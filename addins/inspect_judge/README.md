@@ -17,6 +17,23 @@ provider-client retries set to zero. The model may carry only the explicit
 those choices. Other inherited model, provider or generation settings are
 rejected before a call is admitted.
 
+The repository includes a maintained executable collector at
+`examples/judge-measurements/collect.py`. After freezing the plan and runs,
+reviewing `collection.json`, and completing the core `evaluate --preflight`, run
+it from the copied example directory:
+
+```bash
+export OPENAI_API_KEY=your-key-from-a-secret-store
+python collect.py --execute-collection
+```
+
+The explicit flag acknowledges that provider calls may be billed. The script
+constructs the pinned Inspect model with Chat Completions, cache and retries
+disabled; resumes through a private checkpoint; rejects custom OpenAI provider
+URLs; and writes a new `measurements-collected.json`. It never places the key in
+the plan, checkpoint or retained output. Rename that completed file to the path
+selected by a `judge_import` request before publication.
+
 For `openai/gpt-5.6-sol`, the pinned SDK converts system messages to developer
 messages, uses `max_completion_tokens`, and omits temperature from the provider
 request. The approved plan must therefore declare temperature `1`, the provider

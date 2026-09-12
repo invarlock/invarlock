@@ -94,6 +94,21 @@ Collection uses an exclusive checkpoint lock, writes a durable admission before
 each call and treats an admitted call without a retained result as an ambiguous
 timeout that cannot be retried.
 
+The maintained `examples/judge-measurements/collect.py` runner supplies the
+complete supported wiring. It loads the plan, collection options and frozen runs,
+constructs the explicit pinned Inspect model, uses a private resumable checkpoint
+and writes a new measurement file:
+
+```bash
+python -m pip install 'invarlock-inspect-judge[inspect]==0.15.0'
+export OPENAI_API_KEY=your-key-from-a-secret-store
+python collect.py --execute-collection
+```
+
+Run it only after reviewing preflight and the declared call, token, cost and time
+caps. It rejects custom provider URLs. The collector never reads a key from a
+request file or writes one to retained evidence.
+
 The core CLI does not construct providers or accept credentials. Running
 `evaluate` without `--preflight` for `judge_collect` therefore names the optional
 API as the next action and exits 2. After collection, use `judge_import` to replay
@@ -112,6 +127,40 @@ The recipient maintains its own `judge-measurement-recipient-policy-v1` outside
 the submitted evidence. It pins the signer identity and public-key fingerprint,
 intended subject, exact artifact digests, metric and bounded decision scope.
 An embedded public key cannot authorize itself.
+
+A complete policy has this shape. The recipient obtains every value through its
+own approval process: the signer identity and key fingerprint come from a trusted
+channel, while the artifact pins identify the exact plan, frozen runs,
+measurements, policy and recomputed result the recipient has chosen to accept.
+Run and case-set digests include the `sha256:` prefix; the four canonical judge
+object digests are bare lowercase SHA-256 values, as declared by their contracts.
+
+```json
+{
+  "format": "invarlock/judge-measurement-recipient-policy-v1",
+  "decision_scope": "bounded-judge-fixed-benchmark-v1",
+  "intended_subject": "sha256:<64 lowercase hexadecimal characters>",
+  "required_metric_name": "factual-correctness",
+  "trusted_signer": {
+    "identity": "release-evidence-signer",
+    "public_key_sha256": "sha256:<64 lowercase hexadecimal characters>"
+  },
+  "bindings": {
+    "baseline_run_sha256": "sha256:<64 lowercase hexadecimal characters>",
+    "subject_run_sha256": "sha256:<64 lowercase hexadecimal characters>",
+    "case_set_sha256": "sha256:<64 lowercase hexadecimal characters>",
+    "plan_sha256": "<64 lowercase hexadecimal characters>",
+    "measurements_sha256": "<64 lowercase hexadecimal characters>",
+    "analysis_policy_sha256": "<64 lowercase hexadecimal characters>",
+    "analysis_result_sha256": "<64 lowercase hexadecimal characters>"
+  },
+  "required_decision": "pass"
+}
+```
+
+Do not generate this policy by copying the submitted envelope. That would make
+the producer's claims authorize themselves. Store the completed policy outside
+the evidence directory and review it before verification.
 
 ```bash
 invarlock verify evidence --trust-profile recipient-policy.json --receipt receipt.json --json
