@@ -1,0 +1,230 @@
+{
+  "format": "invarlock/inspect-judge-export-v1",
+  "profile": "inspect-text-frozen-answer-v1",
+  "inspect_version": "0.3.263",
+  "collection": {
+    "grader": "example-judge",
+    "inspect_version": "0.3.263",
+    "profile": "inspect-text-frozen-answer-v1",
+    "epochs": 1,
+    "log_model_api": true,
+    "log_samples": true,
+    "sdk_max_retries": 0,
+    "tools": false,
+    "concurrency": 2,
+    "requests_per_minute": 60,
+    "request_timeout_seconds": 30,
+    "max_calls": 10,
+    "max_input_tokens": 10000,
+    "max_output_tokens": 10000,
+    "max_cost_microusd": 10000,
+    "input_tokens_per_call": 100,
+    "cost_microusd_per_call": 100
+  },
+  "samples": [
+    {
+      "id": "trial-3b4f6201a5d5039179ed81b822c49ad152d4951d815528ce01bae7d2946569b5",
+      "epoch": 1,
+      "metadata": {
+        "case_id": "case-1",
+        "side": "baseline",
+        "repetition": 1,
+        "plan_sha256": "edd8f6e442a937b53a2abad3eb0b923c40b0ede2ab170c60c746000d64f653ed",
+        "answer_sha256": "5dd272b4f316b776a7b8e3d0894b37e1e42be3d5d3b204b8a5836cc50597a6b1",
+        "scorer_id": "correctness"
+      },
+      "events": [
+        {
+          "event": "model",
+          "uuid": "event-0",
+          "role": "grader",
+          "model": "example-judge",
+          "input": [
+            {
+              "content": "Grade the delimited answer using the rubric.",
+              "role": "system"
+            },
+            {
+              "content": "{\"answer\":\"Paris\",\"input\":\"Capital of France?\",\"instruction\":\"Grade the input and answer against the rubric. Return only a JSON object with one rating field.\",\"references\":[],\"rubric\":\"Rate factual correctness.\"}",
+              "role": "user"
+            }
+          ],
+          "tools": [],
+          "tool_choice": "none",
+          "config": {
+            "temperature": 0.0,
+            "top_p": 1.0,
+            "max_tokens": 128,
+            "seed": null,
+            "max_retries": 0,
+            "timeout": 30,
+            "attempt_timeout": 30,
+            "max_connections": 2,
+            "adaptive_connections": false,
+            "num_choices": 1,
+            "internal_tools": false,
+            "parallel_tool_calls": false,
+            "reasoning_summary": "none",
+            "reasoning_history": "none",
+            "cache": false,
+            "batch": false
+          },
+          "retries": 0,
+          "cache": null,
+          "call": {
+            "request": {
+              "config": {
+                "max_output_tokens": 128,
+                "seed": null,
+                "temperature": "0",
+                "top_p": "1"
+              },
+              "format": "invarlock/judge-request-v1",
+              "messages": [
+                {
+                  "content": "Grade the delimited answer using the rubric.",
+                  "role": "system"
+                },
+                {
+                  "content": "{\"answer\":\"Paris\",\"input\":\"Capital of France?\",\"instruction\":\"Grade the input and answer against the rubric. Return only a JSON object with one rating field.\",\"references\":[],\"rubric\":\"Rate factual correctness.\"}",
+                  "role": "user"
+                }
+              ],
+              "model": "example-judge",
+              "model_role": "judge",
+              "response_format": {
+                "additional_properties": false,
+                "rating_labels": [
+                  "incorrect",
+                  "correct"
+                ],
+                "required": [
+                  "rating"
+                ],
+                "type": "json_object"
+              },
+              "tools": []
+            },
+            "response": {
+              "rating": "correct"
+            },
+            "error": false
+          },
+          "output": {
+            "model": "example-judge-001",
+            "request_id": "request-0",
+            "finish_reason": "stop",
+            "usage": {
+              "input_tokens": 30,
+              "output_tokens": 5
+            },
+            "completion": "{\"rating\":\"correct\"}"
+          },
+          "error": null
+        }
+      ]
+    },
+    {
+      "id": "trial-16da72a1265d4b35ccf4c99a622da30162c4094bb826be2ede3eb1b1e4400345",
+      "epoch": 1,
+      "metadata": {
+        "case_id": "case-1",
+        "side": "subject",
+        "repetition": 1,
+        "plan_sha256": "edd8f6e442a937b53a2abad3eb0b923c40b0ede2ab170c60c746000d64f653ed",
+        "answer_sha256": "5dd272b4f316b776a7b8e3d0894b37e1e42be3d5d3b204b8a5836cc50597a6b1",
+        "scorer_id": "correctness"
+      },
+      "events": [
+        {
+          "event": "model",
+          "uuid": "event-1",
+          "role": "grader",
+          "model": "example-judge",
+          "input": [
+            {
+              "content": "Grade the delimited answer using the rubric.",
+              "role": "system"
+            },
+            {
+              "content": "{\"answer\":\"Paris\",\"input\":\"Capital of France?\",\"instruction\":\"Grade the input and answer against the rubric. Return only a JSON object with one rating field.\",\"references\":[],\"rubric\":\"Rate factual correctness.\"}",
+              "role": "user"
+            }
+          ],
+          "tools": [],
+          "tool_choice": "none",
+          "config": {
+            "temperature": 0.0,
+            "top_p": 1.0,
+            "max_tokens": 128,
+            "seed": null,
+            "max_retries": 0,
+            "timeout": 30,
+            "attempt_timeout": 30,
+            "max_connections": 2,
+            "adaptive_connections": false,
+            "num_choices": 1,
+            "internal_tools": false,
+            "parallel_tool_calls": false,
+            "reasoning_summary": "none",
+            "reasoning_history": "none",
+            "cache": false,
+            "batch": false
+          },
+          "retries": 0,
+          "cache": null,
+          "call": {
+            "request": {
+              "config": {
+                "max_output_tokens": 128,
+                "seed": null,
+                "temperature": "0",
+                "top_p": "1"
+              },
+              "format": "invarlock/judge-request-v1",
+              "messages": [
+                {
+                  "content": "Grade the delimited answer using the rubric.",
+                  "role": "system"
+                },
+                {
+                  "content": "{\"answer\":\"Paris\",\"input\":\"Capital of France?\",\"instruction\":\"Grade the input and answer against the rubric. Return only a JSON object with one rating field.\",\"references\":[],\"rubric\":\"Rate factual correctness.\"}",
+                  "role": "user"
+                }
+              ],
+              "model": "example-judge",
+              "model_role": "judge",
+              "response_format": {
+                "additional_properties": false,
+                "rating_labels": [
+                  "incorrect",
+                  "correct"
+                ],
+                "required": [
+                  "rating"
+                ],
+                "type": "json_object"
+              },
+              "tools": []
+            },
+            "response": {
+              "rating": "correct"
+            },
+            "error": false
+          },
+          "output": {
+            "model": "example-judge-001",
+            "request_id": "request-1",
+            "finish_reason": "stop",
+            "usage": {
+              "input_tokens": 30,
+              "output_tokens": 5
+            },
+            "completion": "{\"rating\":\"correct\"}"
+          },
+          "error": null
+        }
+      ]
+    }
+  ]
+}

@@ -20,8 +20,8 @@ rejected before a call is admitted.
 The repository includes a maintained executable collector at
 `examples/judge-measurements/collect.py`. After freezing the plan and runs,
 reviewing `collection.json`, and completing the core `evaluate --preflight`, run
-it from the copied example directory. Until a release containing this workflow
-is published, first install matching packages from the repository root:
+it from the copied example directory. First install matching packages from the
+repository root:
 
 ```bash
 python -m pip install .
@@ -92,6 +92,21 @@ generation settings, normalized model input, the bounded provider request and
 response, accessible completion, model identity and attempt outcome. The
 synthetic fixture in `tests/fixtures/export.json` describes this projection and
 makes no external execution claim.
+
+The maintained `examples/judge-measurements/import_inspect.py` command imports
+that projection without the SDK extra or provider credentials. Install matching
+core and add-in packages, then run it from the copied example directory:
+
+```bash
+python import_inspect.py --export inspect-export.json --collection collection-inspect.json --output measurements-inspect.json
+invarlock evaluate request-inspect.yaml --unsigned --json
+invarlock report evidence-inspect --html report-inspect.html --json
+```
+
+The included export is synthetic. Both frozen runs, the plan and the explicit
+collection settings are checked before writing a new measurements file. Import
+rejects unsupported profiles and does not repair missing judgments. The example
+README documents path and size limits and continuation into signed publication.
 
 Inspect's native `ModelCall` contains provider-specific request and response
 objects. The retained `retained-inspect-model-events-v1` source keeps the bounded

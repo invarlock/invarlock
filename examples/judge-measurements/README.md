@@ -13,6 +13,46 @@ invarlock evaluate request.yaml --unsigned --json
 invarlock report evidence --html report.html --markdown report.md --junit report.xml --json
 ```
 
+## Import expanded Inspect events offline
+
+The optional add-in imports the closed `invarlock/inspect-judge-export-v1`
+projection, including the expanded model events and provider request/response
+fields. It does not accept arbitrary Inspect `.eval` archives or summary scores.
+Install the matching packages from the repository root, without the SDK extra:
+
+```bash
+python -m pip install .
+python -m pip install addins/inspect_judge
+```
+
+From the copied example directory, exercise the synthetic expanded-event fixture:
+
+```bash
+python import_inspect.py --export inspect-export.json --collection collection-inspect.json --output measurements-inspect.json
+invarlock evaluate request-inspect.yaml --preflight --json
+invarlock evaluate request-inspect.yaml --unsigned --json
+invarlock report evidence-inspect --html report-inspect.html --json
+```
+
+No provider key or network call is needed. The two completed trial slots remain
+bound to the same frozen runs and approved plan. The one-case policy still
+returns `insufficient_evidence`; this fixture makes no hosted execution claim.
+For a retained supported export, provide its path and the independently selected
+collection configuration with `--export` and `--collection`. Use `--plan`,
+`--baseline-run` and `--subject-run` when the frozen inputs have different names.
+Point the evaluation request's `comparison.measurements` at the imported file.
+
+`--root` defaults to the current directory. Input paths resolve relative to that
+root; `--output` must be a new relative path inside it, through existing real
+directories. Existing files, symlinks and parent traversal are rejected. Reads
+are bounded to 64 MiB for plans, 128 MiB per frozen run, 1 MiB for collection
+settings and 384 MiB for the export. Import preserves retained event values and
+missing or failed trials; it neither calls a model nor fills missing results.
+Unsupported event settings, changed answers and mismatched plan or collection
+bindings fail before publication.
+
+## Collect new judgments
+
 `request-collect.yaml` demonstrates the execution-free collection preflight. Its
 synthetic `example-judge` identity is deliberately not callable. For a
 live run, freeze a real supported hosted-model identity in the plan, set the

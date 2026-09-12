@@ -1,0 +1,19 @@
+{
+  "grader": "example-judge",
+  "inspect_version": "0.3.263",
+  "profile": "inspect-text-frozen-answer-v1",
+  "epochs": 1,
+  "log_model_api": true,
+  "log_samples": true,
+  "sdk_max_retries": 0,
+  "tools": false,
+  "concurrency": 2,
+  "requests_per_minute": 60,
+  "request_timeout_seconds": 30,
+  "max_calls": 10,
+  "max_input_tokens": 10000,
+  "max_output_tokens": 10000,
+  "max_cost_microusd": 10000,
+  "input_tokens_per_call": 100,
+  "cost_microusd_per_call": 100
+}
