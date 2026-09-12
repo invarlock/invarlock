@@ -60,7 +60,7 @@ def test_ci_runs_the_repository_gates() -> None:
     assert _step(fast, "Set up uv")["with"]["version"] == "0.10.10"
     assert _step(fast, "Run fast repository gates")["run"] == "make verify-fast"
     assert _step(fast, "Build, install, and validate distributions")["run"] == (
-        "make addins-install-smoke"
+        "make addins-install-smoke inspect-judge-sdk-test"
     )
     assert _step(fast, "Lint workflows")["run"].endswith("make workflow-lint\n")
 
@@ -74,7 +74,7 @@ def test_ci_runs_the_repository_gates() -> None:
     )
     assert _step(minimum, "Check command surface")["run"] == "make cli-smoke-core"
     assert _step(minimum, "Build, install, and validate distributions")["run"] == (
-        "make addins-install-smoke"
+        "make addins-install-smoke inspect-judge-sdk-test"
     )
     assert minimum["timeout-minutes"] >= 35
 
@@ -101,7 +101,7 @@ def test_manual_full_ci_uses_standard_repository_and_distribution_gates() -> Non
     assert _step(full, "Install documentation linters")["run"] == "npm ci"
     assert _step(full, "Run complete repository gates")["run"] == "make verify"
     assert _step(full, "Build, install, and validate distributions")["run"] == (
-        "make addins-install-smoke"
+        "make addins-install-smoke inspect-judge-sdk-test"
     )
 
 

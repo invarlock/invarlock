@@ -674,6 +674,10 @@ dist-check:  ## Build and validate the core and first-party add-in distributions
 	$(DIST_RUN) python scripts/release/first_party_distribution_validation.py \
 		--repo-root . --core-dist-dir dist --addin-dist-dir dist/addins
 
+.PHONY: inspect-judge-sdk-test
+inspect-judge-sdk-test: dist-check  ## Resolve the optional judge SDK extra and replay real SDK events offline
+	PYTHON=$(PYTHON) bash scripts/inspect_judge_sdk_gate.sh
+
 addins-install-smoke: dist-check  ## Install and discover all six wheels in a disposable environment
 	@test -f $(ADDINS_SMOKE_RELEASE_LOCK) || { echo "No coordinated release lock for $(PYTHON); expected $(ADDINS_SMOKE_RELEASE_LOCK)" >&2; exit 2; }
 	@set -eu; \

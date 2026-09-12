@@ -440,6 +440,8 @@ jobs:
                   f"release tag/version mismatch: tag={release_version}, packages={observed}"
               )
           PY
+      - name: Resolve and qualify the optional judge SDK extra
+        run: PYTHON=python bash scripts/inspect_judge_sdk_gate.sh
       - name: Create release install-surface venv
         id: install_surface
         shell: bash

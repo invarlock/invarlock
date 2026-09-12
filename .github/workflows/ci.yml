@@ -93,7 +93,7 @@ jobs:
       - name: Run fast repository gates
         run: make verify-fast
       - name: Build, install, and validate distributions
-        run: make addins-install-smoke
+        run: make addins-install-smoke inspect-judge-sdk-test
       - name: Lint workflows
         run: |
           gopath="$(go env GOPATH)"
@@ -130,7 +130,7 @@ jobs:
       - name: Check command surface
         run: make cli-smoke-core
       - name: Build, install, and validate distributions
-        run: make addins-install-smoke
+        run: make addins-install-smoke inspect-judge-sdk-test
 
   coverage:
     if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.full) }}
@@ -198,7 +198,7 @@ jobs:
           export PATH="${gopath}/bin:$PATH"
           make workflow-lint
       - name: Build, install, and validate distributions
-        run: make addins-install-smoke
+        run: make addins-install-smoke inspect-judge-sdk-test
 
   supply-chain:
     if: ${{ startsWith(github.ref, 'refs/tags/') }}
