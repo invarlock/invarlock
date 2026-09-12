@@ -16,7 +16,7 @@ From the source checkout with InvarLock installed, validate without model calls:
 ```bash
 python examples/judge_measurements_reference.py validate \
   --bundle examples/judge-measurements/references/k2-32b/reference.zip \
-  --expected-sha256 5d17b5d636f5bb40536f9bb5abff7019a52df320d6415df4cc4de10aa3fe8248
+  --expected-sha256 feb9876cffd857b5c6bdb4e8bd1fc47fc318c4bbef931bf3c1bdc29938778d7d
 ```
 
 [archive.json](archive.json) pins the ZIP transport and internal reference

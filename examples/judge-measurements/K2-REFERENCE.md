@@ -15,6 +15,22 @@ python examples/judge_measurements_reference.py pack --bundle reference --output
 python examples/judge_measurements_reference.py validate --bundle reference.zip
 ```
 
+If pilot review changes a rubric, first unpack and validate the retained reference,
+then rebuild only its derived plans and review sheets from the independently pinned
+frozen subset:
+
+```bash
+python examples/judge_measurements_reference.py rebind \
+  --bundle reference \
+  --output rebound-reference \
+  --judge-templates updated-judge-templates.json \
+  --expected-sha256 independently-recorded-reference-manifest-sha256
+```
+
+Rebinding preserves the outcome-blind case membership and makes no model call. A
+changed pilot plan requires a new pilot collection and review before final plans
+can be activated.
+
 The output must be new. ZIP transport fixes file order, timestamps, permissions
 and compression settings and retains exact file bytes. Validation works with
 either the directory or archive alone. Adding
@@ -67,7 +83,8 @@ judgments.
 ## Bound contracts
 
 The explicit template file fixes judge `openai/gpt-5.6-sol`, approved returned
-model `gpt-5.6-sol`, temperature zero, three repetitions, one attempt, no tools,
+model `gpt-5.6-sol`, the model's supported default temperature of one, three
+repetitions, one attempt, no tools,
 a three-label scale, and separate grounded-QA/extraction rubrics. The helper
 constructs canonical `evaluation-run-v1` and case-set contracts from the exact
 source user text and raw answer. Native scores and capture context remain in

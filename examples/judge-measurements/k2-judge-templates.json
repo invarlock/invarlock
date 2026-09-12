@@ -21,7 +21,7 @@
           "weights_sha256": null
         },
         "config": {
-          "temperature": "0",
+          "temperature": "1",
           "top_p": "1",
           "max_output_tokens": 128,
           "seed": null
@@ -109,7 +109,7 @@
           "weights_sha256": null
         },
         "config": {
-          "temperature": "0",
+          "temperature": "1",
           "top_p": "1",
           "max_output_tokens": 128,
           "seed": null

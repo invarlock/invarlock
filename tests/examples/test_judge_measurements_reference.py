@@ -244,6 +244,30 @@ def test_self_contained_validation_never_needs_campaign(bundle, monkeypatch):
         ref.validate_bundle(path, expected_sha256="0" * 64)
 
 
+def test_rebind_reuses_only_an_authenticated_frozen_subset(bundle, tmp_path):
+    path, result = bundle
+    templates = ref.obj(
+        Path(__file__).parents[2]
+        / "examples/judge-measurements/k2-judge-templates.json"
+    )
+    original_selection = (path / "grounded_qa/selection.json").read_bytes()
+    original_plan = (path / "grounded_qa/pilot/plan.json").read_bytes()
+    templates["grounded_qa"]["plan"]["rubric"]["text"] += " Clarified."
+    rebound = tmp_path / "rebound"
+    verified = ref.rebind_bundle(
+        path,
+        rebound,
+        templates,
+        result["manifest_sha256"],
+    )
+    assert verified["ok"]
+    assert (rebound / "grounded_qa/selection.json").read_bytes() == original_selection
+    assert (rebound / "grounded_qa/pilot/plan.json").read_bytes() != original_plan
+    assert (path / "grounded_qa/pilot/plan.json").read_bytes() == original_plan
+    with pytest.raises(ValueError, match="pin mismatch"):
+        ref.rebind_bundle(path, tmp_path / "rejected", templates, "0" * 64)
+
+
 def repin(bundle, name, data):
     (bundle / name).write_bytes(data)
     manifest = ref.obj(bundle / "reference.json")

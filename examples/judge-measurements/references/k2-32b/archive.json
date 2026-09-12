@@ -2,10 +2,10 @@
   "format": "invarlock/judge-reference-archive-v1",
   "archive": {
     "path": "reference.zip",
-    "sha256": "539f3d2cea449fc8f9a942d723e6947017935a1ff74cc18a2ee899861759b802",
-    "size_bytes": 3045597
+    "sha256": "cb64e97920ac0f2f0d97354693509a0583d858f9e217f4634f1ea1ee6d0e9fc5",
+    "size_bytes": 3045514
   },
-  "reference_manifest_sha256": "5d17b5d636f5bb40536f9bb5abff7019a52df320d6415df4cc4de10aa3fe8248",
+  "reference_manifest_sha256": "feb9876cffd857b5c6bdb4e8bd1fc47fc318c4bbef931bf3c1bdc29938778d7d",
   "final_plan_status": "candidate_pending_pilot_review",
   "pilot_cases_per_workflow": 40,
   "final_cases": {

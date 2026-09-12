@@ -718,6 +718,68 @@ def build(campaign_root: Path, output: Path, templates: dict | None = None) -> d
     return validate_bundle(output)
 
 
+def rebind_bundle(
+    bundle: Path,
+    output: Path,
+    templates: dict,
+    expected_sha256: str,
+) -> dict:
+    """Rebuild derived plans and review sheets over an authenticated frozen subset."""
+    validate_bundle(bundle, expected_sha256=expected_sha256)
+    manifest = obj(bundle / "reference.json")
+    retained = {
+        name: read(safe_path(bundle, name), pin["size_bytes"])
+        for name, pin in manifest["files"].items()
+    }
+
+    def retained_json(name: str) -> Any:
+        return parse_json_bytes(retained[name], label=name)
+
+    campaign = {
+        "sources": retained_json("sources.json"),
+        "workflows": {
+            workflow: {
+                name: retained_json(f"{workflow}/{name}.json")
+                for name in ("inventory", "raw", "mappings", "endpoints", "protocols")
+            }
+            for workflow in WORKFLOWS
+        },
+    }
+    notice_names = set(NOTICE_FILES) | {
+        "attribution/ATTRIBUTION.md",
+        "attribution/source-attribution.json",
+        "README.md",
+    }
+    files = {
+        **derive(campaign, templates),
+        **{name: retained[name] for name in notice_names},
+    }
+    if sum(map(len, files.values())) > MAX_BUNDLE_BYTES:
+        raise ValueError("reference bundle exceeds total byte budget")
+    rebound_manifest = {
+        "format": FORMAT,
+        "seed": SEED,
+        "selection": "pilot-balanced-then-all-remaining-clusters-v1",
+        "files": {
+            name: {"sha256": sha(data), "size_bytes": len(data)}
+            for name, data in sorted(files.items())
+        },
+        "new_model_calls": 0,
+        "assurance": "retained-source-derivation-not-independent-authentication",
+    }
+    if output.exists() or output.is_symlink():
+        raise ValueError("reference output must be new")
+    output.mkdir(parents=False)
+    for name, data in files.items():
+        path = safe_path(output, name)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("xb") as stream:
+            stream.write(data)
+    with (output / "reference.json").open("xb") as stream:
+        stream.write(canonical_payload(rebound_manifest))
+    return validate_bundle(output)
+
+
 def validate_bundle(
     bundle: Path, campaign_root: Path | None = None, expected_sha256: str | None = None
 ) -> dict:
@@ -934,6 +996,11 @@ def main() -> None:
     pack = commands.add_parser("pack")
     pack.add_argument("--bundle", type=Path, required=True)
     pack.add_argument("--output", type=Path, required=True)
+    rebind = commands.add_parser("rebind")
+    rebind.add_argument("--bundle", type=Path, required=True)
+    rebind.add_argument("--output", type=Path, required=True)
+    rebind.add_argument("--judge-templates", type=Path, required=True)
+    rebind.add_argument("--expected-sha256", required=True)
     args = parser.parse_args()
     try:
         result = (
@@ -945,6 +1012,13 @@ def main() -> None:
             if args.command == "build"
             else pack_bundle(args.bundle, args.output)
             if args.command == "pack"
+            else rebind_bundle(
+                args.bundle,
+                args.output,
+                obj(args.judge_templates),
+                args.expected_sha256,
+            )
+            if args.command == "rebind"
             else validate_reference(
                 args.bundle, args.campaign_root, args.expected_sha256
             )
