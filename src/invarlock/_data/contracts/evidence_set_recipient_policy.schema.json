@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://invarlock.dev/contracts/evidence_set_recipient_policy.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "format": {
+      "const": "invarlock/evidence-set-recipient-policy-v1"
+    },
+    "scope": {
+      "const": "same-answer-component-conjunction-v1"
+    },
+    "index_sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "minLength": 71,
+      "maxLength": 71
+    },
+    "shared_inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "baseline_run_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "minLength": 71,
+          "maxLength": 71
+        },
+        "subject_run_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "minLength": 71,
+          "maxLength": 71
+        },
+        "case_set_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "minLength": 71,
+          "maxLength": 71
+        },
+        "subject_artifact_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "minLength": 71,
+          "maxLength": 71
+        }
+      },
+      "required": [
+        "baseline_run_sha256",
+        "subject_run_sha256",
+        "case_set_sha256",
+        "subject_artifact_sha256"
+      ]
+    },
+    "members": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "deterministic": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "captured"
+            },
+            "trust_profile": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096,
+              "pattern": "^(?!/)(?!~)(?![A-Za-z]:)(?!.*://)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*(?:^|/)\\.(?:/|$))(?!.*//)(?!\\s)(?!.*\\s$)(?!.*\\/$)[^\\u0000-\\u001f]+$"
+            },
+            "trust_profile_sha256": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "minLength": 71,
+              "maxLength": 71
+            },
+            "role": {
+              "const": "required"
+            }
+          },
+          "required": [
+            "kind",
+            "trust_profile",
+            "trust_profile_sha256",
+            "role"
+          ]
+        },
+        "judge": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "judge"
+            },
+            "trust_profile": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096,
+              "pattern": "^(?!/)(?!~)(?![A-Za-z]:)(?!.*://)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*(?:^|/)\\.(?:/|$))(?!.*//)(?!\\s)(?!.*\\s$)(?!.*\\/$)[^\\u0000-\\u001f]+$"
+            },
+            "trust_profile_sha256": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "minLength": 71,
+              "maxLength": 71
+            },
+            "role": {
+              "const": "required"
+            }
+          },
+          "required": [
+            "kind",
+            "trust_profile",
+            "trust_profile_sha256",
+            "role"
+          ]
+        }
+      },
+      "required": [
+        "deterministic",
+        "judge"
+      ]
+    },
+    "decision_rule": {
+      "const": "all-required-components-pass"
+    },
+    "statistical_scope": {
+      "const": "component-methods-no-joint-confidence"
+    }
+  },
+  "required": [
+    "format",
+    "scope",
+    "index_sha256",
+    "shared_inputs",
+    "members",
+    "decision_rule",
+    "statistical_scope"
+  ]
+}

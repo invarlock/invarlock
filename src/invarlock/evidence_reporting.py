@@ -1414,6 +1414,19 @@ def render_evidence(
     evidence = Path(evidence_path)
     if not evidence.is_dir() or evidence.is_symlink():
         raise EvidenceReportError("evidence must be a real directory")
+    from invarlock.evidence_sets.contracts import is_evidence_set
+
+    if is_evidence_set(evidence):
+        from invarlock.evidence_sets.reporting import render_evidence_set
+
+        return render_evidence_set(
+            evidence,
+            html_path=html_path,
+            markdown_path=markdown_path,
+            junit_path=junit_path,
+            explain=explain,
+        )
+
     from invarlock.judge_measurements.reporting import (
         is_judge_evidence,
         render_judge_evidence,

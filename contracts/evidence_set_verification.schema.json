@@ -1,0 +1,362 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://invarlock.dev/contracts/evidence_set_verification.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "format_version": {
+      "const": "invarlock/evidence-set-verification-v1"
+    },
+    "kind": {
+      "const": "evidence_set"
+    },
+    "scope": {
+      "const": "same-answer-component-conjunction-v1"
+    },
+    "statistical_scope": {
+      "const": "component-methods-no-joint-confidence"
+    },
+    "ok": {
+      "type": "boolean"
+    },
+    "verified": {
+      "type": "boolean"
+    },
+    "authenticated": {
+      "type": "boolean"
+    },
+    "replayed": {
+      "type": "boolean"
+    },
+    "accepted": {
+      "type": "boolean"
+    },
+    "decision": {
+      "enum": [
+        "pass",
+        "regression",
+        "insufficient_evidence",
+        null
+      ]
+    },
+    "index_sha256": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "minLength": 71,
+          "maxLength": 71
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "recipient_policy_sha256": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "minLength": 71,
+          "maxLength": 71
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "shared_inputs": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "baseline_run_sha256": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "minLength": 71,
+              "maxLength": 71
+            },
+            "subject_run_sha256": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "minLength": 71,
+              "maxLength": 71
+            },
+            "case_set_sha256": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "minLength": 71,
+              "maxLength": 71
+            },
+            "subject_artifact_sha256": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "minLength": 71,
+              "maxLength": 71
+            }
+          },
+          "required": [
+            "baseline_run_sha256",
+            "subject_run_sha256",
+            "case_set_sha256",
+            "subject_artifact_sha256"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "shared_inputs_verified": {
+      "type": "boolean"
+    },
+    "members": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "deterministic": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "captured"
+            },
+            "verified": {
+              "type": "boolean"
+            },
+            "authenticated": {
+              "type": "boolean"
+            },
+            "replayed": {
+              "type": "boolean"
+            },
+            "accepted": {
+              "type": "boolean"
+            },
+            "decision": {
+              "enum": [
+                "pass",
+                "regression",
+                "insufficient_evidence",
+                null
+              ]
+            },
+            "statement_sha256": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$",
+                  "minLength": 71,
+                  "maxLength": 71
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "trust_profile_sha256": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$",
+                  "minLength": 71,
+                  "maxLength": 71
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "receipt": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 262144
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "errors": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1024
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "verified",
+            "authenticated",
+            "replayed",
+            "accepted",
+            "decision",
+            "statement_sha256",
+            "trust_profile_sha256",
+            "receipt",
+            "errors"
+          ]
+        },
+        "judge": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "judge"
+            },
+            "verified": {
+              "type": "boolean"
+            },
+            "authenticated": {
+              "type": "boolean"
+            },
+            "replayed": {
+              "type": "boolean"
+            },
+            "accepted": {
+              "type": "boolean"
+            },
+            "decision": {
+              "enum": [
+                "pass",
+                "regression",
+                "insufficient_evidence",
+                null
+              ]
+            },
+            "statement_sha256": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$",
+                  "minLength": 71,
+                  "maxLength": 71
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "trust_profile_sha256": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$",
+                  "minLength": 71,
+                  "maxLength": 71
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "receipt": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 262144
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "errors": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1024
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "verified",
+            "authenticated",
+            "replayed",
+            "accepted",
+            "decision",
+            "statement_sha256",
+            "trust_profile_sha256",
+            "receipt",
+            "errors"
+          ]
+        }
+      },
+      "required": [
+        "deterministic",
+        "judge"
+      ]
+    },
+    "errors": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1024
+      }
+    }
+  },
+  "required": [
+    "format_version",
+    "kind",
+    "scope",
+    "statistical_scope",
+    "ok",
+    "verified",
+    "authenticated",
+    "replayed",
+    "accepted",
+    "decision",
+    "index_sha256",
+    "recipient_policy_sha256",
+    "shared_inputs",
+    "shared_inputs_verified",
+    "members",
+    "errors"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "accepted": {
+            "const": true
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "ok": {
+            "const": true
+          },
+          "verified": {
+            "const": true
+          },
+          "authenticated": {
+            "const": true
+          },
+          "replayed": {
+            "const": true
+          },
+          "shared_inputs_verified": {
+            "const": true
+          },
+          "decision": {
+            "const": "pass"
+          },
+          "errors": {
+            "maxItems": 0
+          }
+        }
+      }
+    }
+  ]
+}

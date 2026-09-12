@@ -1026,7 +1026,7 @@ def verify(
     receipt: Path | None = typer.Option(
         None,
         "--receipt",
-        help="Write the signed verification receipt outside the pack.",
+        help="Write verification results outside evidence; receipt scope depends on the evidence format.",
         rich_help_panel="Recipient verification",
     ),
     verifier_signing_key: Path | None = typer.Option(
@@ -1068,6 +1068,7 @@ def verify(
         VerificationOptions,
         execute_verification,
     )
+    from invarlock.evidence_sets.contracts import is_evidence_set
     from invarlock.evidence_verification import EvidenceVerificationError
     from invarlock.judge_measurements.reporting import is_judge_evidence
 
@@ -1077,7 +1078,9 @@ def verify(
             raise EvidenceVerificationError("evidence must be a real directory")
         try:
             captured = (
-                False if is_judge_evidence(evidence) else is_captured_manifest(evidence)
+                False
+                if is_evidence_set(evidence) or is_judge_evidence(evidence)
+                else is_captured_manifest(evidence)
             )
         except CapturedReportError as exc:
             raise EvidenceVerificationError(str(exc), exit_code=4) from exc
@@ -1110,11 +1113,15 @@ def verify(
             command_line=command_line,
         )
     except EvidenceVerificationError as exc:
-        if exc.payload.get("kind") == "judge":
+        if exc.payload.get("kind") in {"judge", "evidence_set"}:
             if json_out:
                 _echo_json(exc.as_json())
             else:
-                console.print("Judge verification did not establish acceptance")
+                console.print(
+                    "Evidence set verification did not establish acceptance"
+                    if exc.payload.get("kind") == "evidence_set"
+                    else "Judge verification did not establish acceptance"
+                )
                 console.print(
                     f"Authenticated: {exc.payload.get('authenticated', False)}; replayed: {exc.payload.get('replayed', False)}; accepted: {exc.payload.get('accepted', False)}"
                 )
@@ -1161,11 +1168,15 @@ def verify(
                     soft_wrap=True,
                 )
         raise typer.Exit(exc.exit_code) from exc
-    if result.payload.get("kind") == "judge":
+    if result.payload.get("kind") in {"judge", "evidence_set"}:
         if json_out:
             _echo_json(result.as_json())
         else:
-            console.print("PASS Bounded judge recipient verification complete")
+            console.print(
+                "PASS Evidence set recipient verification complete"
+                if result.payload.get("kind") == "evidence_set"
+                else "PASS Bounded judge recipient verification complete"
+            )
             console.print(
                 f"Authenticated: {result.payload['authenticated']}; replayed: {result.payload['replayed']}; accepted: {result.payload['accepted']}"
             )

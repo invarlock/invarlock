@@ -71,6 +71,13 @@ def execute_verification(
 ) -> EvidenceVerification:
     """Resolve one closed trust source and execute mode-appropriate verification."""
 
+    from invarlock.evidence_sets.contracts import is_evidence_set
+
+    if is_evidence_set(options.evidence):
+        from invarlock.evidence_sets.cli import execute_evidence_set_verification
+
+        return execute_evidence_set_verification(options, command_line=command_line)
+
     from invarlock.judge_measurements.reporting import is_judge_evidence
 
     if is_judge_evidence(options.evidence):

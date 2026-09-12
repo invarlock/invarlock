@@ -27,6 +27,12 @@ JUDGE_MEASUREMENT_VERIFICATION_RECEIPT_FORMAT_VERSION = (
     "invarlock/judge-measurement-verification-receipt-v1"
 )
 
+EVIDENCE_SET_FORMAT_VERSION = "invarlock/evidence-set-v1"
+EVIDENCE_SET_RECIPIENT_POLICY_FORMAT_VERSION = (
+    "invarlock/evidence-set-recipient-policy-v1"
+)
+EVIDENCE_SET_VERIFICATION_FORMAT_VERSION = "invarlock/evidence-set-verification-v1"
+
 EVALUATION_REQUEST_FORMAT_VERSION = "invarlock/evaluation-request-v1"
 CAPTURED_EVALUATION_REQUEST_FORMAT_VERSION = "invarlock/evaluation-request-v2"
 EVIDENCE_PACK_FORMAT_VERSION = "invarlock/evidence-pack-v1"
@@ -114,6 +120,18 @@ def load_judge_measurement_recipient_policy_schema() -> dict[str, Any]:
 
 def load_judge_measurement_verification_receipt_schema() -> dict[str, Any]:
     return _load_object_contract("judge_measurement_verification_receipt.schema.json")
+
+
+def load_evidence_set_schema() -> dict[str, Any]:
+    return _load_object_contract("evidence_set.schema.json")
+
+
+def load_evidence_set_recipient_policy_schema() -> dict[str, Any]:
+    return _load_object_contract("evidence_set_recipient_policy.schema.json")
+
+
+def load_evidence_set_verification_schema() -> dict[str, Any]:
+    return _load_object_contract("evidence_set_verification.schema.json")
 
 
 def load_evaluation_request_schema() -> dict[str, Any]:
@@ -218,6 +236,12 @@ def load_evaluator_qualification_result_schema() -> dict[str, Any]:
 
 __all__ = [
     "ContractLoadError",
+    "EVIDENCE_SET_FORMAT_VERSION",
+    "EVIDENCE_SET_RECIPIENT_POLICY_FORMAT_VERSION",
+    "EVIDENCE_SET_VERIFICATION_FORMAT_VERSION",
+    "load_evidence_set_schema",
+    "load_evidence_set_recipient_policy_schema",
+    "load_evidence_set_verification_schema",
     "JUDGE_EVALUATION_REQUEST_FORMAT_VERSION",
     "load_judge_evaluation_request_schema",
     "JUDGE_MEASUREMENT_PLAN_FORMAT_VERSION",
