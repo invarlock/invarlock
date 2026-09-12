@@ -345,6 +345,36 @@ def test_record_junit_preserves_policy_outcome(outcome):
         assert issue.attrib["message"] == "; ".join(comparison["metrics"][0]["reasons"])
 
 
+def test_record_junit_escapes_controls_and_xml_forbidden_characters():
+    from xml.etree.ElementTree import fromstring
+
+    from invarlock.record_reporting import render_junit
+    from invarlock.report_presentation import xml_text
+
+    baseline, candidate, policy = example_project("classification")
+    policy["metrics"] = policy["metrics"][:1]
+    policy["slices"] = []
+    for row in candidate["records"]:
+        row["output"] = "wrong"
+    comparison = pack_json(build_pack(baseline, candidate, policy), "report")
+    metric = comparison["metrics"][0]
+    metric["name"] = "quality\u009b2J\ufffevisible"
+    metric["slice"] = "overall\u009b2J\ufffevisible"
+    metric["reasons"] = ["failed\u009b2J\ufffevisible"]
+
+    raw = render_junit(comparison)
+    assert b"\xc2\x9b" not in raw
+    suite = fromstring(raw)
+    case = suite.find("testcase")
+    assert case is not None
+    assert case.get("name") == "quality\\u009b2J\\ufffevisible"
+    assert case.get("classname") == "overall\\u009b2J\\ufffevisible"
+    failure = case.find("failure")
+    assert failure is not None
+    assert failure.get("message") == "failed\\u009b2J\\ufffevisible"
+    assert xml_text("bell\u0007visible") == "bell\\u0007visible"
+
+
 @pytest.mark.parametrize("outcome", ["regression", "missing"])
 def test_multi_metric_overview_keeps_every_scope_and_adverse_check_visible(outcome):
     import re

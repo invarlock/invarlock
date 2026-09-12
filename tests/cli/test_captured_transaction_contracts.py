@@ -486,6 +486,37 @@ def test_verify_malformed_manifest_returns_integrity_exit_code(tmp_path):
     assert json.loads(result.stdout)["ok"] is False
 
 
+@pytest.mark.parametrize(
+    ("initial_captured", "format_version", "kind"),
+    [
+        (True, "invarlock/evidence-pack-verify-v2", "captured"),
+        (False, "invarlock/evidence-verification-error-v1", None),
+    ],
+)
+def test_verify_rejects_evidence_family_changes_with_a_closed_error(
+    tmp_path, monkeypatch, initial_captured, format_version, kind
+):
+    from invarlock import captured_reporting
+
+    (tmp_path / "manifest.json").write_bytes(b"{}")
+    classifications = iter((initial_captured, not initial_captured))
+    monkeypatch.setattr(
+        captured_reporting,
+        "is_captured_manifest",
+        lambda _path: next(classifications),
+    )
+
+    result = RUNNER.invoke(app, ["verify", str(tmp_path), "--json"])
+
+    assert result.exit_code == 4, result.output
+    payload = json.loads(result.stdout)
+    assert payload["format_version"] == format_version
+    assert payload.get("kind") == kind
+    assert payload["errors"] == [
+        "evidence family changed while verification was starting"
+    ]
+
+
 def test_report_text_describes_partial_outputs_without_clobbering(
     tmp_path, monkeypatch
 ):

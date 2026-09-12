@@ -176,6 +176,7 @@ def execute_verification(
             policy_bytes=policy_bytes,
             verifier_signing_key_bytes=verifier_signing_key_bytes,
             max_bootstrap_draws=options.max_bootstrap_draws,
+            _expected_captured=True,
         )
     if command_line.intersection(NATIVE_IRRELEVANT_OPTIONS):
         raise EvidenceVerificationError(
@@ -200,4 +201,5 @@ def execute_verification(
         trust_profile_digest=trust_profile_digest,
         policy_bytes=policy_bytes,
         verifier_signing_key_bytes=verifier_signing_key_bytes,
+        _expected_captured=False,
     )

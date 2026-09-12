@@ -11,7 +11,7 @@ from invarlock.evaluator_qualification import (
     EvaluatorQualificationError,
     qualify_evaluator_export,
 )
-from invarlock.report_presentation import visible_controls
+from invarlock.report_presentation import terminal_text
 from invarlock.security import enforce_default_security
 
 app = typer.Typer(
@@ -28,7 +28,7 @@ console = Console(markup=False, highlight=False)
 
 def _terminal_text(value: object) -> str:
     """Render dynamic values without active terminal controls."""
-    return visible_controls(str(value))
+    return terminal_text(str(value))
 
 
 @app.callback()
@@ -101,7 +101,7 @@ def qualify(
         console.print(f"FAIL {_terminal_text(exc)}")
         raise typer.Exit(2) from exc
     if json_out:
-        typer.echo(_terminal_text(result.as_json()), nl=False)
+        typer.echo(_terminal_text(result.as_json().rstrip("\r\n")))
     elif result.authority == "verdict_authority":
         console.print(
             f"PASS {_terminal_text(result.profile_id)}: {result.record_count} "

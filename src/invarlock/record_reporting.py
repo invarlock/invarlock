@@ -29,6 +29,7 @@ from invarlock.report_presentation import (
     MetricView,
     ReportView,
     number,
+    xml_text,
 )
 from invarlock.report_presentation import (
     render_html as render_report_html,
@@ -649,12 +650,15 @@ def render_junit(comparison: dict[str, Any]) -> bytes:
     )
     for metric in metrics:
         case = SubElement(
-            root, "testcase", name=metric["name"], classname=metric["slice"]
+            root,
+            "testcase",
+            name=xml_text(metric["name"]),
+            classname=xml_text(metric["slice"]),
         )
         if metric["decision"] != "pass":
             SubElement(
                 case,
                 "failure" if metric["decision"] == "regression" else "error",
-                message="; ".join(metric["reasons"]),
+                message=xml_text("; ".join(metric["reasons"])),
             )
     return cast(bytes, tostring(root, encoding="utf-8", xml_declaration=True))

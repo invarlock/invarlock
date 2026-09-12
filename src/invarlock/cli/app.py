@@ -265,14 +265,15 @@ def _finish_policy_gate(verdict: str | None) -> None:
 
 def _terminal_text(value: object) -> str:
     """Render untrusted dynamic text without active terminal controls."""
-    from invarlock.report_presentation import visible_controls
+    from invarlock.report_presentation import terminal_text
 
-    return visible_controls(str(value))
+    return terminal_text(str(value))
 
 
 def _echo_json(value: str) -> None:
     """Escape terminal controls while preserving parsed JSON string values."""
-    typer.echo(_terminal_text(value))
+    body = value.rstrip("\r\n")
+    typer.echo(_terminal_text(body) + value[len(body) :])
 
 
 def _print_captured_metrics(metrics: tuple[dict[str, Any], ...]) -> None:
@@ -1096,7 +1097,7 @@ def verify(
         console.print("Evidence integrity: verified")
         if result.payload.get("policy_verdict") in {"pass", "fail"}:
             console.print(f"Policy result: {result.payload['policy_verdict']}")
-        console.print(_terminal_text(result.summary), soft_wrap=True)
+        console.print(result.summary, soft_wrap=True)
         if result.payload.get("kind") == "captured":
             console.print(f"Recorded decision: {result.payload['decision']}")
             _print_captured_metrics(result.payload["metric_summaries"])

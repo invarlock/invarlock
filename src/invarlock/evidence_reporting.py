@@ -46,6 +46,7 @@ from invarlock.report_presentation import (
     MetricView,
     ReportView,
     number,
+    xml_text,
 )
 from invarlock.report_presentation import (
     render_html as render_report_html,
@@ -62,23 +63,6 @@ _DIRECTORY_FLAGS = (
     | getattr(os, "O_DIRECTORY", 0)
     | getattr(os, "O_NOFOLLOW", 0)
 )
-
-
-def _xml_text(value: str) -> str:
-    """Replace characters forbidden by XML 1.0 with visible escape text."""
-    return "".join(
-        character
-        if character in "\t\n\r"
-        or "\u0020" <= character <= "\ud7ff"
-        or "\ue000" <= character <= "\ufffd"
-        or "\U00010000" <= character <= "\U0010ffff"
-        else (
-            f"\\u{ord(character):04x}"
-            if ord(character) <= 0xFFFF
-            else f"\\U{ord(character):08x}"
-        )
-        for character in value
-    )
 
 
 class EvidenceReportError(ValueError):
@@ -1585,8 +1569,8 @@ def render_evidence(
                 case = SubElement(
                     suite,
                     "testcase",
-                    name=_xml_text(metric.name),
-                    classname=_xml_text(metric.scope),
+                    name=xml_text(metric.name),
+                    classname=xml_text(metric.scope),
                 )
                 if metric.decision != "pass":
                     SubElement(
@@ -1594,7 +1578,7 @@ def render_evidence(
                         "error"
                         if metric.decision == "insufficient_evidence"
                         else "failure",
-                        message=_xml_text(metric.explanation),
+                        message=xml_text(metric.explanation),
                     )
             rendered["junit"] = tostring(suite, encoding="utf-8", xml_declaration=True)
         for name, raw in rendered.items():

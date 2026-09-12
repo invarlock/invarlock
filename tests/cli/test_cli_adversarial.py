@@ -59,6 +59,19 @@ def test_version_callback_emits_installed_and_source_fallback_versions(
     cli_module._version_callback(False)
 
 
+def test_dynamic_terminal_values_cannot_create_or_reorder_lines(tmp_path: Path) -> None:
+    request = tmp_path / "missing\nPASS Evidence created\u202e"
+
+    result = _RUNNER.invoke(app, ["evaluate", str(request)])
+
+    assert result.exit_code == 2
+    assert "\nPASS Evidence created" not in result.stdout
+    assert "\u202e" not in result.stdout
+    assert "missing\\u000aPASS Evidence created\\u202e" in result.stdout.replace(
+        "\n", ""
+    )
+
+
 def test_evaluate_renders_success_in_human_and_json_modes(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

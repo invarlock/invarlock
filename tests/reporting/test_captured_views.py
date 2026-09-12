@@ -136,9 +136,9 @@ def test_shared_render_preserves_frozen_values_labels_and_outputs(
     no_replay.assert_not_called()
 
 
-def test_junit_escapes_xml_forbidden_metric_characters(tmp_path):
+def test_junit_escapes_terminal_controls_and_xml_forbidden_characters(tmp_path):
     _, baseline, subject, policy = _inputs(tmp_path)
-    policy["metrics"][0]["name"] = "quality\ufffevisible"
+    policy["metrics"][0]["name"] = "quality\u009b2J\ufffevisible"
     request = _request(tmp_path, baseline, subject, policy)
     result = evaluate_captured_request(request, signing_key_path=None, unsigned=True)
     destination = tmp_path / "junit.xml"
@@ -148,7 +148,8 @@ def test_junit_escapes_xml_forbidden_metric_characters(tmp_path):
     assert rendered.written_outputs["junit"] == str(destination)
     suite = fromstring(destination.read_bytes())
     case = next(iter(suite))
-    assert case.get("name") == "quality\\ufffevisible"
+    assert case.get("name") == "quality\\u009b2J\\ufffevisible"
+    assert b"\xc2\x9b" not in destination.read_bytes()
 
 
 def test_captured_report_includes_mandatory_run_identities(tmp_path):
