@@ -29,11 +29,11 @@ receipt as JSON text within its member entries. The composite result itself is a
 local calculation. Reuse it only through fresh `verify_stored_evidence_set_result`
 recomputation; an `accepted` field does not establish authority.
 
-The script creates separate producer and recipient keys for demonstration.
+The script creates separate evidence-signer and recipient keys for demonstration.
 A real recipient must independently review the original runs and policies and
-obtain the producer fingerprint through an authorized channel. Never create
+obtain the evidence-signer fingerprint through an authorized channel. Never create
 production trust simply by copying a submitted pack's values. Keep the generated
-`producer/` and `recipient/` directories outside shared evidence.
+`signer/` and `recipient/` directories outside shared evidence.
 
 See [evidence sets](../../docs/reference/evidence-sets.md) for the closed index,
 recipient policy and API. For the preceding generation stage, follow the

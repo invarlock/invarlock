@@ -84,11 +84,11 @@ def build(output: Path) -> Path:
     )
     request_digest = captured_request_digest(normalized)
     signer, verifier = Ed25519PrivateKey.generate(), Ed25519PrivateKey.generate()
-    producer, recipient = output / "producer", output / "recipient"
-    producer.mkdir(mode=0o700)
+    signer_root, recipient = output / "signer", output / "recipient"
+    signer_root.mkdir(mode=0o700)
     recipient.mkdir(mode=0o700)
     for path, key in (
-        (producer / "signer.pem", signer),
+        (signer_root / "signer.pem", signer),
         (recipient / "verifier.pem", verifier),
     ):
         atomic_write(
@@ -100,7 +100,7 @@ def build(output: Path) -> Path:
             ),
         )
     # This one-process demo controls both roles. Real recipients independently
-    # review inputs/policies and obtain the producer key fingerprint externally.
+    # review inputs/policies and obtain the evidence-signer fingerprint externally.
     case_set = {
         "format": "invarlock/evaluation-case-set-v1",
         "cases": [
@@ -127,7 +127,7 @@ def build(output: Path) -> Path:
         "intended_subject": shared["subject_artifact_sha256"],
         "required_metric_name": values["analysis_policy"]["metric_name"],
         "trusted_signer": {
-            "identity": "example-producer",
+            "identity": "example-evidence-signer",
             "public_key_sha256": public_key_fingerprint(signer.public_key()),
         },
         "bindings": {
@@ -173,7 +173,7 @@ def build(output: Path) -> Path:
         policy=captured_policy,
         comparison=compare_runs(baseline, subject, captured_policy),
         request_digest=request_digest,
-        signing_key_path=producer / "signer.pem",
+        signing_key_path=signer_root / "signer.pem",
         unsigned=False,
         normalized_request=normalized,
     )
@@ -185,7 +185,7 @@ def build(output: Path) -> Path:
         subject_run=subject,
         analysis_policy=values["analysis_policy"],
         signing_key=signer,
-        signer_identity="example-producer",
+        signer_identity="example-evidence-signer",
     )
     index = write_evidence_set_index(
         evidence, deterministic="deterministic", judge="judge"
