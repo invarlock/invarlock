@@ -259,3 +259,70 @@ def test_labels_are_written_before_orientation_is_revealed(
 def test_no_agreement_denominator_is_reported_as_zero_not_perfect():
     result = review.agreement([], {"trials": []})
     assert result["exact_agreement"] == {"numerator": 0, "denominator": 0}
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("reviewer", "../name"),
+        ("outcome", "approved"),
+        ("stage", "unknown"),
+        ("workflow", "unknown"),
+    ],
+)
+def test_review_rejects_invalid_identity_outcome_and_stage(
+    tmp_path, frozen, field, value
+):
+    args = kwargs(tmp_path, frozen)
+    if field in {"stage", "workflow"}:
+        sheet = ref.obj(args["completed"])
+        sheet[field] = value
+        args["completed"].write_bytes(ref.canonical_payload(sheet))
+    else:
+        args[field] = value
+    with pytest.raises(ValueError):
+        review.complete_review(**args)
+    assert not args["output"].exists()
+
+
+def test_review_requires_object_and_exact_sheet_fields(tmp_path, frozen):
+    path = tmp_path / "measurements.json"
+    path.write_text("[]")
+    with pytest.raises(ValueError, match="JSON object"):
+        review.measurements_object(path)
+    _, files = frozen
+    template = review.decode(files, "human_review/rubric_development/grounded_qa.json")
+    for invalid in ([], {**filled(files), "extra": 1}):
+        with pytest.raises(ValueError, match="fields differ"):
+            review.validate_review(invalid, template)
+
+
+def test_agreement_ignores_answers_outside_reviewed_subset():
+    result = review.agreement(
+        [],
+        {
+            "trials": [
+                {"case_id": "unreviewed", "side": "subject", "status": "complete"}
+            ]
+        },
+    )
+    assert result["scheduled_trials"] == 0
+    assert result["exact_agreement"] == {"numerator": 0, "denominator": 0}
+
+
+def test_review_cli_freezes_result_and_reports_overwrite_error(
+    tmp_path, frozen, monkeypatch, capsys
+):
+    args = kwargs(tmp_path, frozen)
+    command = ["review"]
+    for name, value in args.items():
+        command.extend(["--" + name.replace("_", "-"), str(value)])
+    monkeypatch.setattr("sys.argv", command)
+    review.main()
+    value = json.loads(capsys.readouterr().out)
+    assert value["activation"] == "not_activated"
+    assert (args["output"] / "review-record.json").is_file()
+    with pytest.raises(SystemExit) as exc:
+        review.main()
+    assert exc.value.code == 2
+    assert "Review validation failed" in capsys.readouterr().err
