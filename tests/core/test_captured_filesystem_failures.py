@@ -2,6 +2,7 @@
 
 import errno
 import os
+import shutil
 import stat
 from contextlib import contextmanager, nullcontext
 from pathlib import Path
@@ -12,7 +13,7 @@ import pytest
 from invarlock import captured_contracts as contracts
 from invarlock import captured_evidence_publication as publication
 from invarlock import captured_verification as verification
-from invarlock.filesystem import AtomicDirectoryPublicationError
+from invarlock.filesystem import AtomicDirectoryPublicationError, atomic_file
 from tests.core.test_captured_contract_freeze import (
     _authenticate,
     _digest,
@@ -156,19 +157,15 @@ def test_directory_cleanup_releases_ancestors_even_when_close_fails(
     monkeypatch.setattr(contracts.os, "open", track_open)
     monkeypatch.setattr(contracts.os, "close", close_directory)
     monkeypatch.setattr(contracts.os, "fstat", fail_setup)
-    expected = cleanup_error if close_error else operation_error
-    context = (
-        pytest.raises(type(expected))
-        if close_error or phase != "success"
-        else nullcontext()
-    )
+    expected = operation_error
+    context = pytest.raises(type(expected)) if phase != "success" else nullcontext()
     with context as failure:
         with contracts.secure_directory(target) as descriptor:
             assert phase != "setup", "setup failure reached caller"
             assert stat.S_ISDIR(original_fstat(descriptor).st_mode)
             if phase == "body":
                 raise operation_error
-    if close_error or phase != "success":
+    if phase != "success":
         assert failure.value is expected
     assert len(opened) > 1
     leaked = []
@@ -404,7 +401,7 @@ def test_atomic_write_closes_descriptor_when_stream_creation_fails(
 
     def tracked_open(path, flags, *args, **kwargs):
         descriptor = original_open(path, flags, *args, **kwargs)
-        if isinstance(path, str) and path.startswith(".captured-"):
+        if path == "payload":
             opened.append(descriptor)
         return descriptor
 
@@ -433,7 +430,7 @@ def test_atomic_write_does_not_retry_an_uncertain_stream_close(tmp_path, monkeyp
     def track_staging_open(path, flags, *args, **kwargs):
         nonlocal staging_descriptor
         descriptor = real_open(path, flags, *args, **kwargs)
-        if isinstance(path, str) and path.startswith(".captured-"):
+        if path == "payload":
             staging_descriptor = descriptor
         return descriptor
 
@@ -452,7 +449,7 @@ def test_atomic_write_does_not_retry_an_uncertain_stream_close(tmp_path, monkeyp
     )
     monkeypatch.setattr(contracts.os, "close", close_then_fail)
 
-    with pytest.raises(OSError, match="close result is uncertain"):
+    with pytest.raises(OSError, match="cannot create stream"):
         contracts.atomic_write(tmp_path / "result.json", b"payload")
 
     assert len(closed) == 1
@@ -495,44 +492,48 @@ def test_evidence_publication_closes_descriptor_when_stream_creation_fails(
     assert sorted(path.name for path in tmp_path.iterdir()) == ["signer.pem"]
 
 
-def test_atomic_write_has_no_fallible_sync_after_publication(tmp_path, monkeypatch):
+def test_atomic_write_keeps_completed_output_when_postpublication_sync_fails(
+    tmp_path, monkeypatch
+):
     destination = tmp_path / "receipt.json"
     original_fsync = os.fsync
-    original_link = os.link
+    original_rename = atomic_file._rename_no_replace
     published = False
 
-    def track_link(*args, **kwargs):
+    def track_rename(**kwargs):
         nonlocal published
-        original_link(*args, **kwargs)
+        result = original_rename(**kwargs)
         published = True
+        return result
 
     def fail_after_publication(descriptor):
         if published:
             raise OSError(errno.EIO, "post-publication sync attempted")
         original_fsync(descriptor)
 
-    monkeypatch.setattr(contracts.os, "link", track_link)
+    monkeypatch.setattr(atomic_file, "_rename_no_replace", track_rename)
     monkeypatch.setattr(contracts.os, "fsync", fail_after_publication)
-    contracts.atomic_write(destination, b"our complete output")
+    with pytest.raises(OSError, match="post-publication sync attempted"):
+        contracts.atomic_write(destination, b"our complete output")
     assert destination.read_bytes() == b"our complete output"
-    assert not list(tmp_path.glob(".captured-*"))
+    assert not list(tmp_path.glob(".invarlock-write-*"))
 
 
 def test_atomic_write_cleanup_failure_never_removes_published_output(
     tmp_path, monkeypatch
 ):
     destination = tmp_path / "receipt.json"
-    original_unlink = os.unlink
+    original_rmdir = os.rmdir
 
     def fail_staging_cleanup(path, *args, **kwargs):
-        if str(path).startswith(".captured-"):
+        if str(path).startswith(".invarlock-write-"):
             raise OSError(errno.EACCES, "staging cleanup denied")
-        return original_unlink(path, *args, **kwargs)
+        return original_rmdir(path, *args, **kwargs)
 
-    monkeypatch.setattr(contracts.os, "unlink", fail_staging_cleanup)
+    monkeypatch.setattr(contracts.os, "rmdir", fail_staging_cleanup)
     contracts.atomic_write(destination, b"our complete output")
     assert destination.read_bytes() == b"our complete output"
-    assert len(list(tmp_path.glob(".captured-*"))) == 1
+    assert len(list(tmp_path.glob(".invarlock-write-*"))) == 1
 
 
 @pytest.mark.parametrize(
@@ -598,10 +599,10 @@ def test_destination_created_at_publication_instant_is_not_clobbered(
     destination = tmp_path / "evidence"
     original = publication.publish_directory_no_replace
 
-    def collide(staging, target):
+    def collide(staging, target, **ownership):
         target.mkdir()
         (target / "keep").write_bytes(b"concurrent writer")
-        return original(staging, target)
+        return original(staging, target, **ownership)
 
     monkeypatch.setattr(publication, "publish_directory_no_replace", collide)
     with pytest.raises(publication.CapturedEvidenceError, match="already exists"):
@@ -625,3 +626,161 @@ def test_staging_name_collision_does_not_remove_foreign_files(
         publication.publish_captured_evidence(destination, **publication_args)
     assert not destination.exists()
     assert marker.read_bytes() == b"foreign staging content"
+
+
+def test_publication_rejects_valid_staging_substitute_after_writing(
+    tmp_path, monkeypatch, publication_args
+):
+    destination = tmp_path / "evidence"
+    original = publication.publish_directory_no_replace
+    retained = tmp_path / "retained-stage"
+    replacement = None
+    expected_files = {}
+
+    def replace_before_publish(staging, target, **ownership):
+        nonlocal replacement, expected_files
+        assert os.fstat(ownership["expected_source_fd"]).st_ino == staging.stat().st_ino
+        staging.rename(retained)
+        shutil.copytree(retained, staging)
+        replacement = staging
+        expected_files = {
+            path.relative_to(staging): path.read_bytes()
+            for path in staging.rglob("*")
+            if path.is_file()
+        }
+        return original(staging, target, **ownership)
+
+    monkeypatch.setattr(
+        publication, "publish_directory_no_replace", replace_before_publish
+    )
+    with pytest.raises(
+        publication.CapturedEvidenceError, match="staging identity changed"
+    ):
+        publication.publish_captured_evidence(destination, **publication_args)
+
+    assert not destination.exists()
+    assert replacement is not None
+    assert {
+        path.relative_to(replacement): path.read_bytes()
+        for path in replacement.rglob("*")
+        if path.is_file()
+    } == expected_files
+    assert {
+        path.relative_to(retained): path.read_bytes()
+        for path in retained.rglob("*")
+        if path.is_file()
+    } == expected_files
+
+
+def test_publication_leaves_recreated_staging_name_after_success(
+    tmp_path, monkeypatch, publication_args
+):
+    destination = tmp_path / "evidence"
+    original = publication.publish_directory_no_replace
+    replacement = None
+
+    def recreate_after_publish(staging, target, **ownership):
+        nonlocal replacement
+        original(staging, target, **ownership)
+        staging.mkdir()
+        (staging / "keep").write_bytes(b"foreign replacement")
+        replacement = staging
+
+    monkeypatch.setattr(
+        publication, "publish_directory_no_replace", recreate_after_publish
+    )
+    assert (
+        publication.publish_captured_evidence(destination, **publication_args)
+        == destination
+    )
+    assert (destination / "manifest.json").is_file()
+    assert replacement is not None
+    assert (replacement / "keep").read_bytes() == b"foreign replacement"
+
+
+def test_publication_cleanup_failure_preserves_primary_error(
+    tmp_path, monkeypatch, publication_args
+):
+    destination = tmp_path / "evidence"
+    failure = AtomicDirectoryPublicationError("primary publication failure")
+    ownership = {}
+
+    def fail_publish(staging, target, **descriptors):
+        ownership.update(descriptors)
+        raise failure
+
+    monkeypatch.setattr(publication, "publish_directory_no_replace", fail_publish)
+    monkeypatch.setattr(
+        publication.os,
+        "unlink",
+        Mock(side_effect=PermissionError("secondary cleanup failure")),
+    )
+    with pytest.raises(
+        publication.CapturedEvidenceError, match="primary publication failure"
+    ) as caught:
+        publication.publish_captured_evidence(destination, **publication_args)
+
+    assert caught.value.__cause__ is failure
+    assert not destination.exists()
+    for descriptor in ownership.values():
+        with pytest.raises(OSError, match="Bad file descriptor"):
+            os.fstat(descriptor)
+
+
+def test_publication_post_rename_failure_leaves_published_tree_intact(
+    tmp_path, monkeypatch, publication_args
+):
+    destination = tmp_path / "evidence"
+    original = publication.publish_directory_no_replace
+    expected_files = {}
+
+    def fail_after_rename(staging, target, **ownership):
+        nonlocal expected_files
+        original(staging, target, **ownership)
+        expected_files = {
+            path.relative_to(target): path.read_bytes()
+            for path in target.rglob("*")
+            if path.is_file()
+        }
+        raise AtomicDirectoryPublicationError("post-rename verification failed")
+
+    monkeypatch.setattr(publication, "publish_directory_no_replace", fail_after_rename)
+    with pytest.raises(
+        publication.CapturedEvidenceError, match="post-rename verification failed"
+    ):
+        publication.publish_captured_evidence(destination, **publication_args)
+
+    assert {
+        path.relative_to(destination): path.read_bytes()
+        for path in destination.rglob("*")
+        if path.is_file()
+    } == expected_files
+
+
+def test_publication_failure_cleanup_uses_retained_child_directories(
+    tmp_path, monkeypatch, publication_args
+):
+    destination = tmp_path / "evidence"
+    retained_inputs = tmp_path / "retained-inputs"
+    replacement = None
+
+    def replace_child_then_fail(staging, target, **ownership):
+        nonlocal replacement
+        (staging / "inputs").rename(retained_inputs)
+        (staging / "inputs").mkdir()
+        replacement = staging / "inputs" / "policy.json"
+        replacement.write_bytes(b"foreign input")
+        raise AtomicDirectoryPublicationError("primary publication failure")
+
+    monkeypatch.setattr(
+        publication, "publish_directory_no_replace", replace_child_then_fail
+    )
+    with pytest.raises(
+        publication.CapturedEvidenceError, match="primary publication failure"
+    ):
+        publication.publish_captured_evidence(destination, **publication_args)
+
+    assert not destination.exists()
+    assert replacement is not None
+    assert replacement.read_bytes() == b"foreign input"
+    assert list(retained_inputs.iterdir()) == []

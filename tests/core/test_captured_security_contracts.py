@@ -36,6 +36,7 @@ from invarlock.evidence_reporting import (
     EvidenceReportV2,
     render_evidence,
 )
+from invarlock.filesystem import atomic_file
 from invarlock.public_contracts import (
     load_evidence_pack_schema,
     load_evidence_pack_v2_schema,
@@ -857,22 +858,23 @@ def test_atomic_receipt_parent_replacement_does_not_risk_foreign_output(
     output = pack.parent / "output"
     output.mkdir()
     kwargs["receipt_path"] = output / "receipt.json"
-    original = os.link
+    original = atomic_file._rename_no_replace
     renamed = pack.parent / "moved-output"
 
-    def replace(*args, **kwargs):
-        original(*args, **kwargs)
+    def replace(**kwargs):
+        result = original(**kwargs)
         output.rename(renamed)
         output.mkdir()
+        return result
 
-    monkeypatch.setattr(contract.os, "link", replace)
+    monkeypatch.setattr(atomic_file, "_rename_no_replace", replace)
     with pytest.raises(
         verification.CapturedVerificationIncomplete, match="publication_failed"
     ):
         verification.verify_captured_evidence(pack, **kwargs)
     assert (renamed / "receipt.json").is_file()
     assert not kwargs["receipt_path"].exists()
-    assert not list(renamed.glob(".captured-*"))
+    assert not list(renamed.glob(".invarlock-write-*"))
 
 
 def test_resigned_ledger_digest_cannot_authorize_duplicate_inventory(handoff):

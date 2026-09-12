@@ -6,10 +6,9 @@ import base64
 import errno
 import hashlib
 import os
-import secrets
 import stat
 from collections.abc import Iterator, Mapping
-from contextlib import ExitStack, contextmanager
+from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -30,6 +29,12 @@ from invarlock.evaluation_record_contracts.validation_limits import check_record
 from invarlock.evidence_pack_contract import EvidencePackError, canonical_json_bytes
 from invarlock.evidence_pack_integrity import public_key_fingerprint
 from invarlock.evidence_pack_json import StrictJsonError, parse_json_bytes
+from invarlock.filesystem.atomic_file import write_file_no_replace
+from invarlock.filesystem.paths import (
+    PathChangedError,
+    UnsafePathError,
+    pinned_directory,
+)
 from invarlock.public_contracts import (
     load_evidence_pack_v2_schema,
     load_evidence_verification_receipt_v3_schema,
@@ -141,65 +146,15 @@ def _identity(value: os.stat_result) -> tuple[int, ...]:
 
 
 @contextmanager
-def _directory_descriptor(
-    path: str, flags: int, *, dir_fd: int | None = None
-) -> Iterator[int]:
-    descriptor = os.open(path, flags, dir_fd=dir_fd)
-    try:
-        yield descriptor
-    finally:
-        os.close(descriptor)
-
-
-@contextmanager
 def secure_directory(path: Path, *, create: bool = False) -> Iterator[int]:
-    """Pin every directory component; never resolve away a submitted symlink."""
-    path = Path(path).absolute()
-    if ".." in path.parts:
-        raise CapturedContractError("directory must not contain parent traversal")
-    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
-    bindings: list[tuple[int, str, tuple[int, ...]]] = []
-    with ExitStack() as descriptors:
-        current_descriptor = descriptors.enter_context(
-            _directory_descriptor(path.anchor, flags)
-        )
-        for name in path.parts[1:]:
-            parent = current_descriptor
-            if create:
-                try:
-                    os.mkdir(name, mode=0o700, dir_fd=parent)
-                except FileExistsError:
-                    pass
-            before = os.stat(name, dir_fd=parent, follow_symlinks=False)
-            if not stat.S_ISDIR(before.st_mode):
-                raise CapturedContractError("path must use non-symlink directories")
-            try:
-                child = descriptors.enter_context(
-                    _directory_descriptor(name, flags, dir_fd=parent)
-                )
-            except OSError as exc:
-                if exc.errno in {errno.ELOOP, errno.ENOTDIR, errno.ENOENT}:
-                    raise CapturedIntegrityError(
-                        "directory changed while opening"
-                    ) from exc
-                raise
-            current_descriptor = child
-            identity = _identity(before)[:3]
-            if identity != _identity(os.fstat(child))[:3]:
-                raise CapturedIntegrityError("directory changed while opening")
-            bindings.append((parent, name, identity))
-        try:
-            yield current_descriptor
-        finally:
-            for parent, name, identity in bindings:
-                try:
-                    current = os.stat(name, dir_fd=parent, follow_symlinks=False)
-                except FileNotFoundError as exc:
-                    raise CapturedIntegrityError(
-                        "directory source was replaced"
-                    ) from exc
-                if _identity(current)[:3] != identity:
-                    raise CapturedIntegrityError("directory source was replaced")
+    """Pin every directory component with captured-family error classification."""
+    try:
+        with pinned_directory(path, create=create) as descriptor:
+            yield descriptor
+    except PathChangedError as exc:
+        raise CapturedIntegrityError(str(exc)) from (exc.__cause__ or exc)
+    except UnsafePathError as exc:
+        raise CapturedContractError(str(exc)) from exc
 
 
 def _read_at(parent: int, name: str, limit: int) -> tuple[bytes, tuple[int, ...]]:
@@ -616,48 +571,10 @@ def require_outside(path: Path, pack: Path) -> None:
 
 
 def atomic_write(path: Path, raw: bytes) -> None:
-    """Publish a fully fsynced private file with a descriptor-relative hard link."""
-    path = Path(path)
-    if path.name in {"", ".", ".."}:
-        raise CapturedContractError("destination must name a file")
-    with secure_directory(path.parent, create=True) as parent:
-        name = ".captured-" + secrets.token_hex(16)
-        opened_descriptor = os.open(
-            name,
-            os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
-            0o600,
-            dir_fd=parent,
-        )
-        descriptor: int | None = opened_descriptor
-        try:
-            try:
-                handle = os.fdopen(opened_descriptor, "wb")
-            except BaseException:
-                descriptor = None
-                os.close(opened_descriptor)
-                raise
-            descriptor = None
-            with handle:
-                handle.write(raw)
-                handle.flush()
-                os.fsync(handle.fileno())
-            # Surface directory-sync failures before the destination exists.
-            # Nothing fallible after the link may trigger destination rollback.
-            os.fsync(parent)
-            os.link(
-                name,
-                path.name,
-                src_dir_fd=parent,
-                dst_dir_fd=parent,
-                follow_symlinks=False,
-            )
-        finally:
-            if descriptor is not None:
-                os.close(descriptor)
-            try:
-                os.unlink(name, dir_fd=parent)
-            except OSError:
-                # Publication is complete once the no-replace link succeeds. A
-                # private staging-link cleanup failure must not turn success into
-                # an ambiguous failure or trigger deletion of the final path.
-                pass
+    """Publish complete bytes without replacing an existing destination."""
+    try:
+        write_file_no_replace(path, raw)
+    except PathChangedError as exc:
+        raise CapturedIntegrityError(str(exc)) from exc
+    except (UnsafePathError, ValueError) as exc:
+        raise CapturedContractError(str(exc)) from exc
