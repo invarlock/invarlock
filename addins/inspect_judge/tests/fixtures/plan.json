@@ -28,7 +28,8 @@
       "temperature": "0",
       "top_p": "1",
       "max_output_tokens": 128,
-      "seed": null
+      "seed": null,
+      "reasoning_effort": null
     },
     "tools": false
   },
@@ -76,8 +77,8 @@
       "case_id": "case-1",
       "baseline_answer_sha256": "5dd272b4f316b776a7b8e3d0894b37e1e42be3d5d3b204b8a5836cc50597a6b1",
       "subject_answer_sha256": "5dd272b4f316b776a7b8e3d0894b37e1e42be3d5d3b204b8a5836cc50597a6b1",
-      "baseline_request_sha256": "f64c03e7d306fb4ba9451c3d534ce6ac8f484d49a51745d2ce015c999d6280af",
-      "subject_request_sha256": "f64c03e7d306fb4ba9451c3d534ce6ac8f484d49a51745d2ce015c999d6280af"
+      "baseline_request_sha256": "beda8003c7bd392d85221f775fa9925608e8da8a076d965ab63fb91308caa8ca",
+      "subject_request_sha256": "beda8003c7bd392d85221f775fa9925608e8da8a076d965ab63fb91308caa8ca"
     }
   ]
 }

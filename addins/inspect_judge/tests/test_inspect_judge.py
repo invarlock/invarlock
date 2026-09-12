@@ -82,9 +82,27 @@ def test_sol_rejects_unavailable_temperature_before_admission(data, temperature)
         approved_resolved_models=["gpt-5.6-sol"],
     )
     plan["judge"]["config"]["temperature"] = temperature
+    plan["judge"]["config"]["reasoning_effort"] = "none"
     plan = bind_requests(plan, data[2])
     options = replace(data[3], grader="openai/gpt-5.6-sol")
     with pytest.raises(InspectJudgeError, match="approved temperature 1"):
+        prepare_collection(plan, options)
+
+
+@pytest.mark.parametrize("reasoning_effort", [None, "minimal"])
+def test_sol_requires_supported_explicit_reasoning_effort_before_admission(
+    data, reasoning_effort
+):
+    plan = copy.deepcopy(data[0])
+    plan["judge"].update(
+        provider="openai",
+        requested_model="openai/gpt-5.6-sol",
+        approved_resolved_models=["gpt-5.6-sol"],
+    )
+    plan["judge"]["config"].update(temperature="1", reasoning_effort=reasoning_effort)
+    plan = bind_requests(plan, data[2])
+    options = replace(data[3], grader="openai/gpt-5.6-sol")
+    with pytest.raises(InspectJudgeError, match="supported explicit reasoning_effort"):
         prepare_collection(plan, options)
 
 
@@ -396,6 +414,7 @@ def _native_request(event):
         "top_p": float(config["top_p"]),
         "max_tokens": config["max_output_tokens"],
         "seed": config["seed"],
+        "reasoning_effort": config["reasoning_effort"],
     }
     return event["call"]["request"]
 
@@ -625,6 +644,7 @@ def test_live_collection_checkpoints_and_resumes(data, monkeypatch, tmp_path):
                         "top_p": config.top_p,
                         "max_tokens": config.max_tokens,
                         "seed": config.seed,
+                        "reasoning_effort": config.reasoning_effort,
                     },
                     response={"rating": "correct"},
                     error=None,
@@ -1068,6 +1088,7 @@ def test_import_rejects_duplicate_or_failed_frozen_records(data):
                 "top_p": "1",
                 "max_output_tokens": 32,
                 "seed": None,
+                "reasoning_effort": None,
             }
         },
     ],
@@ -1093,6 +1114,7 @@ def test_normalized_provider_request_rejects_extra_and_contradictory_controls(
         {"seed": False},
         {"n": 2},
         {"temperature": False},
+        {"reasoning_effort": "high"},
         {"response_format": {"type": "json_object"}},
     ],
 )

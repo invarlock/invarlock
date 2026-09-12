@@ -1,6 +1,6 @@
 {
   "format": "invarlock/judge-analysis-policy-v1",
-  "plan_sha256": "edd8f6e442a937b53a2abad3eb0b923c40b0ede2ab170c60c746000d64f653ed",
+  "plan_sha256": "ef9f6411169c9d2f2cf5475cc2d8465abfa3791f23c54a9694f1446174b363a8",
   "metric_name": "factual-correctness",
   "decision_role": "required",
   "direction": "higher",

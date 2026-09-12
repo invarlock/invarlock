@@ -74,6 +74,7 @@ def test_live_inspect_chat_completion_replays_offline(
     )
     if judge_model == "gpt-5.6-sol":
         plan["judge"]["config"]["temperature"] = "1"
+        plan["judge"]["config"]["reasoning_effort"] = "none"
     plan = bind_requests(plan, frozen)
     options = replace(
         CollectionOptions.from_mapping(exported["collection"]),
@@ -147,6 +148,7 @@ def test_live_inspect_chat_completion_replays_offline(
             assert "temperature" not in request
             assert request["max_completion_tokens"] == 128
             assert "max_tokens" not in request
+            assert request["reasoning_effort"] == "none"
         else:
             assert request["messages"][0]["role"] == "system"
             assert request["temperature"] == 0

@@ -183,6 +183,12 @@ def test_plan_semantic_rejections(mutation: Any, message: str) -> None:
     _assert_plan_error(plan, message)
 
 
+def test_plan_requires_an_explicit_reasoning_effort_field() -> None:
+    plan = _plan()
+    del plan["judge"]["config"]["reasoning_effort"]
+    _assert_plan_error(plan, "reasoning_effort")
+
+
 def test_reference_text_digest_is_checked_after_unique_ids() -> None:
     plan = _plan()
     plan["prompt"]["references"].append(

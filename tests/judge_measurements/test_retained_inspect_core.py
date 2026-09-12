@@ -84,6 +84,7 @@ def native(event):
         "top_p": float(config["top_p"]),
         "max_tokens": config["max_output_tokens"],
         "seed": config["seed"],
+        "reasoning_effort": config["reasoning_effort"],
         "n": 1,
     }
     output = event["output"]
@@ -318,6 +319,7 @@ def test_retained_source_respects_each_aggregate_reservation(retained, budget, v
         ("request.temperature", True, "config is incomplete"),
         ("request.temperature", 1, "config differs"),
         ("request.seed", False, "seed differs"),
+        ("request.reasoning_effort", "high", "reasoning effort differs"),
         ("request.max_tokens", True, "token limit differs"),
         ("request.n", 2, "one completion"),
         ("request.tools", ["tool"], "contains tools"),
@@ -383,13 +385,16 @@ def test_sol_projection_is_version_bound_and_preserves_approved_semantics(
     normalized = json.loads(attempt["request"]["text"])
     normalized["model"] = "openai/gpt-5.6-sol"
     normalized["config"]["temperature"] = "1"
+    normalized["config"]["reasoning_effort"] = "none"
     event["model"] = normalized["model"]
     event["config"]["temperature"] = 1.0
+    event["config"]["reasoning_effort"] = "none"
     event["call"]["request"] = normalized
     attempt["request"]["text"] = c.canonical_payload(normalized).decode()
     call = native(event)
     call["request"]["messages"][0]["role"] = "developer"
     call["request"].pop("temperature")
+    call["request"]["reasoning_effort"] = "none"
     call["request"]["max_completion_tokens"] = call["request"].pop("max_tokens")
     c._check_retained_inspect_event(attempt, event, collection)
     if mutation == "role":

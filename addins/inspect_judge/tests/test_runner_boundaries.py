@@ -315,6 +315,7 @@ def test_live_collection_rejects_unsupported_execution_profile(
         (("call", "response"), [], "response must be a JSON object"),
         (("output", "usage", "total_cost"), 0.0002, "reserved per-call amount"),
         (("config", "temperature"), 0.5, "changed generation settings"),
+        (("config", "reasoning_effort"), "high", "changed generation settings"),
         (("config", "top_k"), 10, "hidden generation settings"),
     ],
 )

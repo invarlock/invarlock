@@ -265,11 +265,18 @@ def _validate_inspect_plan_collection_identity(
         _fail("grader differs from approved plan")
     if plan["judge"]["model_identity"]["kind"] != "hosted_api":
         _fail("local weight execution is not qualified by this adapter")
-    if grader == "openai/gpt-5.6-sol" and (
-        inspect_version != "0.3.263"
-        or Decimal(plan["judge"]["config"]["temperature"]) != Decimal(1)
-    ):
-        _fail("GPT-5.6 Sol requires Inspect 0.3.263 and approved temperature 1")
+    if grader == "openai/gpt-5.6-sol":
+        config = plan["judge"]["config"]
+        if (
+            inspect_version != "0.3.263"
+            or Decimal(config["temperature"]) != Decimal(1)
+            or config["reasoning_effort"]
+            not in {"none", "low", "medium", "high", "xhigh", "max"}
+        ):
+            _fail(
+                "GPT-5.6 Sol requires Inspect 0.3.263, approved temperature 1, "
+                "and a supported explicit reasoning_effort"
+            )
 
 
 def _check_trial_integer_types(trial: dict[str, Any]) -> None:
@@ -613,7 +620,13 @@ def _check_retained_inspect_event(
         _fail("retained Inspect input differs from its normalized request")
     expected_config = normalized_request.get("config")
     observed_config = event.get("config")
-    if not isinstance(expected_config, dict):
+    if not isinstance(expected_config, dict) or set(expected_config) != {
+        "temperature",
+        "top_p",
+        "max_output_tokens",
+        "seed",
+        "reasoning_effort",
+    }:
         _fail("retained Inspect normalized config must be an object")
     temperature_value = expected_config.get("temperature")
     top_p_value = expected_config.get("top_p")
@@ -636,6 +649,7 @@ def _check_retained_inspect_event(
         "top_p": top_p,
         "max_tokens": expected_config.get("max_output_tokens"),
         "seed": expected_config.get("seed"),
+        "reasoning_effort": expected_config.get("reasoning_effort"),
         "max_retries": 0,
         "timeout": collection.get("request_timeout_seconds"),
         "attempt_timeout": collection.get("request_timeout_seconds"),
@@ -907,6 +921,12 @@ def _check_native_inspect_controls(
         _fail("retained Inspect provider token limit differs from the request")
     if type(request.get("n", 1)) is not int or request.get("n", 1) != 1:
         _fail("retained Inspect provider request must select one completion")
+    reasoning_effort = expected["reasoning_effort"]
+    if reasoning_effort is None:
+        if request.get("reasoning_effort") is not None:
+            _fail("retained Inspect provider reasoning effort differs from the request")
+    elif request.get("reasoning_effort") != reasoning_effort:
+        _fail("retained Inspect provider reasoning effort differs from the request")
 
 
 def _check_inspect_provider_projection(
@@ -940,6 +960,7 @@ def _check_inspect_provider_projection(
             "max_tokens",
             "max_completion_tokens",
             "seed",
+            "reasoning_effort",
             "n",
             "tools",
             "tool_choice",

@@ -43,6 +43,9 @@ class JudgeConfig(TypedDict):
     top_p: str
     max_output_tokens: int
     seed: int | None
+    reasoning_effort: (
+        Literal["none", "minimal", "low", "medium", "high", "xhigh", "max"] | None
+    )
 
 
 class JudgeIdentity(TypedDict):

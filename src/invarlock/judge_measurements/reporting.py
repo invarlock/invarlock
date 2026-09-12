@@ -363,6 +363,10 @@ def _view(
             ("Judge provider", plan["judge"]["provider"]),
             ("Requested judge", plan["judge"]["requested_model"]),
             ("Resolved judges", ", ".join(resolved_models) or "Unavailable"),
+            (
+                "Reasoning effort",
+                plan["judge"]["config"]["reasoning_effort"] or "Not configured",
+            ),
             ("Rubric", plan["rubric"]["text"][:TEXT_DETAIL_LIMIT]),
             ("Judge prompt", plan["prompt"]["template"][:TEXT_DETAIL_LIMIT]),
             ("Prompt demonstrations", str(len(plan["prompt"]["demonstrations"]))),

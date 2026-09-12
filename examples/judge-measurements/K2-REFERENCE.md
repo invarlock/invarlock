@@ -84,7 +84,7 @@ judgments.
 
 The explicit template file fixes judge `openai/gpt-5.6-sol`, approved returned
 model `gpt-5.6-sol`, the model's supported default temperature of one, three
-repetitions, one attempt, no tools,
+repetitions, one attempt, reasoning effort `none`, no tools,
 a three-label scale, and separate grounded-QA/extraction rubrics. The helper
 constructs canonical `evaluation-run-v1` and case-set contracts from the exact
 source user text and raw answer. Native scores and capture context remain in

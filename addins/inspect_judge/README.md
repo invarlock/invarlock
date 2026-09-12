@@ -42,7 +42,10 @@ selected by a `judge_import` request before publication.
 For `openai/gpt-5.6-sol`, the pinned SDK converts system messages to developer
 messages, uses `max_completion_tokens`, and omits temperature from the provider
 request. The approved plan must therefore declare temperature `1`, the provider
-default. Collection rejects other temperatures before admission. Offline replay
+default, and an explicit non-null `reasoning_effort`. The adapter passes that
+effort into Inspect and verifies it in both the retained generation event and
+provider request. Collection rejects a missing or changed effort before the
+evidence can be accepted. Offline replay
 accepts exactly this version-bound projection for that model; other models keep
 their existing message and sampling-control checks. Normalized requests retain
 the approved system message and configuration alongside the actual provider call.

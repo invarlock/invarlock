@@ -23,13 +23,13 @@
   },
   "samples": [
     {
-      "id": "trial-3b4f6201a5d5039179ed81b822c49ad152d4951d815528ce01bae7d2946569b5",
+      "id": "trial-3c53d5578c48f851dda5d5794fda8ed5f09ce46b1db64b1da9b95fce47479f3f",
       "epoch": 1,
       "metadata": {
         "case_id": "case-1",
         "side": "baseline",
         "repetition": 1,
-        "plan_sha256": "edd8f6e442a937b53a2abad3eb0b923c40b0ede2ab170c60c746000d64f653ed",
+        "plan_sha256": "ef9f6411169c9d2f2cf5475cc2d8465abfa3791f23c54a9694f1446174b363a8",
         "answer_sha256": "5dd272b4f316b776a7b8e3d0894b37e1e42be3d5d3b204b8a5836cc50597a6b1",
         "scorer_id": "correctness"
       },
@@ -56,6 +56,7 @@
             "top_p": 1.0,
             "max_tokens": 128,
             "seed": null,
+            "reasoning_effort": null,
             "max_retries": 0,
             "timeout": 30,
             "attempt_timeout": 30,
@@ -75,6 +76,7 @@
             "request": {
               "config": {
                 "max_output_tokens": 128,
+                "reasoning_effort": null,
                 "seed": null,
                 "temperature": "0",
                 "top_p": "1"
@@ -125,13 +127,13 @@
       ]
     },
     {
-      "id": "trial-16da72a1265d4b35ccf4c99a622da30162c4094bb826be2ede3eb1b1e4400345",
+      "id": "trial-7e79279cbbf11d0dfab6155974e039070370d84f6bb16750a93d245e3beea277",
       "epoch": 1,
       "metadata": {
         "case_id": "case-1",
         "side": "subject",
         "repetition": 1,
-        "plan_sha256": "edd8f6e442a937b53a2abad3eb0b923c40b0ede2ab170c60c746000d64f653ed",
+        "plan_sha256": "ef9f6411169c9d2f2cf5475cc2d8465abfa3791f23c54a9694f1446174b363a8",
         "answer_sha256": "5dd272b4f316b776a7b8e3d0894b37e1e42be3d5d3b204b8a5836cc50597a6b1",
         "scorer_id": "correctness"
       },
@@ -158,6 +160,7 @@
             "top_p": 1.0,
             "max_tokens": 128,
             "seed": null,
+            "reasoning_effort": null,
             "max_retries": 0,
             "timeout": 30,
             "attempt_timeout": 30,
@@ -177,6 +180,7 @@
             "request": {
               "config": {
                 "max_output_tokens": 128,
+                "reasoning_effort": null,
                 "seed": null,
                 "temperature": "0",
                 "top_p": "1"

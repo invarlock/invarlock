@@ -198,13 +198,32 @@
                   "type": "null"
                 }
               ]
+            },
+            "reasoning_effort": {
+              "oneOf": [
+                {
+                  "enum": [
+                    "none",
+                    "minimal",
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "max"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
           },
           "required": [
             "temperature",
             "top_p",
             "max_output_tokens",
-            "seed"
+            "seed",
+            "reasoning_effort"
           ]
         },
         "tools": {
