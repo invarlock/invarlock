@@ -7,10 +7,19 @@ returns `insufficient_evidence`. It is not a live provider qualification result.
 Copy this directory to a fresh working directory, then run:
 
 ```bash
+invarlock evaluate request-collect.yaml --preflight --json
 invarlock evaluate request.yaml --preflight --json
 invarlock evaluate request.yaml --unsigned --json
 invarlock report evidence --html report.html --markdown report.md --junit report.xml --json
 ```
+
+`request-collect.yaml` demonstrates the execution-free collection preflight. Its
+synthetic `example-judge` identity is deliberately not callable. For a
+live run, freeze a real supported hosted-model identity in the plan, set the
+matching grader and current account limits in `collection.json`, then pass the
+loaded plan, options and frozen runs to the optional package's asynchronous
+`collect` API. Keep provider credentials in the collector environment. Never put
+them in the request, plan, checkpoint or retained evidence.
 
 Add `--fail-on-policy` to evaluation for exit 7 on the inconclusive policy result.
 The unsigned evidence cannot establish recipient acceptance. To publish signed

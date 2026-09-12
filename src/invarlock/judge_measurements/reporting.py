@@ -26,6 +26,11 @@ CASE_DETAIL_LIMIT = 50
 TEXT_DETAIL_LIMIT = 2000
 
 
+def _count_label(value: int, singular: str) -> str:
+    suffix = "" if value == 1 else "s"
+    return f"{value} {singular}{suffix}"
+
+
 @dataclass(frozen=True)
 class JudgeEvidenceReport(EvidenceReportV2):
     facts: dict[str, Any] = field(default_factory=dict)
@@ -135,7 +140,12 @@ def _view(
         baseline="Frozen baseline answers",
         candidate=subject["mean"] if subject is not None else "Unavailable",
         change=effect["mean"] if effect is not None else "Unavailable",
-        count=f"{counts['scheduled_cases']} cases; {counts['scheduled_units']} independent units; {counts['completed_trials']}/{counts['expected_trials']} completed trials",
+        count=(
+            f"{_count_label(counts['scheduled_cases'], 'case')}; "
+            f"{_count_label(counts['scheduled_units'], 'independent unit')}; "
+            f"{counts['completed_trials']}/{counts['expected_trials']} completed "
+            f"{'trial' if counts['expected_trials'] == 1 else 'trials'}"
+        ),
         explanation=explanation,
         checks=checks,
         interval=interval,

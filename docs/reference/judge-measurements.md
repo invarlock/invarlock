@@ -81,6 +81,9 @@ Preflight validates the full Inspect profile and displays concurrency, rate,
 timeout, call, token and cost reservations. It also computes the maximum calls
 admitted by the tightest reservation and whether that covers the full plan. A
 valid collection preflight exits successfully and makes no provider call.
+The committed `examples/judge-measurements` fixture includes a separate
+`request-collect.yaml` and bounded `collection.json` so this route can be
+inspected without editing the import example.
 
 The optional `invarlock-inspect-judge` package exposes an asynchronous `collect`
 API for a trusted host that explicitly constructs the Inspect model. Live

@@ -348,6 +348,15 @@ def test_report_escapes_metric_markup_and_rejects_in_pack_output(tmp_path):
 def test_committed_judge_example_preflights_and_renders(tmp_path):
     example = Path(__file__).parents[2] / "examples" / "judge-measurements"
     shutil.copytree(example, tmp_path / "example")
+    collection_request = tmp_path / "example" / "request-collect.yaml"
+    result = RUNNER.invoke(
+        app, ["evaluate", str(collection_request), "--preflight", "--json"]
+    )
+    assert result.exit_code == 0, result.output
+    collection = json.loads(result.stdout)
+    assert collection["planned_trials"] == 2
+    assert collection["budget_capacity"]["maximum_admitted_calls"] == 2
+    assert collection["ready"] is True
     request = tmp_path / "example" / "request.yaml"
     result = RUNNER.invoke(app, ["evaluate", str(request), "--preflight", "--json"])
     assert result.exit_code == 0, result.output
@@ -355,8 +364,19 @@ def test_committed_judge_example_preflights_and_renders(tmp_path):
     result = RUNNER.invoke(app, ["evaluate", str(request), "--unsigned", "--json"])
     assert result.exit_code == 0, result.output
     assert json.loads(result.stdout)["decision"] == "insufficient_evidence"
-    result = RUNNER.invoke(app, ["report", str(request.parent / "evidence"), "--json"])
+    report = request.parent / "report.md"
+    result = RUNNER.invoke(
+        app,
+        [
+            "report",
+            str(request.parent / "evidence"),
+            "--markdown",
+            str(report),
+            "--json",
+        ],
+    )
     assert result.exit_code == 0, result.output
+    assert "1 case; 1 independent unit; 2/2 completed trials" in report.read_text()
     assert (
         json.loads(result.stdout)["assurance"]["recipient_acceptance"]
         == "not_performed"

@@ -120,6 +120,8 @@ def test_reports_preserve_decision_and_role_without_gating_advisory_metrics(
     assert result.facts["assurance"]["policy_decision"] == outcome
     assert result.facts["assurance"]["decision_role"] == role
     assert f"Decision role: {role}" in result.text
+    assert "16 cases; 16 independent units;" in result.text
+    assert "completed trials" in result.text
     assert f"Decision role: {role}" in html_path.read_text()
     suite = fromstring(junit_path.read_bytes())
     assert suite.find("properties/property[@name='decision_role']").get("value") == role
