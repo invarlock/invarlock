@@ -1,10 +1,10 @@
 {
   "format": "invarlock/inspect-judge-export-v1",
   "profile": "inspect-text-frozen-answer-v1",
-  "inspect_version": "0.3.254",
+  "inspect_version": "0.3.263",
   "collection": {
     "grader": "example-judge",
-    "inspect_version": "0.3.254",
+    "inspect_version": "0.3.263",
     "profile": "inspect-text-frozen-answer-v1",
     "epochs": 1,
     "log_model_api": true,

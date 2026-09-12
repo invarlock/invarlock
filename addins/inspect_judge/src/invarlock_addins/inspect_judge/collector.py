@@ -16,6 +16,7 @@ from invarlock.judge_measurement_types import (
 )
 from invarlock.judge_measurements.contracts import (
     JUDGE_REQUEST_MAX_BYTES,
+    MEASUREMENTS_MAX_BYTES,
     canonical_payload,
     expected_trial_id,
     measurement_plan_digest,
@@ -23,12 +24,21 @@ from invarlock.judge_measurements.contracts import (
     validate_measurements,
 )
 
-INSPECT_VERSION = "0.3.254"
+INSPECT_VERSION = "0.3.263"
+REPLAY_INSPECT_VERSIONS = {"0.3.254", INSPECT_VERSION}
 EXPORT_FORMAT = "invarlock/inspect-judge-export-v1"
 EXPORT_PROFILE = "inspect-text-frozen-answer-v1"
 RETAINED_SOURCE_PROFILE = "retained-inspect-model-events-v1"
 RETAINED_SOURCE_FORMAT = "invarlock/retained-inspect-model-events-v1"
-MAX_EXPORT_BYTES = 16 * 1024 * 1024
+MAX_EXPORT_BYTES = MEASUREMENTS_MAX_BYTES
+MAX_SOURCE_BYTES = 16 * 1024 * 1024
+MAX_SOURCES = 1000
+MAX_RETAINED_EVENT_BYTES = 2 * 1024 * 1024
+# A retained event is at most 2 MiB. Each normalized request/response is at
+# most 1 MiB and can double when JSON-quoted; the source is quoted once more
+# in measurements, which also repeat the trial. 20 MiB covers this growth
+# plus fixed metadata. Reserve remapping overhead separately for all slots.
+MAX_ADMISSION_GROWTH_BYTES = 20 * 1024 * 1024
 
 
 class InspectJudgeError(ValueError):
@@ -132,7 +142,10 @@ class CollectionOptions:
             and all(ord(char) >= 33 for char in self.grader),
             "grader must be an explicit model identity without URL credentials",
         )
-        _require(self.inspect_version == INSPECT_VERSION, "unsupported Inspect version")
+        _require(
+            self.inspect_version in REPLAY_INSPECT_VERSIONS,
+            "unsupported Inspect version",
+        )
         _require(self.profile == EXPORT_PROFILE, "unsupported Inspect profile")
         _require(
             type(self.epochs) is int and self.epochs == 1, "only epoch one is supported"
@@ -252,6 +265,10 @@ def prepare_inspect_config(
 ) -> Any:
     """Construct the pinned SDK's GenerateConfig; never select or call a model."""
     _check_options(plan, options)
+    _require(
+        options.inspect_version == INSPECT_VERSION,
+        "live collection requires current Inspect version",
+    )
     try:
         version = importlib.metadata.version("inspect-ai")
     except importlib.metadata.PackageNotFoundError as exc:
@@ -320,7 +337,7 @@ def prepare_collection(
         // plan["judge"]["config"]["max_output_tokens"],
         (options.max_cost_microusd - used_cost) // options.cost_microusd_per_call,
     )
-    pending = []
+    pending: list[dict[str, Any]] = []
     terminal = 0
     for binding in sorted(plan["answer_bindings"], key=lambda item: item["case_id"]):
         for side in ("baseline", "subject"):
@@ -345,6 +362,39 @@ def prepare_collection(
                         "attempt": len(attempts) + 1,
                     }
                 )
+    if checkpoint is None:
+        empty_trials = []
+        bindings = {item["case_id"]: item for item in plan["answer_bindings"]}
+        for item in pending:
+            empty_binding = cast(dict[str, Any], bindings[item["case_id"]])
+            empty_trials.append(
+                {
+                    "trial_id": item["trial_id"],
+                    "case_id": item["case_id"],
+                    "side": item["side"],
+                    "repetition": item["repetition"],
+                    "answer_sha256": empty_binding[f"{item['side']}_answer_sha256"],
+                    "plan_sha256": digest,
+                    "status": "incomplete",
+                    "attempts": [],
+                    "selected_attempt": None,
+                    "parse": {"status": "unavailable", "rating": None, "value": None},
+                }
+            )
+        checkpoint = cast(
+            JudgeMeasurements,
+            _assemble_measurements(
+                digest, empty_trials, [{"events": []} for _ in empty_trials], options
+            ),
+        )
+    retained_bytes = len(canonical_payload(checkpoint))
+    remapping_allowance = plan["schedule"]["expected_trials"] * 128
+    storage_capacity = min(
+        MAX_SOURCES - len(checkpoint["sources"]),
+        (MEASUREMENTS_MAX_BYTES - retained_bytes - remapping_allowance)
+        // MAX_ADMISSION_GROWTH_BYTES,
+    )
+    capacity = min(capacity, storage_capacity)
     admitted = min(len(pending), max(0, capacity), options.concurrency)
     return {
         "plan_sha256": digest,
@@ -354,6 +404,13 @@ def prepare_collection(
         "pending_trials": len(pending),
         "next_batch": pending[:admitted],
         "budget_exhausted": bool(pending) and capacity <= 0,
+        "storage_reservation": {
+            "retained_bytes": retained_bytes,
+            "maximum_bytes": MEASUREMENTS_MAX_BYTES,
+            "bytes_per_admitted_call": MAX_ADMISSION_GROWTH_BYTES,
+            "source_count": len(checkpoint["sources"]),
+            "maximum_sources": MAX_SOURCES,
+        },
         "minimum_request_spacing_seconds": 60 / options.requests_per_minute,
     }
 
@@ -396,6 +453,91 @@ def _parse_rating(response: Any, plan: JudgeMeasurementPlan) -> dict[str, Any]:
     return {"status": "invalid", "rating": None, "value": None}
 
 
+def _assemble_measurements(
+    digest: str,
+    trials: list[dict[str, Any]],
+    samples: list[dict[str, Any]],
+    options: CollectionOptions,
+) -> dict[str, Any]:
+    """Greedily shard whole records, preserving deterministic local positions."""
+    sources: list[dict[str, Any]] = []
+    records: list[dict[str, Any]] = []
+    source_id = "inspect-export"
+
+    def document(rows: list[dict[str, Any]]) -> dict[str, Any]:
+        return {
+            "format": RETAINED_SOURCE_FORMAT,
+            "inspect_version": options.inspect_version,
+            "collection": asdict(options),
+            "records": rows,
+        }
+
+    header_bytes = len(canonical_payload(document([])))
+    source_bytes = header_bytes
+
+    def publish() -> None:
+        _require(
+            len(sources) < MAX_SOURCES, "retained sources exceed the source allowance"
+        )
+        payload = canonical_payload(document(records))
+        _require(
+            len(payload) <= MAX_SOURCE_BYTES, "retained source exceeds byte allowance"
+        )
+        sources.append(
+            {
+                "source_id": source_id,
+                "profile": RETAINED_SOURCE_PROFILE,
+                "encoding": "utf-8",
+                "byte_size": len(payload),
+                "media_type": "application/json",
+                "content": payload.decode(),
+                "sha256": _sha(payload),
+            }
+        )
+
+    for trial, sample in zip(trials, samples, strict=True):
+        for attempt in trial["attempts"]:
+            attempt["source"].update(source_id=source_id, record_index=len(records))
+        record = {"trial": trial, "events": sample["events"]}
+        record_bytes = len(canonical_payload(record))
+        if records and source_bytes + 1 + record_bytes > MAX_SOURCE_BYTES:
+            publish()
+            records = []
+            source_bytes = header_bytes
+            source_id = f"inspect-export-{len(sources) + 1:04d}"
+            for attempt in trial["attempts"]:
+                attempt["source"].update(source_id=source_id, record_index=0)
+            record_bytes = len(canonical_payload(record))
+        _require(
+            source_bytes + bool(records) + record_bytes <= MAX_SOURCE_BYTES,
+            "one retained trial exceeds the per-source byte allowance",
+        )
+        source_bytes += bool(records) + record_bytes
+        records.append(record)
+    if records:
+        publish()
+    completed = sum(trial["status"] == "complete" for trial in trials)
+    measurements = {
+        "format": "invarlock/judge-measurements-v1",
+        "profile_id": "text-frozen-answer-v1",
+        "plan_sha256": digest,
+        "source_profile": RETAINED_SOURCE_PROFILE,
+        "sources": sources,
+        "trials": trials,
+        "completeness": {
+            "status": "complete" if completed == len(trials) else "incomplete",
+            "expected_trials": len(trials),
+            "recorded_trials": len(trials),
+            "completed_trials": completed,
+        },
+    }
+    _require(
+        len(canonical_payload(measurements)) <= MEASUREMENTS_MAX_BYTES,
+        "retained measurements exceed the aggregate byte allowance",
+    )
+    return measurements
+
+
 def import_export(
     payload: bytes,
     *,
@@ -428,7 +570,10 @@ def import_export(
         root["format"] == EXPORT_FORMAT and root["profile"] == EXPORT_PROFILE,
         "unsupported export profile",
     )
-    _require(root["inspect_version"] == INSPECT_VERSION, "unsupported Inspect version")
+    _require(
+        root["inspect_version"] == options.inspect_version,
+        "unsupported Inspect version",
+    )
     _require(
         canonical_payload(root["collection"]) == canonical_payload(asdict(options)),
         "export collection settings differ from explicit options",
@@ -539,6 +684,10 @@ def import_export(
         parsed = {"status": "unavailable", "rating": None, "value": None}
         selected = None
         for index, event in enumerate(events):
+            _require(
+                len(canonical_payload(event)) <= MAX_RETAINED_EVENT_BYTES,
+                "model event exceeds the retained-event byte allowance",
+            )
             event = _object(
                 event,
                 {
@@ -718,19 +867,6 @@ def import_export(
                 "parse": parsed,
             }
         )
-    source = canonical_payload(
-        {
-            "format": RETAINED_SOURCE_FORMAT,
-            "inspect_version": INSPECT_VERSION,
-            "collection": asdict(options),
-            "records": [
-                {"trial": trial, "events": sample["events"]}
-                for trial, sample in zip(trials, samples, strict=True)
-            ],
-        }
-    )
-    _require(len(source) <= MAX_EXPORT_BYTES, "retained source exceeds byte allowance")
-    completed = sum(trial["status"] == "complete" for trial in trials)
     spent_calls = sum(len(trial["attempts"]) for trial in trials)
     _require(spent_calls <= options.max_calls, "export exceeds the call allowance")
     _require(
@@ -746,30 +882,7 @@ def import_export(
         spent_calls * options.cost_microusd_per_call <= options.max_cost_microusd,
         "export exceeds the reserved cost allowance",
     )
-    measurements = {
-        "format": "invarlock/judge-measurements-v1",
-        "profile_id": "text-frozen-answer-v1",
-        "plan_sha256": digest,
-        "source_profile": RETAINED_SOURCE_PROFILE,
-        "sources": [
-            {
-                "source_id": "inspect-export",
-                "profile": RETAINED_SOURCE_PROFILE,
-                "encoding": "utf-8",
-                "byte_size": len(source),
-                "media_type": "application/json",
-                "content": source.decode(),
-                "sha256": _sha(source),
-            }
-        ],
-        "trials": trials,
-        "completeness": {
-            "status": "complete" if completed == len(trials) else "incomplete",
-            "expected_trials": len(trials),
-            "recorded_trials": len(trials),
-            "completed_trials": completed,
-        },
-    }
+    measurements = _assemble_measurements(digest, trials, samples, options)
     result = cast(JudgeMeasurements, measurements)
     validate_measurements(
         result, plan, baseline_run=baseline_run, subject_run=subject_run

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import importlib.metadata
 import json
+import os
 from dataclasses import asdict, replace
 from pathlib import Path
 
@@ -33,15 +34,23 @@ FIXTURES = Path(__file__).parent / "fixtures"
 def test_live_inspect_chat_completion_replays_offline(
     tmp_path, monkeypatch, finish_reason, completion, parse_status
 ):
+    required = os.environ.get("INVARLOCK_REQUIRE_INSPECT_SDK") == "1"
     try:
         version = importlib.metadata.version("inspect-ai")
     except importlib.metadata.PackageNotFoundError:
+        if required:
+            pytest.fail("required pinned Inspect SDK is not installed")
         pytest.skip("optional pinned Inspect SDK is not installed")
-    if version != "0.3.254":
-        pytest.skip("this conversion test requires Inspect 0.3.254")
-    model_module = pytest.importorskip("inspect_ai.model")
-    openai = pytest.importorskip("openai")
-    httpx = pytest.importorskip("httpx")
+    if version != "0.3.263":
+        if required:
+            pytest.fail("required Inspect SDK version differs from qualification")
+        pytest.skip("this conversion test requires Inspect 0.3.263")
+    loader = importlib.import_module if required else pytest.importorskip
+    model_module = loader("inspect_ai.model")
+    openai = loader("openai")
+    httpx = loader("httpx")
+    assert importlib.metadata.version("openai") == "3.13.0"
+    assert importlib.metadata.version("httpx") == "0.28.1"
 
     async def forbid_network(*args, **kwargs):
         raise AssertionError("live SDK test attempted a real HTTP request")

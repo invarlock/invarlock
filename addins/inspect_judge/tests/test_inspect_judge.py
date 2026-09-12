@@ -346,9 +346,23 @@ def test_scalar_and_sequence_completions_are_retained_as_invalid(data, completio
     }
 
 
+def _native_request(event):
+    request = event["call"]["request"]
+    config = request["config"]
+    event["call"]["request"] = {
+        "model": request["model"],
+        "messages": request["messages"],
+        "temperature": float(config["temperature"]),
+        "top_p": float(config["top_p"]),
+        "max_tokens": config["max_output_tokens"],
+        "seed": config["seed"],
+    }
+    return event["call"]["request"]
+
+
 def test_native_null_tool_controls_are_retained_as_tool_free(data):
     exported = copy.deepcopy(data[1])
-    request = exported["samples"][0]["events"][0]["call"]["request"]
+    request = _native_request(exported["samples"][0]["events"][0])
     request.update(tools=None, tool_choice=None)
     result = ingest(data, exported)
     validate_measurements(result, data[0], **frozen_runs(data))
@@ -369,7 +383,7 @@ def test_native_null_tool_controls_are_retained_as_tool_free(data):
 )
 def test_native_tool_controls_reject_unapproved_values(data, field, value):
     exported = copy.deepcopy(data[1])
-    exported["samples"][0]["events"][0]["call"]["request"][field] = value
+    _native_request(exported["samples"][0]["events"][0])[field] = value
     with pytest.raises(JudgeMeasurementContractError, match="tool"):
         ingest(data, exported)
 
@@ -449,7 +463,7 @@ def test_sdk_configuration_is_optional_and_uses_no_model_factory(data, monkeypat
         captured.update(kwargs)
         return SimpleNamespace(**kwargs)
 
-    monkeypatch.setattr(importlib.metadata, "version", lambda _: "0.3.254")
+    monkeypatch.setattr(importlib.metadata, "version", lambda _: "0.3.263")
     monkeypatch.setattr(
         "importlib.import_module",
         lambda _: SimpleNamespace(GenerateConfig=generate_config),
@@ -517,7 +531,7 @@ def test_live_collection_checkpoints_and_resumes(data, monkeypatch, tmp_path):
         GenerateConfig=lambda **kwargs: Config(**kwargs),
         use_model_event_sink=use_model_event_sink,
     )
-    monkeypatch.setattr(importlib.metadata, "version", lambda _: "0.3.254")
+    monkeypatch.setattr(importlib.metadata, "version", lambda _: "0.3.263")
     monkeypatch.setattr(importlib, "import_module", lambda _: fake_module)
 
     class Model:
@@ -746,6 +760,100 @@ def test_live_collection_checkpoints_and_resumes(data, monkeypatch, tmp_path):
 
     asyncio.run(cancel_and_check_lock())
 
+    class SecretFailureModel(Model):
+        async def generate(self, *, input, tools, tool_choice, config, cache):
+            self.calls += 1
+            _, event = self.event(input, tools, tool_choice, config)
+            event.call.response = {"error": "Bearer private-token-at-provider-url"}
+            event.output.error = "Bearer private-token-at-provider-url"
+            event.error = "Bearer private-token-at-provider-url"
+            current_sink.on_pending(event)
+            raise RuntimeError("Bearer private-token-at-provider-url")
+
+    secret_runner = replace(runner, checkpoint_directory=tmp_path / "secret-error")
+    secret_result = asyncio.run(
+        collect(
+            plan=data[0],
+            options=replace(data[3], concurrency=1, max_calls=1),
+            runner=secret_runner,
+            model=SecretFailureModel(),
+            **frozen_runs(data),
+        )
+    )
+    assert b"private-token" not in canonical_payload(secret_result)
+    assert all(
+        b"private-token" not in path.read_bytes()
+        for path in secret_runner.checkpoint_directory.iterdir()
+    )
+    failed_attempt = secret_result["trials"][0]["attempts"][0]
+    assert failed_attempt["status"] == "timeout_ambiguous"
+    assert failed_attempt["error"]["code"] == "inspect-call-failed"
+
+    import invarlock_addins.inspect_judge.runner as runner_module
+
+    from invarlock.filesystem.paths import UnsafePathError
+
+    actual_parent = tmp_path / "actual-parent"
+    actual_parent.mkdir()
+    alias_parent = tmp_path / "alias-parent"
+    alias_parent.symlink_to(actual_parent, target_is_directory=True)
+    alias_model = Model()
+    with pytest.raises(UnsafePathError):
+        asyncio.run(
+            collect(
+                plan=data[0],
+                options=data[3],
+                model=alias_model,
+                runner=replace(
+                    runner, checkpoint_directory=alias_parent / "checkpoint"
+                ),
+                **frozen_runs(data),
+            )
+        )
+    assert alias_model.calls == 0
+    assert list(actual_parent.iterdir()) == []
+
+    shared_checkpoint = tmp_path / "shared-checkpoint"
+    shared_checkpoint.mkdir()
+    shared_checkpoint.chmod(0o755)
+    shared_model = Model()
+    with pytest.raises(InspectJudgeError, match="caller-owned and private"):
+        asyncio.run(
+            collect(
+                plan=data[0],
+                options=data[3],
+                model=shared_model,
+                runner=replace(runner, checkpoint_directory=shared_checkpoint),
+                **frozen_runs(data),
+            )
+        )
+    assert shared_model.calls == 0
+
+    # Replace a regular checkpoint directory while the pacer yields; dispatch
+    # must recheck the retained identity before allowing the provider call.
+    swapped_runner = replace(runner, checkpoint_directory=tmp_path / "swapped")
+    swapped_model = Model()
+
+    async def swap_at_pacer(_self):
+        swapped_runner.checkpoint_directory.rename(tmp_path / "original-checkpoint")
+        swapped_runner.checkpoint_directory.mkdir()
+
+    with monkeypatch.context() as patch:
+        patch.setattr(runner_module._Pacer, "wait", swap_at_pacer)
+        with pytest.raises(UnsafePathError):
+            asyncio.run(
+                collect(
+                    plan=data[0],
+                    options=replace(data[3], concurrency=1),
+                    runner=swapped_runner,
+                    model=swapped_model,
+                    **frozen_runs(data),
+                )
+            )
+    assert swapped_model.calls == 0
+    assert list(swapped_runner.checkpoint_directory.iterdir()) == []
+    assert len(list((tmp_path / "original-checkpoint").glob("admission-*"))) == 1
+
     unbounded_provider = Model()
     unbounded_provider.api.client.max_retries = 2
     with pytest.raises(InspectJudgeError, match="provider client"):
@@ -762,11 +870,24 @@ def test_live_collection_checkpoints_and_resumes(data, monkeypatch, tmp_path):
         )
 
 
-def test_malformed_duplicate_json_and_oversized_export_rejected(data):
+def test_malformed_duplicate_json_rejected(data):
     plan, _, frozen, options = data
-    for payload in (b'{"format":1,"format":2}', b"{", b" " * (16 * 1024 * 1024 + 1)):
+    for payload in (b'{"format":1,"format":2}', b"{"):
         with pytest.raises(InspectJudgeError):
             import_export(payload, plan=plan, options=options, **frozen_runs(data))
+
+
+def test_oversized_export_is_rejected_before_parsing(data, monkeypatch):
+    import invarlock_addins.inspect_judge.collector as collector_module
+
+    monkeypatch.setattr(collector_module, "MAX_EXPORT_BYTES", 32)
+    with pytest.raises(InspectJudgeError, match="export exceeds byte allowance"):
+        import_export(
+            b" " * 33,
+            plan=data[0],
+            options=data[3],
+            **frozen_runs(data),
+        )
 
 
 def test_frozen_answer_change_rejected(data):
@@ -893,3 +1014,183 @@ def test_import_rejects_duplicate_or_failed_frozen_records(data):
     runs["subject_run"]["records"][0]["error"] = "failed"
     with pytest.raises(InspectJudgeError, match="successful text answers"):
         import_export(canonical_payload(data[1]), plan=data[0], options=data[3], **runs)
+
+
+@pytest.mark.parametrize(
+    "addition",
+    [
+        {"stop": ["rating"]},
+        {"max_tokens": 999999},
+        {"temperature": 999},
+        {
+            "config": {
+                "temperature": "2",
+                "top_p": "1",
+                "max_output_tokens": 32,
+                "seed": None,
+            }
+        },
+    ],
+)
+def test_normalized_provider_request_rejects_extra_and_contradictory_controls(
+    data, addition
+):
+    exported = copy.deepcopy(data[1])
+    exported["samples"][0]["events"][0]["call"]["request"].update(addition)
+    with pytest.raises(
+        JudgeMeasurementContractError, match="normalized provider request"
+    ):
+        ingest(data, exported)
+
+
+@pytest.mark.parametrize(
+    "addition",
+    [
+        {"config": {"temperature": "0"}},
+        {"stop": ["rating"]},
+        {"max_completion_tokens": 32},
+        {"max_tokens": True},
+        {"seed": False},
+        {"n": 2},
+        {"temperature": False},
+        {"response_format": {"type": "json_object"}},
+    ],
+)
+def test_native_provider_request_has_closed_control_set(data, addition):
+    exported = copy.deepcopy(data[1])
+    _native_request(exported["samples"][0]["events"][0]).update(addition)
+    with pytest.raises(JudgeMeasurementContractError, match="provider"):
+        ingest(data, exported)
+
+
+def test_historical_inspect_projection_remains_replayable(data):
+    plan, exported, frozen, options = copy.deepcopy(data)
+    exported["inspect_version"] = exported["collection"]["inspect_version"] = "0.3.254"
+    options = replace(options, inspect_version="0.3.254")
+    historical = plan, exported, frozen, options
+    result = ingest(historical)
+    assert json.loads(result["sources"][0]["content"])["inspect_version"] == "0.3.254"
+    with pytest.raises(InspectJudgeError, match="current Inspect version"):
+        prepare_inspect_config(plan, options)
+
+
+def test_retained_sources_shard_deterministically_and_keep_local_mappings(
+    data, monkeypatch
+):
+    import invarlock_addins.inspect_judge.collector as collector
+
+    monkeypatch.setattr(collector, "MAX_SOURCE_BYTES", 5000)
+    result = ingest(data)
+    assert result == ingest(data)
+    assert [source["source_id"] for source in result["sources"]] == [
+        "inspect-export",
+        "inspect-export-0002",
+    ]
+    for source in result["sources"]:
+        assert source["byte_size"] <= 5000
+        record = json.loads(source["content"])["records"][0]
+        mapping = record["trial"]["attempts"][0]["source"]
+        assert mapping["source_id"] == source["source_id"]
+        assert mapping["record_index"] == 0
+    validate_measurements(result, data[0], **frozen_runs(data))
+
+
+def test_sharded_source_reservations_are_aggregate(data, monkeypatch):
+    import invarlock_addins.inspect_judge.collector as collector
+
+    monkeypatch.setattr(collector, "MAX_SOURCE_BYTES", 5000)
+    result = ingest(data)
+    for source in result["sources"]:
+        retained = json.loads(source["content"])
+        retained["collection"]["max_calls"] = 1
+        payload = canonical_payload(retained)
+        source.update(
+            content=payload.decode(),
+            byte_size=len(payload),
+            sha256=hashlib.sha256(payload).hexdigest(),
+        )
+    with pytest.raises(JudgeMeasurementContractError, match="aggregate resource"):
+        validate_measurements(result, data[0], **frozen_runs(data))
+
+
+def test_storage_reservation_stops_calls_before_aggregate_exhaustion(data, monkeypatch):
+    import invarlock_addins.inspect_judge.collector as collector
+
+    # Plenty of call/token/cost budget; the retained-source reservation alone
+    # makes the first provider call inadmissible.
+    monkeypatch.setattr(collector, "MEASUREMENTS_MAX_BYTES", 10000)
+    batch = prepare_collection(data[0], data[3])
+    assert batch["budget_exhausted"] and batch["next_batch"] == []
+    assert batch["storage_reservation"]["retained_bytes"] < 10000
+
+
+def test_source_count_and_single_record_caps_fail_closed(data, monkeypatch):
+    import invarlock_addins.inspect_judge.collector as collector
+
+    monkeypatch.setattr(collector, "MAX_SOURCE_BYTES", 5000)
+    monkeypatch.setattr(collector, "MAX_SOURCES", 1)
+    with pytest.raises(InspectJudgeError, match="source allowance"):
+        ingest(data)
+    monkeypatch.setattr(collector, "MAX_SOURCE_BYTES", 1000)
+    with pytest.raises(InspectJudgeError, match="one retained trial"):
+        ingest(data)
+
+
+def test_reference_capacity_7728_completed_trials_shards_and_replays(data):
+    from invarlock.evaluation_records.cases import case_set_digest
+    from invarlock.evaluation_records.io import run_digest
+    from invarlock.judge_measurements.contracts import (
+        expected_trial_id,
+        measurement_plan_digest,
+    )
+
+    plan, original, _, options = copy.deepcopy(data)
+    runs = frozen_runs(data)
+    cases = [f"case-{index:04d}" for index in range(3864)]
+    plan["sampling"]["case_units"] = [
+        {"case_id": case_id, "unit_id": case_id} for case_id in cases
+    ]
+    plan["answer_bindings"] = [
+        dict(plan["answer_bindings"][0], case_id=case_id) for case_id in cases
+    ]
+    plan["schedule"]["expected_trials"] = 7728
+    for side in ("baseline", "subject"):
+        run = runs[f"{side}_run"]
+        run["records"] = [dict(run["records"][0], id=case_id) for case_id in cases]
+        plan[f"{side}_run_sha256"] = run_digest(run)
+    plan["case_set_sha256"] = case_set_digest(
+        {
+            "format": "invarlock/evaluation-case-set-v1",
+            "cases": [
+                {key: record[key] for key in ("id", "input", "expected", "metadata")}
+                for record in runs["baseline_run"]["records"]
+            ],
+        }
+    )
+    digest = measurement_plan_digest(plan)
+    exported = dict(original, samples=[])
+    for case_id in cases:
+        for template in original["samples"]:
+            sample = copy.deepcopy(template)
+            sample["metadata"].update(case_id=case_id, plan_sha256=digest)
+            sample["id"] = expected_trial_id(
+                digest, case_id, sample["metadata"]["side"], 1
+            )
+            sample["events"][0]["uuid"] = f"event-{len(exported['samples'])}"
+            exported["samples"].append(sample)
+    options = replace(
+        options,
+        max_calls=7728,
+        max_input_tokens=10**9,
+        max_output_tokens=10**9,
+        max_cost_microusd=10**9,
+    )
+    exported["collection"] = asdict(options)
+    assert prepare_collection(plan, options)["next_batch"]
+    result = import_export(
+        canonical_payload(exported), plan=plan, options=options, **runs
+    )
+    assert result["completeness"]["completed_trials"] == 7728
+    assert 1 < len(result["sources"]) <= 1000
+    assert max(source["byte_size"] for source in result["sources"]) <= 16 * 1024 * 1024
+    assert len(canonical_payload(result)) <= 384 * 1024 * 1024

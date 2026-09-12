@@ -58,7 +58,7 @@ credentials or provider URL:
 ```json
 {
   "grader": "openai/example-judge",
-  "inspect_version": "0.3.254",
+  "inspect_version": "0.3.263",
   "profile": "inspect-text-frozen-answer-v1",
   "epochs": 1,
   "log_model_api": true,
@@ -84,7 +84,7 @@ valid collection preflight exits successfully and makes no provider call.
 
 The optional `invarlock-inspect-judge` package exposes an asynchronous `collect`
 API for a trusted host that explicitly constructs the Inspect model. Live
-collection currently supports Inspect 0.3.254 Chat Completions with one attempt
+collection currently supports Inspect 0.3.263 Chat Completions with one attempt
 per trial, zero Inspect and provider-client retries, no tools or cache, and no
 inherited model settings beyond `responses_api=false` and `max_retries=0`.
 Collection uses an exclusive checkpoint lock, writes a durable admission before

@@ -136,7 +136,7 @@ def test_collect_preflight_shows_explicit_budgets_without_claiming_a_runner(stag
     path.write_text(json.dumps(value))
     budget = {
         "grader": "example-judge",
-        "inspect_version": "0.3.254",
+        "inspect_version": "0.3.263",
         "profile": "inspect-text-frozen-answer-v1",
         "epochs": 1,
         "log_model_api": True,

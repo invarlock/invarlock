@@ -204,7 +204,7 @@ def _collection_budgets(
         )
     if (
         value["grader"] != plan["judge"]["requested_model"]
-        or value["inspect_version"] != "0.3.254"
+        or value["inspect_version"] != "0.3.263"
         or value["profile"] != "inspect-text-frozen-answer-v1"
         or type(value["epochs"]) is not int
         or value["epochs"] != 1

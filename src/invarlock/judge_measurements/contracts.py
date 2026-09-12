@@ -671,7 +671,7 @@ def _inspect_source_trials(decoded: dict[str, Any]) -> list[dict[str, Any]]:
         _fail("retained Inspect source has an unsupported shape")
     if (
         decoded["format"] != INSPECT_SOURCE_FORMAT
-        or decoded["inspect_version"] != "0.3.254"
+        or decoded["inspect_version"] not in {"0.3.254", "0.3.263"}
         or not isinstance(decoded["records"], list)
     ):
         _fail("retained Inspect source has an unsupported profile")
@@ -704,7 +704,7 @@ def _inspect_source_trials(decoded: dict[str, Any]) -> list[dict[str, Any]]:
         or not 0 < len(grader) <= 256
         or any(part in grader for part in (":", "@", "?", "#", "\\"))
         or any(ord(char) < 33 for char in grader)
-        or collection["inspect_version"] != "0.3.254"
+        or collection["inspect_version"] != decoded["inspect_version"]
         or collection["profile"] != "inspect-text-frozen-answer-v1"
         or collection["epochs"] != 1
         or type(collection["epochs"]) is not int
@@ -812,6 +812,33 @@ def _provider_completion(response: dict[str, Any]) -> object:
     _fail("retained Inspect provider response uses an unsupported shape")
 
 
+def _check_native_inspect_controls(
+    request: dict[str, Any], expected: dict[str, Any]
+) -> None:
+    for provider_key in ("temperature", "top_p"):
+        try:
+            if type(request[provider_key]) not in (int, float):
+                _fail("retained Inspect provider controls must be numeric")
+            observed = Decimal(str(request[provider_key]))
+            required = Decimal(str(expected[provider_key]))
+        except (KeyError, TypeError, ValueError) as exc:
+            raise JudgeMeasurementContractError(
+                "retained Inspect provider config is incomplete"
+            ) from exc
+        if observed != required:
+            _fail("retained Inspect provider config differs from the request")
+    seed = request.get("seed")
+    if seed != expected["seed"] or (seed is not None and type(seed) is not int):
+        _fail("retained Inspect provider seed differs from the request")
+    if len({"max_tokens", "max_completion_tokens"} & request.keys()) != 1:
+        _fail("retained Inspect provider request must use one token limit")
+    token_limit = request.get("max_tokens", request.get("max_completion_tokens"))
+    if type(token_limit) is not int or token_limit != expected["max_output_tokens"]:
+        _fail("retained Inspect provider token limit differs from the request")
+    if type(request.get("n", 1)) is not int or request.get("n", 1) != 1:
+        _fail("retained Inspect provider request must select one completion")
+
+
 def _check_inspect_provider_projection(
     *,
     call: dict[str, Any],
@@ -820,6 +847,28 @@ def _check_inspect_provider_projection(
     completed: bool,
 ) -> None:
     request = call["request"]
+    normalized = request.get("format") == "invarlock/judge-request-v1"
+    if normalized:
+        if canonical_payload(request) != canonical_payload(normalized_request):
+            _fail(
+                "retained Inspect normalized provider request differs from the request"
+            )
+    else:
+        allowed_controls = {
+            "model",
+            "messages",
+            "temperature",
+            "top_p",
+            "max_tokens",
+            "max_completion_tokens",
+            "seed",
+            "n",
+            "tools",
+            "tool_choice",
+            "extra_headers",
+        }
+        if set(request) - allowed_controls:
+            _fail("retained Inspect provider request contains unsupported controls")
     messages = request.get("messages")
     if not isinstance(messages, list):
         _fail("retained Inspect provider request must contain chat messages")
@@ -827,6 +876,7 @@ def _check_inspect_provider_projection(
     for message in messages:
         if (
             not isinstance(message, dict)
+            or set(message) != {"role", "content"}
             or not isinstance(message.get("role"), str)
             or not isinstance(message.get("content"), str)
         ):
@@ -844,25 +894,8 @@ def _check_inspect_provider_projection(
     }:
         _fail("retained Inspect provider model differs from the approved request")
     expected = normalized_request["config"]
-    nested = request.get("config")
-    if nested is not None and nested != expected:
-        _fail("retained Inspect provider config differs from the approved request")
-    if nested is None:
-        for provider_key in ("temperature", "top_p"):
-            try:
-                observed = Decimal(str(request[provider_key]))
-                required = Decimal(str(expected[provider_key]))
-            except (KeyError, TypeError, ValueError) as exc:
-                raise JudgeMeasurementContractError(
-                    "retained Inspect provider config is incomplete"
-                ) from exc
-            if observed != required:
-                _fail("retained Inspect provider config differs from the request")
-        if expected["seed"] is not None and request.get("seed") != expected["seed"]:
-            _fail("retained Inspect provider seed differs from the request")
-        token_limit = request.get("max_tokens", request.get("max_completion_tokens"))
-        if token_limit != expected["max_output_tokens"]:
-            _fail("retained Inspect provider token limit differs from the request")
+    if not normalized:
+        _check_native_inspect_controls(request, expected)
     # Inspect 0.3.254 retains OpenAI's NOT_GIVEN values as JSON null. Both
     # absent/null and an empty list describe the same tool-free request.
     if request.get("tools") not in (None, []):
@@ -924,7 +957,9 @@ def _check_inspect_provider_projection(
             _fail("retained Inspect provider usage contradicts its output")
 
 
-def _source_trials(source: dict[str, Any]) -> list[dict[str, Any]]:
+def _source_trials(
+    source: dict[str, Any], *, inspect_collections: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
     content = source["content"]
     encoded = content.encode("utf-8")
     if len(encoded) != source["byte_size"]:
@@ -940,7 +975,9 @@ def _source_trials(source: dict[str, Any]) -> list[dict[str, Any]]:
     if not isinstance(decoded, dict):
         _fail(f"source {source['source_id']!r} has an unsupported retained shape")
     if source["profile"] == "retained-inspect-model-events-v1":
-        return _inspect_source_trials(decoded)
+        trials = _inspect_source_trials(decoded)
+        inspect_collections.append(decoded["collection"])
+        return trials
     if (
         set(decoded) != {"format", "trials"}
         or decoded.get("format") != SOURCE_FORMAT
@@ -987,6 +1024,30 @@ def _require_declared_source_profile(raw: dict[str, Any]) -> None:
         _fail("measurement source profile differs from the declared profile")
 
 
+def _check_inspect_shard_budgets(
+    inspect_collections: list[dict[str, Any]],
+    replayed: dict[str, dict[str, Any]],
+    plan_raw: dict[str, Any],
+) -> None:
+    if inspect_collections:
+        collection = inspect_collections[0]
+        if any(item != collection for item in inspect_collections[1:]):
+            _fail("retained Inspect shards must bind the same collection options")
+        spent_calls = sum(len(trial["attempts"]) for trial in replayed.values())
+        if (
+            spent_calls > collection["max_calls"]
+            or spent_calls * collection["input_tokens_per_call"]
+            > collection["max_input_tokens"]
+            or spent_calls * plan_raw["judge"]["config"]["max_output_tokens"]
+            > collection["max_output_tokens"]
+            or spent_calls * collection["cost_microusd_per_call"]
+            > collection["max_cost_microusd"]
+        ):
+            _fail(
+                "retained Inspect shards exceed their aggregate resource reservations"
+            )
+
+
 def validate_measurements(
     value: JudgeMeasurements,
     plan: JudgeMeasurementPlan,
@@ -1018,12 +1079,15 @@ def validate_measurements(
 
     sources: dict[str, dict[str, Any]] = {}
     replayed: dict[str, dict[str, Any]] = {}
+    inspect_collections: list[dict[str, Any]] = []
     for source in raw["sources"]:
         source_id = source["source_id"]
         if source_id in sources:
             _fail("measurement source IDs must be unique")
         sources[source_id] = source
-        for record_index, trial in enumerate(_source_trials(source)):
+        for record_index, trial in enumerate(
+            _source_trials(source, inspect_collections=inspect_collections)
+        ):
             _check_trial_integer_types(trial)
             trial_id = trial.get("trial_id")
             if not isinstance(trial_id, str) or trial_id in replayed:
@@ -1037,6 +1101,8 @@ def validate_measurements(
                 ):
                     _fail("retained source position mapping is inconsistent")
             replayed[trial_id] = trial
+
+    _check_inspect_shard_budgets(inspect_collections, replayed, plan_raw)
 
     bindings = {item["case_id"]: item for item in plan_raw["answer_bindings"]}
     repetitions = plan_raw["schedule"]["repetitions"]
@@ -1100,7 +1166,9 @@ def validate_measurements(
                 _fail("source record positions must be unique across trials")
             source_positions.add(position)
             event = (
-                attempt["source"]["source_id"],
+                raw["source_profile"]
+                if inspect_collections
+                else attempt["source"]["source_id"],
                 attempt["source"]["model_event_id"],
             )
             if event in source_events:

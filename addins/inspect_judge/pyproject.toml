@@ -12,7 +12,7 @@ license = "Apache-2.0"
 dependencies = ["invarlock==0.15.0"]
 
 [project.optional-dependencies]
-inspect = ["inspect-ai==0.3.254"]
+inspect = ["inspect-ai==0.3.263", "openai==3.13.0", "httpx==0.28.1"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

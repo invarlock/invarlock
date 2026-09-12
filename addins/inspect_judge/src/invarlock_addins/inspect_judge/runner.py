@@ -9,12 +9,19 @@ import importlib.metadata
 import os
 import stat
 import time
-from dataclasses import asdict, dataclass
+from collections.abc import Callable
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any, cast
 
-from invarlock.evidence_pack_json import parse_json_bytes, read_regular_file_bytes
+from invarlock.captured_contracts import _read_at
+from invarlock.evidence_pack_json import parse_json_bytes
 from invarlock.filesystem.atomic_file import write_file_no_replace
+from invarlock.filesystem.paths import (
+    PathChangedError,
+    entry_identity,
+    pinned_directory,
+)
 from invarlock.judge_measurement_types import JudgeMeasurementPlan, JudgeMeasurements
 from invarlock.judge_measurements.contracts import (
     canonical_payload,
@@ -26,6 +33,7 @@ from .collector import (
     EXPORT_FORMAT,
     EXPORT_PROFILE,
     INSPECT_VERSION,
+    MAX_RETAINED_EVENT_BYTES,
     CollectionOptions,
     InspectJudgeError,
     _check_options,
@@ -123,16 +131,14 @@ def _initialize_checkpoint(
     plan: JudgeMeasurementPlan,
     options: CollectionOptions,
     runner: RunnerOptions,
+    directory_fd: int,
 ) -> None:
     runner.validate()
     directory = runner.checkpoint_directory
-    directory.mkdir(mode=0o700, parents=True, exist_ok=True)
     expected = canonical_payload(_header(plan, options, runner))
     path = directory / _HEADER
-    if path.exists():
-        observed = read_regular_file_bytes(
-            path, label="Inspect judge checkpoint header", max_bytes=65536
-        )
+    if _HEADER in os.listdir(directory_fd):
+        observed, _ = _read_at(directory_fd, _HEADER, 65536)
         if observed != expected:
             raise InspectJudgeError("checkpoint identity differs from this collection")
     else:
@@ -180,24 +186,22 @@ def _checkpoint_export(
     plan: JudgeMeasurementPlan,
     options: CollectionOptions,
     runner: RunnerOptions,
+    directory_fd: int,
 ) -> dict[str, Any]:
     exported = _empty_export(plan, options, runner)
     by_id = {sample["id"]: sample for sample in exported["samples"]}
     records: dict[tuple[str, int], dict[str, Any]] = {}
     admissions: set[tuple[str, int]] = set()
     results: set[tuple[str, int]] = set()
-    for path in sorted(
-        runner.checkpoint_directory.iterdir(), key=lambda item: item.name
-    ):
+    for name in sorted(os.listdir(directory_fd)):
+        path = Path(name)
         if path.name in {_HEADER, _LOCK}:
             continue
         is_admission = path.name.startswith(_ADMISSION_PREFIX)
         is_result = path.name.startswith(_RESULT_PREFIX)
         if not (is_admission or is_result) or path.suffix != ".json":
             raise InspectJudgeError("checkpoint directory contains an unknown entry")
-        payload = read_regular_file_bytes(
-            path, label="Inspect judge checkpoint attempt", max_bytes=2 * 1024 * 1024
-        )
+        payload, _ = _read_at(directory_fd, name, MAX_RETAINED_EVENT_BYTES + 4096)
         record = parse_json_bytes(payload, label="Inspect judge checkpoint attempt")
         if not isinstance(record, dict) or set(record) != {
             "trial_id",
@@ -238,14 +242,18 @@ def _checkpoint_path(
     return runner.checkpoint_directory / f"{prefix}{trial_id}-{attempt:02d}.json"
 
 
-def _acquire_collection_lock(directory: Path) -> int:
+def _acquire_collection_lock(directory_fd: int) -> int:
     flags = os.O_RDWR | os.O_CREAT | os.O_CLOEXEC
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
-    descriptor = os.open(directory / _LOCK, flags, 0o600)
+    descriptor = os.open(_LOCK, flags, 0o600, dir_fd=directory_fd)
     try:
         current = os.fstat(descriptor)
-        if not stat.S_ISREG(current.st_mode) or current.st_uid != os.geteuid():
+        if (
+            not stat.S_ISREG(current.st_mode)
+            or current.st_uid != os.geteuid()
+            or stat.S_IMODE(current.st_mode) & 0o077
+        ):
             raise InspectJudgeError("collection lock is not a safe regular file")
         try:
             fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -374,7 +382,6 @@ def _project_event(
     expected_request: dict[str, Any],
     options: CollectionOptions,
     failure_status: str | None,
-    failure_message: str | None,
 ) -> dict[str, Any]:
     def public_message(message: Any) -> dict[str, str]:
         role = getattr(message, "role", None)
@@ -442,19 +449,18 @@ def _project_event(
         failure_status = (
             "refusal" if getattr(output, "error", None) else "timeout_ambiguous"
         )
-        failure_message = str(getattr(output, "error", None) or event_error)
     error = None
     if failure_status is not None:
         error = {
             "status": failure_status,
             "code": "inspect-call-failed",
-            "message": (failure_message or "Inspect judge call did not complete")[
-                :4096
-            ],
+            "message": "Inspect judge call did not complete",
         }
         resolved_model = None
         projected_usage = None
         stop_reason = None
+        call_response = None
+        completion = ""
     config = expected_request["config"]
     event_config = getattr(event, "config", None)
     projected_config = {
@@ -559,8 +565,10 @@ async def _call_one(
     config: Any,
     options: CollectionOptions,
     pacer: _Pacer,
+    check_directory: Callable[[], None],
 ) -> dict[str, Any]:
     await pacer.wait()
+    check_directory()
     model_module = importlib.import_module("inspect_ai.model")
     sink_module = importlib.import_module("inspect_ai.model._model")
     sink = _EventSink()
@@ -574,7 +582,6 @@ async def _call_one(
         cls = classes[message["role"]]
         messages.append(cls(content=message["content"]))
     failure_status = None
-    failure_message = None
     try:
         with sink_module.use_model_event_sink(sink):
             async with asyncio.timeout(options.request_timeout_seconds):
@@ -585,13 +592,11 @@ async def _call_one(
                     config=config,
                     cache=False,
                 )
-    except TimeoutError as exc:
+    except TimeoutError:
         failure_status = "timeout_ambiguous"
-        failure_message = str(exc) or "judge request deadline elapsed"
-    except Exception as exc:
+    except Exception:
         if sink.complete is None:
             failure_status = "timeout_ambiguous"
-            failure_message = f"{type(exc).__name__}: {exc}"
     event = sink.complete or sink.pending
     if event is None:
         raise InspectJudgeError("Inspect did not expose a model event for the call")
@@ -600,11 +605,10 @@ async def _call_one(
         expected_request=request,
         options=options,
         failure_status=failure_status,
-        failure_message=failure_message,
     )
 
 
-async def collect(
+async def _collect_pinned(
     *,
     plan: JudgeMeasurementPlan,
     options: CollectionOptions,
@@ -612,6 +616,8 @@ async def collect(
     model: Any,
     baseline_run: dict[str, Any],
     subject_run: dict[str, Any],
+    directory_fd: int,
+    directory_bindings: tuple[tuple[Path, tuple[int, int, int]], ...],
 ) -> JudgeMeasurements:
     """Collect or resume fixed-answer judgments with durable attempt shards.
 
@@ -632,8 +638,16 @@ async def collect(
         )
     _require_provider_retries_disabled(model)
     _require_clean_model_configuration(model)
-    _initialize_checkpoint(plan, options, runner)
-    lock_descriptor = _acquire_collection_lock(runner.checkpoint_directory)
+
+    def check_directory() -> None:
+        for path, identity in directory_bindings:
+            if entry_identity(path.stat(follow_symlinks=False)) != identity:
+                raise PathChangedError("checkpoint directory ancestry changed")
+
+    check_directory()
+    _initialize_checkpoint(plan, options, runner, directory_fd)
+    check_directory()
+    lock_descriptor = _acquire_collection_lock(directory_fd)
     try:
         config = prepare_inspect_config(plan, options)
         rows = _frozen_rows(baseline_run, subject_run)
@@ -641,7 +655,8 @@ async def collect(
         started = time.monotonic()
 
         while True:
-            exported = _checkpoint_export(plan, options, runner)
+            check_directory()
+            exported = _checkpoint_export(plan, options, runner, directory_fd)
             checkpoint = import_export(
                 canonical_payload(exported),
                 plan=plan,
@@ -664,6 +679,7 @@ async def collect(
 
             scheduled: list[tuple[dict[str, Any], dict[str, Any]]] = []
             for item in batch["next_batch"]:
+                check_directory()
                 row = rows[item["case_id"]]
                 request = _render_request(
                     plan, input_text=row["input"], answer=row[item["side"]]
@@ -678,6 +694,11 @@ async def collect(
                         options=options,
                     ),
                 }
+                if (
+                    len(canonical_payload(admission["event"]))
+                    > MAX_RETAINED_EVENT_BYTES
+                ):
+                    raise InspectJudgeError("admission event exceeds byte allowance")
                 write_file_no_replace(
                     _checkpoint_path(
                         runner,
@@ -687,17 +708,20 @@ async def collect(
                     ),
                     canonical_payload(admission),
                 )
+                check_directory()
                 scheduled.append((item, request))
 
             async def run_item(
                 item: dict[str, Any], request: dict[str, Any]
             ) -> tuple[dict[str, Any], dict[str, Any]]:
+                check_directory()
                 event = await _call_one(
                     model,
                     request=request,
                     config=config,
                     options=options,
                     pacer=pacer,
+                    check_directory=check_directory,
                 )
                 return item, event
 
@@ -720,7 +744,8 @@ async def collect(
                     "attempt": item["attempt"],
                     "event": event,
                 }
-                candidate = _checkpoint_export(plan, options, runner)
+                check_directory()
+                candidate = _checkpoint_export(plan, options, runner, directory_fd)
                 for sample in candidate["samples"]:
                     if sample["id"] == item["trial_id"]:
                         sample["events"][item["attempt"] - 1] = event
@@ -741,6 +766,7 @@ async def collect(
                     ),
                     canonical_payload(record),
                 )
+                check_directory()
                 persisted_set.add(identity)
 
             async def drain(
@@ -764,7 +790,9 @@ async def collect(
             except TimeoutError:
                 await drain()
                 return import_export(
-                    canonical_payload(_checkpoint_export(plan, options, runner)),
+                    canonical_payload(
+                        _checkpoint_export(plan, options, runner, directory_fd)
+                    ),
                     plan=plan,
                     options=options,
                     baseline_run=baseline_run,
@@ -775,3 +803,46 @@ async def collect(
                 raise
     finally:
         _release_collection_lock(lock_descriptor)
+
+
+async def collect(
+    *,
+    plan: JudgeMeasurementPlan,
+    options: CollectionOptions,
+    runner: RunnerOptions,
+    model: Any,
+    baseline_run: dict[str, Any],
+    subject_run: dict[str, Any],
+) -> JudgeMeasurements:
+    """Collect through a checkpoint whose directory ancestry remains pinned."""
+    _check_options(plan, options)
+    runner.validate()
+    if options.inspect_version != INSPECT_VERSION:
+        raise InspectJudgeError("live collection requires current Inspect version")
+    directory = runner.checkpoint_directory.absolute()
+    runner = replace(runner, checkpoint_directory=directory)
+    with pinned_directory(directory, create=True) as descriptor:
+        directory_stat = os.fstat(descriptor)
+        if (
+            directory_stat.st_uid != os.geteuid()
+            or stat.S_IMODE(directory_stat.st_mode) & 0o077
+        ):
+            raise InspectJudgeError(
+                "checkpoint directory must be caller-owned and private"
+            )
+        paths = (*reversed(directory.parents), directory)
+        bindings = tuple(
+            (path, entry_identity(path.stat(follow_symlinks=False))) for path in paths
+        )
+        if entry_identity(os.fstat(descriptor)) != bindings[-1][1]:
+            raise PathChangedError("checkpoint directory changed while initializing")
+        return await _collect_pinned(
+            plan=plan,
+            options=options,
+            runner=runner,
+            model=model,
+            baseline_run=baseline_run,
+            subject_run=subject_run,
+            directory_fd=descriptor,
+            directory_bindings=bindings,
+        )
