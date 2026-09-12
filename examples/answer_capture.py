@@ -32,8 +32,8 @@ class Adapter(Protocol):
     async def generate(self, request: dict[str, Any]) -> dict[str, Any]: ...
 
 
-def read(path: Path) -> dict[str, Any]:
-    value = parse_json_bytes(read_file(path, 16 * 1024 * 1024), label=str(path))
+def read(path: Path, maximum: int = 16 * 1024 * 1024) -> dict[str, Any]:
+    value = parse_json_bytes(read_file(path, maximum), label=str(path))
     if not isinstance(value, dict):
         raise ValueError("input must be a JSON object")
     return value

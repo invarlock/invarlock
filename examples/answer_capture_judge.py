@@ -8,7 +8,7 @@ import hashlib
 from pathlib import Path
 
 from examples.answer_capture import check_result, digest, exact, read
-from invarlock.evaluation_record_contracts.contracts import validate
+from invarlock.evaluation_record_contracts.contracts import MAX_INPUT_BYTES, validate
 from invarlock.evaluation_records.cases import case_set_digest, validate_run_case_set
 from invarlock.evaluation_records.io import run_digest
 from invarlock.evidence_pack_contract import canonical_json_bytes
@@ -32,7 +32,8 @@ def prepare(
     manifest = read(capture / "manifest.json")
     manifest_digest = digest(manifest)
     runs = {
-        side: read(capture / f"{side}_run.json") for side in ("baseline", "subject")
+        side: read(capture / f"{side}_run.json", MAX_INPUT_BYTES)
+        for side in ("baseline", "subject")
     }
     case_digest = case_set_digest(manifest["case_set"])
     rows = {}

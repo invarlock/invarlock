@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+import examples.answer_capture_judge as answer_capture_judge
 from examples.answer_capture import capture, read
 from examples.answer_capture_judge import prepare
 from examples.answer_capture_process import ProcessAdapter
@@ -111,6 +112,42 @@ def test_pipeline_capture_and_bound_continuation(tmp_path):
         prepare(
             directory, plan, policy, {"case-1": "unit-1"}, collection, tmp_path / "bad"
         )
+
+
+def test_judge_continuation_uses_the_run_contract_limit(tmp_path, monkeypatch):
+    transport, config = adapter(tmp_path)
+    cases = read(ROOT / "examples/answer-capture/cases.json")
+    directory = tmp_path / "capture"
+    asyncio.run(
+        capture(
+            config=config,
+            cases=cases,
+            adapter_sha256=transport.sha256,
+            adapter=transport,
+            directory=directory,
+        )
+    )
+    actual_read = answer_capture_judge.read
+    observed = {}
+
+    def bounded_read(path, maximum=16 * 1024 * 1024):
+        if path.name.endswith("_run.json"):
+            observed[path.name] = maximum
+        return actual_read(path, maximum)
+
+    monkeypatch.setattr(answer_capture_judge, "read", bounded_read)
+    answer_capture_judge.prepare(
+        directory,
+        read(ROOT / "examples/judge-measurements/plan.json"),
+        read(ROOT / "examples/judge-measurements/analysis_policy.json"),
+        {"case-1": "unit-1"},
+        read(ROOT / "examples/judge-measurements/collection.json"),
+        tmp_path / "judge",
+    )
+    assert observed == {
+        "baseline_run.json": 128 * 1024 * 1024,
+        "subject_run.json": 128 * 1024 * 1024,
+    }
 
 
 @pytest.mark.parametrize(
