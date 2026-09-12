@@ -14,7 +14,8 @@ and security checks.
 ## Maintained families
 
 - `checks/` contains the packaged-contract synchronizer, public-evidence and
-  example-scenario audits, and the source-tree cruft check.
+  example-scenario audits, the bounded judge statistics calibration, and the
+  source-tree cruft check.
 - `release/` validates a clean release checkout and built distributions.
   `make dist-check` binds the core wheel/sdist and all five first-party
   optional wheel/sdist pairs to their exact checkout sources, metadata, and
