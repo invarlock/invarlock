@@ -247,6 +247,31 @@ def _require_integer(value: Any, label: str) -> None:
         _fail(f"{label} must be an integer")
 
 
+def _validate_inspect_grader(value: object) -> None:
+    if (
+        not isinstance(value, str)
+        or not 0 < len(value) <= 256
+        or any(part in value for part in (":", "@", "?", "#", "\\"))
+        or any(ord(char) < 33 for char in value)
+    ):
+        _fail("grader must be an explicit model identity without URL credentials")
+
+
+def _validate_inspect_plan_collection_identity(
+    plan: JudgeMeasurementPlan, *, grader: object, inspect_version: object
+) -> None:
+    _validate_inspect_grader(grader)
+    if grader != plan["judge"]["requested_model"]:
+        _fail("grader differs from approved plan")
+    if plan["judge"]["model_identity"]["kind"] != "hosted_api":
+        _fail("local weight execution is not qualified by this adapter")
+    if grader == "openai/gpt-5.6-sol" and (
+        inspect_version != "0.3.263"
+        or Decimal(plan["judge"]["config"]["temperature"]) != Decimal(1)
+    ):
+        _fail("GPT-5.6 Sol requires Inspect 0.3.263 and approved temperature 1")
+
+
 def _check_trial_integer_types(trial: dict[str, Any]) -> None:
     _require_integer(trial.get("repetition"), "trial repetition")
     selected = trial.get("selected_attempt")
@@ -1081,6 +1106,42 @@ def _frozen_run_records(
     return records
 
 
+def _frozen_answer_requests(
+    plan: JudgeMeasurementPlan,
+    baseline_run: dict[str, Any],
+    subject_run: dict[str, Any],
+) -> tuple[
+    dict[str, dict[str, dict[str, Any]]],
+    dict[tuple[str, str], bytes],
+]:
+    plan_raw = cast(dict[str, Any], plan)
+    records = _frozen_run_records(plan_raw, baseline_run, subject_run)
+    requests: dict[tuple[str, str], bytes] = {}
+    for binding in plan_raw["answer_bindings"]:
+        case_id = binding["case_id"]
+        for side in ("baseline", "subject"):
+            record = records[side][case_id]
+            if record["error"] is not None:
+                _fail(f"case {case_id!r} cannot grade a failed frozen answer")
+            if not isinstance(record["input"], str) or not isinstance(
+                record["output"], str
+            ):
+                _fail(
+                    "the text-frozen-answer profile requires string inputs and answers"
+                )
+            answer_key = f"{side}_answer_sha256"
+            if binding[answer_key] != _text_sha256(record["output"]):
+                _fail(f"case {case_id!r} does not bind the frozen {side} answer")
+            request = render_judge_request(
+                plan, input_text=record["input"], answer_text=record["output"]
+            )
+            request_key = f"{side}_request_sha256"
+            if binding[request_key] != _sha256(request):
+                _fail(f"case {case_id!r} request binding does not match frozen inputs")
+            requests[(case_id, side)] = request
+    return records, requests
+
+
 def _require_declared_source_profile(raw: dict[str, Any]) -> None:
     if any(source["profile"] != raw["source_profile"] for source in raw["sources"]):
         _fail("measurement source profile differs from the declared profile")
@@ -1095,6 +1156,11 @@ def _check_inspect_shard_budgets(
         collection = inspect_collections[0]
         if any(item != collection for item in inspect_collections[1:]):
             _fail("retained Inspect shards must bind the same collection options")
+        _validate_inspect_plan_collection_identity(
+            cast(JudgeMeasurementPlan, plan_raw),
+            grader=collection["grader"],
+            inspect_version=collection["inspect_version"],
+        )
         spent_calls = sum(len(trial["attempts"]) for trial in replayed.values())
         if (
             spent_calls > collection["max_calls"]
@@ -1137,7 +1203,7 @@ def validate_measurements(
     if raw["plan_sha256"] != plan_sha256:
         _fail("measurements do not bind the supplied plan")
 
-    run_records = _frozen_run_records(plan_raw, baseline_run, subject_run)
+    _, frozen_requests = _frozen_answer_requests(plan, baseline_run, subject_run)
 
     sources: dict[str, dict[str, Any]] = {}
     replayed: dict[str, dict[str, Any]] = {}
@@ -1193,24 +1259,11 @@ def validate_measurements(
         if trial_raw["plan_sha256"] != plan_sha256:
             _fail(f"trial {expected_id!r} does not bind the supplied plan")
         binding = bindings[trial_raw["case_id"]]
-        record = run_records[trial_raw["side"]][trial_raw["case_id"]]
-        if record["error"] is not None:
-            _fail(f"trial {expected_id!r} cannot grade a failed frozen answer")
-        if not isinstance(record["input"], str) or not isinstance(
-            record["output"], str
-        ):
-            _fail("the text-frozen-answer profile requires string inputs and answers")
         answer_key = f"{trial_raw['side']}_answer_sha256"
-        if trial_raw["answer_sha256"] != binding[answer_key] or binding[
-            answer_key
-        ] != _text_sha256(record["output"]):
+        if trial_raw["answer_sha256"] != binding[answer_key]:
             _fail(f"trial {expected_id!r} does not bind the frozen answer")
-        expected_request = render_judge_request(
-            plan, input_text=record["input"], answer_text=record["output"]
-        )
+        expected_request = frozen_requests[(trial_raw["case_id"], trial_raw["side"])]
         request_key = f"{trial_raw['side']}_request_sha256"
-        if binding[request_key] != _sha256(expected_request):
-            _fail(f"trial {expected_id!r} request binding does not match frozen inputs")
         _check_attempts(
             trial_raw,
             plan=plan_raw,

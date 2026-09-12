@@ -7,7 +7,6 @@ import hashlib
 import importlib
 import importlib.metadata
 from dataclasses import asdict, dataclass, fields
-from decimal import Decimal
 from typing import Any, cast
 
 from invarlock.evidence_pack_json import StrictJsonError, parse_json_bytes
@@ -18,9 +17,12 @@ from invarlock.judge_measurement_types import (
 from invarlock.judge_measurements.contracts import (
     JUDGE_REQUEST_MAX_BYTES,
     MEASUREMENTS_MAX_BYTES,
+    JudgeMeasurementContractError,
     _check_attempts,
     _check_retained_inspect_event,
     _check_trial_integer_types,
+    _validate_inspect_grader,
+    _validate_inspect_plan_collection_identity,
     _validator,
     canonical_payload,
     expected_trial_id,
@@ -141,12 +143,10 @@ class CollectionOptions:
 
     def validate(self) -> None:
         _text(self.grader, 256, "explicit grader")
-        # The named model is an identity, never a URL or a credential carrier.
-        _require(
-            all(part not in self.grader for part in (":", "@", "?", "#", "\\"))
-            and all(ord(char) >= 33 for char in self.grader),
-            "grader must be an explicit model identity without URL credentials",
-        )
+        try:
+            _validate_inspect_grader(self.grader)
+        except JudgeMeasurementContractError as exc:
+            raise InspectJudgeError(str(exc)) from exc
         _require(
             self.inspect_version in REPLAY_INSPECT_VERSIONS,
             "unsupported Inspect version",
@@ -181,20 +181,14 @@ class CollectionOptions:
 def _check_options(plan: JudgeMeasurementPlan, options: CollectionOptions) -> str:
     digest = measurement_plan_digest(plan)
     options.validate()
-    _require(
-        options.grader == plan["judge"]["requested_model"],
-        "grader differs from approved plan",
-    )
-    _require(
-        plan["judge"]["model_identity"]["kind"] == "hosted_api",
-        "local weight execution is not qualified by this adapter",
-    )
-    if options.grader == "openai/gpt-5.6-sol":
-        _require(
-            options.inspect_version == "0.3.263"
-            and Decimal(plan["judge"]["config"]["temperature"]) == Decimal(1),
-            "GPT-5.6 Sol requires Inspect 0.3.263 and approved temperature 1",
+    try:
+        _validate_inspect_plan_collection_identity(
+            plan,
+            grader=options.grader,
+            inspect_version=options.inspect_version,
         )
+    except JudgeMeasurementContractError as exc:
+        raise InspectJudgeError(str(exc)) from exc
     return digest
 
 

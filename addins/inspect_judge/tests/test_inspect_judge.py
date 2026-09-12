@@ -138,6 +138,7 @@ def test_offline_replay_rejects_retained_inspect_event_substitution(data):
     [
         (lambda collection: collection.update(max_calls=1), "resource reservations"),
         (lambda collection: collection.update(concurrency=True), "supported range"),
+        (lambda collection: collection.update(grader="other-judge"), "approved plan"),
         (lambda collection: collection.update(unknown=True), "must be an object"),
     ],
 )

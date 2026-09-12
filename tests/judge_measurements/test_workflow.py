@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 import socket
@@ -17,7 +18,10 @@ from typer.testing import CliRunner
 
 from invarlock.cli.app import app
 from invarlock.core.evaluation_request import evaluation_request_mode
-from invarlock.judge_measurements.contracts import measurement_plan_digest
+from invarlock.judge_measurements.contracts import (
+    measurement_plan_digest,
+    render_judge_request,
+)
 from invarlock.judge_measurements.workflow import (
     JudgeWorkflowError,
     load_judge_request,
@@ -195,7 +199,26 @@ def test_collect_preflight_shows_explicit_budgets_without_claiming_a_runner(stag
     assert "exactly the supported" in result.stdout
 
 
-@pytest.mark.parametrize("unsupported", ["local_weights", "sol_temperature"])
+def _rebind_plan_requests(root: Path, plan: dict) -> None:
+    runs = {
+        side: json.loads((root / f"{side}_run.json").read_text())
+        for side in ("baseline", "subject")
+    }
+    rows = {
+        side: {row["id"]: row for row in run["records"]} for side, run in runs.items()
+    }
+    for binding in plan["answer_bindings"]:
+        for side in ("baseline", "subject"):
+            row = rows[side][binding["case_id"]]
+            request = render_judge_request(
+                plan, input_text=row["input"], answer_text=row["output"]
+            )
+            binding[f"{side}_request_sha256"] = hashlib.sha256(request).hexdigest()
+
+
+@pytest.mark.parametrize(
+    "unsupported", ["local_weights", "sol_temperature", "grader_syntax"]
+)
 def test_collect_preflight_rejects_profiles_the_integration_cannot_run(
     staged, unsupported
 ):
@@ -244,6 +267,14 @@ def test_collect_preflight_rejects_profiles_the_integration_cannot_run(
         )
         collection["grader"] = "openai/gpt-5.6-sol"
         expected = "approved temperature 1"
+        if unsupported == "grader_syntax":
+            plan["judge"].update(
+                requested_model="openai/gpt-5.6-sol ",
+                approved_resolved_models=["gpt-5.6-sol "],
+            )
+            collection["grader"] = "openai/gpt-5.6-sol "
+            expected = "without URL credentials"
+        _rebind_plan_requests(path.parent, plan)
     plan_path.write_text(json.dumps(plan))
     policy_path = path.parent / "analysis_policy.json"
     policy = json.loads(policy_path.read_text())
@@ -254,6 +285,51 @@ def test_collect_preflight_rejects_profiles_the_integration_cannot_run(
     result = RUNNER.invoke(app, ["evaluate", str(path), "--preflight", "--json"])
     assert result.exit_code == 2
     assert expected in result.stdout
+
+
+def test_collect_preflight_validates_frozen_answer_bindings(staged):
+    path, value = staged
+    value["execution"] = {
+        "mode": "judge_collect",
+        "collection": {
+            "integration": "inspect-judge",
+            "configuration": "collection.json",
+        },
+    }
+    value["comparison"]["measurements"] = None
+    path.write_text(json.dumps(value))
+    plan_path = path.parent / "plan.json"
+    plan = json.loads(plan_path.read_text())
+    plan["answer_bindings"][0]["baseline_answer_sha256"] = "0" * 64
+    plan_path.write_text(json.dumps(plan))
+    policy_path = path.parent / "analysis_policy.json"
+    policy = json.loads(policy_path.read_text())
+    policy["plan_sha256"] = measurement_plan_digest(plan)
+    policy_path.write_text(json.dumps(policy))
+    collection = {
+        "grader": "example-judge",
+        "inspect_version": "0.3.263",
+        "profile": "inspect-text-frozen-answer-v1",
+        "epochs": 1,
+        "log_model_api": True,
+        "log_samples": True,
+        "sdk_max_retries": 0,
+        "tools": False,
+        "max_calls": 2,
+        "max_input_tokens": 2000,
+        "max_output_tokens": 256,
+        "max_cost_microusd": 1000000,
+        "input_tokens_per_call": 1000,
+        "cost_microusd_per_call": 500000,
+        "concurrency": 1,
+        "requests_per_minute": 10,
+        "request_timeout_seconds": 30,
+    }
+    (path.parent / "collection.json").write_text(json.dumps(collection))
+
+    result = RUNNER.invoke(app, ["evaluate", str(path), "--preflight", "--json"])
+    assert result.exit_code == 2
+    assert "does not bind the frozen baseline answer" in result.stdout
 
 
 @pytest.mark.parametrize(

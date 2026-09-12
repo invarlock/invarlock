@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from decimal import Decimal
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Literal, cast
@@ -28,7 +27,9 @@ from invarlock.judge_measurement_types import (
 )
 from invarlock.judge_measurements.analysis import decode_analysis_policy
 from invarlock.judge_measurements.contracts import (
-    _frozen_run_records,
+    JudgeMeasurementContractError,
+    _frozen_answer_requests,
+    _validate_inspect_plan_collection_identity,
     canonical_payload,
     validate_measurement_plan,
     validate_measurements,
@@ -204,8 +205,7 @@ def _collection_budgets(
             "collection configuration must contain exactly the supported Inspect judge fields"
         )
     if (
-        value["grader"] != plan["judge"]["requested_model"]
-        or value["inspect_version"] != "0.3.263"
+        value["inspect_version"] != "0.3.263"
         or value["profile"] != "inspect-text-frozen-answer-v1"
         or type(value["epochs"]) is not int
         or value["epochs"] != 1
@@ -240,16 +240,14 @@ def _collection_budgets(
         raise JudgeWorkflowError(
             "live Inspect collection currently requires one attempt per trial"
         )
-    if plan["judge"]["model_identity"]["kind"] != "hosted_api":
-        raise JudgeWorkflowError(
-            "local weight execution is not qualified by the Inspect judge integration"
+    try:
+        _validate_inspect_plan_collection_identity(
+            plan,
+            grader=value["grader"],
+            inspect_version=value["inspect_version"],
         )
-    if value["grader"] == "openai/gpt-5.6-sol" and Decimal(
-        plan["judge"]["config"]["temperature"]
-    ) != Decimal(1):
-        raise JudgeWorkflowError(
-            "GPT-5.6 Sol requires Inspect 0.3.263 and approved temperature 1"
-        )
+    except JudgeMeasurementContractError as exc:
+        raise JudgeWorkflowError(str(exc)) from exc
     return budgets
 
 
@@ -308,7 +306,7 @@ def _prepare(request: JudgeEvaluationRequest) -> tuple[dict[str, Any], dict[str,
                 "maximum_interval_width": str(policy.maximum_interval_width),
             }
         if {"baseline_run", "subject_run"} <= values.keys():
-            _frozen_run_records(
+            _frozen_answer_requests(
                 values["plan"], values["baseline_run"], values["subject_run"]
             )
             result["baseline"] = values["baseline_run"]["run_id"]
