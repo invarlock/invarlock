@@ -235,3 +235,48 @@ def test_report_rejects_ambiguous_or_unbounded_case_selection(
     publication, _ = _publish(tmp_path)
     with pytest.raises(ValueError, match=message):
         render_judge_evidence(publication.path, case_ids=case_ids)
+
+
+@pytest.mark.parametrize(
+    "destination_kind", ["collision", "existing", "symlink_parent"]
+)
+def test_report_rejects_unsafe_destinations_before_replay(
+    tmp_path, monkeypatch, destination_kind
+):
+    from invarlock.judge_measurements import reporting
+
+    publication, _ = _publish(tmp_path)
+    original = {path.name: path.read_bytes() for path in publication.path.iterdir()}
+    html = tmp_path / "report.html"
+    markdown = None
+    expected = "collide"
+    if destination_kind == "collision":
+        markdown = html
+    elif destination_kind == "existing":
+        html.write_text("existing report")
+        expected = "already exists"
+    else:
+        directory = tmp_path / "real"
+        directory.mkdir()
+        alias = tmp_path / "alias"
+        alias.symlink_to(directory, target_is_directory=True)
+        html = alias / "report.html"
+        expected = "parent must be a real directory"
+    monkeypatch.setattr(
+        reporting,
+        "_snapshot",
+        lambda _path: pytest.fail(
+            "unsafe destination must fail before artifact replay"
+        ),
+    )
+
+    with pytest.raises(ValueError, match=expected):
+        render_judge_evidence(publication.path, html_path=html, markdown_path=markdown)
+
+    assert original == {
+        path.name: path.read_bytes() for path in publication.path.iterdir()
+    }
+    if destination_kind == "existing":
+        assert html.read_text() == "existing report"
+    else:
+        assert not html.exists()

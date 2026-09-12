@@ -375,6 +375,54 @@ def test_unsigned_public_workflow_reports_inconclusive_honestly(staged, tmp_path
     assert suite.get("errors") == "1" and suite.get("failures") == "0"
 
 
+def test_plain_text_judge_publication_does_not_claim_recipient_verification(staged):
+    result = RUNNER.invoke(app, ["evaluate", str(staged[0]), "--unsigned"])
+
+    assert result.exit_code == 0, result.output
+    assert "Bounded judge evidence created" in result.stdout
+    assert "Recorded policy result: insufficient_evidence" in result.stdout
+    assert "Authentication: unsigned_local" in result.stdout
+    assert "Independent verification: not performed" in result.stdout
+
+
+def test_plain_text_preflight_identifies_missing_plan_without_publication(staged):
+    path, _ = staged
+    (path.parent / "plan.json").unlink()
+
+    result = RUNNER.invoke(app, ["evaluate", str(path), "--preflight"])
+
+    assert result.exit_code == 2, result.output
+    text = " ".join(result.stdout.split())
+    assert "Judge preflight needs inputs" in text
+    assert "Supply the missing request-relative inputs: plan" in text
+    assert "No model calls, signing, or publication were performed." in text
+    assert not (path.parent / "evidence").exists()
+
+
+def test_judge_verification_type_imports_resolve_the_command_signature(monkeypatch):
+    import importlib.util
+    import typing
+
+    from invarlock.cli.verification_workflow import VerificationOptions
+    from invarlock.evidence_verification import EvidenceVerification
+    from invarlock.judge_measurements import cli_verification
+
+    spec = importlib.util.spec_from_file_location(
+        "judge_verification_type_imports", cli_verification.__file__
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    with monkeypatch.context() as context:
+        context.setattr(typing, "TYPE_CHECKING", True)
+        spec.loader.exec_module(module)
+
+    assert typing.get_type_hints(module.execute_judge_verification) == {
+        "options": VerificationOptions,
+        "command_line": frozenset[str],
+        "return": EvidenceVerification,
+    }
+
+
 def test_publish_requires_explicit_authentication_choice(staged):
     result = RUNNER.invoke(app, ["evaluate", str(staged[0]), "--json"])
     assert result.exit_code == 2

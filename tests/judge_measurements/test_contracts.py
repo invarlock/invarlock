@@ -431,6 +431,28 @@ def test_rehashed_unapproved_rendered_request_is_rejected() -> None:
     _assert_measurement_error(measurements, "request was not approved", retain=True)
 
 
+def test_frozen_request_binding_must_match_rendered_answer() -> None:
+    plan = _plan()
+    plan["answer_bindings"][0]["baseline_request_sha256"] = "0" * 64
+    measurements = _measurements()
+    _bind_plan(measurements, plan)
+
+    with pytest.raises(JudgeMeasurementContractError, match="request binding"):
+        contracts.validate_measurements(
+            measurements,
+            plan,
+            baseline_run=_run("baseline"),
+            subject_run=_run("subject"),
+        )
+
+
+def test_declared_source_profile_must_match_the_retained_sources() -> None:
+    measurements = _measurements()
+    measurements["source_profile"] = "retained-inspect-model-events-v1"
+
+    _assert_measurement_error(measurements, "source profile differs")
+
+
 def test_response_limit_counts_utf8_bytes_instead_of_characters() -> None:
     measurements = _measurements()
     response = measurements["trials"][0]["attempts"][0]["response"]

@@ -82,6 +82,21 @@ def test_rehearsal_refuses_optional_sdk_install_or_import(monkeypatch, module_na
         module.require_core_only()
 
 
+def test_rehearsal_requires_an_installed_candidate_cli(monkeypatch):
+    module = load_module()
+    monkeypatch.setattr(sys, "argv", [str(SCRIPT), "--fixture", str(FIXTURE)])
+    monkeypatch.setattr(module, "require_core_only", lambda: None)
+    monkeypatch.setattr(module.shutil, "which", lambda _: None)
+    monkeypatch.setattr(
+        module.tempfile,
+        "TemporaryDirectory",
+        lambda **_kwargs: pytest.fail("missing CLI must fail before staging evidence"),
+    )
+
+    with pytest.raises(SystemExit, match="Install the candidate wheel"):
+        module.main()
+
+
 @pytest.mark.parametrize(
     "fault", ["accepts_inconclusive", "accepts_wrong_pin", "empty_report"]
 )
