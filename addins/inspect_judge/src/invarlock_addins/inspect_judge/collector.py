@@ -939,7 +939,6 @@ class _LiveCheckpoint:
             plan=cast(dict[str, Any], self.plan),
             source_ids={"inspect-export"},
             expected_request_sha256=_sha(expected_request),
-            expected_request=expected_request,
         )
         _check_retained_inspect_event(trial["attempts"][0], event, self.collection)
         sizes = self._sizes(trial, [event])

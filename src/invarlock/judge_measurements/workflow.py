@@ -28,7 +28,7 @@ from invarlock.judge_measurement_types import (
 from invarlock.judge_measurements.analysis import decode_analysis_policy
 from invarlock.judge_measurements.contracts import (
     JudgeMeasurementContractError,
-    _frozen_answer_requests,
+    _validate_frozen_answer_bindings,
     _validate_inspect_plan_collection_identity,
     canonical_payload,
     validate_measurement_plan,
@@ -306,7 +306,7 @@ def _prepare(request: JudgeEvaluationRequest) -> tuple[dict[str, Any], dict[str,
                 "maximum_interval_width": str(policy.maximum_interval_width),
             }
         if {"baseline_run", "subject_run"} <= values.keys():
-            _frozen_answer_requests(
+            _validate_frozen_answer_bindings(
                 values["plan"], values["baseline_run"], values["subject_run"]
             )
             result["baseline"] = values["baseline_run"]["run_id"]

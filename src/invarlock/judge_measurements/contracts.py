@@ -409,7 +409,6 @@ def _check_attempts(
     plan: dict[str, Any],
     source_ids: set[str],
     expected_request_sha256: str,
-    expected_request: bytes,
 ) -> None:
     attempts = trial["attempts"]
     expected_numbers = list(range(1, len(attempts) + 1))
@@ -428,8 +427,6 @@ def _check_attempts(
         _check_blob(attempt["request"], "judge request")
         if attempt["request"]["sha256"] != expected_request_sha256:
             _fail(f"trial {trial['trial_id']!r} request was not approved by the plan")
-        if attempt["request"]["text"].encode("utf-8") != expected_request:
-            _fail(f"trial {trial['trial_id']!r} request does not match frozen inputs")
         if attempt["response"] is not None:
             _check_blob(attempt["response"], "judge response")
         if attempt["source"]["source_id"] not in source_ids:
@@ -1106,17 +1103,13 @@ def _frozen_run_records(
     return records
 
 
-def _frozen_answer_requests(
+def _validate_frozen_answer_bindings(
     plan: JudgeMeasurementPlan,
     baseline_run: dict[str, Any],
     subject_run: dict[str, Any],
-) -> tuple[
-    dict[str, dict[str, dict[str, Any]]],
-    dict[tuple[str, str], bytes],
-]:
+) -> None:
     plan_raw = cast(dict[str, Any], plan)
     records = _frozen_run_records(plan_raw, baseline_run, subject_run)
-    requests: dict[tuple[str, str], bytes] = {}
     for binding in plan_raw["answer_bindings"]:
         case_id = binding["case_id"]
         for side in ("baseline", "subject"):
@@ -1138,8 +1131,7 @@ def _frozen_answer_requests(
             request_key = f"{side}_request_sha256"
             if binding[request_key] != _sha256(request):
                 _fail(f"case {case_id!r} request binding does not match frozen inputs")
-            requests[(case_id, side)] = request
-    return records, requests
+    return None
 
 
 def _require_declared_source_profile(raw: dict[str, Any]) -> None:
@@ -1203,7 +1195,7 @@ def validate_measurements(
     if raw["plan_sha256"] != plan_sha256:
         _fail("measurements do not bind the supplied plan")
 
-    _, frozen_requests = _frozen_answer_requests(plan, baseline_run, subject_run)
+    _validate_frozen_answer_bindings(plan, baseline_run, subject_run)
 
     sources: dict[str, dict[str, Any]] = {}
     replayed: dict[str, dict[str, Any]] = {}
@@ -1262,14 +1254,12 @@ def validate_measurements(
         answer_key = f"{trial_raw['side']}_answer_sha256"
         if trial_raw["answer_sha256"] != binding[answer_key]:
             _fail(f"trial {expected_id!r} does not bind the frozen answer")
-        expected_request = frozen_requests[(trial_raw["case_id"], trial_raw["side"])]
         request_key = f"{trial_raw['side']}_request_sha256"
         _check_attempts(
             trial_raw,
             plan=plan_raw,
             source_ids=set(sources),
             expected_request_sha256=binding[request_key],
-            expected_request=expected_request,
         )
         for attempt in trial_raw["attempts"]:
             position = (

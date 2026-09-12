@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import tracemalloc
 from pathlib import Path
 from typing import Any, cast
 
@@ -16,6 +17,7 @@ from invarlock.judge_measurement_types import (
 )
 from invarlock.judge_measurements import contracts
 from invarlock.judge_measurements.contracts import JudgeMeasurementContractError
+from tests.judge_measurements.test_analysis import _bundle, _runs
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "judge_measurements"
 
@@ -439,6 +441,33 @@ def test_response_limit_counts_utf8_bytes_instead_of_characters() -> None:
         sha256=hashlib.sha256(content.encode("utf-8")).hexdigest(),
     )
     _assert_measurement_error(measurements, "judge response exceeds", retain=True)
+
+
+def test_frozen_binding_validation_streams_expanded_requests() -> None:
+    plan, _ = _bundle(groups=tuple(f"unit-{index}" for index in range(32)))
+    baseline, subject = _runs(plan)
+    plan["prompt"]["system"] = "x" * (256 * 1024)
+    rows = {
+        "baseline": {row["id"]: row for row in baseline["records"]},
+        "subject": {row["id"]: row for row in subject["records"]},
+    }
+    for binding in plan["answer_bindings"]:
+        for side in ("baseline", "subject"):
+            row = rows[side][binding["case_id"]]
+            request = contracts.render_judge_request(
+                plan, input_text=row["input"], answer_text=row["output"]
+            )
+            binding[f"{side}_request_sha256"] = hashlib.sha256(request).hexdigest()
+
+    tracemalloc.start()
+    try:
+        assert (
+            contracts._validate_frozen_answer_bindings(plan, baseline, subject) is None
+        )
+        _, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+    assert peak < 12 * 1024 * 1024
 
 
 def test_incomplete_trial_is_retained_but_cannot_claim_complete() -> None:
