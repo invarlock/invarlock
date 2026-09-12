@@ -39,6 +39,7 @@ MEASUREMENTS_MAX_BYTES = 384 * 1024 * 1024
 PLAN_FORMAT = "invarlock/judge-measurement-plan-v1"
 MEASUREMENTS_FORMAT = "invarlock/judge-measurements-v1"
 SOURCE_FORMAT = "invarlock/retained-judge-json-v1"
+INSPECT_SOURCE_FORMAT = "invarlock/retained-inspect-model-events-v1"
 TRIAL_ID_SCHEME = "plan-case-side-repetition-sha256-v1"
 JUDGE_REQUEST_MAX_BYTES = 1024 * 1024
 
@@ -487,6 +488,129 @@ def _check_attempts(
         _fail("trial completeness must agree with its parse outcome")
 
 
+def _inspect_source_trials(decoded: dict[str, Any]) -> list[dict[str, Any]]:
+    if set(decoded) != {"format", "inspect_version", "records"}:
+        _fail("retained Inspect source has an unsupported shape")
+    if (
+        decoded["format"] != INSPECT_SOURCE_FORMAT
+        or decoded["inspect_version"] != "0.3.254"
+        or not isinstance(decoded["records"], list)
+    ):
+        _fail("retained Inspect source has an unsupported profile")
+    trials: list[dict[str, Any]] = []
+    for record in decoded["records"]:
+        if not isinstance(record, dict) or set(record) != {"trial", "events"}:
+            _fail("retained Inspect records must contain one trial and its events")
+        trial = record["trial"]
+        events = record["events"]
+        if (
+            not isinstance(trial, dict)
+            or not isinstance(trial.get("attempts"), list)
+            or not isinstance(events, list)
+            or len(events) != len(trial["attempts"])
+        ):
+            _fail("retained Inspect event count must match the trial attempts")
+        for attempt, event in zip(trial["attempts"], events, strict=True):
+            if not isinstance(attempt, dict) or not isinstance(event, dict):
+                _fail("retained Inspect attempts and events must be objects")
+            required = {
+                "event",
+                "uuid",
+                "role",
+                "model",
+                "input",
+                "tools",
+                "tool_choice",
+                "config",
+                "retries",
+                "cache",
+                "call",
+                "output",
+                "error",
+            }
+            if set(event) != required:
+                _fail("retained Inspect model event has unsupported fields")
+            mapping = attempt.get("source")
+            output = event.get("output")
+            call = event.get("call")
+            request = attempt.get("request")
+            if (
+                not isinstance(mapping, dict)
+                or event.get("event") != "model"
+                or event.get("uuid") != mapping.get("model_event_id")
+                or event.get("role") != "grader"
+                or not isinstance(output, dict)
+                or not isinstance(call, dict)
+                or not isinstance(request, dict)
+                or event.get("model") is None
+            ):
+                _fail("retained Inspect model event does not match its attempt")
+            if event.get("cache") is not None or event.get("retries") != 0:
+                _fail("retained Inspect model events cannot use cache or SDK retries")
+            if event.get("tools") != [] or event.get("tool_choice") != "none":
+                _fail("retained Inspect model events cannot use tools")
+            try:
+                normalized_request = parse_json_bytes(
+                    request["text"].encode("utf-8"),
+                    label="retained Inspect normalized request",
+                )
+            except (KeyError, AttributeError, StrictJsonError) as exc:
+                raise JudgeMeasurementContractError(
+                    "retained Inspect normalized request is invalid"
+                ) from exc
+            if (
+                not isinstance(normalized_request, dict)
+                or event.get("model") != normalized_request.get("model")
+                or event.get("input") != normalized_request.get("messages")
+            ):
+                _fail("retained Inspect input differs from its normalized request")
+            expected_config = normalized_request.get("config")
+            observed_config = event.get("config")
+            if not isinstance(expected_config, dict) or observed_config != {
+                "temperature": float(expected_config.get("temperature", "nan")),
+                "top_p": float(expected_config.get("top_p", "nan")),
+                "max_tokens": expected_config.get("max_output_tokens"),
+                "seed": expected_config.get("seed"),
+                "max_retries": 0,
+            }:
+                _fail("retained Inspect generation config differs from its request")
+            if set(call) != {"request", "response", "error"} or not isinstance(
+                call.get("request"), dict
+            ):
+                _fail("retained Inspect provider call is incomplete")
+            _bounded_canonical(
+                call, JUDGE_REQUEST_MAX_BYTES, "retained Inspect provider call"
+            )
+            if output.get("model") != attempt.get("resolved_model"):
+                _fail("retained Inspect resolved model does not match its attempt")
+            usage = output.get("usage")
+            if usage != attempt.get("usage"):
+                _fail("retained Inspect token usage does not match its attempt")
+            response = attempt.get("response")
+            if response is not None:
+                completion = output.get("completion")
+                try:
+                    if not isinstance(completion, str):
+                        raise AttributeError
+                    decoded_completion = parse_json_bytes(
+                        completion.encode("utf-8"), label="Inspect model completion"
+                    )
+                except (AttributeError, StrictJsonError):
+                    decoded_completion = completion
+                if canonical_payload(decoded_completion).decode(
+                    "utf-8"
+                ) != response.get("text"):
+                    _fail("retained Inspect completion does not match its attempt")
+            if output.get("request_id") != attempt.get("request_id") or output.get(
+                "finish_reason"
+            ) != attempt.get("finish_reason"):
+                _fail("retained Inspect output metadata does not match its attempt")
+            if (event.get("error") is None) != (attempt.get("status") == "completed"):
+                _fail("retained Inspect error state does not match its attempt")
+        trials.append(trial)
+    return trials
+
+
 def _source_trials(source: dict[str, Any]) -> list[dict[str, Any]]:
     content = source["content"]
     encoded = content.encode("utf-8")
@@ -500,9 +624,15 @@ def _source_trials(source: dict[str, Any]) -> list[dict[str, Any]]:
         raise JudgeMeasurementContractError(str(exc)) from exc
     if canonical_payload(decoded) != encoded:
         _fail(f"source {source['source_id']!r} content must use canonical JSON")
-    if not isinstance(decoded, dict) or set(decoded) != {"format", "trials"}:
+    if not isinstance(decoded, dict):
         _fail(f"source {source['source_id']!r} has an unsupported retained shape")
-    if decoded["format"] != SOURCE_FORMAT or not isinstance(decoded["trials"], list):
+    if source["profile"] == "retained-inspect-model-events-v1":
+        return _inspect_source_trials(decoded)
+    if (
+        set(decoded) != {"format", "trials"}
+        or decoded.get("format") != SOURCE_FORMAT
+        or not isinstance(decoded.get("trials"), list)
+    ):
         _fail(f"source {source['source_id']!r} has an unsupported retained profile")
     for trial in decoded["trials"]:
         if not isinstance(trial, dict) or not isinstance(trial.get("attempts"), list):
@@ -539,6 +669,11 @@ def _frozen_run_records(
     return records
 
 
+def _require_declared_source_profile(raw: dict[str, Any]) -> None:
+    if any(source["profile"] != raw["source_profile"] for source in raw["sources"]):
+        _fail("measurement source profile differs from the declared profile")
+
+
 def validate_measurements(
     value: JudgeMeasurements,
     plan: JudgeMeasurementPlan,
@@ -560,6 +695,7 @@ def validate_measurements(
         _require_integer(source["byte_size"], "source byte_size")
     for trial in raw["trials"]:
         _check_trial_integer_types(trial)
+    _require_declared_source_profile(raw)
 
     plan_sha256 = _sha256(canonical_payload(plan_raw))
     if raw["plan_sha256"] != plan_sha256:

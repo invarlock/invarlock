@@ -1,8 +1,8 @@
-# Inspect judge preparation
+# Inspect judge collection and import
 
-This optional package prepares bounded text judging requests and imports an
-explicit expanded-event projection into `judge-measurements-v1`. It does not
-execute models or import arbitrary Inspect `.eval` archives.
+This optional package collects bounded text judgments through a caller-supplied
+Inspect model and imports its expanded-event projection into
+`judge-measurements-v1`. It does not import arbitrary Inspect `.eval` archives.
 
 The supported projection pins Inspect `0.3.254`, requires one epoch and an
 explicit grader, and retains all scheduled slots. Missing attempts remain
@@ -17,10 +17,11 @@ digest-bound. Import and checkpoint replay require both frozen
 `evaluation-run-v1` objects and validate their approved digests.
 
 `prepare_collection` returns a deterministic bounded next batch and reservations
-for calls, tokens and cost. A validated checkpoint preserves completed responses,
-parse failures, refusals and ambiguous timeouts. Only a declared transport failure
-can produce another attempt. This function does not schedule calls, track calls
-in flight, persist checkpoints, enforce billing or sleep for rate limits.
+for calls, tokens and cost. `collect` executes those batches through an explicit
+Inspect model, applies a wall deadline and request pacing, and writes each retained
+attempt as an immutable checkpoint shard before advancing. A validated checkpoint
+preserves completed responses, parse failures, refusals and ambiguous timeouts.
+Only a declared transport failure can produce another attempt.
 
 `prepare_inspect_config` optionally constructs the pinned SDK's generation
 configuration. Install the package's `inspect` extra to use that helper. Ordinary
@@ -31,22 +32,19 @@ import and planning do not import Inspect or a provider SDK.
 The `invarlock/inspect-judge-export-v1` projection has a closed envelope containing
 collection options and scheduled samples. Samples bind case, side, repetition,
 plan and answer digests. Each expanded model event includes an explicit grader,
-generation settings, request, accessible rating response, model identity and
-attempt outcome. The synthetic fixture in `tests/fixtures/export.json` describes
-this projection and makes no external execution claim.
+generation settings, normalized model input, the bounded provider request and
+response, accessible completion, model identity and attempt outcome. The
+synthetic fixture in `tests/fixtures/export.json` describes this projection and
+makes no external execution claim.
 
 Inspect's native `ModelCall` contains provider-specific request and response
-objects. The current core parser expects accessible JSON with exactly one
-`rating` field. Consequently this projection does not preserve or replay every
-provider-native wrapper. A native provider trace must not be relabelled as this
-projection by dropping material. Full provider response retention and an actual
-Inspect collection/export qualification are required before claiming a maintained
-live collector or an independently replayable native Inspect import.
-
-The current output retains canonical normalized trials and authenticates their
-source mappings. It does not preserve the original projection bytes or establish
-that a model was called. Independent verification remains limited to the retained
-measurement contract.
+objects. The retained `retained-inspect-model-events-v1` source keeps those
+bounded objects while the deterministic rating parser reads the accessible model
+completion. Offline verification replays the event-to-attempt mapping, input,
+generation configuration, usage, completion and normalized trial table without
+loading Inspect. As with any retained API log, these bytes establish what the
+producer signed and retained; they do not independently prove that a provider
+performed the call.
 
 The pinned SDK interfaces used for configuration and event-field inspection are
 [`GenerateConfig`](https://inspect.aisi.org.uk/reference/inspect_ai.model.html#generateconfig),

@@ -14,7 +14,10 @@
       "$ref": "#/$defs/sha256"
     },
     "source_profile": {
-      "const": "retained-judge-json-v1"
+      "enum": [
+        "retained-judge-json-v1",
+        "retained-inspect-model-events-v1"
+      ]
     },
     "sources": {
       "type": "array",
@@ -26,7 +29,10 @@
             "$ref": "#/$defs/identifier"
           },
           "profile": {
-            "const": "retained-judge-json-v1"
+            "enum": [
+              "retained-judge-json-v1",
+              "retained-inspect-model-events-v1"
+            ]
           },
           "encoding": {
             "const": "utf-8"

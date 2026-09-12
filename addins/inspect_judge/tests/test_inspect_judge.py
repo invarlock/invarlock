@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 import copy
+import hashlib
 import importlib.metadata
 import json
+from contextlib import contextmanager
 from dataclasses import asdict, replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -11,7 +14,9 @@ import pytest
 from invarlock_addins.inspect_judge import (
     CollectionOptions,
     InspectJudgeError,
+    RunnerOptions,
     bind_requests,
+    collect,
     import_export,
     prepare_collection,
     prepare_inspect_config,
@@ -90,6 +95,29 @@ def test_complete_export_replays_offline(data, monkeypatch):
     assert [
         trial["attempts"][0]["source"]["model_event_id"] for trial in result["trials"]
     ] == ["event-0", "event-1"]
+    retained = json.loads(result["sources"][0]["content"])
+    assert retained["format"] == "invarlock/retained-inspect-model-events-v1"
+    assert retained["records"][0]["events"][0]["call"]["response"] == {
+        "rating": "correct"
+    }
+
+
+def test_offline_replay_rejects_retained_inspect_event_substitution(data):
+    result = ingest(data)
+    retained = json.loads(result["sources"][0]["content"])
+    retained["records"][0]["events"][0]["output"]["completion"] = (
+        '{"rating":"incorrect"}'
+    )
+    payload = canonical_payload(retained)
+    result["sources"][0].update(
+        content=payload.decode(),
+        byte_size=len(payload),
+        sha256=hashlib.sha256(payload).hexdigest(),
+    )
+    with pytest.raises(
+        JudgeMeasurementContractError, match="completion does not match"
+    ):
+        validate_measurements(result, data[0], **frozen_runs(data))
 
 
 @pytest.mark.parametrize(
@@ -200,7 +228,7 @@ def test_incomplete_slots_are_visible_and_missing_slots_rejected(data):
 
 def test_parse_failure_is_terminal_on_resume(data):
     exported = copy.deepcopy(data[1])
-    exported["samples"][0]["events"][0]["call"]["response"] = {"rating": "unknown"}
+    exported["samples"][0]["events"][0]["output"]["completion"] = '{"rating":"unknown"}'
     result = ingest(data, exported)
     assert result["trials"][0]["parse"]["status"] == "invalid"
     prepared = prepare_collection(
@@ -279,6 +307,117 @@ def test_sdk_missing_fails_without_importing_provider(data, monkeypatch):
     monkeypatch.setattr(importlib.metadata, "version", missing)
     with pytest.raises(InspectJudgeError, match="inspect extra"):
         prepare_inspect_config(data[0], data[3])
+
+
+def test_live_collection_checkpoints_and_resumes(data, monkeypatch, tmp_path):
+    current_sink = None
+
+    @contextmanager
+    def use_model_event_sink(sink):
+        nonlocal current_sink
+        prior = current_sink
+        current_sink = sink
+        try:
+            yield
+        finally:
+            current_sink = prior
+
+    class Message:
+        role = "user"
+
+        def __init__(self, content):
+            self.content = content
+
+    class SystemMessage(Message):
+        role = "system"
+
+    class Config(SimpleNamespace):
+        pass
+
+    fake_module = SimpleNamespace(
+        ChatMessageSystem=SystemMessage,
+        ChatMessageUser=Message,
+        GenerateConfig=lambda **kwargs: Config(**kwargs),
+        use_model_event_sink=use_model_event_sink,
+    )
+    monkeypatch.setattr(importlib.metadata, "version", lambda _: "0.3.254")
+    monkeypatch.setattr(importlib, "import_module", lambda _: fake_module)
+
+    class Model:
+        name = "example-judge"
+        calls = 0
+
+        def __str__(self):
+            return self.name
+
+        async def generate(self, *, input, tools, tool_choice, config, cache):
+            self.calls += 1
+            output = SimpleNamespace(
+                model="example-judge-001",
+                completion='{"rating":"correct"}',
+                error=None,
+                metadata=None,
+                choices=[SimpleNamespace(stop_reason="stop")],
+                usage=SimpleNamespace(
+                    input_tokens=30,
+                    input_tokens_cache_read=None,
+                    input_tokens_cache_write=None,
+                    output_tokens=5,
+                    total_cost=0.00005,
+                ),
+            )
+            event = SimpleNamespace(
+                uuid=f"event-live-{self.calls}",
+                model=self.name,
+                input=input,
+                tools=tools,
+                tool_choice=tool_choice,
+                config=config,
+                retries=0,
+                cache=None,
+                call=SimpleNamespace(
+                    request={"model": self.name, "messages": ["retained"]},
+                    response={"id": f"request-{self.calls}", "output": "retained"},
+                    error=None,
+                ),
+                output=output,
+                error=None,
+            )
+            assert current_sink is not None
+            current_sink.on_pending(event)
+            current_sink.on_complete(event)
+            return output
+
+    model = Model()
+    runner = RunnerOptions(
+        checkpoint_directory=tmp_path / "checkpoint",
+        scorer_id="correctness",
+        max_elapsed_seconds=30,
+    )
+    result = asyncio.run(
+        collect(
+            plan=data[0],
+            options=data[3],
+            runner=runner,
+            model=model,
+            **frozen_runs(data),
+        )
+    )
+    assert result["completeness"]["status"] == "complete"
+    assert result["source_profile"] == "retained-inspect-model-events-v1"
+    assert model.calls == 2
+    assert len(list(runner.checkpoint_directory.glob("attempt-*.json"))) == 2
+    resumed = asyncio.run(
+        collect(
+            plan=data[0],
+            options=data[3],
+            runner=runner,
+            model=model,
+            **frozen_runs(data),
+        )
+    )
+    assert resumed == result
+    assert model.calls == 2
 
 
 def test_malformed_duplicate_json_and_oversized_export_rejected(data):

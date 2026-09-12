@@ -26,6 +26,8 @@ from invarlock.judge_measurements.contracts import (
 INSPECT_VERSION = "0.3.254"
 EXPORT_FORMAT = "invarlock/inspect-judge-export-v1"
 EXPORT_PROFILE = "inspect-text-frozen-answer-v1"
+RETAINED_SOURCE_PROFILE = "retained-inspect-model-events-v1"
+RETAINED_SOURCE_FORMAT = "invarlock/retained-inspect-model-events-v1"
 MAX_EXPORT_BYTES = 16 * 1024 * 1024
 
 
@@ -55,6 +57,29 @@ def _text(value: Any, maximum: int, label: str) -> None:
 
 def _sha(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
+
+
+def _reject_credential_fields(value: Any) -> None:
+    blocked = {
+        "authorization",
+        "api-key",
+        "api_key",
+        "apikey",
+        "access_token",
+        "secret",
+    }
+    stack = [value]
+    while stack:
+        current = stack.pop()
+        if isinstance(current, dict):
+            for key, child in current.items():
+                _require(
+                    not isinstance(key, str) or key.casefold() not in blocked,
+                    "provider request contains a credential field",
+                )
+                stack.append(child)
+        elif isinstance(current, list):
+            stack.extend(current)
 
 
 @dataclass(frozen=True)
@@ -328,9 +353,19 @@ def _blob(value: Any) -> dict[str, Any]:
     }
 
 
-def _parse_rating(
-    response: dict[str, Any], plan: JudgeMeasurementPlan
-) -> dict[str, Any]:
+def _completion_value(completion: Any) -> Any:
+    _require(isinstance(completion, str), "model completion must be text")
+    _require(
+        len(completion.encode("utf-8")) <= 1048576,
+        "model completion exceeds byte allowance",
+    )
+    try:
+        return parse_json_bytes(completion.encode("utf-8"), label="judge completion")
+    except StrictJsonError:
+        return completion
+
+
+def _parse_rating(response: Any, plan: JudgeMeasurementPlan) -> dict[str, Any]:
     ratings = {rating["label"]: rating["value"] for rating in plan["scale"]["ratings"]}
     if (
         set(response) == {"rating"}
@@ -546,20 +581,21 @@ def import_export(
                 event["call"], {"request", "response", "error"}, "full API call"
             )
             _require(
-                canonical_payload(call["request"])
-                == canonical_payload(expected_request),
-                "raw request differs from approved request or contains unsupported headers/body",
+                isinstance(call["request"], dict)
+                and len(canonical_payload(call["request"])) <= 1048576,
+                "full API request must be a bounded object",
             )
+            _reject_credential_fields(call["request"])
             output = _object(
                 event["output"],
-                {"model", "request_id", "finish_reason", "usage"},
+                {"model", "request_id", "finish_reason", "usage", "completion"},
                 "accessible output",
             )
             error = event["error"]
             response = call["response"]
             if error is None:
                 _require(
-                    call["error"] is False and isinstance(response, dict),
+                    call["error"] in (False, None) and isinstance(response, dict),
                     "completed call requires full response",
                 )
                 _require(
@@ -567,7 +603,8 @@ def import_export(
                     "unapproved resolved model",
                 )
                 status = "completed"
-                parsed = _parse_rating(response, plan)
+                accessible_response = _completion_value(output["completion"])
+                parsed = _parse_rating(accessible_response, plan)
                 selected = index + 1
             else:
                 error = _object(error, {"status", "code", "message"}, "attempt error")
@@ -580,7 +617,8 @@ def import_export(
                 )
                 status = error["status"]
                 _require(
-                    response is None, "failed calls cannot retain a successful response"
+                    response is None or isinstance(response, dict),
+                    "failed API response must be an object or null",
                 )
                 error = {"code": error["code"], "message": error["message"]}
                 parsed = {
@@ -620,7 +658,11 @@ def import_export(
                     "resolved_model": output["model"],
                     "status": status,
                     "request": _blob(expected_request),
-                    "response": _blob(response) if response is not None else None,
+                    "response": (
+                        _blob(_completion_value(output["completion"]))
+                        if status == "completed"
+                        else None
+                    ),
                     "request_id": output["request_id"],
                     "finish_reason": output["finish_reason"],
                     "error": error,
@@ -650,7 +692,14 @@ def import_export(
             }
         )
     source = canonical_payload(
-        {"format": "invarlock/retained-judge-json-v1", "trials": trials}
+        {
+            "format": RETAINED_SOURCE_FORMAT,
+            "inspect_version": INSPECT_VERSION,
+            "records": [
+                {"trial": trial, "events": sample["events"]}
+                for trial, sample in zip(trials, samples, strict=True)
+            ],
+        }
     )
     _require(len(source) <= MAX_EXPORT_BYTES, "retained source exceeds byte allowance")
     completed = sum(trial["status"] == "complete" for trial in trials)
@@ -658,11 +707,11 @@ def import_export(
         "format": "invarlock/judge-measurements-v1",
         "profile_id": "text-frozen-answer-v1",
         "plan_sha256": digest,
-        "source_profile": "retained-judge-json-v1",
+        "source_profile": RETAINED_SOURCE_PROFILE,
         "sources": [
             {
                 "source_id": "inspect-export",
-                "profile": "retained-judge-json-v1",
+                "profile": RETAINED_SOURCE_PROFILE,
                 "encoding": "utf-8",
                 "byte_size": len(source),
                 "media_type": "application/json",
