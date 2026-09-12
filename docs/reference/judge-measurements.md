@@ -36,6 +36,10 @@ that contains an input are rejected. Baseline and subject use frozen
 `evaluation-run-v1` records. The plan binds both runs, case membership, answers,
 rendered requests, judge identity/configuration, rubric, scale and trial schedule.
 The analysis policy is a separate `judge-analysis-policy-v1` document.
+The judge configuration always declares `reasoning_effort`. Use `null` only
+when the selected model has no approved reasoning control; otherwise bind one
+of the supported effort names explicitly. This field is part of the plan digest,
+every rendered request digest and retained provider-call validation.
 
 ```bash
 invarlock evaluate request.yaml --preflight --json
@@ -93,6 +97,12 @@ inherited model settings beyond `responses_api=false` and `max_retries=0`.
 Collection uses an exclusive checkpoint lock, writes a durable admission before
 each call and treats an admitted call without a retained result as an ambiguous
 timeout that cannot be retried.
+
+`openai/gpt-5.6-sol` additionally requires an explicit non-null
+`reasoning_effort` in its approved plan. The Inspect adapter passes that exact
+value to the SDK and requires the retained provider request to match it. The K2
+reference now selects `none` explicitly for its next pilot. The earlier retained
+pilot omitted this control and remains a separate incomplete run.
 
 The maintained `examples/judge-measurements/collect.py` runner supplies the
 complete supported wiring. It loads the plan, collection options and frozen runs,
@@ -172,7 +182,11 @@ the submitted claims authorize themselves. Store the completed policy outside
 the evidence directory and review it before verification.
 
 ```bash
-invarlock verify evidence --trust-profile recipient-policy.json --receipt receipt.json --json
+invarlock verify evidence --trust-profile recipient-policy.json \
+  --receipt receipt.json \
+  --verifier-signing-key verifier-private.pem \
+  --verifier-identity release-verifier \
+  --json
 invarlock report evidence --html report.html --markdown report.md --junit report.xml --json
 ```
 
@@ -183,9 +197,24 @@ unaccepted because its result is adverse, inconclusive or advisory. Missing trus
 inputs exit 2, verification failure exits 4, and verified but unaccepted evidence
 exits 7. Evaluation with `--fail-on-policy` likewise exits 7 for a non-pass result.
 
-The locally recomputed judge receipt is not a signed native receipt. Reusing one
-requires replay through `verify_stored_judge_receipt`; possession of a receipt
-alone carries no authority. Native receipt-signing overrides are rejected.
+Verification first creates an unsigned `invarlock/judge-verification-result-v1`
+local result. When `--receipt` is present, both verifier options are required and
+the command writes a separate Ed25519
+`invarlock/judge-measurement-verification-receipt-v1` outside the evidence. Its
+judge-specific signature binds the complete validated local result, verifier
+identity and key fingerprint, recipient-policy digest and bounded decision scope.
+The JSON command field `ok` equals `accepted`; authenticated and replayed adverse,
+inconclusive or advisory evidence therefore remains command failure.
+
+Applications can use `verify_signed_judge_verification_receipt` to authenticate a
+received receipt from independently sourced verifier and policy anchors, or
+`replay_signed_judge_verification_receipt` to authenticate it and require exact
+fresh evidence replay. `verify_stored_judge_result` performs the corresponding
+fresh check for an unsigned stored local result. Receipts, stored results,
+recipient policies and verifier keys used with evidence replay must remain
+outside submitted evidence. A valid receipt authenticates the recorded bounded
+result; it does not establish benchmark representativeness, general model quality
+or population-wide safety.
 
 Reports replay retained artifacts but do not perform recipient authorization.
 JSON, HTML and Markdown distinguish replay, signature presence and acceptance.

@@ -36,7 +36,8 @@ cannot substitute a different schema.
 | `judge_analysis_policy.schema.json` | `invarlock/judge-analysis-policy-v1` | Independent judge metric, interval, precision, and degradation requirements |
 | `judge_measurement_evidence.schema.json` | `invarlock/judge-measurement-evidence-v1` | Signed or unsigned judge evidence envelope and artifact digests |
 | `judge_measurement_recipient_policy.schema.json` | `invarlock/judge-measurement-recipient-policy-v1` | Recipient signer, subject, metric, result, and exact-artifact pins |
-| `judge_measurement_verification_receipt.schema.json` | `invarlock/judge-measurement-verification-receipt-v1` | Offline judge authentication, replay, policy decision, and acceptance result |
+| `judge_verification_result.schema.json` | `invarlock/judge-verification-result-v1` | Unsigned local judge authentication, replay, policy decision, and acceptance result |
+| `judge_measurement_verification_receipt.schema.json` | `invarlock/judge-measurement-verification-receipt-v1` | Scoped Ed25519 verifier statement binding the complete local judge result and recipient policy |
 | `evidence_set.schema.json` | `invarlock/evidence-set-v1` | Unsigned index of one deterministic captured pack and one bounded judge pack |
 | `evidence_set_recipient_policy.schema.json` | `invarlock/evidence-set-recipient-policy-v1` | Independent shared-run and component-policy pins for required conjunction |
 | `evidence_set_verification.schema.json` | `invarlock/evidence-set-verification-v1` | Fresh local conjunction result retaining distinct component receipts |

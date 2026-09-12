@@ -24,7 +24,15 @@ from invarlock.evidence_sets.verification import (
     verify_evidence_set,
     verify_stored_evidence_set_result,
 )
-from tests.judge_measurements.test_evidence_acceptance import KEY, _publish
+from invarlock.judge_measurements.acceptance import (
+    verify_signed_judge_verification_receipt,
+)
+from invarlock.judge_measurements.evidence import object_sha256
+from tests.judge_measurements.test_evidence_acceptance import (
+    KEY,
+    VERIFIER_KEY,
+    _publish,
+)
 
 
 def write(path, value):
@@ -83,9 +91,18 @@ def fixture(
         request, baseline=baseline, subject=subject, policy=policy
     )
     request_digest = captured_request_digest(normalized)
+    evidence_key = trust / "evidence-key.pem"
+    evidence_key.write_bytes(
+        KEY.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption(),
+        )
+    )
+    evidence_key.chmod(0o600)
     key = trust / "key.pem"
     key.write_bytes(
-        KEY.private_bytes(
+        VERIFIER_KEY.private_bytes(
             serialization.Encoding.PEM,
             serialization.PrivateFormat.PKCS8,
             serialization.NoEncryption(),
@@ -99,7 +116,7 @@ def fixture(
         policy=policy,
         comparison=compare_runs(baseline, subject, policy),
         request_digest=request_digest,
-        signing_key_path=key,
+        signing_key_path=evidence_key,
         unsigned=False,
         normalized_request=normalized,
     )
@@ -153,6 +170,30 @@ def test_same_original_runs_verify_and_replay_stored_result(tmp_path):
     assert result.payload["shared_inputs_verified"]
     assert result.payload["statistical_scope"] == STATISTICAL_SCOPE
     assert all(member["receipt"] for member in result.payload["members"].values())
+    deterministic_receipt = json.loads(
+        result.payload["members"]["deterministic"]["receipt"]
+    )
+    judge_receipt = json.loads(result.payload["members"]["judge"]["receipt"])
+    assert judge_receipt["statement"]["format"] == (
+        "invarlock/judge-measurement-verification-receipt-v1"
+    )
+    for field in ("identity", "signing_key_fingerprint"):
+        assert (
+            judge_receipt["statement"]["verifier"][field]
+            == deterministic_receipt["statement"]["verifier"][field]
+        )
+    retained_judge_receipt = tmp_path / "retained-judge-receipt.json"
+    retained_judge_receipt.write_text(result.payload["members"]["judge"]["receipt"])
+    authenticated_judge = verify_signed_judge_verification_receipt(
+        retained_judge_receipt,
+        expected_verifier_identity="recipient",
+        expected_verifier_fingerprint=public_key_fingerprint(VERIFIER_KEY.public_key()),
+        expected_recipient_policy_sha256=object_sha256(
+            json.loads((policy.parent / "judge.json").read_text())
+        ),
+    )
+    assert authenticated_judge.ok and authenticated_judge.result is not None
+    assert authenticated_judge.result.accepted
     assert verify_stored_evidence_set_result(
         receipt, root, recipient_policy=policy
     ).accepted

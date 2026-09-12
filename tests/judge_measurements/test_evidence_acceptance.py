@@ -15,9 +15,12 @@ from jsonschema import Draft202012Validator, ValidationError
 from invarlock import public_contracts
 from invarlock.acceptance_attestation import verify_acceptance_attestation
 from invarlock.judge_measurements.acceptance import (
+    replay_signed_judge_verification_receipt,
     verify_judge_evidence,
     verify_judge_evidence_with_policy,
-    verify_stored_judge_receipt,
+    verify_signed_judge_verification_receipt,
+    verify_stored_judge_result,
+    write_signed_judge_verification_receipt,
 )
 from invarlock.judge_measurements.contracts import (
     canonical_payload,
@@ -37,6 +40,7 @@ ACCEPTANCE_FIXTURES = (
     Path(__file__).parents[1] / "fixtures" / "judge_measurement_acceptance"
 )
 KEY = Ed25519PrivateKey.from_private_bytes(bytes(range(32)))
+VERIFIER_KEY = Ed25519PrivateKey.from_private_bytes(bytes(reversed(range(32))))
 
 
 def _json(path):
@@ -45,6 +49,19 @@ def _json(path):
 
 def _write(path, value):
     path.write_bytes(canonical_payload(value) + b"\n")
+
+
+def _verifier_key_path(tmp_path):
+    path = tmp_path / "verifier.pem"
+    path.write_bytes(
+        VERIFIER_KEY.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption(),
+        )
+    )
+    path.chmod(0o600)
+    return path
 
 
 def _publish(
@@ -140,7 +157,7 @@ def test_signed_evidence_is_independently_replayed_and_accepted_offline(
     )
     assert receipt.decision_scope == "bounded-judge-fixed-benchmark-v1"
     Draft202012Validator(
-        public_contracts.load_judge_measurement_verification_receipt_schema()
+        public_contracts.load_judge_verification_result_schema()
     ).validate(receipt.to_dict())
     assert receipt == verify_judge_evidence_with_policy(publication.path, policy_path)
 
@@ -390,24 +407,218 @@ def test_optional_external_key_anchor_must_match_the_recipient_pin(tmp_path):
     ).accepted
 
 
-def test_stored_receipt_is_recomputed_and_cannot_self_authorize(tmp_path):
+def test_stored_result_is_recomputed_and_cannot_self_authorize(tmp_path):
     publication, policy_path = _publish(tmp_path)
     receipt_path = tmp_path / "receipt.json"
     receipt = verify_judge_evidence_with_policy(publication.path, policy_path)
     _write(receipt_path, receipt.to_dict())
-    assert verify_stored_judge_receipt(
+    assert verify_stored_judge_result(
         receipt_path, evidence_path=publication.path, recipient_policy_path=policy_path
     ).accepted
     claimed = receipt.to_dict()
     claimed["signer_identity"] = "another-signer"
     _write(receipt_path, claimed)
-    assert not verify_stored_judge_receipt(
+    assert not verify_stored_judge_result(
         receipt_path, evidence_path=publication.path, recipient_policy_path=policy_path
     ).accepted
     _write(receipt_path, {"accepted": True})
-    assert not verify_stored_judge_receipt(
+    assert not verify_stored_judge_result(
         receipt_path, evidence_path=publication.path, recipient_policy_path=policy_path
     ).accepted
+
+
+def test_stored_result_inside_evidence_is_rejected(tmp_path):
+    publication, policy_path = _publish(tmp_path)
+    stored = publication.path / "stored-result.json"
+    _write(
+        stored,
+        verify_judge_evidence_with_policy(publication.path, policy_path).to_dict(),
+    )
+
+    result = verify_stored_judge_result(
+        stored, evidence_path=publication.path, recipient_policy_path=policy_path
+    )
+
+    assert not result.accepted and not result.verified
+    assert "outside" in result.errors[0]
+
+
+def test_signed_receipt_authenticates_and_fresh_replays(tmp_path):
+    publication, policy_path = _publish(tmp_path)
+    local = verify_judge_evidence_with_policy(publication.path, policy_path)
+    receipt_path = tmp_path / "signed-receipt.json"
+    fingerprint = (
+        "sha256:"
+        + hashlib.sha256(VERIFIER_KEY.public_key().public_bytes_raw()).hexdigest()
+    )
+    returned = write_signed_judge_verification_receipt(
+        publication.path,
+        local,
+        receipt_path,
+        recipient_policy_path=policy_path,
+        verifier_identity="example-verifier",
+        verifier_signing_key_path=_verifier_key_path(tmp_path),
+    )
+
+    assert returned == fingerprint
+    authenticated = verify_signed_judge_verification_receipt(
+        receipt_path,
+        expected_verifier_identity="example-verifier",
+        expected_verifier_fingerprint=fingerprint,
+        expected_recipient_policy_sha256=object_sha256(_json(policy_path)),
+    )
+    assert authenticated.ok and authenticated.signed
+    assert authenticated.result == local
+    assert replay_signed_judge_verification_receipt(
+        receipt_path,
+        evidence_path=publication.path,
+        recipient_policy_path=policy_path,
+        expected_verifier_identity="example-verifier",
+        expected_verifier_fingerprint=fingerprint,
+    ).accepted
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ["result", "policy", "identity", "fingerprint", "signature"],
+)
+def test_signed_receipt_rejects_tampering_and_wrong_anchors(tmp_path, mutation):
+    publication, policy_path = _publish(tmp_path)
+    local = verify_judge_evidence_with_policy(publication.path, policy_path)
+    receipt_path = tmp_path / "signed-receipt.json"
+    write_signed_judge_verification_receipt(
+        publication.path,
+        local,
+        receipt_path,
+        recipient_policy_path=policy_path,
+        verifier_identity="example-verifier",
+        verifier_signing_key_path=_verifier_key_path(tmp_path),
+    )
+    fingerprint = (
+        "sha256:"
+        + hashlib.sha256(VERIFIER_KEY.public_key().public_bytes_raw()).hexdigest()
+    )
+    expected_policy = object_sha256(_json(policy_path))
+    value = _json(receipt_path)
+    expected_identity = "example-verifier"
+    expected_fingerprint = fingerprint
+    if mutation == "result":
+        value["statement"]["result"]["signer_identity"] = "substituted-signer"
+        _write(receipt_path, value)
+    elif mutation == "policy":
+        expected_policy = "f" * 64
+    elif mutation == "identity":
+        expected_identity = "another-verifier"
+    elif mutation == "fingerprint":
+        expected_fingerprint = "sha256:" + "f" * 64
+    else:
+        value["signature"]["value"] = base64.b64encode(b"x" * 64).decode()
+        _write(receipt_path, value)
+
+    checked = verify_signed_judge_verification_receipt(
+        receipt_path,
+        expected_verifier_identity=expected_identity,
+        expected_verifier_fingerprint=expected_fingerprint,
+        expected_recipient_policy_sha256=expected_policy,
+    )
+
+    assert not checked.ok and checked.result is None
+
+
+def test_signature_from_undomained_canonical_statement_is_rejected(tmp_path):
+    publication, policy_path = _publish(tmp_path)
+    local = verify_judge_evidence_with_policy(publication.path, policy_path)
+    receipt_path = tmp_path / "signed-receipt.json"
+    write_signed_judge_verification_receipt(
+        publication.path,
+        local,
+        receipt_path,
+        recipient_policy_path=policy_path,
+        verifier_identity="example-verifier",
+        verifier_signing_key_path=_verifier_key_path(tmp_path),
+    )
+    value = _json(receipt_path)
+    value["signature"]["value"] = base64.b64encode(
+        VERIFIER_KEY.sign(canonical_payload(value["statement"]))
+    ).decode()
+    _write(receipt_path, value)
+
+    checked = verify_signed_judge_verification_receipt(
+        receipt_path,
+        expected_verifier_identity="example-verifier",
+        expected_verifier_fingerprint="sha256:"
+        + hashlib.sha256(VERIFIER_KEY.public_key().public_bytes_raw()).hexdigest(),
+        expected_recipient_policy_sha256=object_sha256(_json(policy_path)),
+    )
+
+    assert not checked.ok
+
+
+def test_signed_receipt_rejects_unsupported_public_key_algorithm(tmp_path):
+    publication, policy_path = _publish(tmp_path)
+    local = verify_judge_evidence_with_policy(publication.path, policy_path)
+    receipt_path = tmp_path / "signed-receipt.json"
+    write_signed_judge_verification_receipt(
+        publication.path,
+        local,
+        receipt_path,
+        recipient_policy_path=policy_path,
+        verifier_identity="example-verifier",
+        verifier_signing_key_path=_verifier_key_path(tmp_path),
+    )
+    value = _json(receipt_path)
+    unsupported_der = bytes.fromhex("300c300506032a03040303000102")
+    value["signature"]["public_key"]["value"] = (
+        "-----BEGIN PUBLIC KEY-----\n"
+        + base64.b64encode(unsupported_der).decode("ascii")
+        + "\n-----END PUBLIC KEY-----\n"
+    )
+    _write(receipt_path, value)
+
+    checked = verify_signed_judge_verification_receipt(
+        receipt_path,
+        expected_verifier_identity="example-verifier",
+        expected_verifier_fingerprint="sha256:"
+        + hashlib.sha256(VERIFIER_KEY.public_key().public_bytes_raw()).hexdigest(),
+        expected_recipient_policy_sha256=object_sha256(_json(policy_path)),
+    )
+
+    assert not checked.ok and checked.result is None
+
+
+def test_signed_receipt_cannot_be_written_or_replayed_inside_evidence(tmp_path):
+    publication, policy_path = _publish(tmp_path)
+    local = verify_judge_evidence_with_policy(publication.path, policy_path)
+    key_path = _verifier_key_path(tmp_path)
+    with pytest.raises(ValueError, match="outside"):
+        write_signed_judge_verification_receipt(
+            publication.path,
+            local,
+            publication.path / "receipt.json",
+            recipient_policy_path=policy_path,
+            verifier_identity="example-verifier",
+            verifier_signing_key_path=key_path,
+        )
+    outside = tmp_path / "receipt.json"
+    write_signed_judge_verification_receipt(
+        publication.path,
+        local,
+        outside,
+        recipient_policy_path=policy_path,
+        verifier_identity="example-verifier",
+        verifier_signing_key_path=key_path,
+    )
+    embedded = publication.path / "embedded.json"
+    embedded.write_bytes(outside.read_bytes())
+    replayed = replay_signed_judge_verification_receipt(
+        embedded,
+        evidence_path=publication.path,
+        recipient_policy_path=policy_path,
+        expected_verifier_identity="example-verifier",
+        expected_verifier_fingerprint="sha256:"
+        + hashlib.sha256(VERIFIER_KEY.public_key().public_bytes_raw()).hexdigest(),
+    )
+    assert not replayed.accepted and "outside" in replayed.errors[0]
 
 
 def test_native_consumers_reject_new_scopes_and_wrappers(tmp_path):
@@ -468,6 +679,11 @@ def test_symlinks_duplicate_json_and_missing_artifacts_fail_closed(tmp_path):
             public_contracts.load_judge_measurement_recipient_policy_schema,
         ),
         (
+            "verification_result",
+            "judge_verification_result",
+            public_contracts.load_judge_verification_result_schema,
+        ),
+        (
             "verification_receipt",
             "judge_measurement_verification_receipt",
             public_contracts.load_judge_measurement_verification_receipt_schema,
@@ -507,9 +723,20 @@ def test_golden_acceptance_fixtures_match_real_offline_verification(tmp_path):
     publication, policy_path = _publish(tmp_path)
     assert publication.envelope == _json(ACCEPTANCE_FIXTURES / "envelope.json")
     assert _json(policy_path) == _json(ACCEPTANCE_FIXTURES / "recipient_policy.json")
-    assert verify_judge_evidence_with_policy(
-        publication.path, policy_path
-    ).to_dict() == _json(ACCEPTANCE_FIXTURES / "verification_receipt.json")
+    result = verify_judge_evidence_with_policy(publication.path, policy_path)
+    assert result.to_dict() == _json(ACCEPTANCE_FIXTURES / "verification_result.json")
+    receipt_path = tmp_path / "verification-receipt.json"
+    write_signed_judge_verification_receipt(
+        publication.path,
+        result,
+        receipt_path,
+        recipient_policy_path=policy_path,
+        verifier_identity="example-verifier",
+        verifier_signing_key_path=_verifier_key_path(tmp_path),
+    )
+    assert _json(receipt_path) == _json(
+        ACCEPTANCE_FIXTURES / "verification_receipt.json"
+    )
 
 
 def test_receipt_schema_cannot_claim_acceptance_without_verified_pass():
@@ -527,6 +754,21 @@ def test_receipt_schema_cannot_claim_acceptance_without_verified_pass():
         ("decision_scope", "native-inference-v1"),
     ]:
         value = copy.deepcopy(golden)
-        value[field] = bad
+        value["statement"]["result"][field] = bad
         with pytest.raises(ValidationError):
             schema.validate(value)
+
+
+def test_signed_receipt_embeds_the_complete_local_result_contract():
+    result_schema = public_contracts.load_judge_verification_result_schema()
+    receipt_schema = (
+        public_contracts.load_judge_measurement_verification_receipt_schema()
+    )
+
+    standalone_result = {
+        name: value
+        for name, value in result_schema.items()
+        if name not in {"$schema", "$id", "$defs"}
+    }
+
+    assert receipt_schema["$defs"]["result"] == standalone_result

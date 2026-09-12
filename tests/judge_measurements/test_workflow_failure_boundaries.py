@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from typer.testing import CliRunner
 
 from invarlock.cli.app import app
@@ -18,6 +19,7 @@ from tests.judge_measurements.test_evidence_acceptance import (
     KEY,
     _json,
     _publish,
+    _verifier_key_path,
     _write,
 )
 from tests.judge_measurements.test_workflow import staged as staged
@@ -295,7 +297,9 @@ def test_collection_preflight_cannot_enable_transport_retries():
         workflow._collection_budgets(collection, plan)
 
 
-@pytest.mark.parametrize("failure", ["bootstrap", "inside_receipt", "existing_receipt"])
+@pytest.mark.parametrize(
+    "failure", ["bootstrap", "inside_receipt", "existing_receipt", "encrypted_key"]
+)
 def test_recipient_cli_rejects_unsupported_options_and_receipt_publication_failures(
     tmp_path, failure
 ):
@@ -311,7 +315,26 @@ def test_recipient_cli_rejects_unsupported_options_and_receipt_publication_failu
         )
         if failure == "existing_receipt":
             receipt.write_text("retained earlier receipt")
-        args.extend(["--receipt", str(receipt)])
+        verifier_key = _verifier_key_path(tmp_path)
+        if failure == "encrypted_key":
+            verifier_key = tmp_path / "encrypted-verifier.pem"
+            verifier_key.write_bytes(
+                Ed25519PrivateKey.generate().private_bytes(
+                    serialization.Encoding.PEM,
+                    serialization.PrivateFormat.PKCS8,
+                    serialization.BestAvailableEncryption(b"test-only"),
+                )
+            )
+        args.extend(
+            [
+                "--receipt",
+                str(receipt),
+                "--verifier-signing-key",
+                str(verifier_key),
+                "--verifier-identity",
+                "example-verifier",
+            ]
+        )
     result = CliRunner().invoke(app, args)
     assert result.exit_code == (2 if failure == "bootstrap" else 4)
     payload = json.loads(result.stdout)

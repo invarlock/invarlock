@@ -83,6 +83,21 @@ The unsigned evidence cannot establish recipient acceptance. To publish signed
 evidence, use a fresh output directory and `--signing-key signer-private.pem`
 instead of `--unsigned`. Verification additionally requires an independently
 maintained judge recipient policy, not a policy copied from submitted evidence.
+When retaining a verification receipt, supply an independent verifier key and
+identity together:
+
+```bash
+invarlock verify signed-evidence \
+  --trust-profile recipient-policy.json \
+  --receipt verification.receipt.json \
+  --verifier-signing-key verifier-private.pem \
+  --verifier-identity release-verifier \
+  --json
+```
+
+The receipt remains outside `signed-evidence`. It authenticates the complete
+local bounded-result record and recipient-policy digest; it does not broaden the
+fixed-benchmark claim.
 
 See the [judge reference](../../docs/reference/judge-measurements.md) for the
 contract boundary, statistical assumptions and recipient verification command.

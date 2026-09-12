@@ -585,7 +585,11 @@ runtime inventory.
 
 The versioned judge request uses the same `evaluate`, `verify` and `report`
 commands. See [judge measurements](judge-measurements.md) for import preflight,
-bounded reports and independent recipient policy verification.
+bounded reports and independent recipient policy verification. Judge
+verification returns an unsigned local result. `--receipt` requires both
+`--verifier-signing-key` and `--verifier-identity` and writes a separately signed
+judge receipt outside the evidence. Its JSON `ok` field is true only when
+`accepted` is true.
 
 
 ## Deterministic and judge evidence sets

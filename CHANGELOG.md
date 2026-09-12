@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added versioned frozen-answer judge import requests, offline preflight,
   recipient-policy verification and bounded JSON, HTML, Markdown and JUnit
   reports that distinguish replay, signer authentication and policy acceptance.
+  Judge verification now separates its unsigned local result from an external
+  Ed25519 receipt that binds the complete result, recipient policy, verifier
+  identity and verifier key under a judge-specific signature domain.
 
 - Added shared comparison context to native and captured HTML and Markdown
   reports, including run and artifact digests, evaluator source, recorded model

@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://invarlock.dev/contracts/judge_verification_result.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "object_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "minLength": 64,
+      "maxLength": 64
+    },
+    "prefixed_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "minLength": 71,
+      "maxLength": 71
+    },
+    "identity": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}(?![\\s\\S])",
+      "maxLength": 256
+    },
+    "bindings": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "baseline_run_sha256": { "$ref": "#/$defs/prefixed_digest" },
+        "subject_run_sha256": { "$ref": "#/$defs/prefixed_digest" },
+        "case_set_sha256": { "$ref": "#/$defs/prefixed_digest" },
+        "plan_sha256": { "$ref": "#/$defs/object_digest" },
+        "measurements_sha256": { "$ref": "#/$defs/object_digest" },
+        "analysis_policy_sha256": { "$ref": "#/$defs/object_digest" },
+        "analysis_result_sha256": { "$ref": "#/$defs/object_digest" }
+      },
+      "required": [
+        "baseline_run_sha256",
+        "subject_run_sha256",
+        "case_set_sha256",
+        "plan_sha256",
+        "measurements_sha256",
+        "analysis_policy_sha256",
+        "analysis_result_sha256"
+      ]
+    }
+  },
+  "properties": {
+    "format": { "const": "invarlock/judge-verification-result-v1" },
+    "decision_scope": { "const": "bounded-judge-fixed-benchmark-v1" },
+    "verified": { "type": "boolean" },
+    "authenticated": { "type": "boolean" },
+    "replayed": { "type": "boolean" },
+    "accepted": { "type": "boolean" },
+    "decision": {
+      "enum": ["pass", "regression", "insufficient_evidence", null]
+    },
+    "intended_subject": {
+      "anyOf": [{ "$ref": "#/$defs/prefixed_digest" }, { "type": "null" }]
+    },
+    "signer_identity": {
+      "anyOf": [{ "$ref": "#/$defs/identity" }, { "type": "null" }]
+    },
+    "signer_public_key_sha256": {
+      "anyOf": [{ "$ref": "#/$defs/prefixed_digest" }, { "type": "null" }]
+    },
+    "envelope_sha256": {
+      "anyOf": [{ "$ref": "#/$defs/object_digest" }, { "type": "null" }]
+    },
+    "recipient_policy_sha256": {
+      "anyOf": [{ "$ref": "#/$defs/object_digest" }, { "type": "null" }]
+    },
+    "bindings": {
+      "anyOf": [{ "$ref": "#/$defs/bindings" }, { "type": "null" }]
+    },
+    "errors": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "maxLength": 1000 },
+      "maxItems": 32
+    }
+  },
+  "required": [
+    "format",
+    "decision_scope",
+    "verified",
+    "authenticated",
+    "replayed",
+    "accepted",
+    "decision",
+    "intended_subject",
+    "signer_identity",
+    "signer_public_key_sha256",
+    "envelope_sha256",
+    "recipient_policy_sha256",
+    "bindings",
+    "errors"
+  ],
+  "allOf": [
+    {
+      "if": { "properties": { "accepted": { "const": true } } },
+      "then": {
+        "properties": {
+          "verified": { "const": true },
+          "authenticated": { "const": true },
+          "replayed": { "const": true },
+          "decision": { "const": "pass" },
+          "errors": { "maxItems": 0 }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "verified": { "const": true } } },
+      "then": {
+        "properties": {
+          "authenticated": { "const": true },
+          "replayed": { "const": true },
+          "intended_subject": { "$ref": "#/$defs/prefixed_digest" },
+          "signer_identity": { "$ref": "#/$defs/identity" },
+          "signer_public_key_sha256": { "$ref": "#/$defs/prefixed_digest" },
+          "envelope_sha256": { "$ref": "#/$defs/object_digest" },
+          "recipient_policy_sha256": { "$ref": "#/$defs/object_digest" },
+          "bindings": { "$ref": "#/$defs/bindings" },
+          "decision": {
+            "enum": ["pass", "regression", "insufficient_evidence"]
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "accepted": { "const": false } } },
+      "then": { "properties": { "errors": { "minItems": 1 } } }
+    }
+  ]
+}

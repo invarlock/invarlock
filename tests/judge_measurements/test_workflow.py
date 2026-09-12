@@ -467,6 +467,11 @@ def test_signed_recipient_cli_replay_and_receipt_remain_offline(tmp_path, monkey
         lambda *_a, **_k: pytest.fail("verification network call"),
     )
     receipt_path = tmp_path / "recipient-receipt.json"
+    verifier_key = Ed25519PrivateKey.generate()
+    verifier_key_path = tmp_path / "verifier.pem"
+    verifier_key_path.write_bytes(
+        verifier_key.private_bytes(Encoding.PEM, PrivateFormat.PKCS8, NoEncryption())
+    )
     result = RUNNER.invoke(
         app,
         [
@@ -476,6 +481,10 @@ def test_signed_recipient_cli_replay_and_receipt_remain_offline(tmp_path, monkey
             str(policy),
             "--receipt",
             str(receipt_path),
+            "--verifier-signing-key",
+            str(verifier_key_path),
+            "--verifier-identity",
+            "example-verifier",
             "--json",
         ],
     )
@@ -483,9 +492,34 @@ def test_signed_recipient_cli_replay_and_receipt_remain_offline(tmp_path, monkey
     payload = json.loads(result.stdout)
     assert payload["authenticated"] and payload["replayed"] and payload["accepted"]
     assert (
-        json.loads(receipt_path.read_text())["format"]
+        json.loads(receipt_path.read_text())["statement"]["format"]
         == "invarlock/judge-measurement-verification-receipt-v1"
     )
+    assert payload["ok"] is payload["accepted"] is True
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["--receipt", "receipt.json"],
+        ["--receipt", "receipt.json", "--verifier-identity", "recipient"],
+        ["--verifier-identity", "recipient"],
+    ],
+)
+def test_judge_receipt_requires_a_complete_signing_request(tmp_path, args):
+    publication, policy = _publish(tmp_path)
+    result = RUNNER.invoke(
+        app,
+        [
+            "verify",
+            str(publication.path),
+            "--trust-profile",
+            str(policy),
+            *args,
+            "--json",
+        ],
+    )
+    assert result.exit_code == 2
 
 
 @pytest.mark.parametrize(
@@ -515,6 +549,7 @@ def test_adverse_and_incomplete_verification_preserve_distinct_decisions(tmp_pat
         assert result.exit_code == 7, result.output
         payload = json.loads(result.stdout)
         assert payload["decision"] == expected
+        assert payload["ok"] is payload["accepted"] is False
         assert (
             payload["authenticated"] and payload["replayed"] and not payload["accepted"]
         )

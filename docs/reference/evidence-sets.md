@@ -126,12 +126,13 @@ both components verified but a required result was adverse or inconclusive.
 Exit 4 means composition could not establish authentication, replay or required
 input identity. Missing CLI trust inputs or invalid output destinations exit 2.
 
-An optional receipt retains the complete captured signed receipt and judge local
-receipt as bounded JSON text inside the member results. The composite result is
-not a signed attestation and cannot authorize itself. All output destinations
-must be new and outside the evidence set. Reports preserve both methods and
-show the shared original cases, component outcomes and distinct assurance
-levels; reporting does not perform recipient acceptance.
+An optional result retains the complete captured signed receipt and a scoped
+signed judge receipt as bounded JSON text inside the member results. Both member
+receipts use the captured trust profile's independently loaded verifier identity
+and key. The composite result remains local and unsigned; it cannot authorize
+itself. All output destinations must be new and outside the evidence set. Reports
+preserve both methods and show the shared original cases, component outcomes and
+distinct assurance levels; reporting does not perform recipient acceptance.
 
 The corresponding APIs are:
 

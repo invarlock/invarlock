@@ -26,6 +26,7 @@ JUDGE_MEASUREMENT_RECIPIENT_POLICY_FORMAT_VERSION = (
 JUDGE_MEASUREMENT_VERIFICATION_RECEIPT_FORMAT_VERSION = (
     "invarlock/judge-measurement-verification-receipt-v1"
 )
+JUDGE_VERIFICATION_RESULT_FORMAT_VERSION = "invarlock/judge-verification-result-v1"
 
 EVIDENCE_SET_FORMAT_VERSION = "invarlock/evidence-set-v1"
 EVIDENCE_SET_RECIPIENT_POLICY_FORMAT_VERSION = (
@@ -120,6 +121,10 @@ def load_judge_measurement_recipient_policy_schema() -> dict[str, Any]:
 
 def load_judge_measurement_verification_receipt_schema() -> dict[str, Any]:
     return _load_object_contract("judge_measurement_verification_receipt.schema.json")
+
+
+def load_judge_verification_result_schema() -> dict[str, Any]:
+    return _load_object_contract("judge_verification_result.schema.json")
 
 
 def load_evidence_set_schema() -> dict[str, Any]:
@@ -250,12 +255,14 @@ __all__ = [
     "JUDGE_MEASUREMENT_EVIDENCE_FORMAT_VERSION",
     "JUDGE_MEASUREMENT_RECIPIENT_POLICY_FORMAT_VERSION",
     "JUDGE_MEASUREMENT_VERIFICATION_RECEIPT_FORMAT_VERSION",
+    "JUDGE_VERIFICATION_RESULT_FORMAT_VERSION",
     "load_judge_measurement_plan_schema",
     "load_judge_measurements_schema",
     "load_judge_analysis_policy_schema",
     "load_judge_measurement_evidence_schema",
     "load_judge_measurement_recipient_policy_schema",
     "load_judge_measurement_verification_receipt_schema",
+    "load_judge_verification_result_schema",
     "ACCEPTANCE_PREDICATE_FORMAT_VERSION",
     "CAPTURED_EVALUATION_REQUEST_FORMAT_VERSION",
     "EVALUATION_REQUEST_FORMAT_VERSION",

@@ -33,7 +33,10 @@ from invarlock.evidence_sets.contracts import (
     require_external,
     validate,
 )
-from invarlock.judge_measurements.acceptance import verify_judge_evidence
+from invarlock.judge_measurements.acceptance import (
+    verify_judge_evidence,
+    write_signed_judge_verification_receipt,
+)
 from invarlock.public_contracts import (
     load_evidence_set_verification_schema,
     load_judge_measurement_recipient_policy_schema,
@@ -261,6 +264,21 @@ def _verify(
     judge = verify_judge_evidence(
         paths["judge"], recipient_policy_path=profiles["judge"]
     )
+    with tempfile.TemporaryDirectory(
+        prefix="invarlock-evidence-set-judge-",
+        dir=Path(tempfile.gettempdir()).resolve(),
+    ) as temporary:
+        judge_receipt_path = Path(temporary) / "judge.json"
+        write_signed_judge_verification_receipt(
+            paths["judge"],
+            judge,
+            judge_receipt_path,
+            recipient_policy_path=profiles["judge"],
+            verifier_identity=captured_profile.verifier_identity,
+            verifier_signing_key_path=captured_profile.verifier_signing_key_path,
+            verifier_signing_key_bytes=captured_profile.verifier_signing_key_bytes,
+        )
+        judge_receipt = read_file(judge_receipt_path, CONTROL_LIMIT).decode("utf-8")
     if (
         judge.recipient_policy_sha256
         != sha(canonical_json_bytes(judge_policy, newline=False))[7:]
@@ -278,7 +296,7 @@ def _verify(
         replayed=judge.replayed,
         accepted=judge.accepted,
         decision=judge.decision,
-        receipt=canonical_json_bytes(judge.to_dict()).decode(),
+        receipt=judge_receipt,
         errors=list(judge.errors),
     )
     if not judge.verified:

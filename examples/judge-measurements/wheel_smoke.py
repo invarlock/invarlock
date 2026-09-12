@@ -97,6 +97,7 @@ def main() -> None:
             subject_run=load("subject_run"),
         ).to_dict()
         signer = run("evaluate", "--keygen", "signer")["details"]
+        verifier = run("evaluate", "--keygen", "verifier")["details"]
         recipient = {
             "format": "invarlock/judge-measurement-recipient-policy-v1",
             "decision_scope": "bounded-judge-fixed-benchmark-v1",
@@ -132,6 +133,10 @@ def main() -> None:
             "recipient.json",
             "--receipt",
             "receipt.json",
+            "--verifier-signing-key",
+            verifier["private_key"],
+            "--verifier-identity",
+            "example-verifier",
             expected=7,
         )
         assert (
@@ -140,7 +145,12 @@ def main() -> None:
         assert (
             not verified["accepted"] and verified["decision"] == "insufficient_evidence"
         )
-        assert load("receipt")["bindings"] == recipient["bindings"]
+        receipt = load("receipt")
+        assert receipt["statement"]["result"]["bindings"] == recipient["bindings"]
+        assert receipt["statement"]["verifier"] == {
+            "identity": "example-verifier",
+            "signing_key_fingerprint": verifier["public_key_fingerprint"],
+        }
         report = run(
             "report",
             "evidence",
