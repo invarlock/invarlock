@@ -17,7 +17,11 @@ try:
 except ModuleNotFoundError:  # Direct execution from the source checkout.
     import judge_measurements_reference as ref
 
-from invarlock.judge_measurements.contracts import validate_measurements
+from invarlock.evidence_pack_json import parse_json_bytes, read_regular_file_bytes
+from invarlock.judge_measurements.contracts import (
+    MEASUREMENTS_MAX_BYTES,
+    validate_measurements,
+)
 
 MAX_NOTES = 4096
 PROTOCOL = {
@@ -39,27 +43,7 @@ def pinned_files(bundle: Path, expected_sha256: str) -> dict[str, bytes]:
     with tempfile.TemporaryDirectory(prefix="invarlock-review-reference-") as directory:
         root = Path(directory)
         if bundle.is_dir():
-            manifest_bytes = ref.read(bundle / "reference.json", 1024 * 1024)
-            if ref.sha(manifest_bytes) != expected_sha256:
-                raise ValueError("independent reference manifest pin mismatch")
-            manifest = ref.parse_json_bytes(manifest_bytes, label="reference manifest")
-            files = manifest["files"]
-            if not isinstance(files, dict) or len(files) > 64:
-                raise ValueError("unexpected reference inventory")
-            total = 0
-            (root / "reference.json").write_bytes(manifest_bytes)
-            for name, pin in files.items():
-                size = pin["size_bytes"]
-                if type(size) is not int or not 0 <= size <= ref.MAX_BYTES:
-                    raise ValueError("invalid reference file size")
-                total += size
-                if total > ref.MAX_BUNDLE_BYTES:
-                    raise ValueError("reference exceeds total byte budget")
-                target = ref.safe_path(root, name)
-                target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_bytes(ref.read(ref.safe_path(bundle, name), size))
-            ref.validate_bundle(root, expected_sha256=expected_sha256)
-            return {name: ref.read(ref.safe_path(root, name)) for name in files}
+            return ref.authenticated_bundle_files(bundle, expected_sha256)
         payload = ref.read(bundle, ref.MAX_ARCHIVE_BYTES)
         archive = root / "reference.zip"
         archive.write_bytes(payload)
@@ -70,6 +54,16 @@ def pinned_files(bundle: Path, expected_sha256: str) -> dict[str, bytes]:
 
 def decode(files: dict[str, bytes], name: str):
     return ref.parse_json_bytes(files[name], label=name)
+
+
+def measurements_object(path: Path) -> dict:
+    payload = read_regular_file_bytes(
+        path, label="judge measurements", max_bytes=MEASUREMENTS_MAX_BYTES
+    )
+    value = parse_json_bytes(payload, label="judge measurements")
+    if not isinstance(value, dict):
+        raise ValueError("judge measurements must contain a JSON object")
+    return value
 
 
 def validate_review(sheet: dict, template: dict) -> None:
@@ -200,7 +194,7 @@ def complete_review(
         if split == "pilot"
         else candidate["plan"]
     )
-    measured = ref.obj(measurements) if measurements is not None else None
+    measured = measurements_object(measurements) if measurements is not None else None
     if measured is not None:
         validate_measurements(
             measured,

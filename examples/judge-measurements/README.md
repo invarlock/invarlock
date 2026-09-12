@@ -20,7 +20,9 @@ matching grader and current account limits in `collection.json`, then install th
 optional package and run the maintained collector:
 
 ```bash
-python -m pip install 'invarlock-inspect-judge[inspect]==0.15.0'
+# From the repository root for this matching checkout:
+python -m pip install .
+python -m pip install 'addins/inspect_judge[inspect]'
 export OPENAI_API_KEY=your-key-from-a-secret-store
 python collect.py --execute-collection
 ```

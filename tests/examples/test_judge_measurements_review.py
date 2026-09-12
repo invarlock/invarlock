@@ -204,6 +204,42 @@ def test_directory_snapshot_validates_every_pin(tmp_path, frozen):
         review.pinned_files(bundle, pin)
 
 
+@pytest.mark.parametrize("extra", ("file", "symlink"))
+def test_directory_snapshot_rejects_unlisted_entries(tmp_path, frozen, extra):
+    pin, files = frozen
+    bundle = tmp_path / "reference"
+    bundle.mkdir()
+    for name, payload in files.items():
+        path = bundle / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(payload)
+    unexpected = bundle / "unlisted"
+    if extra == "file":
+        unexpected.write_text("not retained", encoding="utf-8")
+    else:
+        unexpected.symlink_to(bundle / "reference.json")
+    with pytest.raises(ValueError, match="unlisted|symlink|unexpected"):
+        review.pinned_files(bundle, pin)
+
+
+def test_measurement_loader_uses_the_full_measurement_contract_limit(
+    tmp_path, monkeypatch
+):
+    seen = {}
+
+    def read(_path, *, label, max_bytes):
+        seen.update(label=label, max_bytes=max_bytes)
+        return b"{}"
+
+    monkeypatch.setattr(review, "read_regular_file_bytes", read)
+    assert review.measurements_object(tmp_path / "measurements.json") == {}
+    assert seen == {
+        "label": "judge measurements",
+        "max_bytes": review.MEASUREMENTS_MAX_BYTES,
+    }
+    assert review.MEASUREMENTS_MAX_BYTES == 384 * 1024 * 1024
+
+
 def test_labels_are_written_before_orientation_is_revealed(
     tmp_path, frozen, monkeypatch
 ):

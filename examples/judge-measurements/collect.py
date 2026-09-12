@@ -85,19 +85,37 @@ def main() -> None:
         parser.error(
             "collection is disabled until --execute-collection is supplied after reviewing the plan and resource caps"
         )
-    if not os.environ.get("OPENAI_API_KEY"):
-        parser.error("OPENAI_API_KEY must be set in the collector environment")
-    if os.environ.get("OPENAI_BASE_URL") or os.environ.get("OPENAI_API_BASE"):
-        parser.error("custom OpenAI provider URLs are outside this qualified example")
-    root = args.root.absolute()
-    output = (root / args.output).absolute()
-    checkpoint = (root / args.checkpoint).absolute()
+    try:
+        root = args.root.resolve(strict=True)
+    except OSError as exc:
+        parser.error(f"collection root must be an existing real directory: {exc}")
+    if not root.is_dir():
+        parser.error("collection root must be an existing real directory")
+    output_argument = Path(args.output)
+    checkpoint_argument = Path(args.checkpoint)
+    if output_argument.is_absolute() or ".." in output_argument.parts:
+        parser.error("measurement output must be a relative path within the root")
+    if checkpoint_argument.is_absolute() or ".." in checkpoint_argument.parts:
+        parser.error("checkpoint must be a relative path within the root")
+    output = root / output_argument
+    checkpoint = root / checkpoint_argument
     if output == checkpoint or output.is_relative_to(checkpoint):
         parser.error("measurement output must remain outside the checkpoint directory")
     if output.exists() or output.is_symlink():
         parser.error("measurement output must be a new file")
-    if not output.parent.is_dir() or output.parent.is_symlink():
-        parser.error("measurement output parent must be an existing real directory")
+    try:
+        from invarlock.filesystem.paths import pinned_directory
+
+        with pinned_directory(output.parent):
+            pass
+    except OSError as exc:
+        parser.error(
+            f"measurement output must use existing non-symlink directories: {exc}"
+        )
+    if not os.environ.get("OPENAI_API_KEY"):
+        parser.error("OPENAI_API_KEY must be set in the collector environment")
+    if os.environ.get("OPENAI_BASE_URL") or os.environ.get("OPENAI_API_BASE"):
+        parser.error("custom OpenAI provider URLs are outside this qualified example")
     try:
         from invarlock.filesystem.atomic_file import write_file_no_replace
         from invarlock.judge_measurements.contracts import canonical_payload
@@ -111,7 +129,8 @@ def main() -> None:
     print(f"Retained {completed}/{expected} completed trials in {output}")
     if completed != expected:
         print(
-            "Collection is incomplete; rerun with the same checkpoint to inspect or resume it."
+            "Collection is incomplete; rerun with the same checkpoint and a new output "
+            "path, for example --output measurements-resumed.json."
         )
 
 

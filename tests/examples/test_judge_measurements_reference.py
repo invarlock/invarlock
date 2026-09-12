@@ -244,7 +244,9 @@ def test_self_contained_validation_never_needs_campaign(bundle, monkeypatch):
         ref.validate_bundle(path, expected_sha256="0" * 64)
 
 
-def test_rebind_reuses_only_an_authenticated_frozen_subset(bundle, tmp_path):
+def test_rebind_reuses_only_an_authenticated_frozen_subset(
+    bundle, tmp_path, monkeypatch
+):
     path, result = bundle
     templates = ref.obj(
         Path(__file__).parents[2]
@@ -266,6 +268,30 @@ def test_rebind_reuses_only_an_authenticated_frozen_subset(bundle, tmp_path):
     assert (path / "grounded_qa/pilot/plan.json").read_bytes() == original_plan
     with pytest.raises(ValueError, match="pin mismatch"):
         ref.rebind_bundle(path, tmp_path / "rejected", templates, "0" * 64)
+
+    original_validate = ref.validate_bundle
+    calls = 0
+
+    def replace_after_validation(*args, **kwargs):
+        nonlocal calls
+        result = original_validate(*args, **kwargs)
+        calls += 1
+        if calls == 1:
+            endpoint = path / "grounded_qa/endpoints.json"
+            changed = ref.obj(endpoint)
+            changed["A"]["header"]["artifact_digest"] = "sha256:" + "9" * 64
+            endpoint.write_bytes(ref.canonical_payload(changed))
+        return result
+
+    monkeypatch.setattr(ref, "validate_bundle", replace_after_validation)
+    with pytest.raises(ValueError, match="digest or size mismatch"):
+        ref.rebind_bundle(
+            path,
+            tmp_path / "substituted",
+            templates,
+            result["manifest_sha256"],
+        )
+    assert not (tmp_path / "substituted").exists()
 
 
 def repin(bundle, name, data):

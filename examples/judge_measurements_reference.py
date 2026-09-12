@@ -718,6 +718,32 @@ def build(campaign_root: Path, output: Path, templates: dict | None = None) -> d
     return validate_bundle(output)
 
 
+def authenticated_bundle_files(bundle: Path, expected_sha256: str) -> dict[str, bytes]:
+    """Return one content-pinned snapshot of a closed reference directory."""
+
+    validate_bundle(bundle, expected_sha256=expected_sha256)
+    manifest_bytes = read(bundle / "reference.json", 1024 * 1024)
+    if sha(manifest_bytes) != expected_sha256:
+        raise ValueError("independent reference manifest pin mismatch")
+    manifest = parse_json_bytes(manifest_bytes, label="reference manifest")
+    files = manifest["files"]
+    retained: dict[str, bytes] = {}
+    total = 0
+    for name, pin in files.items():
+        size = pin["size_bytes"]
+        total += size
+        if total > MAX_BUNDLE_BYTES:
+            raise ValueError("reference exceeds total byte budget")
+        data = read(safe_path(bundle, name), size)
+        if len(data) != size or sha(data) != pin["sha256"]:
+            raise ValueError("reference file digest or size mismatch")
+        retained[name] = data
+    # Recheck the closed directory after the snapshot. Later path changes cannot
+    # alter the authenticated bytes returned to the caller.
+    validate_bundle(bundle, expected_sha256=expected_sha256)
+    return retained
+
+
 def rebind_bundle(
     bundle: Path,
     output: Path,
@@ -725,12 +751,7 @@ def rebind_bundle(
     expected_sha256: str,
 ) -> dict:
     """Rebuild derived plans and review sheets over an authenticated frozen subset."""
-    validate_bundle(bundle, expected_sha256=expected_sha256)
-    manifest = obj(bundle / "reference.json")
-    retained = {
-        name: read(safe_path(bundle, name), pin["size_bytes"])
-        for name, pin in manifest["files"].items()
-    }
+    retained = authenticated_bundle_files(bundle, expected_sha256)
 
     def retained_json(name: str) -> Any:
         return parse_json_bytes(retained[name], label=name)

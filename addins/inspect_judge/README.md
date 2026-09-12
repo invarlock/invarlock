@@ -20,9 +20,12 @@ rejected before a call is admitted.
 The repository includes a maintained executable collector at
 `examples/judge-measurements/collect.py`. After freezing the plan and runs,
 reviewing `collection.json`, and completing the core `evaluate --preflight`, run
-it from the copied example directory:
+it from the copied example directory. Until a release containing this workflow
+is published, first install matching packages from the repository root:
 
 ```bash
+python -m pip install .
+python -m pip install 'addins/inspect_judge[inspect]'
 export OPENAI_API_KEY=your-key-from-a-secret-store
 python collect.py --execute-collection
 ```

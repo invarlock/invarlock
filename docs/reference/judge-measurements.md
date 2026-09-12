@@ -100,10 +100,17 @@ constructs the explicit pinned Inspect model, uses a private resumable checkpoin
 and writes a new measurement file:
 
 ```bash
-python -m pip install 'invarlock-inspect-judge[inspect]==0.15.0'
+# From the same source checkout as this documentation:
+python -m pip install .
+python -m pip install 'addins/inspect_judge[inspect]'
 export OPENAI_API_KEY=your-key-from-a-secret-store
 python collect.py --execute-collection
 ```
+
+Until a release containing this workflow is published, install both packages
+from the same checkout as shown above. The release gate builds and installs the
+matching core and add-in wheels in a clean environment before running the pinned
+SDK checks.
 
 Run it only after reviewing preflight and the declared call, token, cost and time
 caps. It rejects custom provider URLs. The collector never reads a key from a
