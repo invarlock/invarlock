@@ -488,8 +488,186 @@ def _check_attempts(
         _fail("trial completeness must agree with its parse outcome")
 
 
+def _check_retained_inspect_event(
+    attempt: object, event: object, collection: dict[str, Any]
+) -> None:
+    if not isinstance(attempt, dict) or not isinstance(event, dict):
+        _fail("retained Inspect attempts and events must be objects")
+    required = {
+        "event",
+        "uuid",
+        "role",
+        "model",
+        "input",
+        "tools",
+        "tool_choice",
+        "config",
+        "retries",
+        "cache",
+        "call",
+        "output",
+        "error",
+    }
+    if set(event) != required:
+        _fail("retained Inspect model event has unsupported fields")
+    mapping = attempt.get("source")
+    output = event.get("output")
+    call = event.get("call")
+    request = attempt.get("request")
+    if (
+        not isinstance(mapping, dict)
+        or event.get("event") != "model"
+        or event.get("uuid") != mapping.get("model_event_id")
+        or event.get("role") != "grader"
+        or not isinstance(output, dict)
+        or not isinstance(call, dict)
+        or not isinstance(request, dict)
+        or event.get("model") is None
+    ):
+        _fail("retained Inspect model event does not match its attempt")
+    if set(output) != {
+        "model",
+        "request_id",
+        "finish_reason",
+        "usage",
+        "completion",
+    }:
+        _fail("retained Inspect model output has unsupported fields")
+    if (
+        event.get("cache") is not None
+        or type(event.get("retries")) is not int
+        or event.get("retries") != 0
+    ):
+        _fail("retained Inspect model events cannot use cache or SDK retries")
+    if event.get("tools") != [] or event.get("tool_choice") != "none":
+        _fail("retained Inspect model events cannot use tools")
+    try:
+        normalized_request = parse_json_bytes(
+            request["text"].encode("utf-8"),
+            label="retained Inspect normalized request",
+        )
+    except (KeyError, AttributeError, StrictJsonError) as exc:
+        raise JudgeMeasurementContractError(
+            "retained Inspect normalized request is invalid"
+        ) from exc
+    if (
+        not isinstance(normalized_request, dict)
+        or event.get("model") != normalized_request.get("model")
+        or event.get("input") != normalized_request.get("messages")
+    ):
+        _fail("retained Inspect input differs from its normalized request")
+    expected_config = normalized_request.get("config")
+    observed_config = event.get("config")
+    if not isinstance(expected_config, dict):
+        _fail("retained Inspect normalized config must be an object")
+    temperature_value = expected_config.get("temperature")
+    top_p_value = expected_config.get("top_p")
+    if (
+        isinstance(temperature_value, bool)
+        or not isinstance(temperature_value, (str, int, float))
+        or isinstance(top_p_value, bool)
+        or not isinstance(top_p_value, (str, int, float))
+    ):
+        _fail("retained Inspect normalized config is invalid")
+    try:
+        temperature = float(temperature_value)
+        top_p = float(top_p_value)
+    except (TypeError, ValueError) as exc:
+        raise JudgeMeasurementContractError(
+            "retained Inspect normalized config is invalid"
+        ) from exc
+    if observed_config != {
+        "temperature": temperature,
+        "top_p": top_p,
+        "max_tokens": expected_config.get("max_output_tokens"),
+        "seed": expected_config.get("seed"),
+        "max_retries": 0,
+        "timeout": collection.get("request_timeout_seconds"),
+        "attempt_timeout": collection.get("request_timeout_seconds"),
+        "max_connections": collection.get("concurrency"),
+        "adaptive_connections": False,
+        "num_choices": 1,
+        "internal_tools": False,
+        "parallel_tool_calls": False,
+        "reasoning_summary": "none",
+        "reasoning_history": "none",
+        "cache": False,
+        "batch": False,
+    }:
+        _fail("retained Inspect generation config differs from its request")
+    if set(call) != {"request", "response", "error"} or not isinstance(
+        call.get("request"), dict
+    ):
+        _fail("retained Inspect provider call is incomplete")
+    _bounded_canonical(call, JUDGE_REQUEST_MAX_BYTES, "retained Inspect provider call")
+    _check_retained_provider_secrets(call)
+    _check_inspect_provider_projection(
+        call=call,
+        output=output,
+        normalized_request=normalized_request,
+        completed=attempt.get("status") == "completed",
+    )
+    if output.get("model") != attempt.get("resolved_model"):
+        _fail("retained Inspect resolved model does not match its attempt")
+    usage = output.get("usage")
+    if usage != attempt.get("usage"):
+        _fail("retained Inspect token usage does not match its attempt")
+    response = attempt.get("response")
+    completed = attempt.get("status") == "completed"
+    if completed and (
+        event.get("error") is not None
+        or call.get("error") not in (None, False)
+        or not isinstance(call.get("response"), dict)
+    ):
+        _fail("completed retained Inspect call has an inconsistent outcome")
+    if not completed and (
+        event.get("error") is None
+        or call.get("error") is not True
+        or (
+            call.get("response") is not None
+            and not isinstance(call.get("response"), dict)
+        )
+    ):
+        _fail("failed retained Inspect call has an inconsistent outcome")
+    if not completed:
+        event_error = event["error"]
+        attempt_error = attempt.get("error")
+        if (
+            not isinstance(event_error, dict)
+            or set(event_error) != {"status", "code", "message"}
+            or event_error.get("status") != attempt.get("status")
+            or not isinstance(attempt_error, dict)
+            or {
+                "code": event_error.get("code"),
+                "message": event_error.get("message"),
+            }
+            != attempt_error
+        ):
+            _fail("retained Inspect error differs from its attempt")
+    if response is not None:
+        completion = output.get("completion")
+        try:
+            if not isinstance(completion, str):
+                raise AttributeError
+            decoded_completion = parse_json_bytes(
+                completion.encode("utf-8"), label="Inspect model completion"
+            )
+        except (AttributeError, StrictJsonError):
+            decoded_completion = completion
+        if canonical_payload(decoded_completion).decode("utf-8") != response.get(
+            "text"
+        ):
+            _fail("retained Inspect completion does not match its attempt")
+    if output.get("request_id") != attempt.get("request_id") or output.get(
+        "finish_reason"
+    ) != attempt.get("finish_reason"):
+        _fail("retained Inspect output metadata does not match its attempt")
+    if (event.get("error") is None) != completed:
+        _fail("retained Inspect error state does not match its attempt")
+
+
 def _inspect_source_trials(decoded: dict[str, Any]) -> list[dict[str, Any]]:
-    if set(decoded) != {"format", "inspect_version", "records"}:
+    if set(decoded) != {"format", "inspect_version", "collection", "records"}:
         _fail("retained Inspect source has an unsupported shape")
     if (
         decoded["format"] != INSPECT_SOURCE_FORMAT
@@ -498,6 +676,61 @@ def _inspect_source_trials(decoded: dict[str, Any]) -> list[dict[str, Any]]:
     ):
         _fail("retained Inspect source has an unsupported profile")
     trials: list[dict[str, Any]] = []
+    collection = decoded["collection"]
+    required_collection = {
+        "grader",
+        "inspect_version",
+        "profile",
+        "epochs",
+        "log_model_api",
+        "log_samples",
+        "sdk_max_retries",
+        "tools",
+        "concurrency",
+        "requests_per_minute",
+        "request_timeout_seconds",
+        "max_calls",
+        "max_input_tokens",
+        "max_output_tokens",
+        "max_cost_microusd",
+        "input_tokens_per_call",
+        "cost_microusd_per_call",
+    }
+    if not isinstance(collection, dict) or set(collection) != required_collection:
+        _fail("retained Inspect collection options must be an object")
+    grader = collection["grader"]
+    if (
+        not isinstance(grader, str)
+        or not 0 < len(grader) <= 256
+        or any(part in grader for part in (":", "@", "?", "#", "\\"))
+        or any(ord(char) < 33 for char in grader)
+        or collection["inspect_version"] != "0.3.254"
+        or collection["profile"] != "inspect-text-frozen-answer-v1"
+        or collection["epochs"] != 1
+        or type(collection["epochs"]) is not int
+        or collection["log_model_api"] is not True
+        or collection["log_samples"] is not True
+        or collection["sdk_max_retries"] != 0
+        or type(collection["sdk_max_retries"]) is not int
+        or collection["tools"] is not False
+    ):
+        _fail("retained Inspect collection configuration is unsupported")
+    for name, maximum in (
+        ("concurrency", 32),
+        ("requests_per_minute", 10000),
+        ("request_timeout_seconds", 3600),
+        ("max_calls", 600000),
+        ("max_input_tokens", 10**12),
+        ("max_output_tokens", 10**12),
+        ("max_cost_microusd", 10**12),
+        ("input_tokens_per_call", 1048576),
+        ("cost_microusd_per_call", 10**9),
+    ):
+        value = collection[name]
+        if type(value) is not int or not 1 <= value <= maximum:
+            _fail(f"retained Inspect {name} is outside its supported range")
+    spent_calls = 0
+    reserved_output_tokens = 0
     for record in decoded["records"]:
         if not isinstance(record, dict) or set(record) != {"trial", "events"}:
             _fail("retained Inspect records must contain one trial and its events")
@@ -511,104 +744,167 @@ def _inspect_source_trials(decoded: dict[str, Any]) -> list[dict[str, Any]]:
         ):
             _fail("retained Inspect event count must match the trial attempts")
         for attempt, event in zip(trial["attempts"], events, strict=True):
-            if not isinstance(attempt, dict) or not isinstance(event, dict):
-                _fail("retained Inspect attempts and events must be objects")
-            required = {
-                "event",
-                "uuid",
-                "role",
-                "model",
-                "input",
-                "tools",
-                "tool_choice",
-                "config",
-                "retries",
-                "cache",
-                "call",
-                "output",
-                "error",
-            }
-            if set(event) != required:
-                _fail("retained Inspect model event has unsupported fields")
-            mapping = attempt.get("source")
-            output = event.get("output")
-            call = event.get("call")
-            request = attempt.get("request")
-            if (
-                not isinstance(mapping, dict)
-                or event.get("event") != "model"
-                or event.get("uuid") != mapping.get("model_event_id")
-                or event.get("role") != "grader"
-                or not isinstance(output, dict)
-                or not isinstance(call, dict)
-                or not isinstance(request, dict)
-                or event.get("model") is None
-            ):
-                _fail("retained Inspect model event does not match its attempt")
-            if event.get("cache") is not None or event.get("retries") != 0:
-                _fail("retained Inspect model events cannot use cache or SDK retries")
-            if event.get("tools") != [] or event.get("tool_choice") != "none":
-                _fail("retained Inspect model events cannot use tools")
-            try:
-                normalized_request = parse_json_bytes(
-                    request["text"].encode("utf-8"),
-                    label="retained Inspect normalized request",
-                )
-            except (KeyError, AttributeError, StrictJsonError) as exc:
-                raise JudgeMeasurementContractError(
-                    "retained Inspect normalized request is invalid"
-                ) from exc
-            if (
-                not isinstance(normalized_request, dict)
-                or event.get("model") != normalized_request.get("model")
-                or event.get("input") != normalized_request.get("messages")
-            ):
-                _fail("retained Inspect input differs from its normalized request")
-            expected_config = normalized_request.get("config")
-            observed_config = event.get("config")
-            if not isinstance(expected_config, dict) or observed_config != {
-                "temperature": float(expected_config.get("temperature", "nan")),
-                "top_p": float(expected_config.get("top_p", "nan")),
-                "max_tokens": expected_config.get("max_output_tokens"),
-                "seed": expected_config.get("seed"),
-                "max_retries": 0,
-            }:
-                _fail("retained Inspect generation config differs from its request")
-            if set(call) != {"request", "response", "error"} or not isinstance(
-                call.get("request"), dict
-            ):
-                _fail("retained Inspect provider call is incomplete")
-            _bounded_canonical(
-                call, JUDGE_REQUEST_MAX_BYTES, "retained Inspect provider call"
-            )
-            if output.get("model") != attempt.get("resolved_model"):
-                _fail("retained Inspect resolved model does not match its attempt")
-            usage = output.get("usage")
-            if usage != attempt.get("usage"):
-                _fail("retained Inspect token usage does not match its attempt")
-            response = attempt.get("response")
-            if response is not None:
-                completion = output.get("completion")
-                try:
-                    if not isinstance(completion, str):
-                        raise AttributeError
-                    decoded_completion = parse_json_bytes(
-                        completion.encode("utf-8"), label="Inspect model completion"
-                    )
-                except (AttributeError, StrictJsonError):
-                    decoded_completion = completion
-                if canonical_payload(decoded_completion).decode(
-                    "utf-8"
-                ) != response.get("text"):
-                    _fail("retained Inspect completion does not match its attempt")
-            if output.get("request_id") != attempt.get("request_id") or output.get(
-                "finish_reason"
-            ) != attempt.get("finish_reason"):
-                _fail("retained Inspect output metadata does not match its attempt")
-            if (event.get("error") is None) != (attempt.get("status") == "completed"):
-                _fail("retained Inspect error state does not match its attempt")
+            _check_retained_inspect_event(attempt, event, collection)
+            spent_calls += 1
+            reserved_output_tokens += event["config"]["max_tokens"]
         trials.append(trial)
+    if (
+        spent_calls > collection["max_calls"]
+        or spent_calls * collection["input_tokens_per_call"]
+        > collection["max_input_tokens"]
+        or reserved_output_tokens > collection["max_output_tokens"]
+        or spent_calls * collection["cost_microusd_per_call"]
+        > collection["max_cost_microusd"]
+    ):
+        _fail("retained Inspect calls exceed their declared resource reservations")
     return trials
+
+
+def _check_retained_provider_secrets(value: object) -> None:
+    blocked = {
+        "authorization",
+        "api-key",
+        "api_key",
+        "apikey",
+        "access_token",
+        "secret",
+    }
+    stack = [value]
+    while stack:
+        current = stack.pop()
+        if isinstance(current, dict):
+            for key, child in current.items():
+                folded = key.casefold() if isinstance(key, str) else ""
+                if folded in blocked:
+                    _fail("retained Inspect provider call contains a credential field")
+                if folded in {"headers", "extra_headers", "http_headers"} and (
+                    not isinstance(child, dict)
+                    or {item.casefold() for item in child} > {"x-irid"}
+                    or not all(
+                        isinstance(item, str) and 0 < len(item) <= 128
+                        for item in child.values()
+                    )
+                ):
+                    _fail("retained Inspect provider call contains unsupported headers")
+                stack.append(child)
+        elif isinstance(current, list):
+            stack.extend(current)
+
+
+def _provider_completion(response: dict[str, Any]) -> object:
+    if set(response) == {"rating"}:
+        return response
+    choices = response.get("choices")
+    if (
+        isinstance(choices, list)
+        and len(choices) == 1
+        and isinstance(choices[0], dict)
+        and isinstance(choices[0].get("message"), dict)
+        and isinstance(choices[0]["message"].get("content"), str)
+    ):
+        content = choices[0]["message"]["content"]
+        try:
+            return parse_json_bytes(
+                content.encode("utf-8"), label="provider completion"
+            )
+        except StrictJsonError:
+            return content
+    _fail("retained Inspect provider response uses an unsupported shape")
+
+
+def _check_inspect_provider_projection(
+    *,
+    call: dict[str, Any],
+    output: dict[str, Any],
+    normalized_request: dict[str, Any],
+    completed: bool,
+) -> None:
+    request = call["request"]
+    messages = request.get("messages")
+    if not isinstance(messages, list):
+        _fail("retained Inspect provider request must contain chat messages")
+    provider_messages: list[dict[str, str]] = []
+    for message in messages:
+        if (
+            not isinstance(message, dict)
+            or not isinstance(message.get("role"), str)
+            or not isinstance(message.get("content"), str)
+        ):
+            _fail("retained Inspect provider messages must be plain text")
+        provider_messages.append(
+            {"role": message["role"], "content": message["content"]}
+        )
+    if provider_messages != normalized_request["messages"]:
+        _fail("retained Inspect provider messages differ from the approved request")
+    requested_model = normalized_request["model"]
+    provider_model = request.get("model")
+    if not isinstance(provider_model, str) or provider_model not in {
+        requested_model,
+        requested_model.split("/", 1)[-1],
+    }:
+        _fail("retained Inspect provider model differs from the approved request")
+    expected = normalized_request["config"]
+    nested = request.get("config")
+    if nested is not None and nested != expected:
+        _fail("retained Inspect provider config differs from the approved request")
+    if nested is None:
+        for provider_key in ("temperature", "top_p"):
+            try:
+                observed = Decimal(str(request[provider_key]))
+                required = Decimal(str(expected[provider_key]))
+            except (KeyError, TypeError, ValueError) as exc:
+                raise JudgeMeasurementContractError(
+                    "retained Inspect provider config is incomplete"
+                ) from exc
+            if observed != required:
+                _fail("retained Inspect provider config differs from the request")
+        if expected["seed"] is not None and request.get("seed") != expected["seed"]:
+            _fail("retained Inspect provider seed differs from the request")
+        token_limit = request.get("max_tokens", request.get("max_completion_tokens"))
+        if token_limit != expected["max_output_tokens"]:
+            _fail("retained Inspect provider token limit differs from the request")
+    if request.get("tools", []) != []:
+        _fail("retained Inspect provider request contains tools")
+    if not completed:
+        return
+    response = call["response"]
+    if not isinstance(response, dict):
+        _fail("completed retained Inspect provider response must be an object")
+    provider_completion = _provider_completion(response)
+    completion = output.get("completion")
+    if not isinstance(completion, str):
+        _fail("retained Inspect output completion must be text")
+    try:
+        projected_completion: object = parse_json_bytes(
+            completion.encode("utf-8"), label="Inspect output completion"
+        )
+    except StrictJsonError:
+        projected_completion = completion
+    if canonical_payload(provider_completion) != canonical_payload(
+        projected_completion
+    ):
+        _fail("retained Inspect provider response contradicts its completion")
+    if isinstance(response.get("model"), str) and response["model"] != output.get(
+        "model"
+    ):
+        _fail("retained Inspect provider response contradicts its resolved model")
+    if isinstance(response.get("id"), str) and response["id"] != output.get(
+        "request_id"
+    ):
+        _fail("retained Inspect provider response contradicts its request ID")
+    choices = response.get("choices")
+    if isinstance(choices, list) and choices:
+        if choices[0].get("finish_reason") != output.get("finish_reason"):
+            _fail("retained Inspect provider response contradicts its finish reason")
+    usage = response.get("usage")
+    projected_usage = output.get("usage")
+    if isinstance(usage, dict) and isinstance(projected_usage, dict):
+        input_tokens = usage.get("prompt_tokens", usage.get("input_tokens"))
+        output_tokens = usage.get("completion_tokens", usage.get("output_tokens"))
+        if input_tokens != projected_usage.get(
+            "input_tokens"
+        ) or output_tokens != projected_usage.get("output_tokens"):
+            _fail("retained Inspect provider usage contradicts its output")
 
 
 def _source_trials(source: dict[str, Any]) -> list[dict[str, Any]]:

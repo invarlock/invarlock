@@ -73,10 +73,21 @@ def _reject_credential_fields(value: Any) -> None:
         current = stack.pop()
         if isinstance(current, dict):
             for key, child in current.items():
+                folded = key.casefold() if isinstance(key, str) else ""
                 _require(
-                    not isinstance(key, str) or key.casefold() not in blocked,
+                    folded not in blocked,
                     "provider request contains a credential field",
                 )
+                if folded in {"headers", "extra_headers", "http_headers"}:
+                    _require(
+                        isinstance(child, dict)
+                        and {key.casefold() for key in child} <= {"x-irid"}
+                        and all(
+                            isinstance(item, str) and 0 < len(item) <= 128
+                            for item in child.values()
+                        ),
+                        "provider request contains unsupported headers",
+                    )
                 stack.append(child)
         elif isinstance(current, list):
             stack.extend(current)
@@ -263,6 +274,10 @@ def prepare_inspect_config(
         num_choices=1,
         internal_tools=False,
         parallel_tool_calls=False,
+        reasoning_summary="none",
+        reasoning_history="none",
+        cache=False,
+        batch=False,
     )
 
 
@@ -368,7 +383,8 @@ def _completion_value(completion: Any) -> Any:
 def _parse_rating(response: Any, plan: JudgeMeasurementPlan) -> dict[str, Any]:
     ratings = {rating["label"]: rating["value"] for rating in plan["scale"]["ratings"]}
     if (
-        set(response) == {"rating"}
+        isinstance(response, dict)
+        and set(response) == {"rating"}
         and isinstance(response["rating"], str)
         and response["rating"] in ratings
     ):
@@ -567,6 +583,17 @@ def import_export(
                 "max_tokens": plan["judge"]["config"]["max_output_tokens"],
                 "seed": plan["judge"]["config"]["seed"],
                 "max_retries": 0,
+                "timeout": options.request_timeout_seconds,
+                "attempt_timeout": options.request_timeout_seconds,
+                "max_connections": options.concurrency,
+                "adaptive_connections": False,
+                "num_choices": 1,
+                "internal_tools": False,
+                "parallel_tool_calls": False,
+                "reasoning_summary": "none",
+                "reasoning_history": "none",
+                "cache": False,
+                "batch": False,
             }
             _require(
                 canonical_payload(event["config"])
@@ -695,6 +722,7 @@ def import_export(
         {
             "format": RETAINED_SOURCE_FORMAT,
             "inspect_version": INSPECT_VERSION,
+            "collection": asdict(options),
             "records": [
                 {"trial": trial, "events": sample["events"]}
                 for trial, sample in zip(trials, samples, strict=True)
@@ -703,6 +731,21 @@ def import_export(
     )
     _require(len(source) <= MAX_EXPORT_BYTES, "retained source exceeds byte allowance")
     completed = sum(trial["status"] == "complete" for trial in trials)
+    spent_calls = sum(len(trial["attempts"]) for trial in trials)
+    _require(spent_calls <= options.max_calls, "export exceeds the call allowance")
+    _require(
+        spent_calls * options.input_tokens_per_call <= options.max_input_tokens,
+        "export exceeds the reserved input-token allowance",
+    )
+    _require(
+        spent_calls * plan["judge"]["config"]["max_output_tokens"]
+        <= options.max_output_tokens,
+        "export exceeds the reserved output-token allowance",
+    )
+    _require(
+        spent_calls * options.cost_microusd_per_call <= options.max_cost_microusd,
+        "export exceeds the reserved cost allowance",
+    )
     measurements = {
         "format": "invarlock/judge-measurements-v1",
         "profile_id": "text-frozen-answer-v1",

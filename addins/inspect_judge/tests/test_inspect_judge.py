@@ -114,9 +114,29 @@ def test_offline_replay_rejects_retained_inspect_event_substitution(data):
         byte_size=len(payload),
         sha256=hashlib.sha256(payload).hexdigest(),
     )
-    with pytest.raises(
-        JudgeMeasurementContractError, match="completion does not match"
-    ):
+    with pytest.raises(JudgeMeasurementContractError, match="provider response"):
+        validate_measurements(result, data[0], **frozen_runs(data))
+
+
+@pytest.mark.parametrize(
+    ("mutate", "message"),
+    [
+        (lambda collection: collection.update(max_calls=1), "resource reservations"),
+        (lambda collection: collection.update(concurrency=True), "supported range"),
+        (lambda collection: collection.update(unknown=True), "must be an object"),
+    ],
+)
+def test_offline_replay_rejects_changed_collection_contract(data, mutate, message):
+    result = ingest(data)
+    retained = json.loads(result["sources"][0]["content"])
+    mutate(retained["collection"])
+    payload = canonical_payload(retained)
+    result["sources"][0].update(
+        content=payload.decode(),
+        byte_size=len(payload),
+        sha256=hashlib.sha256(payload).hexdigest(),
+    )
+    with pytest.raises(JudgeMeasurementContractError, match=message):
         validate_measurements(result, data[0], **frozen_runs(data))
 
 
@@ -168,6 +188,18 @@ def test_collection_rejects_unapproved_configuration(data, key, value):
         (
             ("samples", 0, "events", 0, "call", "request", "headers"),
             {"Authorization": "placeholder"},
+        ),
+        (
+            ("samples", 0, "events", 0, "call", "request", "headers"),
+            {"Cookie": "placeholder"},
+        ),
+        (
+            ("samples", 0, "events", 0, "call", "request", "headers"),
+            {"X-Api-Key": "placeholder"},
+        ),
+        (
+            ("samples", 0, "events", 0, "call", "request", "messages"),
+            [{"role": "user", "content": "substituted"}],
         ),
         (("samples", 0, "events", 0, "output", "model"), "unapproved"),
         (("samples", 1, "events", 0, "uuid"), "event-0"),
@@ -229,6 +261,7 @@ def test_incomplete_slots_are_visible_and_missing_slots_rejected(data):
 def test_parse_failure_is_terminal_on_resume(data):
     exported = copy.deepcopy(data[1])
     exported["samples"][0]["events"][0]["output"]["completion"] = '{"rating":"unknown"}'
+    exported["samples"][0]["events"][0]["call"]["response"] = {"rating": "unknown"}
     result = ingest(data, exported)
     assert result["trials"][0]["parse"]["status"] == "invalid"
     prepared = prepare_collection(
@@ -279,6 +312,40 @@ def test_completed_call_requires_usage_for_budget_accounting(data):
         ingest(data, exported)
 
 
+def test_import_enforces_cumulative_call_reservations(data):
+    exported = copy.deepcopy(data[1])
+    exported["collection"]["max_calls"] = 1
+    options = replace(data[3], max_calls=1)
+    with pytest.raises(InspectJudgeError, match="call allowance"):
+        import_export(
+            canonical_payload(exported),
+            plan=data[0],
+            options=options,
+            **frozen_runs(data),
+        )
+
+
+@pytest.mark.parametrize("completion", ("null", "true", "5", "[]", '["correct"]'))
+def test_scalar_and_sequence_completions_are_retained_as_invalid(data, completion):
+    exported = copy.deepcopy(data[1])
+    event = exported["samples"][0]["events"][0]
+    event["output"]["completion"] = completion
+    event["call"]["response"] = {
+        "choices": [
+            {
+                "message": {"content": completion},
+                "finish_reason": event["output"]["finish_reason"],
+            }
+        ]
+    }
+    result = ingest(data, exported)
+    assert result["trials"][0]["parse"] == {
+        "status": "invalid",
+        "value": None,
+        "rating": None,
+    }
+
+
 def test_sdk_configuration_is_optional_and_uses_no_model_factory(data, monkeypatch):
     captured = {}
 
@@ -310,6 +377,11 @@ def test_sdk_missing_fails_without_importing_provider(data, monkeypatch):
 
 
 def test_live_collection_checkpoints_and_resumes(data, monkeypatch, tmp_path):
+    plan = copy.deepcopy(data[0])
+    plan["prompt"]["demonstrations"] = [
+        {"input": "Two plus two?", "answer": "Four.", "rating": "correct"}
+    ]
+    data = (bind_requests(plan, data[2]), data[1], data[2], data[3])
     current_sink = None
 
     @contextmanager
@@ -331,12 +403,21 @@ def test_live_collection_checkpoints_and_resumes(data, monkeypatch, tmp_path):
     class SystemMessage(Message):
         role = "system"
 
+    class AssistantMessage(Message):
+        role = "assistant"
+
     class Config(SimpleNamespace):
-        pass
+        def model_dump(self, *, exclude_none=False):
+            return {
+                key: value
+                for key, value in vars(self).items()
+                if not exclude_none or value is not None
+            }
 
     fake_module = SimpleNamespace(
         ChatMessageSystem=SystemMessage,
         ChatMessageUser=Message,
+        ChatMessageAssistant=AssistantMessage,
         GenerateConfig=lambda **kwargs: Config(**kwargs),
         use_model_event_sink=use_model_event_sink,
     )
@@ -347,11 +428,19 @@ def test_live_collection_checkpoints_and_resumes(data, monkeypatch, tmp_path):
         name = "example-judge"
         calls = 0
 
+        def __init__(self):
+            self.config = Config()
+            self.api = SimpleNamespace(
+                client=SimpleNamespace(max_retries=0),
+                config=Config(),
+                model_args={},
+                responses_api=False,
+            )
+
         def __str__(self):
             return self.name
 
-        async def generate(self, *, input, tools, tool_choice, config, cache):
-            self.calls += 1
+        def event(self, input, tools, tool_choice, config):
             output = SimpleNamespace(
                 model="example-judge-001",
                 completion='{"rating":"correct"}',
@@ -376,13 +465,28 @@ def test_live_collection_checkpoints_and_resumes(data, monkeypatch, tmp_path):
                 retries=0,
                 cache=None,
                 call=SimpleNamespace(
-                    request={"model": self.name, "messages": ["retained"]},
-                    response={"id": f"request-{self.calls}", "output": "retained"},
+                    request={
+                        "model": self.name,
+                        "messages": [
+                            {"role": message.role, "content": message.content}
+                            for message in input
+                        ],
+                        "temperature": config.temperature,
+                        "top_p": config.top_p,
+                        "max_tokens": config.max_tokens,
+                        "seed": config.seed,
+                    },
+                    response={"rating": "correct"},
                     error=None,
                 ),
                 output=output,
                 error=None,
             )
+            return output, event
+
+        async def generate(self, *, input, tools, tool_choice, config, cache):
+            self.calls += 1
+            output, event = self.event(input, tools, tool_choice, config)
             assert current_sink is not None
             current_sink.on_pending(event)
             current_sink.on_complete(event)
@@ -392,7 +496,7 @@ def test_live_collection_checkpoints_and_resumes(data, monkeypatch, tmp_path):
     runner = RunnerOptions(
         checkpoint_directory=tmp_path / "checkpoint",
         scorer_id="correctness",
-        max_elapsed_seconds=30,
+        invocation_timeout_seconds=30,
     )
     result = asyncio.run(
         collect(
@@ -406,7 +510,12 @@ def test_live_collection_checkpoints_and_resumes(data, monkeypatch, tmp_path):
     assert result["completeness"]["status"] == "complete"
     assert result["source_profile"] == "retained-inspect-model-events-v1"
     assert model.calls == 2
-    assert len(list(runner.checkpoint_directory.glob("attempt-*.json"))) == 2
+    retained = json.loads(result["sources"][0]["content"])
+    assert [
+        message["role"] for message in retained["records"][0]["events"][0]["input"]
+    ] == ["system", "user", "assistant", "user"]
+    assert len(list(runner.checkpoint_directory.glob("admission-*.json"))) == 2
+    assert len(list(runner.checkpoint_directory.glob("result-*.json"))) == 2
     resumed = asyncio.run(
         collect(
             plan=data[0],
@@ -418,6 +527,143 @@ def test_live_collection_checkpoints_and_resumes(data, monkeypatch, tmp_path):
     )
     assert resumed == result
     assert model.calls == 2
+
+    class SlowModel(Model):
+        async def generate(self, *, input, tools, tool_choice, config, cache):
+            self.calls += 1
+            _, event = self.event(input, tools, tool_choice, config)
+            assert current_sink is not None
+            current_sink.on_pending(event)
+            await asyncio.sleep(10)
+
+    slow = SlowModel()
+    slow_runner = replace(
+        runner,
+        checkpoint_directory=tmp_path / "slow-checkpoint",
+        invocation_timeout_seconds=1,
+    )
+    limited = replace(data[3], concurrency=1, max_calls=1)
+    incomplete = asyncio.run(
+        collect(
+            plan=data[0],
+            options=limited,
+            runner=slow_runner,
+            model=slow,
+            **frozen_runs(data),
+        )
+    )
+    assert incomplete["trials"][0]["attempts"][0]["status"] == "timeout_ambiguous"
+    assert slow.calls == 1
+    resumed = asyncio.run(
+        collect(
+            plan=data[0],
+            options=limited,
+            runner=slow_runner,
+            model=slow,
+            **frozen_runs(data),
+        )
+    )
+    assert resumed == incomplete
+    assert slow.calls == 1
+
+    class CompletedThenRaisedModel(Model):
+        async def generate(self, *, input, tools, tool_choice, config, cache):
+            self.calls += 1
+            output, event = self.event(input, tools, tool_choice, config)
+            assert current_sink is not None
+            current_sink.on_pending(event)
+            current_sink.on_complete(event)
+            raise RuntimeError("wrapper failed after recording completion")
+
+    completed_then_raised = CompletedThenRaisedModel()
+    completed_result = asyncio.run(
+        collect(
+            plan=data[0],
+            options=replace(data[3], concurrency=1, max_calls=1),
+            runner=replace(
+                runner, checkpoint_directory=tmp_path / "complete-before-error"
+            ),
+            model=completed_then_raised,
+            **frozen_runs(data),
+        )
+    )
+    assert completed_result["trials"][0]["attempts"][0]["status"] == "completed"
+
+    class BlockingModel(Model):
+        def __init__(self, started):
+            super().__init__()
+            self.started = started
+            self.cancelled = False
+
+        async def generate(self, *, input, tools, tool_choice, config, cache):
+            self.calls += 1
+            _, event = self.event(input, tools, tool_choice, config)
+            assert current_sink is not None
+            current_sink.on_pending(event)
+            self.started.set()
+            try:
+                await asyncio.sleep(60)
+            except asyncio.CancelledError:
+                self.cancelled = True
+                raise
+
+    async def cancel_and_check_lock():
+        started = asyncio.Event()
+        blocking = BlockingModel(started)
+        blocking_runner = replace(
+            runner,
+            checkpoint_directory=tmp_path / "cancelled-checkpoint",
+            invocation_timeout_seconds=30,
+        )
+        limited_options = replace(data[3], concurrency=1, max_calls=1)
+        task = asyncio.create_task(
+            collect(
+                plan=data[0],
+                options=limited_options,
+                runner=blocking_runner,
+                model=blocking,
+                **frozen_runs(data),
+            )
+        )
+        await asyncio.wait_for(started.wait(), timeout=2)
+        with pytest.raises(InspectJudgeError, match="another collector"):
+            await collect(
+                plan=data[0],
+                options=limited_options,
+                runner=blocking_runner,
+                model=Model(),
+                **frozen_runs(data),
+            )
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert blocking.cancelled
+        replayed = await collect(
+            plan=data[0],
+            options=limited_options,
+            runner=blocking_runner,
+            model=blocking,
+            **frozen_runs(data),
+        )
+        assert replayed["trials"][0]["attempts"][0]["status"] == "timeout_ambiguous"
+        assert blocking.calls == 1
+
+    asyncio.run(cancel_and_check_lock())
+
+    unbounded_provider = Model()
+    unbounded_provider.api.client.max_retries = 2
+    with pytest.raises(InspectJudgeError, match="provider client"):
+        asyncio.run(
+            collect(
+                plan=data[0],
+                options=data[3],
+                runner=replace(
+                    runner, checkpoint_directory=tmp_path / "unsafe-provider"
+                ),
+                model=unbounded_provider,
+                **frozen_runs(data),
+            )
+        )
 
 
 def test_malformed_duplicate_json_and_oversized_export_rejected(data):
