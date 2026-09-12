@@ -282,9 +282,10 @@ The scorer-extension v1 contract is suitable for separately supplied
 deterministic text scorers such as token F1, structured-field extraction, or VQA
 answer normalization. Those scorers are separately installed and require
 explicit authorization. SQL or code execution, model-based semantic similarity,
-network or human services, and LLM judges are outside acceptance replay. Judge
-results may be authenticated as observations, where they have no verdict
-authority.
+network or human services, and LLM judges are outside scorer-extension
+acceptance replay. The separate bounded judge report replays its retained
+frozen-answer measurement contract; other judge results may be authenticated as
+observations, where they have no verdict authority.
 
 ## Verification result
 
@@ -453,8 +454,8 @@ The report leads with **Policy satisfied** or **Policy not met**, the recorded
 verdict and the checks responsible for it. Each metric shows baseline and
 candidate values, change, observed pair count, an interval and the configured
 requirements. The interval diagram marks the policy boundary, while the table
-shows which numerical checks passed or were not met. Display values are rounded;
-exact recorded values remain available in the evidence and technical details.
+shows which numerical checks passed or were not met. Exact recorded values remain
+available in the evidence and technical details.
 
 For captured comparisons, the technical details identify both recorded runs,
 their complete-run digests, attributed artifact digests and evaluator
@@ -589,3 +590,10 @@ workflow and its assurance limits.
   dependency order.
 - [Command-line interface](cli.md) documents JSON modes and exit status.
 - [Python API](api-guide.md) defines result and signed-receipt types.
+
+For bounded frozen-answer ratings, see [judge measurements](judge-measurements.md).
+Judge reports keep offline replay, signer authentication and recipient acceptance
+distinct and use additive judge-specific JSON formats. They show the first 50
+case IDs by default; repeat `report --case-id ID` to inspect any retained cases
+without loading every answer and judge response into one report. Case selection
+does not change the complete replay or the recorded policy decision.

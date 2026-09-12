@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://invarlock.dev/contracts/judge_analysis_policy.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "format": {
+      "const": "invarlock/judge-analysis-policy-v1"
+    },
+    "plan_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "minLength": 64,
+      "maxLength": 64
+    },
+    "metric_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
+    },
+    "decision_role": {
+      "enum": [
+        "required",
+        "advisory"
+      ]
+    },
+    "direction": {
+      "enum": [
+        "higher",
+        "lower"
+      ]
+    },
+    "method": {
+      "const": "fixed-benchmark-hoeffding-v1"
+    },
+    "alpha": {
+      "type": "string",
+      "pattern": "^0\\.[0-9]{0,14}[1-9](?![\\s\\S])",
+      "maxLength": 17
+    },
+    "comparison_family_size": {
+      "type": "integer",
+      "minimum": 2
+    },
+    "minimum_units": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "maximum_interval_width": {
+      "type": "string",
+      "pattern": "^(?:1|2|[01]\\.[0-9]{0,14}[1-9])(?![\\s\\S])",
+      "maxLength": 17
+    },
+    "allowed_degradation": {
+      "$ref": "#/$defs/unit_decimal"
+    },
+    "subject_bound": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/unit_decimal"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "format",
+    "plan_sha256",
+    "metric_name",
+    "decision_role",
+    "direction",
+    "method",
+    "alpha",
+    "comparison_family_size",
+    "minimum_units",
+    "maximum_interval_width",
+    "allowed_degradation",
+    "subject_bound"
+  ],
+  "$defs": {
+    "unit_decimal": {
+      "type": "string",
+      "pattern": "^(?:0|1|0\\.[0-9]{0,14}[1-9])(?![\\s\\S])",
+      "maxLength": 17
+    }
+  }
+}

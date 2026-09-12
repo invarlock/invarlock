@@ -1,0 +1,15 @@
+format_version: invarlock/evaluation-request-v3
+execution:
+  mode: judge_collect
+  collection:
+    integration: inspect-judge
+    configuration: collection.json
+comparison:
+  baseline_run: baseline_run.json
+  subject_run: subject_run.json
+  plan: plan.json
+  measurements: null
+  policy: analysis_policy.json
+output:
+  evidence: evidence
+  signer_identity: example-signer

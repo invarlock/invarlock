@@ -20,6 +20,7 @@ from typing import BinaryIO, cast
 PROJECTS = (
     "invarlock",
     "invarlock-diagnostics",
+    "invarlock-inspect-judge",
     "invarlock-runtime-gguf",
     "invarlock-runtime-hf-vision-text",
     "invarlock-runtime-tensorrt-llm",

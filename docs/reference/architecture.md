@@ -21,8 +21,12 @@ invarlock report evidence/
 records and publishes one atomic evidence directory. Native execution/import
 retains pack v1, native artifact/schedule/runtime anchors, and receipt v1/v2.
 Captured comparison uses pack v2, complete-run/request/policy/signer anchors,
-trust profile v2, and receipt v3 scoped to `captured_comparison`. Both use the
-same CLI and `invarlock.engine` SDK facade. Native-only acceptance APIs reject
+trust profile v2, and receipt v3 scoped to `captured_comparison`.
+The bounded judge workflow imports frozen-answer measurements, validates their
+complete planned schedule, and emits a judge evidence envelope with its own
+recipient policy and verification receipt. It preserves fixed-benchmark judge
+uncertainty separately from deterministic comparison statistics. All three use
+the same CLI; the native and captured SDK facade is `invarlock.engine`. Native-only acceptance APIs reject
 captured scope. `report` renders the stored result without changing the pack or
 discovering an adjacent receipt; unsigned captured packs remain local reports.
 
@@ -115,6 +119,12 @@ The GGUF, TensorRT-LLM, and Hugging Face vision-text providers are first-party
 optional distributions. They implement the same ABI and register through the
 `invarlock.runtime_providers` entry-point group. Numeric diagnostics are a
 separate observation-only package and have no acceptance authority.
+The fifth optional distribution, `invarlock-inspect-judge`, adapts bounded
+collection logs to core judge measurements. Its `inspect` extra supplies the
+provider SDK collection path. Offline import, schedule replay, analysis, signing,
+independent verification, and reporting live in core and do not import or require
+Inspect or OpenAI SDKs. Collection remains an explicitly budgeted optional API;
+`evaluate` can preflight its request but does not launch provider calls.
 
 ```text
 invarlock
@@ -128,12 +138,13 @@ first-party optional distributions
 ├── invarlock-runtime-gguf
 ├── invarlock-runtime-tensorrt-llm
 ├── invarlock-runtime-hf-vision-text
-└── invarlock-diagnostics (observation only)
+├── invarlock-diagnostics (observation only)
+└── invarlock-inspect-judge (bounded collection adapter)
 ```
 
 See [Runtime providers](runtime-providers.md) for the extension contract.
 
-## Data flow
+## Native data flow
 
 1. The request loader resolves all file references beneath the request root,
    without following symbolic links, and authenticates the exact source bytes.
@@ -171,6 +182,11 @@ schedule and record IDs establish the pairing invariant.
 
 The exact inventory is documented in [Evidence artifacts](artifacts.md); the
 decision and receipt shapes are documented in [Reports and receipts](reports.md).
+
+The [judge measurement reference](judge-measurements.md) defines the separate
+frozen-answer collection and replay flow, missing-measurement handling, fixed
+benchmark statistical scope, and recipient-owned plan, result, and signer pins.
+A report does not authorize acceptance or claim human agreement with a judge.
 
 ## Stable and internal surfaces
 

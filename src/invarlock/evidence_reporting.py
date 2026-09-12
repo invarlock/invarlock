@@ -1401,6 +1401,7 @@ def render_evidence(
     explain: bool = False,
     markdown_path: Path | None = None,
     junit_path: Path | None = None,
+    case_ids: tuple[str, ...] = (),
 ) -> EvidenceReport | EvidenceReportV2:
     """Render either evidence family without replay or implicit receipt discovery."""
     from invarlock.captured_contracts import atomic_write, sha
@@ -1414,6 +1415,38 @@ def render_evidence(
     evidence = Path(evidence_path)
     if not evidence.is_dir() or evidence.is_symlink():
         raise EvidenceReportError("evidence must be a real directory")
+    from invarlock.evidence_sets.contracts import is_evidence_set
+
+    if is_evidence_set(evidence):
+        from invarlock.evidence_sets.reporting import render_evidence_set
+
+        return render_evidence_set(
+            evidence,
+            html_path=html_path,
+            markdown_path=markdown_path,
+            junit_path=junit_path,
+            explain=explain,
+            case_ids=case_ids,
+        )
+
+    from invarlock.judge_measurements.reporting import (
+        is_judge_evidence,
+        render_judge_evidence,
+    )
+
+    if is_judge_evidence(evidence):
+        return render_judge_evidence(
+            evidence,
+            html_path=html_path,
+            markdown_path=markdown_path,
+            junit_path=junit_path,
+            explain=explain,
+            case_ids=case_ids,
+        )
+    if case_ids:
+        raise EvidenceReportError(
+            "--case-id is available only for judge evidence and evidence sets"
+        )
     try:
         captured = is_captured_manifest(evidence)
     except CapturedReportError as exc:

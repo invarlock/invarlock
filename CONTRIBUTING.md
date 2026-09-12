@@ -10,9 +10,11 @@ invarlock report evidence/
 ```
 
 The `invarlock evaluate`, `invarlock verify`, and `invarlock report` commands
-compare captured evaluator exports, apply metric and slice policies, and verify
-signed evidence. Use `invarlock --help` for that workflow; `invarlock evaluate --help` describes controlled execution or
-import, including the optional run-mode resource profile.
+run or import native comparisons, compare captured evaluator exports, and replay
+bounded frozen-answer judge measurements. They apply the corresponding policy
+and verify signed evidence. Use `invarlock --help` for these workflows;
+`invarlock evaluate --help` describes controlled execution or import, including
+the optional run-mode resource profile.
 See the [captured-results guide](docs/user-guide/captured-results.md).
 Changes should make these workflows easier to understand, safer to execute,
 or easier to verify. Preserve the distinct assurance meaning of each evidence
@@ -85,7 +87,7 @@ listed below. Run them for the affected surface before requesting review.
   behind the same `invarlock.engine` facade.
 - `contracts/` contains the shipped JSON contracts.
 - `addins/` contains the independently installable GGUF, TensorRT-LLM,
-  Hugging Face vision-text, and diagnostics packages.
+  Hugging Face vision-text, diagnostics, and Inspect judge preparation packages.
 - `tests/` mirrors the maintained runtime, contract, evidence, CLI, and release
   surfaces.
 - `scripts/` contains repository checks, release validation, and security
@@ -195,7 +197,8 @@ recorded comparison decisions, and independent verification.
 Tests must exercise production code and assert meaningful outcomes. A passing
 test that only restates fixture data is not evidence that a user journey works.
 `make dist-check` builds and validates the core, diagnostics, GGUF connector,
-Hugging Face vision-text connector, and TensorRT-LLM connector distributions.
+Hugging Face vision-text connector, TensorRT-LLM connector, and Inspect judge
+preparation distributions.
 
 For runtime launcher changes, run the opt-in real-container journey with a
 working Docker or Podman engine. Commit the source being tested, create its

@@ -117,6 +117,37 @@ Its starter records and thresholds are illustrative. Captured verification
 authenticates inputs and arithmetic, not runtime execution; recorded judgments
 remain explicit and cannot authorize native acceptance or deployment.
 
+## Compare frozen answers with a bounded judge
+
+The bounded judge workflow grades frozen baseline and subject answers under one
+declared rubric and judge configuration. The plan fixes the cases, independent
+units, answer digests, rendered requests, rating scale, repetitions, model
+identity, and analysis policy before collection. Evidence retains each request,
+response, error, attempt, and source mapping so a recipient can authenticate and
+replay the comparison offline.
+
+```bash
+invarlock evaluate judge-request.yaml --preflight --json
+invarlock evaluate judge-request.yaml --signing-key signing-key.pem
+invarlock verify judge-evidence/ --trust-profile judge-recipient-policy.json
+invarlock report judge-evidence/ --html judge-report.html
+```
+
+The core wheel imports and verifies retained measurements without provider
+credentials or Inspect. Live collection is an explicit trusted-host step in the
+optional `invarlock-inspect-judge` package, with fixed call, token, cost, timeout,
+retry, and checkpoint controls. The first profile supports bounded text ratings
+of fixed answers; it does not turn arbitrary evaluator scores into replayable
+judge evidence. See the
+[judge measurement reference](https://github.com/invarlock/invarlock/blob/main/docs/reference/judge-measurements.md).
+
+[Evidence sets](https://github.com/invarlock/invarlock/blob/main/docs/reference/evidence-sets.md)
+let a recipient require deterministic and bounded judge checks on the same
+frozen answers, while preserving each component's statistical meaning. Start
+with the [answer capture example](https://github.com/invarlock/invarlock/blob/main/examples/answer-capture/README.md)
+when baseline and subject answers have not yet been collected.
+
+
 For controlled evaluations, `invarlock evaluate --help`
 groups the main workflow separately from advanced runtime options. Run requests
 can use `--runtime-profile runtime.json` to reuse explicit container resources;
@@ -251,7 +282,8 @@ same boundary outside the core.
 
 Independent replay requires complete ordered per-record evidence that passes
 identity, provenance, schedule, and deterministic recomputation requirements.
-Aggregate-only outputs and unsupported judge results remain observation-only.
+Aggregate-only outputs and judge results outside the bounded judge measurement
+profile remain observation-only.
 A signed observation proves what was supplied; a replayable source additionally
 requires the identity, schedule, and recomputation guarantees above.
 
@@ -333,6 +365,7 @@ technical-verdict inputs. See
   [trust model](https://github.com/invarlock/invarlock/blob/main/docs/security/trust-model.md).
 - **Integrate:** [CLI](https://github.com/invarlock/invarlock/blob/main/docs/reference/cli.md),
   [contracts](https://github.com/invarlock/invarlock/blob/main/docs/reference/contracts.md),
+  [judge measurements](https://github.com/invarlock/invarlock/blob/main/docs/reference/judge-measurements.md),
   [acceptance attestations](https://github.com/invarlock/invarlock/blob/main/docs/reference/acceptance-attestations.md),
   [compatibility covenant](https://github.com/invarlock/invarlock/blob/main/docs/reference/compatibility.md),
   [evaluator qualification](https://github.com/invarlock/invarlock/blob/main/docs/reference/evaluator-qualification.md),

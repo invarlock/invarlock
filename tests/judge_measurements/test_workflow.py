@@ -1,0 +1,628 @@
+from __future__ import annotations
+
+import hashlib
+import json
+import shutil
+import socket
+from pathlib import Path
+from xml.etree import ElementTree
+
+import pytest
+from click import unstyle
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from cryptography.hazmat.primitives.serialization import (
+    Encoding,
+    NoEncryption,
+    PrivateFormat,
+)
+from typer.testing import CliRunner
+
+from invarlock.cli.app import app
+from invarlock.core.evaluation_request import evaluation_request_mode
+from invarlock.judge_measurements.contracts import (
+    measurement_plan_digest,
+    render_judge_request,
+)
+from invarlock.judge_measurements.workflow import (
+    JudgeWorkflowError,
+    load_judge_request,
+    preflight_judge_request,
+)
+from tests.judge_measurements.test_evidence_acceptance import _publish
+
+RUNNER = CliRunner()
+FIXTURES = Path(__file__).parents[1] / "fixtures" / "judge_measurements"
+
+
+@pytest.fixture
+def staged(tmp_path):
+    for name in (
+        "plan",
+        "measurements",
+        "baseline_run",
+        "subject_run",
+        "analysis_policy",
+    ):
+        shutil.copyfile(FIXTURES / f"{name}.json", tmp_path / f"{name}.json")
+    value = {
+        "format_version": "invarlock/evaluation-request-v3",
+        "execution": {"mode": "judge_import", "collection": None},
+        "comparison": {
+            "plan": "plan.json",
+            "measurements": "measurements.json",
+            "baseline_run": "baseline_run.json",
+            "subject_run": "subject_run.json",
+            "policy": "analysis_policy.json",
+        },
+        "output": {
+            "evidence": "evidence",
+            "signer_identity": "example-signer",
+        },
+    }
+    path = tmp_path / "request.json"
+    path.write_text(json.dumps(value))
+    return path, value
+
+
+def test_judge_request_rejects_unknown_execution_settings(tmp_path: Path) -> None:
+    path = tmp_path / "request.json"
+    path.write_text(
+        json.dumps(
+            {
+                "format_version": "invarlock/evaluation-request-v3",
+                "execution": {"mode": "judge_import", "network": True},
+            }
+        )
+    )
+    with pytest.raises(JudgeWorkflowError):
+        load_judge_request(path)
+
+
+@pytest.mark.parametrize(
+    "reference",
+    [
+        "../plan.json",
+        "/tmp/plan.json",
+        "https://example.com/plan",
+        "nested/../plan.json",
+    ],
+)
+def test_request_paths_cannot_escape_approved_root(staged, reference):
+    path, value = staged
+    value["comparison"]["plan"] = reference
+    path.write_text(json.dumps(value))
+    with pytest.raises(JudgeWorkflowError):
+        load_judge_request(path)
+
+
+def test_preflight_has_counts_and_no_network_or_publication(staged, monkeypatch):
+    path, _ = staged
+    monkeypatch.setattr(
+        socket,
+        "create_connection",
+        lambda *_a, **_k: pytest.fail("preflight network call"),
+    )
+    assert evaluation_request_mode(path) == "judge_import"
+    result = preflight_judge_request(load_judge_request(path)).payload
+    assert result["ready"]
+    assert (
+        result["cases"],
+        result["independent_units"],
+        result["planned_trials"],
+        result["maximum_attempts"],
+    ) == (1, 1, 2, 2)
+    assert result["network_calls"] == 0
+    assert result["judge"]["requested_model"] == "example-judge"
+    assert not (path.parent / "evidence").exists()
+    cli = RUNNER.invoke(app, ["evaluate", str(path), "--preflight", "--json"])
+    assert cli.exit_code == 0, cli.output
+    assert json.loads(cli.stdout)["planned_trials"] == 2
+
+
+def test_preflight_names_missing_inputs(staged):
+    path, _ = staged
+    (path.parent / "measurements.json").unlink()
+    result = RUNNER.invoke(app, ["evaluate", str(path), "--preflight", "--json"])
+    assert result.exit_code == 2
+    payload = json.loads(result.stdout)
+    assert payload["missing_inputs"] == ["measurements"]
+    assert payload["cases"] == 1
+
+
+def test_collect_preflight_shows_explicit_budgets_without_claiming_a_runner(staged):
+    path, value = staged
+    value["execution"] = {
+        "mode": "judge_collect",
+        "collection": {
+            "integration": "inspect-judge",
+            "configuration": "collection.json",
+        },
+    }
+    value["comparison"]["measurements"] = None
+    path.write_text(json.dumps(value))
+    budget = {
+        "grader": "example-judge",
+        "inspect_version": "0.3.263",
+        "profile": "inspect-text-frozen-answer-v1",
+        "epochs": 1,
+        "log_model_api": True,
+        "log_samples": True,
+        "sdk_max_retries": 0,
+        "tools": False,
+        "max_calls": 2,
+        "max_input_tokens": 2000,
+        "max_output_tokens": 256,
+        "max_cost_microusd": 1000000,
+        "input_tokens_per_call": 1000,
+        "cost_microusd_per_call": 500000,
+        "concurrency": 1,
+        "requests_per_minute": 10,
+        "request_timeout_seconds": 30,
+    }
+    (path.parent / "collection.json").write_text(json.dumps(budget))
+    result = RUNNER.invoke(app, ["evaluate", str(path), "--preflight", "--json"])
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["budgets"] == {
+        key: value
+        for key, value in budget.items()
+        if type(value) is int and key not in {"epochs", "sdk_max_retries"}
+    }
+    assert payload["budget_capacity"] == {
+        "maximum_admitted_calls": 2,
+        "planned_calls": 2,
+        "full_plan_reserved": True,
+    }
+    assert payload["collection_available"] is False
+    assert payload["ready"] and not payload["errors"]
+    assert "inspect-judge collect API" in payload["next_action"]
+    text_result = RUNNER.invoke(app, ["evaluate", str(path), "--preflight"])
+    assert text_result.exit_code == 0, text_result.output
+    text = " ".join(text_result.stdout.split())
+    assert "Maximum admitted calls: 2; full plan reserved: yes" in text
+    assert "Next: " + payload["next_action"] in text
+    budget["max_calls"] = 1
+    (path.parent / "collection.json").write_text(json.dumps(budget))
+    partial = RUNNER.invoke(app, ["evaluate", str(path), "--preflight"])
+    assert partial.exit_code == 0, partial.output
+    assert "Maximum admitted calls: 1; full plan reserved: no" in " ".join(
+        partial.stdout.split()
+    )
+    result = RUNNER.invoke(app, ["evaluate", str(path), "--unsigned", "--json"])
+    assert result.exit_code == 2
+    assert "does not execute provider calls" in result.stdout
+    assert not (path.parent / "evidence").exists()
+
+    budget["Authorization"] = "secret"
+    (path.parent / "collection.json").write_text(json.dumps(budget))
+    result = RUNNER.invoke(app, ["evaluate", str(path), "--preflight", "--json"])
+    assert result.exit_code == 2
+    assert "exactly the supported" in result.stdout
+
+
+def _rebind_plan_requests(root: Path, plan: dict) -> None:
+    runs = {
+        side: json.loads((root / f"{side}_run.json").read_text())
+        for side in ("baseline", "subject")
+    }
+    rows = {
+        side: {row["id"]: row for row in run["records"]} for side, run in runs.items()
+    }
+    for binding in plan["answer_bindings"]:
+        for side in ("baseline", "subject"):
+            row = rows[side][binding["case_id"]]
+            request = render_judge_request(
+                plan, input_text=row["input"], answer_text=row["output"]
+            )
+            binding[f"{side}_request_sha256"] = hashlib.sha256(request).hexdigest()
+
+
+@pytest.mark.parametrize(
+    "unsupported", ["local_weights", "sol_temperature", "grader_syntax"]
+)
+def test_collect_preflight_rejects_profiles_the_integration_cannot_run(
+    staged, unsupported
+):
+    path, value = staged
+    value["execution"] = {
+        "mode": "judge_collect",
+        "collection": {
+            "integration": "inspect-judge",
+            "configuration": "collection.json",
+        },
+    }
+    value["comparison"]["measurements"] = None
+    path.write_text(json.dumps(value))
+    collection = {
+        "grader": "example-judge",
+        "inspect_version": "0.3.263",
+        "profile": "inspect-text-frozen-answer-v1",
+        "epochs": 1,
+        "log_model_api": True,
+        "log_samples": True,
+        "sdk_max_retries": 0,
+        "tools": False,
+        "max_calls": 2,
+        "max_input_tokens": 2000,
+        "max_output_tokens": 256,
+        "max_cost_microusd": 1000000,
+        "input_tokens_per_call": 1000,
+        "cost_microusd_per_call": 500000,
+        "concurrency": 1,
+        "requests_per_minute": 10,
+        "request_timeout_seconds": 30,
+    }
+    plan_path = path.parent / "plan.json"
+    plan = json.loads(plan_path.read_text())
+    expected = "local weight execution"
+    if unsupported == "local_weights":
+        plan["judge"]["model_identity"] = {
+            "kind": "local_weights",
+            "weights_sha256": "a" * 64,
+        }
+    else:
+        plan["judge"].update(
+            provider="openai",
+            requested_model="openai/gpt-5.6-sol",
+            approved_resolved_models=["gpt-5.6-sol"],
+        )
+        collection["grader"] = "openai/gpt-5.6-sol"
+        expected = "approved temperature 1"
+        if unsupported == "grader_syntax":
+            plan["judge"].update(
+                requested_model="openai/gpt-5.6-sol ",
+                approved_resolved_models=["gpt-5.6-sol "],
+            )
+            collection["grader"] = "openai/gpt-5.6-sol "
+            expected = "without URL credentials"
+        _rebind_plan_requests(path.parent, plan)
+    plan_path.write_text(json.dumps(plan))
+    policy_path = path.parent / "analysis_policy.json"
+    policy = json.loads(policy_path.read_text())
+    policy["plan_sha256"] = measurement_plan_digest(plan)
+    policy_path.write_text(json.dumps(policy))
+    (path.parent / "collection.json").write_text(json.dumps(collection))
+
+    result = RUNNER.invoke(app, ["evaluate", str(path), "--preflight", "--json"])
+    assert result.exit_code == 2
+    assert expected in result.stdout
+
+
+def test_collect_preflight_validates_frozen_answer_bindings(staged):
+    path, value = staged
+    value["execution"] = {
+        "mode": "judge_collect",
+        "collection": {
+            "integration": "inspect-judge",
+            "configuration": "collection.json",
+        },
+    }
+    value["comparison"]["measurements"] = None
+    path.write_text(json.dumps(value))
+    plan_path = path.parent / "plan.json"
+    plan = json.loads(plan_path.read_text())
+    plan["answer_bindings"][0]["baseline_answer_sha256"] = "0" * 64
+    plan_path.write_text(json.dumps(plan))
+    policy_path = path.parent / "analysis_policy.json"
+    policy = json.loads(policy_path.read_text())
+    policy["plan_sha256"] = measurement_plan_digest(plan)
+    policy_path.write_text(json.dumps(policy))
+    collection = {
+        "grader": "example-judge",
+        "inspect_version": "0.3.263",
+        "profile": "inspect-text-frozen-answer-v1",
+        "epochs": 1,
+        "log_model_api": True,
+        "log_samples": True,
+        "sdk_max_retries": 0,
+        "tools": False,
+        "max_calls": 2,
+        "max_input_tokens": 2000,
+        "max_output_tokens": 256,
+        "max_cost_microusd": 1000000,
+        "input_tokens_per_call": 1000,
+        "cost_microusd_per_call": 500000,
+        "concurrency": 1,
+        "requests_per_minute": 10,
+        "request_timeout_seconds": 30,
+    }
+    (path.parent / "collection.json").write_text(json.dumps(collection))
+
+    result = RUNNER.invoke(app, ["evaluate", str(path), "--preflight", "--json"])
+    assert result.exit_code == 2
+    assert "does not bind the frozen baseline answer" in result.stdout
+
+
+@pytest.mark.parametrize(
+    "option", ["--allow-installed-scorers", "--max-bootstrap-draws"]
+)
+def test_judge_rejects_native_or_bootstrap_flags(staged, option):
+    args = ["evaluate", str(staged[0]), "--preflight", option, "--json"]
+    if option == "--max-bootstrap-draws":
+        args.insert(-1, "100")
+    result = RUNNER.invoke(app, args)
+    assert result.exit_code == 2
+    assert "do not apply" in result.stdout
+
+
+def test_unsigned_public_workflow_reports_inconclusive_honestly(staged, tmp_path):
+    path, _ = staged
+    result = RUNNER.invoke(
+        app, ["evaluate", str(path), "--unsigned", "--fail-on-policy", "--json"]
+    )
+    assert result.exit_code == 7, result.output
+    payload = json.loads(result.stdout)
+    assert payload["decision"] == "insufficient_evidence"
+    assert payload["independent_verification"] == "not_performed"
+    outputs = {
+        name: tmp_path / f"report.{extension}"
+        for name, extension in (("html", "html"), ("markdown", "md"), ("junit", "xml"))
+    }
+    args = ["report", str(tmp_path / "evidence"), "--json", "--explain"]
+    for name, destination in outputs.items():
+        args.extend([f"--{name}", str(destination)])
+    report = RUNNER.invoke(app, args)
+    assert report.exit_code == 0, report.output
+    facts = json.loads(report.stdout)
+    assert facts["assurance"]["authentication"] == "unsigned"
+    assert facts["assurance"]["recipient_acceptance"] == "not_performed"
+    assert facts["analysis"]["counts"]["scheduled_units"] == 1
+    assert facts["comparison"]["baseline"]["artifact_digest"].startswith("sha256:")
+    assert facts["comparison"]["subject"]["artifact_digest"].startswith("sha256:")
+    assert facts["prompt"]["template_excerpt"].startswith("Grade the input")
+    assert facts["assurance"]["signer_identity"] is None
+    assert "example-judge" in outputs["html"].read_text()
+    suite = ElementTree.fromstring(outputs["junit"].read_bytes())
+    assert suite.get("errors") == "1" and suite.get("failures") == "0"
+
+
+def test_plain_text_judge_publication_does_not_claim_recipient_verification(staged):
+    result = RUNNER.invoke(app, ["evaluate", str(staged[0]), "--unsigned"])
+
+    assert result.exit_code == 0, result.output
+    assert "Bounded judge evidence created" in result.stdout
+    assert "Recorded policy result: insufficient_evidence" in result.stdout
+    assert "Authentication: unsigned_local" in result.stdout
+    assert "Independent verification: not performed" in result.stdout
+
+
+def test_plain_text_preflight_identifies_missing_plan_without_publication(staged):
+    path, _ = staged
+    (path.parent / "plan.json").unlink()
+
+    result = RUNNER.invoke(app, ["evaluate", str(path), "--preflight"])
+
+    assert result.exit_code == 2, result.output
+    text = " ".join(result.stdout.split())
+    assert "Judge preflight needs inputs" in text
+    assert "Supply the missing request-relative inputs: plan" in text
+    assert "No model calls, signing, or publication were performed." in text
+    assert not (path.parent / "evidence").exists()
+
+
+def test_judge_verification_type_imports_resolve_the_command_signature(monkeypatch):
+    import importlib.util
+    import typing
+
+    from invarlock.cli.verification_workflow import VerificationOptions
+    from invarlock.evidence_verification import EvidenceVerification
+    from invarlock.judge_measurements import cli_verification
+
+    spec = importlib.util.spec_from_file_location(
+        "judge_verification_type_imports", cli_verification.__file__
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    with monkeypatch.context() as context:
+        context.setattr(typing, "TYPE_CHECKING", True)
+        spec.loader.exec_module(module)
+
+    assert typing.get_type_hints(module.execute_judge_verification) == {
+        "options": VerificationOptions,
+        "command_line": frozenset[str],
+        "return": EvidenceVerification,
+    }
+
+
+def test_publish_requires_explicit_authentication_choice(staged):
+    result = RUNNER.invoke(app, ["evaluate", str(staged[0]), "--json"])
+    assert result.exit_code == 2
+    assert "--signing-key" in result.stdout and "--unsigned" in result.stdout
+
+
+def test_signed_workflow_uses_request_declared_signer_identity(staged):
+    path, _ = staged
+    key = Ed25519PrivateKey.generate()
+    key_path = path.parent / "signer-private.pem"
+    key_path.write_bytes(
+        key.private_bytes(
+            Encoding.PEM,
+            PrivateFormat.PKCS8,
+            NoEncryption(),
+        )
+    )
+    result = RUNNER.invoke(
+        app, ["evaluate", str(path), "--signing-key", str(key_path), "--json"]
+    )
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.stdout)
+    assert payload["signer_identity"] == "example-signer"
+    envelope = json.loads((path.parent / "evidence" / "envelope.json").read_text())
+    assert envelope["signer"]["identity"] == "example-signer"
+
+
+def test_request_rejects_symlinked_input_before_publication(staged, tmp_path):
+    (tmp_path / "plan.json").unlink()
+    (tmp_path / "plan.json").symlink_to(FIXTURES / "plan.json")
+    result = RUNNER.invoke(app, ["evaluate", str(staged[0]), "--preflight", "--json"])
+    assert result.exit_code == 2
+    assert "symlink" in result.stdout
+
+
+def test_signed_recipient_cli_replay_and_receipt_remain_offline(tmp_path, monkeypatch):
+    publication, policy = _publish(tmp_path)
+    monkeypatch.setattr(
+        socket,
+        "create_connection",
+        lambda *_a, **_k: pytest.fail("verification network call"),
+    )
+    receipt_path = tmp_path / "recipient-receipt.json"
+    verifier_key = Ed25519PrivateKey.generate()
+    verifier_key_path = tmp_path / "verifier.pem"
+    verifier_key_path.write_bytes(
+        verifier_key.private_bytes(Encoding.PEM, PrivateFormat.PKCS8, NoEncryption())
+    )
+    result = RUNNER.invoke(
+        app,
+        [
+            "verify",
+            str(publication.path),
+            "--trust-profile",
+            str(policy),
+            "--receipt",
+            str(receipt_path),
+            "--verifier-signing-key",
+            str(verifier_key_path),
+            "--verifier-identity",
+            "example-verifier",
+            "--json",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.stdout)
+    assert payload["authenticated"] and payload["replayed"] and payload["accepted"]
+    assert (
+        json.loads(receipt_path.read_text())["statement"]["format"]
+        == "invarlock/judge-measurement-verification-receipt-v1"
+    )
+    assert payload["ok"] is payload["accepted"] is True
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["--receipt", "receipt.json"],
+        ["--receipt", "receipt.json", "--verifier-identity", "recipient"],
+        ["--verifier-identity", "recipient"],
+    ],
+)
+def test_judge_receipt_requires_a_complete_signing_request(tmp_path, args):
+    publication, policy = _publish(tmp_path)
+    result = RUNNER.invoke(
+        app,
+        [
+            "verify",
+            str(publication.path),
+            "--trust-profile",
+            str(policy),
+            *args,
+            "--json",
+        ],
+    )
+    assert result.exit_code == 2
+
+
+@pytest.mark.parametrize(
+    "args", [[], ["--policy", "old.json"], ["--verifier-identity", "native-signer"]]
+)
+def test_judge_verification_rejects_missing_or_legacy_trust(tmp_path, args):
+    publication, policy = _publish(tmp_path)
+    arguments = ["verify", str(publication.path), "--json"]
+    if args:
+        arguments.extend(["--trust-profile", str(policy)])
+    result = RUNNER.invoke(app, arguments + args)
+    assert result.exit_code == 2
+
+
+def test_adverse_and_incomplete_verification_preserve_distinct_decisions(tmp_path):
+    for name, kwargs, expected in (
+        ("adverse", {"baseline": 1, "subject": 0}, "regression"),
+        ("incomplete", {"incomplete": True}, "insufficient_evidence"),
+    ):
+        directory = tmp_path / name
+        directory.mkdir()
+        publication, policy = _publish(directory, **kwargs)
+        result = RUNNER.invoke(
+            app,
+            ["verify", str(publication.path), "--trust-profile", str(policy), "--json"],
+        )
+        assert result.exit_code == 7, result.output
+        payload = json.loads(result.stdout)
+        assert payload["decision"] == expected
+        assert payload["ok"] is payload["accepted"] is False
+        assert (
+            payload["authenticated"] and payload["replayed"] and not payload["accepted"]
+        )
+
+
+def test_report_escapes_metric_markup_and_rejects_in_pack_output(tmp_path):
+    metric = '<script>alert("x")</script>'
+    publication, _ = _publish(tmp_path, policy_changes={"metric_name": metric})
+    output = tmp_path / "report.html"
+    result = RUNNER.invoke(
+        app, ["report", str(publication.path), "--html", str(output), "--json"]
+    )
+    assert result.exit_code == 0, result.output
+    assert metric not in output.read_text()
+    assert "&lt;script&gt;" in output.read_text()
+    blocked = RUNNER.invoke(
+        app,
+        [
+            "report",
+            str(publication.path),
+            "--html",
+            str(publication.path / "report.html"),
+            "--json",
+        ],
+    )
+    assert blocked.exit_code == 2
+    assert not (publication.path / "report.html").exists()
+
+
+def test_committed_judge_example_preflights_and_renders(tmp_path):
+    example = Path(__file__).parents[2] / "examples" / "judge-measurements"
+    shutil.copytree(example, tmp_path / "example")
+    collection_request = tmp_path / "example" / "request-collect.yaml"
+    result = RUNNER.invoke(
+        app, ["evaluate", str(collection_request), "--preflight", "--json"]
+    )
+    assert result.exit_code == 0, result.output
+    collection = json.loads(result.stdout)
+    assert collection["planned_trials"] == 2
+    assert collection["budget_capacity"]["maximum_admitted_calls"] == 2
+    assert collection["ready"] is True
+    request = tmp_path / "example" / "request.yaml"
+    result = RUNNER.invoke(app, ["evaluate", str(request), "--preflight", "--json"])
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.stdout)["planned_trials"] == 2
+    result = RUNNER.invoke(app, ["evaluate", str(request), "--unsigned", "--json"])
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.stdout)["decision"] == "insufficient_evidence"
+    report = request.parent / "report.md"
+    result = RUNNER.invoke(
+        app,
+        [
+            "report",
+            str(request.parent / "evidence"),
+            "--markdown",
+            str(report),
+            "--json",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "1 case; 1 independent unit; 2/2 completed trials" in report.read_text()
+    assert (
+        json.loads(result.stdout)["assurance"]["recipient_acceptance"]
+        == "not_performed"
+    )
+
+
+def test_judge_supported_cli_options_have_accurate_help():
+    result = RUNNER.invoke(app, ["evaluate", "--help"], terminal_width=160, color=True)
+    assert result.exit_code == 0
+    text = " ".join(unstyle(result.stdout).replace("│", " ").split())
+    assert "retained judge measurements" in text
+    assert "Publish captured or judge evaluation as unsigned local evidence" in text
+    assert "Captured or judge baseline run override" in text
+    assert "Captured or judge subject run override" in text
+    assert "judge (recorded ratings)" in text

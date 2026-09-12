@@ -167,7 +167,9 @@ cannot redefine aggregation or direction. Deterministic F1, extraction, and VQA
 scorers can be supplied as separately installed packages and run only when
 explicitly authorized through the extension contract. Network, external-model,
 human, executable SQL/code, semantic-model, and judge scoring remain outside
-acceptance; judges fit the authenticated-observation path.
+that scorer-extension boundary. Bounded frozen-answer judging has a separate
+measurement, replay, and recipient-acceptance contract; unsupported judge
+results stay on the authenticated-observation path.
 
 ## Choose a reading path
 
@@ -175,6 +177,7 @@ acceptance; judges fit the authenticated-observation path.
 | --- | --- | --- |
 | Run a first comparison | [Getting started](user-guide/getting-started.md) | [Evaluation request](user-guide/evaluation-request.md) and [schedule and policy](user-guide/schedule-and-policy.md) |
 | Run a model-backed example | [Runnable integrations](https://github.com/invarlock/invarlock/tree/main/examples/integrations) | [Runtime providers](user-guide/runtime-providers.md) and [evidence and verification](user-guide/evidence-and-verification.md) |
+| Compare frozen answers with a bounded judge | [Judge measurements](reference/judge-measurements.md) | [CLI reference](reference/cli.md) and [reports and receipts](reference/reports.md) |
 | Apply InvarLock to a model or runtime change | [Model-change workflows](user-guide/change-scenarios.md) | [Runnable examples](https://github.com/invarlock/invarlock/tree/main/examples) and [runtime providers](user-guide/runtime-providers.md) |
 | Review or accept evidence | [Evidence and verification](user-guide/evidence-and-verification.md) | [Acceptance checklist](assurance/acceptance-checklist.md) and [decision semantics](assurance/decision-semantics.md) |
 | Automate a gate | [CI integration](user-guide/ci-integration.md) | [Key management](user-guide/key-management.md) and [CLI reference](reference/cli.md) |
@@ -213,6 +216,7 @@ remain separate assessments.
 | GGUF / llama.cpp | `invarlock-runtime-gguf` | Exact match | Optional first-party provider for authenticated GGUF artifacts |
 | TensorRT-LLM | `invarlock-runtime-tensorrt-llm` | Exact match | Optional first-party provider for authenticated engine bundles |
 | Hugging Face vision-text | `invarlock-runtime-hf-vision-text` | Exact match | Optional first-party provider for authenticated prompt-and-image schedules |
+| Frozen-answer judge | Core plus optional `invarlock-inspect-judge` for collection | Bounded discrete judge rating | Retained text judgments with separate offline replay and recipient policy |
 | Imported provider material | Core plus the provider package needed to validate identities | Provider-declared metric | Secondary/offline integration when complete sidecars already exist |
 | Custom runtime | Provider package | Declared by provider | ABI integration; strict evidence still requires explicit authorization |
 

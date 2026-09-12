@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://invarlock.dev/contracts/judge_measurement_evidence.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "format": {
+      "const": "invarlock/judge-measurement-evidence-v1"
+    },
+    "decision_scope": {
+      "const": "bounded-judge-fixed-benchmark-v1"
+    },
+    "intended_subject": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "minLength": 71,
+      "maxLength": 71
+    },
+    "bindings": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "baseline_run_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "minLength": 71,
+          "maxLength": 71
+        },
+        "subject_run_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "minLength": 71,
+          "maxLength": 71
+        },
+        "case_set_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "minLength": 71,
+          "maxLength": 71
+        },
+        "plan_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "measurements_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "analysis_policy_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "analysis_result_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        }
+      },
+      "required": [
+        "baseline_run_sha256",
+        "subject_run_sha256",
+        "case_set_sha256",
+        "plan_sha256",
+        "measurements_sha256",
+        "analysis_policy_sha256",
+        "analysis_result_sha256"
+      ]
+    },
+    "signature_algorithm": {
+      "const": "ed25519"
+    },
+    "signer": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "identity": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}(?![\\s\\S])",
+              "maxLength": 256
+            },
+            "public_key_sha256": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "minLength": 71,
+              "maxLength": 71
+            },
+            "public_key": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9+/]{43}=$",
+              "minLength": 44,
+              "maxLength": 44
+            }
+          },
+          "required": [
+            "identity",
+            "public_key_sha256",
+            "public_key"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "signature": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9+/]{86}==$",
+          "minLength": 88,
+          "maxLength": 88
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "format",
+    "decision_scope",
+    "intended_subject",
+    "bindings",
+    "signature_algorithm",
+    "signer",
+    "signature"
+  ],
+  "oneOf": [
+    {
+      "properties": {
+        "signer": {
+          "type": "null"
+        },
+        "signature": {
+          "type": "null"
+        }
+      }
+    },
+    {
+      "properties": {
+        "signer": {
+          "type": "object"
+        },
+        "signature": {
+          "type": "string"
+        }
+      }
+    }
+  ]
+}

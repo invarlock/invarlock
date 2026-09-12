@@ -56,6 +56,7 @@ def test_first_party_addins_share_test_and_distribution_gates() -> None:
     assert "addins-install-smoke:" in MAKEFILE
     for path in (
         "addins/diagnostics",
+        "addins/inspect_judge",
         "addins/gguf",
         "addins/multimodal",
         "addins/tensorrt_llm",

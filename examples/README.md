@@ -7,6 +7,14 @@ evidence report. The self-contained examples create both sets of keys;
 an acceptance workflow should have the verifier owner choose and hold its own
 trust anchors and signing key.
 
+For a small offline frozen-answer rating example, see
+[judge measurements](judge-measurements/README.md). It intentionally demonstrates
+insufficient evidence and unsigned reporting.
+The same directory also contains a
+[K2 Horizon 32B judge reference](judge-measurements/K2-REFERENCE.md) built from
+the retained grounded-QA and extraction campaign. It freezes the pilot and final
+case membership without presenting uncollected ratings as evidence.
+
 To gate results from an existing evaluator, start with the separate
 [captured-results examples](captured-results/README.md). For an artifact handoff, the
 [ModelKit guide](../docs/user-guide/modelkit-handoff.md) checks delivered
@@ -106,3 +114,12 @@ The [K2 Horizon campaign](qualification/k2-horizon/README.md) is a separate
 maintainer qualification protocol with CPU preparation and tests. Its five
 model configurations remain candidates pending a reviewed runtime and actual
 GPU execution; they do not replace the established examples above.
+
+## Frozen answers and combined checks
+
+The [answer capture example](answer-capture/README.md) prepares the baseline and
+subject generation stage before answers are frozen. The
+[deterministic and judge example](judge-with-deterministic/README.md) then shows
+how the same original runs can support both existing evidence formats and one
+independent recipient decision. Its offline fixture is deliberately synthetic
+and makes no model-quality claim.

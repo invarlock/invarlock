@@ -30,6 +30,7 @@ _ADDIN_PROJECTS = {
     "gguf": "invarlock_addins/gguf",
     "multimodal": "invarlock_addins/multimodal",
     "tensorrt_llm": "invarlock_addins/tensorrt_llm",
+    "inspect_judge": "invarlock_addins/inspect_judge",
 }
 
 

@@ -1,0 +1,118 @@
+{
+  "acceptance_rule": "Each Wilson upper bound for the simulated miss rate, Bonferroni-adjusted to simultaneous 95% coverage across the calibration matrix, must not exceed alpha/family-size; every independently computed radius must be enclosed after outward quantization.",
+  "allocated_error_per_comparison": "0.012500",
+  "alpha": "0.05",
+  "calibration_family_alpha": "0.05",
+  "calibration_scenario_count": 8,
+  "comparison_family_size": 4,
+  "experiments_per_scenario": 1900,
+  "format": "invarlock/judge-statistics-calibration-v1",
+  "method": "fixed-benchmark-hoeffding-v1",
+  "passed": true,
+  "scenarios": [
+    {
+      "formula_mismatches": 0,
+      "miss_rate_wilson_simultaneous_95": [
+        "0.000000",
+        "0.003920"
+      ],
+      "misses": 0,
+      "observed_miss_rate": "0.000000",
+      "passed": true,
+      "scenario": "bernoulli-005-n20",
+      "true_mean": "0.05",
+      "unit_count": 20
+    },
+    {
+      "formula_mismatches": 0,
+      "miss_rate_wilson_simultaneous_95": [
+        "0.000000",
+        "0.003920"
+      ],
+      "misses": 0,
+      "observed_miss_rate": "0.000000",
+      "passed": true,
+      "scenario": "bernoulli-050-n20",
+      "true_mean": "0.5",
+      "unit_count": 20
+    },
+    {
+      "formula_mismatches": 0,
+      "miss_rate_wilson_simultaneous_95": [
+        "0.000000",
+        "0.003920"
+      ],
+      "misses": 0,
+      "observed_miss_rate": "0.000000",
+      "passed": true,
+      "scenario": "bernoulli-095-n20",
+      "true_mean": "0.95",
+      "unit_count": 20
+    },
+    {
+      "formula_mismatches": 0,
+      "miss_rate_wilson_simultaneous_95": [
+        "0.000000",
+        "0.003920"
+      ],
+      "misses": 0,
+      "observed_miss_rate": "0.000000",
+      "passed": true,
+      "scenario": "bernoulli-005-n100",
+      "true_mean": "0.05",
+      "unit_count": 100
+    },
+    {
+      "formula_mismatches": 0,
+      "miss_rate_wilson_simultaneous_95": [
+        "0.000828",
+        "0.008335"
+      ],
+      "misses": 5,
+      "observed_miss_rate": "0.002632",
+      "passed": true,
+      "scenario": "bernoulli-050-n100",
+      "true_mean": "0.5",
+      "unit_count": 100
+    },
+    {
+      "formula_mismatches": 0,
+      "miss_rate_wilson_simultaneous_95": [
+        "0.000000",
+        "0.003920"
+      ],
+      "misses": 0,
+      "observed_miss_rate": "0.000000",
+      "passed": true,
+      "scenario": "bernoulli-095-n100",
+      "true_mean": "0.95",
+      "unit_count": 100
+    },
+    {
+      "formula_mismatches": 0,
+      "miss_rate_wilson_simultaneous_95": [
+        "0.000000",
+        "0.003920"
+      ],
+      "misses": 0,
+      "observed_miss_rate": "0.000000",
+      "passed": true,
+      "scenario": "uniform-n40",
+      "true_mean": "0.5",
+      "unit_count": 40
+    },
+    {
+      "formula_mismatches": 0,
+      "miss_rate_wilson_simultaneous_95": [
+        "0.000000",
+        "0.003920"
+      ],
+      "misses": 0,
+      "observed_miss_rate": "0.000000",
+      "passed": true,
+      "scenario": "beta-2-8-n40",
+      "true_mean": "0.2",
+      "unit_count": 40
+    }
+  ]
+}

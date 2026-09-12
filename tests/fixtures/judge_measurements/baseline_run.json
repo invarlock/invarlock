@@ -1,0 +1,23 @@
+{
+  "artifact_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "format": "invarlock/evaluation-run-v1",
+  "records": [
+    {
+      "context": {},
+      "error": null,
+      "expected": "Paris",
+      "id": "case-1",
+      "input": "Capital of France?",
+      "metadata": {},
+      "output": "Paris",
+      "scores": {}
+    }
+  ],
+  "run_id": "baseline",
+  "score_provenance": {},
+  "source": {
+    "name": "fixture",
+    "version": "1"
+  },
+  "source_digest": null
+}

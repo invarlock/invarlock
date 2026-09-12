@@ -18,10 +18,29 @@ cannot substitute a different schema.
 | --- | --- | --- |
 | `evaluation_request.schema.json` | `invarlock/evaluation-request-v1` | One closed run-or-import request |
 | `evaluation_request_v2.schema.json` | `invarlock/evaluation-request-v2` | Captured-only request with paired source specifications and complete-run pins |
+| `evaluation_request_v3.schema.json` | `invarlock/evaluation-request-v3` | Bounded judge import or collection request over frozen runs |
 | `evaluation_setup_result.schema.json` | `invarlock/evaluation-setup-v1` | CLI example, key generation, or case-set preparation result; no evaluation assurance |
+| `evaluation_case_set.schema.json` | `invarlock/evaluation-case-set-v1` | Immutable case membership and inputs shared by captured runs |
+| `evaluation_run.schema.json` | `invarlock/evaluation-run-v1` | Complete attributed answers and optional recorded scores for one side |
+| `normalized_captured_request.schema.json` | `invarlock/evaluation-request-v2` | Canonical captured-request projection retained in evidence |
+| `comparison_policy.schema.json` | `invarlock/comparison-policy-v1` | Deterministic metric, slice, count, precision, and regression requirements |
+| `multi_metric_comparison.schema.json` | `invarlock/multi-metric-comparison-v1` | Recomputed deterministic results across declared metrics and slices |
+| `scorer_extension_descriptor.schema.json` | `invarlock/scorer-extension-descriptor-v1` | Installed deterministic scorer identity and declared capabilities |
+| `scorer_extension_binding.schema.json` | `invarlock/scorer-extension-binding-v1` | Request binding to an exact scorer descriptor and configuration |
+| `scorer_extension_result.schema.json` | `invarlock/scorer-extension-result-v1` | Per-side deterministic scorer replay facts |
 | `evidence_pack.schema.json` | `invarlock/evidence-pack-v1` | Canonical bundle manifest and fixed payload paths |
 | `evidence_pack_v2.schema.json` | `invarlock/evidence-pack-v2` | Captured-only closed directory inventory and explicit signed/unsigned authentication |
 | `evidence_verification_receipt_v3.schema.json` | `invarlock/evidence-verification-receipt-v3` | Captured-only external verifier statement with run/request anchors and per-metric/slice scoring assurance |
+| `judge_measurement_plan.schema.json` | `invarlock/judge-measurement-plan-v1` | Frozen judge identity, prompt, rubric, scale, answer bindings, units, and schedule |
+| `judge_measurements.schema.json` | `invarlock/judge-measurements-v1` | Retained per-trial attempts, responses, parsed ratings, and completeness |
+| `judge_analysis_policy.schema.json` | `invarlock/judge-analysis-policy-v1` | Independent judge metric, interval, precision, and degradation requirements |
+| `judge_measurement_evidence.schema.json` | `invarlock/judge-measurement-evidence-v1` | Signed or unsigned judge evidence envelope and artifact digests |
+| `judge_measurement_recipient_policy.schema.json` | `invarlock/judge-measurement-recipient-policy-v1` | Recipient signer, subject, metric, result, and exact-artifact pins |
+| `judge_verification_result.schema.json` | `invarlock/judge-verification-result-v1` | Unsigned local judge authentication, replay, policy decision, and acceptance result |
+| `judge_measurement_verification_receipt.schema.json` | `invarlock/judge-measurement-verification-receipt-v1` | Scoped Ed25519 verifier statement binding the complete local judge result and recipient policy |
+| `evidence_set.schema.json` | `invarlock/evidence-set-v1` | Unsigned index of one deterministic captured pack and one bounded judge pack |
+| `evidence_set_recipient_policy.schema.json` | `invarlock/evidence-set-recipient-policy-v1` | Independent shared-run and component-policy pins for required conjunction |
+| `evidence_set_verification.schema.json` | `invarlock/evidence-set-verification-v1` | Fresh local conjunction result retaining distinct component receipts |
 | `evidence_observation.schema.json` | `invarlock/evidence-observation-v1` | Typed observation-only envelope and comparison bindings |
 | `trust_inputs.schema.json` | `invarlock/trust-inputs-v1` | Independent policy, anchors, verifier identity/key path, and scorer authorization |
 | `trust_inputs_v2.schema.json` | `invarlock/trust-inputs-v2` | Captured independent policy, complete-run/request/signer anchors and verifier identity/key path |
@@ -42,6 +61,10 @@ comparison evidence is not accepted. A captured receipt's
 acceptance attestations, ModelKit acceptance, or deployment approval. See
 [Captured records](evaluation-records.md) for run, case-set, policy and request
 normalization contracts; these schema identifiers are not product-release pins.
+
+[Evidence sets](evidence-sets.md) compose existing deterministic and judge
+components over the same original runs. Their combined decision does not add a
+joint confidence guarantee or change either component's acceptance scope.
 
 Evaluator qualification has two stable wire classifications:
 
@@ -239,8 +262,10 @@ structured-field extraction, or VQA answer normalization when separately
 implemented and authorized. Those scorer packages are separately installed and
 require explicit authorization. SQL or code execution, model-based semantic
 similarity, network services,
-human review, and LLM judges require different trust contracts; judge outputs
-can be attached as authenticated observations without acceptance authority.
+human review, and LLM judges require different trust contracts. The bounded
+frozen-answer judge formats provide one such contract for their declared text
+profile; other judge outputs can be attached as authenticated observations
+without acceptance authority.
 
 ### Evaluator input boundary
 
@@ -256,9 +281,9 @@ qualification boundary binds the profile, independent schedule, normalized
 export, retained upstream output, runner bundle, and dependency declaration.
 For a deterministic exact-match profile, every ordered input and output must be
 present and InvarLock independently recomputes every score. Aggregate-only
-results, missing or reordered record facts, and external-judge outputs whose
-scores cannot be deterministically replayed remain observation-only and expose
-no runtime-import records.
+results, missing or reordered record facts, and external-judge outputs outside
+the bounded judge-measurement profile remain observation-only and expose no
+runtime-import records.
 
 The maintained [evaluator qualification
 matrix](evaluator-qualification.md) executes representative upstream tools

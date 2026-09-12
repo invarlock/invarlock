@@ -19,10 +19,14 @@ if TYPE_CHECKING:  # pragma: no cover - imports exist only for static analysis
         EvaluationPreflightResult,
         EvaluationTransactionResult,
     )
+    from invarlock.judge_measurements.workflow import JudgeWorkflowResult
 
-type RequestMode = Literal["captured", "runtime", "run", "import"]
+type RequestMode = Literal[
+    "captured", "runtime", "run", "import", "judge_import", "judge_collect"
+]
 type EvaluationResult = (
-    CapturedEvaluationPreflightResult
+    JudgeWorkflowResult
+    | CapturedEvaluationPreflightResult
     | CapturedEvaluationTransactionResult
     | EvaluationPreflightResult
     | EvaluationTransactionResult
@@ -150,6 +154,44 @@ def execute_evaluation(
         for name in ("baseline_run", "subject_run", "output")
         if (value := getattr(options, name)) is not None
     }
+
+    from invarlock.core.evaluation_request import evaluation_request_mode
+    from invarlock.judge_measurements.workflow import (
+        JudgeWorkflowError,
+        evaluate_judge_request,
+        load_judge_request,
+        preflight_judge_request,
+    )
+
+    detected_mode = initial_mode
+    if detected_mode is None:
+        try:
+            detected_mode = evaluation_request_mode(request_path)
+        except EvaluationRequestError:
+            pass
+    if detected_mode in {"judge_import", "judge_collect"}:
+        if (RUNTIME_ONLY_OPTIONS | {"max_bootstrap_draws"}) & command_line:
+            raise JudgeWorkflowError(
+                "runtime and bootstrap options do not apply to bounded judge requests"
+            )
+        judge_request = load_judge_request(
+            request_path, request_root=options.request_root, **overrides
+        )
+        if judge_request.mode != detected_mode:
+            raise JudgeWorkflowError(
+                "judge request execution mode changed while loading"
+            )
+        effective_key = options.signing_key
+        if options.unsigned and "signing_key" not in command_line:
+            effective_key = None
+        judge_result = (
+            preflight_judge_request(judge_request)
+            if options.preflight
+            else evaluate_judge_request(
+                judge_request, signing_key=effective_key, unsigned=options.unsigned
+            )
+        )
+        return EvaluationOutcome(result=judge_result, request_mode=judge_request.mode)
 
     loaded_request: object | None = None
     if initial_mode is None:

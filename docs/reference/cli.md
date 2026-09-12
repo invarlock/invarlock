@@ -437,7 +437,7 @@ receipts](reports.md#verification-result) for the complete field matrix.
 ## `report`
 
 ```text
-invarlock report EVIDENCE [--html report.html] [--markdown report.md] [--junit results.xml] [--explain] [--json]
+invarlock report EVIDENCE [--html report.html] [--markdown report.md] [--junit results.xml] [--explain] [--case-id ID]... [--json]
 ```
 
 `report` verifies the bundle's closed inventory, checksums, reference digests,
@@ -451,6 +451,7 @@ authentication before rendering `reports/evaluation.report.json`.
 | `--markdown PATH` | No | Write Markdown outside the pack |
 | `--junit PATH` | No | Write recorded policy checks as JUnit XML outside the pack |
 | `--explain` | No | Add a concise explanation of the decision and evidence bindings |
+| `--case-id ID` | No | Select one retained judge case for detailed inspection; repeat for up to 50 cases |
 | `--json` | No | Emit one compact machine-readable rendering result instead of the text view |
 
 Every output option refuses to overwrite an existing file. By default, `report`
@@ -464,6 +465,12 @@ and native calls requesting Markdown or JUnit, emit
 All destinations are checked up front; a later write failure leaves earlier
 completed outputs accurately listed. There is no automatic receipt discovery.
 Unsigned captured reports remain explicitly local, without independent assurance.
+
+Judge evidence and evidence sets show the first 50 case IDs by default. Repeat
+`--case-id` to render any specific retained cases in HTML or in the expanded
+text/Markdown view produced by `--explain`. Selection changes presentation only;
+the report still replays the complete retained measurement set. Other evidence
+formats reject this option.
 
 Captured text, HTML and Markdown reports include the baseline and subject run
 IDs, complete-run digests, attributed artifact digests and evaluator source
@@ -573,3 +580,22 @@ runtime inventory.
 - [Evaluation lifecycle](lifecycle.md) explains write boundaries and retry
   behavior.
 - [Reports and receipts](reports.md) defines JSON results and formatted reports.
+
+## Frozen-answer judge evidence
+
+The versioned judge request uses the same `evaluate`, `verify` and `report`
+commands. See [judge measurements](judge-measurements.md) for import preflight,
+bounded reports and independent recipient policy verification. Judge
+verification returns an unsigned local result. `--receipt` requires both
+`--verifier-signing-key` and `--verifier-identity` and writes a separately signed
+judge receipt outside the evidence. Its JSON `ok` field is true only when
+`accepted` is true.
+
+
+## Deterministic and judge evidence sets
+
+Use the existing `evaluate` requests for each component, then index the two
+packs and run `verify` with an independent composition recipient policy.
+`report` shows their metrics together. Both components must bind the same
+original runs and case set; their statistical methods retain separate meanings.
+See [evidence sets](evidence-sets.md) for commands, policies and exit codes.

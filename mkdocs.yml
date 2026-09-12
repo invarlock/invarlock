@@ -41,6 +41,8 @@ nav:
       - Python API: reference/api-guide.md
       - Artifacts: reference/artifacts.md
       - Reports: reference/reports.md
+      - Judge measurements: reference/judge-measurements.md
+      - Evidence sets: reference/evidence-sets.md
       - Runtime providers: reference/runtime-providers.md
       - Runtime-security API: reference/runtime-security.md
       - Environment: reference/environment.md

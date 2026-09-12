@@ -1,0 +1,455 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://invarlock.dev/contracts/judge_measurement_plan.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "format": {
+      "const": "invarlock/judge-measurement-plan-v1"
+    },
+    "profile_id": {
+      "const": "text-frozen-answer-v1"
+    },
+    "case_set_sha256": {
+      "$ref": "#/$defs/artifact_digest"
+    },
+    "baseline_run_sha256": {
+      "$ref": "#/$defs/artifact_digest"
+    },
+    "subject_run_sha256": {
+      "$ref": "#/$defs/artifact_digest"
+    },
+    "rubric": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1048576
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "required": [
+        "text",
+        "sha256"
+      ]
+    },
+    "prompt": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "system": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 1048576
+        },
+        "template": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1048576
+        },
+        "demonstrations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "input": {
+                "type": "string",
+                "minLength": 0,
+                "maxLength": 1048576
+              },
+              "answer": {
+                "type": "string",
+                "minLength": 0,
+                "maxLength": 1048576
+              },
+              "rating": {
+                "$ref": "#/$defs/identifier"
+              }
+            },
+            "required": [
+              "input",
+              "answer",
+              "rating"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 100,
+          "uniqueItems": true
+        },
+        "references": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/identifier"
+              },
+              "text": {
+                "type": "string",
+                "minLength": 0,
+                "maxLength": 1048576
+              },
+              "sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            },
+            "required": [
+              "id",
+              "text",
+              "sha256"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 100,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "system",
+        "template",
+        "demonstrations",
+        "references"
+      ]
+    },
+    "judge": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "provider": {
+          "$ref": "#/$defs/identifier"
+        },
+        "requested_model": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "approved_resolved_models": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "minItems": 1,
+          "maxItems": 100,
+          "uniqueItems": true
+        },
+        "model_identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "enum": [
+                "hosted_api",
+                "local_weights"
+              ]
+            },
+            "weights_sha256": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/sha256"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "weights_sha256"
+          ]
+        },
+        "config": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "temperature": {
+              "type": "string",
+              "pattern": "^(?:0|1|2|0\\.[0-9]{0,14}[1-9]|1\\.[0-9]{0,14}[1-9])$",
+              "minLength": 1,
+              "maxLength": 17
+            },
+            "top_p": {
+              "type": "string",
+              "pattern": "^(?:1|0\\.[0-9]{0,14}[1-9])$",
+              "minLength": 1,
+              "maxLength": 17
+            },
+            "max_output_tokens": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65536
+            },
+            "seed": {
+              "oneOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 2147483647
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "reasoning_effort": {
+              "oneOf": [
+                {
+                  "enum": [
+                    "none",
+                    "minimal",
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "max"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "temperature",
+            "top_p",
+            "max_output_tokens",
+            "seed",
+            "reasoning_effort"
+          ]
+        },
+        "tools": {
+          "const": false
+        }
+      },
+      "required": [
+        "provider",
+        "requested_model",
+        "approved_resolved_models",
+        "model_identity",
+        "config",
+        "tools"
+      ]
+    },
+    "parser": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "const": "json-rating-v1"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "scale": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "const": "bounded-discrete-v1"
+        },
+        "ratings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "label": {
+                "$ref": "#/$defs/identifier"
+              },
+              "value": {
+                "type": "string",
+                "pattern": "^(?:0|1|0\\.[0-9]{0,14}[1-9])$",
+                "minLength": 1,
+                "maxLength": 17
+              }
+            },
+            "required": [
+              "label",
+              "value"
+            ]
+          },
+          "minItems": 2,
+          "maxItems": 101,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "id",
+        "ratings"
+      ]
+    },
+    "sampling": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "const": "curated_benchmark"
+        },
+        "unit_weighting": {
+          "const": "equal"
+        },
+        "within_unit_weighting": {
+          "const": "equal_cases"
+        },
+        "case_units": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "case_id": {
+                "$ref": "#/$defs/identifier"
+              },
+              "unit_id": {
+                "$ref": "#/$defs/identifier"
+              }
+            },
+            "required": [
+              "case_id",
+              "unit_id"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 10000
+        }
+      },
+      "required": [
+        "basis",
+        "unit_weighting",
+        "within_unit_weighting",
+        "case_units"
+      ]
+    },
+    "schedule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "order": {
+          "const": "case-side-repetition-lexicographic-v1"
+        },
+        "trial_id_scheme": {
+          "const": "plan-case-side-repetition-sha256-v1"
+        },
+        "repetitions": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10
+        },
+        "max_attempts": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        },
+        "attempt_selection": {
+          "const": "first_completed_response"
+        },
+        "retry_on": {
+          "type": "array",
+          "items": {
+            "const": "transport_error"
+          },
+          "minItems": 0,
+          "maxItems": 1,
+          "uniqueItems": true
+        },
+        "cache": {
+          "const": "forbid"
+        },
+        "expected_trials": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 200000
+        }
+      },
+      "required": [
+        "order",
+        "trial_id_scheme",
+        "repetitions",
+        "max_attempts",
+        "attempt_selection",
+        "retry_on",
+        "cache",
+        "expected_trials"
+      ]
+    },
+    "answer_bindings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "case_id": {
+            "$ref": "#/$defs/identifier"
+          },
+          "baseline_answer_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "subject_answer_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "baseline_request_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "subject_request_sha256": {
+            "$ref": "#/$defs/sha256"
+          }
+        },
+        "required": [
+          "case_id",
+          "baseline_answer_sha256",
+          "subject_answer_sha256",
+          "baseline_request_sha256",
+          "subject_request_sha256"
+        ]
+      },
+      "minItems": 1,
+      "maxItems": 10000
+    }
+  },
+  "required": [
+    "format",
+    "profile_id",
+    "case_set_sha256",
+    "baseline_run_sha256",
+    "subject_run_sha256",
+    "rubric",
+    "prompt",
+    "judge",
+    "parser",
+    "scale",
+    "sampling",
+    "schedule",
+    "answer_bindings"
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "minLength": 64,
+      "maxLength": 64
+    },
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+    },
+    "artifact_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "minLength": 71,
+      "maxLength": 71
+    }
+  }
+}
