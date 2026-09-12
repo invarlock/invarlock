@@ -100,12 +100,12 @@ def _run_setup_action(
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
     from invarlock.captured_contracts import read_file
+    from invarlock.cli.evaluation_setup import starter_artifacts
     from invarlock.evaluation_record_contracts.contracts import (
         MAX_INPUT_BYTES,
         EvaluationRecordsError,
     )
     from invarlock.evaluation_records.cases import canonical_case_set, case_set_digest
-    from invarlock.evaluation_records.templates import example_project
     from invarlock.evidence_pack_contract import canonical_json_bytes
     from invarlock.evidence_pack_integrity import public_key_fingerprint
     from invarlock.evidence_pack_json import parse_json_bytes
@@ -116,51 +116,7 @@ def _run_setup_action(
             assert directory is not None
             if directory.exists():
                 raise EvaluationRecordsError("init directory must not already exist")
-            baseline, subject, policy = example_project(example)
-            request = {
-                "format_version": "invarlock/evaluation-request-v2",
-                "execution": {"mode": "captured"},
-                "comparison": {
-                    "baseline": {
-                        "path": "inputs/baseline.json",
-                        "adapter": "invarlock",
-                    },
-                    "subject": {
-                        "path": "inputs/subject.json",
-                        "adapter": "invarlock",
-                    },
-                    "policy": "policy.json",
-                },
-                "output": {"evidence": "artifacts/evidence"},
-            }
-            readme = (
-                "# InvarLock captured evaluation example\n\n"
-                "The JSON inputs are honest synthetic captured results. Replace them "
-                "with independently produced records before relying on a decision.\n"
-                "Run these commands from this directory:\n\n"
-                "invarlock evaluate request.yaml --unsigned --json\n"
-                "invarlock report artifacts/evidence --html artifacts/report.html "
-                "--markdown artifacts/summary.md --junit artifacts/junit.xml --explain\n"
-                "\nUnsigned reports are local, not independent verification or native "
-                "acceptance. For a signed handoff use --signing-key, then verify with "
-                "a recipient-owned --trust-profile (invarlock/trust-inputs-v2) and "
-                "--receipt outside the pack. See docs/user-guide/captured-results.md.\n"
-                "Add --fail-on-policy to evaluate for a local gate: 0 pass, 7 adverse "
-                "decision, 2 input/work-budget failure. Report only a newly published "
-                "pack. Commands default to text; --json emits captured evaluation/"
-                "verification/report v2 results. Report output maps are requested_outputs "
-                "and written_outputs, with failed_output and errors on write failure.\n"
-            )
-            _publish_setup_directory(
-                directory,
-                {
-                    "request.yaml": canonical_json_bytes(request),
-                    "inputs/baseline.json": canonical_json_bytes(baseline),
-                    "inputs/subject.json": canonical_json_bytes(subject),
-                    "policy.json": canonical_json_bytes(policy),
-                    "README.txt": readme.encode("utf-8"),
-                },
-            )
+            _publish_setup_directory(directory, starter_artifacts(example))
             details = {
                 "directory": str(directory),
                 "request": str(directory / "request.yaml"),
@@ -401,13 +357,13 @@ def evaluate(  # noqa: C901
         None,
         "--init",
         metavar="DIRECTORY",
-        help="Create a captured evaluation example without a request.",
+        help="Create a captured example or native judge starter without a request.",
         rich_help_panel="Evaluation setup",
     ),
     example: str = typer.Option(
         "classification",
         "--example",
-        help="Captured example for --init: classification, extraction, or judge (recorded ratings).",
+        help="Starter for --init: classification, extraction, judge (recorded ratings), or native-judge (model generation and judging).",
         rich_help_panel="Evaluation setup",
     ),
     keygen_directory: Path | None = typer.Option(
@@ -779,8 +735,7 @@ def evaluate(  # noqa: C901
         else:
             console.print(f"FAIL {_terminal_text(failure)}", markup=False)
         raise typer.Exit(failure.exit_code) from exc
-    if request_mode in {"judge_import", "judge_collect"}:
-        assert isinstance(evaluation_result, JudgeWorkflowResult)
+    if isinstance(evaluation_result, JudgeWorkflowResult):
         payload = evaluation_result.payload
         if json_out:
             _echo_json(evaluation_result.as_json())
@@ -877,6 +832,19 @@ def evaluate(  # noqa: C901
             soft_wrap=True,
         )
         console.print(f"Validated checks: {len(evaluation_result.checks)}")
+        if evaluation_result.judge is not None:
+            judge = evaluation_result.judge
+            console.print(
+                f"Judge: {_terminal_text(judge['judge']['requested_model'])}",
+                markup=False,
+            )
+            console.print(
+                f"Independent units: {judge['independent_units']}; planned judge trials: {judge['planned_trials']}"
+            )
+            console.print(
+                f"Collection budgets: {_terminal_text(str(judge['budgets']))}",
+                markup=False,
+            )
         if (
             outcome.profile is not None
             and outcome.profile_context is not None

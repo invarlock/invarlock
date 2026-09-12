@@ -325,7 +325,9 @@ def execute_evaluation(
             )
         runtime_executor = OciRuntimeExecutor(launch)
     runtime_digests = preflight_oci_launch(launch) if launch else None
-    runtime_result: EvaluationPreflightResult | EvaluationTransactionResult
+    runtime_result: (
+        EvaluationPreflightResult | EvaluationTransactionResult | JudgeWorkflowResult
+    )
     if options.preflight:
         runtime_result = preflight_evaluation_request(
             loaded_runtime_request,

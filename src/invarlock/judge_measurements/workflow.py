@@ -91,6 +91,8 @@ class JudgeEvaluationRequest:
     inputs: Mapping[str, Path]
     evidence: Path
     signer_identity: str
+    workspace: Path | None = None
+    runner: Mapping[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -157,7 +159,38 @@ def load_judge_request(
         evidence = _resolve_output_reference(
             root, output_reference, label="output.evidence"
         )
+        workspace = None
+        runner = None
+        if collection is not None:
+            workspace = root.joinpath(
+                *_reference_parts(
+                    collection.get("workspace", output_reference + ".judge-work"),
+                    label="execution.collection.workspace",
+                )
+            )
+            if (
+                workspace == evidence
+                or workspace.is_relative_to(evidence)
+                or evidence.is_relative_to(workspace)
+            ):
+                raise EvaluationRequestError(
+                    "judge workspace and evidence destination must be separate"
+                )
+            runner = MappingProxyType(
+                {
+                    "scorer_id": collection.get("scorer_id", "judge"),
+                    "invocation_timeout_seconds": collection.get(
+                        "invocation_timeout_seconds", 3600
+                    ),
+                }
+            )
         for source in inputs.values():
+            if workspace is not None and (
+                source == workspace or source.is_relative_to(workspace)
+            ):
+                raise EvaluationRequestError(
+                    "input files must remain outside the judge workspace"
+                )
             if source == evidence or source.is_relative_to(evidence):
                 raise EvaluationRequestError(
                     "input files must remain outside the evidence destination"
@@ -168,6 +201,8 @@ def load_judge_request(
             MappingProxyType(inputs),
             evidence,
             value["output"]["signer_identity"],
+            workspace,
+            runner,
         )
     except (OSError, ValueError) as exc:
         if isinstance(exc, JudgeWorkflowError):
@@ -306,6 +341,16 @@ def _prepare(request: JudgeEvaluationRequest) -> tuple[dict[str, Any], dict[str,
                 "maximum_interval_width": str(policy.maximum_interval_width),
             }
         if {"baseline_run", "subject_run"} <= values.keys():
+            from invarlock.judge_measurements.native_capture import NATIVE_RUN_SOURCE
+
+            if any(
+                isinstance(values[name].get("source"), dict)
+                and values[name]["source"].get("name") == NATIVE_RUN_SOURCE
+                for name in ("baseline_run", "subject_run")
+            ):
+                raise JudgeWorkflowError(
+                    "Native judge answers require their runtime capture; resume the native metric: judge request and workspace"
+                )
             _validate_frozen_answer_bindings(
                 values["plan"], values["baseline_run"], values["subject_run"]
             )
@@ -340,6 +385,14 @@ def _prepare(request: JudgeEvaluationRequest) -> tuple[dict[str, Any], dict[str,
                 "planned_calls": plan["schedule"]["expected_trials"],
                 "full_plan_reserved": capacity >= plan["schedule"]["expected_trials"],
             }
+    if (
+        request.mode == "judge_collect"
+        and result["budget_capacity"] is not None
+        and not result["budget_capacity"]["full_plan_reserved"]
+    ):
+        result["errors"].append(
+            "Live collection budgets must reserve every planned call"
+        )
     if missing:
         result["errors"].append(
             "Supply the missing request-relative inputs: " + ", ".join(missing)
@@ -347,13 +400,22 @@ def _prepare(request: JudgeEvaluationRequest) -> tuple[dict[str, Any], dict[str,
     if request.mode == "judge_collect":
         result["collection_integration"] = {
             "package": "invarlock-inspect-judge",
-            "api": "invarlock_addins.inspect_judge.collect",
-            "execution": "trusted_host_integration",
-            "core_cli_execution": False,
+            "api": "invarlock_addins.inspect_judge.collect_configured",
+            "execution": "installed_evaluate",
+            "core_cli_execution": True,
         }
+        result["workspace"] = str(request.workspace)
+        if not result["errors"]:
+            from invarlock.judge_measurements.native_workflow import (
+                collection_preflight,
+            )
+
+            result["collection_environment"] = collection_preflight(
+                values["collection"]
+            )
+            result["collection_available"] = True
         result["next_action"] = (
-            "Run the optional inspect-judge collect API with an explicitly "
-            "constructed model, then import its retained measurements."
+            "Run evaluate with a signing key to collect and publish judge evidence."
         )
     result["ok"] = result["ready"] = not result["errors"]
     return values, result
@@ -379,22 +441,58 @@ def evaluate_judge_request(
     """Publish imported evidence through its separately scoped evidence writer."""
     try:
         values, preflight = _prepare(request)
-        if request.mode == "judge_collect":
-            preflight["ok"] = preflight["ready"] = False
-            preflight["errors"].append(
-                "The core CLI does not execute provider calls. Run the optional inspect-judge collect API, then use a judge_import request."
-            )
-            raise JudgeWorkflowError(
-                "Judge collection requires the optional trusted-host API",
-                payload=preflight,
-            )
         if not preflight["ready"]:
             raise JudgeWorkflowError("Judge evaluation is not ready", payload=preflight)
         if unsigned == (signing_key is not None):
             raise JudgeWorkflowError(
                 "Choose either --signing-key or explicit --unsigned for judge evidence"
             )
-        from invarlock.judge_measurements.evidence import publish_judge_evidence
+        from invarlock.judge_measurements.evidence import (
+            _private_key,
+            publish_judge_evidence,
+        )
+
+        # Authenticate the signing input before admitting a billable call.
+        checked_key = _private_key(signing_key) if signing_key is not None else None
+        collection_status = None
+        if request.mode == "judge_collect":
+            from invarlock.judge_measurements.evidence import object_sha256
+            from invarlock.judge_measurements.native_workflow import (
+                _retain_identity,
+                collect_frozen,
+                locked_workspace,
+                require_completed_collection,
+            )
+
+            assert request.workspace is not None and request.runner is not None
+            with locked_workspace(request.workspace) as unchanged:
+                _retain_identity(
+                    request.workspace / "identity.json",
+                    {
+                        "format": "invarlock/judge-collection-workspace-v1",
+                        "inputs": {
+                            key: object_sha256(value) for key, value in values.items()
+                        },
+                        "runner": dict(request.runner),
+                    },
+                )
+                unchanged()
+                collection_stop: dict[str, str] = {}
+                values["measurements"] = collect_frozen(
+                    plan=values["plan"],
+                    collection=values["collection"],
+                    runner=dict(request.runner),
+                    workspace=request.workspace,
+                    baseline_run=values["baseline_run"],
+                    subject_run=values["subject_run"],
+                    status=collection_stop,
+                )
+                unchanged()
+                collection_status = require_completed_collection(
+                    values["measurements"],
+                    request.workspace,
+                    stop_reason=collection_stop.get("stop_reason"),
+                )
 
         publication = publish_judge_evidence(
             request.evidence,
@@ -403,7 +501,7 @@ def evaluate_judge_request(
             baseline_run=values["baseline_run"],
             subject_run=values["subject_run"],
             analysis_policy=cast(JudgeAnalysisPolicyDocument, values["policy"]),
-            signing_key=signing_key,
+            signing_key=checked_key,
             signer_identity=request.signer_identity if signing_key else None,
         )
         analysis = publication.analysis_result.to_dict()
@@ -418,6 +516,11 @@ def evaluate_judge_request(
                 "independent_verification": "not_performed",
                 "decision": analysis["decision"],
                 "analysis": analysis,
+                **(
+                    {"collection": collection_status}
+                    if collection_status is not None
+                    else {}
+                ),
                 "errors": [],
             }
         )

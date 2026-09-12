@@ -1,0 +1,113 @@
+{
+  "format": "invarlock/native-judge-policy-v1",
+  "plan": {
+    "format": "invarlock/judge-measurement-plan-v1",
+    "profile_id": "text-frozen-answer-v1",
+    "rubric": {
+      "text": "Rate whether the answer correctly answers the question using only the supplied context. Mark incorrect if it contradicts the context or invents unsupported facts."
+    },
+    "prompt": {
+      "system": "Grade the delimited answer using the rubric.",
+      "template": "Grade the input and answer against the rubric. Return only a JSON object with one rating field.",
+      "demonstrations": [],
+      "references": []
+    },
+    "judge": {
+      "provider": "openai",
+      "requested_model": "gpt-5.6-sol",
+      "approved_resolved_models": [
+        "gpt-5.6-sol"
+      ],
+      "model_identity": {
+        "kind": "hosted_api",
+        "weights_sha256": null
+      },
+      "config": {
+        "temperature": "1",
+        "top_p": "1",
+        "max_output_tokens": 128,
+        "seed": null,
+        "reasoning_effort": "none"
+      },
+      "tools": false
+    },
+    "parser": {
+      "id": "json-rating-v1"
+    },
+    "scale": {
+      "id": "bounded-discrete-v1",
+      "ratings": [
+        {
+          "label": "incorrect",
+          "value": "0"
+        },
+        {
+          "label": "correct",
+          "value": "1"
+        }
+      ]
+    },
+    "sampling": {
+      "basis": "curated_benchmark",
+      "unit_weighting": "equal",
+      "within_unit_weighting": "equal_cases",
+      "case_units": [
+        {
+          "case_id": "case-1",
+          "unit_id": "case-1"
+        },
+        {
+          "case_id": "case-2",
+          "unit_id": "case-2"
+        }
+      ]
+    },
+    "schedule": {
+      "order": "case-side-repetition-lexicographic-v1",
+      "trial_id_scheme": "plan-case-side-repetition-sha256-v1",
+      "repetitions": 1,
+      "max_attempts": 1,
+      "attempt_selection": "first_completed_response",
+      "retry_on": [
+        "transport_error"
+      ],
+      "cache": "forbid"
+    }
+  },
+  "analysis": {
+    "format": "invarlock/judge-analysis-policy-v1",
+    "metric_name": "grounded-correctness",
+    "decision_role": "required",
+    "direction": "higher",
+    "method": "fixed-benchmark-hoeffding-v1",
+    "alpha": "0.05",
+    "comparison_family_size": 2,
+    "minimum_units": 2,
+    "maximum_interval_width": "0.3",
+    "allowed_degradation": "0.05",
+    "subject_bound": null
+  },
+  "collection": {
+    "grader": "openai/gpt-5.6-sol",
+    "inspect_version": "0.3.263",
+    "profile": "inspect-text-frozen-answer-v1",
+    "epochs": 1,
+    "log_model_api": true,
+    "log_samples": true,
+    "sdk_max_retries": 0,
+    "tools": false,
+    "concurrency": 2,
+    "requests_per_minute": 60,
+    "request_timeout_seconds": 30,
+    "max_calls": 4,
+    "max_input_tokens": 16384,
+    "max_output_tokens": 512,
+    "max_cost_microusd": 1000000,
+    "input_tokens_per_call": 4096,
+    "cost_microusd_per_call": 250000
+  },
+  "runner": {
+    "scorer_id": "grounded-correctness",
+    "invocation_timeout_seconds": 600
+  }
+}

@@ -129,7 +129,21 @@ def test_preflight_names_missing_inputs(staged):
     assert payload["cases"] == 1
 
 
-def test_collect_preflight_shows_explicit_budgets_without_claiming_a_runner(staged):
+def test_collect_preflight_shows_explicit_budgets_and_installed_runner(
+    staged, monkeypatch
+):
+    from invarlock.judge_measurements import native_workflow
+
+    monkeypatch.setattr(
+        native_workflow,
+        "collection_preflight",
+        lambda *_: {"credential_available": True},
+    )
+
+    def unavailable(**_):
+        raise JudgeWorkflowError("test collector unavailable")
+
+    monkeypatch.setattr(native_workflow, "collect_frozen", unavailable)
     path, value = staged
     value["execution"] = {
         "mode": "judge_collect",
@@ -173,9 +187,9 @@ def test_collect_preflight_shows_explicit_budgets_without_claiming_a_runner(stag
         "planned_calls": 2,
         "full_plan_reserved": True,
     }
-    assert payload["collection_available"] is False
+    assert payload["collection_available"] is True
     assert payload["ready"] and not payload["errors"]
-    assert "inspect-judge collect API" in payload["next_action"]
+    assert "Run evaluate" in payload["next_action"]
     text_result = RUNNER.invoke(app, ["evaluate", str(path), "--preflight"])
     assert text_result.exit_code == 0, text_result.output
     text = " ".join(text_result.stdout.split())
@@ -184,13 +198,13 @@ def test_collect_preflight_shows_explicit_budgets_without_claiming_a_runner(stag
     budget["max_calls"] = 1
     (path.parent / "collection.json").write_text(json.dumps(budget))
     partial = RUNNER.invoke(app, ["evaluate", str(path), "--preflight"])
-    assert partial.exit_code == 0, partial.output
+    assert partial.exit_code == 2, partial.output
     assert "Maximum admitted calls: 1; full plan reserved: no" in " ".join(
         partial.stdout.split()
     )
     result = RUNNER.invoke(app, ["evaluate", str(path), "--unsigned", "--json"])
     assert result.exit_code == 2
-    assert "does not execute provider calls" in result.stdout
+    assert "reserve every planned call" in result.stdout
     assert not (path.parent / "evidence").exists()
 
     budget["Authorization"] = "secret"
@@ -579,7 +593,14 @@ def test_report_escapes_metric_markup_and_rejects_in_pack_output(tmp_path):
     assert not (publication.path / "report.html").exists()
 
 
-def test_committed_judge_example_preflights_and_renders(tmp_path):
+def test_committed_judge_example_preflights_and_renders(tmp_path, monkeypatch):
+    from invarlock.judge_measurements import native_workflow
+
+    monkeypatch.setattr(
+        native_workflow,
+        "collection_preflight",
+        lambda *_: {"credential_available": True},
+    )
     example = Path(__file__).parents[2] / "examples" / "judge-measurements"
     shutil.copytree(example, tmp_path / "example")
     collection_request = tmp_path / "example" / "request-collect.yaml"
@@ -626,3 +647,44 @@ def test_judge_supported_cli_options_have_accurate_help():
     assert "Captured or judge baseline run override" in text
     assert "Captured or judge subject run override" in text
     assert "judge (recorded ratings)" in text
+
+
+def test_standalone_request_rejects_native_answers_before_collector(
+    staged, monkeypatch
+):
+    from invarlock.judge_measurements import native_workflow
+
+    path, value = staged
+    value["execution"] = {
+        "mode": "judge_collect",
+        "collection": {
+            "integration": "inspect-judge",
+            "configuration": "collection.json",
+        },
+    }
+    value["comparison"]["measurements"] = None
+    path.write_text(json.dumps(value))
+    (path.parent / "collection.json").write_text("{}")
+    run_path = path.parent / "baseline_run.json"
+    run = json.loads(run_path.read_text())
+    run["source"]["name"] = "invarlock-native-judge"
+    run_path.write_text(json.dumps(run))
+    monkeypatch.setattr(
+        native_workflow,
+        "collection_preflight",
+        lambda *_: pytest.fail("collector reached"),
+    )
+    with pytest.raises(JudgeWorkflowError, match="require their runtime capture"):
+        preflight_judge_request(load_judge_request(path))
+
+
+@pytest.mark.parametrize("source", [None, [], "invalid"])
+def test_malformed_frozen_source_has_controlled_preflight_error(staged, source):
+    path, _ = staged
+    run_path = path.parent / "baseline_run.json"
+    run = json.loads(run_path.read_text())
+    run["source"] = source
+    run_path.write_text(json.dumps(run))
+    result = RUNNER.invoke(app, ["evaluate", str(path), "--preflight", "--json"])
+    assert result.exit_code == 2
+    assert json.loads(result.stdout)["ok"] is False

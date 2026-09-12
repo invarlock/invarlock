@@ -50,7 +50,7 @@ def request():
     }
 
 
-def test_pipeline_capture_and_bound_continuation(tmp_path):
+def test_pipeline_capture_and_bound_continuation(tmp_path, monkeypatch):
     transport, config = adapter(tmp_path)
     cases = read(ROOT / "examples/answer-capture/cases.json")
     directory = tmp_path / "capture"
@@ -86,6 +86,13 @@ def test_pipeline_capture_and_bound_continuation(tmp_path):
     assert (
         read(target / "analysis_policy.json")["minimum_units"]
         == policy["minimum_units"]
+    )
+    from invarlock.judge_measurements import native_workflow
+
+    monkeypatch.setattr(
+        native_workflow,
+        "collection_preflight",
+        lambda *_: {"credential_available": True},
     )
     # The prepared request goes through the actual public preflight.
     from typer.testing import CliRunner

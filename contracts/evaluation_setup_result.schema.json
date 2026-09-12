@@ -21,7 +21,7 @@
           "action": {"const": "init"},
           "details": {
             "type": "object", "required": ["directory", "request", "example"], "additionalProperties": false,
-            "properties": {"directory": {"type": "string"}, "request": {"type": "string"}, "example": {"enum": ["classification", "extraction", "judge"]}}
+            "properties": {"directory": {"type": "string"}, "request": {"type": "string"}, "example": {"enum": ["classification", "extraction", "judge", "native-judge"]}}
           }
         }
       },
