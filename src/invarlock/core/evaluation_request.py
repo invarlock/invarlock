@@ -974,7 +974,9 @@ def load_evaluation_request(
     )
 
 
-def evaluation_request_mode(path: str | Path) -> Literal["captured", "run", "import"]:
+def evaluation_request_mode(
+    path: str | Path,
+) -> Literal["captured", "run", "import", "judge_import", "judge_collect"]:
     """Read only the closed request discriminator before provider discovery."""
     try:
         payload = read_regular_file_bytes(
@@ -990,6 +992,14 @@ def evaluation_request_mode(path: str | Path) -> Literal["captured", "run", "imp
     if not isinstance(value, dict):
         raise EvaluationRequestError("request must be a YAML object")
     format_version = value.get("format_version")
+    if format_version == "invarlock/evaluation-request-v3":
+        execution = value.get("execution")
+        if not isinstance(execution, dict) or execution.get("mode") not in {
+            "judge_import",
+            "judge_collect",
+        }:
+            raise EvaluationRequestError("judge request execution mode is invalid")
+        return cast(Literal["judge_import", "judge_collect"], execution["mode"])
     if format_version == CAPTURED_EVALUATION_REQUEST_FORMAT_VERSION:
         execution = value.get("execution")
         if not isinstance(execution, dict) or execution.get("mode") != "captured":

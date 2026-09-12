@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://invarlock.dev/contracts/evaluation_request_v3.schema.json",
+  "title": "InvarLock bounded judge evaluation request",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format_version": {
+          "const": "invarlock/evaluation-request-v3"
+        },
+        "execution": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mode": {
+              "const": "judge_import"
+            },
+            "collection": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "mode",
+            "collection"
+          ]
+        },
+        "comparison": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "baseline_run": {
+              "$ref": "#/$defs/reference"
+            },
+            "subject_run": {
+              "$ref": "#/$defs/reference"
+            },
+            "plan": {
+              "$ref": "#/$defs/reference"
+            },
+            "measurements": {
+              "$ref": "#/$defs/reference"
+            },
+            "policy": {
+              "$ref": "#/$defs/reference"
+            }
+          },
+          "required": [
+            "baseline_run",
+            "subject_run",
+            "plan",
+            "measurements",
+            "policy"
+          ]
+        },
+        "output": {
+          "$ref": "#/$defs/output"
+        }
+      },
+      "required": [
+        "format_version",
+        "execution",
+        "comparison",
+        "output"
+      ]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format_version": {
+          "const": "invarlock/evaluation-request-v3"
+        },
+        "execution": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mode": {
+              "const": "judge_collect"
+            },
+            "collection": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "integration": {
+                  "const": "inspect-judge"
+                },
+                "configuration": {
+                  "$ref": "#/$defs/reference"
+                }
+              },
+              "required": [
+                "integration",
+                "configuration"
+              ]
+            }
+          },
+          "required": [
+            "mode",
+            "collection"
+          ]
+        },
+        "comparison": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "baseline_run": {
+              "$ref": "#/$defs/reference"
+            },
+            "subject_run": {
+              "$ref": "#/$defs/reference"
+            },
+            "plan": {
+              "$ref": "#/$defs/reference"
+            },
+            "measurements": {
+              "type": "null"
+            },
+            "policy": {
+              "$ref": "#/$defs/reference"
+            }
+          },
+          "required": [
+            "baseline_run",
+            "subject_run",
+            "plan",
+            "measurements",
+            "policy"
+          ]
+        },
+        "output": {
+          "$ref": "#/$defs/output"
+        }
+      },
+      "required": [
+        "format_version",
+        "execution",
+        "comparison",
+        "output"
+      ]
+    }
+  ],
+  "$defs": {
+    "reference": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "pattern": "^(?!/)(?!~)(?![A-Za-z]:)(?!.*://)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*(?:^|/)\\.(?:/|$))(?!.*//)(?!\\s)(?!.*\\s$)(?!.*\\/$)[^\\u0000-\\u001f]+$"
+    },
+    "output": {
+      "type": "object",
+      "required": [
+        "evidence"
+      ],
+      "properties": {
+        "evidence": {
+          "$ref": "#/$defs/reference"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
