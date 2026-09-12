@@ -1,0 +1,92 @@
+"""Descriptor-pinned directory traversal shared by readers and publishers."""
+
+from __future__ import annotations
+
+import errno
+import os
+import stat
+from collections.abc import Iterator
+from contextlib import ExitStack, contextmanager
+from pathlib import Path
+
+
+class UnsafePathError(OSError):
+    """The supplied path does not meet the directory contract."""
+
+
+class PathChangedError(UnsafePathError):
+    """A directory entry no longer names the directory opened by this operation."""
+
+
+def entry_identity(value: os.stat_result) -> tuple[int, int, int]:
+    return value.st_dev, value.st_ino, value.st_mode
+
+
+def close_descriptor(descriptor: int) -> None:
+    """Release a retained descriptor once without masking an operation result.
+
+    A failed close can have released the descriptor already; never retry it.
+    Writers must flush and synchronize data explicitly before this cleanup.
+    """
+    try:
+        os.close(descriptor)
+    except OSError:
+        pass
+
+
+@contextmanager
+def _directory_descriptor(
+    path: str, flags: int, *, dir_fd: int | None = None
+) -> Iterator[int]:
+    descriptor = os.open(path, flags, dir_fd=dir_fd)
+    try:
+        yield descriptor
+    finally:
+        close_descriptor(descriptor)
+
+
+@contextmanager
+def pinned_directory(path: Path, *, create: bool = False) -> Iterator[int]:
+    """Reject symlinks and retain/check every ancestor through the operation.
+
+    These checks detect changed bindings; they do not lock caller-owned paths
+    against changes after the operation returns. Preserve a primary operation
+    failure instead of masking it with a subsequent binding check.
+    """
+    path = Path(path).absolute()
+    if ".." in path.parts:
+        raise UnsafePathError("directory must not contain parent traversal")
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
+    bindings: list[tuple[int, str, tuple[int, int, int]]] = []
+    with ExitStack() as descriptors:
+        current = descriptors.enter_context(_directory_descriptor(path.anchor, flags))
+        for name in path.parts[1:]:
+            parent = current
+            if create:
+                try:
+                    os.mkdir(name, mode=0o700, dir_fd=parent)
+                except FileExistsError:
+                    pass
+            before = os.stat(name, dir_fd=parent, follow_symlinks=False)
+            if not stat.S_ISDIR(before.st_mode):
+                raise UnsafePathError("path must use non-symlink directories")
+            try:
+                current = descriptors.enter_context(
+                    _directory_descriptor(name, flags, dir_fd=parent)
+                )
+            except OSError as exc:
+                if exc.errno in {errno.ELOOP, errno.ENOTDIR, errno.ENOENT}:
+                    raise PathChangedError("directory changed while opening") from exc
+                raise
+            identity = entry_identity(before)
+            if identity != entry_identity(os.fstat(current)):
+                raise PathChangedError("directory changed while opening")
+            bindings.append((parent, name, identity))
+        yield current
+        for parent, name, identity in bindings:
+            try:
+                named = os.stat(name, dir_fd=parent, follow_symlinks=False)
+            except FileNotFoundError as exc:
+                raise PathChangedError("directory source was replaced") from exc
+            if entry_identity(named) != identity:
+                raise PathChangedError("directory source was replaced")
