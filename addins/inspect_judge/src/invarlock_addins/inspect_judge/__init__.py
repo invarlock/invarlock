@@ -16,7 +16,10 @@ from .collector import (
     render_request,
 )
 
+__version__ = "0.15.0"
+
 __all__ = [
+    "__version__",
     "INSPECT_VERSION",
     "CollectionOptions",
     "InspectJudgeError",

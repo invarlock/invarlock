@@ -6,6 +6,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ADDINS = {
+    "inspect_judge": REPO_ROOT / "addins/inspect_judge",
     "diagnostics": REPO_ROOT / "addins/diagnostics",
     "gguf": REPO_ROOT / "addins/gguf",
     "multimodal": REPO_ROOT / "addins/multimodal",
@@ -52,7 +53,7 @@ def test_provider_addins_require_the_exact_matching_core_release() -> None:
     core_version = str(_project(REPO_ROOT)["version"])
     expected = f"invarlock=={core_version}"
 
-    for name in ("gguf", "tensorrt_llm"):
+    for name in ("gguf", "tensorrt_llm", "inspect_judge"):
         dependencies = _project(ADDINS[name])["dependencies"]
         assert isinstance(dependencies, list)
         assert dependencies == [expected]
@@ -113,3 +114,17 @@ def test_provider_images_expose_the_invarlock_front_door() -> None:
         '"/opt/invarlock/cli-venv/bin/python", "-m", "invarlock"]' in tensorrt
     )
     assert 'CMD ["python", "-m", "invarlock"]' not in tensorrt
+
+
+def test_inspect_judge_keeps_the_sdk_optional_and_joins_installed_smokes() -> None:
+    project = _project(ADDINS["inspect_judge"])
+    assert project["optional-dependencies"] == {"inspect": ["inspect-ai==0.3.254"]}
+    makefile = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
+    assert "-p invarlock_addins.inspect_judge" in makefile
+    for text in (
+        makefile,
+        (REPO_ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8"),
+    ):
+        assert "import invarlock_addins.inspect_judge as judge" in text
+        assert "version('invarlock-inspect-judge') == judge.__version__" in text
+        assert "'inspect_ai' not in sys.modules" in text

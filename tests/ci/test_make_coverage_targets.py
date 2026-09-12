@@ -38,14 +38,20 @@ def test_coverage_uses_pytest_cov_with_an_individual_file_ratchet() -> None:
 def test_addin_coverage_has_a_separate_parallel_ratchet() -> None:
     block = MAKE.target("coverage-addins").text
     config = (ROOT / "scripts" / "addins.coveragerc").read_text(encoding="utf-8")
-    for package in ("diagnostics", "gguf", "multimodal", "tensorrt_llm"):
+    for package in (
+        "diagnostics",
+        "gguf",
+        "multimodal",
+        "tensorrt_llm",
+        "inspect_judge",
+    ):
         assert f"--include='addins/{package}/src/*'" in block
     assert "--cov --cov-config=scripts/addins.coveragerc" in block
     assert "source =\n    addins" in config
     assert "addins/*/tests/*" in config
     assert "--cov-branch" in block
     assert "--cov-fail-under=95" in block
-    assert block.count("--fail-under=95") == 5
+    assert block.count("--fail-under=95") == 6
     assert "git ls-files 'addins/*/src/**/*.py'" in block
     assert "grep -v '/__init__.py$$'" in block
     assert '--include="$$source" --fail-under=95' in block
@@ -55,7 +61,7 @@ def test_addin_coverage_has_a_separate_parallel_ratchet() -> None:
     assert "COVERAGE_FILE=$(COVERAGE_ADDINS_FILE)" in block
     assert (
         "PYTHONPATH=src:addins/diagnostics/src:addins/gguf/src:"
-        "addins/multimodal/src:addins/tensorrt_llm/src:."
+        "addins/multimodal/src:addins/tensorrt_llm/src:addins/inspect_judge/src:."
     ) in block
 
 

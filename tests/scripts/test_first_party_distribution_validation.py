@@ -41,7 +41,13 @@ def built_addins(tmp_path_factory: pytest.TempPathFactory) -> Path:
     dist.mkdir()
     sources = fixture_root / "sources"
     sources.mkdir()
-    for project in ("diagnostics", "gguf", "multimodal", "tensorrt_llm"):
+    for project in (
+        "diagnostics",
+        "gguf",
+        "multimodal",
+        "tensorrt_llm",
+        "inspect_judge",
+    ):
         isolated_source = sources / project
         shutil.copytree(
             ROOT / "addins" / project,
@@ -170,6 +176,7 @@ def test_first_party_addin_artifacts_match_exact_source(
         "gguf",
         "multimodal",
         "tensorrt_llm",
+        "inspect_judge",
     }
 
 
@@ -189,8 +196,9 @@ def test_first_party_artifacts_include_core_and_all_addins(
         "gguf",
         "multimodal",
         "tensorrt_llm",
+        "inspect_judge",
     ]
-    assert len({result.distribution for result in results}) == 5
+    assert len({result.distribution for result in results}) == 6
 
 
 def test_first_party_artifacts_reject_core_namespace_injection(
@@ -332,7 +340,7 @@ def test_distribution_names_must_be_unique(
         )
 
 
-def test_cli_emits_one_core_and_four_addin_results(
+def test_cli_emits_one_core_and_five_addin_results(
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -358,7 +366,13 @@ def test_cli_emits_one_core_and_four_addin_results(
             wheel=f"invarlock_{project}-{VERSION}-py3-none-any.whl",
             sdist=f"invarlock_{project}-{VERSION}.tar.gz",
         )
-        for project in ("diagnostics", "gguf", "multimodal", "tensorrt_llm")
+        for project in (
+            "diagnostics",
+            "gguf",
+            "multimodal",
+            "tensorrt_llm",
+            "inspect_judge",
+        )
     )
     observed: dict[str, object] = {}
 
@@ -466,12 +480,15 @@ def _write_wheel_files(wheel: Path, files: dict[str, bytes]) -> None:
             archive.writestr(name, content)
 
 
+@pytest.mark.parametrize(
+    "distribution", ["invarlock_runtime_gguf", "invarlock_inspect_judge"]
+)
 def test_first_party_addin_rejects_removed_wheel_dependency(
-    built_addins: Path, tmp_path: Path
+    built_addins: Path, tmp_path: Path, distribution: str
 ) -> None:
     copied = tmp_path / "addins"
     shutil.copytree(built_addins, copied)
-    wheel = next(copied.glob("invarlock_runtime_gguf-*.whl"))
+    wheel = next(copied.glob(f"{distribution}-*.whl"))
     files = _read_wheel_files(wheel)
     metadata = next(name for name in files if name.endswith(".dist-info/METADATA"))
     files[metadata] = b"\n".join(
@@ -594,19 +611,25 @@ def test_first_party_addin_rejects_substituted_sdist_dependency(
         )
 
 
+@pytest.mark.parametrize(
+    ("distribution", "source"),
+    [
+        ("invarlock_diagnostics", "invarlock_addins/diagnostics/observations.py"),
+        ("invarlock_inspect_judge", "invarlock_addins/inspect_judge/collector.py"),
+    ],
+)
 def test_first_party_addin_rejects_validly_recorded_source_substitution(
-    built_addins: Path, tmp_path: Path
+    built_addins: Path, tmp_path: Path, distribution: str, source: str
 ) -> None:
     copied = tmp_path / "addins"
     shutil.copytree(built_addins, copied)
-    wheel = next(copied.glob("invarlock_diagnostics-*.whl"))
+    wheel = next(copied.glob(f"{distribution}-*.whl"))
     with zipfile.ZipFile(wheel) as archive:
         files = {
             member.filename: archive.read(member)
             for member in archive.infolist()
             if not member.is_dir()
         }
-    source = "invarlock_addins/diagnostics/observations.py"
     files[source] += b"\nSUBSTITUTED = True\n"
     _rewrite_record(files)
     with zipfile.ZipFile(wheel, "w") as archive:

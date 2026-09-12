@@ -114,9 +114,9 @@ test-integration:  ## Run integration tests
 	PYTHONPATH=src $(PYTEST) -q -m integration tests/integration
 
 addins-test:  ## Test every first-party optional package
-	PYTHONPATH=src:addins/diagnostics/src:addins/gguf/src:addins/multimodal/src:addins/tensorrt_llm/src \
+	PYTHONPATH=src:addins/diagnostics/src:addins/gguf/src:addins/multimodal/src:addins/tensorrt_llm/src:addins/inspect_judge/src \
 		$(PYTEST) $(PYTEST_WORKER_ARGS) -q \
-		addins/diagnostics/tests addins/gguf/tests addins/multimodal/tests addins/tensorrt_llm/tests
+		addins/diagnostics/tests addins/gguf/tests addins/multimodal/tests addins/tensorrt_llm/tests addins/inspect_judge/tests
 
 test-%:  ## Run one tests/<name> directory
 	$(MAKE) ensure-python
@@ -147,9 +147,9 @@ coverage-linux-check:
 
 coverage-addins: coverage-linux-check  ## Enforce branch-aware coverage for optional packages
 	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) $(PYTHON) -m coverage erase
-	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) PYTHONPATH=src:addins/diagnostics/src:addins/gguf/src:addins/multimodal/src:addins/tensorrt_llm/src:. \
+	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) PYTHONPATH=src:addins/diagnostics/src:addins/gguf/src:addins/multimodal/src:addins/tensorrt_llm/src:addins/inspect_judge/src:. \
 		$(PYTEST) $(PYTEST_WORKER_ARGS) -q \
-		addins/diagnostics/tests addins/gguf/tests addins/multimodal/tests addins/tensorrt_llm/tests \
+		addins/diagnostics/tests addins/gguf/tests addins/multimodal/tests addins/tensorrt_llm/tests addins/inspect_judge/tests \
 		--cov --cov-config=scripts/addins.coveragerc \
 		--cov-branch --cov-report=term-missing \
 		--cov-report=xml:reports/addins-cov.xml \
@@ -165,6 +165,9 @@ coverage-addins: coverage-linux-check  ## Enforce branch-aware coverage for opti
 		--fail-under=95
 	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) $(PYTHON) -m coverage report \
 		--include='addins/tensorrt_llm/src/*' \
+		--fail-under=95
+	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) $(PYTHON) -m coverage report \
+		--include='addins/inspect_judge/src/*' \
 		--fail-under=95
 	@git ls-files 'addins/*/src/**/*.py' | \
 		grep -v '/__init__.py$$' | \
@@ -448,6 +451,7 @@ typecheck:  ## Type-check the core package
 	PYTHONPATH=src:addins/gguf/src $(MYPY) -p invarlock_addins.gguf
 	PYTHONPATH=src:addins/multimodal/src $(MYPY) -p invarlock_addins.multimodal
 	PYTHONPATH=src:addins/tensorrt_llm/src $(MYPY) -p invarlock_addins.tensorrt_llm
+	PYTHONPATH=src:addins/inspect_judge/src $(MYPY) -p invarlock_addins.inspect_judge
 
 mypy-typed-surface:  ## Type-check the public transaction and evidence surface
 	$(MAKE) ensure-mypy
@@ -664,12 +668,13 @@ dist-check:  ## Build and validate the core and first-party add-in distributions
 	$(DIST_RUN) python -m build --no-isolation --outdir dist/addins addins/gguf
 	$(DIST_RUN) python -m build --no-isolation --outdir dist/addins addins/multimodal
 	$(DIST_RUN) python -m build --no-isolation --outdir dist/addins addins/tensorrt_llm
+	$(DIST_RUN) python -m build --no-isolation --outdir dist/addins addins/inspect_judge
 	$(DIST_RUN) python -m twine check dist/*.whl dist/*.tar.gz
 	$(DIST_RUN) python -m twine check dist/addins/*
 	$(DIST_RUN) python scripts/release/first_party_distribution_validation.py \
 		--repo-root . --core-dist-dir dist --addin-dist-dir dist/addins
 
-addins-install-smoke: dist-check  ## Install and discover all five wheels in a disposable environment
+addins-install-smoke: dist-check  ## Install and discover all six wheels in a disposable environment
 	@test -f $(ADDINS_SMOKE_RELEASE_LOCK) || { echo "No coordinated release lock for $(PYTHON); expected $(ADDINS_SMOKE_RELEASE_LOCK)" >&2; exit 2; }
 	@set -eu; \
 		smoke_venv="$$(mktemp -d "$${TMPDIR:-/tmp}/invarlock-addins-smoke.XXXXXX")"; \
@@ -711,6 +716,7 @@ addins-install-smoke: dist-check  ## Install and discover all five wheels in a d
 		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -m invarlock_addins.tensorrt_llm.conformance; \
 		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -c "from pathlib import Path; import invarlock; import sysconfig; site = Path(sysconfig.get_path('purelib')).resolve(); assert Path(invarlock.__file__).resolve().is_relative_to(site)"; \
 		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -c "from invarlock_addins.diagnostics import spectral_observation; assert spectral_observation([[1.0]])['status'] == 'observation'"; \
+		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -c "from importlib.metadata import version; from pathlib import Path; from sysconfig import get_path; import sys; import invarlock; import invarlock_addins.inspect_judge as judge; assert version('invarlock-inspect-judge') == judge.__version__ == invarlock.__version__; assert Path(judge.__file__).resolve().is_relative_to(Path(get_path('purelib')).resolve()); assert callable(judge.import_export) and callable(judge.prepare_collection); assert 'inspect_ai' not in sys.modules"; \
 		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -c "from importlib.metadata import entry_points; assert {'hf_vision_text', 'llama_cpp', 'tensorrt_llm'} <= {item.name for item in entry_points(group='invarlock.runtime_providers')}"; \
 		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -c "from importlib import import_module; from pathlib import Path; import sysconfig; from invarlock import __version__; from invarlock.core.registry import CoreRegistry; from invarlock.core.runtime_provider import INVARLOCK_RUNTIME_PROVIDER_ABI; registry = CoreRegistry(); expected = {'hf_vision_text': 'invarlock-runtime-hf-vision-text', 'llama_cpp': 'invarlock-runtime-gguf', 'tensorrt_llm': 'invarlock-runtime-tensorrt-llm'}; providers = {name: registry.get_runtime_provider(name) for name in expected}; assert all(provider.name == name and provider.abi_version == INVARLOCK_RUNTIME_PROVIDER_ABI for name, provider in providers.items()); assert all(registry.get_plugin_info(name, 'runtime_providers')['package'] == package and registry.get_plugin_info(name, 'runtime_providers')['version'] == __version__ and registry.get_plugin_info(name, 'runtime_providers')['entry_point'] == name for name, package in expected.items()); site = Path(sysconfig.get_path('purelib')).resolve(); assert all(Path(import_module(provider.__class__.__module__).__file__).resolve().is_relative_to(site) for provider in providers.values())"
 

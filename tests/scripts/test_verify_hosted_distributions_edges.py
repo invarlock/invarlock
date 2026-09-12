@@ -68,7 +68,7 @@ def test_open_url_sets_release_user_agent(monkeypatch: pytest.MonkeyPatch) -> No
             ],
             "duplicate distribution filename",
         ),
-        ([f"{'1' * 64}  dist/invarlock-1.2.3.tar.gz"], "expected 10"),
+        ([f"{'1' * 64}  dist/invarlock-1.2.3.tar.gz"], "expected 12"),
     ],
 )
 def test_build_ledger_rejects_duplicate_or_incomplete_file_sets(
