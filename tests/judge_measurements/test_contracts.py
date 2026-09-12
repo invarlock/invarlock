@@ -30,11 +30,23 @@ def _measurements() -> JudgeMeasurements:
     return cast(JudgeMeasurements, _fixture("measurements.json"))
 
 
+def _run(side: str) -> dict[str, Any]:
+    return _fixture(f"{side}_run.json")
+
+
 def _retain_trials(value: JudgeMeasurements) -> None:
     source = value["sources"][0]
     payload = contracts.canonical_payload(
         {"format": contracts.SOURCE_FORMAT, "trials": value["trials"]}
     )
+    source["content"] = payload.decode("utf-8")
+    source["byte_size"] = len(payload)
+    source["sha256"] = hashlib.sha256(payload).hexdigest()
+
+
+def _replace_source(value: JudgeMeasurements, payload_value: object) -> None:
+    source = value["sources"][0]
+    payload = contracts.canonical_payload(payload_value)
     source["content"] = payload.decode("utf-8")
     source["byte_size"] = len(payload)
     source["sha256"] = hashlib.sha256(payload).hexdigest()
@@ -62,13 +74,21 @@ def _assert_measurement_error(
     if retain:
         _retain_trials(value)
     with pytest.raises(JudgeMeasurementContractError, match=message):
-        contracts.validate_measurements(value, _plan())
+        contracts.validate_measurements(
+            value,
+            _plan(),
+            baseline_run=_run("baseline"),
+            subject_run=_run("subject"),
+        )
 
 
 def test_golden_plan_and_measurements_replay() -> None:
     plan = contracts.load_measurement_plan(FIXTURES / "plan.json")
     measurements = contracts.load_measurements(
-        FIXTURES / "measurements.json", plan=plan
+        FIXTURES / "measurements.json",
+        plan=plan,
+        baseline_run=_run("baseline"),
+        subject_run=_run("subject"),
     )
 
     assert measurements["plan_sha256"] == contracts.measurement_plan_digest(plan)
@@ -106,7 +126,7 @@ def test_golden_plan_and_measurements_replay() -> None:
             "rating labels",
         ),
         (
-            lambda plan: plan["scale"]["ratings"][1].update(value=0),
+            lambda plan: plan["scale"]["ratings"][1].update(value="0"),
             "numeric values",
         ),
         (
@@ -138,6 +158,10 @@ def test_golden_plan_and_measurements_replay() -> None:
         (
             lambda plan: plan["schedule"].update(expected_trials=4),
             "cases × two sides × repetitions",
+        ),
+        (
+            lambda plan: plan["schedule"].update(repetitions=1.0),
+            "repetitions must be an integer",
         ),
         (
             lambda plan: plan["schedule"].update(max_attempts=2, retry_on=[]),
@@ -248,7 +272,7 @@ def test_trial_ids_are_stable_and_bound_to_every_slot_dimension() -> None:
         ),
         (
             lambda value: value["trials"][0]["parse"].update(
-                rating="incorrect", value=1
+                rating="incorrect", value="1"
             ),
             "deterministic response replay",
             True,
@@ -274,6 +298,45 @@ def test_source_replay_rejects_outer_trial_substitution() -> None:
     _assert_measurement_error(measurements, "source replay differs", retain=False)
 
 
+def test_retained_source_rejects_nonobject_trials_and_attempts() -> None:
+    measurements = _measurements()
+    _replace_source(measurements, {"format": contracts.SOURCE_FORMAT, "trials": [None]})
+    _assert_measurement_error(measurements, "trials must be objects", retain=False)
+
+    measurements = _measurements()
+    retained_trial = copy.deepcopy(measurements["trials"][0])
+    retained_trial["attempts"] = [None]
+    _replace_source(
+        measurements,
+        {"format": contracts.SOURCE_FORMAT, "trials": [retained_trial]},
+    )
+    _assert_measurement_error(measurements, "attempts must be objects", retain=False)
+
+
+def test_integral_floats_are_rejected_before_integer_interpretation() -> None:
+    measurements = _measurements()
+    cast(dict[str, Any], measurements["trials"][0])["selected_attempt"] = 1.0
+    _retain_trials(measurements)
+    _assert_measurement_error(
+        measurements, "selected attempt must be an integer", retain=False
+    )
+
+
+def test_one_model_event_cannot_satisfy_multiple_trials() -> None:
+    measurements = _measurements()
+    first_event = measurements["trials"][0]["attempts"][0]["source"]["model_event_id"]
+    measurements["trials"][1]["attempts"][0]["source"]["model_event_id"] = first_event
+    _assert_measurement_error(measurements, "exactly one attempt", retain=True)
+
+
+def test_rehashed_unapproved_rendered_request_is_rejected() -> None:
+    measurements = _measurements()
+    request = measurements["trials"][0]["attempts"][0]["request"]
+    request["text"] = '{"messages":[{"role":"user","content":"Unapproved"}]}'
+    request["sha256"] = hashlib.sha256(request["text"].encode()).hexdigest()
+    _assert_measurement_error(measurements, "request was not approved", retain=True)
+
+
 def test_incomplete_trial_is_retained_but_cannot_claim_complete() -> None:
     measurements = _measurements()
     trial = measurements["trials"][0]
@@ -295,7 +358,12 @@ def test_incomplete_trial_is_retained_but_cannot_claim_complete() -> None:
     measurements["completeness"].update(status="incomplete", completed_trials=1)
     _retain_trials(measurements)
 
-    contracts.validate_measurements(measurements, _plan())
+    contracts.validate_measurements(
+        measurements,
+        _plan(),
+        baseline_run=_run("baseline"),
+        subject_run=_run("subject"),
+    )
 
 
 def test_transport_retry_must_be_contiguous_and_stop_at_first_completion() -> None:
@@ -310,7 +378,43 @@ def test_transport_retry_must_be_contiguous_and_stop_at_first_completion() -> No
     _bind_plan(measurements, plan)
 
     with pytest.raises(JudgeMeasurementContractError, match="after a terminal result"):
-        contracts.validate_measurements(measurements, plan)
+        contracts.validate_measurements(
+            measurements,
+            plan,
+            baseline_run=_run("baseline"),
+            subject_run=_run("subject"),
+        )
+
+
+def test_transport_retry_then_first_completion_is_valid() -> None:
+    measurements = _measurements()
+    plan = _plan()
+    plan["schedule"]["max_attempts"] = 2
+    first = measurements["trials"][0]["attempts"][0]
+    completed = copy.deepcopy(first)
+    completed["attempt"] = 2
+    completed["request_id"] = "request-after-retry"
+    completed["source"]["attempt_index"] = 1
+    completed["source"]["model_event_id"] = "event-after-retry"
+    first.update(
+        status="transport_error",
+        resolved_model=None,
+        response=None,
+        request_id=None,
+        finish_reason=None,
+        error={"code": "transport", "message": "Connection failed."},
+        usage=None,
+    )
+    measurements["trials"][0]["attempts"].append(completed)
+    measurements["trials"][0]["selected_attempt"] = 2
+    _bind_plan(measurements, plan)
+
+    contracts.validate_measurements(
+        measurements,
+        plan,
+        baseline_run=_run("baseline"),
+        subject_run=_run("subject"),
+    )
 
 
 def test_missing_or_extra_source_trials_never_become_survivor_analysis() -> None:

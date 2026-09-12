@@ -1,16 +1,16 @@
 {
   "format": "invarlock/judge-measurement-plan-v1",
   "profile_id": "text-frozen-answer-v1",
-  "case_set_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
-  "baseline_run_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
-  "subject_run_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+  "case_set_sha256": "sha256:df5c8bcc4d2476fcbe698928ae3c8d1e4fefecf2bdcdd219cd39db837bfba805",
+  "baseline_run_sha256": "sha256:d10732229b483fe4c61e8548c80e584eed9afe5b71ff65455fe9728bc00b367b",
+  "subject_run_sha256": "sha256:ca01c581603395d2be98ce19ef6034ee467f5181562b125f5306725235ec4fa6",
   "rubric": {
     "text": "Rate factual correctness.",
     "sha256": "310d64c2e77a93f854b6d5cf05b619e231ce22d4f3cb265411276897a3764d5b"
   },
   "prompt": {
     "system": "Grade the delimited answer using the rubric.",
-    "template": "Rubric: {rubric}\nInput: {input}\n<answer>{answer}</answer>\nReturn JSON with a rating field.",
+    "template": "Grade the input and answer against the rubric. Return only a JSON object with one rating field.",
     "demonstrations": [],
     "references": []
   },
@@ -25,8 +25,8 @@
       "weights_sha256": null
     },
     "config": {
-      "temperature": 0,
-      "top_p": 1,
+      "temperature": "0",
+      "top_p": "1",
       "max_output_tokens": 128,
       "seed": null
     },
@@ -40,11 +40,11 @@
     "ratings": [
       {
         "label": "incorrect",
-        "value": 0
+        "value": "0"
       },
       {
         "label": "correct",
-        "value": 1
+        "value": "1"
       }
     ]
   },
@@ -75,7 +75,9 @@
     {
       "case_id": "case-1",
       "baseline_answer_sha256": "5dd272b4f316b776a7b8e3d0894b37e1e42be3d5d3b204b8a5836cc50597a6b1",
-      "subject_answer_sha256": "5dd272b4f316b776a7b8e3d0894b37e1e42be3d5d3b204b8a5836cc50597a6b1"
+      "subject_answer_sha256": "5dd272b4f316b776a7b8e3d0894b37e1e42be3d5d3b204b8a5836cc50597a6b1",
+      "baseline_request_sha256": "f64c03e7d306fb4ba9451c3d534ce6ac8f484d49a51745d2ce015c999d6280af",
+      "subject_request_sha256": "f64c03e7d306fb4ba9451c3d534ce6ac8f484d49a51745d2ce015c999d6280af"
     }
   ]
 }

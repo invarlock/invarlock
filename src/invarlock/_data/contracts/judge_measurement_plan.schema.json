@@ -11,13 +11,13 @@
       "const": "text-frozen-answer-v1"
     },
     "case_set_sha256": {
-      "$ref": "#/$defs/sha256"
+      "$ref": "#/$defs/artifact_digest"
     },
     "baseline_run_sha256": {
-      "$ref": "#/$defs/sha256"
+      "$ref": "#/$defs/artifact_digest"
     },
     "subject_run_sha256": {
-      "$ref": "#/$defs/sha256"
+      "$ref": "#/$defs/artifact_digest"
     },
     "rubric": {
       "type": "object",
@@ -171,14 +171,16 @@
           "additionalProperties": false,
           "properties": {
             "temperature": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 2
+              "type": "string",
+              "pattern": "^(?:0|1|2|0\\.[0-9]{0,14}[1-9]|1\\.[0-9]{0,14}[1-9])$",
+              "minLength": 1,
+              "maxLength": 17
             },
             "top_p": {
-              "type": "number",
-              "exclusiveMinimum": 0,
-              "maximum": 1
+              "type": "string",
+              "pattern": "^(?:1|0\\.[0-9]{0,14}[1-9])$",
+              "minLength": 1,
+              "maxLength": 17
             },
             "max_output_tokens": {
               "type": "integer",
@@ -247,9 +249,10 @@
                 "$ref": "#/$defs/identifier"
               },
               "value": {
-                "type": "number",
-                "minimum": 0,
-                "maximum": 1
+                "type": "string",
+                "pattern": "^(?:0|1|0\\.[0-9]{0,14}[1-9])$",
+                "minLength": 1,
+                "maxLength": 17
               }
             },
             "required": [
@@ -272,10 +275,7 @@
       "additionalProperties": false,
       "properties": {
         "basis": {
-          "enum": [
-            "curated_benchmark",
-            "iid_units"
-          ]
+          "const": "curated_benchmark"
         },
         "unit_weighting": {
           "const": "equal"
@@ -302,8 +302,7 @@
             ]
           },
           "minItems": 1,
-          "maxItems": 10000,
-          "uniqueItems": true
+          "maxItems": 10000
         }
       },
       "required": [
@@ -379,17 +378,24 @@
           },
           "subject_answer_sha256": {
             "$ref": "#/$defs/sha256"
+          },
+          "baseline_request_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "subject_request_sha256": {
+            "$ref": "#/$defs/sha256"
           }
         },
         "required": [
           "case_id",
           "baseline_answer_sha256",
-          "subject_answer_sha256"
+          "subject_answer_sha256",
+          "baseline_request_sha256",
+          "subject_request_sha256"
         ]
       },
       "minItems": 1,
-      "maxItems": 10000,
-      "uniqueItems": true
+      "maxItems": 10000
     }
   },
   "required": [
@@ -419,6 +425,12 @@
       "minLength": 1,
       "maxLength": 128,
       "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+    },
+    "artifact_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "minLength": 71,
+      "maxLength": 71
     }
   }
 }

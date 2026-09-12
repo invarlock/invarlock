@@ -8,12 +8,16 @@ bindings, retry selection, source replay, and completeness accounting.
 from __future__ import annotations
 
 import hashlib
+from decimal import Decimal
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, NoReturn, cast
 
 from jsonschema import Draft202012Validator
 
+from invarlock.evaluation_comparison.comparison import _check_run
+from invarlock.evaluation_records.cases import validate_run_case_set
+from invarlock.evaluation_records.io import run_digest
 from invarlock.evidence_pack_contract import canonical_json_bytes
 from invarlock.evidence_pack_json import (
     StrictJsonError,
@@ -41,7 +45,7 @@ class JudgeMeasurementContractError(ValueError):
     """A judge plan or retained-measurement relationship is invalid."""
 
 
-def _fail(message: str) -> None:
+def _fail(message: str) -> NoReturn:
     raise JudgeMeasurementContractError(message)
 
 
@@ -75,6 +79,74 @@ def expected_trial_id(
     return "trial-" + _sha256(material)
 
 
+def render_judge_request(
+    plan: JudgeMeasurementPlan, *, input_text: object, answer_text: object
+) -> bytes:
+    """Render the closed normalized request used by the first judge profile."""
+
+    if not isinstance(input_text, str) or not isinstance(answer_text, str):
+        _fail("the text-frozen-answer profile requires string inputs and answers")
+    checked_input = input_text
+    checked_answer = answer_text
+    prompt = plan["prompt"]
+    references = [
+        {"id": item["id"], "text": item["text"]} for item in prompt["references"]
+    ]
+
+    def user_content(input_value: str, answer_value: str) -> str:
+        return canonical_payload(
+            {
+                "answer": answer_value,
+                "input": input_value,
+                "instruction": prompt["template"],
+                "references": references,
+                "rubric": plan["rubric"]["text"],
+            }
+        ).decode("utf-8")
+
+    messages: list[dict[str, str]] = []
+    if prompt["system"]:
+        messages.append({"role": "system", "content": prompt["system"]})
+    for demonstration in prompt["demonstrations"]:
+        messages.extend(
+            (
+                {
+                    "role": "user",
+                    "content": user_content(
+                        demonstration["input"], demonstration["answer"]
+                    ),
+                },
+                {
+                    "role": "assistant",
+                    "content": canonical_payload(
+                        {"rating": demonstration["rating"]}
+                    ).decode("utf-8"),
+                },
+            )
+        )
+    messages.append(
+        {"role": "user", "content": user_content(checked_input, checked_answer)}
+    )
+    return canonical_payload(
+        {
+            "config": plan["judge"]["config"],
+            "format": "invarlock/judge-request-v1",
+            "messages": messages,
+            "model": plan["judge"]["requested_model"],
+            "model_role": "judge",
+            "response_format": {
+                "additional_properties": False,
+                "rating_labels": [
+                    rating["label"] for rating in plan["scale"]["ratings"]
+                ],
+                "required": ["rating"],
+                "type": "json_object",
+            },
+            "tools": [],
+        }
+    )
+
+
 @lru_cache(maxsize=2)
 def _validator(kind: str) -> Draft202012Validator:
     if kind == "plan":
@@ -101,12 +173,64 @@ def _bounded_canonical(value: object, maximum: int, label: str) -> None:
         _fail(f"{label} exceeds the {maximum}-byte limit")
 
 
+def _precheck_plan_counts(raw: dict[str, Any]) -> None:
+    sampling = raw.get("sampling")
+    bindings = raw.get("answer_bindings")
+    if isinstance(sampling, dict):
+        cases = sampling.get("case_units")
+        if isinstance(cases, list) and len(cases) > 10_000:
+            _fail("judge measurement plan exceeds the case limit")
+    if isinstance(bindings, list) and len(bindings) > 10_000:
+        _fail("judge measurement plan exceeds the answer-binding limit")
+
+
+def _precheck_measurement_counts(raw: dict[str, Any]) -> None:
+    sources = raw.get("sources")
+    trials = raw.get("trials")
+    if isinstance(sources, list) and len(sources) > 1_000:
+        _fail("judge measurements exceed the source-count limit")
+    if isinstance(trials, list):
+        if len(trials) > 200_000:
+            _fail("judge measurements exceed the trial-count limit")
+        for trial in trials:
+            if not isinstance(trial, dict):
+                continue
+            attempts = trial.get("attempts")
+            if isinstance(attempts, list) and len(attempts) > 3:
+                _fail("judge measurements exceed the per-trial attempt limit")
+
+
+def _require_integer(value: Any, label: str) -> None:
+    if type(value) is not int:
+        _fail(f"{label} must be an integer")
+
+
+def _check_trial_integer_types(trial: dict[str, Any]) -> None:
+    _require_integer(trial.get("repetition"), "trial repetition")
+    selected = trial.get("selected_attempt")
+    if selected is not None:
+        _require_integer(selected, "selected attempt")
+    attempts = trial.get("attempts")
+    if not isinstance(attempts, list):
+        _fail("trial attempts must be an array")
+    for attempt in attempts:
+        if not isinstance(attempt, dict):
+            _fail("trial attempts must be objects")
+        _require_integer(attempt.get("attempt"), "attempt number")
+        source = attempt.get("source")
+        if not isinstance(source, dict):
+            _fail("attempt source mapping must be an object")
+        _require_integer(source.get("record_index"), "source record index")
+        _require_integer(source.get("attempt_index"), "source attempt index")
+
+
 def validate_measurement_plan(value: JudgeMeasurementPlan) -> None:
     """Validate the closed plan and all cross-field scheduling invariants."""
 
     raw = cast(dict[str, Any], value)
-    _validate_schema(raw, "plan")
+    _precheck_plan_counts(raw)
     _bounded_canonical(raw, PLAN_MAX_BYTES, "judge measurement plan")
+    _validate_schema(raw, "plan")
 
     rubric = raw["rubric"]
     if _text_sha256(rubric["text"]) != rubric["sha256"]:
@@ -121,16 +245,16 @@ def validate_measurement_plan(value: JudgeMeasurementPlan) -> None:
             _fail(f"prompt reference {reference['id']!r} digest does not match")
 
     ratings: dict[str, Any] = {}
-    rating_values: set[str] = set()
+    rating_values: set[Decimal] = set()
     for rating in raw["scale"]["ratings"]:
         label = rating["label"]
-        encoded_value = canonical_payload(rating["value"]).decode("ascii")
+        numeric_value = Decimal(str(rating["value"]))
         if label in ratings:
             _fail("rating labels must be unique")
-        if encoded_value in rating_values:
+        if numeric_value in rating_values:
             _fail("rating numeric values must be unique")
         ratings[label] = rating["value"]
-        rating_values.add(encoded_value)
+        rating_values.add(numeric_value)
     for demonstration in raw["prompt"]["demonstrations"]:
         if demonstration["rating"] not in ratings:
             _fail("every demonstration rating must exist in the declared scale")
@@ -157,6 +281,9 @@ def validate_measurement_plan(value: JudgeMeasurementPlan) -> None:
         _fail("sampling and answer bindings must contain the same case IDs")
 
     schedule = raw["schedule"]
+    for field in ("repetitions", "max_attempts", "expected_trials"):
+        if type(schedule[field]) is not int:
+            _fail(f"schedule {field} must be an integer")
     if schedule.get("trial_id_scheme") != TRIAL_ID_SCHEME:
         _fail("unsupported judge trial ID scheme")
     expected = len(case_units) * 2 * schedule["repetitions"]
@@ -198,6 +325,8 @@ def _check_attempts(
     *,
     plan: dict[str, Any],
     source_ids: set[str],
+    expected_request_sha256: str,
+    expected_request: bytes,
 ) -> None:
     attempts = trial["attempts"]
     expected_numbers = list(range(1, len(attempts) + 1))
@@ -214,6 +343,10 @@ def _check_attempts(
                 f"trial {trial['trial_id']!r} retained an attempt after a terminal result"
             )
         _check_blob(attempt["request"], "judge request")
+        if attempt["request"]["sha256"] != expected_request_sha256:
+            _fail(f"trial {trial['trial_id']!r} request was not approved by the plan")
+        if attempt["request"]["text"].encode("utf-8") != expected_request:
+            _fail(f"trial {trial['trial_id']!r} request does not match frozen inputs")
         if attempt["response"] is not None:
             _check_blob(attempt["response"], "judge response")
         if attempt["source"]["source_id"] not in source_ids:
@@ -317,21 +450,62 @@ def _source_trials(source: dict[str, Any]) -> list[dict[str, Any]]:
         _fail(f"source {source['source_id']!r} has an unsupported retained shape")
     if decoded["format"] != SOURCE_FORMAT or not isinstance(decoded["trials"], list):
         _fail(f"source {source['source_id']!r} has an unsupported retained profile")
+    for trial in decoded["trials"]:
+        if not isinstance(trial, dict) or not isinstance(trial.get("attempts"), list):
+            _fail("retained source trials must be objects with attempt arrays")
+        if any(not isinstance(attempt, dict) for attempt in trial["attempts"]):
+            _fail("retained source attempts must be objects")
     return cast(list[dict[str, Any]], decoded["trials"])
 
 
-def validate_measurements(value: JudgeMeasurements, plan: JudgeMeasurementPlan) -> None:
+def _frozen_run_records(
+    plan: dict[str, Any],
+    baseline_run: dict[str, Any],
+    subject_run: dict[str, Any],
+) -> dict[str, dict[str, dict[str, Any]]]:
+    try:
+        for side, run in (("baseline", baseline_run), ("subject", subject_run)):
+            _check_run(run)
+            if run_digest(run) != plan[f"{side}_run_sha256"]:
+                _fail(f"{side} run does not match the approved plan digest")
+            validate_run_case_set(run, plan["case_set_sha256"])
+    except JudgeMeasurementContractError:
+        raise
+    except (TypeError, ValueError) as exc:
+        raise JudgeMeasurementContractError(
+            f"frozen answer run is invalid: {str(exc)[:240]}"
+        ) from exc
+    return {
+        "baseline": {row["id"]: row for row in baseline_run["records"]},
+        "subject": {row["id"]: row for row in subject_run["records"]},
+    }
+
+
+def validate_measurements(
+    value: JudgeMeasurements,
+    plan: JudgeMeasurementPlan,
+    *,
+    baseline_run: dict[str, Any],
+    subject_run: dict[str, Any],
+) -> None:
     """Replay retained source normalization and validate every planned slot."""
 
     validate_measurement_plan(plan)
     raw = cast(dict[str, Any], value)
     plan_raw = cast(dict[str, Any], plan)
-    _validate_schema(raw, "measurements")
+    _precheck_measurement_counts(raw)
     _bounded_canonical(raw, MEASUREMENTS_MAX_BYTES, "judge measurements")
+    _validate_schema(raw, "measurements")
+    for field in ("expected_trials", "recorded_trials", "completed_trials"):
+        _require_integer(raw["completeness"][field], f"completeness {field}")
+    for trial in raw["trials"]:
+        _check_trial_integer_types(trial)
 
     plan_sha256 = _sha256(canonical_payload(plan_raw))
     if raw["plan_sha256"] != plan_sha256:
         _fail("measurements do not bind the supplied plan")
+
+    run_records = _frozen_run_records(plan_raw, baseline_run, subject_run)
 
     sources: dict[str, dict[str, Any]] = {}
     replayed: dict[str, dict[str, Any]] = {}
@@ -341,10 +515,10 @@ def validate_measurements(value: JudgeMeasurements, plan: JudgeMeasurementPlan) 
             _fail("measurement source IDs must be unique")
         sources[source_id] = source
         for record_index, trial in enumerate(_source_trials(source)):
+            _check_trial_integer_types(trial)
             trial_id = trial.get("trial_id")
             if not isinstance(trial_id, str) or trial_id in replayed:
                 _fail("retained sources must contain unique trial IDs")
-            checked_trial_id = cast(str, trial_id)
             for attempt_index, attempt in enumerate(trial.get("attempts", [])):
                 mapping = attempt.get("source")
                 if not isinstance(mapping, dict) or (
@@ -353,7 +527,7 @@ def validate_measurements(value: JudgeMeasurements, plan: JudgeMeasurementPlan) 
                     or mapping.get("attempt_index") != attempt_index
                 ):
                     _fail("retained source position mapping is inconsistent")
-            replayed[checked_trial_id] = trial
+            replayed[trial_id] = trial
 
     bindings = {item["case_id"]: item for item in plan_raw["answer_bindings"]}
     repetitions = plan_raw["schedule"]["repetitions"]
@@ -366,7 +540,8 @@ def validate_measurements(value: JudgeMeasurements, plan: JudgeMeasurementPlan) 
     seen_slots: set[tuple[str, str, int]] = set()
     seen_ids: set[str] = set()
     completed = 0
-    source_positions: set[tuple[str, int]] = set()
+    source_positions: set[tuple[str, int, int]] = set()
+    source_events: set[tuple[str, str]] = set()
 
     for trial in raw["trials"]:
         trial_raw = cast(dict[str, Any], trial)
@@ -381,18 +556,47 @@ def validate_measurements(value: JudgeMeasurements, plan: JudgeMeasurementPlan) 
         if trial_raw["plan_sha256"] != plan_sha256:
             _fail(f"trial {expected_id!r} does not bind the supplied plan")
         binding = bindings[trial_raw["case_id"]]
+        record = run_records[trial_raw["side"]][trial_raw["case_id"]]
+        if record["error"] is not None:
+            _fail(f"trial {expected_id!r} cannot grade a failed frozen answer")
+        if not isinstance(record["input"], str) or not isinstance(
+            record["output"], str
+        ):
+            _fail("the text-frozen-answer profile requires string inputs and answers")
         answer_key = f"{trial_raw['side']}_answer_sha256"
-        if trial_raw["answer_sha256"] != binding[answer_key]:
+        if trial_raw["answer_sha256"] != binding[answer_key] or binding[
+            answer_key
+        ] != _text_sha256(record["output"]):
             _fail(f"trial {expected_id!r} does not bind the frozen answer")
-        _check_attempts(trial_raw, plan=plan_raw, source_ids=set(sources))
+        expected_request = render_judge_request(
+            plan, input_text=record["input"], answer_text=record["output"]
+        )
+        request_key = f"{trial_raw['side']}_request_sha256"
+        if binding[request_key] != _sha256(expected_request):
+            _fail(f"trial {expected_id!r} request binding does not match frozen inputs")
+        _check_attempts(
+            trial_raw,
+            plan=plan_raw,
+            source_ids=set(sources),
+            expected_request_sha256=binding[request_key],
+            expected_request=expected_request,
+        )
         for attempt in trial_raw["attempts"]:
             position = (
                 attempt["source"]["source_id"],
                 attempt["source"]["record_index"],
+                attempt["source"]["attempt_index"],
             )
             if position in source_positions:
                 _fail("source record positions must be unique across trials")
             source_positions.add(position)
+            event = (
+                attempt["source"]["source_id"],
+                attempt["source"]["model_event_id"],
+            )
+            if event in source_events:
+                _fail("retained model events must belong to exactly one attempt")
+            source_events.add(event)
         if trial_raw["status"] == "complete":
             completed += 1
         if replayed.get(expected_id) != trial_raw:
@@ -416,14 +620,25 @@ def validate_measurements(value: JudgeMeasurements, plan: JudgeMeasurementPlan) 
         _fail("measurement completeness status is inconsistent")
 
 
-def load_measurements(path: Path, *, plan: JudgeMeasurementPlan) -> JudgeMeasurements:
+def load_measurements(
+    path: Path,
+    *,
+    plan: JudgeMeasurementPlan,
+    baseline_run: dict[str, Any],
+    subject_run: dict[str, Any],
+) -> JudgeMeasurements:
     """Read and validate retained measurements from one bounded snapshot."""
 
     decoded = _load_object(
         Path(path), maximum=MEASUREMENTS_MAX_BYTES, label="judge measurements"
     )
     measurements = cast(JudgeMeasurements, decoded)
-    validate_measurements(measurements, plan)
+    validate_measurements(
+        measurements,
+        plan,
+        baseline_run=baseline_run,
+        subject_run=subject_run,
+    )
     return measurements
 
 
@@ -440,6 +655,7 @@ __all__ = [
     "load_measurement_plan",
     "load_measurements",
     "measurement_plan_digest",
+    "render_judge_request",
     "validate_measurement_plan",
     "validate_measurements",
 ]

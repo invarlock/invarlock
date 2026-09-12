@@ -59,8 +59,7 @@
         ]
       },
       "minItems": 1,
-      "maxItems": 1000,
-      "uniqueItems": true
+      "maxItems": 1000
     },
     "trials": {
       "type": "array",
@@ -354,9 +353,10 @@
               "value": {
                 "oneOf": [
                   {
-                    "type": "number",
-                    "minimum": 0,
-                    "maximum": 1
+                    "type": "string",
+                    "pattern": "^(?:0|1|0\\.[0-9]{0,14}[1-9])$",
+                    "minLength": 1,
+                    "maxLength": 17
                   },
                   {
                     "type": "null"
@@ -385,8 +385,7 @@
         ]
       },
       "minItems": 2,
-      "maxItems": 200000,
-      "uniqueItems": true
+      "maxItems": 200000
     },
     "completeness": {
       "type": "object",

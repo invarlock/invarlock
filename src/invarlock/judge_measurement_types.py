@@ -39,8 +39,8 @@ class JudgeModelIdentity(TypedDict):
 
 
 class JudgeConfig(TypedDict):
-    temperature: float
-    top_p: float
+    temperature: str
+    top_p: str
     max_output_tokens: int
     seed: int | None
 
@@ -60,7 +60,7 @@ class JudgeParser(TypedDict):
 
 class JudgeRating(TypedDict):
     label: str
-    value: float
+    value: str
 
 
 class JudgeScale(TypedDict):
@@ -74,7 +74,7 @@ class JudgeCaseUnit(TypedDict):
 
 
 class JudgeSampling(TypedDict):
-    basis: Literal["curated_benchmark", "iid_units"]
+    basis: Literal["curated_benchmark"]
     unit_weighting: Literal["equal"]
     within_unit_weighting: Literal["equal_cases"]
     case_units: list[JudgeCaseUnit]
@@ -95,6 +95,8 @@ class JudgeAnswerBinding(TypedDict):
     case_id: str
     baseline_answer_sha256: str
     subject_answer_sha256: str
+    baseline_request_sha256: str
+    subject_request_sha256: str
 
 
 class JudgeMeasurementPlan(TypedDict):
@@ -157,7 +159,7 @@ class JudgeAttempt(TypedDict):
 class JudgeParseResult(TypedDict):
     status: Literal["ok", "invalid", "refusal", "unavailable"]
     rating: str | None
-    value: float | None
+    value: str | None
 
 
 class JudgeTrial(TypedDict):
