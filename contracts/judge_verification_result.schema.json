@@ -31,7 +31,8 @@
         "plan_sha256": { "$ref": "#/$defs/object_digest" },
         "measurements_sha256": { "$ref": "#/$defs/object_digest" },
         "analysis_policy_sha256": { "$ref": "#/$defs/object_digest" },
-        "analysis_result_sha256": { "$ref": "#/$defs/object_digest" }
+        "analysis_result_sha256": { "$ref": "#/$defs/object_digest" },
+        "native_capture_sha256": { "$ref": "#/$defs/object_digest" }
       },
       "required": [
         "baseline_run_sha256",

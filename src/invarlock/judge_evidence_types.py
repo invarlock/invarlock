@@ -1,6 +1,6 @@
 """Additive wire types for narrowly scoped, independently accepted judge evidence."""
 
-from typing import Literal, TypedDict
+from typing import Literal, NotRequired, TypedDict
 
 
 class JudgeEvidenceBindings(TypedDict):
@@ -11,6 +11,7 @@ class JudgeEvidenceBindings(TypedDict):
     measurements_sha256: str
     analysis_policy_sha256: str
     analysis_result_sha256: str
+    native_capture_sha256: NotRequired[str]
 
 
 class JudgeEvidenceSigner(TypedDict):

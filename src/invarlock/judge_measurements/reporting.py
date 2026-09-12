@@ -66,13 +66,16 @@ def _snapshot(path: Path) -> tuple[Any, dict[str, dict[str, Any]]]:
 
     publication = replay_judge_evidence(path)
     artifacts: dict[str, dict[str, Any]] = {}
-    for name, digest_field in (
+    retained = [
         ("plan", "plan_sha256"),
         ("measurements", "measurements_sha256"),
         ("analysis_policy", "analysis_policy_sha256"),
         ("baseline_run", "baseline_run_sha256"),
         ("subject_run", "subject_run_sha256"),
-    ):
+    ]
+    if "native_capture_sha256" in publication.envelope["bindings"]:
+        retained.append(("native_capture", "native_capture_sha256"))
+    for name, digest_field in retained:
         value = read_object(Path(path) / f"{name}.json")
         digest = run_digest(value) if name.endswith("_run") else object_sha256(value)
         if (
@@ -333,6 +336,80 @@ def _view(
             "case_ids": list(selected_case_ids),
         },
     }
+    native = artifacts.get("native_capture")
+    native_context: list[tuple[str, str]] = []
+    native_assurance: tuple[tuple[str, str], ...] = ()
+    native_identity: list[tuple[str, str]] = []
+    if native is not None:
+        requested = native["normalized_request"]["comparison"]
+        same_artifact = (
+            artifacts["baseline_run"]["artifact_digest"]
+            == artifacts["subject_run"]["artifact_digest"]
+        )
+        same_settings = (
+            requested["baseline"]["runtime"] == requested["subject"]["runtime"]
+        )
+        intent = (
+            ("Same artifacts" if same_artifact else "Different artifacts")
+            + "; "
+            + (
+                "same runtime settings"
+                if same_settings
+                else "different runtime settings"
+            )
+        )
+        observations = native["normalized_request"].get("observations", [])
+        facts["native_capture"] = {
+            "sha256": publication.envelope["bindings"]["native_capture_sha256"],
+            "execution_mode": native["normalized_request"]["execution"]["mode"],
+            "same_artifact": same_artifact,
+            "same_runtime_settings": same_settings,
+            "comparison_intent": intent,
+            "observations": observations,
+        }
+        native_context.append(("Comparison inputs", intent))
+        for side in ("baseline", "subject"):
+            model_id = requested[side]["artifact"]["model_id"]
+            facts[side] = model_id
+            runtime = requested[side]["runtime"]
+            runtime_digest = artifacts[f"{side}_run"]["records"][0]["context"][
+                "runtime_digest"
+            ]
+            facts["comparison"][side].update(
+                model_id=model_id,
+                runtime=runtime,
+                runtime_digest=runtime_digest,
+            )
+            native_context.append((f"{side.title()} provider", runtime["provider"]))
+            native_context.append(
+                (
+                    f"{side.title()} runtime settings",
+                    canonical_payload(runtime["settings"]).decode("utf-8"),
+                )
+            )
+            native_identity.extend(
+                (
+                    (f"{side.title()} runtime", runtime_digest),
+                    (f"{side.title()} run", artifacts[f"{side}_run"]["run_id"]),
+                )
+            )
+        native_context.append(
+            (
+                "Retained observations",
+                "; ".join(
+                    f"{item['id']} ({item['scope']}, {item['kind']})"
+                    for item in observations
+                )
+                or "None",
+            )
+        )
+        native_assurance = (
+            (
+                "Native runtime provenance",
+                "Replayed offline from retained provider reports, runtime manifests, configurations, receipts, artifact identities, and scoring observations.",
+            ),
+        )
+        native_identity.append(("Native capture", facts["native_capture"]["sha256"]))
     view = ReportView(
         title="InvarLock bounded judge report",
         family="Bounded judge measurement evidence",
@@ -344,7 +421,8 @@ def _view(
             else " This metric is advisory and does not gate required decisions."
         ),
         metrics=(metric,),
-        assurance=(
+        assurance=native_assurance
+        + (
             (
                 "Authentication",
                 "Signature present; recipient signer authorization has not been performed."
@@ -359,7 +437,8 @@ def _view(
             ("Recipient acceptance", "Not performed by report."),
         ),
         subjects=(("Baseline", facts["baseline"]), ("Subject", facts["subject"])),
-        context=(
+        context=tuple(native_context)
+        + (
             ("Judge provider", plan["judge"]["provider"]),
             ("Requested judge", plan["judge"]["requested_model"]),
             ("Resolved judges", ", ".join(resolved_models) or "Unavailable"),
@@ -380,7 +459,8 @@ def _view(
             ),
             ("Coverage", metric.count),
         ),
-        identity=(
+        identity=tuple(native_identity)
+        + (
             ("Baseline artifact", artifacts["baseline_run"]["artifact_digest"]),
             ("Subject artifact", artifacts["subject_run"]["artifact_digest"]),
             ("Plan", publication.envelope["bindings"]["plan_sha256"]),
@@ -411,10 +491,19 @@ def _view(
                 if case_ids
                 else f"Details show the first {min(CASE_DETAIL_LIMIT, len(available_case_ids))} cases by case ID and at most {TEXT_DETAIL_LIMIT} characters per text excerpt; use report --case-id to select any retained case."
             ),
-            "A retained judgment does not establish model execution or immunity to prompt injection.",
+            (
+                "Native runtime provenance binds the captured model answers. Judge measurements do not establish immunity to prompt injection."
+                if native is not None
+                else "A retained judgment does not establish model execution or immunity to prompt injection."
+            ),
         ),
         details=tuple(details),
         technical={
+            **(
+                {"native_capture": facts["native_capture"]}
+                if native is not None
+                else {}
+            ),
             "method": analysis["method"],
             "assumptions": analysis["assumptions"],
             "policy": policy,

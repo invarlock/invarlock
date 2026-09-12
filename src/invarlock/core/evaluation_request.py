@@ -161,14 +161,21 @@ class ComparisonSideRequest:
 
 
 @dataclass(frozen=True)
+class JudgeRequest:
+    workspace: Path
+    signer_identity: str
+
+
+@dataclass(frozen=True)
 class ComparisonRequest:
     baseline: ComparisonSideRequest
     subject: ComparisonSideRequest
     dataset: Path | LocalDatasetRequest
     policy: Path
     task: RuntimeTask
-    metric: Literal["exact_match", "normalized_nll_per_utf8_byte"] | None
+    metric: Literal["exact_match", "normalized_nll_per_utf8_byte", "judge"] | None
     scorer_extension: ScorerExtensionBinding | None = None
+    judge: JudgeRequest | None = None
 
     @property
     def collection_metric(
@@ -176,7 +183,7 @@ class ComparisonRequest:
     ) -> Literal["exact_match", "normalized_nll_per_utf8_byte"]:
         """Provider-owned facts to collect before verifier replay."""
 
-        if self.scorer_extension is not None:
+        if self.scorer_extension is not None or self.metric == "judge":
             return "exact_match"
         if self.metric is None:  # pragma: no cover - loader enforces exclusivity
             raise EvaluationRequestError("comparison metric selection is invalid")
@@ -496,6 +503,31 @@ def _default_provider_resolver(provider_name: str) -> RuntimeProvider:
     return HFTransformersProvider()
 
 
+def _build_judge_request(
+    value: dict[str, Any], *, root: Path, evidence_reference: str
+) -> JudgeRequest:
+    label = "comparison.judge.workspace"
+    reference = cast(str, value["workspace"])
+    parts = _reference_parts(reference, label=label)
+    workspace = root.joinpath(*parts)
+    if os.path.lexists(workspace):
+        workspace = _resolve_existing_reference(
+            root, reference, label=label, expected="artifact"
+        )
+        if not workspace.is_dir():
+            raise EvaluationRequestError(f"{label} must reference a directory")
+    else:
+        workspace = _resolve_output_reference(root, reference, label=label)
+    evidence = root.joinpath(
+        *_reference_parts(evidence_reference, label="output.evidence")
+    )
+    if workspace.is_relative_to(evidence) or evidence.is_relative_to(workspace):
+        raise EvaluationRequestError(
+            "judge workspace and output.evidence must not overlap"
+        )
+    return JudgeRequest(workspace=workspace, signer_identity=value["signer_identity"])
+
+
 def _resolve_provider(
     provider_name: str,
     *,
@@ -752,7 +784,7 @@ def _build_request(
         provider_resolver=provider_resolver,
     )
     metric = cast(
-        Literal["exact_match", "normalized_nll_per_utf8_byte"] | None,
+        Literal["exact_match", "normalized_nll_per_utf8_byte", "judge"] | None,
         comparison.get("metric"),
     )
     try:
@@ -767,7 +799,9 @@ def _build_request(
         raise EvaluationRequestError(
             "comparison must select exactly one built-in metric or scorer_extension"
         )
-    collection_metric = "exact_match" if scorer_extension is not None else metric
+    collection_metric = (
+        "exact_match" if scorer_extension is not None or metric == "judge" else metric
+    )
     assert collection_metric is not None
     try:
         task = require_runtime_task(comparison["task"], field_name="comparison.task")
@@ -840,6 +874,15 @@ def _build_request(
             task=task,
             metric=metric,
             scorer_extension=scorer_extension,
+            judge=(
+                _build_judge_request(
+                    comparison["judge"],
+                    root=root,
+                    evidence_reference=output["evidence"],
+                )
+                if metric == "judge"
+                else None
+            ),
         ),
         execution=execution_request,
         observations=tuple(observation_requests),
@@ -851,6 +894,61 @@ def _build_request(
             )
         ),
     )
+
+
+def _validate_judge_workspace_inputs(
+    request: EvaluationRequest, request_path: Path | None = None
+) -> None:
+    judge = request.comparison.judge
+    if judge is None:
+        return
+    workspace = judge.workspace
+    try:
+        reference = workspace.relative_to(request.root).as_posix()
+        evidence_reference = request.output.evidence.relative_to(
+            request.root
+        ).as_posix()
+    except ValueError as exc:
+        raise EvaluationRequestError(
+            "judge workspace and output must remain inside the request root"
+        ) from exc
+    definition = load_evaluation_request_schema()
+    judge_value = {"workspace": reference, "signer_identity": judge.signer_identity}
+    errors = list(
+        jsonschema.Draft202012Validator(
+            {"$ref": "#/$defs/judgeCollection", "$defs": definition["$defs"]}
+        ).iter_errors(judge_value)
+    )
+    if errors:
+        raise EvaluationRequestError("native judge configuration is invalid")
+    _build_judge_request(
+        judge_value, root=request.root, evidence_reference=evidence_reference
+    )
+    for side in (request.comparison.baseline, request.comparison.subject):
+        artifact = side.artifact.path
+        if artifact is not None and (
+            workspace.is_relative_to(artifact) or artifact.is_relative_to(workspace)
+        ):
+            raise EvaluationRequestError(
+                "judge workspace must not overlap a model artifact directory"
+            )
+    dataset = request.comparison.dataset
+    inputs = [
+        *([request_path.absolute()] if request_path is not None else []),
+        request.comparison.policy,
+        dataset if isinstance(dataset, Path) else dataset.path,
+        *[item.path for item in request.observations],
+    ]
+    inputs.extend(
+        path
+        for path in (request.execution.records, request.execution.schedule)
+        if path is not None
+    )
+    for imported in (request.execution.baseline, request.execution.subject):
+        if imported is not None:
+            inputs.extend(vars(imported).values())
+    if any(path.is_relative_to(workspace) for path in inputs):
+        raise EvaluationRequestError("judge workspace must not contain request inputs")
 
 
 def _build_captured_request(
@@ -967,11 +1065,13 @@ def load_evaluation_request(
         target[key] = reference
     if format_version == CAPTURED_EVALUATION_REQUEST_FORMAT_VERSION:
         return _build_captured_request(_validate_captured_schema(validated), root=root)
-    return _build_request(
+    request = _build_request(
         _validate_schema(validated),
         root=root,
         provider_resolver=provider_resolver or _default_provider_resolver,
     )
+    _validate_judge_workspace_inputs(request, request_path)
+    return request
 
 
 def evaluation_request_mode(

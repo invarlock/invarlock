@@ -68,6 +68,7 @@ class ReceiptBindings:
     measurements_sha256: str
     analysis_policy_sha256: str
     analysis_result_sha256: str
+    native_capture_sha256: str | None = None
 
 
 @dataclass(frozen=True)
@@ -92,6 +93,11 @@ class JudgeVerificationResult:
     def to_dict(self) -> dict[str, Any]:
         value = asdict(self)
         value["errors"] = list(self.errors)
+        if (
+            value["bindings"] is not None
+            and value["bindings"]["native_capture_sha256"] is None
+        ):
+            del value["bindings"]["native_capture_sha256"]
         return value
 
 
@@ -286,7 +292,7 @@ def verify_judge_evidence(
                 "judge evidence intended subject differs from recipient policy"
             )
         for name, expected in policy["bindings"].items():
-            if cast(Mapping[str, str], envelope["bindings"])[name] != expected:
+            if cast(Mapping[str, str], envelope["bindings"]).get(name) != expected:
                 raise JudgeEvidenceError(
                     f"judge evidence {name} differs from recipient policy"
                 )

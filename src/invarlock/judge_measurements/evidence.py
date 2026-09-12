@@ -39,6 +39,11 @@ from invarlock.judge_measurements.contracts import (
     canonical_payload,
     measurement_plan_digest,
 )
+from invarlock.judge_measurements.native_capture import (
+    NATIVE_CAPTURE_MAX_BYTES,
+    NATIVE_RUN_SOURCE,
+    validate_native_capture,
+)
 from invarlock.public_contracts import load_judge_measurement_evidence_schema
 
 DECISION_SCOPE: Final = "bounded-judge-fixed-benchmark-v1"
@@ -63,6 +68,7 @@ ARTIFACT_BYTE_LIMITS = {
     "analysis_policy.json": ANALYSIS_POLICY_MAX_BYTES,
     "analysis_result.json": ANALYSIS_RESULT_MAX_BYTES,
     "envelope.json": _MAX_ENVELOPE_BYTES,
+    "native_capture.json": NATIVE_CAPTURE_MAX_BYTES,
 }
 
 
@@ -135,7 +141,42 @@ def _private_key(value: Path | Ed25519PrivateKey) -> Ed25519PrivateKey:
     return key
 
 
+def _validate_native_artifacts(artifacts: dict[str, dict[str, Any]]) -> None:
+    capture = artifacts.get("native_capture.json")
+    native = any(
+        artifacts[f"{side}_run.json"].get("source", {}).get("name") == NATIVE_RUN_SOURCE
+        for side in ("baseline", "subject")
+    )
+    if capture is None:
+        if native:
+            raise JudgeEvidenceError(
+                "native judge answers require their original capture"
+            )
+        return
+    baseline, subject = validate_native_capture(capture)
+    for name, expected in (
+        ("baseline_run.json", baseline),
+        ("subject_run.json", subject),
+    ):
+        if canonical_payload(artifacts[name]) != canonical_payload(expected):
+            raise JudgeEvidenceError(
+                "native capture differs from the frozen judge answers"
+            )
+    from invarlock.judge_measurements.native_recipe import finalize_native_plan
+
+    plan, policy = finalize_native_plan(capture["recipe"], baseline, subject)
+    if canonical_payload(plan) != canonical_payload(artifacts["plan.json"]):
+        raise JudgeEvidenceError("native judge plan differs from the captured recipe")
+    if canonical_payload(policy) != canonical_payload(
+        artifacts["analysis_policy.json"]
+    ):
+        raise JudgeEvidenceError(
+            "native judge analysis policy differs from the captured recipe"
+        )
+
+
 def _analyze(artifacts: dict[str, dict[str, Any]]) -> JudgeAnalysisResult:
+    _validate_native_artifacts(artifacts)
     plan = cast(JudgeMeasurementPlan, artifacts["plan.json"])
     policy = decode_analysis_policy(
         cast(JudgeAnalysisPolicyDocument, artifacts["analysis_policy.json"]), plan=plan
@@ -150,7 +191,7 @@ def _analyze(artifacts: dict[str, dict[str, Any]]) -> JudgeAnalysisResult:
 
 
 def _bindings(artifacts: dict[str, dict[str, Any]]) -> JudgeEvidenceBindings:
-    return {
+    bindings: JudgeEvidenceBindings = {
         "baseline_run_sha256": run_digest(artifacts["baseline_run.json"]),
         "subject_run_sha256": run_digest(artifacts["subject_run.json"]),
         "case_set_sha256": case_set_digest(artifacts["case_set.json"]),
@@ -161,6 +202,11 @@ def _bindings(artifacts: dict[str, dict[str, Any]]) -> JudgeEvidenceBindings:
         "analysis_policy_sha256": object_sha256(artifacts["analysis_policy.json"]),
         "analysis_result_sha256": object_sha256(artifacts["analysis_result.json"]),
     }
+    if "native_capture.json" in artifacts:
+        bindings["native_capture_sha256"] = object_sha256(
+            artifacts["native_capture.json"]
+        )
+    return bindings
 
 
 def publish_judge_evidence(
@@ -173,6 +219,7 @@ def publish_judge_evidence(
     analysis_policy: JudgeAnalysisPolicyDocument,
     signing_key: Path | Ed25519PrivateKey | None = None,
     signer_identity: str | None = None,
+    native_capture: dict[str, Any] | None = None,
 ) -> JudgeEvidencePublication:
     """Replay before atomically publishing a new, immutable evidence directory.
 
@@ -188,6 +235,11 @@ def publish_judge_evidence(
         parse_json_bytes(
             canonical_payload(
                 {
+                    **(
+                        {"native_capture.json": native_capture}
+                        if native_capture is not None
+                        else {}
+                    ),
                     "plan.json": plan,
                     "measurements.json": measurements,
                     "baseline_run.json": baseline_run,
@@ -272,7 +324,16 @@ def replay_judge_evidence(
             and object_sha256(envelope) != expected_envelope_sha256
         ):
             raise JudgeEvidenceError("judge evidence envelope changed before replay")
-        artifacts = {name: read_object(root / name) for name in ARTIFACT_FILENAMES}
+        filenames = list(ARTIFACT_FILENAMES)
+        if "native_capture_sha256" in envelope["bindings"]:
+            filenames.append("native_capture.json")
+        elif (root / "native_capture.json").exists() or (
+            root / "native_capture.json"
+        ).is_symlink():
+            raise JudgeEvidenceError(
+                "native capture is not bound by the judge envelope"
+            )
+        artifacts = {name: read_object(root / name) for name in filenames}
     actual = _bindings(artifacts)
     if envelope["bindings"] != actual:
         raise JudgeEvidenceError(

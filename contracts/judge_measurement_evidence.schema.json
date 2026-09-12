@@ -56,6 +56,12 @@
           "minLength": 64,
           "maxLength": 64
         },
+        "native_capture_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
         "analysis_result_sha256": {
           "type": "string",
           "pattern": "^[0-9a-f]{64}$",
