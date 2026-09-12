@@ -936,9 +936,9 @@ jobs:
         inputs.publication_phase != 'bootstrap'
       }}
     runs-on: ubuntu-latest
-    # Hosted verification can consume about 92 minutes at its documented
-    # 12 attempts, 15 serial requests per attempt, and 30-second request timeout.
-    timeout-minutes: 120
+    # Hosted verification can consume about 110 minutes at its documented
+    # 12 attempts, 18 serial requests per attempt, and 30-second request timeout.
+    timeout-minutes: 130
     permissions:
       actions: read
       contents: read
@@ -979,7 +979,7 @@ jobs:
       }}
     runs-on: ubuntu-latest
     # Leave the same bounded verification budget plus installation headroom.
-    timeout-minutes: 120
+    timeout-minutes: 130
     permissions:
       actions: read
       contents: read

@@ -10,4 +10,4 @@ comparison:
   policy: analysis_policy.json
 output:
   evidence: evidence
-  signer_identity: example-producer
+  signer_identity: example-signer

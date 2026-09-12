@@ -282,9 +282,10 @@ The scorer-extension v1 contract is suitable for separately supplied
 deterministic text scorers such as token F1, structured-field extraction, or VQA
 answer normalization. Those scorers are separately installed and require
 explicit authorization. SQL or code execution, model-based semantic similarity,
-network or human services, and LLM judges are outside acceptance replay. Judge
-results may be authenticated as observations, where they have no verdict
-authority.
+network or human services, and LLM judges are outside scorer-extension
+acceptance replay. The separate bounded judge report replays its retained
+frozen-answer measurement contract; other judge results may be authenticated as
+observations, where they have no verdict authority.
 
 ## Verification result
 

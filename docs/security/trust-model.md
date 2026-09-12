@@ -191,7 +191,9 @@ computing base: review and distribute it with the same discipline as verifier
 code. An acceptance scorer must not use a network, external model, human
 judgment, or LLM judge. InvarLock checks the authenticated scorer identity and
 deterministic replay; it does not sandbox extension code or prove those
-operational restrictions.
+operational restrictions. Bounded frozen-answer judging uses a separate evidence
+and recipient-policy contract; it does not execute through the scorer-extension
+trust boundary.
 
 ### Authorization lifecycle
 

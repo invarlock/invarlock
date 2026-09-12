@@ -14,7 +14,7 @@ invarlock report evidence --html report.html --markdown report.md --junit report
 
 Add `--fail-on-policy` to evaluation for exit 7 on the inconclusive policy result.
 The unsigned evidence cannot establish recipient acceptance. To publish signed
-evidence, use a fresh output directory and `--signing-key producer-private.pem`
+evidence, use a fresh output directory and `--signing-key signer-private.pem`
 instead of `--unsigned`. Verification additionally requires an independently
 maintained judge recipient policy, not a policy copied from submitted evidence.
 

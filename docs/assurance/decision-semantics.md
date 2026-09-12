@@ -382,6 +382,11 @@ does not admit SQL or code execution, model-based semantic similarity, network
 services, human judgment, external models, or LLM judges. Judge outputs may be
 authenticated observations, but observations do not enter acceptance.
 
+The bounded frozen-answer judge workflow is a separate decision contract. It
+retains and replays the declared judge requests, responses, attempts, parsing,
+independent-unit aggregation, interval, and recipient policy. It does not make
+an LLM judge an acceptance scorer or change this extension boundary.
+
 For every metric, the sample controls are optional but indivisible. Exact
 match and scorer extensions use `maximum_interval_width_pp`, whose value must
 be positive and no greater than 200. Normalized NLL uses positive

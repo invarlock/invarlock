@@ -10,9 +10,11 @@ invarlock report evidence/
 ```
 
 The `invarlock evaluate`, `invarlock verify`, and `invarlock report` commands
-compare captured evaluator exports, apply metric and slice policies, and verify
-signed evidence. Use `invarlock --help` for that workflow; `invarlock evaluate --help` describes controlled execution or
-import, including the optional run-mode resource profile.
+run or import native comparisons, compare captured evaluator exports, and replay
+bounded frozen-answer judge measurements. They apply the corresponding policy
+and verify signed evidence. Use `invarlock --help` for these workflows;
+`invarlock evaluate --help` describes controlled execution or import, including
+the optional run-mode resource profile.
 See the [captured-results guide](docs/user-guide/captured-results.md).
 Changes should make these workflows easier to understand, safer to execute,
 or easier to verify. Preserve the distinct assurance meaning of each evidence

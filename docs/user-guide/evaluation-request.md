@@ -315,8 +315,10 @@ Replay runs twice and must produce byte-identical canonical results.
 Separately installed and explicitly authorized scorer packages may implement
 deterministic token F1, structured extraction, or VQA answer normalization. SQL
 or code execution, model-based semantic similarity, network and human scoring,
-external models, and LLM judges are excluded until separate authenticated
-contracts exist. Judge outputs remain optional authenticated observations.
+external models, and LLM judges are excluded from the scorer-extension contract.
+Use the separate bounded judge-measurement request for its supported
+frozen-answer text profile. Other judge outputs remain optional authenticated
+observations.
 
 ## Authenticated optional observations
 

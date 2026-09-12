@@ -239,8 +239,10 @@ structured-field extraction, or VQA answer normalization when separately
 implemented and authorized. Those scorer packages are separately installed and
 require explicit authorization. SQL or code execution, model-based semantic
 similarity, network services,
-human review, and LLM judges require different trust contracts; judge outputs
-can be attached as authenticated observations without acceptance authority.
+human review, and LLM judges require different trust contracts. The bounded
+frozen-answer judge formats provide one such contract for their declared text
+profile; other judge outputs can be attached as authenticated observations
+without acceptance authority.
 
 ### Evaluator input boundary
 
@@ -256,9 +258,9 @@ qualification boundary binds the profile, independent schedule, normalized
 export, retained upstream output, runner bundle, and dependency declaration.
 For a deterministic exact-match profile, every ordered input and output must be
 present and InvarLock independently recomputes every score. Aggregate-only
-results, missing or reordered record facts, and external-judge outputs whose
-scores cannot be deterministically replayed remain observation-only and expose
-no runtime-import records.
+results, missing or reordered record facts, and external-judge outputs outside
+the bounded judge-measurement profile remain observation-only and expose no
+runtime-import records.
 
 The maintained [evaluator qualification
 matrix](evaluator-qualification.md) executes representative upstream tools

@@ -50,7 +50,7 @@ def staged(tmp_path):
         },
         "output": {
             "evidence": "evidence",
-            "signer_identity": "example-producer",
+            "signer_identity": "example-signer",
         },
     }
     path = tmp_path / "request.json"
@@ -234,7 +234,7 @@ def test_publish_requires_explicit_authentication_choice(staged):
 def test_signed_workflow_uses_request_declared_signer_identity(staged):
     path, _ = staged
     key = Ed25519PrivateKey.generate()
-    key_path = path.parent / "producer-private.pem"
+    key_path = path.parent / "signer-private.pem"
     key_path.write_bytes(
         key.private_bytes(
             Encoding.PEM,
@@ -247,9 +247,9 @@ def test_signed_workflow_uses_request_declared_signer_identity(staged):
     )
     assert result.exit_code == 0, result.output
     payload = json.loads(result.stdout)
-    assert payload["signer_identity"] == "example-producer"
+    assert payload["signer_identity"] == "example-signer"
     envelope = json.loads((path.parent / "evidence" / "envelope.json").read_text())
-    assert envelope["signer"]["identity"] == "example-producer"
+    assert envelope["signer"]["identity"] == "example-signer"
 
 
 def test_request_rejects_symlinked_input_before_publication(staged, tmp_path):

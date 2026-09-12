@@ -28,7 +28,7 @@ comparison:
   policy: analysis_policy.json
 output:
   evidence: evidence
-  signer_identity: example-producer
+  signer_identity: example-signer
 ```
 
 Paths are relative to the request root. Traversal, symlinked inputs and output
@@ -45,7 +45,7 @@ invarlock evaluate request.yaml --unsigned --fail-on-policy --json
 Preflight makes no provider calls and publishes nothing. It displays cases,
 independent units, expected trials, maximum attempts, coverage, judge settings,
 policy thresholds and missing files. Evaluation requires either explicit
-`--unsigned` or `--signing-key producer-private.pem`. Signed publication does not
+`--unsigned` or `--signing-key signer-private.pem`. Signed publication does not
 establish independent recipient acceptance. `output.signer_identity` names the
 identity placed in a signed envelope; a recipient still has to pin that identity
 and its public-key fingerprint independently. Unsigned output retains no signer.
