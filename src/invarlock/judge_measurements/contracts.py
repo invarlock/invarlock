@@ -779,7 +779,7 @@ def _check_retained_provider_secrets(value: object) -> None:
                     _fail("retained Inspect provider call contains a credential field")
                 if folded in {"headers", "extra_headers", "http_headers"} and (
                     not isinstance(child, dict)
-                    or {item.casefold() for item in child} > {"x-irid"}
+                    or not {item.casefold() for item in child} <= {"x-irid"}
                     or not all(
                         isinstance(item, str) and 0 < len(item) <= 128
                         for item in child.values()
@@ -863,8 +863,12 @@ def _check_inspect_provider_projection(
         token_limit = request.get("max_tokens", request.get("max_completion_tokens"))
         if token_limit != expected["max_output_tokens"]:
             _fail("retained Inspect provider token limit differs from the request")
-    if request.get("tools", []) != []:
+    # Inspect 0.3.254 retains OpenAI's NOT_GIVEN values as JSON null. Both
+    # absent/null and an empty list describe the same tool-free request.
+    if request.get("tools") not in (None, []):
         _fail("retained Inspect provider request contains tools")
+    if request.get("tool_choice") not in (None, "none"):
+        _fail("retained Inspect provider request contains an unsupported tool choice")
     if not completed:
         return
     response = call["response"]
@@ -894,7 +898,20 @@ def _check_inspect_provider_projection(
         _fail("retained Inspect provider response contradicts its request ID")
     choices = response.get("choices")
     if isinstance(choices, list) and choices:
-        if choices[0].get("finish_reason") != output.get("finish_reason"):
+        # Chat Completions and Inspect use different names for token exhaustion.
+        # Preserve the native value while checking the pinned interpretation;
+        # tool-call endings remain unsupported by this tool-free profile.
+        stop_reasons = {
+            "stop": "stop",
+            "length": "max_tokens",
+            "content_filter": "content_filter",
+        }
+        finish_reason = choices[0].get("finish_reason")
+        if (
+            not isinstance(finish_reason, str)
+            or finish_reason not in stop_reasons
+            or stop_reasons[finish_reason] != output.get("finish_reason")
+        ):
             _fail("retained Inspect provider response contradicts its finish reason")
     usage = response.get("usage")
     projected_usage = output.get("usage")

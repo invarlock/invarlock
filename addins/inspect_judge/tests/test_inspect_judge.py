@@ -346,6 +346,102 @@ def test_scalar_and_sequence_completions_are_retained_as_invalid(data, completio
     }
 
 
+def test_native_null_tool_controls_are_retained_as_tool_free(data):
+    exported = copy.deepcopy(data[1])
+    request = exported["samples"][0]["events"][0]["call"]["request"]
+    request.update(tools=None, tool_choice=None)
+    result = ingest(data, exported)
+    validate_measurements(result, data[0], **frozen_runs(data))
+    retained = json.loads(result["sources"][0]["content"])
+    assert retained["records"][0]["events"][0]["call"]["request"]["tools"] is None
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("tools", [{"type": "function", "function": {"name": "search"}}]),
+        ("tools", False),
+        ("tools", {}),
+        ("tool_choice", "auto"),
+        ("tool_choice", "required"),
+        ("tool_choice", {"type": "function", "function": {"name": "search"}}),
+    ],
+)
+def test_native_tool_controls_reject_unapproved_values(data, field, value):
+    exported = copy.deepcopy(data[1])
+    exported["samples"][0]["events"][0]["call"]["request"][field] = value
+    with pytest.raises(JudgeMeasurementContractError, match="tool"):
+        ingest(data, exported)
+
+
+def test_disjoint_single_provider_header_is_rejected(data):
+    exported = copy.deepcopy(data[1])
+    exported["samples"][0]["events"][0]["call"]["request"]["extra_headers"] = {
+        "Cookie": "session=example-secret"
+    }
+    with pytest.raises(InspectJudgeError, match="unsupported headers"):
+        ingest(data, exported)
+    measurements = ingest(data)
+    source = measurements["sources"][0]
+    retained = json.loads(source["content"])
+    retained["records"][0]["events"][0]["call"]["request"]["extra_headers"] = {
+        "Cookie": "session=example-secret"
+    }
+    payload = canonical_payload(retained)
+    source.update(
+        content=payload.decode(),
+        byte_size=len(payload),
+        sha256=hashlib.sha256(payload).hexdigest(),
+    )
+    with pytest.raises(JudgeMeasurementContractError, match="unsupported headers"):
+        validate_measurements(measurements, data[0], **frozen_runs(data))
+
+
+@pytest.mark.parametrize(
+    ("provider_reason", "inspect_reason"),
+    [("stop", "stop"), ("length", "max_tokens"), ("content_filter", "content_filter")],
+)
+def test_native_finish_reason_uses_pinned_inspect_interpretation(
+    data, provider_reason, inspect_reason
+):
+    exported = copy.deepcopy(data[1])
+    event = exported["samples"][0]["events"][0]
+    event["output"]["finish_reason"] = inspect_reason
+    event["call"]["response"] = {
+        "choices": [
+            {
+                "message": {"content": event["output"]["completion"]},
+                "finish_reason": provider_reason,
+            }
+        ]
+    }
+    result = ingest(data, exported)
+    assert result["trials"][0]["attempts"][0]["finish_reason"] == inspect_reason
+    for invalid_reason in ("contradictory", None, [], "max_tokens"):
+        event["call"]["response"]["choices"][0]["finish_reason"] = invalid_reason
+        with pytest.raises(JudgeMeasurementContractError, match="finish reason"):
+            ingest(data, exported)
+
+
+@pytest.mark.parametrize("finish_reason", ["tool_calls", "function_call"])
+def test_native_tool_finish_reasons_are_rejected_for_tool_free_profile(
+    data, finish_reason
+):
+    exported = copy.deepcopy(data[1])
+    event = exported["samples"][0]["events"][0]
+    event["output"]["finish_reason"] = "tool_calls"
+    event["call"]["response"] = {
+        "choices": [
+            {
+                "message": {"content": event["output"]["completion"]},
+                "finish_reason": finish_reason,
+            }
+        ]
+    }
+    with pytest.raises(JudgeMeasurementContractError, match="finish reason"):
+        ingest(data, exported)
+
+
 def test_sdk_configuration_is_optional_and_uses_no_model_factory(data, monkeypatch):
     captured = {}
 
