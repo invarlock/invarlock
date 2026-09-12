@@ -44,12 +44,111 @@ and `baseline_run.json` and `subject_run.json`. The command prints the run and
 case-set digests. Keep the directory to retain provenance and support resume.
 Rerunning the exact command reads completed results without generating again.
 
-For judge collection, prepare a judge plan bound to these exact run digests and
-case-set digest. Follow the
-[judge measurements example](../judge-measurements/README.md); its committed
-one-case fixture plan must be replaced with a plan for your new answers. Answer
-capture ends before judge collection, so capture budgets do not authorize judge
-calls.
+## Use an existing pipeline executable
+
+The included subprocess transport avoids writing an importable Python adapter.
+Configure an existing trusted executable that supports the JSON protocol below.
+This offline fixture shows the complete configuration:
+
+```bash
+python - <<'PYCODE'
+import json
+import sys
+from pathlib import Path
+
+script = Path("examples/answer-capture/pipeline.py").resolve()
+transport = {
+    "argv": [str(Path(sys.executable).resolve()), "-I", str(script)],
+    "assets": [str(script)],
+    "environment": [],
+}
+with Path("answer-transport.json").open("x") as output:
+    json.dump(transport, output)
+PYCODE
+python -m examples.answer_capture \
+  --config answer-capture-config.json \
+  --cases examples/answer-capture/cases.json \
+  --transport answer-transport.json \
+  --directory answer-process-output \
+  --execute
+```
+
+Replace `argv` with your pipeline executable and arguments. The executable must
+be an absolute non-symlink path. List every script and local configuration file
+in `assets` using absolute paths. Their content hashes, the executable hash,
+transport implementation hash and full argument list are retained. Keep
+secrets out of arguments and files listed as configuration. `environment` names
+only the environment variables explicitly passed to the process; values are not
+retained. The default environment is empty, and the working directory is `/`.
+Use absolute file paths. Pin and retain any other runtime dependencies yourself.
+
+The transport launches one process per operation, without a shell. Standard
+input contains one JSON object and a newline:
+
+```json
+{"operation":"generate","request":{"side":"baseline","case_id":"case-1","input":"Capital of France?","model":{},"max_output_tokens":32}}
+```
+
+`model` is the complete model object from the capture configuration; it is
+abbreviated here. The `count_input_tokens` operation must tokenize locally,
+without inference or a billed request, and return exactly `{"input_tokens": 3}`.
+The `generate` operation must perform exactly one inference attempt and return
+exactly these fields:
+
+```json
+{"output":"Paris","input_tokens":3,"output_tokens":1}
+```
+
+Both operations emit only JSON on stdout. Token usage must be accurate; input
+usage must equal the prepared count. Stderr is bounded and discarded to avoid
+printing credentials. A failed process produces an error with its exit status.
+There are no transport retries, response selection or caching. The executable
+itself is trusted and must disable those behaviors internally. This is a local
+integration boundary, not a sandbox or a verified model provider adapter.
+
+Input is capped at 1 MiB per operation. Stdout is capped at six times the
+configured answer byte cap plus 4 KiB for JSON escaping and response fields;
+stderr is capped at 64 KiB. Every operation shares the fixed capture deadline and
+per-call timeout. Cancellation terminates the process group, including ordinary
+child processes. Trusted executables must not detach children. Neither this
+transport nor local cancellation can stop already dispatched remote billing.
+Retained completed answers are never regenerated; an expired process transport
+requires offline inspection rather than invoking its tokenizer after deadline.
+
+## Continue from captured answers to judge preparation
+
+Prepare a judge plan and request without generating answers again or calling a
+judge. Supply a reviewed plan template, analysis policy, collection limits, and
+an explicit mapping from each case to its statistical unit. Cases from the same
+source or conversation should share a unit; do not invent independence by
+assigning each related row a different unit.
+
+This command uses the committed offline templates for a wiring check:
+
+```bash
+python -m examples.answer_capture_judge \
+  --capture answer-process-output \
+  --plan-template examples/judge-measurements/plan.json \
+  --policy examples/judge-measurements/analysis_policy.json \
+  --units examples/answer-capture/units.json \
+  --collection examples/judge-measurements/collection.json \
+  --directory captured-judge-inputs
+invarlock evaluate captured-judge-inputs/request.json --preflight
+```
+
+The helper checks retained attempts/results against the frozen answers, binds
+both exact run digests, case membership, answer hashes and rendered judge
+requests, and writes a new directory. It preserves the template's rubric,
+model, repetitions, sampling basis and policy thresholds. It does not lower
+minimum sample requirements to make a small capture pass. The one-case fixture
+is intentionally too small to support its analysis policy.
+
+For actual work, review those templates and units before preparation. Then use
+the [judge collection example](../judge-measurements/README.md) with the generated
+plan, runs, policy and collection configuration. Its optional collector script
+accepts these paths. The offline example does not qualify a provider, model,
+tokenizer or rubric. Capture budgets authorize answer capture only; review and
+authorize judge collection separately.
 
 ## Connect a real pipeline
 

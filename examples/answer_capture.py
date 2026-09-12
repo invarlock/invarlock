@@ -156,6 +156,8 @@ def prepare(
             "cost_microusd": cost,
         },
     }
+    if hasattr(adapter, "identity"):
+        manifest["adapter_identity"] = copy.deepcopy(adapter.identity)
     manifest_bytes = len(canonical_json_bytes(manifest))
     # Six bytes per output byte covers worst-case JSON escaping. Each answer is
     # retained twice: once in its result journal and once in an evaluation run.
@@ -346,10 +348,13 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--cases", type=Path, required=True)
-    parser.add_argument(
+    adapter_options = parser.add_mutually_exclusive_group(required=True)
+    adapter_options.add_argument(
         "--adapter",
-        required=True,
         help="trusted importable module exposing count_input_tokens and generate",
+    )
+    adapter_options.add_argument(
+        "--transport", type=Path, help="local JSON process transport configuration"
     )
     parser.add_argument("--directory", type=Path, required=True)
     parser.add_argument(
@@ -360,15 +365,23 @@ def main() -> None:
     args = parser.parse_args()
     if not args.execute:
         parser.error("review the frozen inputs and budget, then supply --execute")
-    adapter = importlib.import_module(args.adapter)
-    if not adapter.__file__:
-        parser.error("adapter must have a source file")
     try:
+        config = read(args.config)
+        if args.transport:
+            from examples.answer_capture_process import ProcessAdapter
+
+            adapter = ProcessAdapter(args.transport, config["limits"])
+            adapter_sha256 = adapter.sha256
+        else:
+            adapter = importlib.import_module(args.adapter)
+            if not adapter.__file__:
+                parser.error("adapter must have a source file")
+            adapter_sha256 = physical_file_digest(adapter.__file__)
         result = asyncio.run(
             capture(
-                config=read(args.config),
+                config=config,
                 cases=read(args.cases),
-                adapter_sha256=physical_file_digest(adapter.__file__),
+                adapter_sha256=adapter_sha256,
                 adapter=adapter,
                 directory=args.directory,
             )
