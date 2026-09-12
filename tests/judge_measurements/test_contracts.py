@@ -429,6 +429,18 @@ def test_rehashed_unapproved_rendered_request_is_rejected() -> None:
     _assert_measurement_error(measurements, "request was not approved", retain=True)
 
 
+def test_response_limit_counts_utf8_bytes_instead_of_characters() -> None:
+    measurements = _measurements()
+    response = measurements["trials"][0]["attempts"][0]["response"]
+    assert response is not None
+    content = "😀" * 400_000
+    response.update(
+        text=content,
+        sha256=hashlib.sha256(content.encode("utf-8")).hexdigest(),
+    )
+    _assert_measurement_error(measurements, "judge response exceeds", retain=True)
+
+
 def test_incomplete_trial_is_retained_but_cannot_claim_complete() -> None:
     measurements = _measurements()
     trial = measurements["trials"][0]

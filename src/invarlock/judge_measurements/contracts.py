@@ -371,7 +371,10 @@ def load_measurement_plan(path: Path) -> JudgeMeasurementPlan:
 
 
 def _check_blob(blob: dict[str, Any], label: str) -> None:
-    if _text_sha256(blob["text"]) != blob["sha256"]:
+    content = blob["text"].encode("utf-8")
+    if len(content) > JUDGE_REQUEST_MAX_BYTES:
+        _fail(f"{label} exceeds the {JUDGE_REQUEST_MAX_BYTES}-byte limit")
+    if hashlib.sha256(content).hexdigest() != blob["sha256"]:
         _fail(f"{label} digest does not match its UTF-8 text")
 
 
@@ -486,6 +489,36 @@ def _check_attempts(
         _fail("parsed judge result does not match deterministic response replay")
     if (trial["status"] == "complete") != (parsed["status"] == "ok"):
         _fail("trial completeness must agree with its parse outcome")
+
+
+def _check_retained_inspect_usage(
+    usage: object,
+    attempt_usage: object,
+    *,
+    completed: bool,
+    maximum_input_tokens: int,
+    maximum_output_tokens: int,
+) -> None:
+    if usage != attempt_usage:
+        _fail("retained Inspect token usage does not match its attempt")
+    if completed and usage is None:
+        _fail("completed retained Inspect call requires token usage")
+    if usage is None:
+        return
+    if not isinstance(usage, dict) or set(usage) != {
+        "input_tokens",
+        "output_tokens",
+    }:
+        _fail("retained Inspect token usage is invalid")
+    for name, maximum in (
+        ("input_tokens", maximum_input_tokens),
+        ("output_tokens", maximum_output_tokens),
+    ):
+        count = usage[name]
+        if type(count) is not int or not 0 <= count <= maximum:
+            _fail(
+                f"retained Inspect {name.replace('_', ' ')} exceeds its per-call reservation"
+            )
 
 
 def _check_retained_inspect_event(
@@ -610,11 +643,15 @@ def _check_retained_inspect_event(
     )
     if output.get("model") != attempt.get("resolved_model"):
         _fail("retained Inspect resolved model does not match its attempt")
-    usage = output.get("usage")
-    if usage != attempt.get("usage"):
-        _fail("retained Inspect token usage does not match its attempt")
     response = attempt.get("response")
     completed = attempt.get("status") == "completed"
+    _check_retained_inspect_usage(
+        output.get("usage"),
+        attempt.get("usage"),
+        completed=completed,
+        maximum_input_tokens=collection["input_tokens_per_call"],
+        maximum_output_tokens=observed_config["max_tokens"],
+    )
     if completed and (
         event.get("error") is not None
         or call.get("error") not in (None, False)

@@ -17,6 +17,7 @@ from typer.testing import CliRunner
 
 from invarlock.cli.app import app
 from invarlock.core.evaluation_request import evaluation_request_mode
+from invarlock.judge_measurements.contracts import measurement_plan_digest
 from invarlock.judge_measurements.workflow import (
     JudgeWorkflowError,
     load_judge_request,
@@ -192,6 +193,67 @@ def test_collect_preflight_shows_explicit_budgets_without_claiming_a_runner(stag
     result = RUNNER.invoke(app, ["evaluate", str(path), "--preflight", "--json"])
     assert result.exit_code == 2
     assert "exactly the supported" in result.stdout
+
+
+@pytest.mark.parametrize("unsupported", ["local_weights", "sol_temperature"])
+def test_collect_preflight_rejects_profiles_the_integration_cannot_run(
+    staged, unsupported
+):
+    path, value = staged
+    value["execution"] = {
+        "mode": "judge_collect",
+        "collection": {
+            "integration": "inspect-judge",
+            "configuration": "collection.json",
+        },
+    }
+    value["comparison"]["measurements"] = None
+    path.write_text(json.dumps(value))
+    collection = {
+        "grader": "example-judge",
+        "inspect_version": "0.3.263",
+        "profile": "inspect-text-frozen-answer-v1",
+        "epochs": 1,
+        "log_model_api": True,
+        "log_samples": True,
+        "sdk_max_retries": 0,
+        "tools": False,
+        "max_calls": 2,
+        "max_input_tokens": 2000,
+        "max_output_tokens": 256,
+        "max_cost_microusd": 1000000,
+        "input_tokens_per_call": 1000,
+        "cost_microusd_per_call": 500000,
+        "concurrency": 1,
+        "requests_per_minute": 10,
+        "request_timeout_seconds": 30,
+    }
+    plan_path = path.parent / "plan.json"
+    plan = json.loads(plan_path.read_text())
+    expected = "local weight execution"
+    if unsupported == "local_weights":
+        plan["judge"]["model_identity"] = {
+            "kind": "local_weights",
+            "weights_sha256": "a" * 64,
+        }
+    else:
+        plan["judge"].update(
+            provider="openai",
+            requested_model="openai/gpt-5.6-sol",
+            approved_resolved_models=["gpt-5.6-sol"],
+        )
+        collection["grader"] = "openai/gpt-5.6-sol"
+        expected = "approved temperature 1"
+    plan_path.write_text(json.dumps(plan))
+    policy_path = path.parent / "analysis_policy.json"
+    policy = json.loads(policy_path.read_text())
+    policy["plan_sha256"] = measurement_plan_digest(plan)
+    policy_path.write_text(json.dumps(policy))
+    (path.parent / "collection.json").write_text(json.dumps(collection))
+
+    result = RUNNER.invoke(app, ["evaluate", str(path), "--preflight", "--json"])
+    assert result.exit_code == 2
+    assert expected in result.stdout
 
 
 @pytest.mark.parametrize(

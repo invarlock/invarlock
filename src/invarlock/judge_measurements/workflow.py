@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Literal, cast
@@ -238,6 +239,16 @@ def _collection_budgets(
     if plan["schedule"]["max_attempts"] != 1:
         raise JudgeWorkflowError(
             "live Inspect collection currently requires one attempt per trial"
+        )
+    if plan["judge"]["model_identity"]["kind"] != "hosted_api":
+        raise JudgeWorkflowError(
+            "local weight execution is not qualified by the Inspect judge integration"
+        )
+    if value["grader"] == "openai/gpt-5.6-sol" and Decimal(
+        plan["judge"]["config"]["temperature"]
+    ) != Decimal(1):
+        raise JudgeWorkflowError(
+            "GPT-5.6 Sol requires Inspect 0.3.263 and approved temperature 1"
         )
     return budgets
 

@@ -327,6 +327,30 @@ def test_completed_call_requires_usage_for_budget_accounting(data):
         ingest(data, exported)
 
 
+@pytest.mark.parametrize(
+    ("usage", "message"),
+    [
+        (None, "requires token usage"),
+        ({"input_tokens": 101, "output_tokens": 4}, "input tokens"),
+        ({"input_tokens": 10, "output_tokens": 129}, "output tokens"),
+    ],
+)
+def test_core_replay_enforces_retained_per_call_usage_bounds(data, usage, message):
+    result = ingest(data)
+    retained = json.loads(result["sources"][0]["content"])
+    retained["records"][0]["events"][0]["output"]["usage"] = copy.deepcopy(usage)
+    retained["records"][0]["trial"]["attempts"][0]["usage"] = copy.deepcopy(usage)
+    result["trials"][0]["attempts"][0]["usage"] = copy.deepcopy(usage)
+    payload = canonical_payload(retained)
+    result["sources"][0].update(
+        content=payload.decode(),
+        byte_size=len(payload),
+        sha256=hashlib.sha256(payload).hexdigest(),
+    )
+    with pytest.raises(JudgeMeasurementContractError, match=message):
+        validate_measurements(result, data[0], **frozen_runs(data))
+
+
 def test_import_enforces_cumulative_call_reservations(data):
     exported = copy.deepcopy(data[1])
     exported["collection"]["max_calls"] = 1

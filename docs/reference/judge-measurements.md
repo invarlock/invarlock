@@ -104,7 +104,9 @@ and writes a new measurement file:
 python -m pip install .
 python -m pip install 'addins/inspect_judge[inspect]'
 export OPENAI_API_KEY=your-key-from-a-secret-store
-python collect.py --execute-collection
+python examples/judge-measurements/collect.py \
+  --root /path/to/reviewed-judge-inputs \
+  --execute-collection
 ```
 
 Until a release containing this workflow is published, install both packages
@@ -166,7 +168,7 @@ object digests are bare lowercase SHA-256 values, as declared by their contracts
 ```
 
 Do not generate this policy by copying the submitted envelope. That would make
-the producer's claims authorize themselves. Store the completed policy outside
+the submitted claims authorize themselves. Store the completed policy outside
 the evidence directory and review it before verification.
 
 ```bash

@@ -64,11 +64,14 @@ optional package and run the maintained collector:
 python -m pip install .
 python -m pip install 'addins/inspect_judge[inspect]'
 export OPENAI_API_KEY=your-key-from-a-secret-store
-python collect.py --execute-collection
+python examples/judge-measurements/collect.py \
+  --root /path/to/copied-example \
+  --execute-collection
 ```
 
 The script loads `plan.json`, `collection.json` and both frozen runs from the
-current directory. It resumes through the private `judge-checkpoint` directory
+directory selected by `--root`. It resumes through the private
+`judge-checkpoint` directory
 and writes a new `measurements-collected.json` for `judge_import`. Review the
 preflight and every call, token and cost cap before supplying
 `--execute-collection`. Custom provider URLs are outside this qualified example.

@@ -19,15 +19,17 @@ rejected before a call is admitted.
 
 The repository includes a maintained executable collector at
 `examples/judge-measurements/collect.py`. After freezing the plan and runs,
-reviewing `collection.json`, and completing the core `evaluate --preflight`, run
-it from the copied example directory. First install matching packages from the
-repository root:
+reviewing `collection.json`, and completing the core `evaluate --preflight`, keep
+the shell at the repository root and point `--root` at the reviewed input
+directory:
 
 ```bash
 python -m pip install .
 python -m pip install 'addins/inspect_judge[inspect]'
 export OPENAI_API_KEY=your-key-from-a-secret-store
-python collect.py --execute-collection
+python examples/judge-measurements/collect.py \
+  --root /path/to/reviewed-judge-inputs \
+  --execute-collection
 ```
 
 The explicit flag acknowledges that provider calls may be billed. The script
