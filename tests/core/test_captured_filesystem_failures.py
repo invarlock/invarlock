@@ -593,6 +593,29 @@ def test_publication_io_failure_cleans_staging_and_descriptors(
             os.fstat(descriptor)
 
 
+def test_publication_child_open_failure_reacquires_directories_for_cleanup(
+    tmp_path, monkeypatch, publication_args
+):
+    destination = tmp_path / "evidence"
+    original_open = os.open
+    failed = False
+
+    def fail_first_records_open(path, flags, *args, **kwargs):
+        nonlocal failed
+        if path == "records" and flags & os.O_DIRECTORY and not failed:
+            failed = True
+            raise OSError(errno.EIO, "injected child open failure")
+        return original_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(publication.os, "open", fail_first_records_open)
+    with pytest.raises(publication.CapturedEvidenceError, match="could not publish"):
+        publication.publish_captured_evidence(destination, **publication_args)
+
+    assert failed
+    assert not destination.exists()
+    assert not list(tmp_path.glob(".captured-evidence-*"))
+
+
 def test_destination_created_at_publication_instant_is_not_clobbered(
     tmp_path, monkeypatch, publication_args
 ):
