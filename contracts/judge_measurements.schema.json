@@ -1,0 +1,448 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://invarlock.dev/contracts/judge_measurements.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "format": {
+      "const": "invarlock/judge-measurements-v1"
+    },
+    "profile_id": {
+      "const": "text-frozen-answer-v1"
+    },
+    "plan_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "source_profile": {
+      "const": "retained-judge-json-v1"
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "source_id": {
+            "$ref": "#/$defs/identifier"
+          },
+          "profile": {
+            "const": "retained-judge-json-v1"
+          },
+          "encoding": {
+            "const": "utf-8"
+          },
+          "byte_size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 16777216
+          },
+          "media_type": {
+            "const": "application/json"
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16777216
+          },
+          "sha256": {
+            "$ref": "#/$defs/sha256"
+          }
+        },
+        "required": [
+          "source_id",
+          "profile",
+          "encoding",
+          "byte_size",
+          "media_type",
+          "content",
+          "sha256"
+        ]
+      },
+      "minItems": 1,
+      "maxItems": 1000,
+      "uniqueItems": true
+    },
+    "trials": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "trial_id": {
+            "$ref": "#/$defs/identifier"
+          },
+          "case_id": {
+            "$ref": "#/$defs/identifier"
+          },
+          "side": {
+            "enum": [
+              "baseline",
+              "subject"
+            ]
+          },
+          "repetition": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10
+          },
+          "answer_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "plan_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "status": {
+            "enum": [
+              "complete",
+              "incomplete"
+            ]
+          },
+          "attempts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "attempt": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 3
+                },
+                "role": {
+                  "const": "judge"
+                },
+                "resolved_model": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 256
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "status": {
+                  "enum": [
+                    "completed",
+                    "refusal",
+                    "transport_error",
+                    "timeout_ambiguous",
+                    "cancelled"
+                  ]
+                },
+                "request": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "media_type": {
+                      "const": "application/json"
+                    },
+                    "text": {
+                      "type": "string",
+                      "minLength": 0,
+                      "maxLength": 1048576
+                    },
+                    "sha256": {
+                      "$ref": "#/$defs/sha256"
+                    }
+                  },
+                  "required": [
+                    "media_type",
+                    "text",
+                    "sha256"
+                  ]
+                },
+                "response": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "media_type": {
+                          "const": "application/json"
+                        },
+                        "text": {
+                          "type": "string",
+                          "minLength": 0,
+                          "maxLength": 1048576
+                        },
+                        "sha256": {
+                          "$ref": "#/$defs/sha256"
+                        }
+                      },
+                      "required": [
+                        "media_type",
+                        "text",
+                        "sha256"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "request_id": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 256
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "finish_reason": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "error": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "$ref": "#/$defs/identifier"
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 4096
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "usage": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "input_tokens": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 10000000
+                        },
+                        "output_tokens": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 10000000
+                        }
+                      },
+                      "required": [
+                        "input_tokens",
+                        "output_tokens"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "cache": {
+                  "enum": [
+                    "none",
+                    "reused"
+                  ]
+                },
+                "source": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "source_id": {
+                      "$ref": "#/$defs/identifier"
+                    },
+                    "scorer_id": {
+                      "$ref": "#/$defs/identifier"
+                    },
+                    "model_event_id": {
+                      "$ref": "#/$defs/identifier"
+                    },
+                    "record_index": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 199999
+                    },
+                    "attempt_index": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 2
+                    }
+                  },
+                  "required": [
+                    "source_id",
+                    "scorer_id",
+                    "model_event_id",
+                    "record_index",
+                    "attempt_index"
+                  ]
+                }
+              },
+              "required": [
+                "attempt",
+                "role",
+                "resolved_model",
+                "status",
+                "request",
+                "response",
+                "request_id",
+                "finish_reason",
+                "error",
+                "usage",
+                "cache",
+                "source"
+              ]
+            },
+            "minItems": 0,
+            "maxItems": 3,
+            "uniqueItems": true
+          },
+          "selected_attempt": {
+            "oneOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "parse": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "status": {
+                "enum": [
+                  "ok",
+                  "invalid",
+                  "refusal",
+                  "unavailable"
+                ]
+              },
+              "rating": {
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/identifier"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "value": {
+                "oneOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "rating",
+              "value"
+            ]
+          }
+        },
+        "required": [
+          "trial_id",
+          "case_id",
+          "side",
+          "repetition",
+          "answer_sha256",
+          "plan_sha256",
+          "status",
+          "attempts",
+          "selected_attempt",
+          "parse"
+        ]
+      },
+      "minItems": 2,
+      "maxItems": 200000,
+      "uniqueItems": true
+    },
+    "completeness": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "enum": [
+            "complete",
+            "incomplete"
+          ]
+        },
+        "expected_trials": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 200000
+        },
+        "recorded_trials": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 200000
+        },
+        "completed_trials": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 200000
+        }
+      },
+      "required": [
+        "status",
+        "expected_trials",
+        "recorded_trials",
+        "completed_trials"
+      ]
+    }
+  },
+  "required": [
+    "format",
+    "profile_id",
+    "plan_sha256",
+    "source_profile",
+    "sources",
+    "trials",
+    "completeness"
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "minLength": 64,
+      "maxLength": 64
+    },
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+    }
+  }
+}

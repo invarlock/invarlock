@@ -1,0 +1,81 @@
+{
+  "format": "invarlock/judge-measurement-plan-v1",
+  "profile_id": "text-frozen-answer-v1",
+  "case_set_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "baseline_run_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+  "subject_run_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+  "rubric": {
+    "text": "Rate factual correctness.",
+    "sha256": "310d64c2e77a93f854b6d5cf05b619e231ce22d4f3cb265411276897a3764d5b"
+  },
+  "prompt": {
+    "system": "Grade the delimited answer using the rubric.",
+    "template": "Rubric: {rubric}\nInput: {input}\n<answer>{answer}</answer>\nReturn JSON with a rating field.",
+    "demonstrations": [],
+    "references": []
+  },
+  "judge": {
+    "provider": "example",
+    "requested_model": "example-judge",
+    "approved_resolved_models": [
+      "example-judge-001"
+    ],
+    "model_identity": {
+      "kind": "hosted_api",
+      "weights_sha256": null
+    },
+    "config": {
+      "temperature": 0,
+      "top_p": 1,
+      "max_output_tokens": 128,
+      "seed": null
+    },
+    "tools": false
+  },
+  "parser": {
+    "id": "json-rating-v1"
+  },
+  "scale": {
+    "id": "bounded-discrete-v1",
+    "ratings": [
+      {
+        "label": "incorrect",
+        "value": 0
+      },
+      {
+        "label": "correct",
+        "value": 1
+      }
+    ]
+  },
+  "sampling": {
+    "basis": "curated_benchmark",
+    "unit_weighting": "equal",
+    "within_unit_weighting": "equal_cases",
+    "case_units": [
+      {
+        "case_id": "case-1",
+        "unit_id": "unit-1"
+      }
+    ]
+  },
+  "schedule": {
+    "order": "case-side-repetition-lexicographic-v1",
+    "trial_id_scheme": "plan-case-side-repetition-sha256-v1",
+    "repetitions": 1,
+    "max_attempts": 1,
+    "attempt_selection": "first_completed_response",
+    "retry_on": [
+      "transport_error"
+    ],
+    "cache": "forbid",
+    "expected_trials": 2
+  },
+  "answer_bindings": [
+    {
+      "case_id": "case-1",
+      "baseline_answer_sha256": "5dd272b4f316b776a7b8e3d0894b37e1e42be3d5d3b204b8a5836cc50597a6b1",
+      "subject_answer_sha256": "5dd272b4f316b776a7b8e3d0894b37e1e42be3d5d3b204b8a5836cc50597a6b1"
+    }
+  ]
+}
