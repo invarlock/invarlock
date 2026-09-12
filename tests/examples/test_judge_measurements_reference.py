@@ -152,10 +152,31 @@ def test_frozen_contracts_bind_answers_requests_and_cluster_units():
 def test_human_review_does_not_expose_roles_scores_or_case_ids():
     campaign = campaign_fixture()["workflows"]["grounded_qa"]
     selection = ref.select(campaign["inventory"], "grounded_qa")
-    review = ref.human_review("grounded_qa", campaign["raw"], selection)
+    template = ref.obj(
+        Path(__file__).parents[2]
+        / "examples/judge-measurements/k2-judge-templates.json"
+    )["grounded_qa"]
+    review = ref.human_review("grounded_qa", campaign["raw"], selection, template)
+    assert review["format"] == "invarlock/blinded-answer-review-v2"
+    assert review["rubric"]["text"] == template["plan"]["rubric"]["text"]
+    assert review["rubric"]["sha256"] == ref.sha(
+        template["plan"]["rubric"]["text"].encode()
+    )
+    assert review["scale"] == template["plan"]["scale"]
     for row in review["cases"]:
-        assert set(row) == {"review_id", "input", "response_1", "response_2"}
+        assert set(row) == {
+            "review_id",
+            "input",
+            "response_1",
+            "response_1_rating",
+            "response_2",
+            "response_2_rating",
+            "review_notes",
+        }
         assert row["review_id"].startswith("review-")
+        assert row["response_1_rating"] is None
+        assert row["response_2_rating"] is None
+        assert row["review_notes"] is None
     # Fixture answers intentionally identify their origin so both orientations can be checked.
     assert {row["response_1"].split("-")[1] for row in review["cases"]} == {"A", "B"}
 
@@ -201,7 +222,11 @@ def bundle(tmp_path, monkeypatch):
         ref, "notices", lambda root: (copy.deepcopy(notice_data), copy.deepcopy(pins))
     )
     output = tmp_path / "bundle"
-    result = ref.build(tmp_path, output)
+    templates = ref.obj(
+        Path(__file__).parents[2]
+        / "examples/judge-measurements/k2-judge-templates.json"
+    )
+    result = ref.build(tmp_path, output, templates)
     return output, result
 
 
@@ -604,6 +629,7 @@ def test_separate_pilot_review_and_candidate_final_plan_status():
             "grounded_qa",
             campaign["workflows"]["grounded_qa"]["raw"],
             {},
+            templates["grounded_qa"],
             "unsupported",
         )
 

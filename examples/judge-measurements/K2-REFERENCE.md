@@ -58,9 +58,11 @@ its own hash ranking. Give reviewers only the appropriate file under
 `human_review/rubric_development/` or `human_review/final_validation/`. The final
 review sheets contain 80 anonymous paired responses with
 hashed presentation order and response position, without native scores, source
-case IDs or A/B role labels. The full bundle retains source records with their roles;
-blinding therefore requires keeping that bundle from reviewers until they have
-recorded their judgments.
+case IDs or A/B role labels. Each sheet includes the frozen rubric, allowed
+rating labels and empty fields for both response ratings and optional review
+notes. The full bundle retains source records with their roles; blinding therefore
+requires keeping that bundle from reviewers until they have recorded their
+judgments.
 
 ## Bound contracts
 

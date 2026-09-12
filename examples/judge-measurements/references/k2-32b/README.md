@@ -16,7 +16,7 @@ From the source checkout with InvarLock installed, validate without model calls:
 ```bash
 python examples/judge_measurements_reference.py validate \
   --bundle examples/judge-measurements/references/k2-32b/reference.zip \
-  --expected-sha256 cd403375fe0e4dcfb40978e10c60e7bb0a126f1dd5b54de71a1818ae27b65002
+  --expected-sha256 5d17b5d636f5bb40536f9bb5abff7019a52df320d6415df4cc4de10aa3fe8248
 ```
 
 [archive.json](archive.json) pins the ZIP transport and internal reference
@@ -30,6 +30,8 @@ For selection rules, exact frozen protocol and the build command, see the
 [K2 reference guide](../../K2-REFERENCE.md). Give human reviewers only the
 appropriate rubric-development or final-validation sheet from the archive,
 keeping source roles and native scores withheld until their judgments are frozen.
+The sheet itself contains the frozen rubric, allowed labels and empty rating and
+notes fields needed to record the review.
 
 Preserve [source attribution](ATTRIBUTION.md), the
 [SGD data license](SGD-LICENSE.txt), and the accurately scoped

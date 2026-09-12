@@ -413,7 +413,11 @@ def bind_contracts(template: dict, runs: dict, split: str) -> dict:
 
 
 def human_review(
-    workflow: str, raw: dict, selection: dict, stage: str = "final_validation"
+    workflow: str,
+    raw: dict,
+    selection: dict,
+    template: dict,
+    stage: str = "final_validation",
 ) -> dict:
     if stage not in {"rubric_development", "final_validation"}:
         raise ValueError("unsupported blinded review stage")
@@ -434,14 +438,24 @@ def human_review(
                 "review_id": "review-" + rank(workflow, stage + "_id", case_id),
                 "input": input_text(a),
                 "response_1": answers[0],
+                "response_1_rating": None,
                 "response_2": answers[1],
+                "response_2_rating": None,
+                "review_notes": None,
             }
         )
+    rubric = template["plan"]["rubric"]
+    scale = template["plan"]["scale"]
     return {
-        "format": "invarlock/blinded-answer-review-v1",
+        "format": "invarlock/blinded-answer-review-v2",
         "workflow": workflow,
         "stage": stage,
-        "instructions": "Assess each response independently. No reference outcomes or model roles are supplied. Record judgments before obtaining the full source bundle.",
+        "instructions": "Assess each response independently using the frozen rubric. Enter exactly one allowed scale label in each response rating field. Use review_notes only for a brief rationale or ambiguity. No reference outcomes or model roles are supplied. Record judgments before obtaining the full source bundle.",
+        "rubric": {
+            "text": rubric["text"],
+            "sha256": sha(rubric["text"].encode()),
+        },
+        "scale": copy.deepcopy(scale),
         "cases": rows,
     }
 
@@ -520,10 +534,17 @@ def derive(campaign: dict, templates: dict | None) -> dict[str, bytes]:
         for name, content in value.items():
             output[f"{workflow}/{name}.json"] = canonical_payload(content)
         output[f"{workflow}/selection.json"] = canonical_payload(selection)
-        for stage in ("rubric_development", "final_validation"):
-            output[f"human_review/{stage}/{workflow}.json"] = canonical_payload(
-                human_review(workflow, value["raw"], selection, stage)
-            )
+        if templates is not None:
+            for stage in ("rubric_development", "final_validation"):
+                output[f"human_review/{stage}/{workflow}.json"] = canonical_payload(
+                    human_review(
+                        workflow,
+                        value["raw"],
+                        selection,
+                        templates[workflow],
+                        stage,
+                    )
+                )
         for split in ("pilot", "final"):
             runs = frozen_runs(
                 workflow, split, value["raw"], selection[split], value["endpoints"]
@@ -623,12 +644,13 @@ for the collection API at this stage.
 The untouched final-validation review takes 40 cases per stratum from final with
 its own hash ranking. Give reviewers only the appropriate
 human_review/rubric_development/<workflow>.json or
-human_review/final_validation/<workflow>.json. That file contains
-anonymous review IDs, unchanged input and two responses with independently hashed
-position order; it exposes no native scores, source IDs or A/B role labels. Review
-order is also independently ranked. Blinding is procedural: the full bundle and
-public deterministic algorithm allow the study operator to recover the mapping.
-Freeze human judgments before giving reviewers the full source bundle.
+human_review/final_validation/<workflow>.json. That file contains the frozen
+rubric, allowed rating labels, empty rating and notes fields, anonymous review
+IDs, unchanged input and two responses with independently hashed position order;
+it exposes no native scores, source IDs or A/B role labels. Review order is also
+independently ranked. Blinding is procedural: the full bundle and public
+deterministic algorithm allow the study operator to recover the mapping. Freeze
+human judgments before giving reviewers the full source bundle.
 
 Judge plans and analysis policies, when supplied, are separately frozen per
 workflow and split. They bind exact answers and rendered requests; repetitions
