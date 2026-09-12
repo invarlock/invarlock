@@ -8,6 +8,7 @@ from pathlib import Path
 from xml.etree import ElementTree
 
 import pytest
+from click import unstyle
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import (
     Encoding,
@@ -582,9 +583,9 @@ def test_committed_judge_example_preflights_and_renders(tmp_path):
 
 
 def test_judge_supported_cli_options_have_accurate_help():
-    result = RUNNER.invoke(app, ["evaluate", "--help"], terminal_width=160)
+    result = RUNNER.invoke(app, ["evaluate", "--help"], terminal_width=160, color=True)
     assert result.exit_code == 0
-    text = " ".join(result.stdout.replace("│", " ").split())
+    text = " ".join(unstyle(result.stdout).replace("│", " ").split())
     assert "retained judge measurements" in text
     assert "Publish captured or judge evaluation as unsigned local evidence" in text
     assert "Captured or judge baseline run override" in text
