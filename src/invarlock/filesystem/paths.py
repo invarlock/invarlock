@@ -22,18 +22,6 @@ def entry_identity(value: os.stat_result) -> tuple[int, int, int]:
     return value.st_dev, value.st_ino, value.st_mode
 
 
-def close_descriptor(descriptor: int) -> None:
-    """Release a retained descriptor once without masking an operation result.
-
-    A failed close can have released the descriptor already; never retry it.
-    Writers must flush and synchronize data explicitly before this cleanup.
-    """
-    try:
-        os.close(descriptor)
-    except OSError:
-        pass
-
-
 @contextmanager
 def _directory_descriptor(
     path: str, flags: int, *, dir_fd: int | None = None
@@ -42,7 +30,14 @@ def _directory_descriptor(
     try:
         yield descriptor
     finally:
-        close_descriptor(descriptor)
+        # Keep allocation and release in this context manager so static analysis
+        # and readers can see the complete ownership lifetime.
+        try:
+            os.close(descriptor)
+        except OSError:
+            # A failed close may already have released the descriptor. Retrying
+            # could close an unrelated descriptor that reused the same number.
+            pass
 
 
 @contextmanager

@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .atomic_directory import publish_directory_no_replace
-from .paths import PathChangedError, close_descriptor, entry_identity, pinned_directory
+from .paths import PathChangedError, entry_identity, pinned_directory
 
 _FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
 _MAX_DEPTH = 16
@@ -45,7 +45,10 @@ def _require_file_bytes(parent: int, name: str, expected: bytes) -> None:
         ):
             raise PathChangedError("staged file identity changed while reading")
     finally:
-        close_descriptor(descriptor)
+        try:
+            os.close(descriptor)
+        except OSError:
+            pass
 
 
 def _require_exact_tree(
@@ -78,7 +81,10 @@ def _require_exact_tree(
                     "staged directory identity changed while reading"
                 )
         finally:
-            close_descriptor(child)
+            try:
+                os.close(child)
+            except OSError:
+                pass
     if _snapshot_identity(os.fstat(descriptor)) != before:
         raise PathChangedError(
             "staged directory changed while validating generated files"
@@ -96,7 +102,10 @@ def _open_owned_child(parent: int, name: str) -> int:
         ):
             raise PathChangedError("private staging directory identity changed")
     except BaseException:
-        close_descriptor(descriptor)
+        try:
+            os.close(descriptor)
+        except OSError:
+            pass
         raise
     return descriptor
 
@@ -117,7 +126,10 @@ def _change_tree(descriptor: int, *, remove: bool, depth: int = 0) -> None:
                     if entry_identity(named) == entry_identity(os.fstat(child)):
                         os.rmdir(name, dir_fd=descriptor)
             finally:
-                close_descriptor(child)
+                try:
+                    os.close(child)
+                except OSError:
+                    pass
         elif remove:
             os.unlink(name, dir_fd=descriptor)
     if not remove:
@@ -209,11 +221,20 @@ def staged_directory(
             with suppress(OSError):
                 os.rmdir(name, dir_fd=parent)
             raise
-        stage = StagedDirectory(
-            destination.parent / name, destination, descriptor, parent
-        )
+        stage: StagedDirectory | None = None
         try:
-            yield stage
+            stage = StagedDirectory(
+                destination.parent / name, destination, descriptor, parent
+            )
+            try:
+                yield stage
+            finally:
+                stage.cleanup()
         finally:
-            stage.cleanup()
-            close_descriptor(descriptor)
+            if stage is None:
+                with suppress(OSError):
+                    os.rmdir(name, dir_fd=parent)
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass

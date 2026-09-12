@@ -5,7 +5,8 @@ from __future__ import annotations
 import hashlib
 import os
 import secrets
-from contextlib import suppress
+from collections.abc import Iterator
+from contextlib import ExitStack, contextmanager, suppress
 from pathlib import Path
 from typing import Any
 
@@ -31,6 +32,24 @@ from invarlock.filesystem import (
     AtomicDirectoryPublicationError,
     publish_directory_no_replace,
 )
+
+
+@contextmanager
+def _opened_directory(parent: int, name: str) -> Iterator[int]:
+    """Own one descriptor for the complete surrounding publication scope."""
+    descriptor = os.open(
+        name,
+        os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC,
+        dir_fd=parent,
+    )
+    try:
+        yield descriptor
+    finally:
+        try:
+            os.close(descriptor)
+        except OSError:
+            # Never retry an uncertain close; the descriptor may be reused.
+            pass
 
 
 class CapturedEvidenceError(ValueError):
@@ -192,6 +211,7 @@ def publish_captured_evidence(
     cleanup: int | None = None
     retained_stage: int | None = None
     directories: dict[str, int] = {}
+    directory_descriptors = ExitStack()
     published = False
     try:
         check_sizes(files)
@@ -208,10 +228,8 @@ def publish_captured_evidence(
                 retained_stage = os.dup(stage)
                 for directory in ("inputs", "records", "reports"):
                     os.mkdir(directory, mode=0o700, dir_fd=stage)
-                    directories[directory] = os.open(
-                        directory,
-                        os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC,
-                        dir_fd=stage,
+                    directories[directory] = directory_descriptors.enter_context(
+                        _opened_directory(stage, directory)
                     )
                 for name, payload in files.items():
                     path = Path(name)
@@ -276,7 +294,8 @@ def publish_captured_evidence(
                 _cleanup_staging(
                     cleanup, staging.name, retained_stage, directories, files
                 )
-        for retained_descriptor in (*directories.values(), retained_stage, cleanup):
+        directory_descriptors.close()
+        for retained_descriptor in (retained_stage, cleanup):
             if retained_descriptor is not None:
                 with suppress(OSError):
                     os.close(retained_descriptor)

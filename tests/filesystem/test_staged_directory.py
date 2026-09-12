@@ -182,6 +182,31 @@ def test_stage_open_failure_closes_descriptor_and_removes_empty_root(
             original_fstat(descriptor)
 
 
+def test_stage_construction_failure_closes_descriptor_and_removes_empty_root(
+    tmp_path, monkeypatch
+):
+    original_open_child = stages._open_owned_child
+    opened = []
+
+    def record_open_child(parent, name):
+        descriptor = original_open_child(parent, name)
+        opened.append(descriptor)
+        return descriptor
+
+    def fail_construction(*args, **kwargs):
+        raise RuntimeError("stage construction failure")
+
+    monkeypatch.setattr(stages, "_open_owned_child", record_open_child)
+    monkeypatch.setattr(stages, "StagedDirectory", fail_construction)
+    with pytest.raises(RuntimeError, match="stage construction failure"):
+        with staged_directory(tmp_path / "output", prefix=".stage-"):
+            pytest.fail("stage must not be exposed")
+    assert list(tmp_path.iterdir()) == []
+    for descriptor in opened:
+        with pytest.raises(OSError):
+            os.fstat(descriptor)
+
+
 def test_post_rename_failure_preserves_completed_directory(tmp_path):
     with pytest.raises(OSError, match="post-rename failure"):
         with staged_directory(tmp_path / "output", prefix=".stage-") as stage:

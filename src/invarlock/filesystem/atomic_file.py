@@ -12,7 +12,6 @@ from .atomic_directory import _rename_no_replace
 from .paths import (
     PathChangedError,
     UnsafePathError,
-    close_descriptor,
     entry_identity,
     pinned_directory,
 )
@@ -138,7 +137,17 @@ def write_file_no_replace(
                     "published file identity changed; destination retained"
                 )
         finally:
-            _cleanup_stage(parent, name, stage, descriptor)
-            if descriptor is not None:
-                close_descriptor(descriptor)
-            close_descriptor(stage)
+            try:
+                _cleanup_stage(parent, name, stage, descriptor)
+            finally:
+                try:
+                    if descriptor is not None:
+                        try:
+                            os.close(descriptor)
+                        except OSError:
+                            pass
+                finally:
+                    try:
+                        os.close(stage)
+                    except OSError:
+                        pass
