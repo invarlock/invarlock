@@ -342,8 +342,9 @@ def _prepare(request: JudgeEvaluationRequest) -> tuple[dict[str, Any], dict[str,
             "execution": "trusted_host_integration",
             "core_cli_execution": False,
         }
-        result["errors"].append(
-            "Live judge collection requires the optional inspect-judge collect API in a trusted host integration with an explicitly constructed model. The core CLI imports its retained measurements with judge_import."
+        result["next_action"] = (
+            "Run the optional inspect-judge collect API with an explicitly "
+            "constructed model, then import its retained measurements."
         )
     result["ok"] = result["ready"] = not result["errors"]
     return values, result
@@ -369,6 +370,15 @@ def evaluate_judge_request(
     """Publish imported evidence through its separately scoped evidence writer."""
     try:
         values, preflight = _prepare(request)
+        if request.mode == "judge_collect":
+            preflight["ok"] = preflight["ready"] = False
+            preflight["errors"].append(
+                "The core CLI does not execute provider calls. Run the optional inspect-judge collect API, then use a judge_import request."
+            )
+            raise JudgeWorkflowError(
+                "Judge collection requires the optional trusted-host API",
+                payload=preflight,
+            )
         if not preflight["ready"]:
             raise JudgeWorkflowError("Judge evaluation is not ready", payload=preflight)
         if unsigned == (signing_key is not None):

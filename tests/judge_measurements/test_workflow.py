@@ -155,7 +155,7 @@ def test_collect_preflight_shows_explicit_budgets_without_claiming_a_runner(stag
     }
     (path.parent / "collection.json").write_text(json.dumps(budget))
     result = RUNNER.invoke(app, ["evaluate", str(path), "--preflight", "--json"])
-    assert result.exit_code == 2
+    assert result.exit_code == 0
     payload = json.loads(result.stdout)
     assert payload["budgets"] == {
         key: value
@@ -168,9 +168,11 @@ def test_collect_preflight_shows_explicit_budgets_without_claiming_a_runner(stag
         "full_plan_reserved": True,
     }
     assert payload["collection_available"] is False
-    assert "trusted host integration" in payload["errors"][0]
+    assert payload["ready"] and not payload["errors"]
+    assert "inspect-judge collect API" in payload["next_action"]
     result = RUNNER.invoke(app, ["evaluate", str(path), "--unsigned", "--json"])
     assert result.exit_code == 2
+    assert "does not execute provider calls" in result.stdout
     assert not (path.parent / "evidence").exists()
 
     budget["Authorization"] = "secret"
