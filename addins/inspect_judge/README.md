@@ -1,7 +1,8 @@
 # Inspect judge collection and import
 
-This optional package collects bounded text judgments through a caller-supplied
-Inspect model and imports its expanded-event projection into
+This optional package collects bounded text judgments through the installed
+`evaluate` command or a caller-supplied Inspect model, and imports its
+expanded-event projection into
 `judge-measurements-v1`. It does not import arbitrary Inspect `.eval` archives.
 
 Live collection pins Inspect `0.3.263` and OpenAI `3.13.0`; retained exports from
@@ -17,27 +18,24 @@ provider-client retries set to zero. The model may carry only the explicit
 those choices. Other inherited model, provider or generation settings are
 rejected before a call is admitted.
 
-The repository includes a maintained executable collector at
-`examples/judge-measurements/collect.py`. After freezing the plan and runs,
-reviewing `collection.json`, and completing the core `evaluate --preflight`, keep
-the shell at the repository root and point `--root` at the reviewed input
-directory:
+The installed native `metric: judge` workflow and frozen-answer `judge_collect`
+request use `collect_configured`. It validates the pinned SDK environment,
+constructs the supported model explicitly, and closes its client on success,
+failure or cancellation. Keep `OPENAI_API_KEY` in the process environment.
 
 ```bash
 python -m pip install .
 python -m pip install 'addins/inspect_judge[inspect]'
-export OPENAI_API_KEY=your-key-from-a-secret-store
-python examples/judge-measurements/collect.py \
-  --root /path/to/reviewed-judge-inputs \
-  --execute-collection
+invarlock evaluate judge-request.yaml --preflight --json
+invarlock evaluate judge-request.yaml --signing-key signer-private.pem --json
 ```
 
-The explicit flag acknowledges that provider calls may be billed. The script
-constructs the pinned Inspect model with Chat Completions, cache and retries
-disabled; resumes through a private checkpoint; rejects custom OpenAI provider
-URLs; and writes a new `measurements-collected.json`. It never places the key in
-the plan, checkpoint or retained output. Rename that completed file to the path
-selected by a `judge_import` request before publication.
+Preflight checks without calling a provider. Execution uses the declared cost,
+call, token and time ceilings, the official OpenAI endpoint and a private
+checkpoint. It never puts the API key in the request, plan, checkpoint or retained
+output. `validate_collection_environment` exposes the same execution-free checks
+to Python callers. Native requests automatically freeze runtime answers before
+judging; frozen-answer requests supply their approved plan and runs directly.
 
 For `openai/gpt-5.6-sol`, the pinned SDK converts system messages to developer
 messages, uses `max_completion_tokens`, and omits temperature from the provider

@@ -7,7 +7,6 @@ returns `insufficient_evidence`. It is not a live provider qualification result.
 Copy this directory to a fresh working directory, then run:
 
 ```bash
-invarlock evaluate request-collect.yaml --preflight --json
 invarlock evaluate request.yaml --preflight --json
 invarlock evaluate request.yaml --unsigned --json
 invarlock report evidence --html report.html --markdown report.md --junit report.xml --json
@@ -53,30 +52,25 @@ bindings fail before publication.
 
 ## Collect new judgments
 
-`request-collect.yaml` demonstrates the execution-free collection preflight. Its
-synthetic `example-judge` identity is deliberately not callable. For a
-live run, freeze a real supported hosted-model identity in the plan, set the
-matching grader and current account limits in `collection.json`, then install the
-optional package and run the maintained collector:
+`request-collect.yaml` selects installed collection for already frozen answers.
+The committed `example-judge` identity is synthetic and cannot make live calls.
+For real collection, freeze an approved supported hosted judge and matching
+collection settings, install matching core and collector packages, and run:
 
 ```bash
-# From the repository root for this matching checkout:
 python -m pip install .
 python -m pip install 'addins/inspect_judge[inspect]'
-export OPENAI_API_KEY=your-key-from-a-secret-store
-python examples/judge-measurements/collect.py \
-  --root /path/to/copied-example \
-  --execute-collection
+# Supply OPENAI_API_KEY through your secret manager.
+invarlock evaluate request-collect.yaml --preflight --json
+invarlock evaluate request-collect.yaml --signing-key signer-private.pem --json
 ```
 
-The script loads `plan.json`, `collection.json` and both frozen runs from the
-directory selected by `--root`. It resumes through the private
-`judge-checkpoint` directory
-and writes a new `measurements-collected.json` for `judge_import`. Review the
-preflight and every call, token and cost cap before supplying
-`--execute-collection`. Custom provider URLs are outside this qualified example.
-Keep provider credentials in the collector environment. Never put them in the
-request, plan, checkpoint or retained evidence.
+The installed command constructs the pinned model and resumes through a private
+workspace. Review its call, token, cost and timeout limits before execution.
+Missing dependencies or credentials fail preflight without a provider call.
+For native model execution and automatic answer freezing, use
+[`metric: judge`](../native-judge/README.md) instead. Imported frozen answers do
+not claim native runtime provenance.
 
 Add `--fail-on-policy` to evaluation for exit 7 on the inconclusive policy result.
 The unsigned evidence cannot establish recipient acceptance. To publish signed

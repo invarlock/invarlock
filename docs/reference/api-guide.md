@@ -698,6 +698,16 @@ verifier.
 
 ### Judge verification results and receipts
 
+Native `evaluate_request_file` also accepts `metric: judge` in a run/import
+request. It retains the normal native resource and signing-key requirements and
+returns `JudgeWorkflowResult`, whose JSON has `kind: judge`, the evidence path,
+analysis decision and collection stop state. Native preflight retains
+`EvaluationPreflightResult` and adds judge model, unit, trial and budget metadata.
+The installed optional collector reads credentials from its process environment;
+callers do not pass keys in the request or plan. Recipient replay requires only
+the core package. Native judge evidence includes a bound runtime capture, whereas
+ordinary frozen-answer import makes no runtime-provenance claim.
+
 `verify_judge_evidence` and `verify_judge_evidence_with_policy` replay bounded
 judge evidence under an external judge recipient policy and return an unsigned
 `JudgeVerificationResult`. `write_signed_judge_verification_receipt` signs that

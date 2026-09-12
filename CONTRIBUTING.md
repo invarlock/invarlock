@@ -10,8 +10,9 @@ invarlock report evidence/
 ```
 
 The `invarlock evaluate`, `invarlock verify`, and `invarlock report` commands
-run or import native comparisons, compare captured evaluator exports, and replay
-bounded frozen-answer judge measurements. They apply the corresponding policy
+run or import native comparisons with exact-match, normalized-NLL or judge scoring,
+compare captured evaluator exports, and replay imported judge measurements.
+They apply the corresponding policy
 and verify signed evidence. Use `invarlock --help` for these workflows;
 `invarlock evaluate --help` describes controlled execution or import, including
 the optional run-mode resource profile.
@@ -87,7 +88,7 @@ listed below. Run them for the affected surface before requesting review.
   behind the same `invarlock.engine` facade.
 - `contracts/` contains the shipped JSON contracts.
 - `addins/` contains the independently installable GGUF, TensorRT-LLM,
-  Hugging Face vision-text, diagnostics, and Inspect judge preparation packages.
+  Hugging Face vision-text, diagnostics, and Inspect judge collection packages.
 - `tests/` mirrors the maintained runtime, contract, evidence, CLI, and release
   surfaces.
 - `scripts/` contains repository checks, release validation, and security

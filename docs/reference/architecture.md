@@ -153,24 +153,20 @@ See [Runtime providers](runtime-providers.md) for the extension contract.
    Docker or Podman worker per side. Both workers score the same schedule, and
    the host validates their complete side results. Import mode authenticates a
    supplied canonical schedule and complete runtime sidecars.
-3. The engine computes a deterministic comparison ID and either derives one of
-   two built-in paired metrics or replays one explicitly authorized
-   deterministic text scorer. Exact match replays paired outcome counts, an
-   exact McNemar probability, and the versioned Newcombe 95% interval.
-   Normalized NLL and
-   scorer-extension deltas use the fixed 2,048-replicate schedule-resampling
-   interval. The scorer owns only per-record values in `[0, 1]`; the core owns
-   means, subject-minus-baseline percentage-point delta, interval, and policy
-   arithmetic. Policy reads the conservative bound of the selected interval.
-   When the policy includes coupled sample controls, core also checks the
-   authenticated record count and observed interval width. All three
-   conditions must pass.
-4. Publication stages a closed inventory, signs the canonical manifest, and
-   renames the directory into place without replacing an existing destination.
+3. The engine selects exact match, normalized NLL, native judge, or an explicitly
+   authorized deterministic text scorer. Exact match replays paired outcome
+   counts, the exact McNemar probability and Newcombe 95% interval. Normalized
+   NLL and scorer-extension deltas use the fixed 2,048-replicate schedule interval.
+   Native judge freezes the exact native capture, derives answer-dependent plan
+   bindings, collects bounded ratings through the installed optional integration,
+   and applies its fixed-benchmark analysis. Each scorer preserves its own
+   statistical assumptions and conservative policy bound.
+4. Publication stages a closed inventory, signs its manifest or judge envelope,
+   and renames the directory into place without replacing an existing destination.
 5. Verification treats the submitted bundle as untrusted, replays all semantic
    bindings, and signs a receipt outside it.
-6. Reporting reads only the signature-authenticated bundle and writes only the
-   optional presentation output.
+6. Reporting replays retained evidence and writes optional presentation outputs.
+   It reports authentication and policy state separately from recipient acceptance.
 
 Run mode and import mode differ only before bundle assembly. Run mode asks each
 isolated worker to emit the sidecars. Import mode authenticates supplied

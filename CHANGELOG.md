@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `judge` as a native run/import scorer through `evaluate`, `verify` and
+  `report`. Native judging freezes authenticated runtime answers, derives the
+  measurement plan bindings, executes bounded installed collection, and retains
+  the complete runtime capture for offline verification.
+- Added a packaged `--init --example native-judge` starter and native model,
+  runtime, rubric and collection context in judge reports. Interrupted collection
+  resumes original answers and admitted trials; exhausted storage produces an
+  explicit terminal insufficient-evidence result.
+- Reject judge workspaces that overlap inputs or model artifacts, changed
+  artifact/runtime identities on resume, underfunded live plans and native-source
+  runs submitted without their runtime capture, before billable judging.
+
 - Added recipient-level composition of deterministic and bounded judge evidence
   over the same frozen answers, with independent component verification and a
   shared report. Component statistical meanings remain separate; the combined

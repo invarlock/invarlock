@@ -283,13 +283,15 @@ deterministic text scorers such as token F1, structured-field extraction, or VQA
 answer normalization. Those scorers are separately installed and require
 explicit authorization. SQL or code execution, model-based semantic similarity,
 network or human services, and LLM judges are outside scorer-extension
-acceptance replay. The separate bounded judge report replays its retained
-frozen-answer measurement contract; other judge results may be authenticated as
-observations, where they have no verdict authority.
+acceptance replay. The built-in `judge` scorer replays its bounded measurement
+contract and, for native run/import evidence, its retained runtime capture. Its
+report shows both evaluated model identities, runtime settings and digests,
+judge model/configuration, rubric, counts and uncertainty. Other recorded judge
+results may be authenticated as observations, where they have no verdict authority.
 
 ## Verification result
 
-Native `invarlock verify --json` emits an `invarlock/evidence-pack-verify-v1` result. Important
+Native deterministic `invarlock verify --json` emits an `invarlock/evidence-pack-verify-v1` result. Important
 fields include:
 
 | Field | Meaning |

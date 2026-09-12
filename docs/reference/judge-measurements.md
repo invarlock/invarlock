@@ -7,10 +7,76 @@ requests, responses, errors, attempts and source mappings for offline replay.
 !!! info "Reference"
 
     - **Surface:** Judge request, measurement, analysis and evidence contracts
-    - **Stability:** Additive versioned formats; existing native and captured formats remain unchanged
-    - **Use this page when:** Importing frozen-answer ratings or reviewing bounded judge evidence
+    - **Stability:** Additive versioned formats; native metric selection and separately scoped judge evidence
+    - **Use this page when:** Running a native judge scorer, importing ratings or reviewing judge evidence
 
-## Request and preflight
+## Native scorer
+
+Use `comparison.metric: judge` in `invarlock/evaluation-request-v1`, with the
+same baseline, subject, dataset and `execution.mode: run` or `import` fields as
+exact match and normalized NLL. Add:
+
+```yaml
+comparison:
+  metric: judge
+  policy: judge-policy.json
+  judge:
+    workspace: judge-work
+    signer_identity: evaluation-signer
+```
+
+These fields belong inside the complete native request; the fragment does not
+replace its baseline, subject, dataset or task. Generate a complete starter with:
+
+```bash
+invarlock evaluate --init my-judge --example native-judge
+```
+
+The [native starter](https://github.com/invarlock/invarlock/blob/main/examples/native-judge/README.md) contains a request,
+local dataset and `invarlock/native-judge-policy-v1` policy. Replace the model and
+runtime placeholders, choose your cases, and supply a native runtime profile and
+signing key before preflight. Its two illustrative cases deliberately cannot
+meet the policy's precision requirement.
+
+The policy has five closed fields: `format`, `plan`, `analysis`, `collection` and
+`runner`. The plan contains the existing judge plan's rubric, prompt, model,
+parser, scale, sampling and schedule choices. Omit run/case/answer digests,
+`rubric.sha256` and `schedule.expected_trials`: InvarLock derives them after native
+capture. The analysis contains the judge analysis policy without `plan_sha256`,
+which is also derived. `collection` declares the budgets below;
+`runner` declares `scorer_id` and `invocation_timeout_seconds` (1–604800 seconds).
+
+The exact original policy bytes are bound into the runtime configuration before
+answers are generated. Native collection retains all six original provider files
+for each side, the schedule, normalized request, policy and observations in
+`native_capture.json`. Offline replay validates that provenance, regenerates the
+frozen runs and finalized plan, and recomputes the judge analysis. Signed
+bindings include `native_capture_sha256`; native capture cannot be stripped to
+turn the result into ordinary imported-answer evidence.
+
+Preflight validates the rubric and full trial reservation, native artifacts and
+resources, installed collector and API environment without making calls. Native
+providers keep their existing network restrictions. Only the explicitly
+configured judge collector calls the supported hosted endpoint; credentials stay
+in `OPENAI_API_KEY`, never in request files or evidence.
+
+`judge-work` is private and resumable. If the invocation ends with unattempted
+trials, evaluation returns an incomplete result and leaves the final evidence
+destination absent. Rerun the same request to continue without regenerating
+answers or retrying admitted calls. Changed artifacts, runtime images, policy,
+rubric or data require a new workspace. An interrupted native answer capture is
+marked as unfinished and cannot silently execute again. If retained storage
+capacity is exhausted, evaluation publishes terminal `insufficient_evidence`
+with `collection.stop_reason: retained_capacity_exhausted`; it does not promise
+that another identical invocation can continue.
+
+The initial profile supports exactly one text part per scheduled input. It grades
+the task input and answer under the declared rubric and optional global
+references. `expected_output` remains authenticated evidence but is not sent to
+the judge. It does not grade against otherwise hidden per-case gold answers.
+Do not place gold answers into the evaluated model's input to work around this.
+
+## Frozen-answer requests and preflight
 
 The self-contained example at `examples/judge-measurements/README.md` uses
 `invarlock/evaluation-request-v3` with this closed request:
@@ -54,8 +120,8 @@ establish independent recipient acceptance. `output.signer_identity` names the
 identity placed in a signed envelope; a recipient still has to pin that identity
 and its public-key fingerprint independently. Unsigned output retains no signer.
 
-The reserved `judge_collect` mode instead declares
-`execution.collection: {integration: inspect-judge, configuration: collector.json}`
+The installed `judge_collect` mode instead declares
+`execution.collection: {integration: inspect-judge, configuration: collector.json, workspace: judge-work}`
 and `comparison.measurements: null`. The configuration is closed and contains no
 credentials or provider URL:
 
@@ -89,14 +155,14 @@ The committed `examples/judge-measurements` fixture includes a separate
 `request-collect.yaml` and bounded `collection.json` so this route can be
 inspected without editing the import example.
 
-The optional `invarlock-inspect-judge` package exposes an asynchronous `collect`
-API for a trusted host that explicitly constructs the Inspect model. Live
-collection currently supports Inspect 0.3.263 Chat Completions with one attempt
-per trial, zero Inspect and provider-client retries, no tools or cache, and no
-inherited model settings beyond `responses_api=false` and `max_retries=0`.
-Collection uses an exclusive checkpoint lock, writes a durable admission before
-each call and treats an admitted call without a retained result as an ambiguous
-timeout that cannot be retried.
+The optional `invarlock-inspect-judge[inspect]` package exposes
+`collect_configured` for installed execution and a lower-level `collect` API for
+callers that construct their own Inspect model. Both use the same admitted-call
+checkpoint. Live collection currently supports the pinned Inspect Chat
+Completions integration with one attempt per trial, zero Inspect and
+provider-client retries, no tools or cache, and no inherited model settings.
+An admitted call without a retained result is an ambiguous timeout that cannot
+be retried. `verify` and `report` make no provider calls.
 
 `openai/gpt-5.6-sol` additionally requires an explicit non-null
 `reasoning_effort` in its approved plan. The Inspect adapter passes that exact
@@ -104,42 +170,31 @@ value to the SDK and requires the retained provider request to match it. The K2
 reference now selects `none` explicitly for its next pilot. The earlier retained
 pilot omitted this control and remains a separate incomplete run.
 
-The maintained `examples/judge-measurements/collect.py` runner supplies the
-complete supported wiring. It loads the plan, collection options and frozen runs,
-constructs the explicit pinned Inspect model, uses a private resumable checkpoint
-and writes a new measurement file:
+Install matching packages and use the installed command:
 
 ```bash
-# From the same source checkout as this documentation:
 python -m pip install .
 python -m pip install 'addins/inspect_judge[inspect]'
-export OPENAI_API_KEY=your-key-from-a-secret-store
-python examples/judge-measurements/collect.py \
-  --root /path/to/reviewed-judge-inputs \
-  --execute-collection
+# Supply OPENAI_API_KEY through your secret manager.
+invarlock evaluate judge-request.yaml --preflight --json
+invarlock evaluate judge-request.yaml --signing-key signer-private.pem --json
 ```
 
-Until a release containing this workflow is published, install both packages
-from the same checkout as shown above. The release gate builds and installs the
-matching core and add-in wheels in a clean environment before running the pinned
-SDK checks.
-
-Run it only after reviewing preflight and the declared call, token, cost and time
-caps. It rejects custom provider URLs. The collector never reads a key from a
-request file or writes one to retained evidence.
-
-The core CLI does not construct providers or accept credentials. Running
-`evaluate` without `--preflight` for `judge_collect` therefore names the optional
-API as the next action and exits 2. After collection, use `judge_import` to replay
-and publish the retained measurements.
-Runtime resource profiles, installed-scorer execution and bootstrap overrides do
-not apply to this request format.
+Review every call, token, cost and time cap first. The collector rejects custom
+provider URLs and reads credentials only from its environment. The optional
+`execution.collection.scorer_id` defaults to `judge` and
+`invocation_timeout_seconds` defaults to 3600. An omitted workspace defaults to
+`<output.evidence>.judge-work`; an explicit workspace is preferable for resuming
+after changing only the final output destination. Runtime resource profiles,
+installed deterministic scorer execution and bootstrap overrides do not apply to
+frozen-answer v3 requests; they retain their normal meaning for native v1 requests.
 
 ## Replay, authentication and acceptance
 
 Evidence contains `plan.json`, `measurements.json`, `baseline_run.json`,
 `subject_run.json`, `case_set.json`, `analysis_policy.json`, `analysis_result.json`
-and `envelope.json`. The additive signed envelope binds all artifact digests and
+and `envelope.json`. Native requests additionally retain `native_capture.json`.
+The additive signed envelope binds all artifact digests and
 the intended subject under `bounded-judge-fixed-benchmark-v1`.
 
 The recipient maintains its own `judge-measurement-recipient-policy-v1` outside

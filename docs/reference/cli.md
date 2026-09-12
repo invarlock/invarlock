@@ -149,6 +149,18 @@ rejects explicit run controls for an import request instead of silently ignoring
 them. The command also fails if the request's execution mode changes between
 mode detection and full loading.
 
+### Native judge scoring
+
+A native request can select `comparison.metric: judge` with its own rubric,
+analysis policy and private collection workspace. `evaluate` captures or imports
+the native answers and calls the optional installed collector, then publishes
+judge evidence. Preflight makes no calls; interrupted judging retains its
+checkpoint and leaves the final output absent for continuation. Native runtime
+resources and artifact authentication still apply. `verify` replays the native
+capture and judgments offline using a judge recipient policy; `report` displays
+model, runtime, rubric, judge identity, outcomes and uncertainty. See the
+[judge reference](judge-measurements.md) for the policy and supported profile.
+
 ### Captured evaluation controls
 
 Captured requests use `invarlock/evaluation-request-v2` with
@@ -160,7 +172,7 @@ pins. `--max-bootstrap-draws` controls the caller-owned captured work allowance
 (default 102,400,000). Runtime, container, and scorer-extension flags are rejected
 for this mode. Native resource limits are unchanged.
 
-`--init DIRECTORY --example classification|extraction|judge`, `--keygen DIRECTORY`,
+`--init DIRECTORY --example classification|extraction|judge|native-judge`, `--keygen DIRECTORY`,
 and `--freeze-cases FILE` are mutually exclusive setup actions on `evaluate`, without
 a request argument. `--case-set-output FILE` optionally writes the canonical case
 set. These actions emit `invarlock/evaluation-setup-v1` with `--json` and

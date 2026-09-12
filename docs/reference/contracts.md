@@ -223,12 +223,13 @@ capabilities, evaluation batches, and provider receipts. Built-in identifiers
 are `text_causal`, `masked_language`, `text_seq2seq`, and
 `vision_text_generation`; a provider must explicitly declare execution
 support. The request selects exactly one built-in `metric` or one complete
-`scorer_extension` binding. Built-in metrics are `exact_match` and
-`normalized_nll_per_utf8_byte`; request loading requires both selected
-providers to declare the chosen built-in metric. A scorer extension instead
-uses `exact_match` as its provider collection metric so that expected and
+`scorer_extension` binding. Built-in scorers are `exact_match`,
+`normalized_nll_per_utf8_byte` and `judge`. Providers declare the required
+collection metric: judge and deterministic scorer extensions use `exact_match`
+to retain complete text outputs; normalized NLL requires its own likelihood
+facts. A scorer extension uses that authenticated collection so that expected and
 observed text are authenticated for verifier replay. The built-in
-`hf_transformers` provider declares both built-in metrics. The
+`hf_transformers` provider declares exact-match and normalized-NLL collection. The
 first-party `llama_cpp`, `tensorrt_llm`, and `hf_vision_text` add-ins currently
 declare exact match for their tasks.
 
