@@ -19,6 +19,7 @@ from invarlock.evidence_receipt import (
     _Omitted,
     write_signed_verification_receipt,
 )
+from invarlock.report_presentation import terminal_text
 
 
 class EvidenceVerificationError(ValueError):
@@ -80,16 +81,16 @@ class EvidenceVerification:
     def summary(self) -> str:
         comparison = self.payload.get("comparison_id")
         signer = self.payload.get("signer_fingerprint")
-        details = [f"Evidence: {self.evidence_path}"]
+        details = [f"Evidence: {terminal_text(str(self.evidence_path))}"]
         if isinstance(comparison, str):
-            details.append(f"Comparison: {comparison}")
+            details.append(f"Comparison: {terminal_text(comparison)}")
         if isinstance(signer, str):
-            details.append(f"Evidence signer: {signer}")
+            details.append(f"Evidence signer: {terminal_text(signer)}")
         verifier = self.payload.get("verifier_fingerprint")
         if isinstance(verifier, str):
-            details.append(f"Verifier signer: {verifier}")
+            details.append(f"Verifier signer: {terminal_text(verifier)}")
         if self.receipt_path is not None:
-            details.append(f"Receipt: {self.receipt_path}")
+            details.append(f"Receipt: {terminal_text(str(self.receipt_path))}")
         return "\n".join(details)
 
     def as_json(self) -> str:
@@ -187,6 +188,7 @@ def verify_evidence(
     trust_profile_digest: str | None = None,
     policy_bytes: bytes | None = None,
     verifier_signing_key_bytes: bytes | None = None,
+    _expected_captured: bool | None = None,
 ) -> EvidenceVerification: ...
 
 
@@ -206,6 +208,7 @@ def verify_evidence(
     policy_bytes: bytes | None = None,
     verifier_signing_key_bytes: bytes | None = None,
     max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
+    _expected_captured: bool | None = None,
 ) -> EvidenceVerification: ...
 
 
@@ -230,6 +233,7 @@ def verify_evidence(
     expected_baseline_run: str | None = None,
     expected_subject_run: str | None = None,
     max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
+    _expected_captured: bool | None = None,
 ) -> EvidenceVerification:
     """Verify one pack with roots that cannot be selected by that pack.
 
@@ -248,6 +252,12 @@ def verify_evidence(
         captured = is_captured_manifest(evidence)
     except CapturedReportError as exc:
         raise EvidenceVerificationError(str(exc), exit_code=4) from exc
+    if _expected_captured is not None and captured != _expected_captured:
+        raise EvidenceVerificationError(
+            "evidence family changed while verification was starting",
+            exit_code=4,
+            captured=_expected_captured,
+        )
     native_anchors = (
         expected_baseline_artifact,
         expected_subject_artifact,

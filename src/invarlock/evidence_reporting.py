@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import errno
 import hashlib
 import math
 import os
@@ -34,6 +33,7 @@ from invarlock.evidence_pack_json import (
     read_regular_file_bytes,
 )
 from invarlock.evidence_pack_snapshot import PackSnapshot
+from invarlock.filesystem.atomic_file import write_file_no_replace
 from invarlock.paired_exact_match import (
     PAIRED_CONFIDENCE_INTERVAL_METHODS,
     PairedExactMatchError,
@@ -46,6 +46,7 @@ from invarlock.report_presentation import (
     MetricView,
     ReportView,
     number,
+    xml_text,
 )
 from invarlock.report_presentation import (
     render_html as render_report_html,
@@ -473,49 +474,16 @@ def _write_html_no_clobber(path: Path, html: str) -> Path:
     destination = Path(path).absolute()
     if destination.name in {"", ".", ".."}:
         raise EvidenceReportError("HTML destination must name a regular file")
-    root_fd = os.open("/", _DIRECTORY_FLAGS)
-    current_fd = root_fd
-    descriptor: int | None = None
     try:
-        for component in destination.parent.parts[1:]:
-            try:
-                child_fd = os.open(component, _DIRECTORY_FLAGS, dir_fd=current_fd)
-            except FileNotFoundError:
-                os.mkdir(component, mode=0o755, dir_fd=current_fd)
-                child_fd = os.open(component, _DIRECTORY_FLAGS, dir_fd=current_fd)
-            previous_descriptor = current_fd
-            current_fd = child_fd
-            if previous_descriptor != root_fd:
-                os.close(previous_descriptor)
-        flags = (
-            os.O_WRONLY
-            | os.O_CREAT
-            | os.O_EXCL
-            | getattr(os, "O_CLOEXEC", 0)
-            | getattr(os, "O_NOFOLLOW", 0)
-        )
-        descriptor = os.open(destination.name, flags, 0o600, dir_fd=current_fd)
-        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
-            descriptor = None
-            handle.write(html)
-            handle.flush()
-            os.fsync(handle.fileno())
+        write_file_no_replace(destination, html.encode("utf-8"))
+    except FileExistsError as exc:
+        raise EvidenceReportError(
+            f"HTML destination already exists: {destination}"
+        ) from exc
     except OSError as exc:
-        if descriptor is not None:
-            os.close(descriptor)
-        if exc.errno == errno.EEXIST:
-            raise EvidenceReportError(
-                f"HTML destination already exists: {destination}"
-            ) from exc
         raise EvidenceReportError(
             f"could not write HTML report: {exc}", exit_code=1
         ) from exc
-    finally:
-        try:
-            if current_fd != root_fd:
-                os.close(current_fd)
-        finally:
-            os.close(root_fd)
     return destination
 
 
@@ -1533,7 +1501,10 @@ def render_evidence(
             )
             for metric in view.metrics:
                 case = SubElement(
-                    suite, "testcase", name=metric.name, classname=metric.scope
+                    suite,
+                    "testcase",
+                    name=xml_text(metric.name),
+                    classname=xml_text(metric.scope),
                 )
                 if metric.decision != "pass":
                     SubElement(
@@ -1541,7 +1512,7 @@ def render_evidence(
                         "error"
                         if metric.decision == "insufficient_evidence"
                         else "failure",
-                        message=metric.explanation,
+                        message=xml_text(metric.explanation),
                     )
             rendered["junit"] = tostring(suite, encoding="utf-8", xml_declaration=True)
         for name, raw in rendered.items():

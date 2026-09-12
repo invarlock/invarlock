@@ -5,7 +5,8 @@ from __future__ import annotations
 import hashlib
 import os
 import secrets
-import shutil
+from collections.abc import Iterator
+from contextlib import contextmanager, suppress
 from pathlib import Path
 from typing import Any
 
@@ -33,6 +34,35 @@ from invarlock.filesystem import (
 )
 
 
+@contextmanager
+def _opened_directory(parent: int, name: str) -> Iterator[int]:
+    """Own one descriptor for the complete surrounding publication scope."""
+    descriptor = os.open(
+        name,
+        os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC,
+        dir_fd=parent,
+    )
+    try:
+        yield descriptor
+    finally:
+        try:
+            os.close(descriptor)
+        except OSError:
+            # Never retry an uncertain close; the descriptor may be reused.
+            pass
+
+
+@contextmanager
+def _opened_directories(parent: int) -> Iterator[dict[str, int]]:
+    """Retain the fixed captured-evidence directories through publication."""
+    with (
+        _opened_directory(parent, "inputs") as inputs,
+        _opened_directory(parent, "records") as records,
+        _opened_directory(parent, "reports") as reports,
+    ):
+        yield {"inputs": inputs, "records": records, "reports": reports}
+
+
 class CapturedEvidenceError(ValueError):
     """Raised when captured evidence cannot be safely published."""
 
@@ -56,6 +86,46 @@ def _checksums(files: dict[str, bytes]) -> bytes:
 
 def _digest_bytes(payload: bytes) -> str:
     return f"sha256:{hashlib.sha256(payload).hexdigest()}"
+
+
+def _remove_empty_bound_directory(parent: int, name: str, descriptor: int) -> None:
+    """Check retained identity before best-effort removal of an empty entry."""
+    named = os.stat(name, dir_fd=parent, follow_symlinks=False)
+    opened = os.fstat(descriptor)
+    if (named.st_dev, named.st_ino) == (opened.st_dev, opened.st_ino):
+        os.rmdir(name, dir_fd=parent)
+
+
+def _cleanup_staging(
+    parent: int,
+    name: str,
+    stage: int,
+    directories: dict[str, int],
+    files: dict[str, bytes],
+) -> None:
+    """Best-effort bounded cleanup through descriptors owned by this attempt.
+
+    Never recursively traverse a staged pathname: it may now name another tree.
+    Same-user mutation within the retained directories remains a trust boundary.
+    """
+    # A moved stage may already be published when a post-rename check fails.
+    # Leave such trees intact; cleanup only uses the retained descriptors below.
+    named = os.stat(name, dir_fd=parent, follow_symlinks=False)
+    opened = os.fstat(stage)
+    if (named.st_dev, named.st_ino) != (opened.st_dev, opened.st_ino):
+        return
+    for filename in files:
+        path = Path(filename)
+        descriptor = (
+            stage if path.parent == Path(".") else directories[str(path.parent)]
+        )
+        with suppress(OSError):
+            os.unlink(path.name, dir_fd=descriptor)
+    for directory, descriptor in directories.items():
+        with suppress(OSError):
+            _remove_empty_bound_directory(stage, directory, descriptor)
+    with suppress(OSError):
+        _remove_empty_bound_directory(parent, name, stage)
 
 
 def publish_captured_evidence(
@@ -149,6 +219,10 @@ def publish_captured_evidence(
     destination = Path(destination).absolute()
     staging: Path | None = None
     cleanup: int | None = None
+    retained_stage: int | None = None
+    directories: dict[str, int] = {}
+    cleanup_attempted = False
+    published = False
     try:
         check_sizes(files)
         validate_contract(manifest)
@@ -159,24 +233,70 @@ def publish_captured_evidence(
             os.mkdir(stage_name, mode=0o700, dir_fd=parent)
             staging = destination.parent / stage_name
             with secure_directory(staging) as stage:
+                # The secure context verifies the original name on exit, before
+                # publication renames it. Keep its opened inode through rename.
+                retained_stage = os.dup(stage)
                 for directory in ("inputs", "records", "reports"):
                     os.mkdir(directory, mode=0o700, dir_fd=stage)
+        assert retained_stage is not None
+        with _opened_directories(retained_stage) as directories:
+            try:
                 for name, payload in files.items():
                     path = Path(name)
-                    with secure_directory(staging / path.parent) as output_parent:
-                        descriptor = os.open(
-                            path.name,
-                            os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
-                            0o600,
-                            dir_fd=output_parent,
+                    output_parent = (
+                        retained_stage
+                        if path.parent == Path(".")
+                        else directories[str(path.parent)]
+                    )
+                    descriptor = os.open(
+                        path.name,
+                        os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                        0o600,
+                        dir_fd=output_parent,
+                    )
+                    try:
+                        handle = os.fdopen(descriptor, "wb")
+                    except BaseException:
+                        os.close(descriptor)
+                        raise
+                    with handle:
+                        handle.write(payload)
+                        handle.flush()
+                        os.fchmod(handle.fileno(), 0o444)
+                        os.fsync(handle.fileno())
+                    os.fsync(output_parent)
+                for directory, descriptor in directories.items():
+                    named = os.stat(
+                        directory, dir_fd=retained_stage, follow_symlinks=False
+                    )
+                    opened = os.fstat(descriptor)
+                    if (named.st_dev, named.st_ino, named.st_mode) != (
+                        opened.st_dev,
+                        opened.st_ino,
+                        opened.st_mode,
+                    ):
+                        raise CapturedEvidenceError(
+                            "captured staging directory identity changed"
                         )
-                        with os.fdopen(descriptor, "wb") as handle:
-                            handle.write(payload)
-                            handle.flush()
-                            os.fchmod(handle.fileno(), 0o444)
-                            os.fsync(handle.fileno())
-                        os.fsync(output_parent)
-        publish_directory_no_replace(staging, destination)
+                publish_directory_no_replace(
+                    staging,
+                    destination,
+                    expected_source_fd=retained_stage,
+                    expected_source_parent_fd=cleanup,
+                )
+                published = True
+            finally:
+                cleanup_attempted = True
+                if not published and cleanup is not None:
+                    assert staging is not None
+                    with suppress(OSError):
+                        _cleanup_staging(
+                            cleanup,
+                            staging.name,
+                            retained_stage,
+                            directories,
+                            files,
+                        )
     except AtomicDirectoryExistsError as exc:
         raise CapturedEvidenceError(
             f"captured evidence destination already exists: {destination}"
@@ -192,14 +312,22 @@ def publish_captured_evidence(
             f"could not publish captured evidence: {exc}"
         ) from exc
     finally:
-        if cleanup is not None:
-            try:
-                if staging is not None:
-                    shutil.rmtree(staging.name, dir_fd=cleanup)
-            except FileNotFoundError:
-                pass
-            finally:
-                os.close(cleanup)
+        if (
+            not published
+            and not cleanup_attempted
+            and cleanup is not None
+            and retained_stage is not None
+        ):
+            assert staging is not None
+            with suppress(OSError):
+                with _opened_directories(retained_stage) as directories:
+                    _cleanup_staging(
+                        cleanup, staging.name, retained_stage, directories, files
+                    )
+        for retained_descriptor in (retained_stage, cleanup):
+            if retained_descriptor is not None:
+                with suppress(OSError):
+                    os.close(retained_descriptor)
     return destination
 
 

@@ -11,6 +11,7 @@ from invarlock.evaluator_qualification import (
     EvaluatorQualificationError,
     qualify_evaluator_export,
 )
+from invarlock.report_presentation import terminal_text
 from invarlock.security import enforce_default_security
 
 app = typer.Typer(
@@ -22,7 +23,12 @@ app = typer.Typer(
         "or retain it explicitly as observation-only."
     ),
 )
-console = Console()
+console = Console(markup=False, highlight=False)
+
+
+def _terminal_text(value: object) -> str:
+    """Render dynamic values without active terminal controls."""
+    return terminal_text(str(value))
 
 
 @app.callback()
@@ -92,19 +98,20 @@ def qualify(
         if output is not None:
             result.write(output)
     except EvaluatorQualificationError as exc:
-        console.print(f"FAIL {exc}")
+        console.print(f"FAIL {_terminal_text(exc)}")
         raise typer.Exit(2) from exc
     if json_out:
-        typer.echo(result.as_json(), nl=False)
+        typer.echo(_terminal_text(result.as_json().rstrip("\r\n")))
     elif result.authority == "verdict_authority":
         console.print(
-            f"PASS {result.profile_id}: {result.record_count} per-record results "
+            f"PASS {_terminal_text(result.profile_id)}: {result.record_count} "
+            "per-record results "
             "qualified for runtime import"
         )
     else:
         console.print(
-            f"PASS {result.profile_id}: retained as observation-only "
-            f"({', '.join(result.reason_codes)})"
+            f"PASS {_terminal_text(result.profile_id)}: retained as observation-only "
+            f"({', '.join(_terminal_text(code) for code in result.reason_codes)})"
         )
     if require_verdict_authority and result.authority != "verdict_authority":
         console.print("FAIL valid result is observation-only")

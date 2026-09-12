@@ -642,7 +642,7 @@ def test_paired_records_publish_only_after_complete_staging(
         raise OSError("simulated publication interruption")
 
     monkeypatch.setattr(
-        "invarlock.runtime_import_authoring.os.link", interrupt_before_publish
+        "invarlock.filesystem.atomic_file._rename_no_replace", interrupt_before_publish
     )
 
     with pytest.raises(RuntimeImportAuthoringError, match="new and writable"):
@@ -655,7 +655,7 @@ def test_paired_records_publish_only_after_complete_staging(
         )
 
     assert not destination.exists()
-    assert not list(tmp_path.glob(".paired-records.json.staging.*"))
+    assert not list(tmp_path.glob(".invarlock-write-*"))
 
 
 def test_reload_rejects_tampered_report_binding(tmp_path: Path) -> None:
@@ -775,7 +775,7 @@ def test_side_writer_removes_staging_after_atomic_publication_failure(
 ) -> None:
     destination = tmp_path / "baseline"
 
-    def fail_publication(_staging: Path, _output: Path) -> None:
+    def fail_publication(_staging: Path, _output: Path, **_ownership) -> None:
         raise OSError("simulated no-replace publication failure")
 
     monkeypatch.setattr(
@@ -1105,7 +1105,9 @@ def test_paired_records_no_clobber_preserves_existing_evidence(tmp_path: Path) -
     assert destination.read_text(encoding="utf-8") == '{"owner":"existing"}\n'
 
 
-def test_paired_records_cleanup_failure_closes_parent(tmp_path, monkeypatch):
+def test_paired_records_cleanup_failure_preserves_success_and_closes_descriptors(
+    tmp_path, monkeypatch
+):
     sides = [
         _write_side(
             tmp_path / role,
@@ -1117,43 +1119,41 @@ def test_paired_records_cleanup_failure_closes_parent(tmp_path, monkeypatch):
         for role, marker in (("baseline", "a"), ("subject", "b"))
     ]
     original_open = os.open
-    parents = []
+    opened = []
 
     def open_parent(path, *args, **kwargs):
         descriptor = original_open(path, *args, **kwargs)
-        if path == tmp_path:
-            parents.append(descriptor)
+        opened.append(descriptor)
         return descriptor
 
     def fail_cleanup(*args, **kwargs):
         raise PermissionError("staging cleanup denied")
 
     monkeypatch.setattr(os, "open", open_parent)
-    monkeypatch.setattr(os, "unlink", fail_cleanup)
-    try:
-        with pytest.raises(PermissionError, match="staging cleanup denied"):
-            write_runtime_import_paired_records(
-                tmp_path / "paired.json",
-                schedule=_schedule(),
-                metric="exact_match",
-                baseline=sides[0],
-                subject=sides[1],
-            )
-        assert len(parents) == 1
+    monkeypatch.setattr(os, "rmdir", fail_cleanup)
+    paired = write_runtime_import_paired_records(
+        tmp_path / "paired.json",
+        schedule=_schedule(),
+        metric="exact_match",
+        baseline=sides[0],
+        subject=sides[1],
+    )
+    assert hashlib.sha256(paired.path.read_bytes()).hexdigest() == paired.sha256
+    assert len(list(tmp_path.glob(".invarlock-write-*"))) == 1
+    assert opened
+    for descriptor in opened:
         with pytest.raises(OSError):
-            os.fstat(parents[0])
-    finally:
-        for descriptor in parents:
-            try:
-                os.close(descriptor)
-            except OSError:
-                pass
+            os.fstat(descriptor)
 
 
-def test_paired_records_detect_post_link_publication_change(
+@pytest.mark.parametrize("change", ["contents", "replacement"])
+def test_paired_records_detect_post_rename_change_without_deleting_destination(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    change: str,
 ) -> None:
+    from invarlock.filesystem import atomic_file
+
     baseline = _write_side(
         tmp_path / "baseline",
         role="baseline",
@@ -1169,17 +1169,21 @@ def test_paired_records_detect_post_link_publication_change(
         image_marker="b",
     )
     destination = tmp_path / "paired.json"
-    original_link = os.link
+    original_rename = atomic_file._rename_no_replace
 
-    def link_then_tamper(*args, **kwargs) -> None:
-        original_link(*args, **kwargs)
+    def rename_then_tamper(**kwargs) -> int:
+        result = original_rename(**kwargs)
+        assert result == 0
+        if change == "replacement":
+            destination.unlink()
         destination.write_text("{}\n", encoding="utf-8")
+        return result
 
-    monkeypatch.setattr("invarlock.runtime_import_authoring.os.link", link_then_tamper)
+    monkeypatch.setattr(atomic_file, "_rename_no_replace", rename_then_tamper)
 
     with pytest.raises(
         RuntimeImportAuthoringError,
-        match="paired records changed during publication",
+        match="paired-record destination must be new and writable",
     ):
         write_runtime_import_paired_records(
             destination,
@@ -1189,4 +1193,39 @@ def test_paired_records_detect_post_link_publication_change(
             subject=subject,
         )
 
-    assert not destination.exists()
+    assert destination.read_bytes() == b"{}\n"
+
+
+def test_paired_records_preserve_destination_created_at_publication_instant(
+    tmp_path, monkeypatch
+):
+    from invarlock.filesystem import atomic_file
+
+    sides = [
+        _write_side(
+            tmp_path / role,
+            role=role,
+            artifact=_artifact(f"{role}.gguf", marker),
+            outputs=("A", "B"),
+            image_marker=marker,
+        )
+        for role, marker in (("baseline", "a"), ("subject", "b"))
+    ]
+    destination = tmp_path / "paired.json"
+    original_rename = atomic_file._rename_no_replace
+
+    def race_then_rename(**kwargs):
+        destination.write_bytes(b"concurrent output")
+        return original_rename(**kwargs)
+
+    monkeypatch.setattr(atomic_file, "_rename_no_replace", race_then_rename)
+    with pytest.raises(RuntimeImportAuthoringError, match="new and writable"):
+        write_runtime_import_paired_records(
+            destination,
+            schedule=_schedule(),
+            metric="exact_match",
+            baseline=sides[0],
+            subject=sides[1],
+        )
+    assert destination.read_bytes() == b"concurrent output"
+    assert not list(tmp_path.glob(".invarlock-write-*"))

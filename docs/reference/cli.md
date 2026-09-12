@@ -143,6 +143,12 @@ publishes the evidence directory. Import requests do not launch workers.
 | `--preflight` | No | None | Perform execution-free qualification and emit `invarlock/evaluation-preflight-v2` |
 | `--json` | No | None | Emit one compact `invarlock/evaluation-result-v1` object |
 
+Runtime image, device, entrypoint and resource controls apply only to run-mode
+requests. Import evidence already records its runtime identity, so `evaluate`
+rejects explicit run controls for an import request instead of silently ignoring
+them. The command also fails if the request's execution mode changes between
+mode detection and full loading.
+
 ### Captured evaluation controls
 
 Captured requests use `invarlock/evaluation-request-v2` with
@@ -458,6 +464,12 @@ and native calls requesting Markdown or JUnit, emit
 All destinations are checked up front; a later write failure leaves earlier
 completed outputs accurately listed. There is no automatic receipt discovery.
 Unsigned captured reports remain explicitly local, without independent assurance.
+
+Captured text, HTML and Markdown reports include the baseline and subject run
+IDs, complete-run digests, attributed artifact digests and evaluator source
+identities in their technical details. The comparison context also shows the
+recorded model, workflow, dataset and prompt metadata when supplied. These
+details identify what was compared without changing the report's assurance.
 
 Reporting does not accept independent artifact, schedule, policy, runtime, or
 signer anchors and does not issue a verification receipt. It is therefore a

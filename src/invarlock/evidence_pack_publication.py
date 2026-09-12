@@ -5,8 +5,6 @@ from __future__ import annotations
 import base64
 import hashlib
 import os
-import shutil
-import tempfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -55,6 +53,7 @@ from invarlock.filesystem import (
     AtomicDirectoryPublicationError,
     publish_directory_no_replace,
 )
+from invarlock.filesystem.staged_directory import staged_directory
 from invarlock.runtime_provider_evidence import (
     RuntimeProviderEvidenceError,
     decode_artifact_identity,
@@ -141,9 +140,20 @@ def _fsync_directory(path: Path) -> None:
         os.close(descriptor)
 
 
-def _publish_directory_no_clobber(staging: Path, destination: Path) -> None:
+def _publish_directory_no_clobber(
+    staging: Path,
+    destination: Path,
+    *,
+    expected_source_fd: int | None = None,
+    expected_source_parent_fd: int | None = None,
+) -> None:
     try:
-        publish_directory_no_replace(staging, destination)
+        publish_directory_no_replace(
+            staging,
+            destination,
+            expected_source_fd=expected_source_fd,
+            expected_source_parent_fd=expected_source_parent_fd,
+        )
     except AtomicDirectoryExistsError as exc:
         raise EvidencePackError(
             f"evidence destination already exists: {destination}"
@@ -174,21 +184,26 @@ def _preflight_runtime_side(
     provider_name: str,
     schedule_sha256: str,
     policy_digest: str,
+    payload_files: Mapping[str, bytes] | None = None,
 ) -> None:
+    def payload(relative: str, *, label: str) -> bytes:
+        if payload_files is not None:
+            return payload_files[relative]
+        return read_regular_file_bytes(
+            staging / relative, label=label, max_bytes=MAX_EVIDENCE_BYTES
+        )
+
     manifest_path = staging / EVIDENCE_PATHS[f"{side}_runtime_manifest"]
     report_path = staging / EVIDENCE_PATHS[f"{side}_run_report"]
     manifest = parse_json_object(
-        read_regular_file_bytes(
-            manifest_path,
+        payload(
+            EVIDENCE_PATHS[f"{side}_runtime_manifest"],
             label=f"{side} runtime manifest",
-            max_bytes=MAX_EVIDENCE_BYTES,
         ),
         label=f"{side} runtime manifest",
     )
     result = verify_runtime_manifest_snapshot(
-        read_regular_file_bytes(
-            report_path, label=f"{side} run report", max_bytes=MAX_EVIDENCE_BYTES
-        ),
+        payload(EVIDENCE_PATHS[f"{side}_run_report"], label=f"{side} run report"),
         manifest,
         report=report_path,
         manifest=manifest_path,
@@ -201,19 +216,17 @@ def _preflight_runtime_side(
         )
     try:
         identity = decode_artifact_identity(
-            read_regular_file_bytes(
-                staging / EVIDENCE_PATHS[f"{side}_provider_identity"],
+            payload(
+                EVIDENCE_PATHS[f"{side}_provider_identity"],
                 label=f"{side} artifact identity",
-                max_bytes=MAX_EVIDENCE_BYTES,
             )
         )
     except (RuntimeProviderEvidenceError, StrictJsonError) as exc:
         raise EvidencePackError(str(exc)) from exc
     config_errors = runtime_side_config_errors(
-        read_regular_file_bytes(
-            staging / EVIDENCE_PATHS[f"{side}_runtime_config"],
+        payload(
+            EVIDENCE_PATHS[f"{side}_runtime_config"],
             label=f"{side} runtime config",
-            max_bytes=MAX_EVIDENCE_BYTES,
         ),
         role=side,
         provider_name=provider_name,
@@ -495,11 +508,8 @@ def publish_comparison_evidence(
     )
     assert fingerprint == derived_fingerprint
 
-    staging = Path(
-        tempfile.mkdtemp(prefix=f".{destination.name}.staging-", dir=destination.parent)
-    )
-    published = False
-    try:
+    with staged_directory(destination, prefix=f".{destination.name}.staging-") as stage:
+        staging = stage.path
         for relative, payload in sorted(payload_files.items()):
             _write_new(staging / relative, payload)
         _preflight_runtime_side(
@@ -511,6 +521,7 @@ def publish_comparison_evidence(
             provider_name=provider_name("baseline"),
             schedule_sha256=schedule.schedule_sha256,
             policy_digest=policy.digest,
+            payload_files=payload_files,
         )
         _preflight_runtime_side(
             staging,
@@ -521,22 +532,30 @@ def publish_comparison_evidence(
             provider_name=provider_name("subject"),
             schedule_sha256=schedule.schedule_sha256,
             policy_digest=policy.digest,
+            payload_files=payload_files,
         )
         _write_new(staging / "checksums.sha256", checksums)
         _write_new(staging / "manifest.json", manifest_bytes)
         _write_new(staging / integrity.MANIFEST_SIGNATURE_FILENAME, signature_bytes)
-        _publish_directory_no_clobber(staging, destination)
-        published = True
-        for directory in sorted(
-            (path for path in destination.rglob("*") if path.is_dir()),
-            key=lambda path: len(path.parts),
-            reverse=True,
-        ):
-            directory.chmod(0o555)
-        destination.chmod(0o555)
-    finally:
-        if not published and staging.exists():
-            shutil.rmtree(staging, ignore_errors=True)
+        expected_files = {
+            **payload_files,
+            "checksums.sha256": checksums,
+            "manifest.json": manifest_bytes,
+            integrity.MANIFEST_SIGNATURE_FILENAME: signature_bytes,
+        }
+        try:
+            stage.require_exact_files(expected_files)
+        except OSError as exc:
+            raise EvidencePackError(
+                f"could not validate staged evidence pack: {exc}"
+            ) from exc
+        stage.publish(_publish_directory_no_clobber)
+        try:
+            stage.make_read_only()
+            stage.require_exact_files(expected_files)
+            stage.require_published_binding()
+        except OSError as exc:
+            raise EvidencePackError(f"could not finalize evidence pack: {exc}") from exc
     return EvidencePublication(
         evidence_path=destination,
         pack_manifest_digest=sha256_digest(manifest_bytes),

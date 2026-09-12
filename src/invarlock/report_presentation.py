@@ -14,15 +14,51 @@ from dataclasses import dataclass, field
 from html import escape as html_escape
 from typing import Any
 
+_DISPLAY_CONTROL_RE = re.compile(
+    r"[\x00-\x08\x0b-\x1f\x7f-\x9f\u061c\u200e\u200f\u2028\u2029\u202a-\u202e\u2066-\u2069]"
+)
+_TERMINAL_CONTROL_RE = re.compile(
+    r"[\x00-\x1f\x7f-\x9f\u061c\u200e\u200f\u2028\u2029\u202a-\u202e\u2066-\u2069]"
+)
 
-def escape(value: str, quote: bool = True) -> str:
-    """Show terminal control bytes literally before escaping report markup."""
-    visible = re.sub(
-        r"[\x00-\x08\x0b-\x1f\x7f-\x9f]",
+
+def visible_controls(value: str) -> str:
+    """Render control and bidirectional formatting characters visibly."""
+    return _DISPLAY_CONTROL_RE.sub(
         lambda match: f"\\u{ord(match.group()):04x}",
         value,
     )
+
+
+def terminal_text(value: str) -> str:
+    """Make one dynamic terminal value unable to create or reorder lines."""
+    return _TERMINAL_CONTROL_RE.sub(
+        lambda match: f"\\u{ord(match.group()):04x}",
+        value,
+    )
+
+
+def escape(value: str, quote: bool = True) -> str:
+    """Show terminal control bytes literally before escaping report markup."""
+    visible = visible_controls(value)
     return html_escape(visible, quote=quote)
+
+
+def xml_text(value: str) -> str:
+    """Render controls visibly and replace characters forbidden by XML 1.0."""
+    return "".join(
+        character
+        if character in "\t\n\r"
+        or "\u0020" <= character <= "\ud7ff"
+        or "\ue000" <= character <= "\ufffd"
+        or "\U00010000" <= character <= "\U0010ffff"
+        else (
+            f"\\u{ord(character):04x}"
+            if ord(character) <= 0xFFFF
+            else f"\\U{ord(character):08x}"
+        )
+        for character in visible_controls(value)
+    )
 
 
 # Static mark from docs/assets/invarlock-app-icon.svg; the adjacent name labels it.
@@ -551,8 +587,14 @@ def render_markdown(view: ReportView, *, include_details: bool = False) -> str:
                 f"## {clean(heading)}",
                 "",
                 "```json",
-                json.dumps(
-                    data, ensure_ascii=False, indent=2, sort_keys=True, allow_nan=False
+                visible_controls(
+                    json.dumps(
+                        data,
+                        ensure_ascii=False,
+                        indent=2,
+                        sort_keys=True,
+                        allow_nan=False,
+                    )
                 ).replace("`", "\\u0060"),
                 "```",
             ]

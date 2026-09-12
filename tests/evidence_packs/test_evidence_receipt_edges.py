@@ -15,6 +15,7 @@ from invarlock.evidence_receipt import (
     verify_signed_verification_receipt,
     write_signed_verification_receipt,
 )
+from invarlock.filesystem import atomic_file
 from tests.evidence_packs.test_evidence_receipt import (
     _digest,
     _input_anchor_kwargs,
@@ -62,16 +63,14 @@ def test_receipt_no_clobber_race_never_removes_the_other_writer_file(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     receipt = tmp_path / "receipt.json"
-    real_open = Path.open
+    real_publish = atomic_file._rename_no_replace
 
-    def raced_open(path: Path, mode: str = "r", *args, **kwargs):
-        if path == receipt and mode == "xb":
-            with real_open(receipt, "wb") as handle:
-                handle.write(b"other writer")
-            raise FileExistsError("raced")
-        return real_open(path, mode, *args, **kwargs)
+    def raced_publish(**kwargs):
+        assert not receipt.exists()
+        receipt.write_bytes(b"other writer")
+        return real_publish(**kwargs)
 
-    monkeypatch.setattr(Path, "open", raced_open)
+    monkeypatch.setattr(atomic_file, "_rename_no_replace", raced_publish)
 
     with pytest.raises(receipt_module.EvidenceReceiptError, match="already exists"):
         receipt_module._write_no_clobber(receipt, b"ours")
@@ -103,12 +102,12 @@ def test_receipt_writer_allows_caller_managed_signer_roles(
     assert receipt.is_file()
 
 
-def test_receipt_writer_removes_partial_file_after_durable_write_failure(
+def test_receipt_writer_never_publishes_file_after_durable_write_failure(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     destination = tmp_path / "receipt.json"
     monkeypatch.setattr(
-        receipt_module.os,
+        atomic_file.os,
         "fsync",
         lambda _descriptor: (_ for _ in ()).throw(OSError("storage failure")),
     )
@@ -123,14 +122,14 @@ def test_receipt_writer_maps_destination_open_failure_without_cleanup_race(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     destination = tmp_path / "receipt.json"
-    real_open = Path.open
+    real_open = atomic_file.os.open
 
-    def denied_open(path: Path, mode: str = "r", *args, **kwargs):
-        if path == destination and mode == "xb":
+    def denied_open(path, flags, *args, **kwargs):
+        if path == "payload":
             raise OSError("permission denied")
-        return real_open(path, mode, *args, **kwargs)
+        return real_open(path, flags, *args, **kwargs)
 
-    monkeypatch.setattr(Path, "open", denied_open)
+    monkeypatch.setattr(atomic_file.os, "open", denied_open)
     with pytest.raises(EvidenceReceiptError, match="could not write"):
         receipt_module._write_no_clobber(destination, b"receipt")
     assert not destination.exists()

@@ -10,9 +10,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added shared comparison context to native and captured HTML and Markdown
-  reports, including recorded model identity, workflow, dataset and prompt changes.
-  Missing metadata remains explicit; report rendering preserves evidence and
-  does not establish independent recipient acceptance.
+  reports, including run and artifact digests, evaluator source, recorded model
+  identity, workflow, dataset and prompt changes. Missing metadata remains
+  explicit; report rendering preserves evidence and does not establish
+  independent recipient acceptance.
+
+- Hardened captured JSONL imports, artifact attestation and retained-reference
+  replay against oversized, replaced or non-regular inputs; escaped hostile
+  control characters in dynamic evaluation, verification, setup, reporting,
+  evaluator qualification and XML output; rejected request mode changes during
+  loading and run-only controls on import requests; and closed raw file
+  descriptors and incomplete report outputs when stream construction fails.
+
+- Consolidated receipt, report, evaluator-qualification and runtime-sidecar file
+  publication around private staging and retained file descriptors. Publication
+  rejects substituted sources and changed parent directories, synchronizes the
+  destination entry, and preserves completed or competing files on failure.
+  Captured evidence retains its original staging identity through publication;
+  artifact attestation checks both the file and its ancestor directories.
+  Linux workers can publish sidecars beneath writable output mounts that allow
+  traversal without directory listing.
 
 - Added the complete 4,000-pair K2 Horizon 32B routing captured reference with
   an unchanged signed pack, independent recipient replay and source attribution.
@@ -133,6 +150,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Kept core report failures in JSON when requested and preserved literal error
   details such as signer fingerprints in text output.
+- Published report files through private, fully flushed staging entries without
+  replacing existing destinations or deleting concurrently replaced output.
 - Displayed sample-count, precision and side-accuracy requirements in both
   report formats, and matched interval labels and units to the actual scorer.
 

@@ -10,9 +10,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
-import shutil
-import tempfile
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -51,12 +48,19 @@ from invarlock.filesystem.atomic_directory import (
     AtomicDirectoryPublicationError,
     publish_directory_no_replace,
 )
-from invarlock.runtime_manifest import write_runtime_manifest
+from invarlock.filesystem.atomic_file import write_file_no_replace
+from invarlock.filesystem.staged_directory import staged_directory
+from invarlock.runtime_manifest import (
+    _build_runtime_manifest_payload,
+    write_runtime_manifest,
+)
 from invarlock.runtime_provider_evidence import (
     MAX_RUNTIME_PROVIDER_SIDECAR_BYTES,
     PersistedRuntimeProviderEvidence,
     RuntimeProviderEvidenceError,
     RuntimeProviderEvidencePaths,
+    encode_artifact_identity,
+    encode_runtime_provider_receipt,
     encode_scoring_observation,
     load_runtime_provider_evidence,
     write_runtime_provider_evidence,
@@ -406,46 +410,28 @@ def write_runtime_import_side(
         runtime_image_digest=runtime_image_digest,
         observation=observation,
     )
-    output, parent = _destination(directory)
-    staging = Path(tempfile.mkdtemp(dir=parent, prefix=f".{output.name}.staging."))
+    output, _parent = _destination(directory)
     try:
-        provider_evidence = write_runtime_provider_evidence(
-            staging,
-            artifact_identity=artifact_identity,
-            scoring_observation=observation,
-            receipt=receipt,
-            expected_outer_image_digest=runtime_image_digest,
-        )
-        report_path = staging / RUNTIME_IMPORT_REPORT_FILENAME
-        report_path.write_bytes(
-            canonical_json_bytes(
+        with staged_directory(output, prefix=f".{output.name}.staging.") as stage:
+            staging = stage.path
+            provider_paths = RuntimeProviderEvidencePaths.in_directory(staging)
+            artifact_bytes = encode_artifact_identity(artifact_identity)
+            observation_bytes = encode_scoring_observation(observation)
+            receipt_bytes = encode_runtime_provider_receipt(receipt)
+            report_bytes = canonical_json_bytes(
                 _report_payload(
                     observation,
-                    scoring_observation_sha256=(
-                        provider_evidence.scoring_observation_sha256
-                    ),
+                    scoring_observation_sha256=hashlib.sha256(
+                        observation_bytes
+                    ).hexdigest(),
                 )
             )
-        )
-        config_path = staging / RUNTIME_IMPORT_CONFIG_FILENAME
-        config_path.write_bytes(
-            canonical_json_bytes(
+            config_bytes = canonical_json_bytes(
                 _config_payload(
-                    role=role,
-                    observation=observation,
-                    policy_digest=policy_digest,
+                    role=role, observation=observation, policy_digest=policy_digest
                 )
             )
-        )
-        manifest_path = write_runtime_manifest(
-            report_path,
-            provider_files=RuntimeProviderManifestFiles(
-                receipt=provider_evidence.paths.receipt,
-                scoring_observation=provider_evidence.paths.scoring_observation,
-                artifact_identity=provider_evidence.paths.artifact_identity,
-            ),
-            config_path=config_path,
-            execution=RuntimeManifestExecution(
+            execution = RuntimeManifestExecution(
                 execution_mode="container",
                 container_execution=True,
                 image_ref=runtime_image_ref,
@@ -453,23 +439,107 @@ def write_runtime_import_side(
                 allow_network=False,
                 allow_remote_code=False,
                 allow_third_party_plugins=False,
-            ),
-            generated_at_utc=generated_at_utc,
-        )
-        manifest = cast(dict[str, object], json.loads(manifest_path.read_bytes()))
-        verification = verify_runtime_manifest_snapshot(
-            report_path.read_bytes(),
-            manifest,
-            report=report_path,
-            manifest=manifest_path,
-            expected_image_digest=runtime_image_digest,
-            require_strict_runtime=True,
-        )
-        if verification.errors:
-            raise RuntimeImportAuthoringError(
-                "runtime import manifest is invalid: " + "; ".join(verification.errors)
             )
-        publish_directory_no_replace(staging, output)
+            manifest = _build_runtime_manifest_payload(
+                report_name=RUNTIME_IMPORT_REPORT_FILENAME,
+                report_sha256=hashlib.sha256(report_bytes).hexdigest(),
+                config_reference={
+                    "path": RUNTIME_IMPORT_CONFIG_FILENAME,
+                    "sha256": hashlib.sha256(config_bytes).hexdigest(),
+                    "source": "file",
+                },
+                provider_references={
+                    role_name: {
+                        "filename": file_path.name,
+                        "sha256": hashlib.sha256(raw).hexdigest(),
+                    }
+                    for role_name, file_path, raw in (
+                        (
+                            "artifact_identity",
+                            provider_paths.artifact_identity,
+                            artifact_bytes,
+                        ),
+                        (
+                            "scoring_observation",
+                            provider_paths.scoring_observation,
+                            observation_bytes,
+                        ),
+                        ("receipt", provider_paths.receipt, receipt_bytes),
+                    )
+                },
+                runtime_execution=execution,
+                generated_at_utc=generated_at_utc,
+            )
+            manifest_bytes = (
+                json.dumps(manifest, indent=2, sort_keys=True, allow_nan=False) + "\n"
+            ).encode("utf-8")
+            expected_files = {
+                provider_paths.artifact_identity.name: artifact_bytes,
+                provider_paths.scoring_observation.name: observation_bytes,
+                provider_paths.receipt.name: receipt_bytes,
+                RUNTIME_IMPORT_REPORT_FILENAME: report_bytes,
+                RUNTIME_IMPORT_CONFIG_FILENAME: config_bytes,
+                RUNTIME_IMPORT_MANIFEST_FILENAME: manifest_bytes,
+            }
+            write_runtime_provider_evidence(
+                staging,
+                artifact_identity=artifact_identity,
+                scoring_observation=observation,
+                receipt=receipt,
+                expected_outer_image_digest=runtime_image_digest,
+            )
+            report_path = staging / RUNTIME_IMPORT_REPORT_FILENAME
+            report_path.write_bytes(report_bytes)
+            config_path = staging / RUNTIME_IMPORT_CONFIG_FILENAME
+            config_path.write_bytes(config_bytes)
+            manifest_path = write_runtime_manifest(
+                report_path,
+                provider_files=RuntimeProviderManifestFiles(
+                    receipt=provider_paths.receipt,
+                    scoring_observation=provider_paths.scoring_observation,
+                    artifact_identity=provider_paths.artifact_identity,
+                ),
+                config_path=config_path,
+                execution=execution,
+                generated_at_utc=cast(str, manifest["generated_at_utc"]),
+            )
+            verification = verify_runtime_manifest_snapshot(
+                report_bytes,
+                manifest,
+                report=report_path,
+                manifest=manifest_path,
+                expected_image_digest=runtime_image_digest,
+                require_strict_runtime=True,
+            )
+            if verification.errors:
+                raise RuntimeImportAuthoringError(
+                    "runtime import manifest is invalid: "
+                    + "; ".join(verification.errors)
+                )
+            stage.require_exact_files(expected_files)
+            stage.publish(publish_directory_no_replace)
+            reloaded = load_runtime_import_side(
+                output,
+                role=role,
+                schedule=schedule,
+                policy_digest=policy_digest,
+                expected_runtime_image_digest=runtime_image_digest,
+            )
+            stage.require_exact_files(expected_files)
+            stage.require_published_binding()
+            expected_side = RuntimeSideEvidence(
+                run_report=report_bytes,
+                runtime_manifest=manifest_bytes,
+                runtime_config=config_bytes,
+                artifact_identity=artifact_bytes,
+                provider_receipt=receipt_bytes,
+                scoring_observation=observation_bytes,
+            )
+            if reloaded.evidence_pack_value() != expected_side:
+                raise RuntimeImportAuthoringError(
+                    "runtime import reload does not match generated evidence"
+                )
+            return reloaded
     except RuntimeImportAuthoringError:
         raise
     except (
@@ -481,16 +551,6 @@ def write_runtime_import_side(
         ValueError,
     ) as exc:
         raise RuntimeImportAuthoringError(str(exc)) from exc
-    finally:
-        if staging.exists():
-            shutil.rmtree(staging, ignore_errors=True)
-    return load_runtime_import_side(
-        output,
-        role=role,
-        schedule=schedule,
-        policy_digest=policy_digest,
-        expected_runtime_image_digest=runtime_image_digest,
-    )
 
 
 def _canonical_object_file(
@@ -678,66 +738,14 @@ def write_runtime_import_paired_records(
         )
     output = output_parent / output_candidate.name
     payload = canonical_json_bytes(paired)
-    parent_fd: int | None = None
-    staging_fd: int | None = None
-    staging_name: str | None = None
     try:
-        parent_fd = os.open(
-            output_parent,
-            os.O_RDONLY
-            | getattr(os, "O_CLOEXEC", 0)
-            | getattr(os, "O_DIRECTORY", 0)
-            | getattr(os, "O_NOFOLLOW", 0),
-        )
-        staging_fd, staging_path = tempfile.mkstemp(
-            dir=output_parent,
-            prefix=f".{output.name}.staging.",
-        )
-        staging_name = Path(staging_path).name
-        with os.fdopen(staging_fd, "wb") as handle:
-            staging_fd = None
-            handle.write(payload)
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.link(
-            staging_name,
-            output.name,
-            src_dir_fd=parent_fd,
-            dst_dir_fd=parent_fd,
-            follow_symlinks=False,
-        )
-        os.fsync(parent_fd)
+        write_file_no_replace(output, payload, create_parents=False)
     except OSError as exc:
         raise RuntimeImportAuthoringError(
             "runtime import paired-record destination must be new and writable"
         ) from exc
-    finally:
-        try:
-            try:
-                if staging_fd is not None:
-                    os.close(staging_fd)
-            finally:
-                if staging_name is not None and parent_fd is not None:
-                    try:
-                        os.unlink(staging_name, dir_fd=parent_fd)
-                    except FileNotFoundError:
-                        pass
-        finally:
-            if parent_fd is not None:
-                os.close(parent_fd)
-    try:
-        reloaded, value = _canonical_object_file(
-            output, label="runtime import paired records"
-        )
-        if value != paired or reloaded != payload:
-            raise RuntimeImportAuthoringError(
-                "runtime import paired records changed during publication"
-            )
-    except RuntimeImportAuthoringError:
-        output.unlink(missing_ok=True)
-        raise
     return RuntimeImportPairedRecords(
-        path=output.resolve(),
+        path=output,
         payload=paired,
         sha256=hashlib.sha256(payload).hexdigest(),
     )

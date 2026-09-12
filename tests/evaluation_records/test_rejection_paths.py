@@ -35,8 +35,6 @@ from tests._evaluation_support import (
     make_run,
     materialize_captured_request,
     read_json,
-    write_directory,
-    write_new,
     write_snapshot,
 )
 
@@ -250,11 +248,7 @@ def test_invalid_file_and_identity_operations(tmp_path):
     path.write_text(json.dumps(base))
     with pytest.raises(EvaluationRecordsError):
         load_run(path, run_id="override")
-    with pytest.raises(EvaluationRecordsError):
-        write_new(path, b"changed")
     assert json.loads(path.read_text()) == base
-    with pytest.raises(EvaluationRecordsError):
-        write_directory(tmp_path / "result", {"../escape": b"bad"})
     request = materialize_captured_request(
         tmp_path / "request", base, candidate, policy
     )

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any, Literal
@@ -66,32 +65,26 @@ def _setup_result(
 def _write_setup_file(path: Path, payload: bytes) -> None:
     from invarlock.captured_contracts import atomic_write
 
-    atomic_write(path, payload)
+    try:
+        atomic_write(path, payload)
+    except FileExistsError as exc:
+        raise ValueError(f"setup file already exists: {path.name}") from exc
 
 
 def _publish_setup_directory(directory: Path, artifacts: dict[str, bytes]) -> None:
-    import secrets
-    import shutil
-
-    from invarlock.captured_contracts import secure_directory
     from invarlock.filesystem import publish_directory_no_replace
+    from invarlock.filesystem.staged_directory import staged_directory
 
     directory = directory.absolute()
-    with secure_directory(directory.parent, create=True) as parent:
-        if directory.exists() or directory.is_symlink():
-            raise ValueError("setup directory must not already exist")
-        name = ".evaluation-setup-" + secrets.token_hex(16)
-        os.mkdir(name, mode=0o700, dir_fd=parent)
-        staging = directory.parent / name
-        try:
-            for relative, raw in artifacts.items():
-                _write_setup_file(staging / relative, raw)
-            publish_directory_no_replace(staging, directory)
-        finally:
-            try:
-                shutil.rmtree(name, dir_fd=parent)
-            except FileNotFoundError:
-                pass
+    if directory.exists() or directory.is_symlink():
+        raise ValueError("setup directory must not already exist")
+    with staged_directory(
+        directory, prefix=".evaluation-setup-", create_parents=True
+    ) as stage:
+        for relative, raw in artifacts.items():
+            _write_setup_file(stage.path / relative, raw)
+        stage.require_exact_files(artifacts)
+        stage.publish(publish_directory_no_replace)
 
 
 def _run_setup_action(
@@ -222,14 +215,14 @@ def _run_setup_action(
     ) as exc:
         setup_result = _setup_result(action, errors=[str(exc)])
     if json_out:
-        typer.echo(canonical_json_bytes(setup_result).decode("utf-8"))
+        _echo_json(canonical_json_bytes(setup_result).decode("utf-8"))
     elif setup_result["ok"]:
         assert setup_result["details"] is not None
         for key, value in setup_result["details"].items():
-            console.print(f"{key}: {value}")
+            console.print(f"{_terminal_text(key)}: {_terminal_text(value)}")
     else:
         for error in setup_result["errors"]:
-            console.print(f"FAIL {error}")
+            console.print(f"FAIL {_terminal_text(error)}")
     if not setup_result["ok"]:
         raise typer.Exit(2)
 
@@ -242,7 +235,7 @@ def _emit_version() -> None:
             from invarlock import __version__ as resolved
         except (ImportError, ModuleNotFoundError):
             resolved = "unknown"
-    console.print(f"InvarLock {resolved}")
+    console.print(f"InvarLock {_terminal_text(resolved)}")
 
 
 def _version_callback(value: bool) -> None:
@@ -263,15 +256,32 @@ def _finish_policy_gate(verdict: str | None) -> None:
     raise typer.Exit(2)
 
 
+def _terminal_text(value: object) -> str:
+    """Render untrusted dynamic text without active terminal controls."""
+    from invarlock.report_presentation import terminal_text
+
+    return terminal_text(str(value))
+
+
+def _echo_json(value: str) -> None:
+    """Escape terminal controls while preserving parsed JSON string values."""
+    body = value.rstrip("\r\n")
+    typer.echo(_terminal_text(body) + value[len(body) :])
+
+
 def _print_captured_metrics(metrics: tuple[dict[str, Any], ...]) -> None:
     for metric in metrics:
+        name = _terminal_text(metric["name"])
+        scope = _terminal_text(metric["slice"])
+        decision = _terminal_text(metric["decision"])
         console.print(
-            f"{metric['name']} / {metric['slice']}: {metric['decision']}; "
+            f"{name} / {scope}: {decision}; "
             f"{metric['usable_count']} usable pairs; "
             f"{metric['missing_count']} missing results"
         )
         if metric["reasons"]:
-            console.print(f"Recorded reasons: {'; '.join(metric['reasons'])}")
+            reasons = "; ".join(_terminal_text(v) for v in metric["reasons"])
+            console.print(f"Recorded reasons: {reasons}")
 
 
 @app.callback()
@@ -627,9 +637,9 @@ def evaluate(  # noqa: C901
         if json_out:
             from invarlock.evidence_pack_contract import canonical_json_bytes
 
-            typer.echo(canonical_json_bytes(result).decode("utf-8"))
+            _echo_json(canonical_json_bytes(result).decode("utf-8"))
         else:
-            console.print(f"FAIL {setup_error}")
+            console.print(f"FAIL {_terminal_text(setup_error)}")
         raise typer.Exit(2)
     if preflight and fail_on_policy:
         raise typer.BadParameter("--fail-on-policy cannot be used with --preflight")
@@ -646,238 +656,83 @@ def evaluate(  # noqa: C901
 
     from invarlock.captured_evaluation import (
         CapturedEvaluationError,
+        CapturedEvaluationPreflightResult,
+        CapturedEvaluationTransactionResult,
     )
-    from invarlock.cli.runtime_profile import (
-        ResolvedRuntimeProfile,
-        RuntimeProfile,
-        RuntimeProfileError,
-        load_runtime_profile,
-        resolve_runtime_profile,
+    from invarlock.cli.evaluation_workflow import (
+        EvaluationOptions,
+        execute_evaluation,
     )
     from invarlock.core.evaluation_request import (
-        CapturedEvaluationRequest,
         EvaluationRequestError,
         evaluation_request_mode,
-        load_evaluation_request,
     )
-    from invarlock.core.registry import CoreRegistry
-    from invarlock.core.scorer_extension import ScorerExtensionRegistry
     from invarlock.evaluation_oci import (
         OciEvaluationError,
-        OciRuntimeExecutor,
-        launch_from_environment,
-        preflight_oci_launch,
     )
     from invarlock.evaluation_transaction import (
         EvaluationPreflightError,
         EvaluationPreflightResult,
         EvaluationTransactionError,
         EvaluationTransactionResult,
-        evaluate_request_file,
-        preflight_evaluation_request,
     )
     from invarlock.evidence_pack_json import StrictJsonError
 
-    profile: RuntimeProfile | None = None
-    profile_context: ResolvedRuntimeProfile | None = None
-    evaluation_result: EvaluationPreflightResult | EvaluationTransactionResult
+    evaluation_result: (
+        CapturedEvaluationPreflightResult
+        | CapturedEvaluationTransactionResult
+        | EvaluationPreflightResult
+        | EvaluationTransactionResult
+    )
     assert request is not None
-    request_path = request
     request_mode: Literal["captured", "runtime", "run", "import"] = "runtime"
-    overrides: dict[str, Any] = {
-        name: value
-        for name, value in (
-            ("baseline_run", baseline_run),
-            ("subject_run", subject_run),
-            ("output", output),
-        )
-        if value is not None
-    }
+    command_line = frozenset(
+        name
+        for name in ctx.params
+        if getattr(ctx.get_parameter_source(name), "name", None) == "COMMANDLINE"
+    )
+    initial_mode: Literal["captured", "runtime", "run", "import"] | None = None
     try:
-        if not request_path.is_file():
-            raise EvaluationRequestError(
-                f"evaluation request is unavailable: {request_path}"
-            )
-        # Discriminate the strict request before constructing the runtime registry.
-        # The fallback keeps callable-level tests and integrations that replace the
-        # loader observable without changing the real strict-loader path.
-        loaded_request: object | None = None
         try:
-            request_mode = evaluation_request_mode(request_path)
+            request_mode = evaluation_request_mode(request)
+            initial_mode = request_mode
         except EvaluationRequestError:
-            loaded_request = load_evaluation_request(
-                request_path, request_root=request_root, **overrides
-            )
-            request_mode = (
-                "captured"
-                if isinstance(loaded_request, CapturedEvaluationRequest)
-                else "runtime"
-            )
-        if request_mode == "captured":
-            if loaded_request is None:
-                loaded_request = load_evaluation_request(
-                    request_path, request_root=request_root, **overrides
-                )
-            assert isinstance(loaded_request, CapturedEvaluationRequest)
-            runtime_names = setup_option_names - {
-                "signing_key",
-                "preflight",
-                "fail_on_policy",
-                "unsigned",
-                "max_bootstrap_draws",
-                "request_root",
-                "baseline_run",
-                "subject_run",
-                "output",
-            }
-            if any(
-                getattr(ctx.get_parameter_source(name), "name", None) == "COMMANDLINE"
-                for name in runtime_names
-            ):
-                raise CapturedEvaluationError(
-                    "runtime options are not valid for captured evaluation"
-                )
-            effective_signing_key = signing_key
-            if (
-                unsigned
-                and getattr(ctx.get_parameter_source("signing_key"), "name", None)
-                != "COMMANDLINE"
-            ):
-                effective_signing_key = None
-            if preflight:
-                captured_preflight = preflight_evaluation_request(
-                    loaded_request,
-                    signing_key_path=effective_signing_key,
-                    unsigned=unsigned,
-                    max_bootstrap_draws=max_bootstrap_draws,
-                )
-                if json_out:
-                    typer.echo(captured_preflight.as_json())
-                else:
-                    console.print("Preflight complete")
-                    console.print(
-                        f"Mode: {captured_preflight.execution_mode}; paired records: "
-                        f"{captured_preflight.record_count}"
-                    )
-                    console.print(
-                        "Requested authentication: "
-                        f"{captured_preflight.requested_authentication}"
-                    )
-                    console.print(
-                        "No execution, signing, scoring, or publication was performed"
-                    )
-                return
-            captured_result = evaluate_request_file(
-                loaded_request,
-                signing_key_path=effective_signing_key,
+            pass
+        outcome = execute_evaluation(
+            EvaluationOptions(
+                request=request,
+                signing_key=signing_key,
+                allow_installed_scorers=allow_installed_scorers,
+                preflight=preflight,
                 unsigned=unsigned,
                 max_bootstrap_draws=max_bootstrap_draws,
-            )
-            if json_out:
-                typer.echo(captured_result.as_json())
-            else:
-                console.print("Captured evidence created")
-                console.print(
-                    f"Recorded policy result: {captured_result.policy_verdict}"
-                )
-                console.print(
-                    "Signing: Signed evidence"
-                    if captured_result.authentication == "signed"
-                    else "Signing: Unsigned local evidence"
-                )
-                console.print("Independent verification: not performed")
-                _print_captured_metrics(captured_result.metric_summaries)
-                console.print(f"Evidence: {captured_result.evidence_path}")
-            if fail_on_policy:
-                _finish_policy_gate(captured_result.policy_verdict)
-            return
-
-        if (
-            getattr(ctx.get_parameter_source("max_bootstrap_draws"), "name", None)
-            == "COMMANDLINE"
-        ):
-            raise EvaluationRequestError(
-                "--max-bootstrap-draws applies only to captured evaluation"
-            )
-        if unsigned:
-            raise EvaluationRequestError(
-                "--unsigned applies only to captured evaluation"
-            )
-        scorer_registry = ScorerExtensionRegistry(
-            allow_installed=allow_installed_scorers
+                request_root=request_root,
+                baseline_run=baseline_run,
+                subject_run=subject_run,
+                output=output,
+                runtime_profile=runtime_profile,
+                runtime_image=runtime_image,
+                runtime_image_digest=runtime_image_digest,
+                baseline_runtime_image=baseline_runtime_image,
+                baseline_runtime_image_digest=baseline_runtime_image_digest,
+                subject_runtime_image=subject_runtime_image,
+                subject_runtime_image_digest=subject_runtime_image_digest,
+                container_engine=container_engine,
+                runtime_device=runtime_device,
+                baseline_runtime_device=baseline_runtime_device,
+                subject_runtime_device=subject_runtime_device,
+                runtime_entrypoint=runtime_entrypoint,
+                baseline_runtime_entrypoint=baseline_runtime_entrypoint,
+                subject_runtime_entrypoint=subject_runtime_entrypoint,
+                runtime_cpus=runtime_cpus,
+                runtime_memory_mib=runtime_memory_mib,
+                runtime_user=runtime_user,
+            ),
+            command_line=command_line,
+            initial_mode=initial_mode,
         )
-        registry = CoreRegistry()
-        loaded_runtime_request = load_evaluation_request(
-            request_path,
-            provider_resolver=registry.get_runtime_provider,
-            request_root=request_root,
-            **overrides,
-        )
-        if isinstance(loaded_runtime_request, CapturedEvaluationRequest):
-            raise EvaluationRequestError(
-                "captured evaluation requests must use the captured evaluation path"
-            )
-        if runtime_profile is not None:
-            if loaded_runtime_request.execution.mode != "run":
-                raise RuntimeProfileError(
-                    "--runtime-profile applies only to run requests; import evidence already binds its runtime"
-                )
-            profile = load_runtime_profile(runtime_profile)
-            explicit = {
-                name: value
-                for name, value in ctx.params.items()
-                if isinstance(value, str)
-                and getattr(ctx.get_parameter_source(name), "name", None)
-                == "COMMANDLINE"
-            }
-            profile_context = resolve_runtime_profile(
-                profile, explicit=explicit, environment=dict(os.environ)
-            )
-        runtime_executor = None
-        launch = None
-        if loaded_runtime_request.execution.mode == "run":
-            if profile_context is not None:
-                launch = launch_from_environment(**profile_context.arguments)
-            else:
-                launch = launch_from_environment(
-                    engine=container_engine,
-                    image_ref=runtime_image,
-                    image_digest=runtime_image_digest,
-                    baseline_image_ref=baseline_runtime_image,
-                    baseline_image_digest=baseline_runtime_image_digest,
-                    subject_image_ref=subject_runtime_image,
-                    subject_image_digest=subject_runtime_image_digest,
-                    default_device=runtime_device,
-                    baseline_device=baseline_runtime_device,
-                    subject_device=subject_runtime_device,
-                    runtime_entrypoint=runtime_entrypoint,
-                    baseline_entrypoint=baseline_runtime_entrypoint,
-                    subject_entrypoint=subject_runtime_entrypoint,
-                    runtime_cpus=runtime_cpus,
-                    runtime_memory_mib=runtime_memory_mib,
-                    runtime_user=runtime_user,
-                )
-            runtime_executor = OciRuntimeExecutor(launch)
-        if preflight:
-            runtime_digests = preflight_oci_launch(launch) if launch else None
-            evaluation_result = preflight_evaluation_request(
-                loaded_runtime_request,
-                signing_key_path=signing_key,
-                scorer_registry=scorer_registry,
-                runtime_image_digests=runtime_digests,
-                resource_resolver=runtime_executor,
-                registry=registry,
-            )
-        else:
-            runtime_digests = preflight_oci_launch(launch) if launch else None
-            evaluation_result = evaluate_request_file(
-                loaded_runtime_request,
-                signing_key_path=signing_key,
-                runtime_executor=runtime_executor,
-                runtime_image_digests=runtime_digests,
-                scorer_registry=scorer_registry,
-                registry=registry,
-            )
+        evaluation_result = outcome.result
+        request_mode = outcome.request_mode
     except (
         EvaluationPreflightError,
         EvaluationRequestError,
@@ -899,17 +754,52 @@ def evaluate(  # noqa: C901
                 if isinstance(exc, EvaluationTransactionError)
                 else EvaluationTransactionError(str(exc))
             )
-        if request_mode == "captured":
+        if request_mode == "captured" or isinstance(exc, CapturedEvaluationError):
             failure.captured = True
             if isinstance(failure, EvaluationPreflightError):
                 failure.unsigned = unsigned
         if json_out:
-            typer.echo(failure.as_json())
+            _echo_json(failure.as_json())
         else:
-            console.print(f"FAIL {failure}", markup=False)
+            console.print(f"FAIL {_terminal_text(failure)}", markup=False)
         raise typer.Exit(failure.exit_code) from exc
+    if request_mode == "captured":
+        if json_out:
+            _echo_json(evaluation_result.as_json())
+        elif preflight:
+            assert isinstance(evaluation_result, CapturedEvaluationPreflightResult)
+            console.print("Preflight complete")
+            console.print(
+                f"Mode: {evaluation_result.execution_mode}; paired records: "
+                f"{evaluation_result.record_count}"
+            )
+            console.print(
+                "Requested authentication: "
+                f"{evaluation_result.requested_authentication}"
+            )
+            console.print(
+                "No execution, signing, scoring, or publication was performed"
+            )
+        else:
+            assert isinstance(evaluation_result, CapturedEvaluationTransactionResult)
+            console.print("Captured evidence created")
+            console.print(f"Recorded policy result: {evaluation_result.policy_verdict}")
+            console.print(
+                "Signing: Signed evidence"
+                if evaluation_result.authentication == "signed"
+                else "Signing: Unsigned local evidence"
+            )
+            console.print("Independent verification: not performed")
+            _print_captured_metrics(evaluation_result.metric_summaries)
+            console.print(
+                f"Evidence: {_terminal_text(evaluation_result.evidence_path)}"
+            )
+        if fail_on_policy:
+            assert isinstance(evaluation_result, CapturedEvaluationTransactionResult)
+            _finish_policy_gate(evaluation_result.policy_verdict)
+        return
     if json_out:
-        typer.echo(evaluation_result.as_json())
+        _echo_json(evaluation_result.as_json())
     elif preflight:
         console.print("Preflight complete")
         assert isinstance(evaluation_result, EvaluationPreflightResult)
@@ -917,23 +807,31 @@ def evaluate(  # noqa: C901
             f"Mode: {evaluation_result.execution_mode}; paired records: {evaluation_result.record_count}"
         )
         console.print(
-            f"Evidence destination: {evaluation_result.output}", soft_wrap=True
+            f"Evidence destination: {_terminal_text(evaluation_result.output)}",
+            soft_wrap=True,
         )
         console.print(f"Validated checks: {len(evaluation_result.checks)}")
-        if profile is not None and profile_context is not None and launch is not None:
-            console.print(f"Runtime profile: {profile.digest}")
-            console.print(f"Container engine: {launch.engine}")
+        if (
+            outcome.profile is not None
+            and outcome.profile_context is not None
+            and outcome.launch is not None
+        ):
+            console.print(f"Runtime profile: {_terminal_text(outcome.profile.digest)}")
+            console.print(f"Container engine: {_terminal_text(outcome.launch.engine)}")
             for side in ("baseline", "subject"):
-                resolved_side = getattr(launch, side)
+                resolved_side = getattr(outcome.launch, side)
                 console.print(
-                    f"{side.capitalize()}: {resolved_side.image_ref}; device {resolved_side.device}; entrypoint {resolved_side.entrypoint}"
+                    f"{side.capitalize()}: {_terminal_text(resolved_side.image_ref)}; "
+                    f"device {_terminal_text(resolved_side.device)}; "
+                    f"entrypoint {_terminal_text(resolved_side.entrypoint)}"
                 )
-            limits = launch.worker_limits
+            limits = outcome.launch.worker_limits
             console.print(
-                f"Each worker: {limits.cpus} CPUs; {limits.memory_mib} MiB; user {limits.user}"
+                f"Each worker: {limits.cpus} CPUs; {limits.memory_mib} MiB; "
+                f"user {_terminal_text(limits.user)}"
             )
-            for field, source in profile_context.sources.items():
-                console.print(f"  {field}: {source}")
+            for field, source in outcome.profile_context.sources.items():
+                console.print(f"  {_terminal_text(field)}: {_terminal_text(source)}")
         console.print("No execution or publication was performed")
         console.print("Next: run the same evaluate command without --preflight.")
     else:
@@ -943,7 +841,10 @@ def evaluate(  # noqa: C901
             f"Recorded policy result: {evaluation_result.policy_verdict or 'unavailable'}"
         )
         console.print("Recipient verification: not performed")
-        console.print(f"Evidence: {evaluation_result.evidence_path}", soft_wrap=True)
+        console.print(
+            f"Evidence: {_terminal_text(evaluation_result.evidence_path)}",
+            soft_wrap=True,
+        )
         console.print(
             "Next: verify with independently approved trust inputs; use report to inspect the recorded checks."
         )
@@ -1097,17 +998,11 @@ def verify(
     """Verify EVIDENCE without trusting its own policy or runtime declarations."""
 
     from invarlock.captured_reporting import CapturedReportError, is_captured_manifest
-    from invarlock.core.scorer_extension import ScorerExtensionRegistry
-    from invarlock.evidence_verification import (
-        EvidenceVerificationError,
-        _require_outside_evidence,
-        verify_evidence,
+    from invarlock.cli.verification_workflow import (
+        VerificationOptions,
+        execute_verification,
     )
-    from invarlock.trust_inputs import (
-        CapturedTrustInputs,
-        TrustInputsError,
-        load_trust_inputs,
-    )
+    from invarlock.evidence_verification import EvidenceVerificationError
 
     captured = False
     try:
@@ -1117,144 +1012,34 @@ def verify(
             captured = is_captured_manifest(evidence)
         except CapturedReportError as exc:
             raise EvidenceVerificationError(str(exc), exit_code=4) from exc
-        trust_profile_digest: str | None = None
-        policy_bytes: bytes | None = None
-        verifier_signing_key_bytes: bytes | None = None
-        if trust_profile is not None:
-            explicit_names = (
-                "policy",
-                "expected_baseline_artifact",
-                "expected_subject_artifact",
-                "expected_schedule",
-                "expected_baseline_runtime",
-                "expected_subject_runtime",
-                "expected_signer",
-                "expected_request_digest",
-                "expected_baseline_run",
-                "expected_subject_run",
-                "verifier_signing_key",
-                "verifier_identity",
-                "allow_installed_scorers",
-            )
-            conflicts = [
-                name.replace("_", "-")
-                for name in explicit_names
-                if getattr(
-                    ctx.get_parameter_source(name),
-                    "name",
-                    None,
-                )
-                == "COMMANDLINE"
-            ]
-            if conflicts:
-                rendered = ", ".join(f"--{name}" for name in conflicts)
-                raise EvidenceVerificationError(
-                    f"--trust-profile cannot be mixed with {rendered}"
-                )
-            _require_outside_evidence(
-                evidence,
-                trust_profile,
-                label="independent trust profile",
-            )
-            try:
-                loaded = load_trust_inputs(trust_profile)
-            except TrustInputsError as exc:
-                raise EvidenceVerificationError(str(exc)) from exc
-            _require_outside_evidence(
-                evidence,
-                loaded.policy_path,
-                label="independent policy",
-            )
-            _require_outside_evidence(
-                evidence,
-                loaded.verifier_signing_key_path,
-                label="verifier Ed25519 signing key",
-            )
-            policy = loaded.policy_path
-            policy_bytes = loaded.policy_bytes
-            if isinstance(loaded, CapturedTrustInputs):
-                if not captured:
-                    raise EvidenceVerificationError(
-                        "captured trust profile requires captured evidence"
-                    )
-                expected_baseline_run = loaded.expected_run_digests["baseline"]
-                expected_subject_run = loaded.expected_run_digests["subject"]
-            else:
-                if captured:
-                    raise EvidenceVerificationError(
-                        "native trust profile requires native evidence"
-                    )
-                expected_baseline_artifact = loaded.expected_artifact_digests[
-                    "baseline"
-                ]
-                expected_subject_artifact = loaded.expected_artifact_digests["subject"]
-                expected_schedule = loaded.expected_schedule_digest
-                expected_baseline_runtime = loaded.expected_runtime_digests["baseline"]
-                expected_subject_runtime = loaded.expected_runtime_digests["subject"]
-                allow_installed_scorers = loaded.allow_installed_scorers
-            expected_signer = loaded.expected_signer_fingerprint
-            expected_request_digest = loaded.expected_request_digest
-            verifier_signing_key = loaded.verifier_signing_key_path
-            verifier_signing_key_bytes = loaded.verifier_signing_key_bytes
-            verifier_identity = loaded.verifier_identity
-            trust_profile_digest = loaded.profile_digest
-        verification_arguments: dict[str, Any] = {
-            "policy_path": policy,
-            "expected_signer": expected_signer,
-            "expected_request_digest": expected_request_digest,
-            "receipt_path": receipt,
-            "verifier_signing_key_path": verifier_signing_key,
-            "verifier_identity": verifier_identity,
-            "trust_profile_digest": trust_profile_digest,
-            "policy_bytes": policy_bytes,
-            "verifier_signing_key_bytes": verifier_signing_key_bytes,
-        }
-        irrelevant: tuple[str, ...]
-        if captured:
-            irrelevant = (
-                "expected_baseline_artifact",
-                "expected_subject_artifact",
-                "expected_schedule",
-                "expected_baseline_runtime",
-                "expected_subject_runtime",
-                "allow_installed_scorers",
-            )
-            if any(
-                getattr(ctx.get_parameter_source(name), "name", None) == "COMMANDLINE"
-                for name in irrelevant
-            ):
-                raise EvidenceVerificationError(
-                    "native anchor/scorer flags are not valid for captured verification"
-                )
-            verification_arguments.update(
-                expected_baseline_run=expected_baseline_run,
-                expected_subject_run=expected_subject_run,
-                max_bootstrap_draws=max_bootstrap_draws,
-            )
-        else:
-            irrelevant = (
-                "expected_baseline_run",
-                "expected_subject_run",
-                "max_bootstrap_draws",
-            )
-            if any(
-                getattr(ctx.get_parameter_source(name), "name", None) == "COMMANDLINE"
-                for name in irrelevant
-            ):
-                raise EvidenceVerificationError(
-                    "captured run/work flags are not valid for native verification"
-                )
-            verification_arguments.update(
+        command_line = frozenset(
+            name
+            for name in ctx.params
+            if getattr(ctx.get_parameter_source(name), "name", None) == "COMMANDLINE"
+        )
+        result = execute_verification(
+            VerificationOptions(
+                evidence=evidence,
+                trust_profile=trust_profile,
+                policy=policy,
                 expected_baseline_artifact=expected_baseline_artifact,
                 expected_subject_artifact=expected_subject_artifact,
                 expected_schedule=expected_schedule,
                 expected_baseline_runtime=expected_baseline_runtime,
                 expected_subject_runtime=expected_subject_runtime,
-                scorer_registry=ScorerExtensionRegistry(
-                    allow_installed=allow_installed_scorers
-                ),
-            )
-        result = verify_evidence(evidence, **verification_arguments)
+                expected_signer=expected_signer,
+                expected_baseline_run=expected_baseline_run,
+                expected_subject_run=expected_subject_run,
+                max_bootstrap_draws=max_bootstrap_draws,
+                expected_request_digest=expected_request_digest,
+                receipt=receipt,
+                verifier_signing_key=verifier_signing_key,
+                verifier_identity=verifier_identity,
+                allow_installed_scorers=allow_installed_scorers,
+            ),
+            captured=captured,
+            command_line=command_line,
+        )
     except EvidenceVerificationError as exc:
         if (
             captured
@@ -1265,9 +1050,9 @@ def verify(
                 str(exc), exit_code=exc.exit_code, captured=True
             )
         if json_out:
-            typer.echo(exc.as_json())
+            _echo_json(exc.as_json())
         else:
-            console.print(f"FAIL {exc}")
+            console.print(f"FAIL {_terminal_text(exc)}")
             if exc.payload.get("integrity_ok") is True:
                 console.print("Evidence integrity: verified")
                 verdict = exc.payload.get("policy_verdict")
@@ -1286,15 +1071,16 @@ def verify(
                     "Verification could not complete; check the required inputs and receipt destination."
                 )
             for detail in exc.details:
-                console.print(detail)
+                console.print(_terminal_text(detail))
             signed_receipt = exc.payload.get("signed_receipt")
             if isinstance(signed_receipt, str):
                 console.print(
-                    f"Receipt {exc.receipt_path or signed_receipt}", soft_wrap=True
+                    f"Receipt {_terminal_text(exc.receipt_path or signed_receipt)}",
+                    soft_wrap=True,
                 )
         raise typer.Exit(exc.exit_code) from exc
     if json_out:
-        typer.echo(result.as_json())
+        _echo_json(result.as_json())
     else:
         console.print(
             "PASS Independent captured verification complete"
@@ -1371,7 +1157,7 @@ def report(
         )
     except EvidenceReportError as exc:
         if json_out:
-            typer.echo(
+            _echo_json(
                 json.dumps(
                     exc.payload
                     or {
@@ -1385,22 +1171,28 @@ def report(
                 )
             )
         else:
-            console.print(f"FAIL {exc}")
+            console.print(f"FAIL {_terminal_text(exc)}")
             for name, destination in exc.written_outputs.items():
-                console.print(f"Written {name}: {destination}", soft_wrap=True)
+                console.print(
+                    f"Written {_terminal_text(name)}: {_terminal_text(destination)}",
+                    soft_wrap=True,
+                )
             if exc.failed_output is not None:
-                console.print(f"Failed output: {exc.failed_output}")
+                console.print(f"Failed output: {_terminal_text(exc.failed_output)}")
         raise typer.Exit(exc.exit_code) from exc
     if isinstance(result, EvidenceReportV2):
         if json_out:
-            typer.echo(result.as_json())
+            _echo_json(result.as_json())
         else:
             console.print(Markdown(result.text))
             for name, destination in result.written_outputs.items():
-                console.print(f"{name.upper()} {destination}", soft_wrap=True)
+                console.print(
+                    f"{_terminal_text(name.upper())} {_terminal_text(destination)}",
+                    soft_wrap=True,
+                )
         return
     if json_out:
-        typer.echo(
+        _echo_json(
             json.dumps(
                 {
                     "format_version": "invarlock/evidence-report-v1",
@@ -1418,7 +1210,7 @@ def report(
     else:
         console.print(Markdown(result.text))
         if result.html_path is not None:
-            console.print(f"HTML {result.html_path}", soft_wrap=True)
+            console.print(f"HTML {_terminal_text(result.html_path)}", soft_wrap=True)
 
 
 def main() -> None:

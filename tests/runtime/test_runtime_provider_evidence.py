@@ -24,6 +24,7 @@ from invarlock.core.runtime_provider import (
     artifact_identity_sha256,
     canonical_artifact_identity_json,
 )
+from invarlock.filesystem import atomic_file
 from invarlock.runtime_provider_evidence import (
     ARTIFACT_IDENTITY_FILENAME,
     MAX_RUNTIME_PROVIDER_SIDECAR_BYTES,
@@ -1053,11 +1054,10 @@ def test_atomic_write_failure_removes_temporary_file(
 ) -> None:
     artifact, observation, receipt = _bundle_values()
 
-    def _fail_link(_source: Path, _target: Path, *, follow_symlinks: bool) -> None:
-        assert follow_symlinks is False
+    def _fail_rename(**_kwargs) -> int:
         raise OSError("injected link failure")
 
-    monkeypatch.setattr("invarlock.runtime_provider_evidence.os.link", _fail_link)
+    monkeypatch.setattr(atomic_file, "_rename_no_replace", _fail_rename)
 
     with pytest.raises(RuntimeProviderEvidenceError, match="atomically write"):
         write_runtime_provider_evidence(
@@ -1070,24 +1070,50 @@ def test_atomic_write_failure_removes_temporary_file(
     assert list(tmp_path.iterdir()) == []
 
 
-def test_late_publication_failure_rolls_back_earlier_sidecars(
+def test_atomic_write_closes_descriptor_when_stream_creation_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    real_open = atomic_file.os.open
+    opened: list[int] = []
+
+    def _tracked_open(path, flags, *args, **kwargs):
+        descriptor = real_open(path, flags, *args, **kwargs)
+        if path == "payload":
+            opened.append(descriptor)
+        return descriptor
+
+    def _fail_fdopen(_descriptor: int, _mode: str, **_kwargs):
+        raise RuntimeError("injected stream construction failure")
+
+    monkeypatch.setattr(atomic_file.os, "open", _tracked_open)
+    monkeypatch.setattr(atomic_file.os, "fdopen", _fail_fdopen)
+
+    with pytest.raises(RuntimeError, match="stream construction"):
+        evidence_module._atomic_write_bytes(tmp_path / "sidecar.json", b"{}")
+
+    assert len(opened) == 1
+    with pytest.raises(OSError):
+        os.fstat(opened[0])
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_late_publication_failure_retains_completed_sidecars(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     artifact, observation, receipt = _bundle_values()
-    real_link = os.link
+    real_rename = atomic_file._rename_no_replace
     calls = 0
 
-    def _fail_second_link(source: Path, target: Path, *, follow_symlinks: bool) -> None:
+    def _fail_second_rename(**kwargs) -> int:
         nonlocal calls
         calls += 1
         if calls == 2:
             raise OSError("injected second-link failure")
-        real_link(source, target, follow_symlinks=follow_symlinks)
+        return real_rename(**kwargs)
 
-    monkeypatch.setattr(
-        "invarlock.runtime_provider_evidence.os.link", _fail_second_link
-    )
+    monkeypatch.setattr(atomic_file, "_rename_no_replace", _fail_second_rename)
 
     with pytest.raises(RuntimeProviderEvidenceError, match="atomically write"):
         write_runtime_provider_evidence(
@@ -1097,7 +1123,7 @@ def test_late_publication_failure_rolls_back_earlier_sidecars(
             receipt=receipt,
         )
 
-    assert list(tmp_path.iterdir()) == []
+    assert [p.name for p in tmp_path.iterdir()] == [ARTIFACT_IDENTITY_FILENAME]
 
 
 def test_publication_race_does_not_replace_existing_target(
@@ -1105,14 +1131,14 @@ def test_publication_race_does_not_replace_existing_target(
     tmp_path: Path,
 ) -> None:
     artifact, observation, receipt = _bundle_values()
-    real_link = os.link
+    real_rename = atomic_file._rename_no_replace
     raced_target = tmp_path / ARTIFACT_IDENTITY_FILENAME
 
-    def _race_link(source: Path, target: Path, *, follow_symlinks: bool) -> None:
+    def _race_rename(**kwargs) -> int:
         raced_target.write_text("created concurrently", encoding="utf-8")
-        real_link(source, target, follow_symlinks=follow_symlinks)
+        return real_rename(**kwargs)
 
-    monkeypatch.setattr("invarlock.runtime_provider_evidence.os.link", _race_link)
+    monkeypatch.setattr(atomic_file, "_rename_no_replace", _race_rename)
 
     with pytest.raises(RuntimeProviderEvidenceError, match="atomically write"):
         write_runtime_provider_evidence(

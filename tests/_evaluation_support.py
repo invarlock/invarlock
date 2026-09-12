@@ -24,8 +24,6 @@ from invarlock.evaluation_record_contracts.contracts import (
     digest,
     read_json,
     validate,
-    write_directory,
-    write_new,
 )
 from invarlock.evaluation_records.adapters import load_run
 from invarlock.evaluation_records.cases import (
@@ -261,6 +259,4 @@ __all__ = [
     "read_json",
     "validate",
     "validate_run_case_set",
-    "write_directory",
-    "write_new",
 ]

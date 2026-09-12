@@ -3,6 +3,8 @@ from __future__ import annotations
 import hashlib
 import os
 import stat
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -74,6 +76,65 @@ def test_regular_file_reader_is_bounded_and_rejects_unsafe_nodes(
         read_regular_file_bytes(tmp_path, label="input")
     with pytest.raises(StrictJsonError, match="unavailable"):
         read_regular_file_bytes(tmp_path / "missing.json", label="input")
+
+
+@pytest.mark.parametrize("operation", ["read", "copy"])
+def test_regular_file_open_rejects_fifo_replacement_without_blocking(
+    tmp_path: Path, operation: str
+) -> None:
+    if not hasattr(os, "mkfifo"):
+        pytest.skip("named pipes are unavailable")
+    source = tmp_path / "source.json"
+    source.write_bytes(b"{}")
+    # Bound the child so a regression cannot hang the test runner. Replace the
+    # actual file between lstat and open, then exercise the real OS descriptor.
+    script = """
+import errno
+import os
+import sys
+from pathlib import Path
+from invarlock.evidence_pack_json import (
+    StrictJsonError, copy_regular_file_snapshot, read_regular_file_bytes,
+)
+source = Path(sys.argv[1])
+destination = source.with_name('snapshot.json')
+real_open = os.open
+opened = []
+def swap(path, flags, *args, **kwargs):
+    if Path(path) == source:
+        source.unlink()
+        os.mkfifo(source)
+    descriptor = real_open(path, flags, *args, **kwargs)
+    opened.append(descriptor)
+    return descriptor
+os.open = swap
+try:
+    if sys.argv[2] == 'read':
+        read_regular_file_bytes(source, label='input', max_bytes=1024)
+    else:
+        copy_regular_file_snapshot(source, destination, label='input', max_bytes=1024)
+except StrictJsonError:
+    pass
+else:
+    raise AssertionError('FIFO replacement was accepted')
+assert not destination.exists()
+assert opened
+for descriptor in opened:
+    try:
+        os.fstat(descriptor)
+    except OSError as exc:
+        assert exc.errno == errno.EBADF
+    else:
+        raise AssertionError('descriptor leaked')
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", script, str(source), operation],
+        capture_output=True,
+        text=True,
+        timeout=5,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
 
 
 def test_snapshot_copy_is_exact_no_clobber_and_preserves_requested_mode(

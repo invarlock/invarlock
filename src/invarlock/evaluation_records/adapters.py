@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import io
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, cast
@@ -10,6 +11,7 @@ from typing import Any, cast
 from invarlock.evaluation_comparison.comparison import make_run
 from invarlock.evaluation_record_contracts.contracts import (
     MAX_INPUT_BYTES,
+    MAX_RECORDS,
     EvaluationRecordsError,
 )
 from invarlock.evidence_pack_json import parse_json_bytes
@@ -27,6 +29,25 @@ def _rows(value: Any, label: str) -> list[dict[str, Any]]:
             f"{label} requires a non-empty array of record objects"
         )
     return value
+
+
+def _jsonl_rows(raw: bytes, label: str) -> list[dict[str, Any]]:
+    """Parse non-empty JSONL rows without expanding work past the record limit."""
+    rows: list[dict[str, Any]] = []
+    for line_number, line in enumerate(io.BytesIO(raw), 1):
+        if line.isspace():
+            continue
+        if len(rows) == MAX_RECORDS:
+            raise EvaluationRecordsError(
+                f"{label} exceeds the {MAX_RECORDS}-record limit"
+            )
+        row = parse_json_bytes(line, label=f"export line {line_number}")
+        if not isinstance(row, dict):
+            raise EvaluationRecordsError(
+                f"{label} requires a non-empty array of record objects"
+            )
+        rows.append(row)
+    return _rows(rows, label)
 
 
 def _scalar_output(value: Any) -> Any:
@@ -286,14 +307,7 @@ def _parse_run_bytes(
         if not isinstance(raw, bytes) or len(raw) > MAX_INPUT_BYTES:
             raise EvaluationRecordsError("evaluation export exceeds its byte limit")
         if adapter in ("jsonl", "lm-eval-samples", "promptfoo-jsonl"):
-            rows = _rows(
-                [
-                    parse_json_bytes(line, label=f"export line {i}")
-                    for i, line in enumerate(raw.splitlines(), 1)
-                    if line.strip()
-                ],
-                adapter,
-            )
+            rows = _jsonl_rows(raw, adapter)
             records = (
                 _harness(rows)
                 if adapter == "lm-eval-samples"

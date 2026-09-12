@@ -9,10 +9,7 @@ facts; aggregate, human, or model-judge outputs remain observation-only.
 
 from __future__ import annotations
 
-import errno
 import hashlib
-import os
-import tempfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -28,6 +25,7 @@ from invarlock.evidence_pack_json import (
     parse_json_bytes,
     read_regular_file_bytes,
 )
+from invarlock.filesystem.atomic_file import write_file_no_replace
 from invarlock.public_contracts import (
     EVALUATOR_QUALIFICATION_EXPORT_FORMAT_VERSION,
     EVALUATOR_QUALIFICATION_PROFILE_FORMAT_VERSION,
@@ -235,39 +233,17 @@ class EvaluatorQualificationResult:
 
     def write(self, destination: str | Path) -> Path:
         """Atomically publish a new result without replacing an existing file."""
-
         path = Path(destination)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        temporary: Path | None = None
         try:
-            descriptor, temporary_name = tempfile.mkstemp(
-                dir=path.parent,
-                prefix=f".{path.name}.",
-                suffix=".tmp",
-            )
-            temporary = Path(temporary_name)
-            with os.fdopen(descriptor, "wb") as handle:
-                handle.write(self.as_json().encode("utf-8"))
-                handle.flush()
-                os.fsync(handle.fileno())
-            os.chmod(temporary, 0o600)
-            os.link(temporary, path, follow_symlinks=False)
-            temporary.unlink()
-            temporary = None
+            write_file_no_replace(path, self.as_json().encode("utf-8"))
+        except FileExistsError as exc:
+            raise EvaluatorQualificationError(
+                f"qualification result already exists: {path}"
+            ) from exc
         except OSError as exc:
-            if exc.errno == errno.EEXIST:
-                raise EvaluatorQualificationError(
-                    f"qualification result already exists: {path}"
-                ) from exc
             raise EvaluatorQualificationError(
                 f"could not write qualification result: {exc}"
             ) from exc
-        finally:
-            if temporary is not None:
-                try:
-                    temporary.unlink()
-                except FileNotFoundError:
-                    pass
         return path
 
 

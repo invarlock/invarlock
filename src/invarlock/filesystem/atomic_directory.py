@@ -250,11 +250,23 @@ def _restore_rejected_publication(
         )
 
 
-def publish_directory_no_replace(staging: Path, destination: Path) -> None:
+def publish_directory_no_replace(
+    staging: Path,
+    destination: Path,
+    *,
+    expected_source_fd: int | None = None,
+    expected_source_parent_fd: int | None = None,
+) -> None:
     """Atomically rename one staged directory into an absent destination.
 
     The operation is descriptor-relative and delegates exclusivity to one kernel
     rename operation. It never performs an existence check followed by a rename.
+    Callers that created the tree can retain its descriptor (and its parent's)
+    to reject substitutions made before this function opens the source path.
+    The caller retains ownership of both expected descriptors.
+
+    Identity checks do not isolate the tree from concurrent same-user mutation;
+    the source and destination parents must remain under the caller's control.
     """
 
     source = Path(staging)
@@ -273,6 +285,10 @@ def publish_directory_no_replace(staging: Path, destination: Path) -> None:
 
     source_parent_fd = _open_directory(source.parent, label="staging parent")
     try:
+        if expected_source_parent_fd is not None and _entry_identity(
+            os.fstat(source_parent_fd)
+        ) != _entry_identity(os.fstat(expected_source_parent_fd)):
+            raise AtomicDirectoryPublicationError("staging parent identity changed")
         destination_parent_fd = _open_directory(
             target.parent, label="destination parent"
         )
@@ -280,6 +296,12 @@ def publish_directory_no_replace(staging: Path, destination: Path) -> None:
             source_fd = _open_child_directory(source_parent_fd, source_name)
             try:
                 source_identity = os.fstat(source_fd)
+                if expected_source_fd is not None and _entry_identity(
+                    source_identity
+                ) != _entry_identity(os.fstat(expected_source_fd)):
+                    raise AtomicDirectoryPublicationError(
+                        "staging identity changed before publication"
+                    )
                 try:
                     named_source = os.stat(
                         source_name,
