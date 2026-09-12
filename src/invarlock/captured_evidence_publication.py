@@ -6,7 +6,7 @@ import hashlib
 import os
 import secrets
 from collections.abc import Iterator
-from contextlib import ExitStack, contextmanager, suppress
+from contextlib import contextmanager, suppress
 from pathlib import Path
 from typing import Any
 
@@ -50,6 +50,17 @@ def _opened_directory(parent: int, name: str) -> Iterator[int]:
         except OSError:
             # Never retry an uncertain close; the descriptor may be reused.
             pass
+
+
+@contextmanager
+def _opened_directories(parent: int) -> Iterator[dict[str, int]]:
+    """Retain the fixed captured-evidence directories through publication."""
+    with (
+        _opened_directory(parent, "inputs") as inputs,
+        _opened_directory(parent, "records") as records,
+        _opened_directory(parent, "reports") as reports,
+    ):
+        yield {"inputs": inputs, "records": records, "reports": reports}
 
 
 class CapturedEvidenceError(ValueError):
@@ -211,7 +222,7 @@ def publish_captured_evidence(
     cleanup: int | None = None
     retained_stage: int | None = None
     directories: dict[str, int] = {}
-    directory_descriptors = ExitStack()
+    cleanup_attempted = False
     published = False
     try:
         check_sizes(files)
@@ -228,13 +239,13 @@ def publish_captured_evidence(
                 retained_stage = os.dup(stage)
                 for directory in ("inputs", "records", "reports"):
                     os.mkdir(directory, mode=0o700, dir_fd=stage)
-                    directories[directory] = directory_descriptors.enter_context(
-                        _opened_directory(stage, directory)
-                    )
+        assert retained_stage is not None
+        with _opened_directories(retained_stage) as directories:
+            try:
                 for name, payload in files.items():
                     path = Path(name)
                     output_parent = (
-                        stage
+                        retained_stage
                         if path.parent == Path(".")
                         else directories[str(path.parent)]
                     )
@@ -256,7 +267,9 @@ def publish_captured_evidence(
                         os.fsync(handle.fileno())
                     os.fsync(output_parent)
                 for directory, descriptor in directories.items():
-                    named = os.stat(directory, dir_fd=stage, follow_symlinks=False)
+                    named = os.stat(
+                        directory, dir_fd=retained_stage, follow_symlinks=False
+                    )
                     opened = os.fstat(descriptor)
                     if (named.st_dev, named.st_ino, named.st_mode) != (
                         opened.st_dev,
@@ -266,13 +279,25 @@ def publish_captured_evidence(
                         raise CapturedEvidenceError(
                             "captured staging directory identity changed"
                         )
-        publish_directory_no_replace(
-            staging,
-            destination,
-            expected_source_fd=retained_stage,
-            expected_source_parent_fd=cleanup,
-        )
-        published = True
+                publish_directory_no_replace(
+                    staging,
+                    destination,
+                    expected_source_fd=retained_stage,
+                    expected_source_parent_fd=cleanup,
+                )
+                published = True
+            finally:
+                cleanup_attempted = True
+                if not published and cleanup is not None:
+                    assert staging is not None
+                    with suppress(OSError):
+                        _cleanup_staging(
+                            cleanup,
+                            staging.name,
+                            retained_stage,
+                            directories,
+                            files,
+                        )
     except AtomicDirectoryExistsError as exc:
         raise CapturedEvidenceError(
             f"captured evidence destination already exists: {destination}"
@@ -288,13 +313,18 @@ def publish_captured_evidence(
             f"could not publish captured evidence: {exc}"
         ) from exc
     finally:
-        if not published and cleanup is not None and retained_stage is not None:
+        if (
+            not published
+            and not cleanup_attempted
+            and cleanup is not None
+            and retained_stage is not None
+        ):
             assert staging is not None
             with suppress(OSError):
-                _cleanup_staging(
-                    cleanup, staging.name, retained_stage, directories, files
-                )
-        directory_descriptors.close()
+                with _opened_directories(retained_stage) as directories:
+                    _cleanup_staging(
+                        cleanup, staging.name, retained_stage, directories, files
+                    )
         for retained_descriptor in (retained_stage, cleanup):
             if retained_descriptor is not None:
                 with suppress(OSError):
