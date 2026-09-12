@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -28,3 +29,23 @@ def test_collection_example_help_needs_no_optional_sdk():
     )
     assert result.returncode == 0
     assert "--execute-collection" in result.stdout
+
+
+def test_collection_example_checks_output_before_loading_optional_sdk(tmp_path):
+    output = tmp_path / "measurements-collected.json"
+    output.write_text("already present")
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--root",
+            str(tmp_path),
+            "--execute-collection",
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+        env={**os.environ, "OPENAI_API_KEY": "unused-test-key"},
+    )
+    assert result.returncode == 2
+    assert "must be a new file" in result.stderr

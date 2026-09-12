@@ -89,11 +89,19 @@ def main() -> None:
         parser.error("OPENAI_API_KEY must be set in the collector environment")
     if os.environ.get("OPENAI_BASE_URL") or os.environ.get("OPENAI_API_BASE"):
         parser.error("custom OpenAI provider URLs are outside this qualified example")
+    root = args.root.absolute()
+    output = (root / args.output).absolute()
+    checkpoint = (root / args.checkpoint).absolute()
+    if output == checkpoint or output.is_relative_to(checkpoint):
+        parser.error("measurement output must remain outside the checkpoint directory")
+    if output.exists() or output.is_symlink():
+        parser.error("measurement output must be a new file")
+    if not output.parent.is_dir() or output.parent.is_symlink():
+        parser.error("measurement output parent must be an existing real directory")
     try:
         from invarlock.filesystem.atomic_file import write_file_no_replace
         from invarlock.judge_measurements.contracts import canonical_payload
 
-        output = (args.root.absolute() / args.output).absolute()
         measurements = asyncio.run(_collect(args))
         write_file_no_replace(output, canonical_payload(measurements))
     except (OSError, ValueError) as exc:
