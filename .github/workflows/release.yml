@@ -384,12 +384,15 @@ jobs:
           trap 'rm -rf "${quickstart_root}" "${approval_root}"' EXIT
           cp examples/quickstart/run.py "${quickstart_root}/run.py"
           cp examples/captured-results/wheel_smoke.py "${quickstart_root}/captured-wheel-smoke.py"
+          mkdir "${quickstart_root}/judge"
+          cp examples/judge-measurements/{wheel_smoke.py,request.yaml,plan.json,measurements.json,baseline_run.json,subject_run.json,analysis_policy.json} "${quickstart_root}/judge/"
           cp -R examples/acceptance-handoff/golden "${quickstart_root}/golden"
           evaluation_cli="$(command -v invarlock)"
           (
             cd "${quickstart_root}"
             python run.py --fixture golden
             python captured-wheel-smoke.py --cli "${evaluation_cli}"
+            python judge/wheel_smoke.py --fixture judge --cli "${evaluation_cli}"
           )
           cp -R examples/ci/standalone-consumer/. "${approval_root}/"
           mkdir "${approval_root}/incoming"
@@ -1031,12 +1034,15 @@ jobs:
           trap 'rm -rf "${quickstart_root}" "${approval_root}"' EXIT
           cp examples/quickstart/run.py "${quickstart_root}/run.py"
           cp examples/captured-results/wheel_smoke.py "${quickstart_root}/captured-wheel-smoke.py"
+          mkdir "${quickstart_root}/judge"
+          cp examples/judge-measurements/{wheel_smoke.py,request.yaml,plan.json,measurements.json,baseline_run.json,subject_run.json,analysis_policy.json} "${quickstart_root}/judge/"
           cp -R examples/acceptance-handoff/golden "${quickstart_root}/golden"
           evaluation_cli="$(command -v invarlock)"
           (
             cd "${quickstart_root}"
             python run.py --fixture golden
             python captured-wheel-smoke.py --cli "${evaluation_cli}"
+            python judge/wheel_smoke.py --fixture judge --cli "${evaluation_cli}"
           )
           cp -R examples/ci/standalone-consumer/. "${approval_root}/"
           mkdir "${approval_root}/incoming"
