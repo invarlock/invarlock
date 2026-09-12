@@ -200,3 +200,20 @@ class JudgeMeasurements(TypedDict):
     sources: list[JudgeRetainedSource]
     trials: list[JudgeTrial]
     completeness: JudgeCompleteness
+
+
+class JudgeAnalysisPolicyDocument(TypedDict):
+    """Standalone decision policy; decimal fields use canonical string values."""
+
+    format: Literal["invarlock/judge-analysis-policy-v1"]
+    plan_sha256: str
+    metric_name: str
+    decision_role: Literal["required", "advisory"]
+    direction: Literal["higher", "lower"]
+    method: Literal["fixed-benchmark-hoeffding-v1"]
+    alpha: str
+    comparison_family_size: int
+    minimum_units: int
+    maximum_interval_width: str
+    allowed_degradation: str
+    subject_bound: str | None

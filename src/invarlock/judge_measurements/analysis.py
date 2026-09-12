@@ -3,16 +3,32 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from decimal import Context, Decimal, localcontext
 from fractions import Fraction
-from typing import Any, Literal
+from functools import lru_cache
+from pathlib import Path
+from typing import Any, Literal, cast
 
-from invarlock.judge_measurement_types import JudgeMeasurementPlan, JudgeMeasurements
+from jsonschema import Draft202012Validator
+
+from invarlock.evidence_pack_json import (
+    StrictJsonError,
+    parse_json_bytes,
+    read_regular_file_bytes,
+)
+from invarlock.judge_measurement_types import (
+    JudgeAnalysisPolicyDocument,
+    JudgeMeasurementPlan,
+    JudgeMeasurements,
+)
 from invarlock.judge_measurements.contracts import (
+    JudgeMeasurementContractError,
     canonical_payload,
+    measurement_plan_digest,
     validate_measurements,
 )
 from invarlock.judge_measurements.statistics import (
@@ -29,8 +45,10 @@ from invarlock.judge_measurements.statistics import (
     decide_subject_bound,
     hoeffding_interval,
 )
+from invarlock.public_contracts import load_judge_analysis_policy_schema
 
 type JsonValue = str | int | bool | None | list[JsonValue] | dict[str, JsonValue]
+ANALYSIS_POLICY_MAX_BYTES = 64 * 1024
 ASSUMPTIONS = (
     "Declared units are independent; distributions may differ between units.",
     "Scores remain within the declared rating scale under the frozen judge protocol.",
@@ -45,6 +63,22 @@ ESTIMAND = (
 )
 
 
+def _fractional_digits(value: Decimal) -> int:
+    """Count significant fractional places without using ambient context."""
+
+    if value.is_zero():
+        return 0
+    digits = value.as_tuple().digits
+    trailing_zeroes = 0
+    for digit in reversed(digits):
+        if digit != 0:
+            break
+        trailing_zeroes += 1
+    exponent = value.as_tuple().exponent
+    assert isinstance(exponent, int)  # finite values have an integral exponent
+    return max(0, -(exponent + trailing_zeroes))
+
+
 @dataclass(frozen=True)
 class JudgeAnalysisPolicy:
     direction: Direction
@@ -55,6 +89,8 @@ class JudgeAnalysisPolicy:
     minimum_units: int = 1
     maximum_interval_width: Decimal = Decimal("2")
     subject_bound: Decimal | None = None
+    plan_sha256: str | None = None
+    metric_name: str | None = None
 
     def __post_init__(self) -> None:
         if self.direction not in ("higher", "lower"):
@@ -63,12 +99,14 @@ class JudgeAnalysisPolicy:
             value = getattr(self, name)
             if not isinstance(value, Decimal) or not value.is_finite():
                 raise ValueError(f"{name} must be a finite Decimal")
-        if self.allowed_degradation < 0:
-            raise ValueError("allowed_degradation must be nonnegative")
+            if _fractional_digits(value) > 15:
+                raise ValueError(f"{name} supports at most 15 fractional digits")
+        if not 0 <= self.allowed_degradation <= 1:
+            raise ValueError("allowed_degradation must be between zero and one")
         if not 0 < self.alpha < 1:
             raise ValueError("alpha must be strictly between zero and one")
-        if self.maximum_interval_width < 0:
-            raise ValueError("maximum_interval_width must be nonnegative")
+        if not 0 < self.maximum_interval_width <= 2:
+            raise ValueError("maximum_interval_width must be positive and at most two")
         for name, minimum in (("comparison_family_size", 2), ("minimum_units", 1)):
             count = getattr(self, name)
             if isinstance(count, bool) or not isinstance(count, int) or count < minimum:
@@ -78,8 +116,102 @@ class JudgeAnalysisPolicy:
         if self.subject_bound is not None and (
             not isinstance(self.subject_bound, Decimal)
             or not self.subject_bound.is_finite()
+            or not 0 <= self.subject_bound <= 1
         ):
-            raise ValueError("subject_bound must be a finite Decimal or None")
+            raise ValueError("subject_bound must be a Decimal in [0, 1] or None")
+        if (
+            self.subject_bound is not None
+            and _fractional_digits(self.subject_bound) > 15
+        ):
+            raise ValueError("subject_bound supports at most 15 fractional digits")
+        if self.plan_sha256 is not None and (
+            not isinstance(self.plan_sha256, str)
+            or re.fullmatch(r"[0-9a-f]{64}", self.plan_sha256) is None
+        ):
+            raise ValueError("plan_sha256 must be a bare lowercase SHA-256 digest")
+        if self.metric_name is not None and (
+            not isinstance(self.metric_name, str)
+            or not 1 <= len(self.metric_name) <= 128
+            or re.search(r"[\x00-\x1f\x7f]", self.metric_name) is not None
+        ):
+            raise ValueError("metric_name must be a nonempty bounded identifier")
+
+
+@lru_cache(maxsize=1)
+def _analysis_policy_validator() -> Draft202012Validator:
+    return Draft202012Validator(load_judge_analysis_policy_schema())
+
+
+def validate_analysis_policy(
+    value: JudgeAnalysisPolicyDocument, *, plan: JudgeMeasurementPlan
+) -> None:
+    """Validate a complete standalone policy and its approved plan binding."""
+    try:
+        payload = canonical_payload(value)
+    except (TypeError, ValueError) as exc:
+        raise JudgeMeasurementContractError(
+            "judge analysis policy is not canonical JSON"
+        ) from exc
+    if len(payload) > ANALYSIS_POLICY_MAX_BYTES:
+        raise JudgeMeasurementContractError(
+            "judge analysis policy exceeds its byte limit"
+        )
+    error = next(_analysis_policy_validator().iter_errors(value), None)
+    if error is not None:
+        path = "/".join(str(part) for part in error.absolute_path)
+        raise JudgeMeasurementContractError(
+            f"judge analysis policy is invalid at {path or '/'}: {error.message[:240]}"
+        )
+    # JSON Schema's mathematical integer type accepts 2.0; the wire policy
+    # requires integer tokens and must reject booleans and every JSON float.
+    for field in ("comparison_family_size", "minimum_units"):
+        if type(value[field]) is not int:
+            raise JudgeMeasurementContractError(f"{field} must be a strict integer")
+    if value["plan_sha256"] != measurement_plan_digest(plan):
+        raise JudgeMeasurementContractError(
+            "judge analysis policy does not bind the supplied plan"
+        )
+
+
+def decode_analysis_policy(
+    value: JudgeAnalysisPolicyDocument, *, plan: JudgeMeasurementPlan
+) -> JudgeAnalysisPolicy:
+    """Decode all explicit wire fields into the immutable arithmetic policy."""
+    validate_analysis_policy(value, plan=plan)
+    return JudgeAnalysisPolicy(
+        direction=value["direction"],
+        allowed_degradation=Decimal(value["allowed_degradation"]),
+        alpha=Decimal(value["alpha"]),
+        comparison_family_size=value["comparison_family_size"],
+        required=value["decision_role"] == "required",
+        minimum_units=value["minimum_units"],
+        maximum_interval_width=Decimal(value["maximum_interval_width"]),
+        subject_bound=Decimal(value["subject_bound"])
+        if value["subject_bound"] is not None
+        else None,
+        plan_sha256=value["plan_sha256"],
+        metric_name=value["metric_name"],
+    )
+
+
+def load_analysis_policy(
+    path: Path, *, plan: JudgeMeasurementPlan
+) -> JudgeAnalysisPolicy:
+    """Load one bounded JSON snapshot without accepting duplicate object keys."""
+    try:
+        payload = read_regular_file_bytes(
+            Path(path),
+            label="judge analysis policy",
+            max_bytes=ANALYSIS_POLICY_MAX_BYTES,
+        )
+        value = parse_json_bytes(payload, label="judge analysis policy")
+    except StrictJsonError as exc:
+        raise JudgeMeasurementContractError(str(exc)) from exc
+    if not isinstance(value, dict):
+        raise JudgeMeasurementContractError(
+            "judge analysis policy must be a JSON object"
+        )
+    return decode_analysis_policy(cast(JudgeAnalysisPolicyDocument, value), plan=plan)
 
 
 @dataclass(frozen=True)
@@ -212,6 +344,13 @@ def analyze_measurements(
     validate_measurements(
         measurements, plan, baseline_run=baseline_run, subject_run=subject_run
     )
+    if (
+        policy.plan_sha256 is not None
+        and policy.plan_sha256 != measurements["plan_sha256"]
+    ):
+        raise JudgeMeasurementContractError(
+            "analysis policy does not bind the supplied plan"
+        )
     counts = _coverage(plan, measurements)
     effect = subject = None
     gates: tuple[AnalysisGate, ...] = ()

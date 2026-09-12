@@ -345,6 +345,8 @@ def test_combination_refuses_underdeclared_or_inconsistent_family():
         {"maximum_interval_width": D("NaN")},
         {"alpha": D(0)},
         {"alpha": D(1)},
+        {"alpha": D("1e-1000000000")},
+        {"maximum_interval_width": D("0.0000000000000001")},
         {"alpha": 0.05},
         {"required": 1},
         {"subject_bound": D("Infinity")},

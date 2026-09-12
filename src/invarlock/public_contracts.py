@@ -17,6 +17,7 @@ PACKAGE_CONTRACTS_ROOT = importlib.resources.files("invarlock").joinpath(
 
 JUDGE_MEASUREMENT_PLAN_FORMAT_VERSION = "invarlock/judge-measurement-plan-v1"
 JUDGE_MEASUREMENTS_FORMAT_VERSION = "invarlock/judge-measurements-v1"
+JUDGE_ANALYSIS_POLICY_FORMAT_VERSION = "invarlock/judge-analysis-policy-v1"
 
 EVALUATION_REQUEST_FORMAT_VERSION = "invarlock/evaluation-request-v1"
 CAPTURED_EVALUATION_REQUEST_FORMAT_VERSION = "invarlock/evaluation-request-v2"
@@ -85,6 +86,10 @@ def load_judge_measurement_plan_schema() -> dict[str, Any]:
 
 def load_judge_measurements_schema() -> dict[str, Any]:
     return _load_object_contract("judge_measurements.schema.json")
+
+
+def load_judge_analysis_policy_schema() -> dict[str, Any]:
+    return _load_object_contract("judge_analysis_policy.schema.json")
 
 
 def load_evaluation_request_schema() -> dict[str, Any]:
@@ -191,8 +196,10 @@ __all__ = [
     "ContractLoadError",
     "JUDGE_MEASUREMENT_PLAN_FORMAT_VERSION",
     "JUDGE_MEASUREMENTS_FORMAT_VERSION",
+    "JUDGE_ANALYSIS_POLICY_FORMAT_VERSION",
     "load_judge_measurement_plan_schema",
     "load_judge_measurements_schema",
+    "load_judge_analysis_policy_schema",
     "ACCEPTANCE_PREDICATE_FORMAT_VERSION",
     "CAPTURED_EVALUATION_REQUEST_FORMAT_VERSION",
     "EVALUATION_REQUEST_FORMAT_VERSION",
