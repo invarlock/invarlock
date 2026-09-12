@@ -10,6 +10,10 @@ trust anchors and signing key.
 For a small offline frozen-answer rating example, see
 [judge measurements](judge-measurements/README.md). It intentionally demonstrates
 insufficient evidence and unsigned reporting.
+The same directory also contains a
+[K2 Horizon 32B judge reference](judge-measurements/K2-REFERENCE.md) built from
+the retained grounded-QA and extraction campaign. It freezes the pilot and final
+case membership without presenting uncollected ratings as evidence.
 
 To gate results from an existing evaluator, start with the separate
 [captured-results examples](captured-results/README.md). For an artifact handoff, the

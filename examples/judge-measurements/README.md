@@ -20,3 +20,9 @@ maintained judge recipient policy, not a policy copied from submitted evidence.
 
 See the [judge reference](../../docs/reference/judge-measurements.md) for the
 contract boundary, statistical assumptions and recipient verification command.
+
+For the real K2 Horizon 32B frozen-answer corpus, outcome-blind selection,
+pilot plans, reviewer sheets and pending final plans, see
+[Freeze a K2 judge reference](K2-REFERENCE.md). That retained reference contains
+no judge-model results yet; its final plans remain unavailable for execution
+until the pilot rubric review is recorded.
