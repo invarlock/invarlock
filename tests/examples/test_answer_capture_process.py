@@ -206,3 +206,201 @@ def test_cancellation_kills_process(tmp_path):
     asyncio.run(cancel())
     with pytest.raises(ProcessLookupError):
         os.kill(int(pidfile.read_text()), 0)
+
+
+@pytest.mark.parametrize(
+    "operation,expected",
+    [
+        ("count_input_tokens", {"input_tokens": 3}),
+        (
+            "generate",
+            {"output": "offline fixture answer", "input_tokens": 3, "output_tokens": 3},
+        ),
+    ],
+)
+def test_offline_process_protocol(operation, expected, monkeypatch, capsys):
+    import io
+    import runpy
+
+    monkeypatch.setattr(
+        sys,
+        "stdin",
+        io.StringIO(json.dumps({"operation": operation, "request": request()})),
+    )
+    runpy.run_path(str(ROOT / "examples/answer-capture/pipeline.py"))
+    assert json.loads(capsys.readouterr().out) == expected
+
+
+def test_offline_process_rejects_unknown_operation(monkeypatch):
+    import io
+    import runpy
+
+    monkeypatch.setattr(
+        sys,
+        "stdin",
+        io.StringIO(json.dumps({"operation": "retry", "request": request()})),
+    )
+    with pytest.raises(ValueError, match="unknown operation"):
+        runpy.run_path(str(ROOT / "examples/answer-capture/pipeline.py"))
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("argv", []),
+        ("argv", ["python"]),
+        ("argv", ["\0"]),
+        ("assets", ["relative.py"]),
+        ("environment", ["KEY", "KEY"]),
+        ("environment", ["bad-name"]),
+    ],
+)
+def test_transport_rejects_unsafe_configuration(tmp_path, field, value):
+    _, config = adapter(tmp_path)
+    path = tmp_path / "transport.json"
+    value_config = read(path)
+    value_config[field] = value
+    path.write_text(json.dumps(value_config))
+    with pytest.raises(ValueError):
+        ProcessAdapter(path, config["limits"])
+
+
+@pytest.mark.parametrize("failure", ["request_size", "deadline"])
+def test_transport_rejects_unadmitted_call_before_launch(
+    tmp_path, failure, monkeypatch
+):
+    transport, _ = adapter(tmp_path)
+    payload = request()
+    if failure == "request_size":
+        payload["input"] = "x" * 1024 * 1024
+    else:
+        transport.deadline = int(time.time()) - 1
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("process launched despite failed admission")
+
+    monkeypatch.setattr("examples.answer_capture_process.subprocess.Popen", forbidden)
+    with pytest.raises(ValueError, match="cap|deadline"):
+        transport.count_input_tokens(payload)
+
+
+def frozen_capture(tmp_path):
+    transport, config = adapter(tmp_path)
+    directory = tmp_path / "capture"
+    asyncio.run(
+        capture(
+            config=config,
+            cases=read(ROOT / "examples/answer-capture/cases.json"),
+            adapter_sha256=transport.sha256,
+            adapter=transport,
+            directory=directory,
+        )
+    )
+    return {
+        "capture": directory,
+        "template": read(ROOT / "examples/judge-measurements/plan.json"),
+        "policy": read(ROOT / "examples/judge-measurements/analysis_policy.json"),
+        "units": {"case-1": "unit-1"},
+        "collection": read(ROOT / "examples/judge-measurements/collection.json"),
+        "output": tmp_path / "judge",
+    }
+
+
+@pytest.mark.parametrize(
+    "mutation", ["run_source", "run_artifact", "attempt", "result", "unit"]
+)
+def test_judge_continuation_rejects_changed_capture_identity(tmp_path, mutation):
+    args = frozen_capture(tmp_path)
+    if mutation == "unit":
+        args["units"]["case-1"] = ""
+    else:
+        filename = {
+            "run_source": "subject_run.json",
+            "run_artifact": "subject_run.json",
+            "attempt": "000000.attempt.json",
+            "result": "000000.result.json",
+        }[mutation]
+        path = args["capture"] / filename
+        value = read(path)
+        field = {
+            "run_source": "source_digest",
+            "run_artifact": "artifact_digest",
+            "attempt": "manifest_sha256",
+            "result": "manifest_sha256",
+        }[mutation]
+        value[field] = "sha256:" + "f" * 64
+        path.write_text(json.dumps(value))
+    with pytest.raises(ValueError):
+        prepare(**args)
+    assert not args["output"].exists()
+
+
+def test_capture_transport_cli_and_judge_preparation_cli(tmp_path, monkeypatch, capsys):
+    from examples import answer_capture
+
+    _, config = adapter(tmp_path)
+    config_path = tmp_path / "config.json"
+    config_path.write_text(json.dumps(config))
+    capture_dir = tmp_path / "capture"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "capture",
+            "--config",
+            str(config_path),
+            "--cases",
+            str(ROOT / "examples/answer-capture/cases.json"),
+            "--transport",
+            str(tmp_path / "transport.json"),
+            "--directory",
+            str(capture_dir),
+            "--execute",
+        ],
+    )
+    answer_capture.main()
+    units = tmp_path / "units.json"
+    units.write_text('{"case-1":"unit-1"}')
+    command = [
+        "prepare",
+        "--capture",
+        str(capture_dir),
+        "--plan-template",
+        str(ROOT / "examples/judge-measurements/plan.json"),
+        "--policy",
+        str(ROOT / "examples/judge-measurements/analysis_policy.json"),
+        "--collection",
+        str(ROOT / "examples/judge-measurements/collection.json"),
+        "--units",
+        str(units),
+        "--directory",
+        str(tmp_path / "judge"),
+    ]
+    monkeypatch.setattr(sys, "argv", command)
+    answer_capture_judge.main()
+    assert "Judge inputs ready; no calls made" in capsys.readouterr().out
+    with pytest.raises(SystemExit) as exc:
+        answer_capture_judge.main()
+    assert exc.value.code == 2
+    assert "Judge preparation stopped" in capsys.readouterr().err
+    config_path.write_text("[]")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "capture",
+            "--config",
+            str(config_path),
+            "--cases",
+            str(ROOT / "examples/answer-capture/cases.json"),
+            "--transport",
+            str(tmp_path / "transport.json"),
+            "--directory",
+            str(capture_dir),
+            "--execute",
+        ],
+    )
+    with pytest.raises(SystemExit) as exc:
+        answer_capture.main()
+    assert exc.value.code == 2
+    assert "Answer capture stopped" in capsys.readouterr().err

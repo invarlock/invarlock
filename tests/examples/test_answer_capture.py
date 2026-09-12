@@ -342,3 +342,61 @@ def test_documented_cli_offline_journey_and_explicit_execution(
     assert "Frozen answer runs ready" in capsys.readouterr().out
     assert (tmp_path / "out" / "baseline_run.json").is_file()
     capture.main()
+
+
+@pytest.mark.parametrize("value", [0, -1, True, "1"])
+def test_positive_limits_reject_nonpositive_and_noninteger_values(value):
+    with pytest.raises(ValueError, match="positive integer"):
+        capture.positive(value, "limit")
+
+
+def test_read_requires_an_object(tmp_path):
+    path = tmp_path / "input.json"
+    path.write_text("[]")
+    with pytest.raises(ValueError, match="JSON object"):
+        capture.read(path)
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("provider", ""),
+        ("model", None),
+        ("revision", ""),
+        ("tokenizer", ""),
+        ("artifact_digest", "unpinned"),
+        ("generation", []),
+    ],
+)
+def test_capture_rejects_incomplete_model_identity_before_dispatch(
+    tmp_path, inputs, field, value
+):
+    inputs["config"]["subject"][field] = value
+    adapter = Adapter()
+    with pytest.raises(ValueError):
+        run(tmp_path, inputs, adapter)
+    assert adapter.calls == []
+
+
+def test_capture_requires_adapter_digest(tmp_path, inputs):
+    inputs["adapter_sha256"] = "unpinned"
+    with pytest.raises(ValueError, match="source digest"):
+        run(tmp_path, inputs)
+
+
+def test_retained_result_requires_dispatch_attempt(tmp_path, inputs):
+    run(tmp_path, inputs)
+    (tmp_path / "capture/000000.attempt.json").unlink()
+    with pytest.raises(ValueError, match="missing its retained dispatch"):
+        run(tmp_path, inputs)
+
+
+def test_deadline_rechecked_before_dispatch(tmp_path, inputs, monkeypatch):
+    deadline = inputs["config"]["limits"]["deadline_unix_seconds"]
+    ticks = iter([deadline - 1, deadline + 1])
+    monkeypatch.setattr(capture.time, "time", lambda: next(ticks, deadline + 1))
+    adapter = Adapter()
+    with pytest.raises(ExceptionGroup, match="TaskGroup"):
+        run(tmp_path, inputs, adapter)
+    assert not adapter.calls
+    assert not list((tmp_path / "capture").glob("*.attempt.json"))
