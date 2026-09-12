@@ -458,9 +458,8 @@ def test_shared_output_preflight_cannot_add_files_to_pack(
 
 
 @pytest.mark.parametrize("failed", ["html", "markdown", "junit"])
-@pytest.mark.parametrize("failed_flush", [1, 2], ids=["file", "directory"])
-def test_fsync_failure_is_atomic_per_file_and_reports_prior_outputs(
-    tmp_path, monkeypatch, failed, failed_flush
+def test_file_fsync_failure_is_atomic_and_reports_prior_outputs(
+    tmp_path, monkeypatch, failed
 ):
     pack = _pack(tmp_path)
     paths = {
@@ -481,7 +480,7 @@ def test_fsync_failure_is_atomic_per_file_and_reports_prior_outputs(
     def fail_fsync(fd):
         nonlocal flush_count
         flush_count += 1
-        if current == paths[failed] and flush_count == failed_flush:
+        if current == paths[failed] and flush_count == 1:
             raise OSError("report disk flush failed")
         return fsync(fd)
 

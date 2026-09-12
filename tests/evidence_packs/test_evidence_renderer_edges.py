@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import errno
 import json
 from pathlib import Path
 
@@ -475,6 +476,125 @@ def test_html_writer_cleans_up_when_stream_construction_fails(
     assert len(opened) == 1
     with pytest.raises(OSError):
         reporting.os.fstat(opened[0])
+
+
+def test_html_writer_never_removes_a_concurrent_destination(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    destination = tmp_path / "report.html"
+
+    def replace_and_fail(_descriptor: int, *_args: object, **_kwargs: object) -> object:
+        destination.write_text("independent output", encoding="utf-8")
+        raise OSError(errno.EIO, "injected stream construction failure")
+
+    monkeypatch.setattr(reporting.os, "fdopen", replace_and_fail)
+    with pytest.raises(EvidenceReportError, match="could not write HTML report"):
+        reporting._write_html_no_clobber(destination, "<p>report</p>")
+    assert destination.read_text(encoding="utf-8") == "independent output"
+    assert list(tmp_path.iterdir()) == [destination]
+
+
+def test_html_writer_does_not_report_a_post_publication_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    destination = tmp_path / "report.html"
+    published = False
+    real_fsync = reporting.os.fsync
+    real_link = reporting.os.link
+
+    def track_link(*args: object, **kwargs: object) -> None:
+        nonlocal published
+        real_link(*args, **kwargs)
+        published = True
+
+    def fail_after_publication(descriptor: int) -> None:
+        if published:
+            raise OSError(errno.EIO, "injected post-publication failure")
+        real_fsync(descriptor)
+
+    monkeypatch.setattr(reporting.os, "link", track_link)
+    monkeypatch.setattr(reporting.os, "fsync", fail_after_publication)
+    assert reporting._write_html_no_clobber(destination, "<p>report</p>") == destination
+    assert destination.read_text(encoding="utf-8") == "<p>report</p>"
+    assert list(tmp_path.iterdir()) == [destination]
+
+
+def test_html_writer_retries_a_private_name_collision(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    occupied = tmp_path / ".invarlock-report-occupied"
+    occupied.write_text("independent output", encoding="utf-8")
+    names = iter(("occupied", "available"))
+    monkeypatch.setattr(reporting.secrets, "token_hex", lambda _length: next(names))
+
+    destination = tmp_path / "report.html"
+    reporting._write_html_no_clobber(destination, "<p>report</p>")
+
+    assert occupied.read_text(encoding="utf-8") == "independent output"
+    assert destination.read_text(encoding="utf-8") == "<p>report</p>"
+    assert not (tmp_path / ".invarlock-report-available").exists()
+
+
+def test_html_writer_rejects_exhausted_private_names(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    occupied = tmp_path / ".invarlock-report-occupied"
+    occupied.write_text("independent output", encoding="utf-8")
+    monkeypatch.setattr(reporting.secrets, "token_hex", lambda _length: "occupied")
+
+    with pytest.raises(EvidenceReportError, match="allocate a temporary report"):
+        reporting._write_html_no_clobber(tmp_path / "report.html", "<p>report</p>")
+
+    assert occupied.read_text(encoding="utf-8") == "independent output"
+    assert list(tmp_path.iterdir()) == [occupied]
+
+
+def test_html_writer_does_not_unlink_an_unopened_candidate(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    occupied = tmp_path / ".invarlock-report-occupied"
+    occupied.write_text("independent output", encoding="utf-8")
+    real_open = reporting.os.open
+
+    monkeypatch.setattr(reporting.secrets, "token_hex", lambda _length: "occupied")
+
+    def fail_candidate_open(
+        path: object, flags: int, *args: object, **kwargs: object
+    ) -> int:
+        if path == occupied.name and flags & reporting.os.O_WRONLY:
+            raise OSError(errno.EMFILE, "injected open failure")
+        return real_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(reporting.os, "open", fail_candidate_open)
+    with pytest.raises(EvidenceReportError, match="could not write HTML report"):
+        reporting._write_html_no_clobber(tmp_path / "report.html", "<p>report</p>")
+
+    assert occupied.read_text(encoding="utf-8") == "independent output"
+    assert list(tmp_path.iterdir()) == [occupied]
+
+
+def test_html_writer_preserves_a_link_time_destination(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    destination = tmp_path / "report.html"
+    real_link = reporting.os.link
+
+    def occupy_then_link(*args: object, **kwargs: object) -> None:
+        destination.write_text("independent output", encoding="utf-8")
+        real_link(*args, **kwargs)
+
+    monkeypatch.setattr(reporting.os, "link", occupy_then_link)
+    with pytest.raises(EvidenceReportError, match="destination already exists"):
+        reporting._write_html_no_clobber(destination, "<p>report</p>")
+
+    assert destination.read_text(encoding="utf-8") == "independent output"
+    assert list(tmp_path.iterdir()) == [destination]
 
 
 def test_report_json_loader_and_manifest_path_inventory_fail_closed(

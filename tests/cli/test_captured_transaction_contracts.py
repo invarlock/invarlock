@@ -310,6 +310,48 @@ def test_failed_discriminator_does_not_reload_a_native_request(
     assert json.loads(result.stdout)["ok"] is True
 
 
+@pytest.mark.parametrize("preflight", [False, True])
+def test_failed_discriminator_preserves_captured_error_contract(
+    tmp_path, monkeypatch, preflight
+):
+    from invarlock.core import evaluation_request
+
+    _inputs(tmp_path)
+    monkeypatch.setattr(
+        evaluation_request,
+        "evaluation_request_mode",
+        lambda _path: (_ for _ in ()).throw(
+            engine.EvaluationRequestError("initial discriminator unavailable")
+        ),
+    )
+    arguments = [
+        "evaluate",
+        str(tmp_path / "request.json"),
+        "--unsigned",
+        "--runtime-device",
+        "cpu",
+        "--json",
+    ]
+    if preflight:
+        arguments.append("--preflight")
+    result = RUNNER.invoke(app, arguments)
+
+    assert result.exit_code == 2
+    payload = json.loads(result.stdout)
+    assert payload["kind"] == "captured"
+    assert payload["ok"] is False
+    assert payload["errors"] == [
+        "runtime options are not valid for captured evaluation"
+    ]
+    if preflight:
+        assert payload["format_version"] == "invarlock/evaluation-preflight-v3"
+        assert payload["execution_mode"] == "captured"
+        assert payload["requested_authentication"] == "unsigned_local"
+    else:
+        assert payload["format_version"] == "invarlock/evaluation-result-v2"
+    assert not (tmp_path / "artifacts").exists()
+
+
 @pytest.mark.parametrize(
     "options",
     [

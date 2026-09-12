@@ -141,6 +141,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Kept core report failures in JSON when requested and preserved literal error
   details such as signer fingerprints in text output.
+- Published report files through private, fully flushed staging entries without
+  replacing existing destinations or deleting concurrently replaced output.
 - Displayed sample-count, precision and side-accuracy requirements in both
   report formats, and matched interval labels and units to the actual scorer.
 

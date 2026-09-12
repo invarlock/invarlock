@@ -781,8 +781,9 @@ def _file_sha256(path: Path) -> str:
         try:
             handle = os.fdopen(descriptor, "rb")
         except BaseException:
-            os.close(descriptor)
+            owned_descriptor = descriptor
             descriptor = None
+            os.close(owned_descriptor)
             raise
         descriptor = None
         with handle:

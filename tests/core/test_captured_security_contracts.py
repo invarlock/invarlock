@@ -850,7 +850,9 @@ def test_publication_and_readers_reject_symlinked_ancestors(handoff):
     assert not kwargs["receipt_path"].exists()
 
 
-def test_atomic_receipt_parent_replacement_rolls_back(handoff, monkeypatch):
+def test_atomic_receipt_parent_replacement_does_not_risk_foreign_output(
+    handoff, monkeypatch
+):
     pack, kwargs, _, _, _ = handoff
     output = pack.parent / "output"
     output.mkdir()
@@ -868,8 +870,9 @@ def test_atomic_receipt_parent_replacement_rolls_back(handoff, monkeypatch):
         verification.CapturedVerificationIncomplete, match="publication_failed"
     ):
         verification.verify_captured_evidence(pack, **kwargs)
-    assert not (renamed / "receipt.json").exists()
+    assert (renamed / "receipt.json").is_file()
     assert not kwargs["receipt_path"].exists()
+    assert not list(renamed.glob(".captured-*"))
 
 
 def test_resigned_ledger_digest_cannot_authorize_duplicate_inventory(handoff):

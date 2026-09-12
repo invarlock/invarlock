@@ -146,8 +146,8 @@ publishes the evidence directory. Import requests do not launch workers.
 Runtime image, device, entrypoint and resource controls apply only to run-mode
 requests. Import evidence already records its runtime identity, so `evaluate`
 rejects explicit run controls for an import request instead of silently ignoring
-them. The command also fails if the request changes between mode detection and
-full loading.
+them. The command also fails if the request's execution mode changes between
+mode detection and full loading.
 
 ### Captured evaluation controls
 

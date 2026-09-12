@@ -760,7 +760,7 @@ def evaluate(  # noqa: C901
                 if isinstance(exc, EvaluationTransactionError)
                 else EvaluationTransactionError(str(exc))
             )
-        if request_mode == "captured":
+        if request_mode == "captured" or isinstance(exc, CapturedEvaluationError):
             failure.captured = True
             if isinstance(failure, EvaluationPreflightError):
                 failure.unsigned = unsigned

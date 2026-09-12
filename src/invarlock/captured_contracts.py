@@ -620,51 +620,44 @@ def atomic_write(path: Path, raw: bytes) -> None:
     path = Path(path)
     if path.name in {"", ".", ".."}:
         raise CapturedContractError("destination must name a file")
-    cleanup = None
-    published = False
-    identity = None
-    try:
-        with secure_directory(path.parent, create=True) as parent:
-            cleanup = os.dup(parent)
-            name = ".captured-" + secrets.token_hex(16)
-            descriptor = os.open(
+    with secure_directory(path.parent, create=True) as parent:
+        name = ".captured-" + secrets.token_hex(16)
+        opened_descriptor = os.open(
+            name,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+            0o600,
+            dir_fd=parent,
+        )
+        descriptor: int | None = opened_descriptor
+        try:
+            try:
+                handle = os.fdopen(opened_descriptor, "wb")
+            except BaseException:
+                descriptor = None
+                os.close(opened_descriptor)
+                raise
+            descriptor = None
+            with handle:
+                handle.write(raw)
+                handle.flush()
+                os.fsync(handle.fileno())
+            # Surface directory-sync failures before the destination exists.
+            # Nothing fallible after the link may trigger destination rollback.
+            os.fsync(parent)
+            os.link(
                 name,
-                os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
-                0o600,
-                dir_fd=parent,
+                path.name,
+                src_dir_fd=parent,
+                dst_dir_fd=parent,
+                follow_symlinks=False,
             )
+        finally:
+            if descriptor is not None:
+                os.close(descriptor)
             try:
-                try:
-                    handle = os.fdopen(descriptor, "wb")
-                except BaseException:
-                    os.close(descriptor)
-                    raise
-                with handle:
-                    handle.write(raw)
-                    handle.flush()
-                    os.fsync(handle.fileno())
-                    identity = _identity(os.fstat(handle.fileno()))[:3]
-                os.link(
-                    name,
-                    path.name,
-                    src_dir_fd=parent,
-                    dst_dir_fd=parent,
-                    follow_symlinks=False,
-                )
-                published = True
-                os.fsync(parent)
-            finally:
                 os.unlink(name, dir_fd=parent)
-    except BaseException:
-        # Keep the pinned parent open through its final pathname stability check.
-        if published and cleanup is not None:
-            try:
-                current = os.stat(path.name, dir_fd=cleanup, follow_symlinks=False)
-                if _identity(current)[:3] == identity:
-                    os.unlink(path.name, dir_fd=cleanup)
-            except FileNotFoundError:
+            except OSError:
+                # Publication is complete once the no-replace link succeeds. A
+                # private staging-link cleanup failure must not turn success into
+                # an ambiguous failure or trigger deletion of the final path.
                 pass
-        raise
-    finally:
-        if cleanup is not None:
-            os.close(cleanup)

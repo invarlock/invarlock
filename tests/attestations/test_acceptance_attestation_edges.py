@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import copy
+import errno
 import hashlib
 import json
 import shutil
@@ -643,6 +644,30 @@ def test_subject_file_hashing_closes_descriptor_when_stream_construction_fails(
     assert len(opened) == 1
     with pytest.raises(OSError):
         target.os.fstat(opened[0])
+
+
+def test_subject_file_hashing_does_not_retry_an_uncertain_close(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    artifact = tmp_path / "model.gguf"
+    artifact.write_bytes(b"artifact")
+    real_close = target.os.close
+    close_calls: list[int] = []
+
+    def fail_stream(_descriptor: int, _mode: str) -> object:
+        raise RuntimeError("injected stream construction failure")
+
+    def release_then_fail(descriptor: int) -> None:
+        close_calls.append(descriptor)
+        real_close(descriptor)
+        raise OSError(errno.EIO, "injected uncertain close failure")
+
+    monkeypatch.setattr(target.os, "fdopen", fail_stream)
+    monkeypatch.setattr(target.os, "close", release_then_fail)
+    with pytest.raises(AcceptanceAttestationError, match="read safely"):
+        target._file_sha256(artifact)
+    assert len(close_calls) == 1
 
 
 def test_artifact_path_digest_dispatches_engine_and_rejects_unknown(

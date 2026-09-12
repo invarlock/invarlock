@@ -458,10 +458,10 @@ exact recorded values remain available in the evidence and technical details.
 
 For captured comparisons, the technical details identify both recorded runs,
 their complete-run digests, attributed artifact digests and evaluator
-source name and version. These fields distinguish a same-model prompt change
-from a model or evaluator change and make the report traceable to the exact
-inputs. They describe the supplied records; only `verify` can add independent
-authentication and replay assurance.
+source name and version. These fields make the report traceable to the exact
+supplied runs. Optional model and prompt context describes the evaluator-recorded
+change; it does not establish checkpoint identity. Only `verify` can add
+independent authentication and replay assurance.
 
 For exact match, means appear as percentages and changes as percentage points.
 The decision tests the paired interval's lower bound, not just the observed

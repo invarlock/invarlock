@@ -424,6 +424,42 @@ def test_atomic_write_closes_descriptor_when_stream_creation_fails(
     assert not list(tmp_path.iterdir())
 
 
+def test_atomic_write_does_not_retry_an_uncertain_stream_close(tmp_path, monkeypatch):
+    real_close = contracts.os.close
+    closed = []
+    staging_descriptor = None
+    real_open = contracts.os.open
+
+    def track_staging_open(path, flags, *args, **kwargs):
+        nonlocal staging_descriptor
+        descriptor = real_open(path, flags, *args, **kwargs)
+        if isinstance(path, str) and path.startswith(".captured-"):
+            staging_descriptor = descriptor
+        return descriptor
+
+    def close_then_fail(descriptor):
+        if descriptor != staging_descriptor:
+            return real_close(descriptor)
+        closed.append(descriptor)
+        real_close(descriptor)
+        raise OSError(errno.EIO, "close result is uncertain")
+
+    monkeypatch.setattr(contracts.os, "open", track_staging_open)
+    monkeypatch.setattr(
+        contracts.os,
+        "fdopen",
+        Mock(side_effect=OSError(errno.EMFILE, "cannot create stream")),
+    )
+    monkeypatch.setattr(contracts.os, "close", close_then_fail)
+
+    with pytest.raises(OSError, match="close result is uncertain"):
+        contracts.atomic_write(tmp_path / "result.json", b"payload")
+
+    assert len(closed) == 1
+    assert staging_descriptor is not None
+    assert not list(tmp_path.iterdir())
+
+
 def test_evidence_publication_closes_descriptor_when_stream_creation_fails(
     tmp_path, monkeypatch, publication_args
 ):
@@ -459,31 +495,44 @@ def test_evidence_publication_closes_descriptor_when_stream_creation_fails(
     assert sorted(path.name for path in tmp_path.iterdir()) == ["signer.pem"]
 
 
-@pytest.mark.parametrize("mutation", ["removed", "replaced"])
-def test_atomic_rollback_preserves_original_failure_and_foreign_output(
-    tmp_path, monkeypatch, mutation
+def test_atomic_write_has_no_fallible_sync_after_publication(tmp_path, monkeypatch):
+    destination = tmp_path / "receipt.json"
+    original_fsync = os.fsync
+    original_link = os.link
+    published = False
+
+    def track_link(*args, **kwargs):
+        nonlocal published
+        original_link(*args, **kwargs)
+        published = True
+
+    def fail_after_publication(descriptor):
+        if published:
+            raise OSError(errno.EIO, "post-publication sync attempted")
+        original_fsync(descriptor)
+
+    monkeypatch.setattr(contracts.os, "link", track_link)
+    monkeypatch.setattr(contracts.os, "fsync", fail_after_publication)
+    contracts.atomic_write(destination, b"our complete output")
+    assert destination.read_bytes() == b"our complete output"
+    assert not list(tmp_path.glob(".captured-*"))
+
+
+def test_atomic_write_cleanup_failure_never_removes_published_output(
+    tmp_path, monkeypatch
 ):
     destination = tmp_path / "receipt.json"
-    original = os.fsync
-    error = OSError(errno.EIO, "directory synchronization failed")
+    original_unlink = os.unlink
 
-    def change_published_output(descriptor):
-        if stat.S_ISDIR(os.fstat(descriptor).st_mode):
-            destination.unlink()
-            if mutation == "replaced":
-                destination.write_bytes(b"another writer's output")
-            raise error
-        original(descriptor)
+    def fail_staging_cleanup(path, *args, **kwargs):
+        if str(path).startswith(".captured-"):
+            raise OSError(errno.EACCES, "staging cleanup denied")
+        return original_unlink(path, *args, **kwargs)
 
-    monkeypatch.setattr(contracts.os, "fsync", change_published_output)
-    with pytest.raises(OSError) as failure:
-        contracts.atomic_write(destination, b"our complete output")
-    assert failure.value is error
-    if mutation == "replaced":
-        assert destination.read_bytes() == b"another writer's output"
-    else:
-        assert not destination.exists()
-    assert not list(tmp_path.glob(".captured-*"))
+    monkeypatch.setattr(contracts.os, "unlink", fail_staging_cleanup)
+    contracts.atomic_write(destination, b"our complete output")
+    assert destination.read_bytes() == b"our complete output"
+    assert len(list(tmp_path.glob(".captured-*"))) == 1
 
 
 @pytest.mark.parametrize(

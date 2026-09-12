@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import errno
 import hashlib
 import math
 import os
+import secrets
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
@@ -493,8 +493,7 @@ def _write_html_no_clobber(path: Path, html: str) -> Path:
     root_fd = os.open("/", _DIRECTORY_FLAGS)
     current_fd = root_fd
     descriptor: int | None = None
-    created = False
-    completed = False
+    temporary_name: str | None = None
     try:
         for component in destination.parent.parts[1:]:
             try:
@@ -513,25 +512,42 @@ def _write_html_no_clobber(path: Path, html: str) -> Path:
             | getattr(os, "O_CLOEXEC", 0)
             | getattr(os, "O_NOFOLLOW", 0)
         )
-        descriptor = os.open(destination.name, flags, 0o600, dir_fd=current_fd)
-        created = True
+        for _attempt in range(10):
+            candidate_name = ".invarlock-report-" + secrets.token_hex(16)
+            try:
+                descriptor = os.open(candidate_name, flags, 0o600, dir_fd=current_fd)
+            except FileExistsError:
+                continue
+            temporary_name = candidate_name
+            break
+        else:
+            raise EvidenceReportError("could not allocate a temporary report file")
         try:
             handle = os.fdopen(descriptor, "w", encoding="utf-8", newline="\n")
         except BaseException:
-            os.close(descriptor)
+            owned_descriptor = descriptor
             descriptor = None
+            os.close(owned_descriptor)
             raise
         descriptor = None
         with handle:
             handle.write(html)
             handle.flush()
             os.fsync(handle.fileno())
-        completed = True
-    except OSError as exc:
-        if exc.errno == errno.EEXIST:
+        os.fsync(current_fd)
+        try:
+            os.link(
+                temporary_name,
+                destination.name,
+                src_dir_fd=current_fd,
+                dst_dir_fd=current_fd,
+                follow_symlinks=False,
+            )
+        except FileExistsError as exc:
             raise EvidenceReportError(
                 f"HTML destination already exists: {destination}"
             ) from exc
+    except OSError as exc:
         raise EvidenceReportError(
             f"could not write HTML report: {exc}", exit_code=1
         ) from exc
@@ -540,9 +556,9 @@ def _write_html_no_clobber(path: Path, html: str) -> Path:
             try:
                 if descriptor is not None:
                     os.close(descriptor)
-                if created and not completed:
+                if temporary_name is not None:
                     try:
-                        os.unlink(destination.name, dir_fd=current_fd)
+                        os.unlink(temporary_name, dir_fd=current_fd)
                     except OSError:
                         pass
             finally:
