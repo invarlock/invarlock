@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added explicit hosted-service identity to captured runs, binding configuration,
+  harness and observation windows without asserting immutable model weights.
+  Documented periodic and incident-triggered requalification through fresh
+  capture, signed evaluation, offline verification and scoped reporting.
+
 - Completed per-case reference forwarding in the answer-capture judge example
   and aligned overview, integration, verification and security documentation
   with the three built-in scorers and their distinct evidence contracts.

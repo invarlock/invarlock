@@ -28,6 +28,11 @@ results and supports exact match, normalized NLL and judge scoring. Exact match
 and NLL use retained facts; judging can import retained calls or collect bounded
 new ratings over the frozen answers. Deterministic comparisons also support
 multiple metrics and slices. Verification and reporting run offline using core.
+For hosted endpoints and applications, use the
+[requalification guide](user-guide/hosted-service-requalification.md) to capture
+a fresh bounded campaign against an approved baseline. Explicit service identity
+records the observed configuration and window; offline replay does not measure
+the current service.
 Start with `invarlock --help` and use `evaluate`, `verify`, or `report`.
 All three default to readable text; add `--json` for machine-readable status.
 Signed captured comparisons use independent run/request anchors and a scoped

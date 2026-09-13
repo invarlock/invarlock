@@ -9,6 +9,7 @@ nav:
   - User guide:
       - Getting started: user-guide/getting-started.md
       - Captured results: user-guide/captured-results.md
+      - Hosted-service requalification: user-guide/hosted-service-requalification.md
       - ModelKit recipient handoff: user-guide/modelkit-handoff.md
       - Change scenarios: user-guide/change-scenarios.md
       - Key management: user-guide/key-management.md

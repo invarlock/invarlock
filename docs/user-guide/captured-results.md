@@ -9,6 +9,12 @@ Use the core `evaluate`, `verify`, and `report` commands when an evaluator has
 already produced paired records. The request binds the baseline, subject,
 policy, and output location without introducing a separate command namespace.
 
+Hosted captures can declare a service identity and observation window with
+`artifact_digest: null`. The [hosted requalification guide](hosted-service-requalification.md)
+walks through baseline approval, fresh capture, evaluation, offline verification
+and the resulting decision. This is captured assurance: replay does not attest
+execution or freshly measure a service.
+
 ## Prepare the request
 
 `invarlock evaluate --init demo --example classification` creates synthetic

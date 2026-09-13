@@ -64,6 +64,16 @@ evaluation at `0` (pass), `7` (adverse decision), or `2` (input/local-budget
 failure); render only newly published packs. See the
 [complete signed/local guide](../../docs/user-guide/captured-results.md).
 
+## Hosted-service campaigns
+
+The [hosted requalification guide](../../docs/user-guide/hosted-service-requalification.md)
+uses the same captured request for periodic or incident-triggered campaigns.
+A hosted run has `artifact_digest: null` and explicit service identity,
+configuration, harness and observation window. Fresh calls belong to the capture
+harness; the core evaluates retained facts and verifies them offline. Local
+fixtures establish contract behavior only and are not externally hosted
+qualification evidence.
+
 ## Real native capture
 
 `native_rehearsal.py` runs a small local model through Inspect, LM Evaluation

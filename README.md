@@ -22,8 +22,8 @@
 </p>
 
 Using independently supplied trust inputs, an artifact recipient can check
-whether one exact model derivative satisfies an agreed release-regression
-policy.
+whether a local model derivative or captured hosted-service observation
+satisfies an agreed release-regression policy.
 
 InvarLock is an open-source assurance engine for one paired
 baseline-versus-subject decision. It can execute both sides on the same
@@ -84,7 +84,7 @@ for itself.
 
 ## Decision boundary
 
-InvarLock answers one precise question: whether a subject artifact satisfies an
+InvarLock answers one precise question: whether a subject satisfies an
 agreed release-regression policy relative to a baseline, using authenticated
 evidence and independently supplied trust anchors. It makes that decision
 reproducible, portable, and suitable for recipient-controlled approval.
@@ -120,6 +120,14 @@ Prepare the request, independent captured trust profile, and keys using the
 Its starter records and thresholds are illustrative. Captured verification
 authenticates inputs and arithmetic, not runtime execution; recorded judgments
 remain explicit and cannot authorize native acceptance or deployment.
+
+For a hosted endpoint or application, follow the
+[requalification workflow](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/hosted-service-requalification.md):
+approve a baseline and policy, capture fresh service executions, then evaluate,
+verify offline and report. Captured service identity records the configuration,
+harness and observation window without claiming immutable weights. Periodic and
+incident-triggered campaigns use your own harness and scheduler; replay of old
+evidence is not a fresh service measurement.
 
 ## Evaluate with a native judge scorer
 
