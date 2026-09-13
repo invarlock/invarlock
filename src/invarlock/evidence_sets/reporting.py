@@ -87,11 +87,10 @@ def build_evidence_set_view(
         for field in ("baseline_run_sha256", "subject_run_sha256", "case_set_sha256"):
             if publication.envelope["bindings"][field] != shared[field]:
                 raise EvidenceSetError("component runs or case sets differ")
-        if (
-            publication.envelope["intended_subject"]
-            != shared["subject_artifact_sha256"]
+        if publication.envelope["intended_subject"] != shared.get(
+            "subject_service_identity_sha256", shared["subject_artifact_sha256"]
         ):
-            raise EvidenceSetError("component subject artifacts differ")
+            raise EvidenceSetError("component subject identities differ")
         if artifacts["analysis_policy"]["decision_role"] != "required":
             raise EvidenceSetError("evidence set requires a required judge policy")
         first = captured_view(manifest, payloads, signer)
@@ -141,7 +140,7 @@ def build_evidence_set_view(
         ("Judge measurement replay", "Recomputed offline from retained measurements."),
         (
             "Shared inputs",
-            "Same complete baseline and subject runs, original case set, and subject artifact.",
+            "Same complete baseline and subject runs, original case set, and evaluated subject identity.",
         ),
         ("Recipient acceptance", "Not performed by report."),
     )
@@ -171,7 +170,14 @@ def build_evidence_set_view(
             ("Baseline run", shared["baseline_run_sha256"]),
             ("Subject run", shared["subject_run_sha256"]),
             ("Original case set", shared["case_set_sha256"]),
-            ("Subject artifact", shared["subject_artifact_sha256"]),
+            (
+                "Subject service identity"
+                if "subject_service_identity_sha256" in shared
+                else "Subject artifact",
+                shared.get(
+                    "subject_service_identity_sha256", shared["subject_artifact_sha256"]
+                ),
+            ),
         ),
         next_steps=(
             "Verify the evidence set with an independently maintained composition recipient policy before accepting the combined result.",
