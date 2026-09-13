@@ -61,7 +61,9 @@ RELEASE_EXAMPLE_COVERAGE_FILES := \
 	examples/quickstart/run.py \
 	examples/captured-results/scorer_wheel_smoke.py \
 	examples/captured-results/harness_likelihood_rehearsal.py \
-	examples/captured-results/harness_likelihood_handoff.py
+	examples/captured-results/harness_likelihood_handoff.py \
+	examples/captured-results/harness_model_comparison.py \
+	examples/captured-results/harness_model_handoff.py
 
 .PHONY: help install dev-install lock-sync test test-fast test-parallel test-integration addins-test
 .PHONY: coverage coverage-addins coverage-qualification coverage-release coverage-examples coverage-maintenance coverage-enforce coverage-enforce-parallel
