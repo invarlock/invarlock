@@ -20,8 +20,8 @@ invarlock report evidence/
 `evaluate` executes, imports, or compares captured baseline-versus-subject
 records and publishes one atomic evidence directory. Native exact-match/NLL and
 deterministic-extension execution/import retain pack v1, native
-artifact/schedule/runtime anchors, and receipt v1/v2. Corresponding captured
-comparisons use pack v2, complete-run/request/policy/signer anchors,
+artifact/schedule/runtime anchors, and receipt v1/v2. Captured built-in and
+recorded-score comparisons use pack v2, complete-run/request/policy/signer anchors,
 trust profile v2, and receipt v3 scoped to `captured_comparison`.
 The bounded judge workflow collects or imports frozen-answer measurements, validates their
 complete planned schedule, and emits a judge evidence envelope with its own

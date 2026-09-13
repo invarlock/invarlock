@@ -55,7 +55,7 @@ through `tests/integration/conftest.py`.
   inputs in pytest temporary directories or use the checked-in public
   transaction under `examples/`.
 - Optional-package tests live beside their packages under `addins/*/tests/` and
-run together through `make addins-test`.
+  run together through `make addins-test`.
 
 Ordinary collection tests use substituted transports; they make no paid provider
 calls. The optional Inspect add-in also has a pinned-SDK gate with mocked HTTP

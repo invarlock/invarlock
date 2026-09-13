@@ -142,6 +142,11 @@ acceptance or deployment; unsigned reports have no independent assurance.
 
 ## Metrics and verdicts
 
+The table describes native scorer choices. Captured comparisons use their
+[own policy and interval contracts](reference/evaluation-records.md): captured
+exact match uses paired bootstrap intervals, and omitting `comparison.metric`
+permits multiple policy metrics and slices.
+
 | Metric | What is compared | Passing rule |
 | --- | --- | --- |
 | `exact_match` | Difference between subject and baseline literal accuracy, with paired regression/improvement counts and exact McNemar probability | Paired Newcombe interval lower bound is at least `metrics.exact_match.delta_min_pp` |
@@ -149,7 +154,7 @@ acceptance or deployment; unsigned reports have no independent assurance.
 | `judge` | Repeated bounded ratings over declared independent units and frozen answers | The declared judge analysis and recipient policy accept the retained measurements and required uncertainty bounds |
 | Authorized deterministic text scorer | Difference between subject and baseline arithmetic-mean `[0,1]` scores, in percentage points | Paired schedule-resampling interval lower bound is at least `metrics.scorer_extension.delta_min_pp` |
 
-Exact match uses the continuity-corrected paired Newcombe 95% effect-size
+Native exact match uses the continuity-corrected paired Newcombe 95% effect-size
 interval emitted by `invarlock/comparison-report-v3`. Normalized NLL
 uses the deterministic `paired_percentile_bootstrap_sha256_v1` method with
 2,048 replicates over the authenticated finite schedule. The selected policy
@@ -170,7 +175,7 @@ comparable, the report also includes a verifier-derived token-weighted
 perplexity ratio as interpretation only; it has no policy, interval, or verdict
 authority.
 
-A request selects exactly one built-in `metric` or one complete
+A native request selects exactly one built-in `metric` or one complete
 `scorer_extension` binding. Extension scorers receive only authenticated
 expected-output and output-text facts, run only when explicitly authorized, and
 cannot redefine aggregation or direction. Deterministic F1, extraction, and VQA
