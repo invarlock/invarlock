@@ -16,7 +16,14 @@ the retained grounded-QA and extraction campaign. It freezes the pilot and final
 case membership without presenting uncollected ratings as evidence.
 
 To gate results from an existing evaluator, start with the separate
-[captured-results examples](captured-results/README.md). For an artifact handoff, the
+[captured-results examples](captured-results/README.md). Their installed-wheel
+smoke covers exact match, normalized NLL and judge imports using authored
+contract fixtures. The [Harness likelihood reference](captured-results/references/harness-likelihood/README.md)
+adds real CPU measurements and an independently replayable signed pack for one
+same-model NLL integration profile. Neither substitutes for task-quality evidence.
+For native answer capture followed by judging, use the
+[native judge starter](native-judge/README.md).
+For an artifact handoff, the
 [ModelKit guide](../docs/user-guide/modelkit-handoff.md) checks delivered
 package contents and recipient acceptance at the actual model directories.
 

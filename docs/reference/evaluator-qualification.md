@@ -1,8 +1,8 @@
 # Evaluator qualification
 
 InvarLock qualifies evaluator evidence through one closed, evaluator-neutral
-boundary. The core does not contain evaluator-name dispatch, evaluator SDK
-imports, or native-output parsers. Example-owned runners execute representative
+boundary. `qualify_evaluator_export` consumes normalized contracts without
+dispatching to an evaluator SDK. Example-owned runners execute representative
 upstream tools and normalize their results into the same four contracts.
 
 !!! info "Reference"
@@ -23,6 +23,38 @@ qualification boundary documented here also accepts normalized matching, numeric
 tolerance, structured fields and token F1 when independent reference text is
 available for recomputation. Existing retained matrix rows continue to prove
 their declared exact-match profiles; they are not evidence for every new metric.
+
+## Capture for exact match, likelihood and judge scoring
+
+The installed `load_run` parsers support canonical JSON, generic JSONL,
+`inspect-json`, `lm-eval-samples` and `promptfoo-jsonl`. Other workflows can map
+original per-case facts through `invarlock.engine.capture_evaluator_run` and
+inspect `evaluator_input_capabilities`. These are captured-input interfaces,
+separate from qualification and the example-owned signed OCI bridges.
+
+The [maintained capture helper](https://github.com/invarlock/invarlock/blob/main/examples/evaluator-qualification/maintained/CAPTURE.md)
+covers all 19 ecosystems through explicit canonical records. It can also join
+17 retained deterministic exports to their original cases and independent
+schedule. MLflow aggregate observations and Garak detector summaries cannot
+supply original per-case predictions, references or likelihoods; those workflows
+must capture the actual records separately. Historical matrix identities and
+authority remain unchanged.
+
+InvarLock owns the selected scorer. Exact match requires string answers and
+references. Judge requires task and answer text plus a declared recipe and
+complete retained judge calls; a scalar rating is insufficient. Structured task
+inputs require an explicit text projection that preserves the original facts.
+Per-case judge references are opt-in and stay separate from the model input.
+Normalized NLL requires typed reference-continuation log probabilities, byte and
+token counts, and bound source, artifact, configuration and tokenizer identities.
+Naming an evaluator cannot supply these facts.
+
+The separate [Harness likelihood reference](https://github.com/invarlock/invarlock/blob/main/examples/captured-results/references/harness-likelihood/README.md)
+retains real unmodified Harness `0.4.12` `HFLM` measurements on six authored
+same-model CPU pairs, followed by signed evaluation and independent replay.
+It establishes that likelihood compatibility profile. Synthetic canonical NLL
+tests exercise the shared contract across the shortlist; neither those tests nor
+the retained exact-match matrix qualify all 19 native likelihood or judge paths.
 
 ## Three independent status axes
 

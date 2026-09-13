@@ -9,8 +9,12 @@ The two invented questions demonstrate wiring. They cannot establish benchmark
 quality or satisfy the interval precision in the example policy. Replace them
 with your own reviewed regression cases and independent-unit assignments before
 using the result for a decision. Context needed to judge an answer belongs in
-`prompt`; the current text profile does not send the separate `expected` field
-to the judge.
+`prompt`. By default, the separate `expected` reference remains authenticated
+but is not sent to the judge. To grade against it, set
+`plan.prompt.reference_mode: per_case` in `judge-policy.json`. Every case must
+then have a string reference, which is sent as a separate `reference` field and
+counts toward request limits. It is never added to the evaluated model input.
+Omitting the mode or setting it to `none` preserves the original request bytes.
 
 ## Prepare
 
@@ -20,6 +24,13 @@ Install matching core and collector packages from the repository root:
 python -m pip install .
 python -m pip install 'addins/inspect_judge[inspect]'
 ```
+
+Installed collection requires exactly Inspect `0.3.263`, OpenAI `3.13.0` and
+`httpx==0.28.1`, supplied by the extra. It uses the official OpenAI Chat Completions
+endpoint. Remove `OPENAI_BASE_URL` and `OPENAI_API_BASE` from the environment;
+even empty overrides are rejected. The starter explicitly selects temperature
+`1` and reasoning effort `none` for `openai/gpt-5.6-sol`. Keep those controls
+consistent with the approved plan and collection configuration.
 
 Copy this directory to a private workspace. Replace the baseline and subject
 artifact identities, immutable revisions, checkpoint and tokenizer digests in
@@ -61,5 +72,15 @@ capacity publishes terminal insufficient evidence with an explicit stop reason.
 
 Native `execution.mode: import` can use existing complete provider side files
 instead of generating answers. Those files must bind the original judge policy
-bytes, schedule and exact output observations. Arbitrary frozen runs use the
-separate `judge_collect` request; they do not claim native runtime provenance.
+bytes, schedule and exact output observations. This mode still collects judge
+ratings through the installed collector.
+
+Existing evaluator exports can instead use `metric: judge` in a captured
+`invarlock/evaluation-request-v2` request with this same policy recipe. That
+route accepts explicit text projections and can import retained measurements
+through `comparison.judge.measurements` without the collector or credentials.
+Already finalized plans and frozen runs use the separate v3 `judge_import` or
+`judge_collect` request. These captured-answer routes authenticate the retained
+records and judge replay; they do not claim native runtime provenance. See the
+[judge reference](https://invarlock.github.io/invarlock/reference/judge-measurements/) for the
+request and recipient trust contracts.

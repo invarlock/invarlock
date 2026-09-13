@@ -18,11 +18,12 @@ invarlock report evidence/
 ![InvarLock paired release-regression architecture](../assets/evaluation-verification-flow.svg)
 
 `evaluate` executes, imports, or compares captured baseline-versus-subject
-records and publishes one atomic evidence directory. Native execution/import
-retains pack v1, native artifact/schedule/runtime anchors, and receipt v1/v2.
-Captured comparison uses pack v2, complete-run/request/policy/signer anchors,
+records and publishes one atomic evidence directory. Native exact-match/NLL and
+deterministic-extension execution/import retain pack v1, native
+artifact/schedule/runtime anchors, and receipt v1/v2. Corresponding captured
+comparisons use pack v2, complete-run/request/policy/signer anchors,
 trust profile v2, and receipt v3 scoped to `captured_comparison`.
-The bounded judge workflow imports frozen-answer measurements, validates their
+The bounded judge workflow collects or imports frozen-answer measurements, validates their
 complete planned schedule, and emits a judge evidence envelope with its own
 recipient policy and verification receipt. It preserves fixed-benchmark judge
 uncertainty separately from deterministic comparison statistics. All three use
@@ -32,7 +33,7 @@ discovering an adjacent receipt; unsigned captured packs remain local reports.
 
 ## Transaction boundaries
 
-For native execution/import:
+For native exact-match/NLL and deterministic-extension execution/import:
 
 | Transaction | Reads | Writes | Independent trust required | Acceptance authority |
 | --- | --- | --- | --- | --- |
@@ -43,11 +44,15 @@ For native execution/import:
 The same pack can be rendered many times and verified by many independent
 authorities without changing a byte in the evidence directory.
 
-Captured evaluation recomputes supported deterministic scores or carries
-explicitly attributed recorded scores; it does not execute a runtime or confer
-verdict authority on external evaluator observations. Signed captured verification
+Captured exact-match/NLL comparisons score supplied case facts; other declared
+metrics can use explicitly attributed recorded scores. They do not authenticate
+native model execution. Evaluator profiles qualified as observation-only retain
+that limit. Signed captured verification
 replays the complete comparison under independent pins and a recipient-owned
-work budget. An unsigned pack is not independently authenticated, though an
+work budget. Captured judge requests instead collect or import bounded ratings
+and use the judge envelope and recipient policy. They preserve supplied-answer
+provenance; native judge evidence additionally retains the runtime capture.
+An unsigned pack is not independently authenticated, though an
 attempt to verify it can produce an external signed rejection. A valid receipt
 signature does not mean the technical verdict passes. The
 [captured-results guide](../user-guide/captured-results.md) defines both paths.
@@ -67,7 +72,8 @@ The native runtime layers are:
 
 ## Trust boundaries
 
-The following native anchors are not substitutes for captured run/request pins.
+The following native pack-v1 anchors are not substitutes for captured run/request
+pins or the [judge recipient policy](judge-measurements.md#replay-authentication-and-acceptance).
 
 The evidence-signing key authenticates the bundle bytes and identifies the
 signer. It does not make the submitted assertions true. Verification therefore requires inputs that
@@ -123,8 +129,9 @@ The fifth optional distribution, `invarlock-inspect-judge`, adapts bounded
 collection logs to core judge measurements. Its `inspect` extra supplies the
 provider SDK collection path. Offline import, schedule replay, analysis, signing,
 independent verification, and reporting live in core and do not import or require
-Inspect or OpenAI SDKs. Collection remains an explicitly budgeted optional API;
-`evaluate` can preflight its request but does not launch provider calls.
+Inspect or OpenAI SDKs. `evaluate` invokes the installed collector when a judge
+request requires new ratings, under its explicit budgets. Preflight, retained-call
+import, verification and reporting make no provider calls.
 
 ```text
 invarlock

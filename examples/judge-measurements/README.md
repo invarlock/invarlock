@@ -12,6 +12,27 @@ invarlock evaluate request.yaml --unsigned --json
 invarlock report evidence --html report.html --markdown report.md --junit report.xml --json
 ```
 
+## Use existing evaluator captures
+
+Captured `invarlock/evaluation-request-v2` requests can select
+`comparison.metric: judge` and the same `invarlock/native-judge-policy-v1` recipe
+used by the native starter. InvarLock derives the finalized plan and analysis
+policy from the frozen case records. Use `comparison.judge.measurements` for
+retained measurements, or omit it to collect through the installed add-in.
+The [captured-results guide](../../docs/user-guide/captured-results.md#judge-captured-answers)
+shows the complete route and explicit text projection for structured exports.
+This directory's v3 requests instead take an already finalized plan and analysis
+policy. Neither captured-answer route grants native model execution assurance.
+
+The text profile grades string inputs and answers. References remain retained
+but are omitted from judge requests by default. Set `prompt.reference_mode` to
+`per_case` in a finalized plan, or `plan.prompt.reference_mode` in a recipe, to
+send each string reference as a separate field. Rebind every rendered-request
+and plan digest after changing this choice; it is not a presentation-only option.
+The generic core `prepare_evaluator_judge` and `import_judge_sources` APIs described
+in the [judge reference](../../docs/reference/judge-measurements.md) support
+caller-owned collection without requiring Inspect.
+
 ## Import expanded Inspect events offline
 
 The optional add-in imports the closed `invarlock/inspect-judge-export-v1`
@@ -68,6 +89,14 @@ invarlock evaluate request-collect.yaml --signing-key signer-private.pem --json
 The installed command constructs the pinned model and resumes through a private
 workspace. Review its call, token, cost and timeout limits before execution.
 Missing dependencies or credentials fail preflight without a provider call.
+Installed collection requires exactly Inspect `0.3.263`, OpenAI `3.13.0` and
+`httpx==0.28.1`. Remove `OPENAI_BASE_URL` and `OPENAI_API_BASE` entirely; custom
+endpoints and empty endpoint overrides are rejected. Review the model-specific
+sampling and reasoning requirements in the [add-in guide](../../addins/inspect_judge/README.md).
+The optional `execution.collection.workspace` defaults to
+`<output.evidence>.judge-work`, `scorer_id` to `judge`, and
+`invocation_timeout_seconds` to 3600. Use a private, stable workspace to resume
+without repeating admitted calls.
 For native model execution and automatic answer freezing, use
 [`metric: judge`](../native-judge/README.md) instead. Imported frozen answers do
 not claim native runtime provenance.
@@ -98,6 +127,6 @@ contract boundary, statistical assumptions and recipient verification command.
 
 For the real K2 Horizon 32B frozen-answer corpus, outcome-blind selection,
 pilot plans, reviewer sheets and pending final plans, see
-[Freeze a K2 judge reference](K2-REFERENCE.md). That retained reference contains
-no judge-model results yet; its final plans remain unavailable for execution
+[Freeze a K2 judge reference](K2-REFERENCE.md). That archive retains frozen inputs
+and plans, without judge outcomes. Its final plans remain candidate documents
 until the pilot rubric review is recorded.

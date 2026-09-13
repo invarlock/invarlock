@@ -188,12 +188,15 @@ policy pins the scorer ID, version, descriptor digest, and configuration
 digest. The registry must resolve that exact binding, and replay must produce
 the same canonical result twice. Scorer code is part of the verifier's trusted
 computing base: review and distribute it with the same discipline as verifier
-code. An acceptance scorer must not use a network, external model, human
+code. A deterministic extension scorer must not use a network, external model, human
 judgment, or LLM judge. InvarLock checks the authenticated scorer identity and
 deterministic replay; it does not sandbox extension code or prove those
-operational restrictions. Bounded frozen-answer judging uses a separate evidence
-and recipient-policy contract; it does not execute through the scorer-extension
-trust boundary.
+operational restrictions. The native `judge` scorer collects or imports bounded
+ratings under a separate evidence and recipient-policy contract. Only live
+collection requires the installed collector and provider credentials; verification
+replays retained measurements offline. Native judge evidence binds its runtime
+capture, while imported answers retain their supplied-source provenance. Judging
+does not execute through the deterministic scorer-extension trust boundary.
 
 ### Authorization lifecycle
 

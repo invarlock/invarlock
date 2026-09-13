@@ -180,6 +180,15 @@ unsigned evidence rejection. It runs before any add-in install and requires
 Inspect and OpenAI SDK modules to be absent. Provider SDK collection is qualified
 separately by `make inspect-judge-sdk-test`; offline replay needs only core.
 
+The three-scorer consumer additionally exercises exact-match, normalized-NLL and
+judge selection through captured v2 requests and public SDK capture/import helpers.
+Its copied fixture inventory includes `collection.json`; tests exercise that
+exact inventory outside the checkout. The NLL contract fixtures are synthetic.
+The separate [Harness likelihood reference](https://github.com/invarlock/invarlock/blob/main/examples/captured-results/references/harness-likelihood/README.md)
+retains real CPU measurements and an installed signed journey for one pinned
+same-model profile. Its file hashes, executed capture source, regenerated anchors,
+receipt and model identity in reports are replayed by the example tests.
+
 Retained native release consumers request HTML and Markdown and validate report
 v2 with `kind: runtime`; ordinary native default/HTML-only callers keep v1 JSON.
 Validation preserves historical native receipts, upstream fixture bytes, and

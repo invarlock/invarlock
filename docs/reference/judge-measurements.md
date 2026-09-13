@@ -75,16 +75,17 @@ task input and answer under the declared rubric and optional global references.
 By default, the per-case reference remains authenticated evidence but is not
 sent to the judge. Set `plan.prompt.reference_mode: per_case` in the recipe to
 include each case's string reference in a separate `reference` field of the
-judge request. Missing references or references that are not strings are rejected. This field counts
-toward the request bounds and changes the authenticated request digest. It is
-never added to the evaluated model's input. Omitted or `none` reference mode
+judge request. Missing references or references that are not strings are
+rejected. This field counts toward the request bounds and changes the
+authenticated request digest. It is never added to the evaluated model's input. Omitted or `none` reference mode
 preserves existing request bytes.
 
 ## Existing evaluator workflows
 
 The three built-in scorers also accept captured evaluator records through
 `invarlock/evaluation-request-v2`. Choose `comparison.metric: judge`, the same
-recipe, and a private `comparison.judge.workspace`. The
+recipe, and a private `comparison.judge.workspace` with an explicit
+`comparison.judge.signer_identity`. The
 [captured-results guide](../user-guide/captured-results.md#judge-captured-answers)
 shows source mapping, explicit text projection and offline measurement import.
 
@@ -95,6 +96,39 @@ Core import, verification and reporting work without Inspect. A caller-owned
 collector can use `invarlock.engine.prepare_evaluator_judge` and
 `import_judge_sources` to supply complete retained calls under the same contract.
 Neither route converts unrelated upstream scalar scores into replayable trials.
+
+For v2, omit `comparison.judge.measurements` to collect new ratings, or set it
+to a request-relative measurements file for offline import. Import requires
+neither the optional package nor credentials. Preflight and evaluation both
+require a signing key or explicit `--unsigned`. Sources may be canonical frozen
+runs or supported evaluator exports; an explicit `input_projection` selects one
+string through a JSON pointer rooted at `/input` or `/context`. Structured
+messages are never implicitly joined or converted to text. Projection settings,
+the original input and context, and their hashes remain in the signed records;
+offline replay checks them before pairing or judging.
+
+The public Python preparation and import interfaces are:
+
+```python
+from invarlock.engine import import_judge_sources, prepare_evaluator_judge
+
+# recipe, baseline and subject are already loaded, reviewed JSON objects.
+plan, analysis_policy = prepare_evaluator_judge(recipe, baseline, subject)
+measurements = import_judge_sources(
+    {"source-1": retained_source_bytes},
+    plan=plan,
+    baseline_run=baseline,
+    subject_run=subject,
+)
+```
+
+`retained_source_bytes` is an unchanged UTF-8 JSON shard with exactly `format`
+and `trials`, using `invarlock/retained-judge-json-v1`. Trial records must bind the
+approved requests, answers, attempts, responses or errors, and source positions.
+The importer validates the plan before reading shards and replays every retained
+trial; incomplete slots remain incomplete. It accepts 1–1,000 shards of at most
+16 MiB each within the 384 MiB measurement allowance. A source hash authenticates
+retained bytes, not execution by the named evaluator or hosted provider.
 
 ## Frozen-answer requests and preflight
 
@@ -178,7 +212,8 @@ inspected without editing the import example.
 The optional `invarlock-inspect-judge[inspect]` package exposes
 `collect_configured` for installed execution and a lower-level `collect` API for
 callers that construct their own Inspect model. Both use the same admitted-call
-checkpoint. Live collection currently supports the pinned Inspect Chat
+checkpoint. Installed live collection requires exactly Inspect `0.3.263`,
+OpenAI `3.13.0` and `httpx==0.28.1`. It supports the pinned Inspect Chat
 Completions integration with one attempt per trial, zero Inspect and
 provider-client retries, no tools or cache, and no inherited model settings.
 An admitted call without a retained result is an ambiguous timeout that cannot
@@ -201,8 +236,11 @@ invarlock evaluate judge-request.yaml --signing-key signer-private.pem --json
 ```
 
 Review every call, token, cost and time cap first. The collector rejects custom
-provider URLs and reads credentials only from its environment. The optional
-`execution.collection.scorer_id` defaults to `judge` and
+provider URLs and reads credentials only from its environment. Remove both
+`OPENAI_BASE_URL` and `OPENAI_API_BASE`; their presence is rejected even when
+empty. Missing credentials, missing or mismatched SDK dependencies, and dependency
+import failures stop collection preflight. These requirements do not apply to
+offline import. The optional `execution.collection.scorer_id` defaults to `judge` and
 `invocation_timeout_seconds` defaults to 3600. An omitted workspace defaults to
 `<output.evidence>.judge-work`; an explicit workspace is preferable for resuming
 after changing only the final output destination. Runtime resource profiles,
@@ -214,6 +252,10 @@ frozen-answer v3 requests; they retain their normal meaning for native v1 reques
 Evidence contains `plan.json`, `measurements.json`, `baseline_run.json`,
 `subject_run.json`, `case_set.json`, `analysis_policy.json`, `analysis_result.json`
 and `envelope.json`. Native requests additionally retain `native_capture.json`.
+Captured v2 judge evidence retains the normalized evaluator runs and their
+projection provenance, without `native_capture.json`. It uses the same judge
+recipient policy and receipt contract as frozen-answer v3 evidence; a
+deterministic captured-result trust profile cannot authorize it.
 The additive signed envelope binds all artifact digests and
 the intended subject under `bounded-judge-fixed-benchmark-v1`.
 
@@ -346,6 +388,7 @@ increasing the number of independent cases.
 | One retained expanded model event | 2 MiB |
 | One retained source shard / source shards | 16 MiB / 1,000 |
 | Canonical plan / measurements | 64 MiB / 384 MiB |
+| Captured judge recipe / each captured run | 4 MiB / 128 MiB |
 | Combined judge workflow inputs | 384 MiB |
 
 These are safety ceilings, not recommended workload sizes or evidence-quality

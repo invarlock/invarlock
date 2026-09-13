@@ -21,6 +21,29 @@ authenticated one-token limit. Every run manifest records the evaluator,
 scorer, fixed CPU/float32 profile, batch size 8, seed, disabled remote code, and
 per-record output digests.
 
+## Capture an existing OpenAI Evals workflow
+
+The command below is the example-owned signed OCI bridge. An existing workflow
+can instead map original stable case IDs, inputs, references and answers through
+`invarlock.engine.capture_evaluator_run` and use
+[captured evaluation](../../captured-results/README.md). This canonical path
+does not depend on a dedicated installed OpenAI Evals export parser.
+
+Select InvarLock exact match for string answers and references. A judge recipe
+can use frozen task/answer text and complete retained calls; a native Match
+score or an existing scalar rating is insufficient. Use an explicit projection
+for structured task inputs, and opt in to `prompt.reference_mode: per_case` when
+the judge should receive each string reference separately from the model input.
+
+Normalized NLL requires an actual reference-continuation measurement with the
+closed likelihood facts and identity bindings. The Match workflow described
+here produces generated answers and match events, so it supplies no such
+likelihoods. The [shortlist capture guide](../../evaluator-qualification/maintained/CAPTURE.md)
+distinguishes canonical compatibility tests and the separate real Harness NLL
+reference from this historical exact-match qualification.
+
+## Run the signed OCI integration
+
 From a clean committed checkout with Docker or Podman available:
 
 ```bash

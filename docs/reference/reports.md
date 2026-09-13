@@ -13,6 +13,14 @@ They have different trust meanings.
     - **Use this page when:** Parsing a decision, validating a receipt, or
       distinguishing signed evidence from independently accepted evidence
 
+Report formats depend on the selected scorer and evidence family. The native
+runtime sections below describe exact match, normalized NLL and deterministic
+extensions. Captured comparisons use the multi-metric report described in
+[evaluation records](evaluation-records.md). Native and captured `judge` requests
+produce judge analysis and verification results described in
+[judge measurements](judge-measurements.md); they do not use the native
+`invarlock/comparison-report-v3` shape. All are rendered by `invarlock report`.
+
 ## Runtime-side report
 
 Each side has an `invarlock/runtime-side-report-v1` object:
@@ -35,7 +43,8 @@ reconstructs the runtime-side object exactly.
 
 ## Canonical comparison report
 
-New evaluations write `reports/evaluation.report.json` as an
+Native exact-match/NLL and deterministic-extension evaluations write
+`reports/evaluation.report.json` as an
 `invarlock/comparison-report-v3` object. Strict verification also accepts
 signed `invarlock/comparison-report-v2` and `invarlock/comparison-report-v1`
 objects. Version 2 omits side-accuracy qualification; version 1 additionally

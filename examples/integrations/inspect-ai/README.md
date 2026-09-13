@@ -15,6 +15,33 @@ balanced MMLU-Pro records on CUDA. Every required snapshot file, tokenizer
 contract, task setting, evaluator version, runtime image, and per-record output
 is digest-bound.
 
+## Capture existing Inspect answers or collect judgments
+
+The profiles below execute the example-owned signed OCI bridge. To keep an
+existing Inspect workflow, import supported per-case JSON with the installed
+`inspect-json` adapter or explicitly map records through
+`invarlock.engine.capture_evaluator_run`. Follow the separate
+[captured-results workflow](../../captured-results/README.md) to select InvarLock
+exact match, normalized NLL or judge scoring according to the available facts.
+The JSON answer parser does not import arbitrary `.eval` archives or turn an
+aggregate score into complete judge evidence.
+
+The optional [Inspect judge add-in](../../../addins/inspect_judge/README.md)
+collects or imports complete retained calls for the shared native/captured judge
+recipe. Its live collection pins Inspect `0.3.263` and OpenAI `3.13.0`; this does
+not relabel the historical exact-match profiles below. Per-case references use
+`prompt.reference_mode: per_case` and remain a distinct judge request field.
+Structured task inputs require an explicit text projection, with the original
+input and context retained and bound.
+
+A generated answer export does not provide reference-continuation likelihoods.
+Normalized NLL needs actual typed measurements with token/byte counts and
+model, tokenizer, configuration and source bindings. The separate real
+[Harness likelihood reference](../../captured-results/references/harness-likelihood/README.md)
+establishes one `HFLM` CPU compatibility profile, not native Inspect likelihood
+qualification. Contract and mocked-transport judge tests establish integration
+behavior; they do not establish a new hosted judge result.
+
 ## Run the integration
 
 From a clean committed checkout with Docker or Podman available:

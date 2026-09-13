@@ -10,6 +10,13 @@ sizes before doing statistical work. The verifier also charges the complete
 planned replay budget before evaluating a metric. These limits protect the
 recipient process and are independent of native runtime resource limits.
 
+The table and bootstrap controls below apply to captured exact-match/NLL and
+deterministic multi-metric comparisons. Captured `metric: judge` shares the
+128 MiB per-run and 384 MiB combined-input ceilings but uses the separate
+[judge plan, trial and collection limits](judge-measurements.md#operational-bounds-and-measured-reference-workload).
+Its statistical work is governed by the judge plan; `--max-bootstrap-draws`
+does not apply to judging.
+
 | Bound | Captured limit |
 | --- | --- |
 | Records per run / planned case set | 50,000 |

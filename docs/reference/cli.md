@@ -77,7 +77,8 @@ invarlock evaluate REQUEST \
   [--json]
 ```
 
-For native run/import requests, `evaluate` loads one closed YAML request and runs
+For native exact-match/NLL and deterministic-extension run/import requests,
+`evaluate` loads one closed YAML request and runs
 the complete execution-free preflight before any worker starts. It then prepares or validates the canonical
 schedule, executes or imports paired runtime records, derives the selected
 metric and its paired interval, applies the policy to the conservative bound,
@@ -120,8 +121,8 @@ publishes the evidence directory. Import requests do not launch workers.
 
 | Input | Required | Environment alternative | Purpose |
 | --- | --- | --- | --- |
-| `REQUEST` | Except setup actions | None | Existing readable YAML governed by native `evaluation_request.schema.json` or captured `evaluation_request_v2.schema.json`; its parent is the request root |
-| `--signing-key PATH` | Except captured `--unsigned` and setup actions | `INVARLOCK_SIGNING_KEY` | Ed25519 evidence-signing private-key file |
+| `REQUEST` | Except setup actions | None | Existing readable YAML governed by native v1, captured v2 or frozen-answer judge v3; its parent is the request root |
+| `--signing-key PATH` | For signed publication; native run/import requires it | `INVARLOCK_SIGNING_KEY` | Ed25519 evidence-signing private-key file; captured and frozen-answer judge requests permit explicit `--unsigned` |
 | `--allow-installed-scorers` | Only for a scorer-bound request | `INVARLOCK_ALLOW_INSTALLED_SCORERS` | Authorize loading and executing the exact installed scorer bound by the request and policy |
 | `--runtime-profile FILE` | No | None | Explicit closed JSON runtime settings for run requests; maximum 16 KiB |
 | `--runtime-image IMAGE` | Run mode from host | `INVARLOCK_RUNTIME_IMAGE` | Local OCI image reference; must contain a digest or be paired with the digest option |
@@ -140,8 +141,8 @@ publishes the evidence directory. Import requests do not launch workers.
 | `--runtime-cpus DECIMAL` | No | `INVARLOCK_RUNTIME_CPUS` | Per-worker CPU ceiling; defaults to `4` and accepts up to three decimal places |
 | `--runtime-memory-mib INTEGER` | No | `INVARLOCK_RUNTIME_MEMORY_MIB` | Per-worker memory ceiling in MiB; defaults to `65536` |
 | `--runtime-user UID:GID` | No | `INVARLOCK_RUNTIME_USER` | Numeric non-root worker identity; defaults to `65532:65532` |
-| `--preflight` | No | None | Perform execution-free qualification and emit `invarlock/evaluation-preflight-v2` |
-| `--json` | No | None | Emit one compact `invarlock/evaluation-result-v1` object |
+| `--preflight` | No | None | Perform the selected workflow's execution-free validation; native requests emit `invarlock/evaluation-preflight-v2` |
+| `--json` | No | None | Emit the selected workflow's versioned status JSON, described below |
 
 Runtime image, device, entrypoint and resource controls apply only to run-mode
 requests. Import evidence already records its runtime identity, so `evaluate`

@@ -1,6 +1,7 @@
 # Evidence and verification
 
-For native run/import requests, `invarlock evaluate` publishes one closed
+For native exact-match/NLL and deterministic-extension run/import requests,
+`invarlock evaluate` publishes one closed
 evidence directory governed by
 [`contracts/evidence_pack.schema.json`](https://github.com/invarlock/invarlock/blob/main/contracts/evidence_pack.schema.json).
 The bundle is the portable machine record; a signed verification receipt is the
@@ -21,6 +22,11 @@ independent acceptance record.
 For captured v2 packs, use the [captured-results guide](captured-results.md)
 for independent run/request pins and captured receipt scope. The native
 artifact, schedule, and runtime bindings below do not apply to that family.
+Native and captured `metric: judge` requests instead use
+[judge evidence and recipient policies](../reference/judge-measurements.md).
+Native judge evidence retains its original runtime capture; imported frozen
+answers retain their narrower provenance. Select the matching verifier and
+receipt contract rather than treating all evidence directories as pack v1.
 
 ## Artifact lifecycle at a glance
 

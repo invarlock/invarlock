@@ -54,14 +54,17 @@ Capabilities are closed over:
 - artifact formats: `hf_snapshot`, `gguf`, `tensorrt_llm_engine`;
 - canonical tasks declared by each provider, currently `text_causal` and
   `vision_text_generation` across shipped integrations;
-- metrics: `exact_match` and `normalized_nll_per_utf8_byte`; and
+- collection metrics: `exact_match` and `normalized_nll_per_utf8_byte`; and
 - execution modes: `in_process`, `local_process`, `container`.
 
-The request loader rejects a built-in metric the selected provider does not
-declare. A scorer extension is not a provider metric: the provider collects
-authenticated output text through its declared exact-match path, and an
-explicitly authorized verifier-replay scorer derives unit-interval values from
-those text facts after collection.
+The request loader checks the selected scorer's required collection metric
+against the provider declaration. Native `judge` and deterministic extensions
+collect authenticated output text through the existing `exact_match` path;
+they do not require a new provider metric. The bounded text judge profile also
+requires text task inputs and answers, so an image-generation capability alone
+does not establish judge compatibility. An explicitly authorized deterministic
+extension derives unit-interval values from those authenticated text facts
+after collection.
 Strict evidence execution further requires a real offline container and
 `batch_size=1`, regardless of a provider's broader capability declaration.
 

@@ -24,14 +24,16 @@ independently supplied trust anchors.
 
 Already running an evaluator? The
 [captured-results workflow](user-guide/captured-results.md) imports per-case
-results, checks multiple metrics and slices, and writes CI reports without model
-execution. It includes runnable classification, extraction and recorded-judge
-examples and an explicit boundary between recomputed and recorded scores.
+results and supports exact match, normalized NLL and judge scoring. Exact match
+and NLL use retained facts; judging can import retained calls or collect bounded
+new ratings over the frozen answers. Deterministic comparisons also support
+multiple metrics and slices. Verification and reporting run offline using core.
 Start with `invarlock --help` and use `evaluate`, `verify`, or `report`.
 All three default to readable text; add `--json` for machine-readable status.
-Signed captured evidence uses independent run/request anchors and a scoped
-receipt. Explicit `--unsigned` results are local reports, not verification or
-native acceptance evidence.
+Signed captured comparisons use independent run/request anchors and a scoped
+receipt. Judge evidence uses its own recipient policy and receipt. Explicit
+`--unsigned` results are local reports, not verification or native acceptance
+evidence.
 
 ```bash
 invarlock evaluate request.yaml
@@ -44,7 +46,7 @@ invarlock report evidence/
 ## The primary path
 
 Select native run, authenticated provider import, or captured records in the
-evaluation request. For native run mode:
+evaluation request. The native exact-match/NLL and deterministic-extension path is:
 
 1. Pin local baseline and subject artifacts, a local JSONL source, provider
    settings, one built-in metric or scorer binding, one policy, and a fresh
@@ -78,6 +80,12 @@ another controlled execution. It publishes the same bundle format and faces
 the same verifier. Its inputs must include authenticated record-level material;
 aggregate scores alone are insufficient.
 
+Native `metric: judge` uses the same run/import entry point, freezes authenticated
+answers, then collects bounded ratings and publishes judge evidence with retained
+runtime provenance. Its plan fixes the rubric, units, repetitions, reference
+mode and budgets. Independent replay uses a judge recipient policy. See
+[judge measurements](reference/judge-measurements.md) for its complete workflow.
+
 ## The three transactions
 
 <div class="invarlock-transaction" markdown>
@@ -91,10 +99,10 @@ aggregate scores alone are insufficient.
 Validate one closed baseline-versus-subject request. In run mode, prepare the
 canonical schedule from digest-pinned local JSONL and execute the selected
 providers in the delegated OCI environment. In import mode, authenticate
-complete provider materials. Pair records by schedule identity, compute the
-selected built-in metric or replay the authorized scorer, derive its paired
-interval, apply the policy to the
-conservative interval bound, and atomically publish signed evidence.
+complete provider materials. Captured requests consume the evaluator's retained
+case facts. Derive exact-match or normalized-NLL comparisons, replay an authorized
+deterministic scorer, or analyze bounded judge measurements. Apply the selected
+policy and atomically publish the corresponding signed evidence.
 
 </div>
 
@@ -108,7 +116,8 @@ Treat the bundle as untrusted. Verify inventory, checksums, signatures,
 cross-bindings, schedule order, record-level scores, interval arithmetic, and
 the canonical report. Compare the artifact identities, schedule, policy,
 runtime identities, and evidence signer with caller-owned anchors, then record
-the result in a separately signed receipt.
+the result in a separately signed receipt. Captured and judge evidence use their
+own anchor and recipient-policy contracts; replay never calls a judge model.
 
 </div>
 
@@ -137,6 +146,7 @@ acceptance or deployment; unsigned reports have no independent assurance.
 | --- | --- | --- |
 | `exact_match` | Difference between subject and baseline literal accuracy, with paired regression/improvement counts and exact McNemar probability | Paired Newcombe interval lower bound is at least `metrics.exact_match.delta_min_pp` |
 | `normalized_nll_per_utf8_byte` | Ratio of arithmetic means of teacher-forced expected-continuation NLL per UTF-8 byte | Paired schedule-resampling interval upper bound is at most `metrics.normalized_nll_per_utf8_byte.ratio_max` |
+| `judge` | Repeated bounded ratings over declared independent units and frozen answers | The declared judge analysis and recipient policy accept the retained measurements and required uncertainty bounds |
 | Authorized deterministic text scorer | Difference between subject and baseline arithmetic-mean `[0,1]` scores, in percentage points | Paired schedule-resampling interval lower bound is at least `metrics.scorer_extension.delta_min_pp` |
 
 Exact match uses the continuity-corrected paired Newcombe 95% effect-size
@@ -145,7 +155,7 @@ uses the deterministic `paired_percentile_bootstrap_sha256_v1` method with
 2,048 replicates over the authenticated finite schedule. The selected policy
 reads the conservative bound of the corresponding interval.
 
-A metric policy may additionally bind `minimum_record_count` and the matching
+An exact-match, NLL or deterministic-extension policy may additionally bind `minimum_record_count` and the matching
 maximum interval-width field. The two fields are supplied together. When they
 are present, the metric bound, record count, and precision width must all pass;
 the canonical report records each result. Preflight can qualify record count
@@ -168,8 +178,10 @@ scorers can be supplied as separately installed packages and run only when
 explicitly authorized through the extension contract. Network, external-model,
 human, executable SQL/code, semantic-model, and judge scoring remain outside
 that scorer-extension boundary. Bounded frozen-answer judging has a separate
-measurement, replay, and recipient-acceptance contract; unsupported judge
-results stay on the authenticated-observation path.
+measurement, replay, and recipient-acceptance contract behind the native `judge`
+selection. Unsupported external judge results stay on the authenticated-observation
+path. The [judge reference](reference/judge-measurements.md) defines its distinct
+uncertainty and reference-handling semantics.
 
 ## Choose a reading path
 

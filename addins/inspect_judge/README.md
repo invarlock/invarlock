@@ -5,9 +5,9 @@ This optional package collects bounded text judgments through the installed
 expanded-event projection into
 `judge-measurements-v1`. It does not import arbitrary Inspect `.eval` archives.
 
-Live collection pins Inspect `0.3.263` and OpenAI `3.13.0`; retained exports from
-Inspect `0.3.254` also remain replayable offline. The projection requires one epoch and an
-explicit grader, and retains all scheduled slots. Missing attempts remain
+Installed live collection requires exactly Inspect `0.3.263`, OpenAI `3.13.0`
+and `httpx==0.28.1`; retained exports from Inspect `0.3.254` also remain replayable
+offline. The projection requires one epoch and an explicit grader, and retains all scheduled slots. Missing attempts remain
 incomplete. SDK retries, cache reuse, tools, unrecorded generation settings,
 extra request headers and arbitrary request bodies are rejected.
 
@@ -18,10 +18,14 @@ provider-client retries set to zero. The model may carry only the explicit
 those choices. Other inherited model, provider or generation settings are
 rejected before a call is admitted.
 
-The installed native and captured `metric: judge` workflows and frozen-answer `judge_collect`
-request use `collect_configured`. It validates the pinned SDK environment,
+The installed native and captured `metric: judge` workflows and frozen-answer
+`judge_collect` request use `collect_configured`. It validates the pinned SDK environment,
 constructs the supported model explicitly, and closes its client on success,
 failure or cancellation. Keep `OPENAI_API_KEY` in the process environment.
+Remove `OPENAI_BASE_URL` and `OPENAI_API_BASE` entirely; even empty overrides in
+the process or explicitly supplied environment are rejected. The configured
+client uses `https://api.openai.com/v1`, Chat Completions and disabled model
+memoization. Missing or mismatched dependencies and credentials fail preflight.
 
 ```bash
 python -m pip install .
@@ -35,7 +39,13 @@ call, token and time ceilings, the official OpenAI endpoint and a private
 checkpoint. It never puts the API key in the request, plan, checkpoint or retained
 output. `validate_collection_environment` exposes the same execution-free checks
 to Python callers. Native requests automatically freeze runtime answers before
-judging; frozen-answer requests supply their approved plan and runs directly.
+judging; captured requests freeze an explicit recipe against normalized evaluator
+records, and frozen-answer requests supply their approved plan and runs directly.
+A captured v2 request with `comparison.judge.measurements`, or a v3
+`judge_import` request, replays retained measurements without this package or
+credentials. Caller-owned collectors can use the core `prepare_evaluator_judge`
+and `import_judge_sources` APIs for the generic retained-call format; arbitrary
+upstream scalar scores cannot replace those calls.
 
 For `openai/gpt-5.6-sol`, the pinned SDK converts system messages to developer
 messages, uses `max_completion_tokens`, and omits temperature from the provider
@@ -51,8 +61,10 @@ the approved system message and configuration alongside the actual provider call
 `bind_requests` creates exact request digests for a plan before independent
 approval. `render_request` uses the core renderer to separate rubric, input and answer
 values in JSON fields. With `prompt.reference_mode: per_case`, the core renderer
-adds the case reference as a separate bounded field; it never adds it to the
-evaluated model input. Templates remain literal instructions. This separation
+adds each case's string reference as a separate bounded field; it never adds it
+to the evaluated model input. Missing or non-string references fail validation.
+Omitted or `none` reference mode preserves the original requests and retains
+references only in the frozen evidence. Templates remain literal instructions. This separation
 does not prove resistance to prompt injection. The original answers remain
 digest-bound. Import and checkpoint replay require both frozen
 `evaluation-run-v1` objects and validate their approved digests.

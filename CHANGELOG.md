@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Completed per-case reference forwarding in the answer-capture judge example
+  and aligned overview, integration, verification and security documentation
+  with the three built-in scorers and their distinct evidence contracts.
 - Added a real LM Evaluation Harness likelihood reference with pinned CPU
   measurements, source-preserving import, independent signed verification and
   reports. Its six paired cases establish same-model integration conformance.

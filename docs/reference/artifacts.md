@@ -10,6 +10,13 @@ verification.
     - **Stability:** Versioned public artifact contract; fixed paths and closed inventory are verification requirements
     - **Use this page when:** Inspecting a bundle, implementing artifact storage, or determining which bytes carry a particular claim
 
+This layout applies to native exact-match/NLL and deterministic-extension
+evidence. Captured comparisons use [evaluation records](evaluation-records.md)
+and pack v2. Native and captured judge requests use the
+[judge evidence envelope](judge-measurements.md); native judge evidence also
+retains its bound runtime capture. A shared CLI does not make these inventories
+or receipt contracts interchangeable.
+
 ![Evidence dependency map](../assets/reference-evidence-dependency.svg)
 
 ## Directory layout

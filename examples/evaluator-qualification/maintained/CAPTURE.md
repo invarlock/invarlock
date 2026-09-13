@@ -6,7 +6,8 @@
 > **Prerequisites:** An installed InvarLock wheel, its matching example checkout,
 > original per-case data and the evaluated model's artifact digest.
 
-`capture.py` uses `invarlock.evaluator_capture.capture_evaluator_run`. It captures
+`capture.py` uses the public `capture_evaluator_run` SDK, also exported by
+`invarlock.engine`. It captures
 existing case facts; InvarLock owns subsequent scoring. Naming an evaluator does
 not execute that package or transfer its scoring authority. Capability output
 reports which records have the required facts, rather than claiming a completed
@@ -45,8 +46,11 @@ separate from this new capture.
 
 Every canonical path has the same fact requirements. Exact match requires a
 string output and reference. Judge input requires original input/output text and
-an optional string reference; a configured rubric and an actual judge execution
-are additional requirements. Normalized NLL requires typed reference-continuation
+an optional string reference; a configured rubric and actual retained judge calls
+are additional requirements. `prompt.reference_mode: per_case` requires a string
+reference for every judged case and adds it as a separate judge request field.
+Omitted or `none` keeps references out of that request; neither mode changes the
+evaluated model input. Normalized NLL requires typed reference-continuation
 likelihood facts. The retained qualification exports contain no such likelihoods.
 MLflow aggregate accuracy and Garak detector counts cannot supply missing rows,
 references or log probabilities.
@@ -56,6 +60,20 @@ Print the machine-readable matrix with:
 ```bash
 python examples/evaluator-qualification/maintained/capture.py matrix
 ```
+
+## Use an installed export parser
+
+The installed `load_run` API and captured request sources support `invarlock`,
+`jsonl`, `inspect-json`, `lm-eval-samples` and `promptfoo-jsonl`. These parsers
+normalize their declared per-case export shapes; they do not run an evaluator or
+qualify an arbitrary source. The `capture.py` paths below additionally support
+explicit record mapping and retained qualification joins for the full shortlist.
+
+For a captured request, set `comparison.metric` to `exact_match`,
+`normalized_nll_per_utf8_byte` or `judge`. Exact match and NLL must agree with the
+single metric in the comparison policy. Judge uses its own recipe and full
+retained-call contract, with an optional configured collector. Omitting the
+selector keeps ordinary multi-metric comparison behavior.
 
 ## Capture a retained per-case export
 
@@ -88,7 +106,7 @@ point where the original case is available, map its fields explicitly to a JSON
 array of SDK records:
 
 ```python
-from invarlock.evaluator_capture import capture_evaluator_run
+from invarlock.engine import capture_evaluator_run
 
 records = [
     {
@@ -134,8 +152,10 @@ python examples/evaluator-qualification/maintained/capture.py records \
 
 Use the appropriate `--ecosystem` for all other workflows. Structured inputs can
 select one text field with `--input-pointer /input/question`; the SDK retains and
-binds the original structured source and the exact projection. It never silently
-stringifies an object or array.
+binds the original structured source and the exact projection. Pointers may
+select existing strings beneath `/input/` or `/context/`. It never silently
+stringifies an object or array. Canonical `adapter: invarlock` sources already
+carry these bindings and reject a request-level projection override.
 
 To enable normalized NLL, retain the SDK's typed `likelihood` object with the
 actual reference-continuation log-probability sum, positive token count, reference
@@ -144,7 +164,7 @@ configuration and tokenizer digests, and source identity. These must come from
 the model measurement. A generated-answer confidence, reward, or aggregate score
 cannot substitute for reference likelihood.
 
-Capture baseline and candidate runs with the same paired IDs, inputs, references
+Capture baseline and subject runs with the same paired IDs, inputs, references
 and case metadata. Use the resulting files as `adapter: invarlock` sources in an
 `invarlock/evaluation-request-v2` captured comparison. Select the policy and scorer
 for the available facts, then evaluate and independently verify the published
