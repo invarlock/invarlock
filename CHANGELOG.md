@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Made exact match, normalized NLL and judge scoring available to captured
+  evaluator workflows, with explicit source text projections, typed likelihood
+  bindings, offline retained-call import and evaluator context in reports.
+- Added opt-in per-case judge references without changing existing request bytes
+  or exposing reference answers to the evaluated model.
+
 - Added `judge` as a native run/import scorer through `evaluate`, `verify` and
   `report`. Native judging freezes authenticated runtime answers, derives the
   measurement plan bindings, executes bounded installed collection, and retains

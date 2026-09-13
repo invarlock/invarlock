@@ -58,6 +58,36 @@ their `source_digest` remain unchanged. A canonical `invarlock` run supplies its
 own metadata; external adapters require explicit source, run ID and artifact
 identity, with approved score provenance when recorded metrics are used.
 
+## Captured reference likelihoods
+
+A record may additionally retain `likelihood` with these closed fields:
+
+| Field | Meaning |
+| --- | --- |
+| `basis` | Exactly `reference_continuation` |
+| `logprob_sum` | Finite, zero or negative natural-log probability sum of the reference continuation |
+| `token_count` | Positive integer count of measured reference tokens |
+| `utf8_byte_count` | Positive integer equal to the reference string's UTF-8 byte length |
+| `input_digest`, `reference_digest` | Canonical digests of the original input and reference |
+| `artifact_digest`, `source` | Exact evaluated artifact and evaluator identity from the run |
+| `configuration_digest`, `tokenizer_digest` | Pins for the likelihood measurement configuration and tokenizer |
+
+These facts must originate from an actual likelihood measurement. Generated
+answer probabilities and summary losses have different semantics. With an input
+projection, `input_digest` still identifies the preserved original input.
+
+The NLL policy metric uses `direction: lower`, `unit: nats_per_utf8_byte`,
+`aggregation: mean` and `ratio_max` in place of `maximum_regression`. Its
+configuration requires `configuration_digest`, `baseline_tokenizer_digest` and
+`subject_tokenizer_digest`. The score per record is `-logprob_sum / utf8_byte_count`;
+the comparison is the ratio of subject and baseline means, with the same paired
+resampling method as native NLL. Interval width is measured in ratio units.
+References, configuration and tokenizer identities are verified before scoring.
+
+Judge selection uses the separate judge recipe and retained measurement contract
+through the same captured request. It does not reinterpret a `recorded` scalar
+score as a native judge trial. See [judge measurements](judge-measurements.md).
+
 ## Policy and identity
 
 Policies contain 1..16 metrics and up to 16 metadata slices in addition to the
@@ -67,8 +97,9 @@ regression and maximum interval width. Optional absolute limits are
 `subject_minimum` and `subject_maximum`.
 
 Built-in captured kinds are `exact_match`, `normalized_match`,
-`numeric_tolerance`, `json_exact`, `json_fields`, and `token_f1`. These are
-separate from native runtime scorer IDs. `normalized_match` and `token_f1` pin
+`numeric_tolerance`, `json_exact`, `json_fields`, `token_f1`, and
+`normalized_nll_per_utf8_byte`. Exact match and normalized NLL share native
+scorer semantics while retaining captured-input assurance. `normalized_match` and `token_f1` pin
 `unicode_version`; a recipient with an incompatible Unicode environment refuses
 replay without issuing a receipt. `recorded` instead selects a `score_key` and
 exact `accepted_provenance` (`kind`, `source`, `version`, `unit`, `rubric_digest`).

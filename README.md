@@ -136,6 +136,12 @@ invarlock verify judge-evidence/ --trust-profile judge-recipient-policy.json
 invarlock report judge-evidence/ --html judge-report.html
 ```
 
+All three scorers also accept captured records from existing evaluator workflows.
+Each requires its own per-case facts: outputs and references for exact match,
+reference-continuation likelihoods for NLL, and frozen text plus retained ratings
+for judging. See the [captured-results guide](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/captured-results.md#use-the-three-built-in-scorers).
+An evaluator's aggregate score cannot replace those facts.
+
 `evaluate` performs live collection through the optional
 `invarlock-inspect-judge[inspect]` package, with explicit call, token, cost, timeout
 and checkpoint controls. The core wheel verifies and reports retained evidence

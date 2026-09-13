@@ -19,6 +19,7 @@ The facade deliberately groups these stable surfaces:
 | Transactions | `evaluate_request_file`, `verify_evidence`, `render_evidence`, native/captured receipt verification, judge verification and signed judge receipts, acceptance attestations |
 | Request | `load_evaluation_request`, `EvaluationRequest`, `EvaluationRequestError` |
 | Captured authoring | `CapturedEvaluationRequest`, `make_run`, `load_run`, `write_run`, `run_digest`, `physical_file_digest`, `freeze_case_set`, `case_set_digest`, `validate_run_case_set`, `compare_runs`, `comparison_policy_digest`, `normalize_captured_request`, `captured_request_digest`, `EvaluationRecordsError`, `DEFAULT_MAX_BOOTSTRAP_DRAWS` |
+| Evaluator scorer inputs | `CapturedSourceRequest`, `CapturedJudgeRequest`, `capture_evaluator_run`, `evaluator_input_capabilities`, `prepare_evaluator_judge`, `import_judge_sources` |
 | Trust profiles | `load_trust_inputs`, `TrustInputs`, `CapturedTrustInputs`, `TrustInputsError` |
 | Results and errors | Evaluation, verification, reporting, receipt, and evidence-pack result types |
 | OCI host execution | Per-side launch values, host executor, and environment-backed launch resolution |
@@ -257,7 +258,7 @@ render_evidence(
 ```
 
 Typed native requests return native evaluation/preflight results; typed captured
-requests return captured results. A path is dispatched after loading and returns
+requests return captured results, or `JudgeWorkflowResult` when selecting judge. A path is dispatched after loading and returns
 the corresponding union. The signatures above summarize both families: omit
 native runtime/executor/registry/scorer keywords entirely for captured calls,
 including explicit `None`. Omission and explicit null preserve their distinct
@@ -707,6 +708,15 @@ The installed optional collector reads credentials from its process environment;
 callers do not pass keys in the request or plan. Recipient replay requires only
 the core package. Native judge evidence includes a bound runtime capture, whereas
 ordinary frozen-answer import makes no runtime-provenance claim.
+
+Captured v2 requests also select `metric: judge`; both preflight and evaluation
+return `JudgeWorkflowResult`. `CapturedJudgeRequest` supplies the private
+workspace, signer identity and optional retained measurements path.
+`prepare_evaluator_judge(recipe, baseline, subject)` freezes a plan and analysis
+policy without calls. `import_judge_sources(sources, plan=plan,
+baseline_run=baseline, subject_run=subject)` accepts a mapping of source IDs to
+unchanged canonical retained-call JSON bytes, validates all trial bindings and
+returns the measurements object. Import does not invoke a provider or Inspect.
 
 `verify_judge_evidence` and `verify_judge_evidence_with_policy` replay bounded
 judge evidence under an external judge recipient policy and return an unsigned

@@ -58,7 +58,8 @@ MYPY_TYPED_SURFACE := \
 RELEASE_EXAMPLE_COVERAGE_FILES := \
 	examples/ci/standalone-consumer/review/verify_deployment_receipt.py \
 	examples/evaluator-qualification/measure_signed_transactions.py \
-	examples/quickstart/run.py
+	examples/quickstart/run.py \
+	examples/captured-results/scorer_wheel_smoke.py
 
 .PHONY: help install dev-install lock-sync test test-fast test-parallel test-integration addins-test
 .PHONY: coverage coverage-addins coverage-qualification coverage-release coverage-examples coverage-maintenance coverage-enforce coverage-enforce-parallel
@@ -697,6 +698,7 @@ addins-install-smoke: dist-check  ## Install and discover all six wheels in a di
 		mkdir "$$consumer_root"; \
 		cp examples/quickstart/run.py "$$consumer_root/run.py"; \
 		cp examples/captured-results/wheel_smoke.py "$$consumer_root/captured-wheel-smoke.py"; \
+		cp examples/captured-results/scorer_wheel_smoke.py "$$consumer_root/scorer-wheel-smoke.py"; \
 		mkdir "$$consumer_root/judge"; \
 		for judge_file in wheel_smoke.py request.yaml plan.json measurements.json baseline_run.json subject_run.json analysis_policy.json; do \
 			cp "examples/judge-measurements/$$judge_file" "$$consumer_root/judge/"; \
@@ -708,6 +710,8 @@ addins-install-smoke: dist-check  ## Install and discover all six wheels in a di
 			"$$smoke_venv/bin/python" captured-wheel-smoke.py --cli "$$smoke_venv/bin/invarlock" ); \
 		( cd "$$consumer_root" && PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= \
 			"$$smoke_venv/bin/python" judge/wheel_smoke.py --fixture judge --cli "$$smoke_venv/bin/invarlock" ); \
+		( cd "$$consumer_root"; PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= \
+			"$$smoke_venv/bin/python" scorer-wheel-smoke.py --fixture judge --cli "$$smoke_venv/bin/invarlock" ); \
 		approval_root="$$smoke_venv/deployment-consumer"; \
 		cp -R examples/ci/standalone-consumer "$$approval_root"; \
 		mkdir "$$approval_root/incoming"; \

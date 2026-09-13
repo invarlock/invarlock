@@ -70,11 +70,31 @@ capacity is exhausted, evaluation publishes terminal `insufficient_evidence`
 with `collection.stop_reason: retained_capacity_exhausted`; it does not promise
 that another identical invocation can continue.
 
-The initial profile supports exactly one text part per scheduled input. It grades
-the task input and answer under the declared rubric and optional global
-references. `expected_output` remains authenticated evidence but is not sent to
-the judge. It does not grade against otherwise hidden per-case gold answers.
-Do not place gold answers into the evaluated model's input to work around this.
+The profile supports exactly one text part per scheduled input. It grades the
+task input and answer under the declared rubric and optional global references.
+By default, the per-case reference remains authenticated evidence but is not
+sent to the judge. Set `plan.prompt.reference_mode: per_case` in the recipe to
+include each case's string reference in a separate `reference` field of the
+judge request. Missing references or references that are not strings are rejected. This field counts
+toward the request bounds and changes the authenticated request digest. It is
+never added to the evaluated model's input. Omitted or `none` reference mode
+preserves existing request bytes.
+
+## Existing evaluator workflows
+
+The three built-in scorers also accept captured evaluator records through
+`invarlock/evaluation-request-v2`. Choose `comparison.metric: judge`, the same
+recipe, and a private `comparison.judge.workspace`. The
+[captured-results guide](../user-guide/captured-results.md#judge-captured-answers)
+shows source mapping, explicit text projection and offline measurement import.
+
+The optional pinned Inspect package is the maintained live collection backend.
+It does not require an upstream evaluator to use Inspect or change versions.
+Existing evaluators supply frozen case facts; InvarLock applies its own scorer.
+Core import, verification and reporting work without Inspect. A caller-owned
+collector can use `invarlock.engine.prepare_evaluator_judge` and
+`import_judge_sources` to supply complete retained calls under the same contract.
+Neither route converts unrelated upstream scalar scores into replayable trials.
 
 ## Frozen-answer requests and preflight
 

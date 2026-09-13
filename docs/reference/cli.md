@@ -20,7 +20,7 @@ Use `invarlock --version` for the installed version and `invarlock --help` for
 the authoritative option list. The core commands have the same transaction
 boundaries as the [Python facade](api-guide.md).
 
-The captured-results flow compares existing records without inference while
+The deterministic captured-results flow compares existing records without inference while
 retaining an explicit captured-evidence and verifier-receipt scope. See the
 [captured-results guide](../user-guide/captured-results.md).
 
@@ -182,7 +182,13 @@ do not evaluate or establish assurance.
 invarlock evaluate --freeze-cases cases.json --case-set-output frozen-cases.json --json
 ```
 
-Captured preflight emits `invarlock/evaluation-preflight-v3`; captured publication
+When `comparison.metric: judge` is selected, captured requests use the judge
+recipe, private workspace and optional retained measurements. Preflight and
+evaluation return judge result envelopes; `--max-bootstrap-draws` does not apply.
+Without retained measurements, judging uses the installed collector under the
+recipe's explicit budgets. Verification uses a judge recipient policy.
+
+Deterministic captured preflight emits `invarlock/evaluation-preflight-v3`; captured publication
 emits `invarlock/evaluation-result-v2`. The
 [captured-results guide](../user-guide/captured-results.md) gives the request,
 complete trust profile, and output fields. `--fail-on-policy` applies after either

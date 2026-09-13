@@ -18,7 +18,7 @@ provider-client retries set to zero. The model may carry only the explicit
 those choices. Other inherited model, provider or generation settings are
 rejected before a call is admitted.
 
-The installed native `metric: judge` workflow and frozen-answer `judge_collect`
+The installed native and captured `metric: judge` workflows and frozen-answer `judge_collect`
 request use `collect_configured`. It validates the pinned SDK environment,
 constructs the supported model explicitly, and closes its client on success,
 failure or cancellation. Keep `OPENAI_API_KEY` in the process environment.
@@ -50,7 +50,9 @@ the approved system message and configuration alongside the actual provider call
 
 `bind_requests` creates exact request digests for a plan before independent
 approval. `render_request` uses the core renderer to separate rubric, input and answer
-values in JSON fields. Templates remain literal instructions. This separation
+values in JSON fields. With `prompt.reference_mode: per_case`, the core renderer
+adds the case reference as a separate bounded field; it never adds it to the
+evaluated model input. Templates remain literal instructions. This separation
 does not prove resistance to prompt injection. The original answers remain
 digest-bound. Import and checkpoint replay require both frozen
 `evaluation-run-v1` objects and validate their approved digests.
