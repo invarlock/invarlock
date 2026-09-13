@@ -753,11 +753,30 @@ def _captured_summary(
         failed = sum(m.decision == "regression" for m in metrics)
         insufficient = sum(m.decision == "insufficient_evidence" for m in metrics)
         passed = len(metrics) - failed - insufficient
-        return (
+        overview = (
             f"{len(metrics):,} metric / scope results: {passed:,} passed, "
             f"{failed:,} did not meet policy, and {insufficient:,} need more evidence. "
             "Each result applies to its recorded scope; overlapping slice counts must not be added together."
         )
+        # Different metrics have different units; lead with the first adverse
+        # result in report order, without ranking their numeric magnitudes.
+        focus = next((m for m in metrics if m.decision == "regression"), None)
+        if focus is None:
+            focus = next(
+                (m for m in metrics if m.decision == "insufficient_evidence"), None
+            )
+        if focus is None:
+            return overview
+        outcome = (
+            "did not meet policy"
+            if focus.decision == "regression"
+            else "needs more evidence"
+        )
+        lead = f"{focus.name} ({focus.scope}) {outcome}"
+        check = next((c for c in focus.checks if c.passed is False), None)
+        if check is not None:
+            lead += f": the {check.name} check recorded {check.observed} against a requirement of {check.required}"
+        return lead + ". " + overview
     metric = metrics[0]
     recorded = (
         next(

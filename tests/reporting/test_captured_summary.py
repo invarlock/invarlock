@@ -64,8 +64,10 @@ def test_summary_aggregates_scopes_without_adding_overlapping_pair_counts():
     ]
     metrics = record_reporting._metric_views(comparison, {})
     summary = record_reporting._captured_summary(metrics)
-    assert summary.startswith(
+    assert summary.startswith(f"{metrics[1].name} (west) did not meet policy")
+    assert (
         "3 metric / scope results: 1 passed, 1 did not meet policy, and 1 need more evidence."
+        in summary
     )
     assert "overlapping slice counts must not be added together" in summary
 
@@ -270,3 +272,36 @@ def test_missing_nll_summary_marks_ratio_unavailable_without_implying_zero():
     assert "Of 1 included pair, 1 has a missing result." in summary
     assert "No ratio estimate or uncertainty interval is available." in summary
     assert "ratio of 0" not in summary
+
+
+def test_multi_summary_names_first_failed_check_without_ranking_metric_units():
+    from dataclasses import replace
+
+    from invarlock.report_presentation import CheckView, MetricView
+
+    passing = MetricView(
+        "accuracy", "overall", "pass", "80%", "90%", "+10 pp", "400", "Passed"
+    )
+    failed = replace(
+        passing,
+        name="quality",
+        decision="regression",
+        checks=(CheckView("Allowed change", "-26.11 pp", ">= -20 pp", False),),
+    )
+    later = replace(
+        failed,
+        name="latency",
+        checks=(CheckView("Maximum latency", "999 ms", "<= 100 ms", False),),
+    )
+    summary = record_reporting._captured_summary((passing, failed, later))
+    assert summary.startswith(
+        "quality (overall) did not meet policy: the Allowed change check recorded -26.11 pp against a requirement of >= -20 pp."
+    )
+    assert "worst" not in summary
+    incomplete = replace(passing, decision="insufficient_evidence", checks=())
+    assert record_reporting._captured_summary((passing, incomplete)).startswith(
+        "accuracy (overall) needs more evidence."
+    )
+    assert record_reporting._captured_summary((passing, passing)).startswith(
+        "2 metric / scope results: 2 passed"
+    )

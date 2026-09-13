@@ -570,3 +570,34 @@ def test_ratio_change_tile_does_not_present_ratio_bounds_as_signed_effects():
         "<small>95% finite-schedule resampling interval: 0.98 to 1.03 ratio</small>"
         in html
     )
+
+
+def test_markdown_keeps_quotes_readable_without_allowing_html_or_links():
+    from invarlock.report_presentation import render_markdown
+
+    text = 'The subject\'s "answer" <img src=x> & [link](https://example.com)'
+    markdown = render_markdown(replace(view(), summary=text))
+    assert 'subject\'s "answer"' in markdown
+    assert "&lt;img src=x&gt; &amp;" in markdown
+    assert "<img" not in markdown and "[link](" not in markdown
+
+
+@pytest.mark.parametrize(
+    "name", ["Recorded model ID", "Recorded model key", "Recorded run"]
+)
+def test_known_identity_prefixes_become_row_labels_only_when_both_sides_agree(name):
+    from invarlock.report_presentation import _comparison_view
+
+    report = view(
+        subjects=(("Baseline", f"{name}: model-a"), ("Subject", f"{name}: model-b"))
+    )
+    assert _comparison_view(report).rows == ((name, "model-a", "model-b", True),)
+    mixed = replace(
+        report,
+        subjects=(
+            ("Baseline", f"{name}: model-a"),
+            ("Subject", "Different identity: model-b"),
+        ),
+    )
+    assert _comparison_view(mixed).rows[0][0] == "Subject identity"
+    assert _comparison_view(mixed).rows[0][1] == f"{name}: model-a"
