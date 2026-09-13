@@ -391,15 +391,16 @@ def _interval(view: IntervalView) -> str:
                 "limit-label",
             )
         )
+    bounds = []
     if x(view.upper) - x(view.lower) < 180:
         midpoint = view.lower / 2 + view.upper / 2
-        annotations.append(
+        bounds.append(
             annotation(
                 midpoint, f"{number(view.lower)} to {number(view.upper)}", "bound-label"
             )
         )
     else:
-        annotations.extend(
+        bounds.extend(
             (
                 annotation(view.lower, number(view.lower), "bound-label"),
                 annotation(view.upper, number(view.upper), "bound-label"),
@@ -408,14 +409,16 @@ def _interval(view: IntervalView) -> str:
     return (
         '<figure class="interval"><div class="chart-annotations" aria-hidden="true">'
         + "".join(annotations)
-        + '</div><svg viewBox="0 0 640 72" role="img" aria-label="'
+        + '</div><div class="interval-plot"><svg viewBox="0 0 640 72" role="img" aria-label="'
         + escape(description, quote=True)
         + '">'
         + "".join(graphics)
         + '<line class="axis" x1="30" x2="610" y1="60" y2="60"/>'
         + f'<line class="range" x1="{x(view.lower):.2f}" x2="{x(view.upper):.2f}" y1="38" y2="38"/>'
         + f'<circle class="estimate" cx="{x(view.estimate):.2f}" cy="38" r="6"/>'
-        + '</svg><div class="axis-labels" aria-hidden="true">'
+        + '</svg><div class="interval-bounds" aria-hidden="true">'
+        + "".join(bounds)
+        + '</div></div><div class="axis-labels" aria-hidden="true">'
         + "".join(labels)
         + "</div>"
         + '<figcaption><span class="chart-key"><i class="estimate-key" aria-hidden="true"></i>Estimate'
@@ -468,7 +471,7 @@ h1,h2,h3,h4,p{margin-top:0}h1{font-size:36px;line-height:1.15;letter-spacing:-.0
 .metric-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}.metric-heading>div{min-width:0}.metric h3,.metric h4{overflow-wrap:anywhere}.metric-heading>.badge{flex-shrink:0}.scope{font-size:13px;color:var(--muted);margin:4px 0}.metric-explanation{margin:10px 0 18px}
 .values{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--line);border-radius:8px;background:var(--paper);overflow:hidden;margin:0}
 .value{padding:12px;border-right:1px solid var(--line);min-width:0}.value:last-child{border:0}.value dt{font-size:13px;color:var(--muted)}.value dd{margin:4px 0 0;font-size:26px;font-weight:650;line-height:1.2;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
-.value small{display:block;margin-top:5px;font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--muted);letter-spacing:0}.interval{margin:22px 0}.interval svg{display:block;width:100%;height:auto}.interval figcaption{overflow-wrap:anywhere;font-size:13px;color:var(--muted);margin-top:8px}.axis{stroke:var(--line);stroke-width:2}.range{stroke:#277b91;stroke-width:7;stroke-linecap:round}.estimate{fill:var(--paper);stroke:#277b91;stroke-width:3}.threshold{stroke:var(--red);stroke-width:2}.neutral{stroke:#78909c;stroke-width:1.5;stroke-dasharray:3 4}.allowed{fill:#e5f3ed}.tick{stroke:#78909c;stroke-width:1.5}.legend{display:block;margin-top:4px}.chart-annotations{height:48px;position:relative;font-size:12px;font-variant-numeric:tabular-nums}.chart-label{position:absolute;max-width:72%;overflow-wrap:anywhere}.chart-label.middle{transform:translateX(-50%)}.chart-label.end{transform:translateX(-100%)}.limit-label{top:0;color:var(--red)}.bound-label{top:25px;font-weight:650}.chart-key{display:inline-block;margin-right:18px}.chart-key i,.legend i{display:inline-block;margin-right:7px;vertical-align:middle}.estimate-key{width:10px;height:10px;border:2px solid #277b91;border-radius:50%}.interval-key{width:16px;border-top:3px solid #277b91}.neutral-key{width:16px;border-top:2px dashed #78909c}.threshold-key{height:12px;border-left:2px solid var(--red)}.axis-labels{position:relative;height:22px;font-size:13px;font-variant-numeric:tabular-nums;color:var(--muted)}.axis-labels span{position:absolute;transform:translateX(-50%);white-space:nowrap}
+.value small{display:block;margin-top:5px;font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--muted);letter-spacing:0}.interval{margin:22px 0}.interval svg{display:block;width:100%;height:auto}.interval figcaption{overflow-wrap:anywhere;font-size:13px;color:var(--muted);margin-top:8px}.axis{stroke:var(--line);stroke-width:2}.range{stroke:#277b91;stroke-width:7;stroke-linecap:round}.estimate{fill:var(--paper);stroke:#277b91;stroke-width:3}.threshold{stroke:var(--red);stroke-width:2}.neutral{stroke:#78909c;stroke-width:1.5;stroke-dasharray:3 4}.allowed{fill:#e5f3ed}.tick{stroke:#78909c;stroke-width:1.5}.legend{display:block;margin-top:4px}.chart-annotations{height:24px;position:relative;font-size:12px;font-variant-numeric:tabular-nums}.chart-label{position:absolute;max-width:72%;overflow-wrap:anywhere}.chart-label.middle{transform:translateX(-50%)}.chart-label.end{transform:translateX(-100%)}.limit-label{top:0;color:var(--red)}.interval-plot{position:relative}.interval-bounds{position:absolute;inset:0;pointer-events:none;font-size:12px;font-variant-numeric:tabular-nums}.bound-label{bottom:calc(47.222222% + 10px);line-height:1.2;font-weight:650}.chart-key{display:inline-block;margin-right:18px}.chart-key i,.legend i{display:inline-block;margin-right:7px;vertical-align:middle}.estimate-key{width:10px;height:10px;border:2px solid #277b91;border-radius:50%}.interval-key{width:16px;border-top:3px solid #277b91}.neutral-key{width:16px;border-top:2px dashed #78909c}.threshold-key{height:12px;border-left:2px solid var(--red)}.axis-labels{position:relative;height:22px;font-size:13px;font-variant-numeric:tabular-nums;color:var(--muted)}.axis-labels span{position:absolute;transform:translateX(-50%);white-space:nowrap}
 .scroll{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:14px;margin-top:16px}caption{text-align:left;font-weight:650;padding:0 0 8px}th{text-align:left;color:var(--muted);font-size:13px;font-weight:650}th,td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}th:first-child,td:first-child{padding-left:0}td:last-child,th:last-child{padding-right:0}tbody tr:last-child td,tbody tr:last-child th{border-bottom:0}
 .check-label{display:none}.context-heading{font-size:14px;margin:14px 0 8px}.checks-table td{white-space:nowrap}.checks-table th[scope="row"]{width:48%}.check-detail{display:block;font-size:13px;font-weight:400;margin-top:4px;color:var(--muted)}.check-fail{color:var(--red);font-weight:650}.check-pass{color:var(--teal)}.check-unknown{color:var(--amber)}.notes{font-size:13px;color:var(--muted);padding-left:20px;margin-bottom:0}.notes li+li{margin-top:6px}
 .columns{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:24px}.panel dl{margin:0}.panel dt{font-size:13px;font-weight:650;margin-top:10px}.panel dt:first-child{margin-top:0}.panel dd{margin:3px 0 0;color:var(--muted);font-size:14px;overflow-wrap:anywhere}.panel ol,.panel ul{padding-left:20px;font-size:14px;margin:0}.panel li+li{margin-top:8px}
