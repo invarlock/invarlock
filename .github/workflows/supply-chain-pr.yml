@@ -138,9 +138,17 @@ jobs:
           ]
           harness_pins = list(zip(("lm_eval.api.model", "lm_eval.api.metrics"), public_digests[:2]))
           tokenizer_pins = list(zip(("special_tokens_map.json", "tokenizer_config.json"), public_digests[2:]))
-          for filename in ("harness_model_comparison.py", "harness_likelihood_rehearsal.py"):
-              relative = "examples/captured-results/" + filename
-              pins = harness_pins + (tokenizer_pins if "likelihood" in filename else [])
+          source_paths = [
+              "examples/captured-results/harness_model_comparison.py",
+              "examples/captured-results/harness_likelihood_rehearsal.py",
+              "examples/captured-results/references/mistral-7b-likelihood/capture/baseline/protocol.json",
+              "examples/captured-results/references/mistral-7b-likelihood/capture/subject/protocol.json",
+              "examples/hosted-service/references/mistral-7b-http/capture/checkpoint-loader-source.txt",
+              "examples/hosted-service/references/mistral-7b-http/capture/checkpoint-loading-protocol.json",
+          ]
+          for relative in source_paths:
+              filename = Path(relative).name
+              pins = harness_pins + (tokenizer_pins if filename == "harness_likelihood_rehearsal.py" else [])
               cases = []
               for field, digest in pins:
                   line = f'    "{field}": "{digest}",'
@@ -153,8 +161,15 @@ jobs:
                       (line + f' api_key = "{canary}"', 1),
                       (f'api_key = "{canary}"', 1),
                   ])
-              if "comparison" in filename:
+              if filename != "harness_likelihood_rehearsal.py":
                   cases.extend((f'    "{field}": "{digest}",', 1) for field, digest in tokenizer_pins)
+              if "/references/" in relative:
+                  for field, digest in pins:
+                      line = json.dumps({field: digest}, separators=(",", ":"))
+                      cases.extend([
+                          (line, 0),
+                          (line[:-1] + f',"api_key":"{canary}"' + "}", 1),
+                      ])
               write_cases(relative, cases)
               for other in ("prefix/" + relative, relative + ".bak", relative.replace(filename, "unrelated_" + filename)):
                   write_cases(other, [(f'    "{field}": "{digest}",', 1) for field, digest in pins])
