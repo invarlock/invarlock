@@ -272,6 +272,14 @@ def _status(check: CheckView) -> str:
     )
 
 
+def _interval_summary(view: IntervalView) -> str:
+    """Format the same interval consistently in the change tile and chart."""
+    label = view.label.replace("confidence interval", "CI")
+    lower = number(view.lower, signed=view.neutral == 0)
+    upper = number(view.upper, signed=view.neutral == 0)
+    return f"{label}: {lower} to {upper} {view.unit}".strip()
+
+
 def _interval(view: IntervalView) -> str:
     values = [view.lower, view.upper, view.estimate]
     if view.threshold is not None:
@@ -311,7 +319,7 @@ def _interval(view: IntervalView) -> str:
             ):
                 low, high = axis_low, axis_high
                 ticks = [index * step for index in range(first_tick, last_tick + 1)]
-    description = f"{view.label}: {number(view.lower)} to {number(view.upper)} {view.unit}. Estimate {number(view.estimate)} {view.unit}."
+    description = f"{_interval_summary(view)}. Estimate {number(view.estimate, signed=view.neutral == 0)} {view.unit}."
     graphics = []
     legend = ""
     neutral_legend = ""
@@ -401,15 +409,7 @@ def _interval(view: IntervalView) -> str:
         + '<figcaption><span class="chart-key"><i class="estimate-key" aria-hidden="true"></i>Estimate '
         + escape(number(view.estimate, signed=view.neutral == 0) + " " + view.unit)
         + '</span><span class="chart-key"><i class="interval-key" aria-hidden="true"></i>'
-        + escape(
-            view.label
-            + ": "
-            + number(view.lower)
-            + " to "
-            + number(view.upper)
-            + " "
-            + view.unit
-        )
+        + escape(_interval_summary(view))
         + "</span>"
         + (
             ' <span class="legend"><i class="threshold-key" aria-hidden="true"></i>'
@@ -792,12 +792,9 @@ def render_html(view: ReportView) -> str:
             parts.append(
                 f'<section id="metric-result-{result_index}" tabindex="-1" class="metric {_tone(metric.decision)}"><div class="metric-heading"><div>{heading}<p class="scope">{context}</p></div><span class="badge">{e(decision_label(metric.decision))}</span></div><p class="metric-explanation">{e(metric.explanation)}</p><dl class="values">'
             )
-            change_detail = ""
-            if interval := metric.interval:
-                label = interval.label.replace("confidence interval", "CI")
-                lower = number(interval.lower, signed=interval.neutral == 0)
-                upper = number(interval.upper, signed=interval.neutral == 0)
-                change_detail = f"{label}: {lower} to {upper} {interval.unit}".strip()
+            change_detail = (
+                _interval_summary(metric.interval) if metric.interval else ""
+            )
             for name, value, detail in [
                 ("Baseline", metric.baseline, metric.baseline_detail),
                 ("Subject", metric.candidate, metric.candidate_detail),

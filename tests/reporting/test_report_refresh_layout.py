@@ -509,6 +509,8 @@ def test_change_tile_shows_bound_interval_without_relabelling_method(
         f"<dt>Change</dt><dd>+1 pp<small>{display_label}: -1.444 to +3.526 pp</small></dd>"
         in html
     )
+    summary = f"{display_label}: -1.444 to +3.526 pp"
+    assert html.count(summary) == 3  # Tile, chart caption and accessible description.
     html = render_html(replace(view(), metrics=(replace(metric, interval=None),)))
     assert "<dt>Change</dt><dd>+1 pp</dd>" in html
 
