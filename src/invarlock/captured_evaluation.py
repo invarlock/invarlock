@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from invarlock.judge_measurements.workflow import JudgeWorkflowResult
 
 from invarlock import captured_evidence_publication
 from invarlock.captured_contracts import read_file, sha
@@ -135,22 +138,26 @@ def _json(raw: bytes, *, label: str) -> dict[str, Any]:
     return value
 
 
-def _read_input(request: CapturedEvaluationRequest, path: Path) -> bytes:
+def _read_input(
+    request: CapturedEvaluationRequest, path: Path, *, limit: int | None = None
+) -> bytes:
     try:
         relative = path.relative_to(request.root).as_posix()
         _reference_parts(relative, label="captured input")
-        return read_file(path, contracts.MAX_INPUT_BYTES)
+        return read_file(path, contracts.MAX_INPUT_BYTES if limit is None else limit)
     except (OSError, ValueError) as exc:
         raise CapturedEvaluationError(
             f"captured input could not be read safely: {exc}"
         ) from exc
 
 
-def _run(request: CapturedEvaluationRequest, side: str) -> dict[str, Any]:
+def _run(
+    request: CapturedEvaluationRequest, side: str, *, raw: bytes | None = None
+) -> dict[str, Any]:
     source = getattr(request, side)
     try:
         return _parse_run_bytes(
-            _read_input(request, source.path),
+            _read_input(request, source.path) if raw is None else raw,
             adapter=source.adapter,
             source=dict(source.source) if source.source is not None else None,
             run_id=source.run_id,
@@ -160,6 +167,7 @@ def _run(request: CapturedEvaluationRequest, side: str) -> dict[str, Any]:
                 if source.score_provenance is not None
                 else None
             ),
+            input_projection=source.input_projection,
         )
     except EvaluationRecordsError as exc:
         raise CapturedEvaluationError(f"{side} run could not be loaded: {exc}") from exc
@@ -225,13 +233,18 @@ def _prepare_captured_request(
             "artifact_digest",
             "score_provenance",
             "expected_run_digest",
+            "input_projection",
         ):
             value = getattr(source, name)
             if value is not None:
                 spec[name] = (
-                    dict(value) if name in {"source", "score_provenance"} else value
+                    dict(value)
+                    if name in {"source", "score_provenance", "input_projection"}
+                    else value
                 )
         authored["comparison"][side] = spec
+    if request.metric is not None:
+        authored["comparison"]["metric"] = request.metric
     try:
         normalized = normalize_captured_request(
             authored, baseline=baseline, subject=subject, policy=policy
@@ -332,7 +345,21 @@ def preflight_captured_request(
     signing_key_path: Path | None = None,
     unsigned: bool = False,
     max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
-) -> CapturedEvaluationPreflightResult:
+) -> CapturedEvaluationPreflightResult | JudgeWorkflowResult:
+    if request.metric != "judge" and request.judge is not None:
+        raise CapturedEvaluationError("judge configuration requires metric: judge")
+    if request.metric == "judge":
+        from invarlock.judge_measurements.captured_workflow import (
+            preflight_captured_judge,
+        )
+
+        if max_bootstrap_draws != DEFAULT_MAX_BOOTSTRAP_DRAWS:
+            raise CapturedEvaluationError(
+                "bootstrap overrides do not apply to judge scoring"
+            )
+        return preflight_captured_judge(
+            request, signing_key_path=signing_key_path, unsigned=unsigned
+        )
     return _prepare_captured_request(
         request,
         signing_key_path=signing_key_path,
@@ -347,8 +374,22 @@ def evaluate_captured_request(
     signing_key_path: Path | None = None,
     unsigned: bool = False,
     max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
-) -> CapturedEvaluationTransactionResult:
+) -> CapturedEvaluationTransactionResult | JudgeWorkflowResult:
     """Load, compare, bind, and publish one captured request."""
+    if request.metric != "judge" and request.judge is not None:
+        raise CapturedEvaluationError("judge configuration requires metric: judge")
+    if request.metric == "judge":
+        from invarlock.judge_measurements.captured_workflow import (
+            evaluate_captured_judge,
+        )
+
+        if max_bootstrap_draws != DEFAULT_MAX_BOOTSTRAP_DRAWS:
+            raise CapturedEvaluationError(
+                "bootstrap overrides do not apply to judge scoring"
+            )
+        return evaluate_captured_judge(
+            request, signing_key_path=signing_key_path, unsigned=unsigned
+        )
     baseline, subject, policy, normalized_request, prepared = _prepare_captured_request(
         request,
         signing_key_path=signing_key_path,

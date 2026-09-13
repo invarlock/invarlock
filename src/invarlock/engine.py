@@ -33,6 +33,8 @@ from invarlock.captured_normalization import (
 from invarlock.core.checkpoint_identity import checkpoint_tree_sha256
 from invarlock.core.evaluation_request import (
     CapturedEvaluationRequest,
+    CapturedJudgeRequest,
+    CapturedSourceRequest,
     EvaluationRequest,
     EvaluationRequestError,
     ProviderResolver,
@@ -112,6 +114,10 @@ from invarlock.evaluation_transaction import (
     evaluate_request_file,
     preflight_evaluation_request,
 )
+from invarlock.evaluator_capture import (
+    capture_evaluator_run,
+    evaluator_input_capabilities,
+)
 from invarlock.evaluator_qualification import (
     EVALUATOR_EXPORT_FORMAT,
     EVALUATOR_PROFILE_FORMAT,
@@ -149,6 +155,8 @@ from invarlock.judge_measurements.acceptance import (
     verify_stored_judge_result,
     write_signed_judge_verification_receipt,
 )
+from invarlock.judge_measurements.captured_workflow import prepare_evaluator_judge
+from invarlock.judge_measurements.source_import import import_judge_sources
 from invarlock.runtime_import_authoring import (
     RuntimeImportAuthoringError,
     RuntimeImportPairedRecords,
@@ -241,6 +249,10 @@ __all__ = [
     "captured_request_digest",
     "comparison_policy_digest",
     "normalize_captured_request",
+    "capture_evaluator_run",
+    "evaluator_input_capabilities",
+    "prepare_evaluator_judge",
+    "import_judge_sources",
     "ACCEPTANCE_PREDICATE_FORMAT",
     "ACCEPTANCE_PREDICATE_TYPE",
     "DSSE_PAYLOAD_TYPE",
@@ -251,6 +263,8 @@ __all__ = [
     "AcceptanceAttestationError",
     "AcceptanceDecision",
     "CapturedEvaluationRequest",
+    "CapturedJudgeRequest",
+    "CapturedSourceRequest",
     "EvaluationBatch",
     "EvaluationInputPart",
     "EvaluationRecord",

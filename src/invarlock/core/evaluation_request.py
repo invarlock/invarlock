@@ -243,6 +243,14 @@ class CapturedSourceRequest:
     artifact_digest: str | None = None
     score_provenance: Mapping[str, Mapping[str, str | None]] | None = None
     expected_run_digest: str | None = None
+    input_projection: Mapping[str, str] | None = None
+
+
+@dataclass(frozen=True)
+class CapturedJudgeRequest:
+    workspace: Path
+    signer_identity: str
+    measurements: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -254,6 +262,10 @@ class CapturedEvaluationRequest:
     policy: Path
     evidence: Path
     execution_mode: Literal["captured"] = "captured"
+    metric: Literal["exact_match", "normalized_nll_per_utf8_byte", "judge"] | None = (
+        None
+    )
+    judge: CapturedJudgeRequest | None = None
 
 
 def _scan_yaml_limits_and_features(text: str) -> None:
@@ -975,8 +987,12 @@ def _build_captured_request(
                 Mapping[str, Mapping[str, str | None]] | None, provenance
             ),
             expected_run_digest=cast(str | None, source.get("expected_run_digest")),
+            input_projection=cast(
+                Mapping[str, str] | None, source.get("input_projection")
+            ),
         )
 
+    judge = comparison.get("judge")
     return CapturedEvaluationRequest(
         format_version=cast(str, value["format_version"]),
         root=root,
@@ -992,6 +1008,29 @@ def _build_captured_request(
             root,
             cast(str, output["evidence"]),
             label="output.evidence",
+        ),
+        metric=comparison.get("metric"),
+        judge=(
+            CapturedJudgeRequest(
+                workspace=root.joinpath(
+                    *_reference_parts(
+                        judge["workspace"], label="comparison.judge.workspace"
+                    )
+                ),
+                signer_identity=judge["signer_identity"],
+                measurements=(
+                    _resolve_existing_reference(
+                        root,
+                        judge["measurements"],
+                        label="comparison.judge.measurements",
+                        expected="file",
+                    )
+                    if "measurements" in judge
+                    else None
+                ),
+            )
+            if judge is not None
+            else None
         ),
     )
 
@@ -1064,7 +1103,16 @@ def load_evaluation_request(
         _reference_parts(reference, label="override")
         target[key] = reference
     if format_version == CAPTURED_EVALUATION_REQUEST_FORMAT_VERSION:
-        return _build_captured_request(_validate_captured_schema(validated), root=root)
+        captured = _build_captured_request(
+            _validate_captured_schema(validated), root=root
+        )
+        if captured.judge is not None and request_path.absolute().is_relative_to(
+            captured.judge.workspace
+        ):
+            raise EvaluationRequestError(
+                "Judge workspace must remain separate from request file"
+            )
+        return captured
     request = _build_request(
         _validate_schema(validated),
         root=root,
@@ -1126,6 +1174,7 @@ __all__ = [
     "ArtifactRequest",
     "CAPTURED_EVALUATION_REQUEST_FORMAT_VERSION",
     "CapturedEvaluationRequest",
+    "CapturedJudgeRequest",
     "CapturedSourceRequest",
     "ComparisonRequest",
     "ComparisonSideRequest",

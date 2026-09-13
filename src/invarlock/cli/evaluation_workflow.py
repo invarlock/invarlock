@@ -223,11 +223,15 @@ def execute_evaluation(
             raise CapturedEvaluationError(
                 "runtime options are not valid for captured evaluation"
             )
+        if loaded_request.metric == "judge" and "max_bootstrap_draws" in command_line:
+            raise JudgeWorkflowError("bootstrap options do not apply to judge scoring")
         effective_signing_key = options.signing_key
         if options.unsigned and "signing_key" not in command_line:
             effective_signing_key = None
         captured_result: (
-            CapturedEvaluationPreflightResult | CapturedEvaluationTransactionResult
+            CapturedEvaluationPreflightResult
+            | CapturedEvaluationTransactionResult
+            | JudgeWorkflowResult
         )
         if options.preflight:
             captured_result = preflight_evaluation_request(

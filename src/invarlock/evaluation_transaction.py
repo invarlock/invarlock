@@ -1055,7 +1055,7 @@ def preflight_evaluation_request(
     signing_key_path: Path | None,
     unsigned: bool = False,
     max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
-) -> CapturedEvaluationPreflightResult: ...
+) -> CapturedEvaluationPreflightResult | JudgeWorkflowResult: ...
 
 
 @overload
@@ -1069,7 +1069,9 @@ def preflight_evaluation_request(
     registry: CoreRegistry | None = None,
     unsigned: bool = False,
     max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
-) -> EvaluationPreflightResult | CapturedEvaluationPreflightResult: ...
+) -> (
+    EvaluationPreflightResult | CapturedEvaluationPreflightResult | JudgeWorkflowResult
+): ...
 
 
 def preflight_evaluation_request(
@@ -1082,7 +1084,9 @@ def preflight_evaluation_request(
     registry: CoreRegistry | None | _Omitted = _OMITTED,
     unsigned: bool = False,
     max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
-) -> EvaluationPreflightResult | CapturedEvaluationPreflightResult:
+) -> (
+    EvaluationPreflightResult | CapturedEvaluationPreflightResult | JudgeWorkflowResult
+):
     """Validate an evaluation transaction without execution or filesystem mutation."""
 
     try:
@@ -1378,6 +1382,10 @@ def preflight_evaluation_request(
         TypeError,
         ValueError,
     ) as exc:
+        from invarlock.judge_measurements.workflow import JudgeWorkflowError
+
+        if isinstance(exc, JudgeWorkflowError):
+            raise
         raise EvaluationPreflightError(str(exc)) from exc
 
 
@@ -1403,7 +1411,7 @@ def evaluate_request_file(
     signing_key_path: Path | None,
     unsigned: bool = False,
     max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
-) -> CapturedEvaluationTransactionResult: ...
+) -> CapturedEvaluationTransactionResult | JudgeWorkflowResult: ...
 
 
 @overload

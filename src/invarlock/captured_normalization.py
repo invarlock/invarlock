@@ -69,7 +69,13 @@ def comparison_policy_digest(policy: Mapping[str, Any]) -> str:
         )
     for metric in value["metrics"]:
         kind, config = metric["kind"], metric["configuration"]
-        if kind == "recorded":
+        if kind == "normalized_nll_per_utf8_byte":
+            from invarlock.evaluation_comparison.likelihood import (
+                validate_likelihood_policy,
+            )
+
+            validate_likelihood_policy(metric)
+        elif kind == "recorded":
             provenance = metric.get("accepted_provenance")
             if not provenance or not metric.get("score_key") or config:
                 raise EvaluationRecordsError(
@@ -133,6 +139,13 @@ def normalize_captured_request(
     _validate_request(authored, normalized=False)
     policy_digest = comparison_policy_digest(policy)
     comparison: dict[str, Any] = {"policy_digest": policy_digest}
+    if "metric" in authored["comparison"]:
+        selected = authored["comparison"]["metric"]
+        if len(policy["metrics"]) != 1 or policy["metrics"][0]["kind"] != selected:
+            raise EvaluationRecordsError(
+                "selected metric must match the single policy metric"
+            )
+        comparison["metric"] = selected
     for side, run in (("baseline", baseline), ("subject", subject)):
         source = authored["comparison"][side]
         actual = run_digest(run)
@@ -142,7 +155,7 @@ def normalize_captured_request(
             raise EvaluationRecordsError(f"{side} run digest differs from expected pin")
         identities = ("source", "run_id", "artifact_digest", "score_provenance")
         if source["adapter"] == "invarlock":
-            if any(key in source for key in identities):
+            if any(key in source for key in (*identities, "input_projection")):
                 raise EvaluationRecordsError(
                     "canonical run identities cannot be overridden at import"
                 )
@@ -159,6 +172,21 @@ def normalize_captured_request(
                     raise EvaluationRecordsError(
                         f"{side} {key} differs from declared source intent"
                     )
+            if "input_projection" in source:
+                for row in run["records"]:
+                    context = row.get("context")
+                    binding = (
+                        context.get("input_projection")
+                        if isinstance(context, dict)
+                        else None
+                    )
+                    if (
+                        not isinstance(binding, dict)
+                        or binding.get("configuration") != source["input_projection"]
+                    ):
+                        raise EvaluationRecordsError(
+                            f"{side} input projection differs from declared intent"
+                        )
         comparison[side] = {
             key: value for key, value in source.items() if key != "path"
         }
