@@ -35,6 +35,7 @@ def test_single_metric_summary_includes_values_interval_and_bound_requirements()
     assert "No absolute minimum score" not in view.summary
     assert metric.interval.neutral == 0
     assert metric.interval.threshold_direction == "minimum"
+    assert metric.interval.method == "Newcombe hybrid score"
 
 
 def test_absent_floor_claim_requires_supplied_bound_policy():

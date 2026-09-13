@@ -584,6 +584,10 @@ def _metric_views(
                 if policy
                 else None,
                 neutral=1.0 if likelihood else 0.0,
+                method={
+                    "newcombe_hybrid_score_paired_v1": "Newcombe hybrid score",
+                    "newcombe_hybrid_score_paired_v2": "Newcombe hybrid score",
+                }.get(interval.get("method", ""), ""),
             )
             if policy:
                 bound = interval["lower" if higher else "upper"]

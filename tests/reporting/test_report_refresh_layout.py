@@ -2,6 +2,7 @@
 
 import re
 from dataclasses import replace
+from html import escape
 
 import pytest
 
@@ -509,10 +510,31 @@ def test_change_tile_shows_bound_interval_without_relabelling_method(
         f"<dt>Change</dt><dd>+1 pp<small>{display_label}: -1.444 to +3.526 pp</small></dd>"
         in html
     )
-    summary = f"{display_label}: -1.444 to +3.526 pp"
-    assert html.count(summary) == 3  # Tile, chart caption and accessible description.
+    chart_summary = f"{escape(label)}: -1.444 to +3.526 pp"
+    assert f"{chart_summary}</span>" in html
+    assert f'aria-label="{chart_summary}. Estimate +1 pp.' in html
     html = render_html(replace(view(), metrics=(replace(metric, interval=None),)))
     assert "<dt>Change</dt><dd>+1 pp</dd>" in html
+
+
+def test_chart_names_retained_method_while_tile_stays_compact():
+    interval = IntervalView(
+        -1.444,
+        3.526,
+        1,
+        -2,
+        "Paired 95% confidence interval",
+        "pp",
+        "minimum",
+        0,
+        "Newcombe hybrid score",
+    )
+    chart = _interval(interval)
+    assert (
+        "Paired 95% confidence interval (Newcombe hybrid score): -1.444 to +3.526 pp"
+        in chart
+    )
+    assert "&lt;method&gt;" in _interval(replace(interval, method="<method>"))
 
 
 def test_ratio_change_tile_does_not_present_ratio_bounds_as_signed_effects():

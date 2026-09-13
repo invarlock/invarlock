@@ -199,6 +199,7 @@ class IntervalView:
     unit: str
     threshold_direction: str | None = None
     neutral: float | None = None
+    method: str = ""
 
 
 @dataclass(frozen=True)
@@ -272,9 +273,13 @@ def _status(check: CheckView) -> str:
     )
 
 
-def _interval_summary(view: IntervalView) -> str:
+def _interval_summary(view: IntervalView, *, compact: bool = False) -> str:
     """Format the same interval consistently in the change tile and chart."""
-    label = view.label.replace("confidence interval", "CI")
+    label = view.label
+    if compact:
+        label = label.replace("confidence interval", "CI")
+    elif view.method:
+        label += f" ({view.method})"
     lower = number(view.lower, signed=view.neutral == 0)
     upper = number(view.upper, signed=view.neutral == 0)
     return f"{label}: {lower} to {upper} {view.unit}".strip()
@@ -793,7 +798,9 @@ def render_html(view: ReportView) -> str:
                 f'<section id="metric-result-{result_index}" tabindex="-1" class="metric {_tone(metric.decision)}"><div class="metric-heading"><div>{heading}<p class="scope">{context}</p></div><span class="badge">{e(decision_label(metric.decision))}</span></div><p class="metric-explanation">{e(metric.explanation)}</p><dl class="values">'
             )
             change_detail = (
-                _interval_summary(metric.interval) if metric.interval else ""
+                _interval_summary(metric.interval, compact=True)
+                if metric.interval
+                else ""
             )
             for name, value, detail in [
                 ("Baseline", metric.baseline, metric.baseline_detail),
