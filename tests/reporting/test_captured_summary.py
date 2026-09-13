@@ -111,6 +111,9 @@ def test_match_counts_require_complete_binary_mean_with_exact_integer_arithmetic
     assert match_notes == (
         [] if mutation else ["Matches: baseline 20 of 400; subject 24 of 400."]
     )
+    assert view.baseline_detail == ("" if mutation else "20 of 400 matched")
+    assert view.candidate_detail == ("" if mutation else "24 of 400 matched")
+    assert "required" not in view.count_detail
     assert comparison == before
 
 
@@ -153,3 +156,44 @@ def test_single_metric_nonpass_summary_preserves_explanation(decision):
     summary = record_reporting._captured_summary((metric,))
     assert summary.startswith(metric.explanation)
     assert "Matches:" not in summary
+
+
+@pytest.mark.parametrize("with_policy", [False, True])
+@pytest.mark.parametrize("missing", [False, True])
+def test_count_sublabels_preserve_included_and_usable_pairs_and_policy_scope(
+    with_policy, missing
+):
+    _, comparison, policy = binary_comparison()
+    metric = comparison["metrics"][0]
+    metric["missing_ids"] = ["one-missing"] if missing else []
+    count = metric["count"]
+    configured = (
+        {item["name"]: item for item in policy["metrics"]} if with_policy else {}
+    )
+    rendered = record_reporting._metric_views(comparison, configured)[0]
+    assert rendered.count == str(count - int(missing))
+    assert rendered.count_detail.startswith(
+        f"{int(missing)} missing · {count} included"
+    )
+    if with_policy:
+        minimum = policy["metrics"][0]["minimum_count"]
+        assert rendered.count_detail.endswith(f"≥ {minimum} required")
+    else:
+        assert "required" not in rendered.count_detail
+    if missing:
+        assert rendered.baseline_detail == rendered.candidate_detail == ""
+
+
+def test_nll_sublabels_do_not_invent_match_counts():
+    from invarlock.evaluation_comparison.comparison import compare_runs
+    from tests.evaluation_comparison.test_likelihood import policy, row, run
+
+    configured = policy()
+    comparison = compare_runs(run([row()]), run([row(logprob=-3)]), configured)
+    rendered = record_reporting._metric_views(
+        comparison, {"nll": configured["metrics"][0]}
+    )[0]
+    assert rendered.baseline == "2 nats / byte"
+    assert rendered.baseline_detail == rendered.candidate_detail == ""
+    assert rendered.count_detail == "0 missing · 1 included · ≥ 1 required"
+    assert "matched" not in str(rendered)

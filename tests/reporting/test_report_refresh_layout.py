@@ -1,5 +1,6 @@
 """Report layout exposes comparisons and thresholds without changing assurance."""
 
+import re
 from dataclasses import replace
 
 import pytest
@@ -78,8 +79,13 @@ def test_native_candidate_alias_aligns_identity_and_context_without_mutation():
     )
     html = _comparison_context(report)
     assert 'class="comparison-table"' in html
-    assert "<td>baseline-artifact</td><td>candidate-artifact</td>" in html
-    assert "<td>cpu</td><td>mps</td>" in html
+    assert re.search(
+        r'<td data-side="Baseline">.*?baseline-artifact</td><td data-side="Subject">.*?candidate-artifact</td>',
+        html,
+    )
+    assert re.search(
+        r'<td data-side="Baseline">.*?cpu</td><td data-side="Subject">.*?mps</td>', html
+    )
     assert report.subjects[1][0] == "Candidate"
     assert report.context[1][0] == "Candidate provider"
 
@@ -97,7 +103,10 @@ def test_subjects_with_matching_field_suffixes_align_and_keep_the_field_name(
     html = _comparison_context(report)
     assert 'class="comparison-table"' in html
     assert '<th scope="row">Artifact</th>' in html
-    assert "<td>baseline-artifact</td><td>subject-artifact</td>" in html
+    assert re.search(
+        r'<td data-side="Baseline">.*?baseline-artifact</td><td data-side="Subject">.*?subject-artifact</td>',
+        html,
+    )
     assert report.subjects[1][0] == subject_label
 
 
@@ -264,3 +273,103 @@ def test_nested_policy_previews_have_a_readable_escaped_disclosure():
     assert "&lt;b&gt; configuration preview" in html
     assert "<img" not in html and "&lt;node limit&gt;" in html
     assert "ordinary configuration preview" not in html
+
+
+def test_summary_emphasis_is_escaped_and_does_not_split_other_numbers():
+    from invarlock.report_presentation import _summary_html
+
+    metric = MetricView("<img>", "overall", "pass", "5%", "6%", "+1 pp", "400", "")
+    report = replace(
+        view(), metrics=(metric,), summary="<img>: 5% to 6%; 95% interval; +1 pp."
+    )
+    rendered = _summary_html(report)
+    assert "<strong>&lt;img&gt;</strong>" in rendered
+    assert "<strong>5%</strong>" in rendered
+    assert "95% interval" in rendered
+    assert "9<strong>5%" not in rendered
+    assert "<img>" not in rendered
+    assert (
+        _summary_html(replace(report, metrics=()))
+        == "&lt;img&gt;: 5% to 6%; 95% interval; +1 pp."
+    )
+    empty = replace(metric, name="", baseline="", candidate="", change="")
+    assert (
+        _summary_html(replace(report, metrics=(empty,)))
+        == "&lt;img&gt;: 5% to 6%; 95% interval; +1 pp."
+    )
+
+
+@pytest.mark.parametrize(
+    "bounds",
+    [
+        (-1.444, 3.526, 1, -2),
+        (1.085, 1.098, 1.091, 1.05),
+        (0, 0, 0, None),
+        (-1e308, 1e308, 0, 1e307),
+        (1e-320, 2e-320, 1.5e-320, None),
+    ],
+)
+def test_chart_annotations_remain_finite_and_show_the_actual_bounds(bounds):
+    from invarlock.report_presentation import number
+
+    lower, upper, estimate, threshold = bounds
+    chart = _interval(
+        IntervalView(
+            lower, upper, estimate, threshold, "<interval>", "units", "minimum", 0
+        )
+    )
+    assert "&lt;interval&gt;" in chart
+    assert 'class="chart-annotations"' in chart
+    assert 'class="estimate-key"' in chart
+    assert number(lower) in chart and number(upper) in chart
+    assert not re.search(r'(?:left|x1|x2|width|cx)[=:]"?(?:nan|inf|-inf)', chart)
+    if threshold is not None:
+        assert "Limit ≥ " + number(threshold) in chart
+
+
+def test_metric_sublabels_and_count_label_are_escaped_and_assurance_is_not_duplicated():
+    metric = MetricView(
+        "quality",
+        "overall",
+        "pass",
+        "5%",
+        "6%",
+        "+1 pp",
+        "400",
+        "",
+        baseline_detail="<script>",
+        candidate_detail="24 matched",
+        count_detail="0 missing",
+        count_label="<pairs>",
+    )
+    report = replace(
+        view(), metrics=(metric,), assurance=(("Signing", "Not authorized"),)
+    )
+    html = render_html(report)
+    assert "<small>&lt;script&gt;</small>" in html
+    assert "<small>24 matched</small>" in html
+    assert "<dt>&lt;pairs&gt;</dt>" in html
+    assert html.count("Not authorized") == 1
+    assert html.index("Not authorized") < html.index("Results and requirements")
+
+
+def test_neutral_reference_is_not_given_a_policy_limit_key_without_policy():
+    chart = _interval(IntervalView(1, 2, 1.5, None, "Range", "ratio", neutral=1))
+    assert 'class="neutral-key"' in chart
+    assert 'class="threshold-key"' not in chart
+    assert "No change: 1 ratio." in chart
+    assert "Limit" not in chart
+
+
+def test_regular_ticks_use_display_units_and_summary_emphasizes_sentence_end_value():
+    from invarlock.report_presentation import _summary_html
+
+    chart = _interval(
+        IntervalView(-1.444, 3.526, 1, -2, "Paired interval", "pp", "minimum", 0)
+    )
+    assert re.search(r'class="axis-labels".*?>-2</span>.*?>0</span>.*?>2</span>', chart)
+    assert ">1.763</span>" not in chart
+    metric = MetricView("quality", "overall", "pass", "5%", "6%", "+1 pp", "400", "")
+    assert "<strong>+1 pp</strong>." in _summary_html(
+        replace(view(), metrics=(metric,), summary="Change +1 pp.")
+    )

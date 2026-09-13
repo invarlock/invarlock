@@ -691,6 +691,17 @@ def _metric_views(
                 if change is None
                 else number(change * scale, signed=not likelihood) + " " + unit,
                 count=f"{complete:,}",
+                count_label="Usable pairs",
+                baseline_detail=f"{counts[0]:,} of {m['count']:,} matched"
+                if counts is not None
+                else "",
+                candidate_detail=f"{counts[1]:,} of {m['count']:,} matched"
+                if counts is not None
+                else "",
+                count_detail=(
+                    f"{missing:,} missing · {m['count']:,} included"
+                    + (f" · ≥ {policy['minimum_count']:,} required" if policy else "")
+                ),
                 explanation=explanation,
                 checks=tuple(checks),
                 interval=visual,

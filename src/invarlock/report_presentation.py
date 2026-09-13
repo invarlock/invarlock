@@ -9,6 +9,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import math
 import re
 from dataclasses import dataclass, field
 from html import escape as html_escape
@@ -213,6 +214,10 @@ class MetricView:
     checks: tuple[CheckView, ...] = ()
     interval: IntervalView | None = None
     notes: tuple[str, ...] = ()
+    baseline_detail: str = ""
+    candidate_detail: str = ""
+    count_detail: str = ""
+    count_label: str = "Observed pairs"
 
 
 @dataclass(frozen=True)
@@ -285,6 +290,7 @@ def _interval(view: IntervalView) -> str:
     description = f"{view.label}: {number(view.lower)} to {number(view.upper)} {view.unit}. Estimate {number(view.estimate)} {view.unit}."
     graphics = []
     legend = ""
+    neutral_legend = ""
     if view.threshold is not None:
         description += f" Policy threshold {number(view.threshold)} {view.unit}."
         position = x(view.threshold)
@@ -308,8 +314,22 @@ def _interval(view: IntervalView) -> str:
         graphics.append(
             f'<line class="neutral" x1="{position:.2f}" x2="{position:.2f}" y1="18" y2="60"/>'
         )
-        legend += f" No change: {number(view.neutral)} {view.unit}."
+        neutral_legend = f"No change: {number(view.neutral)} {view.unit}."
     ticks = [first] if first == last else [first, first / 2 + last / 2, last]
+    desired_step = (last - first) * (scale / 4)
+    if desired_step > 0:
+        magnitude = 10.0 ** math.floor(math.log10(desired_step))
+        if magnitude > 0:
+            factor = desired_step / magnitude
+            step = (
+                next(value for value in (1, 2, 5, 10) if value >= factor)
+                * magnitude
+                / scale
+            )
+            first_tick, last_tick = math.ceil(first / step), math.floor(last / step)
+            regular = [index * step for index in range(first_tick, last_tick + 1)]
+            if len(regular) >= 2:
+                ticks = regular
     labels = []
     for tick in ticks:
         value = tick * scale
@@ -320,8 +340,46 @@ def _interval(view: IntervalView) -> str:
         labels.append(
             f'<span style="left:{position / 640 * 100:.2f}%">{escape(number(value))}</span>'
         )
+
+    def annotation(value: float, text: str, kind: str) -> str:
+        percent = x(value) / 640 * 100
+        anchor = "start" if percent < 22 else "end" if percent > 78 else "middle"
+        return (
+            f'<span class="chart-label {kind} {anchor}" style="left:{percent:.2f}%">'
+            + escape(text)
+            + "</span>"
+        )
+
+    annotations = []
+    if view.threshold is not None:
+        operator = {"minimum": "≥ ", "maximum": "≤ "}.get(
+            view.threshold_direction or "", ""
+        )
+        annotations.append(
+            annotation(
+                view.threshold,
+                f"Limit {operator}{number(view.threshold)}",
+                "limit-label",
+            )
+        )
+    if x(view.upper) - x(view.lower) < 180:
+        midpoint = view.lower / 2 + view.upper / 2
+        annotations.append(
+            annotation(
+                midpoint, f"{number(view.lower)} to {number(view.upper)}", "bound-label"
+            )
+        )
+    else:
+        annotations.extend(
+            (
+                annotation(view.lower, number(view.lower), "bound-label"),
+                annotation(view.upper, number(view.upper), "bound-label"),
+            )
+        )
     return (
-        '<figure class="interval"><svg viewBox="0 0 640 72" role="img" aria-label="'
+        '<figure class="interval"><div class="chart-annotations" aria-hidden="true">'
+        + "".join(annotations)
+        + '</div><svg viewBox="0 0 640 72" role="img" aria-label="'
         + escape(description, quote=True)
         + '">'
         + "".join(graphics)
@@ -331,11 +389,31 @@ def _interval(view: IntervalView) -> str:
         + '</svg><div class="axis-labels" aria-hidden="true">'
         + "".join(labels)
         + "</div>"
-        + "<figcaption>"
-        + escape(description)
+        + '<figcaption><span class="chart-key"><i class="estimate-key" aria-hidden="true"></i>Estimate '
+        + escape(number(view.estimate, signed=view.neutral == 0) + " " + view.unit)
+        + '</span><span class="chart-key"><i class="interval-key" aria-hidden="true"></i>'
+        + escape(
+            view.label
+            + ": "
+            + number(view.lower)
+            + " to "
+            + number(view.upper)
+            + " "
+            + view.unit
+        )
+        + "</span>"
         + (
-            ' <span class="legend">' + escape(legend.strip()) + "</span>"
+            ' <span class="legend"><i class="threshold-key" aria-hidden="true"></i>'
+            + escape(legend.strip())
+            + "</span>"
             if legend
+            else ""
+        )
+        + (
+            '<span class="chart-key"><i class="neutral-key" aria-hidden="true"></i>'
+            + escape(neutral_legend)
+            + "</span>"
+            if neutral_legend
             else ""
         )
         + "</figcaption></figure>"
@@ -343,29 +421,32 @@ def _interval(view: IntervalView) -> str:
 
 
 _CSS = """
-:root{color-scheme:light;--ink:#172a35;--muted:#526773;--line:#d8e3e8;--paper:#fff;--canvas:#f2f6f8;--teal:#086756;--red:#a32639;--amber:#79530b}
+:root{color-scheme:light;--ink:#172a35;--muted:#526773;--line:#d8e3e8;--paper:#fff;--canvas:#f6f8f9;--teal:#086756;--red:#a32639;--amber:#79530b}
 *{box-sizing:border-box}
-body{margin:0;background:var(--canvas);color:var(--ink);font:16px/1.6 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-a{color:#145d7b}main{max-width:1120px;margin:auto;padding:30px 28px 60px}
-h1,h2,h3,h4,p{margin-top:0}h1{font-size:36px;line-height:1.15;letter-spacing:-.03em;margin-bottom:14px}h2{font-size:22px;line-height:1.3;letter-spacing:-.02em;margin-bottom:0}h3,h4{font-size:20px;line-height:1.3;margin-bottom:10px}
+body{margin:0;background:var(--canvas);color:var(--ink);font:15px/1.55 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+a{color:#145d7b}main{max-width:1120px;margin:auto;padding:26px 28px 48px}
+h1,h2,h3,h4,p{margin-top:0}h1{font-size:36px;line-height:1.15;letter-spacing:-.03em;margin-bottom:14px}h2{font-size:18px;line-height:1.3;letter-spacing:-.02em;margin-bottom:0}h3,h4{font-size:20px;line-height:1.3;margin-bottom:10px}
 .brand{display:flex;align-items:center;gap:10px;font-weight:750}.mark{width:34px;height:34px;flex-shrink:0}.family{margin-left:auto;color:var(--muted);font-size:13px;text-align:right}
-.hero{margin:24px 0;padding:28px 30px;border:1px solid var(--line);border-radius:14px;background:var(--paper);border-top:4px solid var(--teal)}
-.hero.fail{border-top-color:var(--red)}.hero.insufficient{border-top-color:var(--amber)}.hero>p{max-width:90ch;margin-bottom:0;overflow-wrap:anywhere}.hero .eyebrow{margin-bottom:10px}
+.hero{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(260px,1fr);gap:30px;margin:24px 0;padding:26px 0;border-block:1px solid var(--line)}
+.hero h1::before{content:"";display:inline-block;width:12px;height:12px;border-radius:50%;background:var(--teal);margin-right:12px;vertical-align:middle}.hero.fail h1::before{background:var(--red)}.hero.insufficient h1::before{background:var(--amber)}
+.verdict{min-width:0}.decision-summary{max-width:65ch;margin-bottom:0;overflow-wrap:anywhere;font-size:16px;color:var(--muted)}.decision-summary strong{color:var(--ink);font-weight:650}.hero .eyebrow{margin-bottom:10px}
+.assurance{min-width:0}.assurance h2{font-size:13px;margin:0 0 10px;color:var(--muted)}.assurance dl{margin:0}.assurance dl>div{display:grid;grid-template-columns:minmax(90px,1fr) minmax(0,1.8fr);gap:12px;padding:8px 0;border-bottom:1px dashed var(--line);font-size:12px}.assurance dl>div:last-child{border:0}.assurance dt{color:var(--muted)}.assurance dd{margin:0;overflow-wrap:anywhere}.next-steps{margin-top:22px}
+.eyebrow{margin-bottom:10px}
 .eyebrow{text-transform:uppercase;letter-spacing:.12em;font-size:12px;font-weight:750;color:var(--muted)}
 .summary-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.pill{font-size:13px;font-weight:650;padding:4px 10px;border-radius:6px;background:#eef3f6;color:var(--muted)}
 .badge{display:inline-block;font-size:13px;font-weight:700;border:1px solid currentColor;border-radius:5px;padding:2px 8px;white-space:nowrap}
 .pass .badge,.badge.pass{color:var(--teal);background:#eef8f4}.fail .badge,.badge.fail{color:var(--red);background:#fff1f2}.insufficient .badge,.badge.insufficient{color:var(--amber);background:#fff8e6}
-.panel,.metric{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:24px}.panel h2{font-size:18px;margin-bottom:12px}.metric{margin-bottom:18px;break-inside:avoid}
-.section-heading{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin:26px 0 14px}.section-heading p{font-size:13px;color:var(--muted);margin:0}
+.panel,.metric{background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:20px}.panel h2{font-size:16px;margin-bottom:12px}.metric{margin-bottom:16px;break-inside:avoid}
+.section-heading{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin:24px 0 12px}.section-heading p{font-size:13px;color:var(--muted);margin:0}
 .subjects{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:0}.subjects div{min-width:0}.subjects dt{font-size:13px;font-weight:650;color:var(--muted)}.subjects dd{margin:3px 0 0;overflow-wrap:anywhere}
-.comparison-table{table-layout:fixed;margin-top:0}.comparison-table th:first-child{width:23%}.comparison-table td{width:38.5%;overflow-wrap:anywhere}.comparison-table .different{background:#f0f6fa}.different-label{display:block;font-size:12px;font-weight:400;color:#315e76}
+.comparison-table{table-layout:fixed;margin-top:0}.comparison-table th:first-child{width:23%}.comparison-table td{width:38.5%;overflow-wrap:anywhere}.comparison-table .different{background:#f0f6fa}.side-label{display:none}.different-label{display:block;font-size:12px;font-weight:400;color:#315e76}
 .shared-context{border:0;border-top:1px solid var(--line);border-radius:0;margin:12px 0 0;background:transparent}.shared-context summary{padding:12px 0}.shared-context .detail-content{padding:0}
 .context-list{display:grid;grid-template-columns:minmax(120px,1fr) 3fr;gap:8px 18px;margin:0}.context-list dt{font-weight:650;font-size:13px}.context-list dd{margin:0;overflow-wrap:anywhere;font-size:14px}
 .change-notes{font-size:13px;color:var(--muted);margin:14px 0 0;padding-left:20px}.change-notes li+li{margin-top:6px}
 .metric-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}.metric-heading>div{min-width:0}.metric h3,.metric h4{overflow-wrap:anywhere}.metric-heading>.badge{flex-shrink:0}.scope{font-size:13px;color:var(--muted);margin:4px 0}.metric-explanation{margin:10px 0 18px}
-.values{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--line);border-radius:8px;background:#f8fafb;overflow:hidden;margin:0}
-.value{padding:14px;border-right:1px solid var(--line);min-width:0}.value:last-child{border:0}.value dt{font-size:13px;color:var(--muted)}.value dd{margin:4px 0 0;font-size:22px;font-weight:650;line-height:1.3;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
-.interval{margin:22px 0}.interval svg{display:block;width:100%;height:auto}.interval figcaption{overflow-wrap:anywhere;font-size:13px;color:var(--muted);margin-top:8px}.axis{stroke:var(--line);stroke-width:2}.range{stroke:#277b91;stroke-width:7;stroke-linecap:round}.estimate{fill:var(--ink);stroke:white;stroke-width:2}.threshold{stroke:var(--amber);stroke-width:2;stroke-dasharray:4 4}.neutral{stroke:#78909c;stroke-width:1.5}.allowed{fill:#e5f3ed}.tick{stroke:#78909c;stroke-width:1.5}.legend{display:block;margin-top:4px}.axis-labels{position:relative;height:22px;font-size:13px;font-variant-numeric:tabular-nums;color:var(--muted)}.axis-labels span{position:absolute;transform:translateX(-50%);white-space:nowrap}
+.values{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--line);border-radius:8px;background:var(--paper);overflow:hidden;margin:0}
+.value{padding:12px;border-right:1px solid var(--line);min-width:0}.value:last-child{border:0}.value dt{font-size:13px;color:var(--muted)}.value dd{margin:4px 0 0;font-size:26px;font-weight:650;line-height:1.2;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.value small{display:block;margin-top:5px;font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--muted);letter-spacing:0}.interval{margin:22px 0}.interval svg{display:block;width:100%;height:auto}.interval figcaption{overflow-wrap:anywhere;font-size:13px;color:var(--muted);margin-top:8px}.axis{stroke:var(--line);stroke-width:2}.range{stroke:#277b91;stroke-width:7;stroke-linecap:round}.estimate{fill:var(--paper);stroke:#277b91;stroke-width:3}.threshold{stroke:var(--red);stroke-width:2}.neutral{stroke:#78909c;stroke-width:1.5;stroke-dasharray:3 4}.allowed{fill:#e5f3ed}.tick{stroke:#78909c;stroke-width:1.5}.legend{display:block;margin-top:4px}.chart-annotations{height:48px;position:relative;font-size:12px;font-variant-numeric:tabular-nums}.chart-label{position:absolute;max-width:72%;overflow-wrap:anywhere}.chart-label.middle{transform:translateX(-50%)}.chart-label.end{transform:translateX(-100%)}.limit-label{top:0;color:var(--red)}.bound-label{top:25px;font-weight:650}.chart-key{display:inline-block;margin-right:18px}.chart-key i,.legend i{display:inline-block;margin-right:7px;vertical-align:middle}.estimate-key{width:10px;height:10px;border:2px solid #277b91;border-radius:50%}.interval-key{width:16px;border-top:3px solid #277b91}.neutral-key{width:16px;border-top:2px dashed #78909c}.threshold-key{height:12px;border-left:2px solid var(--red)}.axis-labels{position:relative;height:22px;font-size:13px;font-variant-numeric:tabular-nums;color:var(--muted)}.axis-labels span{position:absolute;transform:translateX(-50%);white-space:nowrap}
 .scroll{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:14px;margin-top:16px}caption{text-align:left;font-weight:650;padding:0 0 8px}th{text-align:left;color:var(--muted);font-size:13px;font-weight:650}th,td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}th:first-child,td:first-child{padding-left:0}td:last-child,th:last-child{padding-right:0}tbody tr:last-child td,tbody tr:last-child th{border-bottom:0}
 .checks-table td{white-space:nowrap}.checks-table th[scope="row"]{width:48%}.check-detail{display:block;font-size:13px;font-weight:400;margin-top:4px;color:var(--muted)}.check-fail{color:var(--red);font-weight:650}.check-pass{color:var(--teal)}.check-unknown{color:var(--amber)}.notes{font-size:13px;color:var(--muted);padding-left:20px;margin-bottom:0}.notes li+li{margin-top:6px}
 .columns{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:24px}.panel dl{margin:0}.panel dt{font-size:13px;font-weight:650;margin-top:10px}.panel dt:first-child{margin-top:0}.panel dd{margin:3px 0 0;color:var(--muted);font-size:14px;overflow-wrap:anywhere}.panel ol,.panel ul{padding-left:20px;font-size:14px;margin:0}.panel li+li{margin-top:8px}
@@ -374,8 +455,8 @@ details{border:1px solid var(--line);border-radius:8px;background:var(--paper);m
 a:focus-visible,summary:focus-visible,[tabindex]:focus-visible{outline:3px solid #277b91;outline-offset:4px}a,[tabindex]{scroll-margin-top:20px}.metric-group:target,.metric:target{border-color:#277b91}
 .metric-group>.section-heading h3{font-size:22px;margin:0}.metric-group>.section-heading>a{font-size:13px}.results-overview{margin:18px 0}.results-overview .section-heading p{max-width:48ch}.overview-scroll{border:1px solid var(--line);border-radius:8px;background:var(--paper);padding:4px 16px}.overview-table{margin:12px 0;min-width:840px}.overview-table a,.overview-table .scope{display:block}.overview-table .badge{white-space:normal}.overview-table tbody th{font-size:14px}.overview-table td{font-variant-numeric:tabular-nums}.overview-checks{margin:0;padding-left:16px}.overview-checks li+li{margin-top:4px}
 .metric-controls{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:18px 0}.metric-navigation{display:flex;flex-wrap:wrap;gap:8px}.metric-navigation a{display:block;padding:9px 14px;border:1px solid var(--line);border-radius:8px;background:var(--paper);font-weight:650;text-decoration:none}.metric-navigation a:hover{border-color:#277b91;background:#eaf3f7}.metric-navigation span{display:block;color:var(--muted);font-size:13px;font-weight:400}.metric-navigation [role="tab"][aria-selected="true"]{border-color:#145d7b;background:#e4f1f7;box-shadow:inset 0 -3px #145d7b}.metric-display-toggle{font:inherit;font-size:13px;border:1px solid var(--line);border-radius:7px;background:var(--paper);color:#145d7b;padding:9px 12px;cursor:pointer}.metric-display-toggle:focus-visible{outline:3px solid #277b91;outline-offset:4px}
-@media(max-width:650px){main{padding:20px 14px 40px}.hero{padding:22px 18px}h1{font-size:29px}.metric,.panel{padding:18px}.values{grid-template-columns:repeat(2,minmax(0,1fr))}.value:nth-child(2){border-right:0}.value:nth-child(-n+2){border-bottom:1px solid var(--line)}.value dd{font-size:20px}.columns,.subjects{grid-template-columns:1fr}.family{max-width:160px}.section-heading{display:block}.section-heading p{margin-top:5px}.metric-heading{gap:8px;flex-direction:column}th,td{padding:10px 8px}.context-list{grid-template-columns:1fr}.context-list dd{margin-bottom:6px}.comparison-table{font-size:13px}.comparison-table th:first-child{width:25%}.checks-table{min-width:540px}.interval{margin-inline:0}}
-@media print{body{background:white;font-size:10pt}main{max-width:none;padding:0}.hero{margin-top:16px;padding:20px}h1{font-size:25pt}.metric,.panel{padding:15px}.columns{display:block}.panel{margin:12px 0}details{break-inside:avoid}details>.detail-content{display:block!important}pre{max-height:none}.footer{font-size:9pt}.scroll{overflow:visible}a{color:inherit}.metric-group[hidden]{display:block!important}.metric-navigation,.metric-display-toggle,.metric-group>.section-heading>a{display:none}.overview-table,.checks-table{min-width:0;font-size:8pt;table-layout:fixed}.overview-table th{font-size:8pt}.overview-scroll{padding:0;border:0}.overview-table th,.overview-table td{padding:6px 4px}.overview-table .badge{font-size:8pt}.metric-group>.section-heading{break-after:avoid}.checks-table td{white-space:normal}}
+@media(max-width:650px){main{padding:20px 14px 40px}.hero{grid-template-columns:1fr;gap:22px;padding:22px 0}.assurance dl>div{grid-template-columns:1fr 1.8fr}h1{font-size:29px}.metric,.panel{padding:18px}.values{grid-template-columns:repeat(2,minmax(0,1fr))}.value:nth-child(2){border-right:0}.value:nth-child(-n+2){border-bottom:1px solid var(--line)}.value dd{font-size:20px}.columns,.subjects{grid-template-columns:1fr}.family{max-width:160px}.section-heading{display:block}.section-heading p{margin-top:5px}.metric-heading{gap:8px;flex-direction:column}th,td{padding:10px 8px}.context-list{grid-template-columns:1fr}.context-list dd{margin-bottom:6px}.comparison-table{font-size:13px}.comparison-table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}.comparison-table,.comparison-table tbody,.comparison-table tr,.comparison-table th,.comparison-table td{display:block;width:100%}.comparison-table th:first-child{width:100%}.comparison-table tbody tr{padding:10px 12px;border-bottom:1px solid var(--line)}.comparison-table tbody th,.comparison-table tbody td{padding:5px 0;border:0}.comparison-table .different-label{display:inline;margin-left:8px}.side-label{display:block;font-size:11px;color:var(--muted);font-weight:500;margin-bottom:2px}.checks-table{min-width:540px}.interval{margin-inline:0}}
+@media print{body{background:white;font-size:10pt}main{max-width:none;padding:0}.hero{margin-top:16px;padding:16px 0;grid-template-columns:1fr 1fr;gap:20px}h1{font-size:25pt}.metric,.panel{padding:15px}.columns{display:block}.panel{margin:12px 0}details{break-inside:avoid}details>.detail-content{display:block!important}pre{max-height:none}.footer{font-size:9pt}.scroll{overflow:visible}a{color:inherit}.metric-group[hidden]{display:block!important}.metric-navigation,.metric-display-toggle,.metric-group>.section-heading>a{display:none}.overview-table,.checks-table{min-width:0;font-size:8pt;table-layout:fixed}.overview-table th{font-size:8pt}.overview-scroll{padding:0;border:0}.overview-table th,.overview-table td{padding:6px 4px}.overview-table .badge{font-size:8pt}.metric-group>.section-heading{break-after:avoid}.checks-table td{white-space:normal}}
 """
 
 
@@ -503,7 +584,7 @@ def _comparison_context(view: ReportView) -> str:
                 '<span class="different-label">Differs</span>' if changed else ""
             )
             parts.append(
-                f'<tr{style}><th scope="row">{escape(label)}{annotation}</th><td>{escape(baseline)}</td><td>{escape(subject)}</td></tr>'
+                f'<tr{style}><th scope="row">{escape(label)}{annotation}</th><td data-side="Baseline"><span class="side-label" aria-hidden="true">Baseline</span>{escape(baseline)}</td><td data-side="Subject"><span class="side-label" aria-hidden="true">Subject</span>{escape(subject)}</td></tr>'
             )
         parts.append("</tbody></table>")
     if shared:
@@ -563,6 +644,37 @@ def _detail_content(data: Any) -> str:
     )
 
 
+def _summary_html(view: ReportView) -> str:
+    """Emphasize supplied display values without interpreting summary markup."""
+    if len(view.metrics) != 1:
+        return escape(view.summary)
+    metric = view.metrics[0]
+    values = {metric.name, metric.baseline, metric.candidate, metric.change}
+    if metric.interval:
+        values.update(
+            number(value)
+            for value in (
+                metric.interval.lower,
+                metric.interval.upper,
+                metric.interval.estimate,
+                metric.interval.threshold,
+            )
+            if value is not None
+        )
+    tokens = sorted((value for value in values if value), key=len, reverse=True)
+    if not tokens:
+        return escape(view.summary)
+    pattern = re.compile(
+        r"(?<![\w.+-])("
+        + "|".join(re.escape(value) for value in tokens)
+        + r")(?![\w%]|\.\d)"
+    )
+    return "".join(
+        "<strong>" + escape(part) + "</strong>" if index % 2 else escape(part)
+        for index, part in enumerate(pattern.split(view.summary))
+    )
+
+
 def render_html(view: ReportView) -> str:
     """Render escaped fields with optional hash-authorized local metric tabs."""
     e = escape
@@ -578,23 +690,23 @@ def render_html(view: ReportView) -> str:
         f"<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none';{script_policy}\">",
         f"<title>{e(view.title)}</title><style>{_CSS}</style></head><body><main>",
         f'<header class="brand">{_BRAND_MARK} InvarLock<span class="family">{e(view.family)}</span></header>',
-        f'<section class="hero {_tone(view.decision)}" aria-labelledby="decision"><p class="eyebrow">Recorded policy result</p><h1 id="decision">{e(decision_label(view.decision))}</h1><p>{e(view.summary)}</p>',
+        f'<section class="hero {_tone(view.decision)}" aria-labelledby="decision"><div class="verdict"><p class="eyebrow">Recorded policy result</p><h1 id="decision">{e(decision_label(view.decision))}</h1><p class="decision-summary">{_summary_html(view)}</p>',
     ]
     if multiple_results:
         parts.append(
             f'<div class="summary-row"><span class="pill">{len(view.metrics)} metric / scope results</span></div>'
         )
-    parts.append("</section>")
+    parts.append(
+        '</div><aside class="assurance" aria-labelledby="assurance-heading"><h2 id="assurance-heading">What was checked</h2><dl>'
+    )
+    for name, value in view.assurance:
+        parts.append(f"<div><dt>{e(name)}</dt><dd>{e(value)}</dd></div>")
+    parts.append("</dl></aside></section>")
     if view.subjects or view.context or view.changes:
         parts.append(_comparison_context(view))
-    support = [
-        '<div class="columns"><section class="panel"><h2>What was checked</h2><dl>'
-    ]
-    for name, value in view.assurance:
-        support.append(f"<dt>{e(name)}</dt><dd>{e(value)}</dd>")
-    support.append('</dl></section><section class="panel"><h2>Next steps</h2><ol>')
+    support = ['<section class="panel next-steps"><h2>Next steps</h2><ol>']
     support.extend(f"<li>{e(step)}</li>" for step in view.next_steps)
-    support.append("</ol></section></div>")
+    support.append("</ol></section>")
     if multiple_results:
         parts.append(
             '<details class="overview-disclosure"><summary>Compare all metric and scope results</summary><div class="detail-content">'
@@ -633,14 +745,15 @@ def render_html(view: ReportView) -> str:
             parts.append(
                 f'<section id="metric-result-{result_index}" tabindex="-1" class="metric {_tone(metric.decision)}"><div class="metric-heading"><div>{heading}<p class="scope">{context}</p></div><span class="badge">{e(decision_label(metric.decision))}</span></div><p class="metric-explanation">{e(metric.explanation)}</p><dl class="values">'
             )
-            for name, value in [
-                ("Baseline", metric.baseline),
-                ("Candidate", metric.candidate),
-                ("Change", metric.change),
-                ("Observed pairs", metric.count),
+            for name, value, detail in [
+                ("Baseline", metric.baseline, metric.baseline_detail),
+                ("Subject", metric.candidate, metric.candidate_detail),
+                ("Change", metric.change, ""),
+                (metric.count_label, metric.count, metric.count_detail),
             ]:
+                sublabel = f"<small>{e(detail)}</small>" if detail else ""
                 parts.append(
-                    f'<div class="value"><dt>{name}</dt><dd>{e(value)}</dd></div>'
+                    f'<div class="value"><dt>{e(name)}</dt><dd>{e(value)}{sublabel}</dd></div>'
                 )
             parts.append("</dl>")
             if metric.interval:

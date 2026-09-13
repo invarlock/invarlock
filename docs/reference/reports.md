@@ -462,11 +462,15 @@ regression as failure and insufficient evidence as error.
 ### Read the result and its requirements
 
 The report leads with **Policy satisfied** or **Policy not met**, the recorded
-verdict and the checks responsible for it. Each metric shows baseline and
+verdict and the checks responsible for it. HTML places the assurance checks
+beside the verdict, with signature validation and independent recipient
+acceptance kept separate. Each metric shows baseline and
 candidate values, change, observed pair count, an interval and the configured
 requirements. The interval diagram labels its scale, the policy boundary and the no-change
 reference: zero for a difference and one for a ratio. Shading marks only the
-region meeting the change requirement; separate count, precision and absolute
+region meeting the change requirement. Labels identify the interval endpoints,
+estimate, policy limit and neutral reference; axis ticks use rounded steps in
+the displayed units. Separate count, precision and absolute
 score requirements still apply. The table shows which numerical checks passed
 or were not met. Exact recorded values remain
 available in the evidence and technical details.
@@ -506,7 +510,9 @@ interpretation includes its recorded reason.
 
 Complete binary-mean results can also show exact match counts when the retained
 mean and record count determine an integer count consistently. Missing results
-and fractional scores do not acquire match counts.
+and fractional scores do not acquire match counts. HTML places match counts
+beneath the corresponding score, and missing, included and required pair counts
+beneath the usable-pair count. Required counts appear only when policy is bound.
 
 HTML includes expandable identities, exact comparison data, paired outcome
 analysis where available, and supplementary authenticated observations.
@@ -520,7 +526,9 @@ HTML and Markdown reports put **What was compared** before the results. The
 section aligns baseline and subject fields side by side, highlights differences,
 and groups matching displayed fields with the recorded workflow, task, dataset
 and coverage information under **Additional recorded context**. Matching
-previews do not establish equality of the complete retained fields. The recorded changes explain
+previews do not establish equality of the complete retained fields. On small
+screens, each comparison field stacks its explicitly labelled baseline and
+subject values while retaining the table headers for assistive technology. The recorded changes explain
 what the evidence establishes about the difference between the two sides.
 
 Native run and import reports use the authenticated request and input identities.

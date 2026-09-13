@@ -11,7 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Refined evidence reports with aligned comparison identities, collapsible shared
   settings, labelled interval scales and change requirements, metric navigation,
-  readable configuration previews and compact result summaries. Captured CLI and
+  readable configuration previews and compact result summaries. Assurance checks
+  appear beside the verdict, score counts beneath their values, and comparison
+  fields stack into labelled baseline and subject rows on small screens. Captured CLI and
   SDK reports share presentation assembly while retaining their validation
   boundaries. Captured HTTP request context and complete exact-match counts
   remain distinct from hidden service instructions and missing observations.
