@@ -132,3 +132,36 @@ def test_hosted_configuration_preview_is_bounded_and_not_a_policy_claim():
     assert "x" * 1000 not in text
     assert "policy binding" not in text
     assert "captured run" in text
+
+
+def test_same_alias_distinct_observations_are_visible_without_empty_artifact_fields():
+    baseline, subject, _ = runs()
+    for run, model in ((baseline, "model-a"), (subject, "model-b")):
+        run["service_identity"]["observed_model"] = model
+        run["source"]["name"] = "existing-harness"
+        run["source"]["version"] = "1"
+    subjects, context, _, _ = record_reporting._captured_context(
+        {"baseline": baseline, "subject": subject}
+    )
+    assert (
+        dict(subjects)["Baseline"] == "Observed model: model-a · Deployment: production"
+    )
+    assert (
+        dict(subjects)["Subject"] == "Observed model: model-b · Deployment: production"
+    )
+    assert "Unavailable in recorded context" not in str(context)
+    assert "Baseline evaluator" not in dict(context)
+    assert dict(context)["Baseline service harness"] == "existing-harness 1"
+    assert dict(context)["Baseline exposed revision"] == "Not exposed"
+
+
+def test_hosted_context_retains_distinct_evaluator_and_mixed_recorded_metadata():
+    baseline, subject, _ = runs()
+    baseline["records"][0]["metadata"] = {"dataset": "tasks-a"}
+    baseline["records"][1]["metadata"] = {"dataset": "tasks-b"}
+    subjects, context, _, _ = record_reporting._captured_context(
+        {"baseline": baseline, "subject": subject}
+    )
+    assert dict(subjects)["Baseline"].startswith("Requested model: example-8b")
+    assert "Baseline evaluator" in dict(context)
+    assert dict(context)["Baseline dataset"] == "Mixed or incomplete across records"

@@ -239,14 +239,23 @@ def _captured_context(
         )
         service = run.get("service_identity")
         if service is not None:
-            identity = "Hosted service: " + _short_context(
-                f"{service['service']} / {service['requested_model']}"
+            model_label = (
+                "Observed model" if service["observed_model"] else "Requested model"
             )
+            identity = (
+                model_label
+                + ": "
+                + _short_context(
+                    service["observed_model"] or service["requested_model"]
+                )
+            )
+            identity += " · Deployment: " + _short_context(service["deployment"])
             window = service["observation_window"]
             context.extend(
                 (label + " " + key, value)
                 for key, value in (
                     ("provider", _short_context(service["provider"])),
+                    ("service", _short_context(service["service"])),
                     ("deployment", _short_context(service["deployment"])),
                     ("requested model", _short_context(service["requested_model"])),
                     (
@@ -287,23 +296,33 @@ def _captured_context(
             and isinstance(source.get("version"), str)
             else "Unavailable in recorded run"
         )
-        context.extend(
+        recorded_context = (
+            (label + " evaluator", evaluator),
+            (label + " model revision", fields["model_revision"][1]),
+            (label + " capture role", fields["role"][1]),
             (
-                (label + " evaluator", evaluator),
-                (label + " model revision", fields["model_revision"][1]),
-                (label + " capture role", fields["role"][1]),
-                (
-                    label + " workflow",
-                    _common_context(records, "workflow", "metadata")[1],
-                ),
-                (
-                    label + " dataset",
-                    _common_context(records, "dataset", "metadata")[1],
-                ),
-                (label + " records", f"{len(records):,}"),
-                (label + " effective message roles", _prompt_roles(indexed)),
-            )
+                label + " workflow",
+                _common_context(records, "workflow", "metadata")[1],
+            ),
+            (
+                label + " dataset",
+                _common_context(records, "dataset", "metadata")[1],
+            ),
+            (label + " records", f"{len(records):,}"),
+            (label + " effective message roles", _prompt_roles(indexed)),
         )
+        if service is not None:
+            source_is_harness = isinstance(source, dict) and all(
+                source.get(key) == service["harness"][key]
+                for key in ("name", "version")
+            )
+            recorded_context = tuple(
+                (key, value)
+                for key, value in recorded_context
+                if value != "Unavailable in recorded context"
+                and not (key == label + " evaluator" and source_is_harness)
+            )
+        context.extend(recorded_context)
     services = [
         inputs[side].get("service_identity") for side in ("baseline", "subject")
     ]
