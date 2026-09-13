@@ -311,12 +311,28 @@ def test_judge_workspace_cannot_contain_the_request_with_explicit_ancestor_root(
     "metric,decision",
     [("exact_match", "regression"), ("normalized_nll_per_utf8_byte", "pass")],
 )
+@pytest.mark.parametrize("hosted", [False, True])
 def test_signed_projected_capture_replays_with_recipient_owned_intent(
-    tmp_path, material, metric, decision
+    tmp_path, material, metric, decision, hosted
 ):
+    from tests.evaluation_records.test_hosted_service_identity import identity
+
+    if hosted:
+        for side in ("baseline", "subject"):
+            source = material["authored"]["comparison"][side]
+            source.update(artifact_digest=None, service_identity=identity())
+            source["service_identity"]["deployment"] = side
+            material[side] = _parse_run_bytes(
+                (tmp_path / source["path"]).read_bytes(),
+                **{key: value for key, value in source.items() if key != "path"},
+            )
     if metric == "normalized_nll_per_utf8_byte":
         material["policy"] = nll_policy()
         material["authored"]["comparison"]["metric"] = metric
+        if hosted:
+            material["policy"]["metrics"][0]["configuration"][
+                "configuration_digest"
+            ] = identity()["configuration_digest"]
         (tmp_path / "policy.json").write_text(json.dumps(material["policy"]))
         for side in ("baseline", "subject"):
             source = material["authored"]["comparison"][side]
@@ -334,6 +350,13 @@ def test_signed_projected_capture_replays_with_recipient_owned_intent(
                 "tokenizer_digest": digest("tokenizer"),
                 "source": source["source"],
             }
+            if hosted:
+                row["likelihood"].update(
+                    service_identity_digest=digest(source["service_identity"]),
+                    configuration_digest=source["service_identity"][
+                        "configuration_digest"
+                    ],
+                )
             raw = json.dumps(row).encode()
             path.write_bytes(raw)
             material[side] = _parse_run_bytes(
@@ -358,6 +381,104 @@ def test_signed_projected_capture_replays_with_recipient_owned_intent(
     assert result["replay_status"] == "completed"
     assert result["decision"] == decision
     assert (tmp_path / "receipt.json").is_file()
+
+
+def test_signed_cli_retains_opaque_hosted_configuration_and_replays(tmp_path, material):
+    from typer.testing import CliRunner
+
+    from invarlock.cli.app import app
+    from tests.evaluation_records.test_hosted_service_identity import identity
+
+    configuration = {
+        "instructions": "first line\nsecond line",
+        "tools": [
+            {
+                "name": "lookup",
+                "configuration": dict.fromkeys(
+                    (
+                        "include",
+                        "includes",
+                        "include_file",
+                        "include_files",
+                        "extends",
+                        "ref",
+                    ),
+                    "retained declaration, not a file reference",
+                ),
+            }
+        ],
+    }
+    for side in ("baseline", "subject"):
+        source = material["authored"]["comparison"][side]
+        descriptor = identity()
+        descriptor.update(
+            configuration=copy.deepcopy(configuration),
+            configuration_digest=digest(configuration),
+        )
+        source.update(artifact_digest=None, service_identity=descriptor)
+        material[side] = _parse_run_bytes(
+            (tmp_path / source["path"]).read_bytes(),
+            **{key: value for key, value in source.items() if key != "path"},
+        )
+    normalized = _normalize(material)
+    key, signer = _key(tmp_path / "signer.pem")
+    result = CliRunner().invoke(
+        app,
+        [
+            "evaluate",
+            str(_write(tmp_path, material)),
+            "--signing-key",
+            str(key),
+            "--json",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.stdout)["authentication"] == "signed"
+    for side in ("baseline", "subject"):
+        retained = json.loads(
+            (tmp_path / "evidence/records" / f"{side}.json").read_text()
+        )
+        assert retained["service_identity"]["configuration"] == configuration
+    verifier_key, _ = _key(tmp_path / "verifier.pem")
+    replay = verify_captured_evidence(
+        tmp_path / "evidence",
+        policy_path=tmp_path / "policy.json",
+        expected_baseline_run=digest(material["baseline"]),
+        expected_subject_run=digest(material["subject"]),
+        expected_request_digest=captured_request_digest(normalized),
+        expected_signer=signer,
+        receipt_path=tmp_path / "receipt.json",
+        verifier_signing_key_path=verifier_key,
+        verifier_identity="recipient",
+    )
+    assert replay["integrity_ok"]
+    assert replay["replay_status"] == "completed"
+
+
+@pytest.mark.parametrize(
+    "target", ["root", "comparison", "source", "service", "native-lookalike"]
+)
+def test_hosted_configuration_exemption_does_not_allow_request_directives(
+    tmp_path, material, target
+):
+    from tests.evaluation_records.test_hosted_service_identity import identity
+
+    authored = material["authored"]
+    source = authored["comparison"]["baseline"]
+    source.update(artifact_digest=None, service_identity=identity())
+    if target == "native-lookalike":
+        authored["format_version"] = "invarlock/evaluation-request-v1"
+        target_object = source["service_identity"]["configuration"]
+    else:
+        target_object = {
+            "root": authored,
+            "comparison": authored["comparison"],
+            "source": source,
+            "service": source["service_identity"],
+        }[target]
+    target_object["include"] = "other.yaml"
+    with pytest.raises(EvaluationRequestError, match="include directives"):
+        load_evaluation_request(_write(tmp_path, material))
 
 
 @pytest.mark.parametrize(

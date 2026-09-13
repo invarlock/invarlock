@@ -31,14 +31,21 @@ def _validate_request(value: dict[str, Any], *, normalized: bool) -> None:
             raise EvaluationRecordsError(
                 "captured request exceeds the 1 MiB byte limit"
             )
-    pending: list[Any] = [value]
+    pending: list[tuple[tuple[str, ...], Any]] = [((), value)]
     while pending:
-        item = pending.pop()
+        path, item = pending.pop()
+        # Declared customer configuration is retained JSON data, including
+        # multiline instructions. It is never interpreted as a host reference.
+        if path in {
+            ("comparison", "baseline", "service_identity", "configuration"),
+            ("comparison", "subject", "service_identity", "configuration"),
+        }:
+            continue
         if isinstance(item, dict):
-            pending.extend(item.keys())
-            pending.extend(item.values())
+            pending.extend((path, key) for key in item)
+            pending.extend(((*path, key), child) for key, child in item.items())
         elif isinstance(item, list):
-            pending.extend(item)
+            pending.extend((path, child) for child in item)
         elif isinstance(item, str) and any(ord(c) < 32 or ord(c) == 127 for c in item):
             raise EvaluationRecordsError(
                 "captured request strings cannot contain control characters"
@@ -51,6 +58,12 @@ def _validate_request(value: dict[str, Any], *, normalized: bool) -> None:
     error = next(Draft202012Validator(schema).iter_errors(value), None)
     if error is not None:
         raise EvaluationRecordsError(f"invalid captured request: {error.message}")
+    from invarlock.evaluation_records.identity import validate_service_identity
+
+    for side in ("baseline", "subject"):
+        source = value["comparison"][side]
+        if "service_identity" in source:
+            validate_service_identity(source["service_identity"])
 
 
 def comparison_policy_digest(policy: Mapping[str, Any]) -> str:
@@ -153,7 +166,13 @@ def normalize_captured_request(
             validate_run_case_set(dict(run), policy["expected_case_set_digest"])
         if "expected_run_digest" in source and source["expected_run_digest"] != actual:
             raise EvaluationRecordsError(f"{side} run digest differs from expected pin")
-        identities = ("source", "run_id", "artifact_digest", "score_provenance")
+        identities = (
+            "source",
+            "run_id",
+            "artifact_digest",
+            "score_provenance",
+            "service_identity",
+        )
         if source["adapter"] == "invarlock":
             if any(key in source for key in (*identities, "input_projection")):
                 raise EvaluationRecordsError(
@@ -168,7 +187,9 @@ def normalize_captured_request(
                     "native import requires source, run and artifact identities and physical source digest"
                 )
             for key in identities:
-                if source.get(key, {}) != run.get(key):
+                if source.get(
+                    key, {} if key == "score_provenance" else None
+                ) != run.get(key):
                     raise EvaluationRecordsError(
                         f"{side} {key} differs from declared source intent"
                     )

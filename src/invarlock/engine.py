@@ -95,6 +95,7 @@ from invarlock.evaluation_oci import (
 from invarlock.evaluation_record_contracts.contracts import MAX_RECORDS as _MAX_RECORDS
 from invarlock.evaluation_record_contracts.contracts import (
     EvaluationRecordsError,
+    digest,
 )
 from invarlock.evaluation_records.adapters import load_run
 from invarlock.evaluation_records.cases import (
@@ -103,6 +104,10 @@ from invarlock.evaluation_records.cases import (
 from invarlock.evaluation_records.cases import case_set_digest as _case_set_digest
 from invarlock.evaluation_records.cases import (
     validate_run_case_set as _validate_run_case_set,
+)
+from invarlock.evaluation_records.identity import (
+    evaluated_subject_digest,
+    validate_service_identity,
 )
 from invarlock.evaluation_records.io import physical_file_digest, run_digest, write_run
 from invarlock.evaluation_runtime import RuntimeResourceResolver
@@ -182,7 +187,8 @@ def make_run(
     *,
     source: Mapping[str, str],
     run_id: str,
-    artifact_digest: str,
+    artifact_digest: str | None,
+    service_identity: Mapping[str, Any] | None = None,
     source_digest: str | None = None,
     score_provenance: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
@@ -194,6 +200,7 @@ def make_run(
         source=dict(source),
         run_id=run_id,
         artifact_digest=artifact_digest,
+        service_identity=service_identity,
         source_digest=source_digest,
         score_provenance=dict(score_provenance)
         if score_provenance is not None
@@ -348,6 +355,9 @@ __all__ = [
     "load_trust_inputs",
     "launch_from_environment",
     "make_run",
+    "digest",
+    "evaluated_subject_digest",
+    "validate_service_identity",
     "prepare_local_evaluation_schedule",
     "preflight_evaluation_request",
     "physical_file_digest",

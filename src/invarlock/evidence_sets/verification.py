@@ -14,6 +14,7 @@ from invarlock.captured_verification import verify_captured_evidence
 from invarlock.evaluation_comparison.capacity import DEFAULT_MAX_BOOTSTRAP_DRAWS
 from invarlock.evaluation_comparison.comparison import _check_policy
 from invarlock.evaluation_records.cases import case_set_digest
+from invarlock.evaluation_records.identity import evaluated_subject_digest
 from invarlock.evaluation_records.io import run_digest
 from invarlock.evidence_pack_contract import canonical_json_bytes
 from invarlock.evidence_pack_json import parse_json_bytes
@@ -101,7 +102,7 @@ def _empty_result() -> dict[str, Any]:
     }
 
 
-def shared_captured_inputs(payloads: dict[str, dict[str, Any]]) -> dict[str, str]:
+def shared_captured_inputs(payloads: dict[str, dict[str, Any]]) -> dict[str, Any]:
     """Derive complete input identity from a validated captured snapshot."""
     baseline, subject = payloads["baseline"], payloads["subject"]
     case_sets = [
@@ -123,6 +124,11 @@ def shared_captured_inputs(payloads: dict[str, dict[str, Any]]) -> dict[str, str
         "subject_run_sha256": run_digest(subject),
         "case_set_sha256": case_sets[0],
         "subject_artifact_sha256": subject["artifact_digest"],
+        **(
+            {"subject_service_identity_sha256": evaluated_subject_digest(subject)}
+            if "service_identity" in subject
+            else {}
+        ),
     }
 
 
@@ -210,7 +216,9 @@ def _verify(
         load_judge_measurement_recipient_policy_schema(),
         label="judge recipient policy",
     )
-    if judge_policy.get("intended_subject") != shared["subject_artifact_sha256"]:
+    if judge_policy.get("intended_subject") != shared.get(
+        "subject_service_identity_sha256", shared["subject_artifact_sha256"]
+    ):
         raise EvidenceSetError(
             "judge intended subject differs from shared recipient pin"
         )
@@ -311,9 +319,11 @@ def _verify(
         raise EvidenceSetError(
             "verified judge shared inputs differ from recipient pins"
         )
-    if judge.intended_subject != shared["subject_artifact_sha256"]:
+    if judge.intended_subject != shared.get(
+        "subject_service_identity_sha256", shared["subject_artifact_sha256"]
+    ):
         raise EvidenceSetError(
-            "verified judge subject artifact differs from recipient pin"
+            "verified judge subject identity differs from recipient pin"
         )
     # An advisory-only judge cannot become a required accepted component.
     analysis_policy, _ = read_object(paths["judge"] / "analysis_policy.json")

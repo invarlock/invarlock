@@ -162,6 +162,7 @@ def _run(
             source=dict(source.source) if source.source is not None else None,
             run_id=source.run_id,
             artifact_digest=source.artifact_digest,
+            service_identity=source.service_identity,
             score_provenance=(
                 dict(source.score_provenance)
                 if source.score_provenance is not None
@@ -231,15 +232,24 @@ def _prepare_captured_request(
             "source",
             "run_id",
             "artifact_digest",
+            "service_identity",
             "score_provenance",
             "expected_run_digest",
             "input_projection",
         ):
             value = getattr(source, name)
-            if value is not None:
+            if value is not None or (
+                name == "artifact_digest" and source.service_identity is not None
+            ):
                 spec[name] = (
                     dict(value)
-                    if name in {"source", "score_provenance", "input_projection"}
+                    if name
+                    in {
+                        "source",
+                        "score_provenance",
+                        "input_projection",
+                        "service_identity",
+                    }
                     else value
                 )
         authored["comparison"][side] = spec
