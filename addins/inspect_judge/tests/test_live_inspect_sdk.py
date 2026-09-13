@@ -27,6 +27,7 @@ from invarlock.judge_measurements.contracts import (
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
+@pytest.mark.parametrize("reference_mode", [None, "per_case"])
 @pytest.mark.parametrize("judge_model", ["gpt-4o-2024-08-06", "gpt-5.6-sol"])
 @pytest.mark.parametrize(
     ("finish_reason", "completion", "parse_status"),
@@ -37,7 +38,13 @@ FIXTURES = Path(__file__).parent / "fixtures"
     ],
 )
 def test_live_inspect_chat_completion_replays_offline(
-    tmp_path, monkeypatch, finish_reason, completion, parse_status, judge_model
+    tmp_path,
+    monkeypatch,
+    finish_reason,
+    completion,
+    parse_status,
+    judge_model,
+    reference_mode,
 ):
     required = os.environ.get("INVARLOCK_REQUIRE_INSPECT_SDK") == "1"
     try:
@@ -67,6 +74,14 @@ def test_live_inspect_chat_completion_replays_offline(
         json.loads((FIXTURES / f"{name}.json").read_text())
         for name in ("plan", "export", "frozen")
     ]
+    runs = {
+        f"{side}_run": json.loads((FIXTURES / f"{side}_run.json").read_text())
+        for side in ("baseline", "subject")
+    }
+    if reference_mode is not None:
+        plan["prompt"]["reference_mode"] = reference_mode
+        for row in runs["baseline_run"]["records"]:
+            frozen[row["id"]]["expected"] = row["expected"]
     plan["judge"].update(
         provider="openai",
         requested_model=f"openai/{judge_model}",
@@ -81,10 +96,6 @@ def test_live_inspect_chat_completion_replays_offline(
         grader=plan["judge"]["requested_model"],
         requests_per_minute=10000,
     )
-    runs = {
-        f"{side}_run": json.loads((FIXTURES / f"{side}_run.json").read_text())
-        for side in ("baseline", "subject")
-    }
     requests = []
 
     def respond(request):
@@ -143,6 +154,14 @@ def test_live_inspect_chat_completion_replays_offline(
 
     measurements = asyncio.run(run())
     for request in requests:
+        content = json.loads(request["messages"][-1]["content"])
+        assert content["input"] == runs["baseline_run"]["records"][0]["input"]
+        if reference_mode == "per_case":
+            assert (
+                content["reference"] == runs["baseline_run"]["records"][0]["expected"]
+            )
+        else:
+            assert "reference" not in content
         if judge_model == "gpt-5.6-sol":
             assert request["messages"][0]["role"] == "developer"
             assert "temperature" not in request
@@ -201,7 +220,10 @@ def test_live_inspect_chat_completion_replays_offline(
     # Check the precise wire projection during offline import too. The native
     # SDK test must not turn missing controls or arbitrary role edits into an
     # allowance for every provider/model.
-    for mutation in ("role", "temperature", "top_p", "token_limit"):
+    mutations = ("role", "temperature", "top_p", "token_limit")
+    if reference_mode == "per_case":
+        mutations += ("reference",)
+    for mutation in mutations:
         changed = copy.deepcopy(samples)
         request = changed[0]["events"][0]["call"]["request"]
         if mutation == "role":
@@ -215,6 +237,10 @@ def test_live_inspect_chat_completion_replays_offline(
                 request.pop("temperature")
         elif mutation == "top_p":
             request.pop("top_p")
+        elif mutation == "reference":
+            content = json.loads(request["messages"][-1]["content"])
+            content["reference"] = "substituted gold"
+            request["messages"][-1]["content"] = json.dumps(content)
         elif judge_model == "gpt-5.6-sol":
             request["max_tokens"] = request.pop("max_completion_tokens")
         else:

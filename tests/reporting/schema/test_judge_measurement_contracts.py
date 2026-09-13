@@ -120,7 +120,22 @@ def test_judge_contracts_bound_all_collections_and_text() -> None:
         if isinstance(value, dict):
             if value.get("type") == "object":
                 assert value["additionalProperties"] is False
-                assert set(value["required"]) == set(value["properties"])
+                optional = set(value["properties"]) - set(value["required"])
+                if optional:
+                    assert set(value["properties"]) == {
+                        "system",
+                        "template",
+                        "references",
+                        "demonstrations",
+                        "reference_mode",
+                    }
+                    assert optional == {"reference_mode"}
+                    assert value["properties"]["reference_mode"]["enum"] == [
+                        "none",
+                        "per_case",
+                    ]
+                else:
+                    assert set(value["required"]) == set(value["properties"])
             if value.get("type") == "array":
                 assert isinstance(value["maxItems"], int)
             if value.get("type") == "string":

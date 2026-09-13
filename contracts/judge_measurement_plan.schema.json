@@ -108,6 +108,12 @@
           "minItems": 0,
           "maxItems": 100,
           "uniqueItems": true
+        },
+        "reference_mode": {
+          "enum": [
+            "none",
+            "per_case"
+          ]
         }
       },
       "required": [

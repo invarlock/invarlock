@@ -11,8 +11,15 @@ from xml.etree.ElementTree import Element, SubElement, tostring
 
 from invarlock.captured_contracts import atomic_write
 from invarlock.engine import run_digest
+from invarlock.evaluation_record_contracts.contracts import digest as record_digest
 from invarlock.evidence_reporting import EvidenceReportError, EvidenceReportV2
 from invarlock.judge_measurements.contracts import canonical_payload
+from invarlock.record_reporting import (
+    _captured_context,
+    _captured_identities,
+    _configuration_preview,
+    _short_context,
+)
 from invarlock.report_presentation import (
     CheckView,
     IntervalView,
@@ -135,6 +142,58 @@ def _selected_case_ids(
     return requested or available[:CASE_DETAIL_LIMIT]
 
 
+def _captured_record_context(records: list[dict[str, Any]]) -> dict[str, Any]:
+    """Summarize source settings and projection identities without source prompts."""
+    settings: dict[str, Any] = {}
+    settings_count = 0
+    projections: dict[str, dict[str, str]] = {}
+    projection_count = 0
+    for record in records:
+        context = record.get("context")
+        if not isinstance(context, dict):
+            continue
+        if "settings" in context:
+            settings_count += 1
+            identity = record_digest(context["settings"])
+            if identity not in settings:
+                settings[identity] = context["settings"]
+        projection = context.get("input_projection")
+        if isinstance(projection, dict):
+            projection_count += 1
+            identity = projection["configuration_digest"]
+            projections[identity] = {
+                "configuration_digest": identity,
+                "kind": projection["configuration"]["kind"],
+                "pointer": _short_context(projection["configuration"]["pointer"]),
+            }
+    result: dict[str, Any] = {}
+    if settings_count:
+        result["settings"] = {
+            "status": "common"
+            if len(settings) == 1 and settings_count == len(records)
+            else "mixed_or_incomplete",
+            "present_records": settings_count,
+            "included_records": len(records),
+        }
+        if result["settings"]["status"] == "common":
+            identity, value = next(iter(settings.items()))
+            result["settings"].update(
+                digest=identity,
+                preview=_short_context(
+                    _configuration_preview(value)["text"], TEXT_DETAIL_LIMIT
+                ),
+            )
+    if projection_count:
+        result["input_projection"] = {
+            "present_records": projection_count,
+            "included_records": len(records),
+            "configuration_count": len(projections),
+            "configurations": [projections[key] for key in sorted(projections)[:8]],
+            "note": "At most eight mapping identities are shown; original structured inputs remain in retained records.",
+        }
+    return result
+
+
 def _view(
     publication: Any,
     artifacts: dict[str, dict[str, Any]],
@@ -142,6 +201,7 @@ def _view(
     case_ids: tuple[str, ...] = (),
 ) -> tuple[ReportView, dict[str, Any]]:
     plan = artifacts["plan"]
+    per_case_references = plan["prompt"].get("reference_mode") == "per_case"
     policy = artifacts["analysis_policy"]
     analysis = publication.analysis_result.to_dict()
     effect = analysis["effect_interval"]
@@ -263,6 +323,15 @@ def _view(
                         :TEXT_DETAIL_LIMIT
                     ],
                     "trials": trials_by_case[case_id],
+                    **(
+                        {
+                            "reference_excerpt": baseline_rows[case_id]["expected"][
+                                :TEXT_DETAIL_LIMIT
+                            ]
+                        }
+                        if per_case_references
+                        else {}
+                    ),
                 },
             )
         )
@@ -307,6 +376,7 @@ def _view(
         },
         "judge": plan["judge"],
         "prompt": {
+            **({"reference_mode": "per_case"} if per_case_references else {}),
             "system_excerpt": plan["prompt"]["system"][:TEXT_DETAIL_LIMIT],
             "template_excerpt": plan["prompt"]["template"][:TEXT_DETAIL_LIMIT],
             "demonstrations": len(plan["prompt"]["demonstrations"]),
@@ -336,10 +406,21 @@ def _view(
             "case_ids": list(selected_case_ids),
         },
     }
+    if per_case_references:
+        facts["per_case_references"] = [
+            {
+                "case_id": case_id,
+                "reference_excerpt": baseline_rows[case_id]["expected"][
+                    :TEXT_DETAIL_LIMIT
+                ],
+            }
+            for case_id in selected_case_ids
+        ]
     native = artifacts.get("native_capture")
     native_context: list[tuple[str, str]] = []
     native_assurance: tuple[tuple[str, str], ...] = ()
     native_identity: list[tuple[str, str]] = []
+    captured_subjects: tuple[tuple[str, str], ...] | None = None
     if native is not None:
         requested = native["normalized_request"]["comparison"]
         same_artifact = (
@@ -410,6 +491,67 @@ def _view(
             ),
         )
         native_identity.append(("Native capture", facts["native_capture"]["sha256"]))
+    else:
+        inputs = {side: artifacts[f"{side}_run"] for side in ("baseline", "subject")}
+        captured_subjects, context, changes, context_details = _captured_context(inputs)
+        native_context.extend(context)
+        native_context.extend(("Captured comparison", change) for change in changes)
+        native_identity.extend(_captured_identities(inputs))
+        details.extend(context_details)
+        captured_facts: dict[str, Any] = {"context": dict(context), "changes": changes}
+        for side, run in inputs.items():
+            facts["comparison"][side].update(
+                run_digest=run_digest(run), source_digest=run["source_digest"]
+            )
+            native_identity.append(
+                (
+                    side.title() + " source digest",
+                    run["source_digest"] or "Unavailable in captured run",
+                )
+            )
+            recorded = _captured_record_context(run["records"])
+            captured_facts[side] = recorded
+            for label, value in recorded.items():
+                details.append(
+                    (side.title() + " recorded " + label.replace("_", " "), value)
+                )
+                heading = side.title() + " recorded " + label.replace("_", " ")
+                if label == "settings":
+                    native_context.append(
+                        (
+                            heading,
+                            value.get("preview", "Mixed or incomplete across records"),
+                        )
+                    )
+                    if "digest" in value:
+                        native_identity.append((heading, value["digest"]))
+                else:
+                    native_context.append(
+                        (
+                            heading,
+                            f"{value['present_records']} of {value['included_records']} records; {value['configuration_count']} mapping configurations",
+                        )
+                    )
+                    for configuration in value["configurations"]:
+                        native_context.append(
+                            (
+                                side.title() + " projection pointer",
+                                configuration["pointer"],
+                            )
+                        )
+                        native_identity.append(
+                            (
+                                side.title() + " projection configuration",
+                                configuration["configuration_digest"],
+                            )
+                        )
+        facts["captured_context"] = captured_facts
+        native_assurance = (
+            (
+                "Captured answer provenance",
+                "Evaluator, artifact, configuration and model labels are source assertions retained with the captured runs; runtime execution has not been independently established.",
+            ),
+        )
     view = ReportView(
         title="InvarLock bounded judge report",
         family="Bounded judge measurement evidence",
@@ -436,8 +578,20 @@ def _view(
             ("Policy result", analysis["decision"]),
             ("Recipient acceptance", "Not performed by report."),
         ),
-        subjects=(("Baseline", facts["baseline"]), ("Subject", facts["subject"])),
+        subjects=captured_subjects
+        if captured_subjects is not None
+        else (("Baseline", facts["baseline"]), ("Subject", facts["subject"])),
         context=tuple(native_context)
+        + (
+            (
+                (
+                    "Per-case references",
+                    "Enabled; each judge request includes its case reference separately from the model input.",
+                ),
+            )
+            if per_case_references
+            else ()
+        )
         + (
             ("Judge provider", plan["judge"]["provider"]),
             ("Requested judge", plan["judge"]["requested_model"]),
@@ -502,7 +656,7 @@ def _view(
             **(
                 {"native_capture": facts["native_capture"]}
                 if native is not None
-                else {}
+                else {"captured_context": facts["captured_context"]}
             ),
             "method": analysis["method"],
             "assumptions": analysis["assumptions"],

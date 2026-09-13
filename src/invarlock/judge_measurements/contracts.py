@@ -106,7 +106,11 @@ def expected_trial_id(
 
 
 def render_judge_request(
-    plan: JudgeMeasurementPlan, *, input_text: object, answer_text: object
+    plan: JudgeMeasurementPlan,
+    *,
+    input_text: object,
+    answer_text: object,
+    reference_text: object = None,
 ) -> bytes:
     """Render the closed normalized request used by the first judge profile."""
 
@@ -115,13 +119,24 @@ def render_judge_request(
     checked_input = input_text
     checked_answer = answer_text
     prompt = plan["prompt"]
+    reference_mode = prompt.get("reference_mode", "none")
+    if reference_mode not in ("none", "per_case"):
+        _fail("unsupported judge reference mode")
+    if reference_mode == "per_case":
+        if not isinstance(reference_text, str):
+            _fail("per-case judging requires a string reference")
+        _bounded_canonical_payload(
+            reference_text, JUDGE_REQUEST_MAX_BYTES, "per-case judge reference"
+        )
     references = [
         {"id": item["id"], "text": item["text"]} for item in prompt["references"]
     ]
 
     content_bytes = len(prompt["system"].encode("utf-8"))
 
-    def user_content(input_value: str, answer_value: str) -> str:
+    def user_content(
+        input_value: str, answer_value: str, *, include_reference: bool = False
+    ) -> str:
         nonlocal content_bytes
         encoded = _bounded_canonical_payload(
             {
@@ -130,6 +145,7 @@ def render_judge_request(
                 "instruction": prompt["template"],
                 "references": references,
                 "rubric": plan["rubric"]["text"],
+                **({"reference": reference_text} if include_reference else {}),
             },
             JUDGE_REQUEST_MAX_BYTES,
             "normalized judge request",
@@ -170,7 +186,14 @@ def render_judge_request(
             )
         )
     messages.append(
-        {"role": "user", "content": user_content(checked_input, checked_answer)}
+        {
+            "role": "user",
+            "content": user_content(
+                checked_input,
+                checked_answer,
+                include_reference=reference_mode == "per_case",
+            ),
+        }
     )
     return _bounded_canonical_payload(
         {
@@ -377,7 +400,7 @@ def validate_measurement_plan(value: JudgeMeasurementPlan) -> None:
         _fail("multiple attempts require transport_error as the sole retry condition")
     # Reject plans whose fixed prompt material already exceeds the request
     # envelope. Frozen case inputs and answers are checked when rendered.
-    render_judge_request(value, input_text="", answer_text="")
+    render_judge_request(value, input_text="", answer_text="", reference_text="")
 
 
 def _load_object(path: Path, *, maximum: int, label: str) -> dict[str, Any]:
@@ -1121,6 +1144,10 @@ def _frozen_run_records(
     planned = {item["case_id"] for item in plan["answer_bindings"]}
     if any(set(side_records) != planned for side_records in records.values()):
         _fail("frozen run membership must exactly match the judging plan")
+    from invarlock.evaluator_capture import verify_input_pair
+
+    for case_id in planned:
+        verify_input_pair(records["baseline"][case_id], records["subject"][case_id])
     return records
 
 
@@ -1147,7 +1174,10 @@ def _validate_frozen_answer_bindings(
             if binding[answer_key] != _text_sha256(record["output"]):
                 _fail(f"case {case_id!r} does not bind the frozen {side} answer")
             request = render_judge_request(
-                plan, input_text=record["input"], answer_text=record["output"]
+                plan,
+                input_text=record["input"],
+                answer_text=record["output"],
+                reference_text=record["expected"],
             )
             request_key = f"{side}_request_sha256"
             if binding[request_key] != _sha256(request):

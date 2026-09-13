@@ -193,7 +193,11 @@ def _check_options(plan: JudgeMeasurementPlan, options: CollectionOptions) -> st
 
 
 def render_request(
-    plan: JudgeMeasurementPlan, *, input_text: str, answer: str
+    plan: JudgeMeasurementPlan,
+    *,
+    input_text: str,
+    answer: str,
+    reference_text: object = None,
 ) -> dict[str, Any]:
     """Return the core normalized request with data isolated in JSON fields.
 
@@ -201,11 +205,17 @@ def render_request(
     JSON field separation does not establish prompt injection immunity.
     """
     measurement_plan_digest(plan)
-    return _render_request(plan, input_text=input_text, answer=answer)
+    return _render_request(
+        plan, input_text=input_text, answer=answer, reference_text=reference_text
+    )
 
 
 def _render_request(
-    plan: JudgeMeasurementPlan, *, input_text: str, answer: str
+    plan: JudgeMeasurementPlan,
+    *,
+    input_text: str,
+    answer: str,
+    reference_text: object = None,
 ) -> dict[str, Any]:
     """Render after the caller has validated the plan once."""
     _require(
@@ -218,7 +228,9 @@ def _render_request(
         and len(answer.encode("utf-8")) <= JUDGE_REQUEST_MAX_BYTES,
         "answer must be bounded text",
     )
-    content = render_judge_request(plan, input_text=input_text, answer_text=answer)
+    content = render_judge_request(
+        plan, input_text=input_text, answer_text=answer, reference_text=reference_text
+    )
     _require(
         len(content) <= JUDGE_REQUEST_MAX_BYTES,
         "rendered request exceeds byte allowance",
@@ -250,7 +262,12 @@ def bind_requests(
     for binding in cast(dict[str, Any], result)["answer_bindings"]:
         row = _object(
             frozen_inputs[binding["case_id"]],
-            {"input", "baseline", "subject"},
+            {"input", "baseline", "subject"}
+            | (
+                {"expected"}
+                if result["prompt"].get("reference_mode") == "per_case"
+                else set()
+            ),
             "frozen input",
         )
         for side in ("baseline", "subject"):
@@ -259,7 +276,12 @@ def bind_requests(
                 and _sha(row[side].encode()) == binding[f"{side}_answer_sha256"],
                 "frozen answer digest mismatch",
             )
-            request = _render_request(result, input_text=row["input"], answer=row[side])
+            request = _render_request(
+                result,
+                input_text=row["input"],
+                answer=row[side],
+                reference_text=row.get("expected"),
+            )
             binding[f"{side}_request_sha256"] = _sha(canonical_payload(request))
     measurement_plan_digest(result)
     return result
@@ -597,6 +619,7 @@ def _import_sample(
         plan,
         input_text=frozen_inputs[case_id]["input"],
         answer=frozen_inputs[case_id][side],
+        reference_text=frozen_inputs[case_id].get("expected"),
     )
     _require(
         _sha(canonical_payload(expected_request))
@@ -934,6 +957,7 @@ class _LiveCheckpoint:
                 self.plan,
                 input_text=self.frozen_inputs[trial["case_id"]]["input"],
                 answer=self.frozen_inputs[trial["case_id"]][trial["side"]],
+                reference_text=self.frozen_inputs[trial["case_id"]].get("expected"),
             )
         )
         _check_attempts(
@@ -1022,6 +1046,17 @@ def import_export(
             row = frozen_inputs.setdefault(case_id, {"input": record["input"]})
             _require(row["input"] == record["input"], "frozen paired inputs differ")
             row[side] = record["output"]
+            if plan["prompt"].get("reference_mode") == "per_case":
+                expected = record.get("expected")
+                _require(
+                    isinstance(expected, str),
+                    "per-case judging requires a string reference",
+                )
+                _require(
+                    "expected" not in row or row["expected"] == expected,
+                    "frozen paired references differ",
+                )
+                row["expected"] = expected
     bindings = {
         item["case_id"]: cast(dict[str, Any], item) for item in plan["answer_bindings"]
     }
@@ -1029,7 +1064,16 @@ def import_export(
         set(frozen_inputs) == set(bindings), "frozen input membership differs from plan"
     )
     for case_id, row in frozen_inputs.items():
-        _object(row, {"input", "baseline", "subject"}, "frozen input")
+        _object(
+            row,
+            {"input", "baseline", "subject"}
+            | (
+                {"expected"}
+                if plan["prompt"].get("reference_mode") == "per_case"
+                else set()
+            ),
+            "frozen input",
+        )
         for side in ("baseline", "subject"):
             _require(
                 isinstance(row[side], str)

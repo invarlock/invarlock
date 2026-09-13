@@ -6,7 +6,7 @@ qualify a collector, authorize a plan, or confer an evidence acceptance scope.
 
 from __future__ import annotations
 
-from typing import Literal, TypedDict
+from typing import Literal, NotRequired, TypedDict
 
 
 class JudgeRubric(TypedDict):
@@ -27,6 +27,7 @@ class JudgeReference(TypedDict):
 
 
 class JudgePrompt(TypedDict):
+    reference_mode: NotRequired[Literal["none", "per_case"]]
     system: str
     template: str
     demonstrations: list[JudgeDemonstration]

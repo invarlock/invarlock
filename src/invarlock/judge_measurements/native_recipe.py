@@ -150,6 +150,7 @@ def finalize_native_plan(
                 cast(JudgeMeasurementPlan, plan),
                 input_text=row["input"],
                 answer_text=row["output"],
+                reference_text=row["expected"],
             )
             binding[f"{side}_answer_sha256"] = hashlib.sha256(
                 row["output"].encode("utf-8")

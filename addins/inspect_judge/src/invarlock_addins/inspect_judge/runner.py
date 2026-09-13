@@ -543,7 +543,10 @@ def _project_event(
 
 
 def _frozen_rows(
-    baseline_run: dict[str, Any], subject_run: dict[str, Any]
+    baseline_run: dict[str, Any],
+    subject_run: dict[str, Any],
+    *,
+    per_case_reference: bool = False,
 ) -> dict[str, dict[str, str]]:
     rows: dict[str, dict[str, str]] = {}
     for side, run in (("baseline", baseline_run), ("subject", subject_run)):
@@ -559,6 +562,15 @@ def _frozen_rows(
                 raise InspectJudgeError("frozen runs require text inputs and outputs")
             row["input"] = record["input"]
             row[side] = record["output"]
+            if per_case_reference:
+                expected = record.get("expected")
+                if not isinstance(expected, str):
+                    raise InspectJudgeError(
+                        "per-case judging requires a string reference"
+                    )
+                if "expected" in row and row["expected"] != expected:
+                    raise InspectJudgeError("frozen paired references differ")
+                row["expected"] = expected
     return rows
 
 
@@ -655,7 +667,11 @@ async def _collect_pinned(
     lock_descriptor = _acquire_collection_lock(directory_fd)
     try:
         config = prepare_inspect_config(plan, options)
-        rows = _frozen_rows(baseline_run, subject_run)
+        rows = _frozen_rows(
+            baseline_run,
+            subject_run,
+            per_case_reference=plan["prompt"].get("reference_mode") == "per_case",
+        )
         pacer = _Pacer(60 / options.requests_per_minute)
         started = time.monotonic()
 
@@ -716,7 +732,10 @@ async def _collect_pinned(
                 check_directory()
                 row = rows[item["case_id"]]
                 request = _render_request(
-                    plan, input_text=row["input"], answer=row[item["side"]]
+                    plan,
+                    input_text=row["input"],
+                    answer=row[item["side"]],
+                    reference_text=row.get("expected"),
                 )
                 admission = {
                     "trial_id": item["trial_id"],
