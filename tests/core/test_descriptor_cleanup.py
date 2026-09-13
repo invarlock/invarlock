@@ -147,8 +147,13 @@ def test_parent_close_failure_releases_newly_owned_descriptors(
             patch.setattr(os, "open", track_open)
             patch.setattr(os, "dup", track_dup)
             patch.setattr(os, "close", fail_close)
-            with pytest.raises((OSError, ValueError)):
+            if operation == "html_output":
+                # Cleanup cannot turn a synchronized publication into failure.
                 operations[operation]()
+                assert (directory / "report.html").read_text() == "report"
+            else:
+                with pytest.raises((OSError, ValueError)):
+                    operations[operation]()
         assert failed
         # fdopen-owned handles are closed by their file object, bypassing os.close.
         for descriptor in tuple(active):

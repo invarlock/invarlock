@@ -25,7 +25,11 @@ from invarlock.evidence_pack_json import (
     StrictJsonError,
     parse_json_bytes,
 )
-from invarlock.record_reporting import _captured_context, _metric_views
+from invarlock.record_reporting import (
+    _captured_context,
+    _captured_identities,
+    _metric_views,
+)
 from invarlock.report_presentation import (
     ReportView,
 )
@@ -155,6 +159,7 @@ def _view(
             ("Manifest", _digest(canonical_json_bytes(manifest))),
             ("Comparison", str(manifest.get("comparison_id"))),
             ("Evidence signer", signer),
+            *_captured_identities(payloads),
         ),
         next_steps=(
             "Review the stored comparison and its policy.",

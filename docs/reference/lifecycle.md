@@ -117,8 +117,10 @@ schedule, policy, runtime digests, and paired records.
 Publication validates the complete candidate in a private staging directory,
 writes canonical payloads and checksums, signs the manifest, and atomically
 renames the directory into place. The destination and a sibling publication
-lock are no-clobber. A failed publication removes staging and leaves no partial
-evidence directory.
+lock are no-clobber. Only a completed staged tree is renamed into place. If a
+publication check observes a changed path, the operation fails; completed or
+competing output, or private staging, may remain for inspection. Cleanup does not
+recursively remove a replacement at an old staging name.
 
 Published permissions are read-only, and all later outputs remain external.
 See [Evidence artifacts](artifacts.md) for the exact inventory.
@@ -142,6 +144,13 @@ rejected and under which anchors.
 Structural failure that prevents the verification transaction from reaching a
 completed result may prevent receipt creation. Automation must check both exit
 status and expected receipt presence.
+
+Receipt and report files are written in private staging, synchronized, and
+published without replacing an existing destination. A synchronization or path
+check failure after publication can leave a completed or competing file even
+though the command failed. Inspect and authenticate any retained evidence, and
+choose a new destination for a retry; file presence alone does not establish
+successful verification.
 
 Verification snapshots the submitted pack before replay so subsequent reads
 refer to the same regular-file inventory. It validates syntax and signatures

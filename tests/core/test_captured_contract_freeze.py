@@ -33,6 +33,7 @@ from invarlock.core.evaluation_request import load_evaluation_request
 from invarlock.evaluation_comparison import comparison
 from invarlock.evaluation_record_contracts.contracts import EvaluationRecordsError
 from invarlock.evidence_pack_contract import canonical_json_bytes
+from invarlock.filesystem import atomic_file
 
 CORPUS_PATH = (
     Path(__file__).parents[1] / "fixtures/evaluation_contracts/captured-v2.json"
@@ -822,7 +823,7 @@ def test_frozen_freeze_cases_setup(tmp_path, monkeypatch, variant):
     monkeypatch.chdir(tmp_path)
     # Pin only the staging filename; keep real no-replace filesystem publication.
     token_hex = Mock(return_value="0" * 32)
-    monkeypatch.setattr(contracts.secrets, "token_hex", token_hex)
+    monkeypatch.setattr(atomic_file.secrets, "token_hex", token_hex)
     args = ["evaluate", "--freeze-cases", str(source), "--json"]
     if variant != "success":
         args.extend(["--case-set-output", str(output)])
@@ -834,7 +835,14 @@ def test_frozen_freeze_cases_setup(tmp_path, monkeypatch, variant):
         assert stdout.count(str(output)) == 1
         stdout = stdout.replace(str(output), "<root>/canonical.json")
         expected_files[output] = approved
-    assert stdout.encode() == _raw(f"setup-freeze-cases-{variant}.json") + b"\n"
+    expected = _raw(f"setup-freeze-cases-{variant}.json")
+    if variant == "failure":
+        # Preserve the frozen wire fields while improving the incidental OS
+        # diagnostic, which used to expose a private staging filename.
+        value = json.loads(expected)
+        value["errors"] = ["setup file already exists: canonical.json"]
+        expected = _canonical(value)
+    assert stdout.encode() == expected + b"\n"
     if variant == "success":
         token_hex.assert_not_called()
     else:

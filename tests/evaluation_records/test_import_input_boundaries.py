@@ -62,6 +62,26 @@ def test_snapshot_parser_enforces_exact_byte_limit(monkeypatch):
         adapters._parse_run_bytes(raw, **_OPTIONS)
 
 
+@pytest.mark.parametrize("adapter", ["jsonl", "lm-eval-samples", "promptfoo-jsonl"])
+def test_jsonl_record_limit_stops_before_parsing_extra_rows(monkeypatch, adapter):
+    calls = []
+    original = adapters.parse_json_bytes
+
+    def counted(*args, **kwargs):
+        calls.append(1)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(adapters, "MAX_RECORDS", 2)
+    monkeypatch.setattr(adapters, "parse_json_bytes", counted)
+    with pytest.raises(EvaluationRecordsError, match="exceeds the 2-record limit"):
+        adapters._parse_run_bytes(
+            b"{}\n\n{}\n{}\n",
+            adapter=adapter,
+            **{key: value for key, value in _OPTIONS.items() if key != "adapter"},
+        )
+    assert len(calls) == 2
+
+
 def test_physical_digest_rejects_replacement_between_stat_and_open(
     tmp_path, monkeypatch
 ):

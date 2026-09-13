@@ -68,7 +68,7 @@ def test_publish_maps_atomic_no_replace_failure(
     staging.mkdir()
     destination = tmp_path / "evidence"
 
-    def denied(_source: Path, _destination: Path) -> None:
+    def denied(_source: Path, _destination: Path, **_ownership) -> None:
         raise publication.AtomicDirectoryPublicationError("denied")
 
     monkeypatch.setattr(publication, "publish_directory_no_replace", denied)
@@ -83,7 +83,7 @@ def test_publish_maps_atomic_destination_race(
     staging.mkdir()
     destination = tmp_path / "evidence"
 
-    def raced(_source: Path, _destination: Path) -> None:
+    def raced(_source: Path, _destination: Path, **_ownership) -> None:
         raise publication.AtomicDirectoryExistsError("raced")
 
     monkeypatch.setattr(publication, "publish_directory_no_replace", raced)
@@ -234,13 +234,13 @@ def test_failed_publication_removes_private_staging_tree(
     monkeypatch.setattr(
         publication,
         "_publish_directory_no_clobber",
-        lambda *_args: (_ for _ in ()).throw(EvidencePackError("rejected")),
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(EvidencePackError("rejected")),
     )
 
     with pytest.raises(EvidencePackError, match="rejected"):
         publication.publish_comparison_evidence(destination, **arguments)
 
-    assert list(tmp_path.glob(".rejected.*.staging")) == []
+    assert list(tmp_path.glob(".rejected.staging-*")) == []
 
 
 def test_publication_enforces_observation_inventory_bound(

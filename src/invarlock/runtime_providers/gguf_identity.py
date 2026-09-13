@@ -193,7 +193,12 @@ def _open_regular_without_symlinks(path: str | os.PathLike[str]) -> _OpenArtifac
         if not stat.S_ISREG(before.st_mode):
             raise GGUFIdentityError("GGUF artifact must be a stable regular file")
 
-        file_flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | os.O_NOFOLLOW
+        file_flags = (
+            os.O_RDONLY
+            | getattr(os, "O_CLOEXEC", 0)
+            | os.O_NOFOLLOW
+            | getattr(os, "O_NONBLOCK", 0)
+        )
         try:
             descriptor = os.open(
                 absolute.name,

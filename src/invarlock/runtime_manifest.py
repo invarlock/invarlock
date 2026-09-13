@@ -75,19 +75,7 @@ def _execution_or_current(
     )
 
 
-def write_runtime_manifest(
-    report_path: str | os.PathLike[str],
-    *,
-    provider_files: RuntimeProviderManifestFiles,
-    config_path: str | os.PathLike[str] | None = None,
-    config_payload: Any | None = None,
-    execution: RuntimeManifestExecution | None = None,
-    generated_at_utc: str | None = None,
-) -> Path:
-    """Write the one closed manifest binding runtime and provider evidence."""
-
-    report = Path(report_path).resolve()
-    runtime_execution = _execution_or_current(execution)
+def _validate_manifest_execution(runtime_execution: RuntimeManifestExecution) -> str:
     if (
         runtime_execution.execution_mode != "container"
         or runtime_execution.container_execution is not True
@@ -102,6 +90,81 @@ def write_runtime_manifest(
     ):
         raise ValueError("runtime manifest requires a lowercase image digest")
 
+    return image_digest
+
+
+def _manifest_timestamp(generated_at_utc: str | None) -> str:
+    if generated_at_utc is None:
+        generated_at = datetime.now(UTC).isoformat()
+    else:
+        try:
+            parsed = datetime.fromisoformat(generated_at_utc.replace("Z", "+00:00"))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("generated_at_utc must be an ISO 8601 timestamp") from exc
+        offset = parsed.utcoffset()
+        if parsed.tzinfo is None or offset is None:
+            raise ValueError("generated_at_utc must include a UTC offset")
+        if offset.total_seconds() != 0:
+            raise ValueError("generated_at_utc must use UTC")
+        generated_at = generated_at_utc
+
+    return generated_at
+
+
+def _build_runtime_manifest_payload(
+    *,
+    report_name: str,
+    report_sha256: str,
+    config_reference: dict[str, Any],
+    provider_references: dict[str, Any],
+    runtime_execution: RuntimeManifestExecution,
+    generated_at_utc: str | None,
+) -> dict[str, Any]:
+    """Build a manifest from independently held references without reading paths."""
+    image_digest = _validate_manifest_execution(runtime_execution)
+    generated_at = _manifest_timestamp(generated_at_utc)
+
+    manifest: dict[str, Any] = {
+        "manifest_version": RUNTIME_MANIFEST_VERSION,
+        "generated_at_utc": generated_at,
+        "verifier_contract_version": RUNTIME_VERIFIER_CONTRACT_VERSION,
+        "report": {
+            "path": report_name,
+            "filename": report_name,
+            "sha256": report_sha256,
+        },
+        "config": config_reference,
+        "execution_mode": "container",
+        "outer_container": {
+            "image_ref": _runtime_provenance_image_ref(
+                runtime_execution.image_ref,
+                image_digest,
+            ),
+            "image_digest": image_digest,
+            "container_execution": True,
+            "allow_network": runtime_execution.allow_network,
+            "allow_remote_code": runtime_execution.allow_remote_code,
+            "allow_third_party_plugins": runtime_execution.allow_third_party_plugins,
+        },
+        "runtime_provider": provider_references,
+    }
+    return manifest
+
+
+def write_runtime_manifest(
+    report_path: str | os.PathLike[str],
+    *,
+    provider_files: RuntimeProviderManifestFiles,
+    config_path: str | os.PathLike[str] | None = None,
+    config_payload: Any | None = None,
+    execution: RuntimeManifestExecution | None = None,
+    generated_at_utc: str | None = None,
+) -> Path:
+    """Write the one closed manifest binding runtime and provider evidence."""
+
+    report = Path(report_path).resolve()
+    runtime_execution = _execution_or_current(execution)
+    _validate_manifest_execution(runtime_execution)
     provider_paths = (
         Path(provider_files.receipt).resolve(),
         Path(provider_files.scoring_observation).resolve(),
@@ -125,47 +188,16 @@ def write_runtime_manifest(
     }:
         raise ValueError("file config must be distinct from the report and manifest")
 
-    if generated_at_utc is None:
-        generated_at = datetime.now(UTC).isoformat()
-    else:
-        try:
-            parsed = datetime.fromisoformat(generated_at_utc.replace("Z", "+00:00"))
-        except (TypeError, ValueError) as exc:
-            raise ValueError("generated_at_utc must be an ISO 8601 timestamp") from exc
-        offset = parsed.utcoffset()
-        if parsed.tzinfo is None or offset is None:
-            raise ValueError("generated_at_utc must include a UTC offset")
-        if offset.total_seconds() != 0:
-            raise ValueError("generated_at_utc must use UTC")
-        generated_at = generated_at_utc
-
-    manifest: dict[str, Any] = {
-        "manifest_version": RUNTIME_MANIFEST_VERSION,
-        "generated_at_utc": generated_at,
-        "verifier_contract_version": RUNTIME_VERIFIER_CONTRACT_VERSION,
-        "report": {
-            "path": report.name,
-            "filename": report.name,
-            "sha256": _sha256_path(report),
-        },
-        "config": _config_reference(
+    generated_at = _manifest_timestamp(generated_at_utc)
+    manifest = _build_runtime_manifest_payload(
+        report_name=report.name,
+        report_sha256=_sha256_path(report),
+        config_reference=_config_reference(
             report_directory=report.parent,
             config_path=config_path,
             config_payload=config_payload,
         ),
-        "execution_mode": "container",
-        "outer_container": {
-            "image_ref": _runtime_provenance_image_ref(
-                runtime_execution.image_ref,
-                image_digest,
-            ),
-            "image_digest": image_digest,
-            "container_execution": True,
-            "allow_network": runtime_execution.allow_network,
-            "allow_remote_code": runtime_execution.allow_remote_code,
-            "allow_third_party_plugins": runtime_execution.allow_third_party_plugins,
-        },
-        "runtime_provider": {
+        provider_references={
             "receipt": _sibling_reference(
                 provider_files.receipt,
                 report_directory=report.parent,
@@ -182,7 +214,9 @@ def write_runtime_manifest(
                 label="model artifact identity",
             ),
         },
-    }
+        runtime_execution=runtime_execution,
+        generated_at_utc=generated_at,
+    )
     try:
         with manifest_path.open("x", encoding="utf-8") as output:
             json.dump(manifest, output, indent=2, sort_keys=True, allow_nan=False)

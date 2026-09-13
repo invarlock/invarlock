@@ -250,6 +250,7 @@ def test_every_example_request_input_is_present_in_committed_head(
 
 def test_only_bounded_fixture_receipts_are_unignored() -> None:
     receipt_exceptions = {
+        "examples/captured-results/references/*/verification.receipt.json",
         "examples/evaluator-qualification/signed-transactions/*/evidence/providers/*/runtime-provider.receipt.json",
         "examples/evaluator-qualification/signed-transactions/*/verification.receipt.json",
         "examples/import/baseline/runtime-provider.receipt.json",

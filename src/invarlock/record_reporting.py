@@ -19,6 +19,7 @@ from invarlock.captured_contracts import (
 )
 from invarlock.evaluation_record_contracts.contracts import (
     EvaluationRecordsError,
+    digest,
     validate,
 )
 from invarlock.evidence_pack_contract import canonical_json_bytes
@@ -28,6 +29,7 @@ from invarlock.report_presentation import (
     MetricView,
     ReportView,
     number,
+    xml_text,
 )
 from invarlock.report_presentation import (
     render_html as render_report_html,
@@ -231,10 +233,21 @@ def _captured_context(
             "Recorded model ID: " + fields["model_id"][1]
             if fields["model_id"][0] is not None
             else "Recorded model key: " + fields["model_key"][1]
+            if fields["model_key"][0] is not None
+            else "Recorded run: " + _short_context(str(run["run_id"]), 128)
         )
         subjects.append((label, identity))
+        source = run.get("source")
+        evaluator = (
+            _short_context(f"{source['name']} {source['version']}")
+            if isinstance(source, dict)
+            and isinstance(source.get("name"), str)
+            and isinstance(source.get("version"), str)
+            else "Unavailable in recorded run"
+        )
         context.extend(
             (
+                (label + " evaluator", evaluator),
                 (label + " model revision", fields["model_revision"][1]),
                 (label + " capture role", fields["role"][1]),
                 (
@@ -261,6 +274,26 @@ def _captured_context(
         model = "Model-key comparison is unavailable because recorded values are missing or mixed."
     prompt, details = _prompt_change(*messages)
     return tuple(subjects), tuple(context), (model, prompt), details
+
+
+def _captured_identities(
+    inputs: dict[str, dict[str, Any]],
+) -> tuple[tuple[str, str], ...]:
+    """Expose mandatory run identities with the same labels in every report path."""
+    identities: list[tuple[str, str]] = []
+    for role in ("baseline", "subject"):
+        run = inputs[role]
+        label = role.title()
+        source = run["source"]
+        identities.extend(
+            (
+                (label + " run", run["run_id"]),
+                (label + " run digest", digest(run)),
+                (label + " attributed artifact", run["artifact_digest"]),
+                (label + " evaluator", f"{source['name']} {source['version']}"),
+            )
+        )
+    return tuple(identities)
 
 
 def _metric_views(
@@ -486,14 +519,7 @@ def _view(comparison: dict[str, Any], evidence: CapturedSnapshot | None) -> Repo
                 "report comparison differs from supplied evidence"
             )
         policy_metrics = {m["name"]: m for m in inputs["policy"]["metrics"]}
-        for role in ("baseline", "subject"):
-            run = inputs[role]
-            identity.extend(
-                (
-                    (role.title() + " run", run["run_id"]),
-                    (role.title() + " artifact", run["artifact_digest"]),
-                )
-            )
+        identity.extend(_captured_identities(inputs))
         signing = (
             "Unsigned local evidence. No signature is available for independent authentication."
             if manifest["authentication"] == "unsigned_local"
@@ -624,12 +650,15 @@ def render_junit(comparison: dict[str, Any]) -> bytes:
     )
     for metric in metrics:
         case = SubElement(
-            root, "testcase", name=metric["name"], classname=metric["slice"]
+            root,
+            "testcase",
+            name=xml_text(metric["name"]),
+            classname=xml_text(metric["slice"]),
         )
         if metric["decision"] != "pass":
             SubElement(
                 case,
                 "failure" if metric["decision"] == "regression" else "error",
-                message="; ".join(metric["reasons"]),
+                message=xml_text("; ".join(metric["reasons"])),
             )
     return cast(bytes, tostring(root, encoding="utf-8", xml_declaration=True))

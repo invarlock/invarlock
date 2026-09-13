@@ -328,7 +328,12 @@ def _open_file_by_components(
             previous_descriptor = directory_descriptor
             directory_descriptor = next_descriptor
             os.close(previous_descriptor)
-        file_flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | os.O_NOFOLLOW
+        file_flags = (
+            os.O_RDONLY
+            | getattr(os, "O_CLOEXEC", 0)
+            | os.O_NOFOLLOW
+            | getattr(os, "O_NONBLOCK", 0)
+        )
         try:
             file_descriptor = os.open(
                 components[-1],

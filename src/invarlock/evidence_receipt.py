@@ -5,7 +5,6 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
-import os
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -26,6 +25,7 @@ from invarlock.evidence_pack_json import (
     read_regular_file_bytes,
 )
 from invarlock.evidence_pack_support import EvidencePackResult
+from invarlock.filesystem.atomic_file import write_file_no_replace
 
 SIGNED_RECEIPT_FORMAT_V1 = "invarlock/evidence-verification-receipt-v1"
 SIGNED_RECEIPT_FORMAT_V2 = "invarlock/evidence-verification-receipt-v2"
@@ -140,22 +140,13 @@ def _outside_pack(pack_dir: Path, candidate: Path) -> bool:
 
 
 def _write_no_clobber(path: Path, payload: bytes) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    created = False
     try:
-        with path.open("xb") as handle:
-            created = True
-            handle.write(payload)
-            handle.flush()
-            os.fsync(handle.fileno())
-        path.chmod(0o444)
+        write_file_no_replace(path, payload, mode=0o444)
     except FileExistsError as exc:
         raise EvidenceReceiptError(
             f"receipt destination already exists: {path.name}"
         ) from exc
     except OSError as exc:
-        if created:
-            path.unlink(missing_ok=True)
         raise EvidenceReceiptError("could not write signed receipt") from exc
 
 
