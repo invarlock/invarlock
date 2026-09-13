@@ -284,9 +284,33 @@ def _interval(view: IntervalView) -> str:
     padding = (last - first) * 0.12 or max(abs(first) * 0.1, 0.01)
     low, high = first - padding, last + padding
 
-    def x(value: float) -> float:
-        return 30 + (value / scale - low) / (high - low) * 580
+    def project(normalized: float) -> float:
+        return 30 + (normalized - low) / (high - low) * 580
 
+    def x(value: float) -> float:
+        return project(value / scale)
+
+    ticks = [first] if first == last else [first, first / 2 + last / 2, last]
+    desired_step = (last - first) * (scale / 4)
+    if desired_step > 0:
+        magnitude = 10.0 ** math.floor(math.log10(desired_step))
+        if magnitude > 0:
+            factor = desired_step / magnitude
+            step = (
+                next(value for value in (1, 2, 5, 10) if value >= factor)
+                * magnitude
+                / scale
+            )
+            first_tick, last_tick = math.floor(low / step), math.ceil(high / step)
+            axis_low, axis_high = first_tick * step, last_tick * step
+            if (
+                math.isfinite(axis_low * scale)
+                and math.isfinite(axis_high * scale)
+                and axis_low < axis_high
+                and axis_low <= first <= last <= axis_high
+            ):
+                low, high = axis_low, axis_high
+                ticks = [index * step for index in range(first_tick, last_tick + 1)]
     description = f"{view.label}: {number(view.lower)} to {number(view.upper)} {view.unit}. Estimate {number(view.estimate)} {view.unit}."
     graphics = []
     legend = ""
@@ -315,25 +339,10 @@ def _interval(view: IntervalView) -> str:
             f'<line class="neutral" x1="{position:.2f}" x2="{position:.2f}" y1="18" y2="60"/>'
         )
         neutral_legend = f"No change: {number(view.neutral)} {view.unit}."
-    ticks = [first] if first == last else [first, first / 2 + last / 2, last]
-    desired_step = (last - first) * (scale / 4)
-    if desired_step > 0:
-        magnitude = 10.0 ** math.floor(math.log10(desired_step))
-        if magnitude > 0:
-            factor = desired_step / magnitude
-            step = (
-                next(value for value in (1, 2, 5, 10) if value >= factor)
-                * magnitude
-                / scale
-            )
-            first_tick, last_tick = math.ceil(first / step), math.floor(last / step)
-            regular = [index * step for index in range(first_tick, last_tick + 1)]
-            if len(regular) >= 2:
-                ticks = regular
     labels = []
     for tick in ticks:
         value = tick * scale
-        position = x(value)
+        position = project(tick)
         graphics.append(
             f'<line class="tick" x1="{position:.2f}" x2="{position:.2f}" y1="60" y2="67"/>'
         )
@@ -448,14 +457,18 @@ h1,h2,h3,h4,p{margin-top:0}h1{font-size:36px;line-height:1.15;letter-spacing:-.0
 .value{padding:12px;border-right:1px solid var(--line);min-width:0}.value:last-child{border:0}.value dt{font-size:13px;color:var(--muted)}.value dd{margin:4px 0 0;font-size:26px;font-weight:650;line-height:1.2;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .value small{display:block;margin-top:5px;font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--muted);letter-spacing:0}.interval{margin:22px 0}.interval svg{display:block;width:100%;height:auto}.interval figcaption{overflow-wrap:anywhere;font-size:13px;color:var(--muted);margin-top:8px}.axis{stroke:var(--line);stroke-width:2}.range{stroke:#277b91;stroke-width:7;stroke-linecap:round}.estimate{fill:var(--paper);stroke:#277b91;stroke-width:3}.threshold{stroke:var(--red);stroke-width:2}.neutral{stroke:#78909c;stroke-width:1.5;stroke-dasharray:3 4}.allowed{fill:#e5f3ed}.tick{stroke:#78909c;stroke-width:1.5}.legend{display:block;margin-top:4px}.chart-annotations{height:48px;position:relative;font-size:12px;font-variant-numeric:tabular-nums}.chart-label{position:absolute;max-width:72%;overflow-wrap:anywhere}.chart-label.middle{transform:translateX(-50%)}.chart-label.end{transform:translateX(-100%)}.limit-label{top:0;color:var(--red)}.bound-label{top:25px;font-weight:650}.chart-key{display:inline-block;margin-right:18px}.chart-key i,.legend i{display:inline-block;margin-right:7px;vertical-align:middle}.estimate-key{width:10px;height:10px;border:2px solid #277b91;border-radius:50%}.interval-key{width:16px;border-top:3px solid #277b91}.neutral-key{width:16px;border-top:2px dashed #78909c}.threshold-key{height:12px;border-left:2px solid var(--red)}.axis-labels{position:relative;height:22px;font-size:13px;font-variant-numeric:tabular-nums;color:var(--muted)}.axis-labels span{position:absolute;transform:translateX(-50%);white-space:nowrap}
 .scroll{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:14px;margin-top:16px}caption{text-align:left;font-weight:650;padding:0 0 8px}th{text-align:left;color:var(--muted);font-size:13px;font-weight:650}th,td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}th:first-child,td:first-child{padding-left:0}td:last-child,th:last-child{padding-right:0}tbody tr:last-child td,tbody tr:last-child th{border-bottom:0}
-.checks-table td{white-space:nowrap}.checks-table th[scope="row"]{width:48%}.check-detail{display:block;font-size:13px;font-weight:400;margin-top:4px;color:var(--muted)}.check-fail{color:var(--red);font-weight:650}.check-pass{color:var(--teal)}.check-unknown{color:var(--amber)}.notes{font-size:13px;color:var(--muted);padding-left:20px;margin-bottom:0}.notes li+li{margin-top:6px}
+.check-label{display:none}.context-heading{font-size:14px;margin:14px 0 8px}.checks-table td{white-space:nowrap}.checks-table th[scope="row"]{width:48%}.check-detail{display:block;font-size:13px;font-weight:400;margin-top:4px;color:var(--muted)}.check-fail{color:var(--red);font-weight:650}.check-pass{color:var(--teal)}.check-unknown{color:var(--amber)}.notes{font-size:13px;color:var(--muted);padding-left:20px;margin-bottom:0}.notes li+li{margin-top:6px}
 .columns{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:24px}.panel dl{margin:0}.panel dt{font-size:13px;font-weight:650;margin-top:10px}.panel dt:first-child{margin-top:0}.panel dd{margin:3px 0 0;color:var(--muted);font-size:14px;overflow-wrap:anywhere}.panel ol,.panel ul{padding-left:20px;font-size:14px;margin:0}.panel li+li{margin-top:8px}
 .limits{color:var(--muted);font-size:14px;margin:24px 0}.limits h2{font-size:18px;margin-bottom:8px}.limits li+li{margin-top:6px}
 details{border:1px solid var(--line);border-radius:8px;background:var(--paper);margin:10px 0}summary{overflow-wrap:anywhere;padding:14px 18px;font-size:14px;font-weight:650;cursor:pointer}details .detail-content{padding:0 18px 18px}pre{font:13px/1.6 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere;background:#f5f8fa;border-radius:6px;padding:14px;max-height:480px;overflow:auto}code{overflow-wrap:anywhere}.footer{color:var(--muted);font-size:13px;margin-top:26px;border-top:1px solid var(--line);padding-top:16px}
 a:focus-visible,summary:focus-visible,[tabindex]:focus-visible{outline:3px solid #277b91;outline-offset:4px}a,[tabindex]{scroll-margin-top:20px}.metric-group:target,.metric:target{border-color:#277b91}
 .metric-group>.section-heading h3{font-size:22px;margin:0}.metric-group>.section-heading>a{font-size:13px}.results-overview{margin:18px 0}.results-overview .section-heading p{max-width:48ch}.overview-scroll{border:1px solid var(--line);border-radius:8px;background:var(--paper);padding:4px 16px}.overview-table{margin:12px 0;min-width:840px}.overview-table a,.overview-table .scope{display:block}.overview-table .badge{white-space:normal}.overview-table tbody th{font-size:14px}.overview-table td{font-variant-numeric:tabular-nums}.overview-checks{margin:0;padding-left:16px}.overview-checks li+li{margin-top:4px}
 .metric-controls{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:18px 0}.metric-navigation{display:flex;flex-wrap:wrap;gap:8px}.metric-navigation a{display:block;padding:9px 14px;border:1px solid var(--line);border-radius:8px;background:var(--paper);font-weight:650;text-decoration:none}.metric-navigation a:hover{border-color:#277b91;background:#eaf3f7}.metric-navigation span{display:block;color:var(--muted);font-size:13px;font-weight:400}.metric-navigation [role="tab"][aria-selected="true"]{border-color:#145d7b;background:#e4f1f7;box-shadow:inset 0 -3px #145d7b}.metric-display-toggle{font:inherit;font-size:13px;border:1px solid var(--line);border-radius:7px;background:var(--paper);color:#145d7b;padding:9px 12px;cursor:pointer}.metric-display-toggle:focus-visible{outline:3px solid #277b91;outline-offset:4px}
-@media(max-width:650px){main{padding:20px 14px 40px}.hero{grid-template-columns:1fr;gap:22px;padding:22px 0}.assurance dl>div{grid-template-columns:1fr 1.8fr}h1{font-size:29px}.metric,.panel{padding:18px}.values{grid-template-columns:repeat(2,minmax(0,1fr))}.value:nth-child(2){border-right:0}.value:nth-child(-n+2){border-bottom:1px solid var(--line)}.value dd{font-size:20px}.columns,.subjects{grid-template-columns:1fr}.family{max-width:160px}.section-heading{display:block}.section-heading p{margin-top:5px}.metric-heading{gap:8px;flex-direction:column}th,td{padding:10px 8px}.context-list{grid-template-columns:1fr}.context-list dd{margin-bottom:6px}.comparison-table{font-size:13px}.comparison-table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}.comparison-table,.comparison-table tbody,.comparison-table tr,.comparison-table th,.comparison-table td{display:block;width:100%}.comparison-table th:first-child{width:100%}.comparison-table tbody tr{padding:10px 12px;border-bottom:1px solid var(--line)}.comparison-table tbody th,.comparison-table tbody td{padding:5px 0;border:0}.comparison-table .different-label{display:inline;margin-left:8px}.side-label{display:block;font-size:11px;color:var(--muted);font-weight:500;margin-bottom:2px}.checks-table{min-width:540px}.interval{margin-inline:0}}
+@media(max-width:650px){main{padding:20px 14px 40px}.hero{grid-template-columns:1fr;gap:22px;padding:22px 0}.assurance dl>div{grid-template-columns:1fr 1.8fr}h1{font-size:29px}.metric,.panel{padding:18px}.values{grid-template-columns:repeat(2,minmax(0,1fr))}.value:nth-child(2){border-right:0}.value:nth-child(-n+2){border-bottom:1px solid var(--line)}.value dd{font-size:20px}.columns,.subjects{grid-template-columns:1fr}.family{max-width:160px}.section-heading{display:block}.section-heading p{margin-top:5px}.metric-heading{gap:8px;flex-direction:column}th,td{padding:10px 8px}.context-list{grid-template-columns:1fr}.context-list dd{margin-bottom:6px}.comparison-table{font-size:13px}.comparison-table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}.comparison-table,.comparison-table tbody,.comparison-table tr,.comparison-table th,.comparison-table td{display:block;width:100%}.comparison-table th:first-child{width:100%}.comparison-table tbody tr{padding:10px 12px;border-bottom:1px solid var(--line)}.comparison-table tbody th,.comparison-table tbody td{padding:5px 0;border:0}.comparison-table .different-label{display:inline;margin-left:8px}.side-label{display:block;font-size:11px;color:var(--muted);font-weight:500;margin-bottom:2px}.checks-table{min-width:0}.checks-table caption{display:block;width:100%}.checks-table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}.checks-table,.checks-table tbody,.checks-table tbody tr,.checks-table tbody th,.checks-table tbody td{display:block;width:100%}.checks-table th[scope="row"]{width:100%}.checks-table tbody tr{padding:12px 0;border-bottom:1px solid var(--line)}.checks-table tbody th,.checks-table tbody td{border:0;padding:5px 0}.checks-table tbody td{display:grid;grid-template-columns:90px minmax(0,1fr);white-space:normal;overflow-wrap:anywhere}.check-label{display:block;font-weight:400;color:var(--muted)}.interval{margin-inline:0}}
+@media screen and (prefers-color-scheme:dark){
+:root{color-scheme:dark;--ink:#e2e9ed;--muted:#aebfc9;--line:#394951;--paper:#192229;--canvas:#11191e;--teal:#6fd7b8;--red:#ff99aa;--amber:#eac27a}
+a{color:#99d4f1}.pill{background:#25333d}.pass .badge,.badge.pass{background:#183c33}.fail .badge,.badge.fail{background:#41232c}.insufficient .badge,.badge.insufficient{background:#3b301b}.comparison-table .different{background:#24343e}.different-label{color:#a9d4e7}.range,.estimate{stroke:#84c9e0}.allowed{fill:#24483c}.neutral,.tick{stroke:#a0b7c3}.estimate-key{border-color:#84c9e0}.interval-key{border-color:#84c9e0}.neutral-key{border-color:#a0b7c3}pre{background:#11191e}.metric-navigation a:hover{background:#243844}.metric-navigation [role="tab"][aria-selected="true"]{background:#243c49;border-color:#99d4f1;box-shadow:inset 0 -3px #99d4f1}.metric-display-toggle{color:#99d4f1}.metric-group:target,.metric:target{border-color:#99d4f1}a:focus-visible,summary:focus-visible,[tabindex]:focus-visible,.metric-display-toggle:focus-visible{outline-color:#99d4f1}
+}
 @media print{body{background:white;font-size:10pt}main{max-width:none;padding:0}.hero{margin-top:16px;padding:16px 0;grid-template-columns:1fr 1fr;gap:20px}h1{font-size:25pt}.metric,.panel{padding:15px}.columns{display:block}.panel{margin:12px 0}details{break-inside:avoid}details>.detail-content{display:block!important}pre{max-height:none}.footer{font-size:9pt}.scroll{overflow:visible}a{color:inherit}.metric-group[hidden]{display:block!important}.metric-navigation,.metric-display-toggle,.metric-group>.section-heading>a{display:none}.overview-table,.checks-table{min-width:0;font-size:8pt;table-layout:fixed}.overview-table th{font-size:8pt}.overview-scroll{padding:0;border:0}.overview-table th,.overview-table td{padding:6px 4px}.overview-table .badge{font-size:8pt}.metric-group>.section-heading{break-after:avoid}.checks-table td{white-space:normal}}
 """
 
@@ -497,11 +510,19 @@ def _results_overview(metrics: tuple[MetricView, ...]) -> str:
     return "".join(parts)
 
 
-def _comparison_context(view: ReportView) -> str:
+@dataclass(frozen=True)
+class _ComparisonContext:
+    rows: tuple[tuple[str, str, str, bool], ...]
+    matching: tuple[tuple[str, str], ...]
+    additional: tuple[tuple[str, str], ...]
+
+
+def _comparison_view(view: ReportView) -> _ComparisonContext:
     """Align unambiguous sides and compare displayed text, not hidden full values."""
     side_names = {"Baseline": "Baseline", "Subject": "Subject", "Candidate": "Subject"}
     grouped: dict[str, list[tuple[str, str, str]]] = {}
     shared = []
+    matching = []
     for label, value in view.context:
         side, separator, name = label.partition(" ")
         if separator and name and side in side_names:
@@ -559,18 +580,29 @@ def _comparison_context(view: ReportView) -> str:
                 else "Subject identity",
                 subjects["Baseline"],
                 subjects["Subject"],
-                False,
+                subjects["Baseline"] != subjects["Subject"],
             )
         )
     else:
         shared.extend(view.subjects)
     for name, sides in paired.items():
         if sides["Baseline"] == sides["Subject"]:
-            shared.append(
-                (name.capitalize() + " (same displayed text)", sides["Baseline"])
-            )
+            matching.append((name[:1].upper() + name[1:], sides["Baseline"]))
         else:
-            rows.append((name.capitalize(), sides["Baseline"], sides["Subject"], True))
+            rows.append(
+                (name[:1].upper() + name[1:], sides["Baseline"], sides["Subject"], True)
+            )
+    return _ComparisonContext(tuple(rows), tuple(matching), tuple(shared))
+
+
+_MATCHING_CONTEXT_NOTE = (
+    "Matching previews do not establish equality of the complete retained fields."
+)
+
+
+def _comparison_context(view: ReportView) -> str:
+    context = _comparison_view(view)
+    rows = context.rows
     parts = [
         '<section class="panel" aria-labelledby="comparison-context"><h2 id="comparison-context">What was compared</h2>'
     ]
@@ -587,17 +619,26 @@ def _comparison_context(view: ReportView) -> str:
                 f'<tr{style}><th scope="row">{escape(label)}{annotation}</th><td data-side="Baseline"><span class="side-label" aria-hidden="true">Baseline</span>{escape(baseline)}</td><td data-side="Subject"><span class="side-label" aria-hidden="true">Subject</span>{escape(subject)}</td></tr>'
             )
         parts.append("</tbody></table>")
-    if shared:
+    if context.matching or context.additional:
         if rows:
             parts.append(
-                f'<details class="shared-context"><summary>Additional recorded context ({len(shared)})</summary><div class="detail-content">'
+                f'<details class="shared-context"><summary>Additional recorded context ({len(context.matching) + len(context.additional)})</summary><div class="detail-content">'
             )
-        parts.append('<dl class="context-list">')
-        parts.extend(
-            f"<dt>{escape(label)}</dt><dd>{escape(value)}</dd>"
-            for label, value in shared
-        )
-        parts.append("</dl>")
+        for label, entries in (
+            ("Matching displayed fields", context.matching),
+            ("Additional fields", context.additional),
+        ):
+            if not entries:
+                continue
+            parts.append(f'<h3 class="context-heading">{label}</h3>')
+            if label == "Matching displayed fields":
+                parts.append('<p class="scope">' + _MATCHING_CONTEXT_NOTE + "</p>")
+            parts.append('<dl class="context-list">')
+            parts.extend(
+                f"<dt>{escape(name)}</dt><dd>{escape(value)}</dd>"
+                for name, value in entries
+            )
+            parts.append("</dl>")
         if rows:
             parts.append("</div></details>")
     if view.changes:
@@ -709,7 +750,13 @@ def render_html(view: ReportView) -> str:
     support.append("</ol></section>")
     if multiple_results:
         parts.append(
-            '<details class="overview-disclosure"><summary>Compare all metric and scope results</summary><div class="detail-content">'
+            '<details class="overview-disclosure"'
+            + (
+                " open"
+                if any(metric.decision != "pass" for metric in view.metrics)
+                else ""
+            )
+            + '><summary>Compare all metric and scope results</summary><div class="detail-content">'
             + _results_overview(view.metrics)
             + "</div></details>"
         )
@@ -775,7 +822,7 @@ def render_html(view: ReportView) -> str:
                     else ""
                 )
                 parts.append(
-                    f'<tr><th scope="row">{e(check.name)}{detail}</th><td>{e(check.observed)}</td><td>{e(check.required)}</td><td class="check-{tone}">{_status(check)}</td></tr>'
+                    f'<tr><th scope="row">{e(check.name)}{detail}</th><td data-label="Observed"><span class="check-label" aria-hidden="true">Observed</span>{e(check.observed)}</td><td data-label="Required"><span class="check-label" aria-hidden="true">Required</span>{e(check.required)}</td><td data-label="Result" class="check-{tone}"><span class="check-label" aria-hidden="true">Result</span>{_status(check)}</td></tr>'
                 )
             parts.append("</tbody></table></div>")
             if metric.notes:
@@ -851,9 +898,27 @@ def render_markdown(view: ReportView, *, include_details: bool = False) -> str:
     ]
     if view.subjects or view.context or view.changes:
         lines += ["## What was compared", ""]
-        lines.extend(
-            f"- **{clean(k)}:** {clean(v)}" for k, v in (*view.subjects, *view.context)
-        )
+        context = _comparison_view(view)
+        # Paired lists retain full identifiers in narrow Markdown terminals;
+        # table cells can silently ellipsize long model and artifact names.
+        for label, baseline, subject, changed in context.rows:
+            difference = "Differs" if changed else "Same displayed text"
+            lines += [
+                "",
+                f"### {clean(label)} — {difference}",
+                "",
+                f"- **Baseline:** {clean(baseline)}",
+                f"- **Subject:** {clean(subject)}",
+            ]
+        for heading, entries in (
+            ("Matching displayed fields", context.matching),
+            ("Additional fields", context.additional),
+        ):
+            if entries:
+                lines += ["", "### " + heading, ""]
+                if heading == "Matching displayed fields":
+                    lines += [_MATCHING_CONTEXT_NOTE, ""]
+                lines.extend(f"- **{clean(k)}:** {clean(v)}" for k, v in entries)
         if view.changes:
             lines += ["", "### Recorded changes", ""]
             lines.extend(f"- {clean(change)}" for change in view.changes)
@@ -866,7 +931,7 @@ def render_markdown(view: ReportView, *, include_details: bool = False) -> str:
             "",
             f"**{decision_label(metric.decision)}**. {clean(metric.explanation)}",
             "",
-            "| Baseline | Candidate | Change | Observed pairs |",
+            f"| Baseline | Subject | Change | {clean(metric.count_label)} |",
             "| --- | --- | --- | --- |",
             "| "
             + " | ".join(

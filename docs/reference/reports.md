@@ -522,11 +522,16 @@ McNemar probability; those diagnostics do not replace the configured decision.
 
 ### Understand the comparison
 
-HTML and Markdown reports put **What was compared** before the results. The
+HTML, Markdown and terminal reports share the same comparison grouping and
+put **What was compared** before the results. HTML aligns sides in a table;
+Markdown and terminal output use paired fields so long identifiers remain
+readable at narrow widths. The
 section aligns baseline and subject fields side by side, highlights differences,
 and groups matching displayed fields with the recorded workflow, task, dataset
 and coverage information under **Additional recorded context**. Matching
-previews do not establish equality of the complete retained fields. On small
+previews do not establish equality of the complete retained fields. They appear
+under **Matching displayed fields**, separately from additional context and
+ambiguous entries; acronyms and original ambiguous labels are preserved. On small
 screens, each comparison field stacks its explicitly labelled baseline and
 subject values while retaining the table headers for assistive technology. The recorded changes explain
 what the evidence establishes about the difference between the two sides.
@@ -557,7 +562,8 @@ Reports with multiple results include an expandable overview of every metric
 and scope. It shows the baseline, subject, change, observed pair count, decision
 and any failed or unavailable checks. The overall verdict and result counts
 remain visible when choosing a metric; selecting one result does not change
-the overall decision.
+the overall decision. The overview opens automatically if any result fails or
+needs more evidence, so adverse checks are visible before choosing a tab.
 
 Metric tabs group related scopes together. For example, quality and latency
 measured overall and on an exceptions slice produce four results under two
@@ -607,8 +613,10 @@ counts are not independent samples. Advanced configuration and missing-ID lists
 use labeled previews while the original values remain in bound evidence.
 Configuration previews use indented text with explicit limits and truncation
 markers; the renderer does not reinterpret them as executable content or
-complete configuration. Small screens keep requirement tables in a local
-scroll region so ordinary words and numerical values remain readable.
+complete configuration. Small screens stack each requirement with labelled Observed, Required and
+Result values. All checks remain visible without horizontal scrolling. HTML
+follows the system light or dark appearance; printed reports use the light
+color scheme.
 
 Use `invarlock verify` with recipient-owned policy and complete-run digests for
 independent authentication and replay. Successful captured report

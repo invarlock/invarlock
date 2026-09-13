@@ -189,7 +189,10 @@ def test_legacy_context_is_unavailable_without_inferred_model_or_execution(tmp_p
     assert "fixture://dataset" in rendered
     html = output.read_text()
     assert 'class="comparison-table"' in html
-    assert '<th scope="row">Artifact</th>' in html
+    assert (
+        '<th scope="row">Artifact<span class="different-label">Differs</span></th>'
+        in html
+    )
     assert "<dt>Baseline artifact</dt>" not in html
     assert "<dt>Candidate artifact</dt>" not in html
 

@@ -48,7 +48,7 @@ def test_comparison_aligns_differences_and_keeps_shared_facts_once():
     assert html.count('class="different"') == 2
     assert html.index("Observed model") < html.index("Deployment")
     assert "Subject identity" not in html
-    assert "<dt>Provider (same displayed text)</dt><dd>provider</dd>" in html
+    assert "<dt>Provider</dt><dd>provider</dd>" in html
     assert "Additional recorded context (1)" in html
     assert report.subjects[0][1].startswith("Observed model:")
 
@@ -102,7 +102,10 @@ def test_subjects_with_matching_field_suffixes_align_and_keep_the_field_name(
     )
     html = _comparison_context(report)
     assert 'class="comparison-table"' in html
-    assert '<th scope="row">Artifact</th>' in html
+    assert (
+        '<th scope="row">Artifact<span class="different-label">Differs</span></th>'
+        in html
+    )
     assert re.search(
         r'<td data-side="Baseline">.*?baseline-artifact</td><td data-side="Subject">.*?subject-artifact</td>',
         html,
@@ -184,7 +187,9 @@ def test_equal_shortened_provider_labels_do_not_claim_equal_recorded_settings():
     html = _comparison_context(
         view(subjects=subjects, context=context, changes=changes)
     )
-    assert "Provider (same displayed text)" in html
+    assert "Matching displayed fields" in html
+    assert "Matching previews do not establish equality" in html
+    assert "<dt>Provider</dt>" in html
     assert "Shared settings" not in html
     assert "Declared service fields differ: provider." in html
 
@@ -373,3 +378,98 @@ def test_regular_ticks_use_display_units_and_summary_emphasizes_sentence_end_val
     assert "<strong>+1 pp</strong>." in _summary_html(
         replace(view(), metrics=(metric,), summary="Change +1 pp.")
     )
+
+
+def test_grouped_comparison_is_shared_by_html_and_markdown_without_loss():
+    from invarlock.report_presentation import _comparison_view, render_markdown
+
+    report = view(
+        subjects=(("Baseline artifact", "first"), ("Candidate artifact", "second")),
+        context=(
+            ("Baseline HTTP roles", "system,user"),
+            ("Subject HTTP roles", "system,user"),
+            ("Baseline revision", "a"),
+            ("Baseline revision", "b"),
+        ),
+    )
+    grouped = _comparison_view(report)
+    assert grouped.rows == (("Artifact", "first", "second", True),)
+    assert grouped.matching == (("HTTP roles", "system,user"),)
+    assert grouped.additional == (
+        ("Baseline revision", "a"),
+        ("Baseline revision", "b"),
+    )
+    for rendered in (render_html(report), render_markdown(report)):
+        assert "Matching displayed fields" in rendered
+        assert "Matching previews do not establish equality" in rendered
+        assert "HTTP roles" in rendered
+        assert "Differs" in rendered
+        assert rendered.count("Baseline revision") == 2
+        assert "same displayed text" not in rendered
+    assert "### Artifact — Differs" in render_markdown(report)
+    assert "- **Baseline:** first\n- **Subject:** second" in render_markdown(report)
+
+
+@pytest.mark.parametrize(
+    "decision,opened",
+    [
+        ("pass", False),
+        ("fail", True),
+        ("regression", True),
+        ("insufficient_evidence", True),
+    ],
+)
+def test_adverse_metric_overview_starts_open(decision, opened):
+    first = MetricView("quality", "overall", "pass", "1", "1", "0", "20", "")
+    second = replace(first, name="latency", decision=decision)
+    html = render_html(replace(view(), metrics=(first, second)))
+    assert ('<details class="overview-disclosure" open>' in html) is opened
+    assert '<details class="overview-disclosure">' in html or opened
+
+
+def test_checks_have_mobile_labels_and_dark_theme_is_screen_only():
+    from invarlock.report_presentation import _CSS, CheckView
+
+    metric = MetricView(
+        "quality",
+        "overall",
+        "fail",
+        "1",
+        "0",
+        "-1",
+        "20",
+        "",
+        checks=(CheckView("Accuracy", "0%", "≥ 95%", False),),
+    )
+    html = render_html(replace(view(), metrics=(metric,)))
+    for label in ("Observed", "Required", "Result"):
+        assert f'data-label="{label}"' in html
+        assert f'aria-hidden="true">{label}</span>' in html
+    assert "min-width:540px" not in _CSS
+    assert "@media screen and (prefers-color-scheme:dark)" in _CSS
+    assert _CSS.index("prefers-color-scheme:dark") < _CSS.index("@media print")
+    assert "default-src 'none'" in html
+
+
+def test_normal_axis_domain_ends_have_ticks_and_geometry_agrees():
+    chart = _interval(
+        IntervalView(-1.444, 3.526, 1, -2, "Interval", "pp", "minimum", 0)
+    )
+    assert ">-4</span>" in chart and ">6</span>" in chart
+    assert 'x1="30.00" x2="30.00"' in chart
+    assert 'x1="610.00" x2="610.00"' in chart
+    # -2 is one fifth of the way from -4 to 6, including the 30px margin.
+    assert 'class="threshold" x1="146.00" x2="146.00"' in chart
+
+
+@pytest.mark.parametrize("lower", [1e-306, 1.0, 1e148, 4.571237497287615e307])
+def test_rounded_domain_cannot_collapse_or_exclude_adjacent_bounds(lower):
+    import math
+
+    upper = math.nextafter(lower, math.inf)
+    chart = _interval(
+        IntervalView(lower, upper, lower, upper, "Interval", "score", "minimum")
+    )
+    positions = [float(value) for value in re.findall(r'(?:x1|x2|cx)="([^"]+)"', chart)]
+    assert positions
+    assert all(30 <= value <= 610 for value in positions)

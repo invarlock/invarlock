@@ -742,7 +742,9 @@ def _view(comparison: dict[str, Any], evidence: CapturedSnapshot | None) -> Repo
     return _assemble_view(comparison, inputs, manifest, signer)
 
 
-def _captured_summary(metrics: tuple[MetricView, ...]) -> str:
+def _captured_summary(
+    metrics: tuple[MetricView, ...], comparison: dict[str, Any] | None = None
+) -> str:
     if len(metrics) != 1:
         failed = sum(m.decision == "regression" for m in metrics)
         insufficient = sum(m.decision == "insufficient_evidence" for m in metrics)
@@ -753,17 +755,78 @@ def _captured_summary(metrics: tuple[MetricView, ...]) -> str:
             "Each result applies to its recorded scope; overlapping slice counts must not be added together."
         )
     metric = metrics[0]
-    parts = [] if metric.decision == "pass" else [metric.explanation]
-    parts.append(
-        f"{metric.name}: baseline {metric.baseline}; subject {metric.candidate}; change {metric.change}."
+    recorded = (
+        next(
+            (
+                item
+                for item in comparison["metrics"]
+                if (item["name"], item["slice"]) == (metric.name, metric.scope)
+            ),
+            None,
+        )
+        if comparison is not None
+        else None
     )
+    likelihood = (
+        recorded["kind"] == "normalized_nll_per_utf8_byte"
+        if recorded is not None
+        else metric.interval is not None and metric.interval.neutral == 1
+    )
+    parts = [] if metric.decision == "pass" else [metric.explanation]
+    scope = "" if metric.scope == "overall" else f" within the {metric.scope} slice"
+    pairs = "pair" if metric.count == "1" else "pairs"
+    if metric.baseline != "Unavailable" and metric.candidate != "Unavailable":
+        sentence = (
+            f"Across {metric.count} usable {pairs}{scope}, the subject's {metric.name} "
+            f"was {metric.candidate}, compared with {metric.baseline} for the baseline"
+        )
+        if metric.change != "Unavailable":
+            if likelihood:
+                ratio = (
+                    recorded["ratio"]
+                    if recorded is not None
+                    else cast(IntervalView, metric.interval).estimate
+                )
+                sentence += f", giving a subject-to-baseline ratio of {number(ratio)}"
+            else:
+                sentence += f", a change of {metric.change}"
+        parts.append(sentence + ".")
+    else:
+        unavailable = (
+            "Baseline and subject scores"
+            if metric.baseline == metric.candidate == "Unavailable"
+            else "The baseline score"
+            if metric.baseline == "Unavailable"
+            else "The subject score"
+        )
+        verb = "are" if unavailable == "Baseline and subject scores" else "is"
+        parts.append(
+            f"{unavailable} for {metric.name} {verb} unavailable across {metric.count} usable {pairs}{scope}."
+        )
+    if recorded is not None and recorded["missing_ids"]:
+        missing = len(recorded["missing_ids"])
+        parts.append(
+            f"Of {recorded['count']:,} included {'pair' if recorded['count'] == 1 else 'pairs'}, {missing:,} "
+            + ("has a missing result." if missing == 1 else "have missing results.")
+        )
     if metric.interval is not None:
         interval = metric.interval
         parts.append(
-            f"95% interval: {number(interval.lower)} to {number(interval.upper)} {interval.unit}."
+            f"The 95% interval for the {'ratio' if likelihood else 'change'} runs from "
+            f"{number(interval.lower)} to {number(interval.upper)}"
+            + ("." if likelihood else f" {interval.unit}.")
         )
+    elif metric.change == "Unavailable":
+        parts.append(
+            f"No {'ratio' if likelihood else 'change'} estimate or uncertainty interval is available."
+        )
+    else:
+        parts.append("No uncertainty interval is available.")
     for check in metric.checks:
-        if check.name in {"Allowed change", "Maximum NLL ratio"}:
+        if check.name == "Included pair count" and check.passed is False:
+            _, minimum = check.required.split(" ", 1)
+            parts.append(f"The policy requires at least {minimum} included pairs.")
+        elif check.name in {"Allowed change", "Maximum NLL ratio"}:
             relation, value = check.required.split(" ", 1)
             parts.append(
                 "The policy requires the interval to stay "
@@ -819,7 +882,7 @@ def _assemble_view(
         for name, value in comparison["bindings"].items()
     )
     metrics = _metric_views(comparison, policy_metrics)
-    summary = _captured_summary(metrics)
+    summary = _captured_summary(metrics, comparison)
     # Report detail remains compact even when evidence lists many missing case IDs.
     technical = {
         **comparison,

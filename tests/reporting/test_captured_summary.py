@@ -22,10 +22,12 @@ def test_single_metric_summary_includes_values_interval_and_bound_requirements()
     view = record_reporting._view(comparison, snapshot)
     metric = view.metrics[0]
     assert (
-        f"baseline {metric.baseline}; subject {metric.candidate}; change {metric.change}"
+        f"the subject's {metric.name} was {metric.candidate}, compared with {metric.baseline} for the baseline, a change of {metric.change}."
         in view.summary
     )
-    assert "95% interval:" in view.summary
+    assert "The 95% interval for the change runs from" in view.summary
+    assert f"Across {metric.count} usable pairs" in view.summary
+    assert ";" not in view.summary
     assert "All configured checks passed" not in view.summary
     assert "Matches:" not in view.summary
     assert "The policy requires the interval to stay at or above" in view.summary
@@ -197,3 +199,73 @@ def test_nll_sublabels_do_not_invent_match_counts():
     assert rendered.baseline_detail == rendered.candidate_detail == ""
     assert rendered.count_detail == "0 missing · 1 included · ≥ 1 required"
     assert "matched" not in str(rendered)
+
+
+@pytest.mark.parametrize("scope", ["overall", "west"])
+def test_nll_summary_describes_ratio_without_calling_it_a_delta(scope):
+    from invarlock.evaluation_comparison.comparison import compare_runs
+    from tests.evaluation_comparison.test_likelihood import policy, row, run
+
+    configured = policy()
+    comparison = compare_runs(run([row()]), run([row(logprob=-3)]), configured)
+    comparison["metrics"][0]["slice"] = scope
+    metrics = record_reporting._metric_views(
+        comparison, {"nll": configured["metrics"][0]}
+    )
+    summary = record_reporting._captured_summary(metrics, comparison)
+    assert "Across 1 usable pair" in summary
+    assert (
+        "the subject's nll was 1.5 nats / byte, compared with 2 nats / byte for the baseline"
+        in summary
+    )
+    assert "a subject-to-baseline ratio of 0.75" in summary
+    assert "The 95% interval for the ratio runs from" in summary
+    assert "at or below 1.1 ratio" in summary
+    assert "a change of 0.75" not in summary
+    assert ("within the west slice" in summary) is (scope == "west")
+
+
+@pytest.mark.parametrize("missing", [0, 1, 40])
+def test_unavailable_summary_explains_usable_pairs_without_inventing_scores(missing):
+    baseline, subject, policy = example_project("classification")
+    policy["metrics"] = policy["metrics"][:1]
+    policy["slices"] = []
+    # A complete schedule can still be insufficient for the configured count.
+    policy["metrics"][0]["minimum_count"] = 50
+    for row in subject["records"][:missing]:
+        row["output"] = None
+        row["error"] = "capture failed"
+    snapshot = build_pack(baseline, subject, policy)
+    comparison = pack_json(snapshot, "report")
+    before = dict(snapshot.files)
+    view = record_reporting._view(comparison, snapshot)
+    assert view.summary.startswith("More evidence is needed")
+    assert f"unavailable across {40 - missing} usable pairs" in view.summary
+    assert "No change estimate or uncertainty interval is available." in view.summary
+    assert "The policy requires at least 50 included pairs." in view.summary
+    if missing:
+        assert f"Of 40 included pairs, {missing}" in view.summary
+        assert "missing result" in view.summary
+    else:
+        assert "have missing results" not in view.summary
+    assert "a change of" not in view.summary
+    assert "was 0" not in view.summary
+    assert snapshot.files == before
+
+
+def test_missing_nll_summary_marks_ratio_unavailable_without_implying_zero():
+    from invarlock.evaluation_comparison.comparison import compare_runs
+    from tests.evaluation_comparison.test_likelihood import policy, row, run
+
+    configured = policy()
+    missing = row()
+    del missing["likelihood"]
+    comparison = compare_runs(run([row()]), run([missing]), configured)
+    metrics = record_reporting._metric_views(
+        comparison, {"nll": configured["metrics"][0]}
+    )
+    summary = record_reporting._captured_summary(metrics, comparison)
+    assert "unavailable across 0 usable pairs" in summary
+    assert "Of 1 included pair, 1 has a missing result." in summary
+    assert "No ratio estimate or uncertainty interval is available." in summary
+    assert "ratio of 0" not in summary
