@@ -464,8 +464,11 @@ regression as failure and insufficient evidence as error.
 The report leads with **Policy satisfied** or **Policy not met**, the recorded
 verdict and the checks responsible for it. Each metric shows baseline and
 candidate values, change, observed pair count, an interval and the configured
-requirements. The interval diagram marks the policy boundary, while the table
-shows which numerical checks passed or were not met. Exact recorded values remain
+requirements. The interval diagram labels its scale, the policy boundary and the no-change
+reference: zero for a difference and one for a ratio. Shading marks only the
+region meeting the change requirement; separate count, precision and absolute
+score requirements still apply. The table shows which numerical checks passed
+or were not met. Exact recorded values remain
 available in the evidence and technical details.
 
 For captured comparisons, the technical details identify both recorded runs,
@@ -501,6 +504,10 @@ schedule. It does not establish population uncertainty. Available derived
 perplexity values appear separately and do not affect acceptance; an unavailable
 interpretation includes its recorded reason.
 
+Complete binary-mean results can also show exact match counts when the retained
+mean and record count determine an integer count consistently. Missing results
+and fractional scores do not acquire match counts.
+
 HTML includes expandable identities, exact comparison data, paired outcome
 analysis where available, and supplementary authenticated observations.
 `--explain` adds technical details to the text view. Paired outcome analysis can
@@ -510,8 +517,10 @@ McNemar probability; those diagnostics do not replace the configured decision.
 ### Understand the comparison
 
 HTML and Markdown reports put **What was compared** before the results. The
-section identifies the baseline and candidate, the recorded workflow and task,
-and the available dataset and coverage information. **Recorded changes** explains
+section aligns baseline and subject fields side by side, highlights differences,
+and groups matching displayed fields with the recorded workflow, task, dataset
+and coverage information under **Additional recorded context**. Matching
+previews do not establish equality of the complete retained fields. The recorded changes explain
 what the evidence establishes about the difference between the two sides.
 
 Native run and import reports use the authenticated request and input identities.
@@ -525,7 +534,9 @@ comparison context. Missing or mixed values are explicit. A matching model key i
 a recorded label, not proof that model weights or runtime settings were identical.
 The renderer does not infer a model revision from filenames or external catalogs.
 
-For paired prompt changes, the report compares effective messages by case ID.
+For paired prompt changes, the report compares retained message sequences by
+case ID. Effective messages and captured HTTP request messages are distinct
+projections; the latter do not reveal hidden service-side instructions.
 When every pair differs only by one uniform added system instruction, the report
 identifies that change and includes a bounded instruction preview in the details.
 It does not display full case prompts by default. Missing or inconsistent context
@@ -534,10 +545,11 @@ recover record context without the associated evidence.
 
 ### Compare multiple metrics and scopes
 
-Reports with multiple results start with an overview of every metric and scope.
-It shows the baseline, candidate, change, observed pair count, decision and any
-failed or unavailable checks. The overview stays visible when choosing a metric;
-a failure in another metric is never hidden by the selection.
+Reports with multiple results include an expandable overview of every metric
+and scope. It shows the baseline, subject, change, observed pair count, decision
+and any failed or unavailable checks. The overall verdict and result counts
+remain visible when choosing a metric; selecting one result does not change
+the overall decision.
 
 Metric tabs group related scopes together. For example, quality and latency
 measured overall and on an exceptions slice produce four results under two
@@ -585,6 +597,10 @@ a policy bound failed, which can be an absolute floor even when the observed
 candidate improved. Missing paired results remain missing; overlapping scope
 counts are not independent samples. Advanced configuration and missing-ID lists
 use labeled previews while the original values remain in bound evidence.
+Configuration previews use indented text with explicit limits and truncation
+markers; the renderer does not reinterpret them as executable content or
+complete configuration. Small screens keep requirement tables in a local
+scroll region so ordinary words and numerical values remain readable.
 
 Use `invarlock verify` with recipient-owned policy and complete-run digests for
 independent authentication and replay. Successful captured report

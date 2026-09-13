@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Refined evidence reports with aligned comparison identities, collapsible shared
+  settings, labelled interval scales and change requirements, metric navigation,
+  readable configuration previews and compact result summaries. Captured CLI and
+  SDK reports share presentation assembly while retaining their validation
+  boundaries. Captured HTTP request context and complete exact-match counts
+  remain distinct from hidden service instructions and missing observations.
+
 - Added explicit hosted-service identity to captured runs, binding configuration,
   harness and observation windows without asserting immutable model weights.
   Documented periodic and incident-triggered requalification through fresh

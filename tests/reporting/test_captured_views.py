@@ -57,14 +57,26 @@ def test_shared_render_preserves_frozen_values_labels_and_outputs(
     manifest, payloads, signer, raw = captured_reporting._load(pack)
     view = captured_reporting._view(manifest, payloads, signer)
     stored = _value(f"comparison-{name}.json")
-    assert view.technical == stored
+    assert view.technical["decision"] == stored["decision"]
+    assert view.technical["bindings"] == stored["bindings"]
+    for projected, original in zip(
+        view.technical["metrics"], stored["metrics"], strict=True
+    ):
+        assert {k: projected[k] for k in original if k != "missing_ids"} == {
+            k: v for k, v in original.items() if k != "missing_ids"
+        }
+        assert projected["missing_count"] == len(original["missing_ids"])
     assert view.decision == stored["decision"]
     assert raw == {
         name: before[Path(name)] for name in captured_contracts.PAYLOADS.values()
     }
     with captured_contracts.captured_snapshot(pack) as snapshot:
         sdk_view = record_reporting._view(stored, snapshot)
-    assert view.metrics == sdk_view.metrics
+    assert view == sdk_view
+    assert dict(view.identity)["Manifest"] == _digest(
+        f"manifest-{name}{'-unsigned' if unsigned else ''}.json"
+    )
+    assert dict(view.identity)["Evidence signer"] == signer
     by_scope = {(m["name"], m["slice"]): m for m in stored["metrics"]}
     for rendered in view.metrics:
         metric = by_scope[(rendered.name, rendered.scope)]

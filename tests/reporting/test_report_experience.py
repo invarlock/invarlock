@@ -284,6 +284,38 @@ def test_configuration_preview_bounds_depth_nodes_strings_and_retains_numbers():
     assert value == before
 
 
+def test_configuration_preview_indents_containers_without_changing_values():
+    from invarlock.record_reporting import _configuration_preview
+
+    value = {
+        "numbers": [0.12345678901234566, 12345678901234567890],
+        "nested": {"empty": [], "literal": 'line\nquote"'},
+    }
+    before = deepcopy(value)
+    preview = _configuration_preview(value)
+    assert preview["text"] == (
+        '{\n  "numbers": [\n    0.12345678901234566,\n    12345678901234567890\n  ],\n'
+        '  "nested": {\n    "empty": [],\n    "literal": "line\\nquote\\""\n  }\n}'
+    )
+    assert preview["limits"] == {"depth": 6, "nodes": 128, "string_characters": 256}
+    assert value == before
+
+
+def test_multiline_configuration_preview_retains_elisions_and_bounded_size():
+    from invarlock.record_reporting import _configuration_preview
+
+    value = {"long-key" * 100: ["long-value" * 100] * 1000}
+    before = deepcopy(value)
+    preview = _configuration_preview(value)
+    assert "\n  " in preview["text"]
+    assert "characters; preview" in preview["text"]
+    assert "… node budget reached" in preview["text"]
+    assert "long-key" * 100 not in preview["text"]
+    assert "long-value" * 100 not in preview["text"]
+    assert len(preview["text"].encode()) < 70_000
+    assert value == before
+
+
 def test_configuration_preview_does_not_render_value_after_key_exhausts_budget():
     from invarlock.record_reporting import _configuration_preview
 

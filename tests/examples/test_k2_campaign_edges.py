@@ -426,8 +426,8 @@ def test_cli_signed_journey_retains_all_outcomes(tmp_path, outcome, expected):
     )
     for cohort in campaign.COHORTS:
         rendered = (tmp_path / "reports" / f"{cohort}.html").read_text()
-        assert "InvarLock captured comparison report" in rendered
-        assert "Results and requirements" in rendered
+        assert "InvarLock captured comparison" in rendered
+        assert "Decision checks" in rendered
         assert "Not performed by report" in rendered
         assert (
             (tmp_path / "reports" / f"{cohort}.xml").read_bytes().startswith(b"<?xml")
