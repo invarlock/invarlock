@@ -93,6 +93,9 @@ def test_end_of_file_hook_preserves_canonical_signed_evidence_bytes() -> None:
         "build-attestation.json",
         "examples/integrations/spdx-ai-observation/source/model-aibom.spdx3.json",
         "examples/integrations/spdx-ai-observation/source/model-artifact.identity.json",
+        "examples/captured-results/references/harness-likelihood/capture/raw-results.json",
+        "examples/captured-results/references/harness-likelihood/evidence/manifest.json",
+        "examples/captured-results/references/harness-likelihood/verification.receipt.json",
         "tests/fixtures/compatibility/v0.13.0/package/verification.receipt.json",
     ):
         assert excluded.search(path)
@@ -106,6 +109,14 @@ def test_end_of_file_hook_preserves_canonical_signed_evidence_bytes() -> None:
     assert not excluded.search(
         "examples/integrations/spdx-ai-observation/observation-payload.json"
     )
+    assert not excluded.search(
+        "examples/captured-results/references/harness-likelihood/README.md"
+    )
+    assert not excluded.search(
+        "examples/captured-results/references/harness-likelihood/reference.json"
+    )
+    check_json = next(hook for hook in hooks if hook["id"] == "check-json")
+    assert "exclude" not in check_json
 
 
 def test_capture_annotation_allowance_requires_exact_path_and_empty_default() -> None:
