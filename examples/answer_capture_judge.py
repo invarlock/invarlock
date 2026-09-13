@@ -90,7 +90,10 @@ def prepare(
             ).hexdigest()
             binding[f"{side}_request_sha256"] = hashlib.sha256(
                 render_judge_request(
-                    plan, input_text=row["input"], answer_text=row["output"]
+                    plan,
+                    input_text=row["input"],
+                    answer_text=row["output"],
+                    reference_text=row.get("expected"),
                 )
             ).hexdigest()
         bindings.append(binding)

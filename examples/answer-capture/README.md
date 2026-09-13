@@ -6,8 +6,10 @@ This optional POSIX example calls a user-owned pipeline adapter once per case
 for the baseline and once for the subject. It writes the two
 `invarlock/evaluation-run-v1` files consumed by captured-result evaluation and
 bounded judge preparation. It makes no quality decision and does not score the
-answers. The same frozen answers can support deterministic metrics and judge
-measurements without generating them again.
+answers. The same frozen answers can support exact-match scoring and judge
+measurements without generating them again. This helper does not capture
+reference-continuation likelihoods, so its token usage cannot supply normalized
+NLL. That scorer requires separately retained, bound likelihood facts.
 
 The included adapter is an offline wiring fixture. Its toy answers, tokenizer,
 artifact digests and prices are not model qualification or useful evaluation
@@ -116,6 +118,20 @@ Retained completed answers are never regenerated; an expired process transport
 requires offline inspection rather than invoking its tokenizer after deadline.
 
 ## Continue from captured answers to judge preparation
+
+For the installed captured-result route, use these two canonical runs as sources
+in `invarlock/evaluation-request-v2`, select `comparison.metric: judge`, and
+supply a reviewed `invarlock/native-judge-policy-v1` recipe. The
+[captured-results guide](../../docs/user-guide/captured-results.md#judge-captured-answers)
+shows collection and offline measurement import. The public
+`prepare_evaluator_judge` helper binds the recipe to the frozen records and
+supports optional `plan.prompt.reference_mode: per_case` for string references.
+References are never sent to the answer-generation adapter.
+
+The following example helper prepares a v3 request from a finalized plan
+template. Set `prompt.reference_mode: per_case` in that template to include each
+string reference in judging; omitted or `none` mode leaves it out. The helper
+binds the exact rendered requests for the selected mode.
 
 Prepare a judge plan and request without generating answers again or calling a
 judge. Supply a reviewed plan template, analysis policy, collection limits, and

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import os
 import sys
@@ -50,7 +51,8 @@ def request():
     }
 
 
-def test_pipeline_capture_and_bound_continuation(tmp_path, monkeypatch):
+@pytest.mark.parametrize("reference_mode", [None, "none", "per_case"])
+def test_pipeline_capture_and_bound_continuation(tmp_path, monkeypatch, reference_mode):
     transport, config = adapter(tmp_path)
     cases = read(ROOT / "examples/answer-capture/cases.json")
     directory = tmp_path / "capture"
@@ -75,6 +77,8 @@ def test_pipeline_capture_and_bound_continuation(tmp_path, monkeypatch):
     assert read(directory / "manifest.json")["adapter_identity"] == transport.identity
     target = tmp_path / "judge"
     plan = read(ROOT / "examples/judge-measurements/plan.json")
+    if reference_mode is not None:
+        plan["prompt"]["reference_mode"] = reference_mode
     policy = read(ROOT / "examples/judge-measurements/analysis_policy.json")
     collection = read(ROOT / "examples/judge-measurements/collection.json")
     summary = prepare(directory, plan, policy, {"case-1": "unit-1"}, collection, target)
@@ -83,6 +87,28 @@ def test_pipeline_capture_and_bound_continuation(tmp_path, monkeypatch):
     assert bound["baseline_run_sha256"] == result["baseline"]
     assert bound["subject_run_sha256"] == result["subject"]
     assert bound["case_set_sha256"] == result["case_set"]
+    # Bind the actual final grading prompt, including only an opted-in reference.
+    from invarlock.judge_measurements.contracts import render_judge_request
+
+    for side in ("baseline", "subject"):
+        row = read(directory / f"{side}_run.json")["records"][0]
+        rendered = render_judge_request(
+            bound,
+            input_text=row["input"],
+            answer_text=row["output"],
+            reference_text=row["expected"],
+        )
+        user = json.loads(json.loads(rendered)["messages"][-1]["content"])
+        if reference_mode == "per_case":
+            assert user["reference"] == row["expected"]
+        else:
+            assert "reference" not in user
+            assert rendered == render_judge_request(
+                bound, input_text=row["input"], answer_text=row["output"]
+            )
+        assert bound["answer_bindings"][0][f"{side}_request_sha256"] == (
+            hashlib.sha256(rendered).hexdigest()
+        )
     assert (
         read(target / "analysis_policy.json")["minimum_units"]
         == policy["minimum_units"]
