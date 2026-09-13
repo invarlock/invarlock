@@ -205,6 +205,10 @@ def test_pr_supply_chain_scans_only_shipped_dependency_surfaces() -> None:
         "src/invarlock/captured_evidence_publication.py",
         "examples/qualification/k2-horizon/model-card-observations.json",
         "examples/qualification/k2_runtime_expat.py",
+        "examples/captured-results/harness_model_comparison.py",
+        "examples/captured-results/harness_likelihood_rehearsal.py",
+        "src/invarlock/judge_measurements/acceptance.py",
+        "src/invarlock/judge_measurements/evidence.py",
     ],
 )
 def test_supply_chain_scanner_probe_rejects_broad_path_exclusions(

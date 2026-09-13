@@ -210,3 +210,63 @@ def test_full_ci_pins_make_to_setup_python() -> None:
     assert _step(full["steps"], "Run complete repository gates")["run"] == (
         "make verify"
     )
+
+
+@pytest.mark.parametrize(
+    ("description", "target", "paths"),
+    [
+        (
+            "Captured harness source pins",
+            "match",
+            (
+                "examples/captured-results/harness_model_comparison.py",
+                "examples/captured-results/harness_likelihood_rehearsal.py",
+            ),
+        ),
+        (
+            "Captured likelihood tokenizer source pins",
+            "match",
+            ("examples/captured-results/harness_likelihood_rehearsal.py",),
+        ),
+        (
+            "Judge acceptance signer key-file size bounds",
+            "line",
+            ("src/invarlock/judge_measurements/acceptance.py",),
+        ),
+        (
+            "Judge evidence signing key-file size bounds",
+            "line",
+            ("src/invarlock/judge_measurements/evidence.py",),
+        ),
+    ],
+)
+def test_public_source_allowances_are_rule_and_exact_path_scoped(
+    description: str, target: str, paths: tuple[str, ...]
+) -> None:
+    config = tomllib.loads(Path(".gitleaks.toml").read_text(encoding="utf-8"))
+    allowance = next(
+        item
+        for item in config["allowlists"]
+        if item["description"].startswith(description)
+    )
+    assert allowance["targetRules"] == ["generic-api-key"]
+    assert allowance["condition"] == "AND"
+    assert allowance["regexTarget"] == target
+    assert set(allowance) == {
+        "description",
+        "targetRules",
+        "condition",
+        "regexTarget",
+        "paths",
+        "regexes",
+    }
+    assert len(allowance["paths"]) == len(paths)
+    for path in paths:
+        assert any(re.search(pattern, path) for pattern in allowance["paths"])
+        for other_path in ("prefix/" + path, path + ".bak", "unrelated.py"):
+            assert not any(
+                re.search(pattern, other_path) for pattern in allowance["paths"]
+            )
+    for pattern in allowance["regexes"]:
+        assert pattern.startswith("^")
+        assert pattern.endswith("$")

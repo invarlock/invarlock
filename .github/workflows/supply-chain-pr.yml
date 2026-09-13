@@ -78,6 +78,7 @@ jobs:
           printf '{"tokenizer_metadata_sha256":"%s","api_key":"%s"}\n' \
             "${digest}" "${digest}" > "${probe_root}/${probe_path}/request.json"
           python - "${probe_root}" "${digest}" <<'PY'
+          import json
           import sys
           from pathlib import Path
 
@@ -118,6 +119,67 @@ jobs:
               encoding="utf-8",
           )
           expat.with_name("unrelated.py").write_text(public_line, encoding="utf-8")
+
+          root = Path(sys.argv[1])
+          extra_expected = []
+
+          def write_cases(relative, cases):
+              path = root / relative
+              path.parent.mkdir(parents=True, exist_ok=True)
+              path.write_text("\n".join(line for line, _ in cases) + "\n", encoding="utf-8")
+              for number, (_, count) in enumerate(cases, 1):
+                  extra_expected.extend([[relative, number]] * count)
+
+          public_digests = [
+              "4b98863889c17ffa7a7d391e83264fde0aa76f6883ef2e863065728b126508f8",
+              "7292215bb68b9cf650023939b2c0e0a9a6f48c77b39600a4069c796c33384b94",
+              "c0b3c279b6ecdb71996a86ffb4d4ab94dfdb5df95f00bac9515688faef2ff5dd",
+              "5e04eb606e3a1583530a42e36c2a6b6615c86f34fe77e44d9ddeb43ff940931f",
+          ]
+          harness_pins = list(zip(("lm_eval.api.model", "lm_eval.api.metrics"), public_digests[:2]))
+          tokenizer_pins = list(zip(("special_tokens_map.json", "tokenizer_config.json"), public_digests[2:]))
+          for filename in ("harness_model_comparison.py", "harness_likelihood_rehearsal.py"):
+              relative = "examples/captured-results/" + filename
+              pins = harness_pins + (tokenizer_pins if "likelihood" in filename else [])
+              cases = []
+              for field, digest in pins:
+                  line = f'    "{field}": "{digest}",'
+                  other_digest = next(value for _, value in pins if value != digest)
+                  cases.extend([
+                      (line, 0),
+                      (line.replace(digest, digest[:-1] + ("0" if digest[-1] != "0" else "1")), 1),
+                      (line.replace(digest, other_digest), 1),
+                      (line.replace(field, "api_key"), 1),
+                      (line + f' api_key = "{canary}"', 1),
+                      (f'api_key = "{canary}"', 1),
+                  ])
+              if "comparison" in filename:
+                  cases.extend((f'    "{field}": "{digest}",', 1) for field, digest in tokenizer_pins)
+              write_cases(relative, cases)
+              for other in ("prefix/" + relative, relative + ".bak", relative.replace(filename, "unrelated_" + filename)):
+                  write_cases(other, [(f'    "{field}": "{digest}",', 1) for field, digest in pins])
+
+          for filename, label, arguments in (
+              ("acceptance.py", "trusted signer key", (" " * 12 + "value", " " * 16 + "path")),
+              ("evidence.py", "judge evidence signing key", (" " * 12 + "path", " " * 12 + "Path(value)")),
+          ):
+              relative = "src/invarlock/judge_measurements/" + filename
+              cases = []
+              public_lines = []
+              for argument in arguments:
+                  line = f'{argument}, label="{label}", max_bytes=65536'
+                  public_lines.append(line)
+                  cases.extend([
+                      (line, 0),
+                      (line.replace("65536", "65535"), 1),
+                      (line.replace(label, "other " + label), 1),
+                      (line + f'; api_key = "{canary}"', 2),
+                      (f'api_key = "{canary}"', 1),
+                  ])
+              write_cases(relative, cases)
+              for other in ("prefix/" + relative, relative + ".bak", relative.replace(filename, "unrelated_" + filename)):
+                  write_cases(other, [(line, 1) for line in public_lines])
+          (root / "expected-extra.json").write_text(json.dumps(extra_expected), encoding="utf-8")
           PY
           git -C "${probe_root}" add .
           git -C "${probe_root}" commit --quiet -m "Add scanner boundary probe"
@@ -154,6 +216,8 @@ jobs:
               ("examples/qualification/k2_runtime_expat.py", 5),
               ("examples/qualification/unrelated.py", 1),
           ])
+          extra = Path(sys.argv[1]).with_name("expected-extra.json")
+          expected.update(tuple(item) for item in json.loads(extra.read_text(encoding="utf-8")))
           observed = Counter((item["File"], item["StartLine"]) for item in findings)
           if observed != expected:
               raise SystemExit("gitleaks boundary probe findings changed")
