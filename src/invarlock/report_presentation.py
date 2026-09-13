@@ -273,13 +273,19 @@ def _status(check: CheckView) -> str:
     )
 
 
-def _interval_summary(view: IntervalView, *, compact: bool = False) -> str:
-    """Format the same interval consistently in the change tile and chart."""
+def _interval_label(view: IntervalView, *, compact: bool = False) -> str:
+    """Name the interval without repeating its measured bounds."""
     label = view.label
     if compact:
         label = label.replace("confidence interval", "CI")
     elif view.method:
         label += f" ({view.method})"
+    return label
+
+
+def _interval_summary(view: IntervalView, *, compact: bool = False) -> str:
+    """Format interval values for the change tile and accessible description."""
+    label = _interval_label(view, compact=compact)
     lower = number(view.lower, signed=view.neutral == 0)
     upper = number(view.upper, signed=view.neutral == 0)
     return f"{label}: {lower} to {upper} {view.unit}".strip()
@@ -327,6 +333,7 @@ def _interval(view: IntervalView) -> str:
     description = f"{_interval_summary(view)}. Estimate {number(view.estimate, signed=view.neutral == 0)} {view.unit}."
     graphics = []
     legend = ""
+    allowed_legend = ""
     neutral_legend = ""
     if view.threshold is not None:
         description += f" Policy threshold {number(view.threshold)} {view.unit}."
@@ -339,10 +346,9 @@ def _interval(view: IntervalView) -> str:
             graphics.append(
                 f'<rect class="allowed" x="{left:.2f}" y="18" width="{right - left:.2f}" height="42"/>'
             )
-            operator = "≥" if direction == "minimum" else "≤"
-            legend = f"Change requirement: {operator} {number(view.threshold)} {view.unit}. Shading shows where this requirement is met."
-        else:
-            legend = f"Policy threshold: {number(view.threshold)} {view.unit}."
+            allowed_legend = '<span class="chart-key"><i class="allowed-key" aria-hidden="true"></i>Allowed change region</span>'
+            description += f" Shading marks values at or {'above' if direction == 'minimum' else 'below'} the threshold."
+        legend = "Policy threshold"
         graphics.append(
             f'<line class="threshold" x1="{position:.2f}" x2="{position:.2f}" y1="10" y2="66"/>'
         )
@@ -351,7 +357,8 @@ def _interval(view: IntervalView) -> str:
         graphics.append(
             f'<line class="neutral" x1="{position:.2f}" x2="{position:.2f}" y1="18" y2="60"/>'
         )
-        neutral_legend = f"No change: {number(view.neutral)} {view.unit}."
+        neutral_legend = "No change"
+        description += f" No change: {number(view.neutral)} {view.unit}."
     labels = []
     for tick in ticks:
         value = tick * scale
@@ -380,7 +387,7 @@ def _interval(view: IntervalView) -> str:
         annotations.append(
             annotation(
                 view.threshold,
-                f"Limit {operator}{number(view.threshold)}",
+                f"Limit {operator}{number(view.threshold)} {view.unit}".strip(),
                 "limit-label",
             )
         )
@@ -411,13 +418,12 @@ def _interval(view: IntervalView) -> str:
         + '</svg><div class="axis-labels" aria-hidden="true">'
         + "".join(labels)
         + "</div>"
-        + '<figcaption><span class="chart-key"><i class="estimate-key" aria-hidden="true"></i>Estimate '
-        + escape(number(view.estimate, signed=view.neutral == 0) + " " + view.unit)
+        + '<figcaption><span class="chart-key"><i class="estimate-key" aria-hidden="true"></i>Estimate'
         + '</span><span class="chart-key"><i class="interval-key" aria-hidden="true"></i>'
-        + escape(_interval_summary(view))
+        + escape(_interval_label(view))
         + "</span>"
         + (
-            ' <span class="legend"><i class="threshold-key" aria-hidden="true"></i>'
+            ' <span class="chart-key"><i class="threshold-key" aria-hidden="true"></i>'
             + escape(legend.strip())
             + "</span>"
             if legend
@@ -430,11 +436,13 @@ def _interval(view: IntervalView) -> str:
             if neutral_legend
             else ""
         )
+        + allowed_legend
         + "</figcaption></figure>"
     )
 
 
 _CSS = """
+.allowed-key{width:16px;height:10px;background:var(--teal);opacity:.25}
 :root{color-scheme:light;--ink:#172a35;--muted:#526773;--line:#d8e3e8;--paper:#fff;--canvas:#f6f8f9;--teal:#086756;--red:#a32639;--amber:#79530b}
 *{box-sizing:border-box}
 body{margin:0;background:var(--canvas);color:var(--ink);font:15px/1.55 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}

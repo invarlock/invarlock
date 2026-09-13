@@ -511,7 +511,7 @@ def test_change_tile_shows_bound_interval_without_relabelling_method(
         in html
     )
     chart_summary = f"{escape(label)}: -1.444 to +3.526 pp"
-    assert f"{chart_summary}</span>" in html
+    assert f"{escape(label)}</span>" in html
     assert f'aria-label="{chart_summary}. Estimate +1 pp.' in html
     html = render_html(replace(view(), metrics=(replace(metric, interval=None),)))
     assert "<dt>Change</dt><dd>+1 pp</dd>" in html
@@ -535,6 +535,13 @@ def test_chart_names_retained_method_while_tile_stays_compact():
         in chart
     )
     assert "&lt;method&gt;" in _interval(replace(interval, method="<method>"))
+    caption = chart.split("<figcaption>", 1)[1].split("</figcaption>", 1)[0]
+    assert "Paired 95% confidence interval (Newcombe hybrid score)</span>" in caption
+    assert "Estimate</span>" in caption
+    assert "Policy threshold</span>" in caption
+    assert "No change</span>" in caption
+    assert "Allowed change region</span>" in caption
+    assert all(value not in caption for value in ("-1.444", "+3.526", "+1 pp", "-2 pp"))
 
 
 def test_ratio_change_tile_does_not_present_ratio_bounds_as_signed_effects():
