@@ -38,6 +38,13 @@ compatibility, not model quality. `harness_likelihood_rehearsal.py` performs the
 bounded model capture; `harness_likelihood_handoff.py` independently checks and
 imports its original facts using only the core package.
 
+The [Mistral 7B comparison](references/mistral-7b-likelihood/README.md) extends
+that control with two distinct full checkpoints and 400 retained public narrative
+passages. It measures each exact reference continuation through Harness and
+preserves the model identities, original measurements, frozen policy, signed
+evidence and independent verification receipt. The capture and handoff helpers
+are `harness_model_comparison.py` and `harness_model_handoff.py`.
+
 The native rehearsal and handoff helpers produce captured records for external
 evaluators. They do not add a second CLI or SDK namespace. Runtime pipelines
 remain ordinary upstream integrations; their exported records enter through

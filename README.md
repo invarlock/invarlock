@@ -154,10 +154,14 @@ reference-continuation likelihoods for NLL, and frozen text plus retained rating
 for judging. See the [captured-results guide](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/captured-results.md#use-the-three-built-in-scorers).
 An evaluator's aggregate score cannot replace those facts.
 
-The [Harness likelihood reference](https://github.com/invarlock/invarlock/blob/main/examples/captured-results/references/harness-likelihood/README.md)
-retains six real same-model CPU pairs and their installed signed handoff. It
-demonstrates that external likelihood integration profile; its conformance pass
-does not establish model quality or qualify the full evaluator matrix.
+The [Mistral 7B likelihood reference](https://github.com/invarlock/invarlock/blob/main/examples/captured-results/references/mistral-7b-likelihood/README.md)
+compares distinct base and instruction-tuned checkpoints over 400 fixed public
+narrative continuations, retaining the measured likelihoods and installed signed
+handoff. The original six-pair
+[same-model control](https://github.com/invarlock/invarlock/blob/main/examples/captured-results/references/harness-likelihood/README.md)
+remains available. These references demonstrate their declared integration
+profiles; they do not qualify the full evaluator matrix or establish broad model
+quality.
 
 `evaluate` performs live collection through the optional
 `invarlock-inspect-judge[inspect]` package, with explicit call, token, cost, timeout
