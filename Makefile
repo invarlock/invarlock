@@ -702,7 +702,7 @@ addins-install-smoke: dist-check  ## Install and discover all six wheels in a di
 		cp examples/captured-results/wheel_smoke.py "$$consumer_root/captured-wheel-smoke.py"; \
 		cp examples/captured-results/scorer_wheel_smoke.py "$$consumer_root/scorer-wheel-smoke.py"; \
 		mkdir "$$consumer_root/judge"; \
-		for judge_file in wheel_smoke.py request.yaml plan.json measurements.json baseline_run.json subject_run.json analysis_policy.json; do \
+		for judge_file in wheel_smoke.py request.yaml plan.json measurements.json baseline_run.json subject_run.json analysis_policy.json collection.json; do \
 			cp "examples/judge-measurements/$$judge_file" "$$consumer_root/judge/"; \
 		done; \
 		cp -R examples/acceptance-handoff/golden "$$consumer_root/golden"; \

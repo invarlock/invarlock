@@ -1,6 +1,9 @@
 """The three-scorer installed-wheel rehearsal uses production CLI and SDK paths."""
 
 import importlib.util
+import re
+import shlex
+import shutil
 import sys
 from pathlib import Path
 
@@ -53,6 +56,31 @@ def test_three_scorers_use_v2_cli_and_public_sdk_with_scoped_receipts(
         )
     assert [call.returncode for call in calls if call.args[1] == "verify"] == [0, 0, 7]
     assert not roots[0].exists()
+
+
+def test_install_smoke_copies_every_fixture_needed_by_three_scorer_consumer(
+    tmp_path, monkeypatch, capsys
+):
+    # Exercise the actual Makefile fixture inventory from an isolated consumer
+    # directory, so checkout-only files cannot hide a release handoff omission.
+    makefile = (ROOT / "Makefile").read_text()
+    inventory = re.search(r"for judge_file in ([^;]+); do", makefile)
+    assert inventory is not None
+    fixture = tmp_path / "judge"
+    fixture.mkdir()
+    for name in shlex.split(inventory.group(1)):
+        shutil.copy2(FIXTURE / name, fixture / name)
+    module = _module()
+    calls, _ = _transport(monkeypatch, module)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [str(SCRIPT), "--cli", "/candidate/bin/invarlock", "--fixture", str(fixture)],
+    )
+    monkeypatch.chdir(tmp_path)
+    module.main()
+    assert "judge: installed SDK" in capsys.readouterr().out
+    assert [call.returncode for call in calls if call.args[1] == "verify"] == [0, 0, 7]
 
 
 def test_requires_installed_cli(monkeypatch):
