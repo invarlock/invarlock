@@ -145,7 +145,82 @@
               }
             ]
           },
-          "context": {}
+          "context": {},
+          "likelihood": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "basis": {
+                "const": "reference_continuation"
+              },
+              "logprob_sum": {
+                "type": "number",
+                "maximum": 0
+              },
+              "token_count": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "utf8_byte_count": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "input_digest": {
+                "type": "string",
+                "pattern": "^sha256:[a-f0-9]{64}$"
+              },
+              "reference_digest": {
+                "type": "string",
+                "pattern": "^sha256:[a-f0-9]{64}$"
+              },
+              "artifact_digest": {
+                "type": "string",
+                "pattern": "^sha256:[a-f0-9]{64}$"
+              },
+              "configuration_digest": {
+                "type": "string",
+                "pattern": "^sha256:[a-f0-9]{64}$"
+              },
+              "tokenizer_digest": {
+                "type": "string",
+                "pattern": "^sha256:[a-f0-9]{64}$"
+              },
+              "source": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                  },
+                  "version": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                  }
+                },
+                "required": [
+                  "name",
+                  "version"
+                ]
+              }
+            },
+            "required": [
+              "basis",
+              "logprob_sum",
+              "token_count",
+              "utf8_byte_count",
+              "input_digest",
+              "reference_digest",
+              "artifact_digest",
+              "configuration_digest",
+              "tokenizer_digest",
+              "source"
+            ]
+          }
         },
         "required": [
           "id",

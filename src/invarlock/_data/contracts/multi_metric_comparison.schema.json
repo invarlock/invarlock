@@ -164,6 +164,16 @@
               "type": "string",
               "maxLength": 4096
             }
+          },
+          "ratio": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "interval_unit": {
+            "const": "ratio"
           }
         },
         "required": [
@@ -182,6 +192,43 @@
           "interval",
           "decision",
           "reasons"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "normalized_nll_per_utf8_byte"
+                }
+              },
+              "required": [
+                "kind"
+              ]
+            },
+            "then": {
+              "required": [
+                "ratio",
+                "interval_unit"
+              ],
+              "properties": {
+                "unit": {
+                  "const": "nats_per_utf8_byte"
+                },
+                "direction": {
+                  "const": "lower"
+                },
+                "scoring_assurance": {
+                  "const": "recomputed"
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "ratio": false,
+                "interval_unit": false
+              }
+            }
+          }
         ]
       },
       "maxItems": 272

@@ -105,7 +105,7 @@
         "required": ["name", "slice", "kind", "scoring_assurance"],
         "properties": {
           "name": {"$ref": "#/$defs/name"}, "slice": {"$ref": "#/$defs/name"},
-          "kind": {"enum": ["exact_match", "normalized_match", "numeric_tolerance", "json_exact", "json_fields", "token_f1", "recorded"]},
+          "kind": {"enum": ["exact_match", "normalized_match", "numeric_tolerance", "json_exact", "json_fields", "token_f1", "recorded", "normalized_nll_per_utf8_byte"]},
           "scoring_assurance": {"enum": ["recorded", "recomputed"]}
         },
         "allOf": [{
