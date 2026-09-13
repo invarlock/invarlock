@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added a real LM Evaluation Harness likelihood reference with pinned CPU
+  measurements, source-preserving import, independent signed verification and
+  reports. Its six paired cases establish same-model integration conformance.
 - Made exact match, normalized NLL and judge scoring available to captured
   evaluator workflows, with explicit source text projections, typed likelihood
   bindings, offline retained-call import and evaluator context in reports.

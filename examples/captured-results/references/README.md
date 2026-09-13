@@ -8,7 +8,9 @@ separate from the native runtime transactions in the [public index](../../../pub
 | Reference | Paired records | Recorded decision | Scoring assurance |
 | --- | ---: | --- | --- |
 | [K2 Horizon 32B routing prompts](k2-32b-routing/README.md) | 4,000 | Regression | Recorded external scores |
+| [Harness likelihood](harness-likelihood/README.md) | 6 | Pass (same-model conformance) | Real reference-continuation likelihoods; captured provenance |
 
-The full finite schedule is retained, including adverse results. A successfully
+Each reference retains its complete fixed schedule and declared scope. The
+routing schedule includes adverse results. A successfully
 replayed rejection means the evidence is intact and the declared policy rejects
 the subject; it does not mean acceptance or runtime qualification.

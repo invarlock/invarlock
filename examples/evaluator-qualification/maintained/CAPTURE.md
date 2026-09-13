@@ -173,11 +173,13 @@ missing capture facts, an import that has not been implemented, and a task or
 runtime that cannot supply the required measurement. When the facts are
 available for a promised profile, implement and test its positive path.
 
-The NLL examples here use synthetic likelihood facts for contract testing.
-They do not qualify an external likelihood measurement. A real likelihood
-qualification must retain the exact context and reference continuation,
-log-probability sum, token/byte counts, tokenizer, configuration and model pins,
-then complete the installed signed journey. A generation-only export is
+The canonical NLL contract tests use synthetic likelihood facts. The separate
+[Harness likelihood reference](../../captured-results/references/harness-likelihood/README.md)
+retains a real six-pair CPU measurement and installed signed journey, including
+the exact context and reference continuation, log-probability sum, token/byte
+counts, tokenizer, configuration and model pins. Its same-model conformance
+result establishes that declared integration profile, not model quality or
+likelihood qualification across the whole matrix. A generation-only export is
 insufficient; that does not mean its evaluator cannot measure likelihoods.
 
 The judge tests likewise establish replay and integration behavior rather than

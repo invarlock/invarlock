@@ -64,6 +64,12 @@ covers the evaluator shortlist and distinguishes tested capture paths from
 upstream qualification. Keep using your evaluator's environment; InvarLock can
 consume its retained exports in a separate environment.
 
+For a complete measured NLL example, replay the
+[Harness likelihood reference](https://github.com/invarlock/invarlock/blob/main/examples/captured-results/references/harness-likelihood/README.md).
+It retains six real same-model CPU pairs, their exact continuation and tokenizer
+bindings, signed evaluation and independent recipient verification. This is an
+integration conformance result, not a model-quality benchmark.
+
 For structured task inputs, a source may declare an explicit text projection:
 
 ```yaml
