@@ -10,6 +10,7 @@ from the native runtime transactions in the [public index](../../../public_evide
 | [K2 Horizon 32B routing prompts](k2-32b-routing/README.md) | 4,000 | Regression | Recorded external scores |
 | [Harness likelihood](harness-likelihood/README.md) | 6 | Pass (same-model conformance) | Real reference-continuation likelihoods; captured provenance |
 | [Mistral 7B base to instruction-tuned](mistral-7b-likelihood/README.md) | 400 | Regression | Real reference-continuation likelihoods; captured provenance |
+| [Mistral 7B local HTTP comparison](../../hosted-service/references/mistral-7b-http/README.md) | 400 | Pass (no absolute quality floor) | Real HTTP responses with literal exact match; captured service provenance |
 
 Each reference retains its complete fixed schedule and declared scope. The
 routing schedule includes adverse results. A successfully

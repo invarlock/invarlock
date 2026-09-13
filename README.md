@@ -129,6 +129,12 @@ harness and observation window without claiming immutable weights. Periodic and
 incident-triggered campaigns use your own harness and scheduler; replay of old
 evidence is not a fresh service measurement.
 
+The [local HTTP reference](https://github.com/invarlock/invarlock/blob/main/examples/hosted-service/references/mistral-7b-http/README.md)
+retains 400 paired cases from two distinct full 7B checkpoints, original responses,
+signed evidence and offline verification. It demonstrates that captured workflow;
+its comparative pass does not establish adequate task quality or qualify an
+external provider.
+
 ## Evaluate with a native judge scorer
 
 Select `metric: judge` alongside `exact_match` and

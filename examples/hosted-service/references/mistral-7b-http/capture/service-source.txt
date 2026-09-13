@@ -1,0 +1,128 @@
+"""A loopback model service for the retained two-deployment rehearsal.
+
+The service runs real local 7B checkpoints. Its public HTTP observations test a
+service capture workflow; they are not external-provider qualification.
+"""
+
+import argparse
+import hashlib
+import importlib.util
+import json
+import os
+import signal
+import sys
+import time
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--role', choices=('baseline', 'subject'), required=True)
+    parser.add_argument('--port', type=int, default=63521)
+    parser.add_argument('--max-calls', type=int, default=400)
+    parser.add_argument('--loader', type=Path, required=True)
+    parser.add_argument('--model-root', type=Path, required=True)
+    parser.add_argument('--model-protocol', type=Path, required=True)
+    args = parser.parse_args()
+    for key in ('HF_HUB_OFFLINE', 'TRANSFORMERS_OFFLINE', 'HF_DATASETS_OFFLINE', 'HF_DEACTIVATE_ASYNC_LOAD'):
+        os.environ[key] = '1'
+    os.environ['TOKENIZERS_PARALLELISM'] = 'false'
+    os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '0'
+    sys.dont_write_bytecode = True
+    def stop(_sig, _frame):
+        raise TimeoutError('local service exceeded its two-hour bound')
+    signal.signal(signal.SIGALRM, stop)
+    signal.alarm(7200)
+    source = args.loader
+    if hashlib.sha256(source.read_bytes()).hexdigest() != '4cc9ef6047ade6b6c7f0ba326700e82c804e29d7b14d6f79d144a11d02964e9c':
+        raise ValueError('model loading source changed')
+    spec = importlib.util.spec_from_file_location('retained_loader', source)
+    helper = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(helper)
+    protocol = json.loads(args.model_protocol.read_text())
+    model_info = protocol['models'][args.role]
+    model_dir = args.model_root / args.role
+    for entry in model_info['files']:
+        path = model_dir / entry['path']
+        with path.open('rb') as stream:
+            actual = 'sha256:' + hashlib.file_digest(stream, 'sha256').hexdigest()
+        if actual != entry['sha256'] or path.stat().st_size != entry['byte_size']:
+            raise ValueError('checkpoint inventory changed')
+    import torch
+    began = time.monotonic()
+    # Bound the entire GPU process, including the loader's staging allocations.
+    # This profile is fixed before any service observations are collected.
+    helper.CONFIGURATION['mps_memory_fraction'] = 0.60
+    lm = helper.load_model(model_dir)
+    calls = 0
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, *_args):
+            pass
+
+        def do_POST(self):
+            nonlocal calls
+            status = 200
+            try:
+                if self.path != '/v1/chat/completions':
+                    raise ValueError('unknown route')
+                length = int(self.headers.get('Content-Length', '0'))
+                if not 0 < length <= 65536:
+                    raise ValueError('request size')
+                request = json.loads(self.rfile.read(length))
+                if set(request) != {'model', 'messages', 'temperature', 'max_tokens', 'stream', 'n'}:
+                    raise ValueError('request fields')
+                if request['model'] != 'mistral-requalification' or request['temperature'] != 0 or request['max_tokens'] != 8 or request['stream'] is not False or request['n'] != 1:
+                    raise ValueError('request differs from declared service profile')
+                messages = request['messages']
+                if len(messages) != 2 or messages[0] != {'role': 'system', 'content': ''} or messages[1]['role'] != 'user' or set(messages[1]) != {'role', 'content'}:
+                    raise ValueError('literal prompt profile required')
+                prompt = messages[1]['content']
+                tokens = lm.tokenizer(prompt, add_special_tokens=False, return_tensors='pt')
+                prompt_count = tokens['input_ids'].shape[-1]
+                if prompt_count + 8 > 512:
+                    raise ValueError('context exceeds declared profile; no truncation')
+                start = time.monotonic()
+                with torch.inference_mode():
+                    generated = lm.model.generate(
+                        **{name: value.to('mps') for name, value in tokens.items()},
+                        max_new_tokens=8, do_sample=False, use_cache=True,
+                        pad_token_id=lm.tokenizer.eos_token_id,
+                    )
+                torch.mps.synchronize()
+                suffix = generated[0, prompt_count:].tolist()
+                raw = lm.tokenizer.decode(suffix, skip_special_tokens=True, clean_up_tokenization_spaces=False)
+                words = raw.split()
+                answer = words[0] if words else ''
+                calls += 1
+                payload = {
+                    'id': f'{args.role}-{calls:04d}', 'object': 'chat.completion',
+                    'model': model_info['id'],
+                    'choices': [{'index': 0, 'message': {'role': 'assistant', 'content': answer}, 'finish_reason': 'length' if len(suffix) == 8 else 'stop'}],
+                    'usage': {'prompt_tokens': prompt_count, 'completion_tokens': len(suffix), 'total_tokens': prompt_count + len(suffix)},
+                    'service_observation': {'generated_text': raw, 'generated_token_ids': suffix, 'output_projection': 'first-whitespace-word-v1', 'generation_seconds': time.monotonic() - start},
+                }
+            except Exception as exc:
+                calls += 1
+                status = 400
+                payload = {'error': type(exc).__name__, 'detail': str(exc)}
+            raw_response = json.dumps(payload, ensure_ascii=False, allow_nan=False).encode()
+            self.send_response(status)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', str(len(raw_response)))
+            self.end_headers()
+            self.wfile.write(raw_response)
+            if calls % 25 == 0:
+                print(json.dumps({'role': args.role, 'calls': calls, 'last_status': status, 'elapsed_seconds': time.monotonic()-began}), flush=True)
+
+    with HTTPServer(('127.0.0.1', args.port), Handler) as server:
+        server.timeout = 5
+        print(json.dumps({'status': 'ready', 'role': args.role, 'model': model_info['id'], 'revision': model_info['revision'], 'load_seconds': time.monotonic()-began}), flush=True)
+        while calls < args.max_calls:
+            server.handle_request()
+    signal.alarm(0)
+
+
+if __name__ == '__main__':
+    main()

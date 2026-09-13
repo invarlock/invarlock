@@ -12,6 +12,12 @@ even when every answer matches. Do not interpret the fixture as model or agent
 quality qualification. For an actual campaign, approve a relevant schedule and
 policy before capture using the [requalification guide](../../docs/user-guide/hosted-service-requalification.md).
 
+The retained [local Mistral 7B HTTP reference](references/mistral-7b-http/README.md)
+contains 400 real HTTP observations per deployment and an offline signed replay.
+Its literal exact-match scores are 5% and 6%; the comparative policy passes with
+no absolute quality floor. It is neither standard LAMBADA accuracy nor external
+provider qualification.
+
 ## Prepare the environment and protocol
 
 Use Python 3.12 or newer with the core wheel installed. Run these commands from

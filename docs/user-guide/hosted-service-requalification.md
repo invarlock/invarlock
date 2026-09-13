@@ -59,6 +59,12 @@ provides a portable protocol, bounded collection and separate installed-wheel
 replay. Its four synthetic smoke cases exercise integration and do not qualify
 a hosted service.
 
+The [retained local HTTP reference](https://github.com/invarlock/invarlock/blob/main/examples/hosted-service/references/mistral-7b-http/README.md)
+also provides 400 measured pairs from distinct full 7B checkpoints. It preserves
+the original responses, signed comparison and separate offline verification.
+Its low literal exact-match scores remain visible despite passing the declared
+comparative policy; it does not qualify an external provider or production task.
+
 Run the harness against the approved endpoint and retain complete per-case inputs,
 outputs, errors and source facts. Include actual service requests and responses
 where needed for attribution, after applying the approved secret-handling rules.
