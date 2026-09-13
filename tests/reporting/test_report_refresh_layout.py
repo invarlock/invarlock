@@ -473,3 +473,69 @@ def test_rounded_domain_cannot_collapse_or_exclude_adjacent_bounds(lower):
     positions = [float(value) for value in re.findall(r'(?:x1|x2|cx)="([^"]+)"', chart)]
     assert positions
     assert all(30 <= value <= 610 for value in positions)
+
+
+@pytest.mark.parametrize(
+    ("label", "display_label"),
+    [
+        ("Paired 95% confidence interval", "Paired 95% CI"),
+        (
+            "95% finite-schedule resampling interval",
+            "95% finite-schedule resampling interval",
+        ),
+        (
+            "Paired independent-unit effect interval",
+            "Paired independent-unit effect interval",
+        ),
+        ("<custom interval>", "&lt;custom interval&gt;"),
+    ],
+)
+def test_change_tile_shows_bound_interval_without_relabelling_method(
+    label, display_label
+):
+    metric = MetricView(
+        "Metric",
+        "Overall",
+        "pass",
+        "5%",
+        "6%",
+        "+1 pp",
+        "400",
+        "Comparison",
+        interval=IntervalView(-1.444, 3.526, 1, -2, label, "pp", "minimum", 0),
+    )
+    html = render_html(replace(view(), metrics=(metric,)))
+    assert (
+        f"<dt>Change</dt><dd>+1 pp<small>{display_label}: -1.444 to +3.526 pp</small></dd>"
+        in html
+    )
+    html = render_html(replace(view(), metrics=(replace(metric, interval=None),)))
+    assert "<dt>Change</dt><dd>+1 pp</dd>" in html
+
+
+def test_ratio_change_tile_does_not_present_ratio_bounds_as_signed_effects():
+    metric = MetricView(
+        "NLL",
+        "Overall",
+        "pass",
+        "1",
+        "1.01",
+        "1.01×",
+        "400",
+        "Comparison",
+        interval=IntervalView(
+            0.98,
+            1.03,
+            1.01,
+            1.1,
+            "95% finite-schedule resampling interval",
+            "ratio",
+            "maximum",
+            1,
+        ),
+    )
+    html = render_html(replace(view(), metrics=(metric,)))
+    assert (
+        "<small>95% finite-schedule resampling interval: 0.98 to 1.03 ratio</small>"
+        in html
+    )

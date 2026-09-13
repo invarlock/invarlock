@@ -792,10 +792,16 @@ def render_html(view: ReportView) -> str:
             parts.append(
                 f'<section id="metric-result-{result_index}" tabindex="-1" class="metric {_tone(metric.decision)}"><div class="metric-heading"><div>{heading}<p class="scope">{context}</p></div><span class="badge">{e(decision_label(metric.decision))}</span></div><p class="metric-explanation">{e(metric.explanation)}</p><dl class="values">'
             )
+            change_detail = ""
+            if interval := metric.interval:
+                label = interval.label.replace("confidence interval", "CI")
+                lower = number(interval.lower, signed=interval.neutral == 0)
+                upper = number(interval.upper, signed=interval.neutral == 0)
+                change_detail = f"{label}: {lower} to {upper} {interval.unit}".strip()
             for name, value, detail in [
                 ("Baseline", metric.baseline, metric.baseline_detail),
                 ("Subject", metric.candidate, metric.candidate_detail),
-                ("Change", metric.change, ""),
+                ("Change", metric.change, change_detail),
                 (metric.count_label, metric.count, metric.count_detail),
             ]:
                 sublabel = f"<small>{e(detail)}</small>" if detail else ""
