@@ -296,7 +296,7 @@ def _captured_context(
             and isinstance(source.get("version"), str)
             else "Unavailable in recorded run"
         )
-        recorded_context = (
+        recorded_context: tuple[tuple[str, str], ...] = (
             (label + " evaluator", evaluator),
             (label + " model revision", fields["model_revision"][1]),
             (label + " capture role", fields["role"][1]),
