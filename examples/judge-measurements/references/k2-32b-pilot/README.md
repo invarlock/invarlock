@@ -81,7 +81,8 @@ Current replay does not rerun that historical environment or promote its result.
 
 ## Human review and claim limits
 
-**Human labels are pending. Final plans remain inactive.** This archive does
+The unchanged pilot archive records pending human labels and inactive final
+plans; the subsequent comparison is linked below. This archive does
 not establish agreement with human judgments, rubric validity, judge accuracy,
 inter-rater reliability, broad model quality or deployment approval. No policy,
 case membership, rubric or answer was relaxed to obtain a passing outcome.
@@ -97,3 +98,10 @@ holdout, native role map, private keys or operator logs are included here.
 Preserve the original dataset terms when redistributing the retained text;
 SQuAD's software MIT license does not relicense all Wikipedia-derived dataset
 material, and SGD-derived data retains CC BY-SA 4.0.
+
+## Subsequent comparison
+
+The [completed Luna held-out reference](../k2-32b-luna-xhigh-heldout/README.md)
+contains separate final measurements and AI-review results. Review status inside
+this pilot archive describes the retained snapshot; it does not describe the
+subsequent comparison or change this pilot outcome.

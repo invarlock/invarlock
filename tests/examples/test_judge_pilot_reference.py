@@ -623,3 +623,161 @@ def test_reference_cli_prints_replayed_json(monkeypatch, capsys):
         assert result["workflows"][workflow]["authenticated"]
         assert result["workflows"][workflow]["replayed"]
         assert result["workflows"][workflow]["accepted"] is False
+
+
+@pytest.mark.parametrize("reader", [ref.read_archive, ref.validate_reference])
+@pytest.mark.parametrize("name", ["max_archive_bytes", "max_expanded_bytes"])
+@pytest.mark.parametrize("bound", [None, True, False, 0, -1, 1.5, "1024"])
+def test_archive_bounds_require_positive_integers_before_io(
+    tmp_path, monkeypatch, reader, name, bound
+):
+    def unexpected_read(*args, **kwargs):
+        pytest.fail("invalid bounds must be rejected before reading the archive")
+
+    monkeypatch.setattr(ref, "read_regular_file_bytes", unexpected_read)
+    with pytest.raises(ValueError, match=f"{name} must be a positive integer"):
+        reader(tmp_path / "missing.zip", "0" * 64, **{name: bound})
+
+
+def test_caller_bounds_are_inclusive_and_independently_enforced(tmp_path, monkeypatch):
+    path = tmp_path / "bounded.zip"
+    pin = _write_reference(
+        path,
+        {"payload.json": b"{}"},
+        {"format": "invarlock/judge-pilot-reference-v2"},
+    )
+    files = ref.read_archive(path, pin)
+    bounds = {
+        "max_archive_bytes": path.stat().st_size,
+        "max_expanded_bytes": sum(map(len, files.values())),
+    }
+    assert ref.read_archive(path, pin, **bounds) == files
+
+    def unexpected_decompression(*args, **kwargs):
+        pytest.fail("resource limits must be checked before decompression")
+
+    monkeypatch.setattr(ref.zipfile.ZipFile, "read", unexpected_decompression)
+    for name, message in (
+        ("max_archive_bytes", "size limit"),
+        ("max_expanded_bytes", "retained reference limits"),
+    ):
+        with pytest.raises(ValueError, match=message):
+            ref.read_archive(path, pin, **{**bounds, name: bounds[name] - 1})
+
+
+@pytest.mark.parametrize("expanded", [False, True])
+def test_explicit_bounds_allow_archives_above_legacy_limits(tmp_path, expanded):
+    import zipfile
+
+    path = tmp_path / "large.zip"
+    payload = b"x" * ((64 if expanded else 8) * 1024 * 1024 + 1)
+    manifest = json.dumps(
+        {
+            "format": "invarlock/judge-pilot-reference-v2",
+            "files": {
+                "payload.json": {"sha256": ref.sha(payload), "size_bytes": len(payload)}
+            },
+        }
+    ).encode()
+    entries = {"payload.json": payload, "reference.json": manifest}
+    with zipfile.ZipFile(path, "w") as archive:
+        for name, raw in entries.items():
+            entry = zipfile.ZipInfo(name)
+            entry.external_attr = 0o100644 << 16
+            archive.writestr(
+                entry,
+                raw,
+                compress_type=zipfile.ZIP_DEFLATED if expanded else zipfile.ZIP_STORED,
+            )
+    pin = ref.sha(path.read_bytes())
+    with pytest.raises(
+        ValueError, match="retained reference limits" if expanded else "size limit"
+    ):
+        ref.read_archive(path, pin)
+    assert (
+        ref.read_archive(
+            path,
+            pin,
+            max_archive_bytes=path.stat().st_size,
+            max_expanded_bytes=sum(map(len, entries.values())),
+        )
+        == entries
+    )
+
+
+def test_validate_reference_forwards_explicit_bounds(monkeypatch, tmp_path):
+    bounds = {"max_archive_bytes": 123, "max_expanded_bytes": 456}
+    path = tmp_path / "reference.zip"
+
+    def capture_read(bundle, pin, **kwargs):
+        assert bundle == path
+        assert pin == "0" * 64
+        assert kwargs == bounds
+        raise ValueError("bounded read reached")
+
+    monkeypatch.setattr(ref, "read_archive", capture_read)
+    with pytest.raises(ValueError, match="bounded read reached"):
+        ref.validate_reference(path, "0" * 64, **bounds)
+
+
+def test_reference_cli_passes_caller_limits(monkeypatch, capsys, tmp_path):
+    import sys
+
+    path = tmp_path / "reference.zip"
+    captured = {}
+
+    def capture_validation(bundle, pin, **kwargs):
+        captured.update(bundle=bundle, pin=pin, **kwargs)
+        return {"bounded": True}
+
+    monkeypatch.setattr(ref, "validate_reference", capture_validation)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "reference",
+            "--bundle",
+            str(path),
+            "--expected-sha256",
+            "0" * 64,
+            "--max-archive-bytes",
+            "123",
+            "--max-expanded-bytes",
+            "456",
+        ],
+    )
+    ref.main()
+    assert captured == {
+        "bundle": path,
+        "pin": "0" * 64,
+        "max_archive_bytes": 123,
+        "max_expanded_bytes": 456,
+    }
+    assert json.loads(capsys.readouterr().out) == {"bounded": True}
+
+
+@pytest.mark.parametrize("flag", ["--max-archive-bytes", "--max-expanded-bytes"])
+@pytest.mark.parametrize("value", ["0", "-1", "1.5", "true"])
+def test_reference_cli_rejects_invalid_limits(monkeypatch, tmp_path, flag, value):
+    import sys
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "reference",
+            "--bundle",
+            str(tmp_path / "missing.zip"),
+            "--expected-sha256",
+            "0" * 64,
+            flag,
+            value,
+        ],
+    )
+    if value in {"0", "-1"}:
+        with pytest.raises(ValueError, match="must be a positive integer"):
+            ref.main()
+    else:
+        with pytest.raises(SystemExit) as raised:
+            ref.main()
+        assert raised.value.code == 2

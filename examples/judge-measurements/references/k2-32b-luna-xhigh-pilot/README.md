@@ -86,7 +86,8 @@ public-key anchors; keys copied from an untrusted submitted package would not.
 
 ## Human review and claim limits
 
-**Human labels are pending. Final plans remain inactive.** This reference does
+The unchanged pilot archive records pending human labels and inactive final
+plans; the subsequent comparison is linked below. This reference does
 not establish human agreement, judge accuracy, rubric validity, inter-rater
 reliability, broad model quality, model equivalence or deployment approval.
 Hosted model identity does not reveal or authenticate model weights. Replay
@@ -101,3 +102,10 @@ authorization, collector console logs or checkpoint files are included.
 Preserve the original dataset terms when redistributing retained text; SQuAD's
 software MIT license does not relicense all Wikipedia-derived dataset material,
 and SGD-derived data remains under CC BY-SA 4.0.
+
+## Subsequent comparison
+
+The [completed Luna held-out reference](../k2-32b-luna-xhigh-heldout/README.md)
+contains separate final measurements and AI-review results. Review status inside
+this pilot archive describes the retained snapshot; it does not describe the
+subsequent comparison or change this pilot outcome.

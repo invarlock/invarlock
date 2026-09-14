@@ -28,18 +28,30 @@ def sha(raw: bytes) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
-def read_archive(bundle: Path, expected_sha256: str) -> dict[str, bytes]:
+def read_archive(
+    bundle: Path,
+    expected_sha256: str,
+    *,
+    max_archive_bytes: int = 8 * 1024 * 1024,
+    max_expanded_bytes: int = 64 * 1024 * 1024,
+) -> dict[str, bytes]:
     """Verify the independently selected physical archive before extracting it."""
+    for name, bound in (
+        ("max_archive_bytes", max_archive_bytes),
+        ("max_expanded_bytes", max_expanded_bytes),
+    ):
+        if isinstance(bound, bool) or not isinstance(bound, int) or bound <= 0:
+            raise ValueError(f"{name} must be a positive integer")
     if not re.fullmatch(r"[0-9a-f]{64}", expected_sha256):
         raise ValueError("an independent archive SHA-256 pin is required")
     raw = read_regular_file_bytes(
-        bundle, label="pilot reference archive", max_bytes=8 * 1024 * 1024
+        bundle, label="pilot reference archive", max_bytes=max_archive_bytes
     )
     if sha(raw) != expected_sha256:
         raise ValueError("archive bytes differ from the expected SHA-256 pin")
     with zipfile.ZipFile(io.BytesIO(raw)) as archive:
         entries = archive.infolist()
-        if len(entries) > 128 or sum(x.file_size for x in entries) > 64 * 1024 * 1024:
+        if len(entries) > 128 or sum(x.file_size for x in entries) > max_expanded_bytes:
             raise ValueError("pilot archive exceeds the retained reference limits")
         names = set()
         for entry in entries:
@@ -102,8 +114,19 @@ def validation_contract(manifest: dict) -> tuple[str, dict[str, dict]]:
     return root, expected
 
 
-def validate_reference(bundle: Path, expected_sha256: str) -> dict:
-    files = read_archive(bundle, expected_sha256)
+def validate_reference(
+    bundle: Path,
+    expected_sha256: str,
+    *,
+    max_archive_bytes: int = 8 * 1024 * 1024,
+    max_expanded_bytes: int = 64 * 1024 * 1024,
+) -> dict:
+    files = read_archive(
+        bundle,
+        expected_sha256,
+        max_archive_bytes=max_archive_bytes,
+        max_expanded_bytes=max_expanded_bytes,
+    )
     manifest = parse_json_bytes(files["reference.json"], label="pilot reference")
     active_root, expectations = validation_contract(manifest)
     results = {}
@@ -172,8 +195,25 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bundle", required=True, type=Path)
     parser.add_argument("--expected-sha256", required=True)
+    parser.add_argument(
+        "--max-archive-bytes",
+        type=int,
+        default=8 * 1024 * 1024,
+        help="Caller-selected compressed archive byte limit (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--max-expanded-bytes",
+        type=int,
+        default=64 * 1024 * 1024,
+        help="Caller-selected total expanded byte limit (default: %(default)s)",
+    )
     args = parser.parse_args()
-    result = validate_reference(args.bundle, args.expected_sha256)
+    result = validate_reference(
+        args.bundle,
+        args.expected_sha256,
+        max_archive_bytes=args.max_archive_bytes,
+        max_expanded_bytes=args.max_expanded_bytes,
+    )
     print(json.dumps(result, indent=2))
 
 
