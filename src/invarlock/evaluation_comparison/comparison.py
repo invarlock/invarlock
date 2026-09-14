@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import math
 import struct
+from collections.abc import Mapping
 from typing import Any, cast
 
 from invarlock.core.scoring import MetricError, score, validate_configuration
@@ -80,7 +81,8 @@ def make_run(
     *,
     source: dict[str, str],
     run_id: str,
-    artifact_digest: str,
+    artifact_digest: str | None,
+    service_identity: Mapping[str, Any] | None = None,
     score_provenance: dict[str, Any] | None = None,
     source_digest: str | None = None,
 ) -> dict[str, Any]:
@@ -113,6 +115,8 @@ def make_run(
         "score_provenance": score_provenance or {},
         "records": normalized,
     }
+    if service_identity is not None:
+        value["service_identity"] = dict(service_identity)
     _check_run(value)
     # Detach caller-owned dictionaries; later mutation must be an explicit new run.
     import json
@@ -124,9 +128,16 @@ def _check_run(value: dict[str, Any]) -> None:
     from invarlock.evaluator_capture import verify_input_projection
 
     validate(value, "run")
+    service_identity_digest = None
+    if "service_identity" in value:
+        from invarlock.evaluation_records.identity import evaluated_subject_digest
+
+        service_identity_digest = evaluated_subject_digest(value)
     for row in value["records"]:
         verify_input_projection(row)
-        validate_likelihood_record(row, value)
+        validate_likelihood_record(
+            row, value, service_identity_digest=service_identity_digest
+        )
     ids = [row["id"] for row in value["records"]]
     if len(ids) != len(set(ids)):
         raise EvaluationRecordsError(
@@ -461,6 +472,10 @@ def compare_runs(
             "A policy pass does not establish truthful model execution, general quality, safety or compliance.",
         ],
     }
+    if any("service_identity" in run for run in (baseline, subject)):
+        result["limitations"].append(
+            "Hosted identity digests authenticate declared service descriptors and observation windows; they do not identify underlying weights or establish hidden configuration or later service behavior."
+        )
     if any(metric["kind"] == LIKELIHOOD_METRIC for metric in policy["metrics"]):
         result["limitations"].append(
             "Normalized NLL replays captured reference-continuation likelihood facts; their model execution, tokenizer and configuration claims are source assertions, not independently established runtime facts."

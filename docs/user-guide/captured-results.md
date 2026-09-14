@@ -9,6 +9,12 @@ Use the core `evaluate`, `verify`, and `report` commands when an evaluator has
 already produced paired records. The request binds the baseline, subject,
 policy, and output location without introducing a separate command namespace.
 
+Hosted captures can declare a service identity and observation window with
+`artifact_digest: null`. The [hosted requalification guide](hosted-service-requalification.md)
+walks through baseline approval, fresh capture, evaluation, offline verification
+and the resulting decision. This is captured assurance: replay does not attest
+execution or freshly measure a service.
+
 ## Prepare the request
 
 `invarlock evaluate --init demo --example classification` creates synthetic
@@ -64,11 +70,14 @@ covers the evaluator shortlist and distinguishes tested capture paths from
 upstream qualification. Keep using your evaluator's environment; InvarLock can
 consume its retained exports in a separate environment.
 
-For a complete measured NLL example, replay the
-[Harness likelihood reference](https://github.com/invarlock/invarlock/blob/main/examples/captured-results/references/harness-likelihood/README.md).
-It retains six real same-model CPU pairs, their exact continuation and tokenizer
-bindings, signed evaluation and independent recipient verification. This is an
-integration conformance result, not a model-quality benchmark.
+For a measured NLL comparison between distinct checkpoints, replay the
+[Mistral 7B reference](https://github.com/invarlock/invarlock/blob/main/examples/captured-results/references/mistral-7b-likelihood/README.md).
+It retains 400 paired narrative continuations, both model identities and the
+complete signed handoff. The smaller
+[Harness likelihood control](https://github.com/invarlock/invarlock/blob/main/examples/captured-results/references/harness-likelihood/README.md)
+preserves the original six-pair same-model CPU check. Both references retain exact
+continuation and tokenizer bindings, signed evaluation and independent recipient
+verification; their scope is the declared integration profile.
 
 For structured task inputs, a source may declare an explicit text projection:
 

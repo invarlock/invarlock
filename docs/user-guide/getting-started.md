@@ -34,7 +34,10 @@ invarlock report evidence/
 To check results from an existing evaluator without preparing an OCI runtime,
 start with [Captured results](captured-results.md). The same commands and SDK
 support multiple metrics and slices with explicit captured assurance. This page
-walks through native execution and its independent receipt.
+walks through native execution and its independent receipt. For periodic or
+incident-triggered hosted evaluation, follow
+[Requalify a hosted service](hosted-service-requalification.md); the capture
+harness supplies fresh executions and the core verifies their retained evidence.
 
 ## Matching wheels and examples
 

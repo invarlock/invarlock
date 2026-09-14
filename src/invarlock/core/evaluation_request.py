@@ -244,6 +244,7 @@ class CapturedSourceRequest:
     score_provenance: Mapping[str, Mapping[str, str | None]] | None = None
     expected_run_digest: str | None = None
     input_projection: Mapping[str, str] | None = None
+    service_identity: Mapping[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -330,18 +331,28 @@ def _load_yaml(payload: bytes) -> Any:
 
 
 def _reject_include_directives(value: Any) -> None:
-    pending = [value]
+    captured = isinstance(value, dict) and (
+        value.get("format_version") == CAPTURED_EVALUATION_REQUEST_FORMAT_VERSION
+    )
+    pending: list[tuple[tuple[str, ...], Any]] = [((), value)]
     while pending:
-        current = pending.pop()
+        path, current = pending.pop()
+        # Hosted configuration is retained declaration data. These fields never
+        # resolve files or extend the surrounding request.
+        if captured and path in {
+            ("comparison", "baseline", "service_identity", "configuration"),
+            ("comparison", "subject", "service_identity", "configuration"),
+        }:
+            continue
         if isinstance(current, dict):
             for key, child in current.items():
                 if isinstance(key, str) and key.lower() in _FORBIDDEN_INCLUDE_KEYS:
                     raise EvaluationRequestError(
                         "request YAML include directives are not allowed"
                     )
-                pending.append(child)
+                pending.append(((*path, key), child))
         elif isinstance(current, list):
-            pending.extend(current)
+            pending.extend((path, child) for child in current)
 
 
 def _schema_error_message(error: jsonschema.ValidationError) -> str:
@@ -983,6 +994,9 @@ def _build_captured_request(
             source=cast(Mapping[str, str] | None, source.get("source")),
             run_id=cast(str | None, source.get("run_id")),
             artifact_digest=cast(str | None, source.get("artifact_digest")),
+            service_identity=cast(
+                Mapping[str, Any] | None, source.get("service_identity")
+            ),
             score_provenance=cast(
                 Mapping[str, Mapping[str, str | None]] | None, provenance
             ),

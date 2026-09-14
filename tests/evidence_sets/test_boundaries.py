@@ -164,7 +164,7 @@ def test_report_checks_subject_artifact_even_when_run_reader_disagrees(
         return actual
 
     monkeypatch.setattr(reporting, "shared_captured_inputs", altered)
-    with pytest.raises(EvidenceReportError, match="artifacts differ"):
+    with pytest.raises(EvidenceReportError, match="identities differ"):
         render_evidence(root)
 
 

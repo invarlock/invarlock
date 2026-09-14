@@ -497,6 +497,13 @@ identities in their technical details. The comparison context also shows the
 recorded model, workflow, dataset and prompt metadata when supplied. These
 details identify what was compared without changing the report's assurance.
 
+Hosted runs use `execution.mode: captured`, `artifact_digest: null` and explicit
+service identity. Their complete-run pins cover the service configuration,
+harness and observation window. They do not use native artifact or runtime
+anchors. Captured `evaluate` consumes supplied service records; it does not
+execute a hosted service. Offline verification does not refresh that observation.
+See [hosted requalification](../user-guide/hosted-service-requalification.md).
+
 Reporting does not accept independent artifact, schedule, policy, runtime, or
 signer anchors and does not issue a verification receipt. It is therefore a
 safe renderer, not a substitute for `invarlock verify`.

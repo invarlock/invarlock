@@ -21,7 +21,12 @@ from invarlock.evidence_pack_contract import (
 LIKELIHOOD_METRIC = "normalized_nll_per_utf8_byte"
 
 
-def validate_likelihood_record(row: dict[str, Any], run: dict[str, Any]) -> None:
+def validate_likelihood_record(
+    row: dict[str, Any],
+    run: dict[str, Any],
+    *,
+    service_identity_digest: str | None,
+) -> None:
     """Cross-bind facts after schema and retained projection validation."""
     if "likelihood" not in row:
         return
@@ -45,6 +50,25 @@ def validate_likelihood_record(row: dict[str, Any], run: dict[str, Any]) -> None
         if isinstance(context, dict) and "input_projection" in context
         else row["input"]
     )
+    if "service_identity" in run:
+        if (
+            service_identity_digest is None
+            or facts.get("service_identity_digest") != service_identity_digest
+        ):
+            raise EvaluationRecordsError(
+                f"{label} service_identity_digest binding differs"
+            )
+        if (
+            facts["configuration_digest"]
+            != run["service_identity"]["configuration_digest"]
+        ):
+            raise EvaluationRecordsError(
+                f"{label} service configuration binding differs"
+            )
+    elif "service_identity_digest" in facts:
+        raise EvaluationRecordsError(
+            f"{label} service identity cannot replace an artifact"
+        )
     for key, expected in (
         ("input_digest", digest(captured_input)),
         ("reference_digest", digest(row["expected"])),

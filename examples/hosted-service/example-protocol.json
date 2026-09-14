@@ -1,0 +1,69 @@
+{
+  "format": "invarlock/hosted-service-protocol-v1",
+  "services": {
+    "baseline": {
+      "provider": "local-simulation",
+      "service": "chat-completions",
+      "deployment": "baseline-window",
+      "endpoint": "http://127.0.0.1:8000/v1/chat/completions",
+      "model": "simulation-model",
+      "expected_observed_model": "simulation-model",
+      "exposed_revision": null
+    },
+    "subject": {
+      "provider": "local-simulation",
+      "service": "chat-completions",
+      "deployment": "subject-window",
+      "endpoint": "http://127.0.0.1:8000/v1/chat/completions",
+      "model": "simulation-model",
+      "expected_observed_model": "simulation-model",
+      "exposed_revision": null
+    }
+  },
+  "harness": {
+    "name": "synthetic-http-smoke",
+    "version": "1",
+    "source_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "collector_source_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "journey_source_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "environment": {
+    "purpose": "Synthetic HTTP integration smoke; not service quality qualification"
+  },
+  "configuration": {
+    "temperature": 0,
+    "system_prompt": "Reply with exactly yes and no other text.",
+    "max_tokens": 8
+  },
+  "limits": {
+    "max_calls": 4,
+    "max_total_output_tokens": 32,
+    "timeout_seconds": 10,
+    "max_response_bytes": 4096,
+    "max_wall_seconds": 60
+  },
+  "cases": [
+    {"id": "smoke-1", "input": "Reply yes for synthetic smoke case one.", "expected": "yes"},
+    {"id": "smoke-2", "input": "Reply yes for synthetic smoke case two.", "expected": "yes"},
+    {"id": "smoke-3", "input": "Reply yes for synthetic smoke case three.", "expected": "yes"},
+    {"id": "smoke-4", "input": "Reply yes for synthetic smoke case four.", "expected": "yes"}
+  ],
+  "policy": {
+    "format": "invarlock/comparison-policy-v1",
+    "slices": [],
+    "metrics": [
+      {
+        "name": "smoke_exact_match",
+        "kind": "exact_match",
+        "configuration": {},
+        "direction": "higher",
+        "unit": "score",
+        "aggregation": "mean",
+        "minimum_count": 20,
+        "maximum_regression": 0.1,
+        "maximum_interval_width": 1,
+        "subject_minimum": 0.5
+      }
+    ]
+  }
+}

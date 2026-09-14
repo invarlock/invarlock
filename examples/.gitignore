@@ -9,3 +9,5 @@ verification.receipt.json
 !import/subject/runtime-provider.receipt.json
 !import/rejected-subject/runtime-provider.receipt.json
 !captured-results/references/*/verification.receipt.json
+!hosted-service/references/mistral-7b-http/verification.receipt.json
+!hosted-service/references/mistral-7b-http/current/verification.receipt.json

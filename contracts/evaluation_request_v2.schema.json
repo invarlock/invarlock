@@ -127,7 +127,15 @@
           "$ref": "#/$defs/text"
         },
         "artifact_digest": {
-          "$ref": "#/$defs/digest"
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "score_provenance": {
           "$ref": "#/$defs/provenance"
@@ -137,6 +145,135 @@
         },
         "input_projection": {
           "$ref": "#/$defs/input_projection"
+        },
+        "service_identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "hosted_service"
+            },
+            "provider": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512,
+              "pattern": "^(?!\\s*$)[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
+            },
+            "service": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512,
+              "pattern": "^(?!\\s*$)[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
+            },
+            "deployment": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512,
+              "pattern": "^(?!\\s*$)[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
+            },
+            "requested_model": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512,
+              "pattern": "^(?!\\s*$)[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
+            },
+            "observed_model": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "pattern": "^(?!\\s*$)[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "exposed_revision": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "pattern": "^(?!\\s*$)[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "configuration": {
+              "type": "object",
+              "maxProperties": 100
+            },
+            "configuration_digest": {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}(?![\\s\\S])",
+              "minLength": 71,
+              "maxLength": 71
+            },
+            "harness": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "pattern": "^(?!\\s*$)[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
+                },
+                "version": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "pattern": "^(?!\\s*$)[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
+                },
+                "source_digest": {
+                  "type": "string",
+                  "pattern": "^sha256:[a-f0-9]{64}(?![\\s\\S])",
+                  "minLength": 71,
+                  "maxLength": 71
+                }
+              },
+              "required": [
+                "name",
+                "version",
+                "source_digest"
+              ]
+            },
+            "observation_window": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "started_at": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?Z(?![\\s\\S])"
+                },
+                "ended_at": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?Z(?![\\s\\S])"
+                }
+              },
+              "required": [
+                "started_at",
+                "ended_at"
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "provider",
+            "service",
+            "deployment",
+            "requested_model",
+            "observed_model",
+            "exposed_revision",
+            "configuration",
+            "configuration_digest",
+            "harness",
+            "observation_window"
+          ]
         }
       },
       "additionalProperties": false,
@@ -154,6 +291,31 @@
               "required": [
                 "input_projection"
               ]
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "service_identity"
+            ]
+          },
+          "then": {
+            "required": [
+              "artifact_digest"
+            ],
+            "properties": {
+              "artifact_digest": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "artifact_digest": {
+                "type": "string",
+                "pattern": "^sha256:[a-f0-9]{64}$"
+              }
             }
           }
         }

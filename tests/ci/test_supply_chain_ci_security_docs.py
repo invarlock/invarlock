@@ -224,6 +224,16 @@ def test_full_ci_pins_make_to_setup_python() -> None:
             ),
         ),
         (
+            "Retained Mistral harness source pins",
+            "match",
+            (
+                "examples/captured-results/references/mistral-7b-likelihood/capture/baseline/protocol.json",
+                "examples/captured-results/references/mistral-7b-likelihood/capture/subject/protocol.json",
+                "examples/hosted-service/references/mistral-7b-http/capture/checkpoint-loader-source.txt",
+                "examples/hosted-service/references/mistral-7b-http/capture/checkpoint-loading-protocol.json",
+            ),
+        ),
+        (
             "Captured likelihood tokenizer source pins",
             "match",
             ("examples/captured-results/harness_likelihood_rehearsal.py",),

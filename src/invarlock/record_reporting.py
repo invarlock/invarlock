@@ -216,6 +216,7 @@ def _captured_context(
 ]:
     subjects = []
     context = [("Evaluation mode", "Captured evaluator outputs")]
+    service_details: list[tuple[str, Any]] = []
     model_keys = []
     messages = []
     for side in ("baseline", "subject"):
@@ -236,6 +237,56 @@ def _captured_context(
             if fields["model_key"][0] is not None
             else "Recorded run: " + _short_context(str(run["run_id"]), 128)
         )
+        service = run.get("service_identity")
+        if service is not None:
+            model_label = (
+                "Observed model" if service["observed_model"] else "Requested model"
+            )
+            identity = (
+                model_label
+                + ": "
+                + _short_context(
+                    service["observed_model"] or service["requested_model"]
+                )
+            )
+            identity += " · Deployment: " + _short_context(service["deployment"])
+            window = service["observation_window"]
+            context.extend(
+                (label + " " + key, value)
+                for key, value in (
+                    ("provider", _short_context(service["provider"])),
+                    ("service", _short_context(service["service"])),
+                    ("deployment", _short_context(service["deployment"])),
+                    ("requested model", _short_context(service["requested_model"])),
+                    (
+                        "observed model",
+                        _short_context(service["observed_model"] or "Not exposed"),
+                    ),
+                    (
+                        "exposed revision",
+                        _short_context(service["exposed_revision"] or "Not exposed"),
+                    ),
+                    (
+                        "observation window",
+                        f"{window['started_at']} → {window['ended_at']}",
+                    ),
+                    (
+                        "service provenance",
+                        "Captured service declaration. Model weights are not identified.",
+                    ),
+                    (
+                        "service harness",
+                        _short_context(
+                            f"{service['harness']['name']} {service['harness']['version']}"
+                        ),
+                    ),
+                )
+            )
+            preview = _configuration_preview(service["configuration"])
+            preview["note"] = (
+                "Full declared configuration remains in the captured run. Its digest identifies the declaration."
+            )
+            service_details.append((label + " declared service configuration", preview))
         subjects.append((label, identity))
         source = run.get("source")
         evaluator = (
@@ -245,24 +296,68 @@ def _captured_context(
             and isinstance(source.get("version"), str)
             else "Unavailable in recorded run"
         )
-        context.extend(
+        recorded_context: tuple[tuple[str, str], ...] = (
+            (label + " evaluator", evaluator),
+            (label + " model revision", fields["model_revision"][1]),
+            (label + " capture role", fields["role"][1]),
             (
-                (label + " evaluator", evaluator),
-                (label + " model revision", fields["model_revision"][1]),
-                (label + " capture role", fields["role"][1]),
-                (
-                    label + " workflow",
-                    _common_context(records, "workflow", "metadata")[1],
-                ),
-                (
-                    label + " dataset",
-                    _common_context(records, "dataset", "metadata")[1],
-                ),
-                (label + " records", f"{len(records):,}"),
-                (label + " effective message roles", _prompt_roles(indexed)),
+                label + " workflow",
+                _common_context(records, "workflow", "metadata")[1],
+            ),
+            (
+                label + " dataset",
+                _common_context(records, "dataset", "metadata")[1],
+            ),
+            (label + " records", f"{len(records):,}"),
+            (label + " effective message roles", _prompt_roles(indexed)),
+        )
+        if service is not None:
+            source_is_harness = isinstance(source, dict) and all(
+                source.get(key) == service["harness"][key]
+                for key in ("name", "version")
+            )
+            recorded_context = tuple(
+                (key, value)
+                for key, value in recorded_context
+                if value != "Unavailable in recorded context"
+                and not (key == label + " evaluator" and source_is_harness)
+            )
+        context.extend(recorded_context)
+    services = [
+        inputs[side].get("service_identity") for side in ("baseline", "subject")
+    ]
+    if any(service is not None for service in services):
+        context.append(
+            (
+                "Measurement scope",
+                "Verification checks retained observations; it does not remeasure the service.",
             )
         )
-    if model_keys[0] is not None and model_keys[0] == model_keys[1]:
+        if all(service is not None for service in services):
+            left, right = (cast(dict[str, Any], service) for service in services)
+            changed = [
+                key.replace("_", " ")
+                for key in (
+                    "provider",
+                    "service",
+                    "deployment",
+                    "requested_model",
+                    "observed_model",
+                    "exposed_revision",
+                    "configuration",
+                    "harness",
+                )
+                if left[key] != right[key]
+            ]
+            model = (
+                "Declared service fields differ: " + ", ".join(changed) + "."
+                if changed
+                else "Declared service and configuration fields are unchanged across the recorded observation windows."
+            )
+            model += " This comparison does not identify the cause of an observed performance change or establish identical hidden weights."
+        else:
+            model = "The runs use different identity profiles: a model artifact and a hosted service. The service declaration does not identify model weights."
+    elif model_keys[0] is not None and model_keys[0] == model_keys[1]:
         model = (
             "Both runs record model key "
             + _short_context(model_keys[0])
@@ -273,7 +368,12 @@ def _captured_context(
     else:
         model = "Model-key comparison is unavailable because recorded values are missing or mixed."
     prompt, details = _prompt_change(*messages)
-    return tuple(subjects), tuple(context), (model, prompt), details
+    return (
+        tuple(subjects),
+        tuple(context),
+        (model, prompt),
+        (*details, *service_details),
+    )
 
 
 def _captured_identities(
@@ -289,10 +389,25 @@ def _captured_identities(
             (
                 (label + " run", run["run_id"]),
                 (label + " run digest", digest(run)),
-                (label + " attributed artifact", run["artifact_digest"]),
+                (
+                    label + " service identity"
+                    if "service_identity" in run
+                    else label + " attributed artifact",
+                    digest(run["service_identity"])
+                    if "service_identity" in run
+                    else run["artifact_digest"],
+                ),
                 (label + " evaluator", f"{source['name']} {source['version']}"),
             )
         )
+        if "service_identity" in run:
+            service = run["service_identity"]
+            identities.extend(
+                (
+                    (label + " service configuration", service["configuration_digest"]),
+                    (label + " harness source", service["harness"]["source_digest"]),
+                )
+            )
     return tuple(identities)
 
 

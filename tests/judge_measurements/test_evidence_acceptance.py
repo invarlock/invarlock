@@ -16,6 +16,7 @@ from jsonschema import Draft202012Validator, ValidationError
 
 from invarlock import public_contracts
 from invarlock.acceptance_attestation import verify_acceptance_attestation
+from invarlock.engine import evaluated_subject_digest
 from invarlock.judge_measurements import acceptance
 from invarlock.judge_measurements.acceptance import (
     replay_signed_judge_verification_receipt,
@@ -112,7 +113,7 @@ def _publish(
     recipient = {
         "format": "invarlock/judge-measurement-recipient-policy-v1",
         "decision_scope": "bounded-judge-fixed-benchmark-v1",
-        "intended_subject": runs[1]["artifact_digest"],
+        "intended_subject": evaluated_subject_digest(runs[1]),
         "required_metric_name": analysis_policy["metric_name"],
         "trusted_signer": {
             "identity": "example-signer",

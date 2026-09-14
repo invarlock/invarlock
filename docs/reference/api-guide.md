@@ -607,8 +607,8 @@ write_runtime_import_paired_records(
 The timestamp is explicit so identical inputs produce identical files. The
 writer records strict container execution, offline operation, disabled remote
 code, and disabled third-party discovery. Those fields describe facts the
-caller is responsible for measuring; serialization does not attest that an
-untrusted host reported them honestly. Independent verification must still pin
+caller is responsible for measuring; serialization does not independently
+establish their accuracy or attest execution. Independent verification must still pin
 the artifact, schedule, policy, runtime-image, and signer identities.
 
 `RuntimeImportAuthoringError` is raised before publication when record pairing,

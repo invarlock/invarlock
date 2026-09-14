@@ -889,7 +889,7 @@ def evaluate(  # noqa: C901
 
 @app.command(
     name="verify",
-    help="Independently verify one evidence pack against caller-supplied trust anchors.",
+    help="Independently verify retained evidence offline against caller-supplied trust anchors. This does not collect new model outputs or remeasure a service.",
 )
 def verify(
     ctx: typer.Context,

@@ -503,6 +503,13 @@ def _view(
             facts["comparison"][side].update(
                 run_digest=run_digest(run), source_digest=run["source_digest"]
             )
+            if "service_identity" in run:
+                service = run["service_identity"]
+                facts["comparison"][side]["service_identity"] = {
+                    key: value
+                    for key, value in service.items()
+                    if key != "configuration"
+                }
             native_identity.append(
                 (
                     side.title() + " source digest",
@@ -614,9 +621,12 @@ def _view(
             ("Coverage", metric.count),
         ),
         identity=tuple(native_identity)
+        + tuple(
+            (side.title() + " artifact", artifacts[f"{side}_run"]["artifact_digest"])
+            for side in ("baseline", "subject")
+            if artifacts[f"{side}_run"]["artifact_digest"] is not None
+        )
         + (
-            ("Baseline artifact", artifacts["baseline_run"]["artifact_digest"]),
-            ("Subject artifact", artifacts["subject_run"]["artifact_digest"]),
             ("Plan", publication.envelope["bindings"]["plan_sha256"]),
             ("Intended subject", publication.envelope["intended_subject"]),
             (
@@ -650,6 +660,7 @@ def _view(
                 if native is not None
                 else "A retained judgment does not establish model execution or immunity to prompt injection."
             ),
+            "Verification replays retained measurements offline; it does not remeasure the evaluated service or independently establish that every judge rating is correct.",
         ),
         details=tuple(details),
         technical={

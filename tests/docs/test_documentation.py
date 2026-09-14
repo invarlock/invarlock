@@ -78,6 +78,7 @@ EXPECTED_DOC_PAGES = {
     "user-guide/public-evidence.md",
     "user-guide/getting-started.md",
     "user-guide/captured-results.md",
+    "user-guide/hosted-service-requalification.md",
     "user-guide/key-management.md",
     "user-guide/modelkit-handoff.md",
     "user-guide/runtime-providers.md",

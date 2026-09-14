@@ -1,0 +1,48 @@
+{
+  "stage": "checkpoint-loading",
+  "role": "baseline",
+  "completed_cases": 0,
+  "exit_signal": 11,
+  "subject_started": false,
+  "diagnosis": "MPS asynchronous weight-copy crash; no measurement results",
+  "correction": "Disable Transformers asynchronous weight loading in the next frozen protocol",
+  "upstream_issue": "https://github.com/huggingface/transformers/issues/48029",
+  "protocol_sha256": "sha256:1aa42ed12257f77343f8d900b0fa8fc57216927102f296800a43a737f9d31eb2",
+  "capture_script_sha256": "sha256:7e277b092e0be23c4fb11d28601808ab2e356949ab48aeb3337368a65c2d832b",
+  "execution_log": {
+    "sha256": "sha256:67c074030c1072a3cb667de5d9625f2b1e73710bb5f5e15ea219cd5d1d0904be",
+    "byte_size": 356
+  },
+  "original_model_identities": {
+    "baseline": {
+      "artifact_digest": "sha256:c8e5d83cef2df1fa38f189fbbaab100571622addb05bb812fcc324cadbf099ec",
+      "id": "mistralai/Mistral-7B-v0.1",
+      "revision": "27d67f1b5f57dc0953326b2601d68371d40ea8da",
+      "tokenizer_digest": "sha256:11539bde3507db70de31a5931152d0907f24972b41b17468b3ea0f4d9fa70299"
+    },
+    "subject": {
+      "artifact_digest": "sha256:301a07d113d1964b69f497b54a8bc32a44f3b8ce0899e03e74809fa660c04067",
+      "id": "mistralai/Mistral-7B-Instruct-v0.1",
+      "revision": "ec5deb64f2c6e6fa90c1abf74a91d5c93a9669ca",
+      "tokenizer_digest": "sha256:bef458384298d886e4e30ac9262f18d7cfc14adf71b2643a2935237b7bd3f7c1"
+    }
+  },
+  "dataset_sha256": "sha256:decb3844b858376751776d48a7cf30d54155fe3249a0fc4085d162d9fdee4b5f",
+  "measured_results_repeated": 0,
+  "explanation": "The first process terminated during checkpoint loading before any model measurement. The source-level serial-loading setting was fixed in a new protocol before the complete comparison. Models, source cases and policy thresholds were preserved.",
+  "subject_loading_attempt": {
+    "completed_cases": 0,
+    "error_type": "RuntimeError",
+    "reason": "MPS memory cap reached during checkpoint loading",
+    "protocol_sha256": "sha256:245ac509709ed5741c97078a7e6a660cf3dcb7d429de0501a2082202f332d324",
+    "execution_log": {
+      "sha256": "sha256:2965b11e4ae2cdc16190607661e61e5ef484e1385395290ca7eb160fe564d19e",
+      "byte_size": 4804
+    },
+    "failure_record": {
+      "sha256": "sha256:53e537393c1282edd57b3825796749d8ad00b1f3b33dbd470de49f0c9db20835",
+      "byte_size": 85
+    },
+    "retry": "fresh subject process with identical frozen protocol, model, cases and memory cap; completed baseline retained"
+  }
+}

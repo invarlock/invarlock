@@ -475,6 +475,18 @@ supplied runs. Optional model and prompt context describes the evaluator-recorde
 change; it does not establish checkpoint identity. Only `verify` can add
 independent authentication and replay assurance.
 
+Hosted captured evidence attributes a service observation, with an explicit
+configuration, harness and observation window, instead of asserting an immutable
+weight artifact. An observed model name or exposed revision remains a source
+assertion. Replaying or rendering the evidence does not make new service calls
+or establish current service behavior.
+
+Keep policy satisfaction, regression or other policy failure, insufficient
+evidence, and integrity or verification failure separate. An authentic policy
+rejection differs from a submission that cannot be verified. Neither report
+rendering nor technical policy satisfaction makes the organizational decision;
+record that decision separately with its remaining conditions and scope.
+
 For exact match, means appear as percentages and changes as percentage points.
 The decision tests the paired interval's lower bound, not just the observed
 change. An improving candidate can still fail an absolute accuracy floor. When
@@ -546,7 +558,7 @@ The assurance panel distinguishes embedded bundle authentication from
 independent recipient acceptance. A bundle's embedded signer is not a
 recipient-owned trust anchor. Use `invarlock verify` with independent policy,
 identity and signer inputs to produce the signed acceptance or rejection
-receipt. A report can truthfully show an authenticated policy failure.
+receipt. A report can show an authenticated policy failure.
 
 A successful `report` invocation indicates that rendering completed, including
 when the recorded policy verdict is `fail`. Automation should parse verified

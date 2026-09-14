@@ -1,0 +1,150 @@
+{
+  "format": "invarlock/harness-model-reference-v1",
+  "scope": "distinct-checkpoint-narrative-likelihood",
+  "case_count": 400,
+  "models": {
+    "baseline": {
+      "artifact_digest": "sha256:c8e5d83cef2df1fa38f189fbbaab100571622addb05bb812fcc324cadbf099ec",
+      "id": "mistralai/Mistral-7B-v0.1",
+      "revision": "27d67f1b5f57dc0953326b2601d68371d40ea8da",
+      "tokenizer_digest": "sha256:11539bde3507db70de31a5931152d0907f24972b41b17468b3ea0f4d9fa70299"
+    },
+    "subject": {
+      "artifact_digest": "sha256:301a07d113d1964b69f497b54a8bc32a44f3b8ce0899e03e74809fa660c04067",
+      "id": "mistralai/Mistral-7B-Instruct-v0.1",
+      "revision": "ec5deb64f2c6e6fa90c1abf74a91d5c93a9669ca",
+      "tokenizer_digest": "sha256:bef458384298d886e4e30ac9262f18d7cfc14adf71b2643a2935237b7bd3f7c1"
+    }
+  },
+  "anchors": {
+    "baseline_run_digest": "sha256:257b27bea9017e8ff6a422ccbbc752ba783b253e719a5aedfe4ca467ff5c2b4d",
+    "subject_run_digest": "sha256:8f6b8a296f01ae50bb31f4ae956ad2e085e0f15118a18af661c3675538bcad12",
+    "request_digest": "sha256:078863a2d47fa3afc06c5e31f3735f296394e70c67ab0ee24ebc1866c152fa75"
+  },
+  "capture_pins": {
+    "protocol_sha256": "sha256:245ac509709ed5741c97078a7e6a660cf3dcb7d429de0501a2082202f332d324",
+    "baseline_sha256": "sha256:6f84774a5181cfafd6c2ac1eca9ec113f8b0e3ab8d9a7af4b34a38f27f7dae02",
+    "subject_sha256": "sha256:82df7a2a4c59d673f9cb2a271398dacc46edf65718d6251776ac6946870ffba5"
+  },
+  "signer_fingerprint": "sha256:d60106c6c8f43c3d5f64498cca0d06bbd9282b15edf94995d65d004a32e3bf15",
+  "retained_verifier": {
+    "identity": "mistral-likelihood-recipient",
+    "signing_key_fingerprint": "sha256:40bf143180a1e62c0e1840bf7d590503415761a38125f42255c9cbf7335dcaa1",
+    "trust_profile_digest": "sha256:79d1623f8c4f0a0d2a7a40bcb1f0f56540c6ee102664c92314e0193a6eeb9234"
+  },
+  "expected_decision": "regression",
+  "expected_metric": {
+    "aggregation": "mean",
+    "baseline_mean": 0.5446367517489973,
+    "count": 400,
+    "decision": "regression",
+    "delta": 0.04965006758952362,
+    "direction": "lower",
+    "interval": {
+      "lower": 1.0845635913082117,
+      "mass": 0.95,
+      "method": "paired_percentile_bootstrap_sha256_v1",
+      "replicates": 2048,
+      "upper": 1.0980647428628072
+    },
+    "interval_unit": "ratio",
+    "kind": "normalized_nll_per_utf8_byte",
+    "missing_ids": [],
+    "name": "reference_nll",
+    "ratio": 1.091161801751501,
+    "reasons": [
+      "upper ratio interval bound exceeds ratio_max"
+    ],
+    "scoring_assurance": "recomputed",
+    "slice": "overall",
+    "subject_mean": 0.5942868193385209,
+    "unit": "nats_per_utf8_byte"
+  },
+  "invarlock_wheel": {
+    "version": "0.15.0",
+    "source_commit": "9a2eb7f8fedf373c2c468ecdc60bb84709dcd1b2",
+    "sha256": "sha256:6b808c9152186d21277bf1e0292a77abc42b4aa64ee5e64b85921914ca260688"
+  },
+  "files": {
+    "capture/baseline/manifest.json": {
+      "sha256": "sha256:6eb1019cdf717a3feacbdf593e1bc34e8c48a9d44d257cb00d996e42458ac5c8",
+      "byte_size": 3590
+    },
+    "capture/baseline/protocol.json": {
+      "sha256": "sha256:245ac509709ed5741c97078a7e6a660cf3dcb7d429de0501a2082202f332d324",
+      "byte_size": 279175
+    },
+    "capture/baseline/raw-results.json": {
+      "sha256": "sha256:6f84774a5181cfafd6c2ac1eca9ec113f8b0e3ab8d9a7af4b34a38f27f7dae02",
+      "byte_size": 1311051
+    },
+    "capture/baseline/tokenizations.json": {
+      "sha256": "sha256:6938ad26ef645e7b2b3190cdd62d33a4041bce7edbdcf8faaf602a75a8f00ee8",
+      "byte_size": 692794
+    },
+    "capture/subject/manifest.json": {
+      "sha256": "sha256:d62de4a29f7f87d3bee7daa8e939d664d797f8a819844230b8ef402f51f6ad8c",
+      "byte_size": 3599
+    },
+    "capture/subject/protocol.json": {
+      "sha256": "sha256:245ac509709ed5741c97078a7e6a660cf3dcb7d429de0501a2082202f332d324",
+      "byte_size": 279175
+    },
+    "capture/subject/raw-results.json": {
+      "sha256": "sha256:82df7a2a4c59d673f9cb2a271398dacc46edf65718d6251776ac6946870ffba5",
+      "byte_size": 1314625
+    },
+    "capture/subject/tokenizations.json": {
+      "sha256": "sha256:6938ad26ef645e7b2b3190cdd62d33a4041bce7edbdcf8faaf602a75a8f00ee8",
+      "byte_size": 692794
+    },
+    "evidence/checksums.sha256": {
+      "sha256": "sha256:688615fa092285a77e56b4d69e18efca144ac45eabdf7098d7b171965cd87a1f",
+      "byte_size": 436
+    },
+    "evidence/inputs/policy.json": {
+      "sha256": "sha256:1b722ca1f7bb36840614f66891bd076f61070a37fe855338adefae16c80b3ba8",
+      "byte_size": 685
+    },
+    "evidence/manifest.json": {
+      "sha256": "sha256:f42638bfa9ec5cb2240aa40881fd0039a842cc531bdb10c1a336ce891c445680",
+      "byte_size": 1162
+    },
+    "evidence/manifest.signature.json": {
+      "sha256": "sha256:e893cafc4b04bd4324a2e9eb783ea97920534ee3706919f2875b55267b7958d3",
+      "byte_size": 464
+    },
+    "evidence/records/baseline.json": {
+      "sha256": "sha256:257b27bea9017e8ff6a422ccbbc752ba783b253e719a5aedfe4ca467ff5c2b4d",
+      "byte_size": 1320944
+    },
+    "evidence/records/subject.json": {
+      "sha256": "sha256:8f6b8a296f01ae50bb31f4ae956ad2e085e0f15118a18af661c3675538bcad12",
+      "byte_size": 1324517
+    },
+    "evidence/reports/evaluation.report.json": {
+      "sha256": "sha256:ef7c7d3563120311b4f319bdf1f95ae070778de49a93a4002cdb69a84ac7d088",
+      "byte_size": 1556
+    },
+    "evidence/request.json": {
+      "sha256": "sha256:078863a2d47fa3afc06c5e31f3735f296394e70c67ab0ee24ebc1866c152fa75",
+      "byte_size": 657
+    },
+    "initial-load-failure.json": {
+      "sha256": "sha256:153db4b11011e4520e89473c4238c241f827f21fb965d7884e8c322a8626e8db",
+      "byte_size": 2487
+    },
+    "signer.public.pem": {
+      "sha256": "sha256:83cb57a5ed764d4262d50e6b8757e2e6ee0e3ada30d69fffba9a468f1a26afcc",
+      "byte_size": 113
+    },
+    "verification.receipt.json": {
+      "sha256": "sha256:12f8f083edb057b1b5534a69d733a42d420d3d4ee7f7731aec6c73de15f32fc8",
+      "byte_size": 1760
+    },
+    "verifier.public.pem": {
+      "sha256": "sha256:93d3019bd497de1fd0922ed283791ff817ef7dbb198390c6762a2c4503060e66",
+      "byte_size": 113
+    }
+  }
+}

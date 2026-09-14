@@ -90,6 +90,19 @@
               "maxLength": 71
             },
             "subject_artifact_sha256": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$",
+                  "minLength": 71,
+                  "maxLength": 71
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "subject_service_identity_sha256": {
               "type": "string",
               "pattern": "^sha256:[0-9a-f]{64}$",
               "minLength": 71,
@@ -101,6 +114,32 @@
             "subject_run_sha256",
             "case_set_sha256",
             "subject_artifact_sha256"
+          ],
+          "allOf": [
+            {
+              "if": {
+                "required": [
+                  "subject_service_identity_sha256"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "subject_artifact_sha256": {
+                    "type": "null"
+                  }
+                }
+              },
+              "else": {
+                "properties": {
+                  "subject_artifact_sha256": {
+                    "type": "string",
+                    "pattern": "^sha256:[0-9a-f]{64}$",
+                    "minLength": 71,
+                    "maxLength": 71
+                  }
+                }
+              }
+            }
           ]
         },
         {

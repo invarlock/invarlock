@@ -148,7 +148,8 @@ def capture_evaluator_run(
     *,
     source: Mapping[str, str],
     run_id: str,
-    artifact_digest: str,
+    artifact_digest: str | None,
+    service_identity: Mapping[str, Any] | None = None,
     source_digest: str | None = None,
     score_provenance: Mapping[str, Any] | None = None,
     input_projection: Mapping[str, Any] | None = None,
@@ -178,6 +179,7 @@ def capture_evaluator_run(
         source=dict(source),
         run_id=run_id,
         artifact_digest=artifact_digest,
+        service_identity=service_identity,
         source_digest=source_digest,
         score_provenance=dict(score_provenance)
         if score_provenance is not None
