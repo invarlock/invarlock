@@ -57,16 +57,18 @@ credentials. Caller-owned collectors can use the core `prepare_evaluator_judge`
 and `import_judge_sources` APIs for the generic retained-call format; arbitrary
 upstream scalar scores cannot replace those calls.
 
-For `openai/gpt-5.6-sol`, the pinned SDK converts system messages to developer
-messages, uses `max_completion_tokens`, and omits temperature from the provider
-request. The approved plan must therefore declare temperature `1`, the provider
-default, and an explicit non-null `reasoning_effort`. The adapter passes that
-effort into Inspect and verifies it in both the retained generation event and
-provider request. Collection rejects a missing or changed effort before the
-evidence can be accepted. Offline replay
-accepts exactly this version-bound projection for that model; other models keep
-their existing message and sampling-control checks. Normalized requests retain
-the approved system message and configuration alongside the actual provider call.
+For `openai/gpt-5.6-sol` and `openai/gpt-5.6-luna`, the pinned SDK converts
+system messages to developer messages, uses `max_completion_tokens`, and omits
+temperature from the provider request. The approved plan must therefore declare
+temperature `1`, the provider default, and an explicit non-null
+`reasoning_effort`. The adapter passes that effort into Inspect and verifies it
+in both the retained generation event and provider request. Collection rejects
+a missing or changed effort before the evidence can be accepted. Offline replay
+accepts exactly this version-bound projection for those two models; other models
+keep their existing message and sampling-control checks. This SDK projection
+support does not qualify either model's judging quality. Normalized requests
+retain the approved system message and configuration alongside the actual
+provider call.
 
 `bind_requests` creates exact request digests for a plan before independent
 approval. `render_request` uses the core renderer to separate rubric, input and answer

@@ -42,6 +42,10 @@ SOURCE_FORMAT = "invarlock/retained-judge-json-v1"
 INSPECT_SOURCE_FORMAT = "invarlock/retained-inspect-model-events-v1"
 TRIAL_ID_SCHEME = "plan-case-side-repetition-sha256-v1"
 JUDGE_REQUEST_MAX_BYTES = 1024 * 1024
+_INSPECT_0_3_263_REASONING_EFFORTS = {
+    "openai/gpt-5.6-sol": {"none", "low", "medium", "high", "xhigh", "max"},
+    "openai/gpt-5.6-luna": {"none", "low", "medium", "high", "xhigh", "max"},
+}
 
 
 class JudgeMeasurementContractError(ValueError):
@@ -288,16 +292,16 @@ def _validate_inspect_plan_collection_identity(
         _fail("grader differs from approved plan")
     if plan["judge"]["model_identity"]["kind"] != "hosted_api":
         _fail("local weight execution is not qualified by this adapter")
-    if grader == "openai/gpt-5.6-sol":
+    supported_efforts = _INSPECT_0_3_263_REASONING_EFFORTS.get(cast(str, grader))
+    if supported_efforts is not None:
         config = plan["judge"]["config"]
         if (
             inspect_version != "0.3.263"
             or Decimal(config["temperature"]) != Decimal(1)
-            or config["reasoning_effort"]
-            not in {"none", "low", "medium", "high", "xhigh", "max"}
+            or config["reasoning_effort"] not in supported_efforts
         ):
             _fail(
-                "GPT-5.6 Sol requires Inspect 0.3.263, approved temperature 1, "
+                f"{grader} requires Inspect 0.3.263, approved temperature 1, "
                 "and a supported explicit reasoning_effort"
             )
 
@@ -910,18 +914,19 @@ def _provider_completion(response: dict[str, Any]) -> object:
 
 
 def _check_native_inspect_controls(
-    request: dict[str, Any], expected: dict[str, Any], *, sol_projection: bool = False
+    request: dict[str, Any],
+    expected: dict[str, Any],
+    *,
+    gpt56_projection: bool = False,
 ) -> None:
-    if sol_projection and (
+    if gpt56_projection and (
         "temperature" in request
         or Decimal(str(expected["temperature"])) != Decimal(1)
         or "max_completion_tokens" not in request
     ):
-        _fail(
-            "retained Inspect GPT-5.6 Sol controls differ from its approved projection"
-        )
+        _fail("retained Inspect GPT-5.6 controls differ from its approved projection")
     for provider_key in ("temperature", "top_p"):
-        if sol_projection and provider_key == "temperature":
+        if gpt56_projection and provider_key == "temperature":
             continue
         try:
             if type(request[provider_key]) not in (int, float):
@@ -964,10 +969,10 @@ def _check_inspect_provider_projection(
     normalized = request.get("format") == "invarlock/judge-request-v1"
     # This is the qualified, version-bound SDK projection, not permission for
     # arbitrary role changes or missing sampling controls on other models.
-    sol_projection = (
+    gpt56_projection = (
         not normalized
         and inspect_version == "0.3.263"
-        and normalized_request["model"] == "openai/gpt-5.6-sol"
+        and normalized_request["model"] in _INSPECT_0_3_263_REASONING_EFFORTS
     )
     if normalized:
         if canonical_payload(request) != canonical_payload(normalized_request):
@@ -1012,7 +1017,7 @@ def _check_inspect_provider_projection(
             {"role": message["role"], "content": message["content"]}
         )
     expected_messages = normalized_request["messages"]
-    if sol_projection:
+    if gpt56_projection:
         expected_messages = [
             {**message, "role": "developer"} if message["role"] == "system" else message
             for message in expected_messages
@@ -1028,7 +1033,9 @@ def _check_inspect_provider_projection(
         _fail("retained Inspect provider model differs from the approved request")
     expected = normalized_request["config"]
     if not normalized:
-        _check_native_inspect_controls(request, expected, sol_projection=sol_projection)
+        _check_native_inspect_controls(
+            request, expected, gpt56_projection=gpt56_projection
+        )
     # Inspect 0.3.254 retains OpenAI's NOT_GIVEN values as JSON null. Both
     # absent/null and an empty list describe the same tool-free request.
     if request.get("tools") not in (None, []):

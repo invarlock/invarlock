@@ -219,13 +219,15 @@ provider-client retries, no tools or cache, and no inherited model settings.
 An admitted call without a retained result is an ambiguous timeout that cannot
 be retried. `verify` and `report` make no provider calls.
 
-`openai/gpt-5.6-sol` additionally requires an explicit non-null
-`reasoning_effort` in its approved plan. The Inspect adapter passes that exact
-value to the SDK and requires the retained provider request to match it. The K2
-reference selects `none` explicitly. Its corrected 480-trial pilot completed
-all planned calls, while both 40-unit analyses remained `insufficient_evidence`
-because their interval width exceeded the frozen maximum. The earlier pilot
-omitted this control and remains a separate incomplete run. See the
+`openai/gpt-5.6-sol` and `openai/gpt-5.6-luna` additionally require an explicit
+non-null `reasoning_effort` in their approved plans. The Inspect adapter passes
+that exact value to the SDK and requires the retained provider request to match
+it. This bounded SDK support does not qualify either model's judging quality.
+The K2 reference selects `none` for Sol explicitly. Its corrected 480-trial
+pilot completed all planned calls, while both 40-unit analyses remained
+`insufficient_evidence` because their interval width exceeded the frozen
+maximum. The earlier pilot omitted this control and remains a separate
+incomplete run. See the
 [retained pilot and offline replay](https://github.com/invarlock/invarlock/tree/main/examples/judge-measurements/references/k2-32b-pilot).
 Human rubric review and final-plan activation remain pending.
 

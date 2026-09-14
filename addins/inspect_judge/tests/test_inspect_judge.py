@@ -73,36 +73,71 @@ def test_missing_grader_is_rejected() -> None:
         CollectionOptions.from_mapping({"grader": None})
 
 
+@pytest.mark.parametrize("judge_model", ["gpt-5.6-sol", "gpt-5.6-luna"])
 @pytest.mark.parametrize("temperature", ["0", "0.5", "2", "1.000000000000001"])
-def test_sol_rejects_unavailable_temperature_before_admission(data, temperature):
-    plan = copy.deepcopy(data[0])
-    plan["judge"].update(
-        provider="openai",
-        requested_model="openai/gpt-5.6-sol",
-        approved_resolved_models=["gpt-5.6-sol"],
-    )
-    plan["judge"]["config"]["temperature"] = temperature
-    plan["judge"]["config"]["reasoning_effort"] = "none"
-    plan = bind_requests(plan, data[2])
-    options = replace(data[3], grader="openai/gpt-5.6-sol")
-    with pytest.raises(InspectJudgeError, match="approved temperature 1"):
-        prepare_collection(plan, options)
-
-
-@pytest.mark.parametrize("reasoning_effort", [None, "minimal"])
-def test_sol_requires_supported_explicit_reasoning_effort_before_admission(
-    data, reasoning_effort
+def test_gpt56_rejects_unavailable_temperature_before_admission(
+    data, judge_model, temperature
 ):
     plan = copy.deepcopy(data[0])
     plan["judge"].update(
         provider="openai",
-        requested_model="openai/gpt-5.6-sol",
-        approved_resolved_models=["gpt-5.6-sol"],
+        requested_model=f"openai/{judge_model}",
+        approved_resolved_models=[judge_model],
+    )
+    plan["judge"]["config"]["temperature"] = temperature
+    plan["judge"]["config"]["reasoning_effort"] = (
+        "none" if judge_model == "gpt-5.6-sol" else "xhigh"
+    )
+    plan = bind_requests(plan, data[2])
+    options = replace(data[3], grader=f"openai/{judge_model}")
+    with pytest.raises(InspectJudgeError, match="approved temperature 1"):
+        prepare_collection(plan, options)
+
+
+@pytest.mark.parametrize(
+    ("judge_model", "reasoning_effort"),
+    [
+        ("gpt-5.6-sol", None),
+        ("gpt-5.6-sol", "minimal"),
+        ("gpt-5.6-luna", None),
+        ("gpt-5.6-luna", "minimal"),
+    ],
+)
+def test_gpt56_requires_supported_explicit_reasoning_effort_before_admission(
+    data, judge_model, reasoning_effort
+):
+    plan = copy.deepcopy(data[0])
+    plan["judge"].update(
+        provider="openai",
+        requested_model=f"openai/{judge_model}",
+        approved_resolved_models=[judge_model],
     )
     plan["judge"]["config"].update(temperature="1", reasoning_effort=reasoning_effort)
     plan = bind_requests(plan, data[2])
-    options = replace(data[3], grader="openai/gpt-5.6-sol")
+    options = replace(data[3], grader=f"openai/{judge_model}")
     with pytest.raises(InspectJudgeError, match="supported explicit reasoning_effort"):
+        prepare_collection(plan, options)
+
+
+@pytest.mark.parametrize("judge_model", ["gpt-5.6-sol", "gpt-5.6-luna"])
+def test_gpt56_requires_pinned_inspect_version_before_admission(data, judge_model):
+    plan = copy.deepcopy(data[0])
+    plan["judge"].update(
+        provider="openai",
+        requested_model=f"openai/{judge_model}",
+        approved_resolved_models=[judge_model],
+    )
+    plan["judge"]["config"].update(
+        temperature="1",
+        reasoning_effort="none" if judge_model == "gpt-5.6-sol" else "xhigh",
+    )
+    plan = bind_requests(plan, data[2])
+    options = replace(
+        data[3],
+        grader=f"openai/{judge_model}",
+        inspect_version="0.3.254",
+    )
+    with pytest.raises(InspectJudgeError, match="requires Inspect 0.3.263"):
         prepare_collection(plan, options)
 
 

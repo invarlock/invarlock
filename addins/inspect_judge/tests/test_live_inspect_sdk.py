@@ -29,7 +29,9 @@ FIXTURES = Path(__file__).parent / "fixtures"
 
 @pytest.mark.parametrize("reference_mode", [None, "per_case"])
 @pytest.mark.parametrize("service_tier", [None, "default"])
-@pytest.mark.parametrize("judge_model", ["gpt-4o-2024-08-06", "gpt-5.6-sol"])
+@pytest.mark.parametrize(
+    "judge_model", ["gpt-4o-2024-08-06", "gpt-5.6-sol", "gpt-5.6-luna"]
+)
 @pytest.mark.parametrize(
     ("finish_reason", "completion", "parse_status"),
     [
@@ -89,14 +91,18 @@ def test_live_inspect_chat_completion_replays_offline(
         requested_model=f"openai/{judge_model}",
         approved_resolved_models=[judge_model],
     )
-    if judge_model == "gpt-5.6-sol":
-        plan["judge"]["config"]["temperature"] = "1"
-        plan["judge"]["config"]["reasoning_effort"] = "none"
+    if judge_model in {"gpt-5.6-sol", "gpt-5.6-luna"}:
+        plan["judge"]["config"].update(
+            temperature="1",
+            reasoning_effort="none" if judge_model == "gpt-5.6-sol" else "xhigh",
+            **({"max_output_tokens": 25000} if judge_model == "gpt-5.6-luna" else {}),
+        )
     plan = bind_requests(plan, frozen)
     options = replace(
         CollectionOptions.from_mapping(exported["collection"]),
         grader=plan["judge"]["requested_model"],
         requests_per_minute=10000,
+        **({"max_output_tokens": 50000} if judge_model == "gpt-5.6-luna" else {}),
     )
     requests = []
 
@@ -170,12 +176,16 @@ def test_live_inspect_chat_completion_replays_offline(
             )
         else:
             assert "reference" not in content
-        if judge_model == "gpt-5.6-sol":
+        if judge_model in {"gpt-5.6-sol", "gpt-5.6-luna"}:
             assert request["messages"][0]["role"] == "developer"
             assert "temperature" not in request
-            assert request["max_completion_tokens"] == 128
+            assert request["max_completion_tokens"] == (
+                25000 if judge_model == "gpt-5.6-luna" else 128
+            )
             assert "max_tokens" not in request
-            assert request["reasoning_effort"] == "none"
+            assert request["reasoning_effort"] == (
+                "xhigh" if judge_model == "gpt-5.6-luna" else "none"
+            )
         else:
             assert request["messages"][0]["role"] == "system"
             assert request["temperature"] == 0
@@ -238,10 +248,12 @@ def test_live_inspect_chat_completion_replays_offline(
         request = changed[0]["events"][0]["call"]["request"]
         if mutation == "role":
             request["messages"][0]["role"] = (
-                "system" if judge_model == "gpt-5.6-sol" else "developer"
+                "system"
+                if judge_model in {"gpt-5.6-sol", "gpt-5.6-luna"}
+                else "developer"
             )
         elif mutation == "temperature":
-            if judge_model == "gpt-5.6-sol":
+            if judge_model in {"gpt-5.6-sol", "gpt-5.6-luna"}:
                 request["temperature"] = 1
             else:
                 request.pop("temperature")
@@ -257,7 +269,7 @@ def test_live_inspect_chat_completion_replays_offline(
             changed[0]["events"][0]["call"]["response"]["service_tier"] = "priority"
         elif mutation == "missing_response_tier":
             changed[0]["events"][0]["call"]["response"].pop("service_tier")
-        elif judge_model == "gpt-5.6-sol":
+        elif judge_model in {"gpt-5.6-sol", "gpt-5.6-luna"}:
             request["max_tokens"] = request.pop("max_completion_tokens")
         else:
             request["max_tokens"] += 1
