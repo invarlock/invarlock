@@ -2,7 +2,7 @@
 
 This reference retains all 10,260 judge ratings from 1,710 frozen cases: 422
 grounded-QA cases and 1,288 extraction cases, with two answers per case and
-three ratings per answer. Both comparisons meet their predeclared policies.
+three ratings per answer. Both comparisons meet their policies declared in advance.
 Neither establishes that the subject is better or that the judge is generally
 accurate.
 
