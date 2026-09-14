@@ -125,8 +125,22 @@ fixed-benchmark claim.
 See the [judge reference](../../docs/reference/judge-measurements.md) for the
 contract boundary, statistical assumptions and recipient verification command.
 
-For the real K2 Horizon 32B frozen-answer corpus, outcome-blind selection,
-pilot plans, reviewer sheets and pending final plans, see
-[Freeze a K2 judge reference](K2-REFERENCE.md). That archive retains frozen inputs
-and plans, without judge outcomes. Its final plans remain candidate documents
-until the pilot rubric review is recorded.
+## Measured references
+
+The [completed Luna held-out reference](references/k2-32b-luna-xhigh-heldout/README.md)
+is the main measured judge example: 10,260 complete ratings, both frozen policies
+met, signed offline replay, and separate AI-review labels and disagreements.
+It does not claim independent-human accuracy or model improvement.
+
+The [corrected Sol pilot](references/k2-32b-pilot/README.md) and
+[Luna xHigh pilot](references/k2-32b-luna-xhigh-pilot/README.md) retain 480
+complete ratings each. Their smaller analyses remain insufficient evidence
+under unchanged interval-width policies. The original incomplete Sol attempt is
+retained with the corrected pilot as historical failure evidence, not a
+recommended configuration or completed qualification.
+
+For outcome-blind corpus selection, original pilot plans, reviewer sheets and
+candidate final plans, see [Freeze a K2 judge reference](K2-REFERENCE.md).
+That frozen-answer archive contains no judge outcomes. Its unchanged candidate
+files and the pilot archives' recorded review status are historical inputs to
+the separately retained completed comparison.
