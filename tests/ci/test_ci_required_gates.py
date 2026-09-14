@@ -82,6 +82,14 @@ def test_ci_runs_the_repository_gates() -> None:
 
     coverage = jobs["coverage"]
     _assert_core_wheel_install(coverage)
+    capacity = _step(coverage, "Check full-capacity signed verification")
+    assert capacity["run"] == (
+        "python -m pytest -q 'tests/evaluation_comparison/test_capacity.py::"
+        "test_full_capacity_signed_independent_recipient[50000]'"
+    )
+    assert coverage["steps"].index(capacity) < coverage["steps"].index(
+        _step(coverage, "Enforce coverage")
+    )
     assert _step(coverage, "Enforce coverage")["run"] == "make coverage-enforce"
 
     supply_chain = jobs["supply-chain"]

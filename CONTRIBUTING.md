@@ -184,6 +184,12 @@ review their changes and repeat affected validation before committing.
 The complete coverage gate requires Linux descriptor execution. On another
 operating system, run the relevant portable target such as `make
 coverage-examples`, and report the full Linux result from CI separately.
+The CI coverage job first runs the 50,000-record signed-recipient capacity
+case without tracing, then runs the coverage suites. The 12,000-record case
+remains under subprocess branch coverage. Both cases retain the same verification
+assertions and watchdog; the large case is classified as slow and is also included
+in `make verify`. This separates full-capacity validation from tracing overhead.
+
 Coverage includes newly added example launchers: successful execution in a
 separate smoke job does not collect their branch coverage. Add meaningful
 tests under `tests/examples/`; do not weaken thresholds to make a change pass.
