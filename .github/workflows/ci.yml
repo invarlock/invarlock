@@ -39,8 +39,23 @@ jobs:
         run: python -m pip install --require-hashes -r requirements/workflows/core-py312.txt
       - name: Install pinned policy engines
         run: |
-          go install github.com/open-policy-agent/opa@v1.17.0
-          go install cuelang.org/go/cmd/cue@v0.16.1
+          install_pinned_engine() {
+            local module="$1" attempt status
+            for attempt in 1 2 3; do
+              if go install "$module"; then
+                return 0
+              else
+                status=$?
+              fi
+              if [ "$attempt" -eq 3 ]; then
+                return "$status"
+              fi
+              echo "Policy engine download/build failed; retrying pinned installation ($attempt/3)." >&2
+              sleep 5
+            done
+          }
+          install_pinned_engine github.com/open-policy-agent/opa@v1.17.0
+          install_pinned_engine cuelang.org/go/cmd/cue@v0.16.1
       - name: Run policy-engine interoperability matrix
         run: |
           gopath="$(go env GOPATH)"

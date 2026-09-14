@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 from typing import Any
 
+import pytest
 import yaml
 
 
@@ -142,3 +144,54 @@ def test_docs_ci_reports_for_every_pull_request_and_scopes_pushes() -> None:
     }
     assert len(paths) == len(expected_paths)
     assert set(paths) == expected_paths
+
+
+@pytest.mark.parametrize(
+    "failures, expected_calls, expected_status", [(0, 2, 0), (1, 3, 0), (3, 3, 7)]
+)
+def test_policy_install_retries_are_bounded_and_fail_closed(
+    failures, expected_calls, expected_status
+):
+    install = _step(
+        _load(".github/workflows/ci.yml")["jobs"]["policy-engine-interop"],
+        "Install pinned policy engines",
+    )["run"]
+    fake_tools = """
+calls=0
+go() {
+  calls=$((calls + 1))
+  printf '%s\\n' "$*"
+  if [ "$calls" -le "$FAILURES" ]; then return 7; fi
+  return 0
+}
+sleep() { :; }
+"""
+    result = subprocess.run(
+        [
+            "bash",
+            "-e",
+            "-o",
+            "pipefail",
+            "-c",
+            f"FAILURES={failures}\n" + fake_tools + install,
+        ],
+        text=True,
+        capture_output=True,
+        timeout=10,
+    )
+    assert result.returncode == expected_status
+    calls = result.stdout.splitlines()
+    assert len(calls) == expected_calls
+    assert all(
+        line
+        in {
+            "install github.com/open-policy-agent/opa@v1.17.0",
+            "install cuelang.org/go/cmd/cue@v0.16.1",
+        }
+        for line in calls
+    )
+    if expected_status == 0:
+        assert calls[-1] == "install cuelang.org/go/cmd/cue@v0.16.1"
+    else:
+        assert all("opa@v1.17.0" in line for line in calls)
+    assert "GOSUMDB" not in install and "GOINSECURE" not in install
