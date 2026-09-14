@@ -219,11 +219,17 @@ provider-client retries, no tools or cache, and no inherited model settings.
 An admitted call without a retained result is an ambiguous timeout that cannot
 be retried. `verify` and `report` make no provider calls.
 
-`openai/gpt-5.6-sol` additionally requires an explicit non-null
-`reasoning_effort` in its approved plan. The Inspect adapter passes that exact
-value to the SDK and requires the retained provider request to match it. The K2
-reference now selects `none` explicitly for its next pilot. The earlier retained
-pilot omitted this control and remains a separate incomplete run.
+`openai/gpt-5.6-sol` and `openai/gpt-5.6-luna` additionally require an explicit
+non-null `reasoning_effort` in their approved plans. The Inspect adapter passes
+that exact value to the SDK and requires the retained provider request to match
+it. This bounded SDK support does not qualify either model's judging quality.
+The K2 reference selects `none` for Sol explicitly. Its corrected 480-trial
+pilot completed all planned calls, while both 40-unit analyses remained
+`insufficient_evidence` because their interval width exceeded the frozen
+maximum. The earlier pilot omitted this control and remains a separate
+incomplete run. See the
+[retained pilot and offline replay](https://github.com/invarlock/invarlock/tree/main/examples/judge-measurements/references/k2-32b-pilot).
+Human rubric review and final-plan activation remain pending.
 
 Install matching packages and use the installed command:
 
@@ -238,7 +244,13 @@ invarlock evaluate judge-request.yaml --signing-key signer-private.pem --json
 Review every call, token, cost and time cap first. The collector rejects custom
 provider URLs and reads credentials only from its environment. Remove both
 `OPENAI_BASE_URL` and `OPENAI_API_BASE`; their presence is rejected even when
-empty. Missing credentials, missing or mismatched SDK dependencies, and dependency
+empty. Remove `OPENAI_SAFETY_IDENTIFIER` too; inherited identifier controls are
+unsupported and rejected before collection. Configured calls explicitly select
+`service_tier=default` for standard processing, and completed retained responses
+must report that tier. Historical requests without the field replay unchanged
+without acquiring a standard-tier claim. Disabled Inspect response caching does
+not disable provider prompt caching; cost reservations must cover applicable
+cache-write charges. Missing credentials, missing or mismatched SDK dependencies, and dependency
 import failures stop collection preflight. These requirements do not apply to
 offline import. The optional `execution.collection.scorer_id` defaults to `judge` and
 `invocation_timeout_seconds` defaults to 3600. An omitted workspace defaults to
@@ -412,9 +424,11 @@ process and excludes provider calls, network limits, checkpoint synchronization,
 signing and report generation. Run the maintained capacity test on the intended
 recipient host before selecting an operational allowance.
 
-No hosted-judge response-size or end-to-end throughput result is published yet.
-The K2 plan caps judge output at 256 tokens, while the retained response contract
-allows up to 1 MiB. The real pilot must measure response token/byte percentiles,
-provider throughput, errors and checkpoint overhead before estimating the final
-collection duration. Until then, preflight call/token/cost ceilings are admission
-bounds rather than a runtime forecast.
+The corrected retained pilot completed 480 trials in 265.454 seconds, with
+260,271 input tokens, 3,868 output tokens and no incomplete trials. This one-run
+observation used a 128-token output cap and does not forecast the final study.
+The final K2 plan caps output at 256 tokens, while the retained response contract
+allows up to 1 MiB. Measure response-size tails, provider throughput, errors and
+checkpoint overhead on the intended workload before estimating final collection
+duration. Preflight call/token/cost ceilings remain admission bounds, not a
+runtime forecast.

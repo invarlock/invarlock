@@ -112,6 +112,30 @@ def test_retained_inspect_normalized_and_native_events_replay_in_core(retained):
     replay(retained)
 
 
+def test_explicit_standard_tier_replays_without_rewriting_historical_events(retained):
+    for record in retained[1]["records"]:
+        native(record["events"][0])
+    historical = c.canonical_payload(retained[1])
+    replay(retained)
+    assert c.canonical_payload(retained[1]) == historical
+    call = retained[1]["records"][0]["events"][0]["call"]
+    call["request"]["service_tier"] = "default"
+    call["response"]["service_tier"] = "default"
+    replay(retained)
+
+
+@pytest.mark.parametrize("tier", [None, "auto", "priority", "flex", "ultrafast"])
+@pytest.mark.parametrize("side", ["request", "response"])
+def test_core_rejects_nonstandard_service_tiers(retained, tier, side):
+    _, event, _ = event_parts(retained)
+    call = native(event)
+    call["request"]["service_tier"] = "default"
+    call["response"]["service_tier"] = "default"
+    call[side]["service_tier"] = tier
+    with pytest.raises(c.JudgeMeasurementContractError, match="service tier"):
+        replay(retained)
+
+
 @pytest.mark.parametrize(
     "path,value,message",
     [
@@ -378,23 +402,32 @@ def test_normalized_completion_must_match_selected_trial_response(retained):
 
 
 @pytest.mark.parametrize("mutation", ["role", "temperature", "token_limit"])
-def test_sol_projection_is_version_bound_and_preserves_approved_semantics(
-    retained, mutation
+@pytest.mark.parametrize(
+    ("judge_model", "reasoning_effort", "max_output_tokens"),
+    [
+        ("gpt-5.6-sol", "none", 128),
+        ("gpt-5.6-luna", "xhigh", 25000),
+    ],
+)
+def test_gpt56_projection_is_version_bound_and_preserves_approved_semantics(
+    retained, mutation, judge_model, reasoning_effort, max_output_tokens
 ):
     attempt, event, collection = event_parts(retained)
     normalized = json.loads(attempt["request"]["text"])
-    normalized["model"] = "openai/gpt-5.6-sol"
+    normalized["model"] = f"openai/{judge_model}"
     normalized["config"]["temperature"] = "1"
-    normalized["config"]["reasoning_effort"] = "none"
+    normalized["config"]["reasoning_effort"] = reasoning_effort
+    normalized["config"]["max_output_tokens"] = max_output_tokens
     event["model"] = normalized["model"]
     event["config"]["temperature"] = 1.0
-    event["config"]["reasoning_effort"] = "none"
+    event["config"]["reasoning_effort"] = reasoning_effort
+    event["config"]["max_tokens"] = max_output_tokens
     event["call"]["request"] = normalized
     attempt["request"]["text"] = c.canonical_payload(normalized).decode()
     call = native(event)
     call["request"]["messages"][0]["role"] = "developer"
     call["request"].pop("temperature")
-    call["request"]["reasoning_effort"] = "none"
+    call["request"]["reasoning_effort"] = reasoning_effort
     call["request"]["max_completion_tokens"] = call["request"].pop("max_tokens")
     c._check_retained_inspect_event(attempt, event, collection)
     if mutation == "role":

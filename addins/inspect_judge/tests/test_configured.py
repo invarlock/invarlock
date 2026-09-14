@@ -32,7 +32,12 @@ KEY = "offline-test-key"
 
 @pytest.fixture
 def inputs(tmp_path, monkeypatch):
-    for name in ("OPENAI_API_KEY", "OPENAI_BASE_URL", "OPENAI_API_BASE"):
+    for name in (
+        "OPENAI_API_KEY",
+        "OPENAI_BASE_URL",
+        "OPENAI_API_BASE",
+        "OPENAI_SAFETY_IDENTIFIER",
+    ):
         monkeypatch.delenv(name, raising=False)
     documents = {
         name: json.loads((FIXTURES / f"{name}.json").read_text())
@@ -65,8 +70,14 @@ def sdk(monkeypatch):
     )
     model = SimpleNamespace(
         config=config,
-        model_args={"max_retries": 0, "responses_api": False},
-        api=SimpleNamespace(client=client, responses_api=False, model_args={}),
+        model_args={
+            "max_retries": 0,
+            "responses_api": False,
+            "service_tier": "default",
+        },
+        api=SimpleNamespace(
+            client=client, responses_api=False, service_tier="default", model_args={}
+        ),
     )
     module = SimpleNamespace(
         get_model=Mock(return_value=model), GenerateConfig=Mock(return_value=config)
@@ -88,6 +99,7 @@ def test_preflight_metadata_is_usable_and_never_constructs_model(inputs, sdk):
     assert metadata == {
         "provider": "openai",
         "base_url": "https://api.openai.com/v1",
+        "service_tier": "default",
         "sdk_versions": {
             "inspect-ai": "0.3.263",
             "openai": "3.13.0",
@@ -133,6 +145,23 @@ def test_endpoint_overrides_rejected_without_echoing_values(
     assert KEY not in str(error.value)
     assert "example.invalid" not in str(error.value)
     sdk[0].get_model.assert_not_called()
+
+
+@pytest.mark.parametrize("inherited", [False, True])
+@pytest.mark.parametrize("value", ["", "private-identifier"])
+def test_safety_identifier_override_fails_before_calls(
+    inputs, sdk, monkeypatch, inherited, value
+):
+    environment = {"OPENAI_API_KEY": KEY}
+    if inherited:
+        monkeypatch.setenv("OPENAI_SAFETY_IDENTIFIER", value)
+    else:
+        environment["OPENAI_SAFETY_IDENTIFIER"] = value
+    with pytest.raises(InspectJudgeError, match="safety identifier") as error:
+        asyncio.run(collect_configured(**inputs, environment=environment))
+    assert "private-identifier" not in str(error.value)
+    sdk[0].get_model.assert_not_called()
+    assert not inputs["runner"].checkpoint_directory.exists()
 
 
 @pytest.mark.parametrize("distribution", ["inspect-ai", "openai", "httpx"])
@@ -222,12 +251,25 @@ def test_explicit_construction_passes_strict_checks_and_closes(
         base_url="https://api.openai.com/v1",
         api_key=KEY,
         responses_api=False,
+        service_tier="default",
         max_retries=0,
         memoize=False,
     )
     client.close.assert_awaited_once()
     assert stops == ["complete"]
     assert os.environ["OPENAI_API_KEY"] == "wrong-inherited-key"
+
+
+@pytest.mark.parametrize("tier", [None, "auto", "priority", "flex", "ultrafast"])
+def test_configured_tier_is_verified_before_collection(inputs, sdk, monkeypatch, tier):
+    sdk[1].api.service_tier = tier
+    collect = AsyncMock()
+    monkeypatch.setattr(configured, "collect", collect)
+    with pytest.raises(InspectJudgeError, match="standard service tier"):
+        asyncio.run(collect_configured(**inputs, environment={"OPENAI_API_KEY": KEY}))
+    collect.assert_not_called()
+    sdk[2].close.assert_awaited_once()
+    assert not inputs["runner"].checkpoint_directory.exists()
 
 
 @pytest.mark.parametrize(

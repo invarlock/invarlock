@@ -23,6 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Completed per-case reference forwarding in the answer-capture judge example
   and aligned overview, integration, verification and security documentation
   with the three built-in scorers and their distinct evidence contracts.
+- Retained the corrected 480-trial K2 judge pilot, signed offline replay and
+  original incomplete history. Both advisory analyses remain insufficient
+  evidence under unchanged interval-width requirements; human labels and
+  final-plan activation remain pending.
+
 - Added a real LM Evaluation Harness likelihood reference with pinned CPU
   measurements, source-preserving import, independent signed verification and
   reports. Its six paired cases establish same-model integration conformance.
@@ -186,6 +191,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unchanged.
 
 ### Fixed
+
+- Select standard processing explicitly for configured hosted judge calls,
+  validate the retained tier, and reject inherited safety identifiers before
+  collection. Historical requests without a tier remain replayable unchanged.
 
 - Close all pinned captured-evidence directory descriptors even when one close
   reports an error, including failures during input setup or caller execution.

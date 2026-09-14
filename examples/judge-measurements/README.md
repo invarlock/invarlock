@@ -130,3 +130,14 @@ pilot plans, reviewer sheets and pending final plans, see
 [Freeze a K2 judge reference](K2-REFERENCE.md). That archive retains frozen inputs
 and plans, without judge outcomes. Its final plans remain candidate documents
 until the pilot rubric review is recorded.
+
+The [retained K2 pilot](references/k2-32b-pilot/README.md) now contains 480
+complete corrected judge trials and the unchanged original incomplete history.
+Both corrected analyses remain insufficient evidence under their frozen width
+requirements. Human labels are pending and final plans remain inactive.
+
+The separate [Luna xHigh pilot](references/k2-32b-luna-xhigh-pilot/README.md)
+retains another 480 complete ratings on the same frozen answers and rubrics,
+with signed offline replay and a descriptive comparison to the Sol results. It
+does not treat Sol as human truth or activate quality claims. Human labels remain
+pending and the final plans remain inactive.

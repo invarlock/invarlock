@@ -1,0 +1,13 @@
+{
+  "archive": {
+    "path": "reference.zip",
+    "sha256": "4d8f50e1cba0056d2118695a4dab73cce4a5ab10829320e2f8ea4b0c48d0e766",
+    "size_bytes": 811448
+  },
+  "collector_source_commit": "adb3c77d0af3e351b6dfe325959660deb5543e80",
+  "completed_trials": 480,
+  "final_plans": "not_activated",
+  "format": "invarlock/judge-pilot-reference-archive-v2",
+  "human_review": "pending",
+  "reference_manifest_sha256": "161d7aad0bb9fe83c8e2e100452e86094ca3a780b5de882f65704ecd79ac7b80"
+}

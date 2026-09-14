@@ -97,6 +97,12 @@ The template intentionally omits these derived values. No implicit judge model,
 rubric or policy is selected if `--judge-templates` is omitted; the result then
 contains only the frozen-answer reference.
 
+The separately retained Luna xHigh pilot derives new plans for its model and
+reasoning configuration while preserving the same frozen cases, answers, rubrics
+and schedule. Its active analysis policies change the copied Sol policies only
+at the required plan-digest binding. It does not replace or mutate this frozen
+reference or the retained Sol pilot.
+
 Pilot policies are advisory. Final policies use family size four, alpha 0.05,
 subject bound 0.6 and the actual selected unit count. QA allows degradation 0.15
 and interval width 0.32; extraction allows 0.10 and width 0.18. These are frozen
