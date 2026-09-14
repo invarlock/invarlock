@@ -292,7 +292,7 @@ def _validate_inspect_plan_collection_identity(
         _fail("grader differs from approved plan")
     if plan["judge"]["model_identity"]["kind"] != "hosted_api":
         _fail("local weight execution is not qualified by this adapter")
-    supported_efforts = _INSPECT_0_3_263_REASONING_EFFORTS.get(cast(str, grader))
+    supported_efforts = _INSPECT_0_3_263_REASONING_EFFORTS.get(grader)
     if supported_efforts is not None:
         config = plan["judge"]["config"]
         if (
@@ -910,7 +910,9 @@ def _provider_completion(response: dict[str, Any]) -> object:
             )
         except StrictJsonError:
             return content
-    _fail("retained Inspect provider response uses an unsupported shape")
+    raise JudgeMeasurementContractError(
+        "retained Inspect provider response uses an unsupported shape"
+    )
 
 
 def _check_native_inspect_controls(

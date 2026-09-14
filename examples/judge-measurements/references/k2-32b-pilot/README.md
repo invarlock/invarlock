@@ -76,7 +76,7 @@ The prior envelopes are unsigned and use older contracts. They are preserved as
 historical observations, not reissued as current signed evidence. A separately
 recorded comparison matched the installed historical runtime to source
 `08430477203459b46f6f76d99ad3d9d08cd5dbe1`; this does not authenticate the original
-live producer, whose launcher used a mutable checkout without a source pin.
+live evaluator, whose launcher used a mutable checkout without a source pin.
 Current replay does not rerun that historical environment or promote its result.
 
 ## Human review and claim limits

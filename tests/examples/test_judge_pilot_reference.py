@@ -438,3 +438,188 @@ def test_archive_rejects_symlink_without_following_target(tmp_path):
     target.symlink_to(REFERENCE / "reference.zip")
     with pytest.raises((ValueError, OSError)):
         ref.read_archive(target, ARCHIVE_SHA256)
+
+
+def _write_archive(path, entries):
+    import zipfile
+
+    with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for name, raw in entries.items():
+            entry = zipfile.ZipInfo(name)
+            entry.external_attr = 0o100644 << 16
+            archive.writestr(entry, raw, compress_type=zipfile.ZIP_DEFLATED)
+    return ref.sha(path.read_bytes())
+
+
+def _write_reference(path, files, manifest):
+    entries = dict(files)
+    manifest = copy.deepcopy(manifest)
+    manifest["files"] = {
+        name: {"sha256": ref.sha(raw), "size_bytes": len(raw)}
+        for name, raw in entries.items()
+        if name != "reference.json"
+    }
+    entries["reference.json"] = json.dumps(manifest).encode()
+    return _write_archive(path, entries)
+
+
+@pytest.mark.parametrize("pin", ["", "0" * 63, "A" * 64, "sha256:" + "0" * 64])
+def test_archive_requires_canonical_independent_pin(tmp_path, pin):
+    with pytest.raises(ValueError, match="independent archive SHA-256 pin"):
+        ref.read_archive(tmp_path / "missing.zip", pin)
+
+
+@pytest.mark.parametrize("limit", ["entry_count", "expanded_size"])
+def test_archive_rejects_excessive_resource_usage(tmp_path, limit):
+    entries = (
+        {f"entry-{index}.json": b"{}" for index in range(129)}
+        if limit == "entry_count"
+        else {"oversized.json": b" " * (64 * 1024 * 1024 + 1)}
+    )
+    path = tmp_path / "excessive.zip"
+    pin = _write_archive(path, entries)
+    assert path.stat().st_size < 8 * 1024 * 1024
+    with pytest.raises(ValueError, match="retained reference limits"):
+        ref.read_archive(path, pin)
+
+
+@pytest.mark.parametrize(
+    ("changed", "message"),
+    [
+        ("format", "unsupported pilot reference"),
+        ("missing_inventory", "file inventory differs"),
+        ("extra_inventory", "file inventory differs"),
+        ("digest", "file pin differs: payload.json"),
+        ("size", "file pin differs: payload.json"),
+    ],
+)
+def test_archive_rejects_manifest_integrity_mismatches(tmp_path, changed, message):
+    raw = b"{}"
+    manifest = {
+        "format": "invarlock/judge-pilot-reference-v2",
+        "files": {"payload.json": {"sha256": ref.sha(raw), "size_bytes": len(raw)}},
+    }
+    if changed == "format":
+        manifest["format"] = "invarlock/judge-pilot-reference-v3"
+    elif changed == "missing_inventory":
+        manifest["files"] = {}
+    elif changed == "extra_inventory":
+        manifest["files"]["absent.json"] = manifest["files"]["payload.json"]
+    elif changed == "digest":
+        manifest["files"]["payload.json"]["sha256"] = "0" * 64
+    else:
+        manifest["files"]["payload.json"]["size_bytes"] += 1
+    path = tmp_path / "mismatched.zip"
+    pin = _write_archive(
+        path, {"reference.json": json.dumps(manifest).encode(), "payload.json": raw}
+    )
+    with pytest.raises(ValueError, match=message):
+        ref.read_archive(path, pin)
+
+
+@pytest.mark.parametrize("pilot", [None, [], {}, {"path": "pilot"}])
+def test_version_two_rejects_malformed_pilot_metadata(pilot):
+    with pytest.raises(ValueError, match="pilot reference metadata differs"):
+        ref.validation_contract(
+            {"format": "invarlock/judge-pilot-reference-v2", "pilot": pilot}
+        )
+
+
+@pytest.mark.parametrize("workflows", [None, [], {}, {"grounded_qa": {}}])
+def test_version_two_requires_exact_workflow_inventory(workflows):
+    with pytest.raises(ValueError, match="pilot workflow inventory differs"):
+        ref.validation_contract(
+            {
+                "format": "invarlock/judge-pilot-reference-v2",
+                "pilot": {"path": "pilot", "workflows": workflows},
+            }
+        )
+
+
+@pytest.mark.parametrize(
+    "outcome",
+    [
+        None,
+        {},
+        {**ref.LEGACY_EXPECTATION, "accepted": 0},
+        {**ref.LEGACY_EXPECTATION, "analysis_reasons": "reason"},
+        {**ref.LEGACY_EXPECTATION, "analysis_reasons": [None]},
+        {**ref.LEGACY_EXPECTATION, "analysis_reasons": [""]},
+        {**ref.LEGACY_EXPECTATION, "unexpected": True},
+    ],
+)
+def test_version_two_rejects_malformed_outcome(outcome):
+    with pytest.raises(
+        ValueError, match="grounded_qa: pilot outcome expectation differs"
+    ):
+        ref.validation_contract(
+            {
+                "format": "invarlock/judge-pilot-reference-v2",
+                "pilot": {
+                    "path": "pilot",
+                    "workflows": {
+                        "grounded_qa": outcome,
+                        "extraction": ref.LEGACY_EXPECTATION,
+                    },
+                },
+            }
+        )
+
+
+def test_pinned_archive_cannot_hide_invalid_receipt_signature(luna_files, tmp_path):
+    entries = dict(luna_files)
+    receipt_name = "pilot/grounded_qa/receipt.json"
+    receipt = json.loads(entries[receipt_name])
+    receipt["signature"]["value"] = "A" * 86 + "=="
+    entries[receipt_name] = json.dumps(receipt).encode()
+    path = tmp_path / "invalid-receipt.zip"
+    pin = _write_reference(path, entries, json.loads(entries["reference.json"]))
+    with pytest.raises(ValueError, match="signed receipt or evidence replay failed"):
+        ref.validate_reference(path, pin)
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("accepted", True, "unexpected recipient outcome"),
+        ("decision", "pass", "unexpected recipient outcome"),
+        ("analysis_reasons", [], "unexpected analysis reason"),
+    ],
+)
+def test_reference_expectations_must_match_signed_replay(
+    luna_files, tmp_path, field, value, message
+):
+    manifest = json.loads(luna_files["reference.json"])
+    manifest["pilot"]["workflows"]["grounded_qa"][field] = value
+    path = tmp_path / "wrong-expectation.zip"
+    pin = _write_reference(path, luna_files, manifest)
+    with pytest.raises(ValueError, match=f"grounded_qa: {message}"):
+        ref.validate_reference(path, pin)
+
+
+def test_reference_cli_prints_replayed_json(monkeypatch, capsys):
+    import runpy
+    import sys
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            str(ROOT / "examples/judge_measurements_pilot_reference.py"),
+            "--bundle",
+            str(LUNA_REFERENCE / "reference.zip"),
+            "--expected-sha256",
+            LUNA_ARCHIVE_SHA256,
+        ],
+    )
+    runpy.run_path(sys.argv[0], run_name="__main__")
+    result = json.loads(capsys.readouterr().out)
+    assert result["archive_sha256"] == LUNA_ARCHIVE_SHA256
+    assert result["reference_manifest_sha256"] == LUNA_MANIFEST_SHA256
+    assert result["active_result_root"] == "pilot"
+    assert result["new_model_calls"] == 0
+    for workflow in ref.WORKFLOWS:
+        assert result["workflows"][workflow]["verified"]
+        assert result["workflows"][workflow]["authenticated"]
+        assert result["workflows"][workflow]["replayed"]
+        assert result["workflows"][workflow]["accepted"] is False
