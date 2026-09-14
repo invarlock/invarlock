@@ -1116,6 +1116,10 @@ def test_normalized_provider_request_rejects_extra_and_contradictory_controls(
         {"temperature": False},
         {"reasoning_effort": "high"},
         {"response_format": {"type": "json_object"}},
+        {"service_tier": "auto"},
+        {"service_tier": "priority"},
+        {"service_tier": "flex"},
+        {"service_tier": None},
     ],
 )
 def test_native_provider_request_has_closed_control_set(data, addition):

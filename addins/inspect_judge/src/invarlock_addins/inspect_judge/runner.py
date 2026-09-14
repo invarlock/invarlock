@@ -349,7 +349,13 @@ def _require_clean_model_configuration(model: Any) -> None:
         raise InspectJudgeError(
             "Inspect provider must explicitly use the chat-completion API"
         )
-    allowed_model_args = {"max_retries": 0, "responses_api": False}
+    if getattr(api, "service_tier", None) not in (None, "default"):
+        raise InspectJudgeError("Inspect provider contains an unsupported service tier")
+    allowed_model_args = {
+        "max_retries": 0,
+        "responses_api": False,
+        "service_tier": "default",
+    }
     for label, model_args in (
         ("model", getattr(model, "model_args", {})),
         ("provider", getattr(api, "model_args", {})),

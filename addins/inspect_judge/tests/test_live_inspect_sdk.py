@@ -28,6 +28,7 @@ FIXTURES = Path(__file__).parent / "fixtures"
 
 
 @pytest.mark.parametrize("reference_mode", [None, "per_case"])
+@pytest.mark.parametrize("service_tier", [None, "default"])
 @pytest.mark.parametrize("judge_model", ["gpt-4o-2024-08-06", "gpt-5.6-sol"])
 @pytest.mark.parametrize(
     ("finish_reason", "completion", "parse_status"),
@@ -45,6 +46,7 @@ def test_live_inspect_chat_completion_replays_offline(
     parse_status,
     judge_model,
     reference_mode,
+    service_tier,
 ):
     required = os.environ.get("INVARLOCK_REQUIRE_INSPECT_SDK") == "1"
     try:
@@ -107,6 +109,7 @@ def test_live_inspect_chat_completion_replays_offline(
                 "object": "chat.completion",
                 "created": 0,
                 "model": judge_model,
+                "service_tier": "default",
                 "choices": [
                     {
                         "index": 0,
@@ -127,6 +130,7 @@ def test_live_inspect_chat_completion_replays_offline(
             options.grader,
             api_key="fake-key-for-offline-test",
             responses_api=False,
+            **({"service_tier": service_tier} if service_tier is not None else {}),
             max_retries=0,
             memoize=False,
         )
@@ -154,6 +158,10 @@ def test_live_inspect_chat_completion_replays_offline(
 
     measurements = asyncio.run(run())
     for request in requests:
+        if service_tier is None:
+            assert "service_tier" not in request
+        else:
+            assert request["service_tier"] == "default"
         content = json.loads(request["messages"][-1]["content"])
         assert content["input"] == runs["baseline_run"]["records"][0]["input"]
         if reference_mode == "per_case":
@@ -220,7 +228,9 @@ def test_live_inspect_chat_completion_replays_offline(
     # Check the precise wire projection during offline import too. The native
     # SDK test must not turn missing controls or arbitrary role edits into an
     # allowance for every provider/model.
-    mutations = ("role", "temperature", "top_p", "token_limit")
+    mutations = ("role", "temperature", "top_p", "token_limit", "service_tier")
+    if service_tier is not None:
+        mutations += ("response_tier", "missing_response_tier")
     if reference_mode == "per_case":
         mutations += ("reference",)
     for mutation in mutations:
@@ -241,6 +251,12 @@ def test_live_inspect_chat_completion_replays_offline(
             content = json.loads(request["messages"][-1]["content"])
             content["reference"] = "substituted gold"
             request["messages"][-1]["content"] = json.dumps(content)
+        elif mutation == "service_tier":
+            request["service_tier"] = "priority"
+        elif mutation == "response_tier":
+            changed[0]["events"][0]["call"]["response"]["service_tier"] = "priority"
+        elif mutation == "missing_response_tier":
+            changed[0]["events"][0]["call"]["response"].pop("service_tier")
         elif judge_model == "gpt-5.6-sol":
             request["max_tokens"] = request.pop("max_completion_tokens")
         else:

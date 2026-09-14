@@ -176,6 +176,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Select standard processing explicitly for configured hosted judge calls,
+  validate the retained tier, and reject inherited safety identifiers before
+  collection. Historical requests without a tier remain replayable unchanged.
+
 - Close all pinned captured-evidence directory descriptors even when one close
   reports an error, including failures during input setup or caller execution.
 - Release owned files, subprocess streams and runtime resources when setup or

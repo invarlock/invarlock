@@ -51,6 +51,10 @@ def validate_collection_environment(
             raise InspectJudgeError(
                 "OpenAI endpoint environment overrides are unsupported"
             )
+        if "OPENAI_SAFETY_IDENTIFIER" in source:
+            raise InspectJudgeError(
+                "OpenAI safety identifier environment overrides are unsupported"
+            )
     key = current.get("OPENAI_API_KEY")
     credential_available = isinstance(key, str) and bool(key.strip())
     if require_credentials and not credential_available:
@@ -78,6 +82,7 @@ def validate_collection_environment(
     return {
         "provider": "openai",
         "base_url": _BASE_URL,
+        "service_tier": "default",
         "sdk_versions": dict(_SDK_VERSIONS),
         "credential_available": credential_available,
     }
@@ -131,6 +136,7 @@ async def collect_configured(
             base_url=_BASE_URL,
             api_key=current["OPENAI_API_KEY"],
             responses_api=False,
+            service_tier="default",
             max_retries=0,
             memoize=False,
         )
@@ -144,6 +150,10 @@ async def collect_configured(
         if str(getattr(client, "base_url", "")) not in {_BASE_URL, _BASE_URL + "/"}:
             raise InspectJudgeError(
                 "Inspect provider must use the official OpenAI endpoint"
+            )
+        if getattr(model.api, "service_tier", None) != "default":
+            raise InspectJudgeError(
+                "Inspect provider must use the standard service tier"
             )
         result = await collect(
             plan=plan,

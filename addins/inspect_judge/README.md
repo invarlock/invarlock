@@ -14,8 +14,8 @@ extra request headers and arbitrary request bodies are rejected.
 Live collection uses the retained Chat Completions projection. The caller must
 construct the Inspect model with Chat Completions selected and both Inspect and
 provider-client retries set to zero. The model may carry only the explicit
-`responses_api=false` and `max_retries=0` construction arguments needed for
-those choices. Other inherited model, provider or generation settings are
+`responses_api=false`, `max_retries=0` and optional `service_tier=default`
+construction arguments. Other inherited model, provider or generation settings are
 rejected before a call is admitted.
 
 The installed native and captured `metric: judge` workflows and frozen-answer
@@ -24,8 +24,18 @@ constructs the supported model explicitly, and closes its client on success,
 failure or cancellation. Keep `OPENAI_API_KEY` in the process environment.
 Remove `OPENAI_BASE_URL` and `OPENAI_API_BASE` entirely; even empty overrides in
 the process or explicitly supplied environment are rejected. The configured
-client uses `https://api.openai.com/v1`, Chat Completions and disabled model
-memoization. Missing or mismatched dependencies and credentials fail preflight.
+client uses `https://api.openai.com/v1`, Chat Completions, explicit
+`service_tier=default` and disabled model memoization. This selects standard
+processing instead of inheriting the project's tier. Remove
+`OPENAI_SAFETY_IDENTIFIER` as well; an inherited identifier would add an
+unsupported request control and is rejected before collection. Missing or
+mismatched dependencies and credentials fail preflight.
+
+Offline replay accepts historical requests that omitted the tier without
+rewriting them or asserting their billing tier. An explicit tier must be
+`default`, with the same returned tier on completed calls. Inspect's disabled
+response cache does not disable provider prompt caching; declared cost
+reservations must include applicable cache-write charges.
 
 ```bash
 python -m pip install .

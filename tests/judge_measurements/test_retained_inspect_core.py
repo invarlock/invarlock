@@ -112,6 +112,30 @@ def test_retained_inspect_normalized_and_native_events_replay_in_core(retained):
     replay(retained)
 
 
+def test_explicit_standard_tier_replays_without_rewriting_historical_events(retained):
+    for record in retained[1]["records"]:
+        native(record["events"][0])
+    historical = c.canonical_payload(retained[1])
+    replay(retained)
+    assert c.canonical_payload(retained[1]) == historical
+    call = retained[1]["records"][0]["events"][0]["call"]
+    call["request"]["service_tier"] = "default"
+    call["response"]["service_tier"] = "default"
+    replay(retained)
+
+
+@pytest.mark.parametrize("tier", [None, "auto", "priority", "flex", "ultrafast"])
+@pytest.mark.parametrize("side", ["request", "response"])
+def test_core_rejects_nonstandard_service_tiers(retained, tier, side):
+    _, event, _ = event_parts(retained)
+    call = native(event)
+    call["request"]["service_tier"] = "default"
+    call["response"]["service_tier"] = "default"
+    call[side]["service_tier"] = tier
+    with pytest.raises(c.JudgeMeasurementContractError, match="service tier"):
+        replay(retained)
+
+
 @pytest.mark.parametrize(
     "path,value,message",
     [

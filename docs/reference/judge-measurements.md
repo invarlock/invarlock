@@ -238,7 +238,13 @@ invarlock evaluate judge-request.yaml --signing-key signer-private.pem --json
 Review every call, token, cost and time cap first. The collector rejects custom
 provider URLs and reads credentials only from its environment. Remove both
 `OPENAI_BASE_URL` and `OPENAI_API_BASE`; their presence is rejected even when
-empty. Missing credentials, missing or mismatched SDK dependencies, and dependency
+empty. Remove `OPENAI_SAFETY_IDENTIFIER` too; inherited identifier controls are
+unsupported and rejected before collection. Configured calls explicitly select
+`service_tier=default` for standard processing, and completed retained responses
+must report that tier. Historical requests without the field replay unchanged
+without acquiring a standard-tier claim. Disabled Inspect response caching does
+not disable provider prompt caching; cost reservations must cover applicable
+cache-write charges. Missing credentials, missing or mismatched SDK dependencies, and dependency
 import failures stop collection preflight. These requirements do not apply to
 offline import. The optional `execution.collection.scorer_id` defaults to `judge` and
 `invocation_timeout_seconds` defaults to 3600. An omitted workspace defaults to

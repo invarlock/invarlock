@@ -988,9 +988,14 @@ def _check_inspect_provider_projection(
             "tools",
             "tool_choice",
             "extra_headers",
+            "service_tier",
         }
         if set(request) - allowed_controls:
             _fail("retained Inspect provider request contains unsupported controls")
+        # Historical requests omitted this field. Preserve their exact bytes and
+        # meaning; explicit new requests may select only standard processing.
+        if "service_tier" in request and request["service_tier"] != "default":
+            _fail("retained Inspect provider request has an unsupported service tier")
     messages = request.get("messages")
     if not isinstance(messages, list):
         _fail("retained Inspect provider request must contain chat messages")
@@ -1035,6 +1040,8 @@ def _check_inspect_provider_projection(
     response = call["response"]
     if not isinstance(response, dict):
         _fail("completed retained Inspect provider response must be an object")
+    if "service_tier" in request and response.get("service_tier") != "default":
+        _fail("retained Inspect provider response contradicts its service tier")
     provider_completion = _provider_completion(response)
     completion = output.get("completion")
     if not isinstance(completion, str):
