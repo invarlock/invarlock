@@ -105,6 +105,33 @@ can only reason about the facts in that bundle.
 | Recipient policy contains contradictory duplicate trust records | Both trust registries reject repeated identity/fingerprint pairs regardless of array order or status, and signer lookup requires exactly one match | The engine cannot decide which identities or keys the recipient should authorize. |
 | A historical receipt is reformatted during wrapping | The predicate authenticates `receipt.raw_base64` and its digest while requiring parsed content to agree with those exact supplied bytes | Byte preservation does not make the historical receipt current or change its original contract semantics. |
 
+## Bounded judge collection
+
+Selecting `judge` adds a measurement source to the evaluation transaction.
+Native requests freeze authenticated runtime answers; captured requests retain
+the evaluator's supplied-answer provenance. Both can collect bounded ratings,
+and captured or frozen-answer requests can import retained calls. Verification
+and reporting replay those measurements offline.
+
+The plan binds the original task text, frozen answers, rubric, judge configuration,
+reference mode, independent units and repetition schedule. Retained attempts and
+call, token, cost, timeout and storage limits constrain collection. They do not
+prove that a compromised operator or provider supplied truthful measurements,
+that the rubric reflects user needs, or that the judge agrees with human review.
+
+Task text and answers remain untrusted content inside the judge prompt. Explicit
+rendering and digest checks expose changed inputs; they do not eliminate prompt
+injection or semantic bias in a judge model. Optional per-case references are
+sent to the judge only under the declared mode and never added to the evaluated
+model's input. Protect sensitive task, answer and reference content before
+authorizing external collection, and keep provider credentials out of plans,
+evidence and reports. The collector executes within the caller's trust boundary.
+
+The [judge contract](../reference/judge-measurements.md) specifies its independent
+recipient policy, receipt and analysis checks. A generic external scalar rating
+does not supply the retained requests, responses and trial identities needed
+by that contract.
+
 ## Trust-boundary data flow
 
 The critical transitions are:

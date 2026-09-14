@@ -1,0 +1,17 @@
+{
+  "format": "invarlock/judge-reference-archive-v1",
+  "archive": {
+    "path": "reference.zip",
+    "sha256": "23a41eed57e4c541d0f7f1c0bf12e3b80782fe38e898a95a97ef2ad9d66037a6",
+    "size_bytes": 3045657
+  },
+  "reference_manifest_sha256": "ee8afde57d48879d9681fe8f3a6a1218aabf371d12b54967eae3246316771363",
+  "final_plan_status": "candidate_pending_pilot_review",
+  "pilot_cases_per_workflow": 40,
+  "final_cases": {
+    "grounded_qa": 422,
+    "extraction": 1288
+  },
+  "final_review_cases_per_workflow": 80,
+  "new_model_calls": 0
+}

@@ -62,11 +62,13 @@ invarlock verify evidence/
 invarlock report evidence/
 ```
 
-Native execution receives pinned artifacts, evaluation source, runtime,
-deterministic scoring, and policy; InvarLock runs both sides and derives the
-paired result. External evaluator adapters remain in the example and
-integration layer and normalize source exports through evaluator-neutral
-contracts; the core exposes evaluator-neutral contracts only. Their status is
+Native execution receives pinned artifacts, evaluation source, runtime, scorer
+and policy; InvarLock runs both sides and derives the paired result. Exact match,
+normalized NLL and judge scoring share this workflow, with their own evidence
+and verification requirements. Existing evaluators can supply per-case facts
+through installed export parsers or the canonical capture SDK, which normalize
+records into evaluator-neutral contracts. Framework launch
+and qualification examples retain their own pinned profiles. Their status is
 recorded on three independent axes:
 
 | Axis | Values | Meaning |
@@ -96,9 +98,11 @@ for the complete claim boundary and assumptions.
 
 ## Check captured evaluation results
 
-The core wheel compares existing evaluation records without rerunning inference.
-The captured flow supports normalized labels, numeric tolerances, structured
-fields, token overlap, and explicitly attributed recorded scores.
+The core wheel scores existing evaluation records using exact match, normalized
+NLL or judge measurements. Deterministic extensions also cover normalized labels,
+numeric tolerances, structured fields and token overlap. Exact match and NLL
+replay retained facts offline. Judge requests can import retained calls or collect
+new ratings under explicit budgets without regenerating the evaluated answers.
 
 ```bash
 python -m pip install invarlock
@@ -116,6 +120,53 @@ Prepare the request, independent captured trust profile, and keys using the
 Its starter records and thresholds are illustrative. Captured verification
 authenticates inputs and arithmetic, not runtime execution; recorded judgments
 remain explicit and cannot authorize native acceptance or deployment.
+
+## Evaluate with a native judge scorer
+
+Select `metric: judge` alongside `exact_match` and
+`normalized_nll_per_utf8_byte` in a native evaluation request. InvarLock captures
+baseline and subject answers, freezes their runtime provenance, and grades them
+under one declared rubric and judge configuration. The policy fixes the cases, independent
+units, rating scale, repetitions, model identity and decision thresholds before
+model execution. Answer and rendered-request digests are derived automatically
+from the frozen captures. Evidence retains each request,
+response, error, attempt, and source mapping so a recipient can authenticate and
+replay the comparison offline.
+
+```bash
+invarlock evaluate judge-request.yaml --preflight --json
+invarlock evaluate judge-request.yaml --signing-key signing-key.pem
+invarlock verify judge-evidence/ --trust-profile judge-recipient-policy.json
+invarlock report judge-evidence/ --html judge-report.html
+```
+
+All three scorers also accept captured records from existing evaluator workflows.
+Each requires its own per-case facts: outputs and references for exact match,
+reference-continuation likelihoods for NLL, and frozen text plus retained ratings
+for judging. See the [captured-results guide](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/captured-results.md#use-the-three-built-in-scorers).
+An evaluator's aggregate score cannot replace those facts.
+
+The [Harness likelihood reference](https://github.com/invarlock/invarlock/blob/main/examples/captured-results/references/harness-likelihood/README.md)
+retains six real same-model CPU pairs and their installed signed handoff. It
+demonstrates that external likelihood integration profile; its conformance pass
+does not establish model quality or qualify the full evaluator matrix.
+
+`evaluate` performs live collection through the optional
+`invarlock-inspect-judge[inspect]` package, with explicit call, token, cost, timeout
+and checkpoint controls. The core wheel verifies and reports retained evidence
+offline without provider credentials or Inspect. Start with
+`invarlock evaluate --init my-judge --example native-judge`; its model pins are
+placeholders to replace with your own native runtime inputs. The first profile supports bounded text ratings
+of fixed answers; it does not turn arbitrary evaluator scores into replayable
+judge evidence. See the
+[judge measurement reference](https://github.com/invarlock/invarlock/blob/main/docs/reference/judge-measurements.md).
+
+[Evidence sets](https://github.com/invarlock/invarlock/blob/main/docs/reference/evidence-sets.md)
+let a recipient require deterministic and bounded judge checks on the same
+frozen answers, while preserving each component's statistical meaning. Start
+with the [answer capture example](https://github.com/invarlock/invarlock/blob/main/examples/answer-capture/README.md)
+when baseline and subject answers have not yet been collected.
+
 
 For controlled evaluations, `invarlock evaluate --help`
 groups the main workflow separately from advanced runtime options. Run requests
@@ -221,12 +272,13 @@ signing keys, and independently derived verifier inputs.
 ## The release-regression decision
 
 For native run/import requests, both sides score the same authenticated records
-in the same order. InvarLock derives one of two built-in paired comparisons:
+in the same order. Select one of three built-in scorers:
 
 | Metric | Point comparison | Policy verdict |
 | --- | --- | --- |
 | `exact_match` | Subject accuracy minus baseline accuracy, with paired regression and improvement counts | Lower bound of the paired Newcombe 95% interval is at least `delta_min_pp` |
 | `normalized_nll_per_utf8_byte` | Ratio of arithmetic means of per-record byte-normalized expected-continuation NLL | Upper bound of the paired schedule-resampling interval is at most `ratio_max` |
+| `judge` | Repeated bounded ratings of frozen answers, aggregated by declared independent units | Fixed-benchmark uncertainty bound satisfies the declared degradation and optional subject threshold |
 
 The conservative interval bound controls the policy; the point value remains
 descriptive. A policy may also require a minimum paired-record count and
@@ -251,7 +303,8 @@ same boundary outside the core.
 
 Independent replay requires complete ordered per-record evidence that passes
 identity, provenance, schedule, and deterministic recomputation requirements.
-Aggregate-only outputs and unsupported judge results remain observation-only.
+Aggregate-only outputs and judge results outside the bounded judge measurement
+profile remain observation-only.
 A signed observation proves what was supplied; a replayable source additionally
 requires the identity, schedule, and recomputation guarantees above.
 
@@ -333,6 +386,7 @@ technical-verdict inputs. See
   [trust model](https://github.com/invarlock/invarlock/blob/main/docs/security/trust-model.md).
 - **Integrate:** [CLI](https://github.com/invarlock/invarlock/blob/main/docs/reference/cli.md),
   [contracts](https://github.com/invarlock/invarlock/blob/main/docs/reference/contracts.md),
+  [judge measurements](https://github.com/invarlock/invarlock/blob/main/docs/reference/judge-measurements.md),
   [acceptance attestations](https://github.com/invarlock/invarlock/blob/main/docs/reference/acceptance-attestations.md),
   [compatibility covenant](https://github.com/invarlock/invarlock/blob/main/docs/reference/compatibility.md),
   [evaluator qualification](https://github.com/invarlock/invarlock/blob/main/docs/reference/evaluator-qualification.md),

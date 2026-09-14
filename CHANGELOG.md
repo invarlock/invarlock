@@ -9,6 +9,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Completed per-case reference forwarding in the answer-capture judge example
+  and aligned overview, integration, verification and security documentation
+  with the three built-in scorers and their distinct evidence contracts.
+- Retained the corrected 480-trial K2 judge pilot, signed offline replay and
+  original incomplete history. Both advisory analyses remain insufficient
+  evidence under unchanged interval-width requirements.
+- Retained all 10,260 Luna xHigh held-out judge ratings, signed offline
+  verification and separate AI-review labels and disagreements. Both frozen
+  comparison policies pass; AI agreement is not independent-human accuracy.
+  Reference replay supports explicit caller-selected archive byte limits while
+  preserving the smaller pilot defaults.
+
+- Added a real LM Evaluation Harness likelihood reference with pinned CPU
+  measurements, source-preserving import, independent signed verification and
+  reports. Its six paired cases establish same-model integration conformance.
+- Made exact match, normalized NLL and judge scoring available to captured
+  evaluator workflows, with explicit source text projections, typed likelihood
+  bindings, offline retained-call import and evaluator context in reports.
+- Added opt-in per-case judge references without changing existing request bytes
+  or exposing reference answers to the evaluated model.
+
+- Added `judge` as a native run/import scorer through `evaluate`, `verify` and
+  `report`. Native judging freezes authenticated runtime answers, derives the
+  measurement plan bindings, executes bounded installed collection, and retains
+  the complete runtime capture for offline verification.
+- Added a packaged `--init --example native-judge` starter and native model,
+  runtime, rubric and collection context in judge reports. Interrupted collection
+  resumes original answers and admitted trials; exhausted storage produces an
+  explicit terminal insufficient-evidence result.
+- Reject judge workspaces that overlap inputs or model artifacts, changed
+  artifact/runtime identities on resume, underfunded live plans and native-source
+  runs submitted without their runtime capture, before billable judging.
+
+- Added recipient-level composition of deterministic and bounded judge evidence
+  over the same frozen answers, with independent component verification and a
+  shared report. Component statistical meanings remain separate; the combined
+  policy provides no joint confidence guarantee.
+- Added a maintained bounded answer-capture example that freezes baseline and
+  subject runs before repeated judging.
+
+- Added versioned frozen-answer judge import requests, offline preflight,
+  recipient-policy verification and bounded JSON, HTML, Markdown and JUnit
+  reports that distinguish replay, signer authentication and policy acceptance.
+  Judge verification now separates its unsigned local result from an external
+  Ed25519 receipt that binds the complete result, recipient policy, verifier
+  identity and verifier key under a judge-specific signature domain.
+
 - Added shared comparison context to native and captured HTML and Markdown
   reports, including run and artifact digests, evaluator source, recorded model
   identity, workflow, dataset and prompt changes. Missing metadata remains
@@ -137,6 +184,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unchanged.
 
 ### Fixed
+
+- Select standard processing explicitly for configured hosted judge calls,
+  validate the retained tier, and reject inherited safety identifiers before
+  collection. Historical requests without a tier remain replayable unchanged.
 
 - Close all pinned captured-evidence directory descriptors even when one close
   reports an error, including failures during input setup or caller execution.

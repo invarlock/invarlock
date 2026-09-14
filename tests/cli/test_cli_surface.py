@@ -131,4 +131,5 @@ def test_report_renders_directly_from_the_bundle() -> None:
 
     assert _arguments("report") == {"evidence"}
     assert "--html" in options
+    assert "--case-id" in options
     assert "--run" not in options

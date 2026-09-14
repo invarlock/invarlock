@@ -65,6 +65,7 @@
     "logloss",
     "lognll",
     "Bonferroni",
+    "Hoeffding",
     "Equalisation",
     "behaviour",
     "logits",
@@ -233,6 +234,8 @@
     "Sunkara",
     "Raghav",
     "Pranav",
+    "Rajpurkar",
+    "Liang",
     "Khaitan"
   ]
 }

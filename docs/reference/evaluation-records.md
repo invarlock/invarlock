@@ -9,8 +9,9 @@ Captured comparisons use neutral evaluation record contracts. A record keeps
 its stable ID, input, expected value, output, score provenance, metadata, and
 error state. Baseline and subject records must use the same complete schedule.
 
-The public request contract is `invarlock/evaluation-request-v2`. Signed handoffs
-use only captured directory pack `invarlock/evidence-pack-v2` and an external
+The public request contract is `invarlock/evaluation-request-v2`. Deterministic
+and recorded-score captured comparisons use directory pack
+`invarlock/evidence-pack-v2` and an external
 `invarlock/evidence-verification-receipt-v3`. The pack has one manifest signature,
 not a second signed record envelope. `verify` checks recipient-owned policy,
 complete-run and normalized-request digests, and signer identity. `report` is a
@@ -22,7 +23,9 @@ policy bounds use `subject_minimum` and `subject_maximum`. The captured SDK help
 is `compare_runs(baseline=..., subject=..., policy=...)`, with no alternate role
 keywords or wire-field aliases. These captured fields do not rename
 native historical reports or third-party exports. Native pack v1 and receipt
-v1/v2 contracts are unchanged.
+v1/v2 contracts are unchanged. Selecting `comparison.metric: judge` instead
+publishes judge evidence with its own measurement and recipient trust contracts;
+see [judge measurements](judge-measurements.md).
 
 For the exact JSON schemas, see the files under `contracts/` and their synced
 copies under `src/invarlock/_data/contracts/`.
@@ -40,9 +43,10 @@ copies under `src/invarlock/_data/contracts/`.
 Runs require `format`, `source` (`name`, `version`), `run_id`, `artifact_digest`,
 `source_digest`, `score_provenance`, and `records`. Every record has `id`, `input`,
 `expected`, `output`, `scores`, `metadata`, `error`, and `context`. Null output or
-an explicit error is retained, not silently dropped. Matching IDs must bind
-matching input, reference and metadata. Missing results produce
-`insufficient_evidence`, rather than a pass computed over survivors. Duplicate
+an explicit error is retained, not silently dropped. Likelihood scoring can use
+a null output when valid reference-continuation facts are present. Matching IDs
+must bind matching input, reference and metadata. Missing required scorer facts
+produce `insufficient_evidence`, rather than a pass computed over survivors. Duplicate
 IDs or changed paired facts are integration errors.
 
 `artifact_digest` attributes the run to a supplied artifact identity; it does not
@@ -58,17 +62,81 @@ their `source_digest` remain unchanged. A canonical `invarlock` run supplies its
 own metadata; external adapters require explicit source, run ID and artifact
 identity, with approved score provenance when recorded metrics are used.
 
+## Capture and explicit input projections
+
+`invarlock.engine.capture_evaluator_run` accepts explicitly mapped per-case rows
+from any evaluator, with its actual source name/version, run ID and supplied
+artifact digest. `evaluator_input_capabilities` reports usable counts and
+unavailable IDs for `exact_match`, `normalized_nll_per_utf8_byte` and `judge`.
+Availability describes input facts; it grants neither qualification nor proof
+of an upstream scorer execution.
+
+For a structured input, `input_projection` may select an existing string with
+`{"kind": "json-pointer", "pointer": "/input/question"}`. Pointers must be
+rooted at `/input` or `/context` and select a string. The capture retains the original input and
+context plus the exact projection binding. Paired runs must agree on the
+original input and projection configuration as well as the selected text.
+Objects and arrays are never implicitly converted to text.
+External adapter sources may declare the same projection in a captured request.
+Canonical `adapter: invarlock` runs already contain their bindings and reject
+source overrides, including a second projection.
+
+Set `comparison.metric` to `exact_match`, `normalized_nll_per_utf8_byte` or
+`judge` to select a scorer explicitly. Exact match and NLL must agree with the
+single metric in the comparison policy. Omit this selector for an ordinary
+multi-metric comparison. Judge uses a separate recipe and retained-call path.
+
+## Captured reference likelihoods
+
+A record may additionally retain `likelihood` with these closed fields:
+
+| Field | Meaning |
+| --- | --- |
+| `basis` | Exactly `reference_continuation` |
+| `logprob_sum` | Finite, zero or negative natural-log probability sum of the reference continuation |
+| `token_count` | Positive integer count of measured reference tokens |
+| `utf8_byte_count` | Positive integer equal to the reference string's UTF-8 byte length |
+| `input_digest`, `reference_digest` | Canonical digests of the original input and reference |
+| `artifact_digest`, `source` | Exact evaluated artifact and evaluator identity from the run |
+| `configuration_digest`, `tokenizer_digest` | Pins for the likelihood measurement configuration and tokenizer |
+
+These facts must originate from an actual likelihood measurement. Generated
+answer probabilities and summary losses have different semantics. With an input
+projection, `input_digest` still identifies the preserved original input.
+
+The NLL policy metric uses `direction: lower`, `unit: nats_per_utf8_byte`,
+`aggregation: mean` and `ratio_max` in place of `maximum_regression`. Its
+configuration requires `configuration_digest`, `baseline_tokenizer_digest` and
+`subject_tokenizer_digest`. The score per record is `-logprob_sum / utf8_byte_count`;
+the comparison is the ratio of subject and baseline means, with the same paired
+resampling method as native NLL. Interval width is measured in ratio units.
+Reference and configuration bindings and the declared tokenizer identities are
+checked before scoring. Replay does not execute the model or tokenizer, so their
+measurement claims remain source assertions. The separate
+[real Harness likelihood reference](https://github.com/invarlock/invarlock/blob/main/examples/captured-results/references/harness-likelihood/README.md)
+retains six same-model CPU pairs; synthetic contract tests and historical
+exact-match qualifications do not establish other native likelihood profiles.
+
+Judge selection uses the separate judge recipe and retained measurement contract
+through the same captured request. It does not reinterpret a `recorded` scalar
+score as a native judge trial. `prompt.reference_mode: per_case` explicitly adds
+the frozen string reference to each judge request as a separate field. Omitted
+or `none` preserves the reference-free behavior. The reference never becomes part
+of the evaluated model input. See [judge measurements](judge-measurements.md).
+
 ## Policy and identity
 
 Policies contain 1..16 metrics and up to 16 metadata slices in addition to the
 overall scope. Each metric selects a unique name, kind, closed configuration,
 direction (`higher`/`lower`), unit, mean aggregation, minimum count, maximum
-regression and maximum interval width. Optional absolute limits are
+regression and maximum interval width; NLL replaces maximum regression with
+`ratio_max`. Optional absolute limits on the subject mean are
 `subject_minimum` and `subject_maximum`.
 
 Built-in captured kinds are `exact_match`, `normalized_match`,
-`numeric_tolerance`, `json_exact`, `json_fields`, and `token_f1`. These are
-separate from native runtime scorer IDs. `normalized_match` and `token_f1` pin
+`numeric_tolerance`, `json_exact`, `json_fields`, `token_f1`, and
+`normalized_nll_per_utf8_byte`. Exact match and normalized NLL share native
+scorer semantics while retaining captured-input assurance. `normalized_match` and `token_f1` pin
 `unicode_version`; a recipient with an incompatible Unicode environment refuses
 replay without issuing a receipt. `recorded` instead selects a `score_key` and
 exact `accepted_provenance` (`kind`, `source`, `version`, `unit`, `rubric_digest`).

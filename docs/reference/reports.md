@@ -13,6 +13,14 @@ They have different trust meanings.
     - **Use this page when:** Parsing a decision, validating a receipt, or
       distinguishing signed evidence from independently accepted evidence
 
+Report formats depend on the selected scorer and evidence family. The native
+runtime sections below describe exact match, normalized NLL and deterministic
+extensions. Captured comparisons use the multi-metric report described in
+[evaluation records](evaluation-records.md). Native and captured `judge` requests
+produce judge analysis and verification results described in
+[judge measurements](judge-measurements.md); they do not use the native
+`invarlock/comparison-report-v3` shape. All are rendered by `invarlock report`.
+
 ## Runtime-side report
 
 Each side has an `invarlock/runtime-side-report-v1` object:
@@ -35,7 +43,8 @@ reconstructs the runtime-side object exactly.
 
 ## Canonical comparison report
 
-New evaluations write `reports/evaluation.report.json` as an
+Native exact-match/NLL and deterministic-extension evaluations write
+`reports/evaluation.report.json` as an
 `invarlock/comparison-report-v3` object. Strict verification also accepts
 signed `invarlock/comparison-report-v2` and `invarlock/comparison-report-v1`
 objects. Version 2 omits side-accuracy qualification; version 1 additionally
@@ -282,13 +291,16 @@ The scorer-extension v1 contract is suitable for separately supplied
 deterministic text scorers such as token F1, structured-field extraction, or VQA
 answer normalization. Those scorers are separately installed and require
 explicit authorization. SQL or code execution, model-based semantic similarity,
-network or human services, and LLM judges are outside acceptance replay. Judge
-results may be authenticated as observations, where they have no verdict
-authority.
+network or human services, and LLM judges are outside scorer-extension
+acceptance replay. The built-in `judge` scorer replays its bounded measurement
+contract and, for native run/import evidence, its retained runtime capture. Its
+report shows both evaluated model identities, runtime settings and digests,
+judge model/configuration, rubric, counts and uncertainty. Other recorded judge
+results may be authenticated as observations, where they have no verdict authority.
 
 ## Verification result
 
-Native `invarlock verify --json` emits an `invarlock/evidence-pack-verify-v1` result. Important
+Native deterministic `invarlock verify --json` emits an `invarlock/evidence-pack-verify-v1` result. Important
 fields include:
 
 | Field | Meaning |
@@ -453,8 +465,8 @@ The report leads with **Policy satisfied** or **Policy not met**, the recorded
 verdict and the checks responsible for it. Each metric shows baseline and
 candidate values, change, observed pair count, an interval and the configured
 requirements. The interval diagram marks the policy boundary, while the table
-shows which numerical checks passed or were not met. Display values are rounded;
-exact recorded values remain available in the evidence and technical details.
+shows which numerical checks passed or were not met. Exact recorded values remain
+available in the evidence and technical details.
 
 For captured comparisons, the technical details identify both recorded runs,
 their complete-run digests, attributed artifact digests and evaluator
@@ -589,3 +601,10 @@ workflow and its assurance limits.
   dependency order.
 - [Command-line interface](cli.md) documents JSON modes and exit status.
 - [Python API](api-guide.md) defines result and signed-receipt types.
+
+For bounded frozen-answer ratings, see [judge measurements](judge-measurements.md).
+Judge reports keep offline replay, signer authentication and recipient acceptance
+distinct and use additive judge-specific JSON formats. They show the first 50
+case IDs by default; repeat `report --case-id ID` to inspect any retained cases
+without loading every answer and judge response into one report. Case selection
+does not change the complete replay or the recorded policy decision.

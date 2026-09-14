@@ -13,6 +13,23 @@ or part of InvarLock's installed evaluator-neutral API. Each signed evaluator
 launcher also removes the exact temporary base and child image tags it created
 after the journey, including when a retained workspace is requested.
 
+For an evaluator workflow that already runs elsewhere, use the separate
+[captured-results journey](../captured-results/README.md). Installed parsers
+accept selected Inspect, Harness and Promptfoo export shapes; the public
+`capture_evaluator_run` SDK accepts explicitly mapped records from any evaluator.
+The [shortlist capture helper](../evaluator-qualification/maintained/CAPTURE.md)
+preserves original cases and distinguishes capture support from historical
+qualification.
+
+Captured comparisons can select InvarLock exact match, normalized NLL or judge
+scoring when the required facts are available. Explicit projections preserve
+structured task inputs, typed likelihoods bind actual reference measurements,
+and judge evidence retains complete calls under the declared recipe. An aggregate
+score cannot supply missing cases or establish any of these measurements.
+The [real Harness likelihood reference](../captured-results/references/harness-likelihood/README.md)
+retains six same-model CPU pairs and a signed captured handoff. It is separate
+from the native signed OCI profiles listed below.
+
 | Integration | Command | Execution |
 | --- | --- | --- |
 | [Hugging Face Transformers](hf-transformers/) | `make example-hf-transformers` | Qwen3.5-0.8B checkpoint and an explicit behavioral derivative |

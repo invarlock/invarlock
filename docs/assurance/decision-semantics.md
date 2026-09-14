@@ -382,7 +382,15 @@ does not admit SQL or code execution, model-based semantic similarity, network
 services, human judgment, external models, or LLM judges. Judge outputs may be
 authenticated observations, but observations do not enter acceptance.
 
-For every metric, the sample controls are optional but indivisible. Exact
+The native `judge` scorer uses a separate bounded measurement decision contract. It
+retains and replays the declared judge requests, responses, attempts, parsing,
+independent-unit aggregation, interval, and recipient policy. It also accepts
+captured evaluator answers and retained judge calls. See
+[judge measurements](../reference/judge-measurements.md) for those acceptance
+rules; no live judge calls occur inside deterministic-extension replay.
+
+For the native exact-match, NLL and extension metrics above, the sample controls
+are optional but indivisible. Exact
 match and scorer extensions use `maximum_interval_width_pp`, whose value must
 be positive and no greater than 200. Normalized NLL uses positive
 `maximum_interval_width_ratio`. `minimum_record_count` is an integer from 1

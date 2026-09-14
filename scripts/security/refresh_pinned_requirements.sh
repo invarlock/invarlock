@@ -226,6 +226,13 @@ run_workflow_locks() {
   fi
   rm -f "${harness_cuda_full_lock}"
 
+  for judge_python in 3.12 3.13; do
+    compile_pyproject "${WORKFLOW_DIR}/inspect-judge-tests-py${judge_python/./}.txt" \
+      "${WORKFLOW_DIR}/inspect-judge-tests.in" \
+      --python-version "${judge_python}" \
+      --custom-compile-command "scripts/security/refresh_pinned_requirements.sh --write --group workflows"
+  done
+
   compile_req_platform \
     "${WORKFLOW_DIR}/inspect-ai-runtime.in" \
     "${WORKFLOW_DIR}/inspect-ai-runtime-py312.txt" \

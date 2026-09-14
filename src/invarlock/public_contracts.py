@@ -15,6 +15,25 @@ PACKAGE_CONTRACTS_ROOT = importlib.resources.files("invarlock").joinpath(
     "_data", "contracts"
 )
 
+JUDGE_EVALUATION_REQUEST_FORMAT_VERSION = "invarlock/evaluation-request-v3"
+JUDGE_MEASUREMENT_PLAN_FORMAT_VERSION = "invarlock/judge-measurement-plan-v1"
+JUDGE_MEASUREMENTS_FORMAT_VERSION = "invarlock/judge-measurements-v1"
+JUDGE_ANALYSIS_POLICY_FORMAT_VERSION = "invarlock/judge-analysis-policy-v1"
+JUDGE_MEASUREMENT_EVIDENCE_FORMAT_VERSION = "invarlock/judge-measurement-evidence-v1"
+JUDGE_MEASUREMENT_RECIPIENT_POLICY_FORMAT_VERSION = (
+    "invarlock/judge-measurement-recipient-policy-v1"
+)
+JUDGE_MEASUREMENT_VERIFICATION_RECEIPT_FORMAT_VERSION = (
+    "invarlock/judge-measurement-verification-receipt-v1"
+)
+JUDGE_VERIFICATION_RESULT_FORMAT_VERSION = "invarlock/judge-verification-result-v1"
+
+EVIDENCE_SET_FORMAT_VERSION = "invarlock/evidence-set-v1"
+EVIDENCE_SET_RECIPIENT_POLICY_FORMAT_VERSION = (
+    "invarlock/evidence-set-recipient-policy-v1"
+)
+EVIDENCE_SET_VERIFICATION_FORMAT_VERSION = "invarlock/evidence-set-verification-v1"
+
 EVALUATION_REQUEST_FORMAT_VERSION = "invarlock/evaluation-request-v1"
 CAPTURED_EVALUATION_REQUEST_FORMAT_VERSION = "invarlock/evaluation-request-v2"
 EVIDENCE_PACK_FORMAT_VERSION = "invarlock/evidence-pack-v1"
@@ -74,6 +93,50 @@ def _load_object_contract(filename: str) -> dict[str, Any]:
             reason=f"expected JSON object, got {type(payload).__name__}",
         )
     return payload
+
+
+def load_judge_evaluation_request_schema() -> dict[str, Any]:
+    return _load_object_contract("evaluation_request_v3.schema.json")
+
+
+def load_judge_measurement_plan_schema() -> dict[str, Any]:
+    return _load_object_contract("judge_measurement_plan.schema.json")
+
+
+def load_judge_measurements_schema() -> dict[str, Any]:
+    return _load_object_contract("judge_measurements.schema.json")
+
+
+def load_judge_analysis_policy_schema() -> dict[str, Any]:
+    return _load_object_contract("judge_analysis_policy.schema.json")
+
+
+def load_judge_measurement_evidence_schema() -> dict[str, Any]:
+    return _load_object_contract("judge_measurement_evidence.schema.json")
+
+
+def load_judge_measurement_recipient_policy_schema() -> dict[str, Any]:
+    return _load_object_contract("judge_measurement_recipient_policy.schema.json")
+
+
+def load_judge_measurement_verification_receipt_schema() -> dict[str, Any]:
+    return _load_object_contract("judge_measurement_verification_receipt.schema.json")
+
+
+def load_judge_verification_result_schema() -> dict[str, Any]:
+    return _load_object_contract("judge_verification_result.schema.json")
+
+
+def load_evidence_set_schema() -> dict[str, Any]:
+    return _load_object_contract("evidence_set.schema.json")
+
+
+def load_evidence_set_recipient_policy_schema() -> dict[str, Any]:
+    return _load_object_contract("evidence_set_recipient_policy.schema.json")
+
+
+def load_evidence_set_verification_schema() -> dict[str, Any]:
+    return _load_object_contract("evidence_set_verification.schema.json")
 
 
 def load_evaluation_request_schema() -> dict[str, Any]:
@@ -178,6 +241,28 @@ def load_evaluator_qualification_result_schema() -> dict[str, Any]:
 
 __all__ = [
     "ContractLoadError",
+    "EVIDENCE_SET_FORMAT_VERSION",
+    "EVIDENCE_SET_RECIPIENT_POLICY_FORMAT_VERSION",
+    "EVIDENCE_SET_VERIFICATION_FORMAT_VERSION",
+    "load_evidence_set_schema",
+    "load_evidence_set_recipient_policy_schema",
+    "load_evidence_set_verification_schema",
+    "JUDGE_EVALUATION_REQUEST_FORMAT_VERSION",
+    "load_judge_evaluation_request_schema",
+    "JUDGE_MEASUREMENT_PLAN_FORMAT_VERSION",
+    "JUDGE_MEASUREMENTS_FORMAT_VERSION",
+    "JUDGE_ANALYSIS_POLICY_FORMAT_VERSION",
+    "JUDGE_MEASUREMENT_EVIDENCE_FORMAT_VERSION",
+    "JUDGE_MEASUREMENT_RECIPIENT_POLICY_FORMAT_VERSION",
+    "JUDGE_MEASUREMENT_VERIFICATION_RECEIPT_FORMAT_VERSION",
+    "JUDGE_VERIFICATION_RESULT_FORMAT_VERSION",
+    "load_judge_measurement_plan_schema",
+    "load_judge_measurements_schema",
+    "load_judge_analysis_policy_schema",
+    "load_judge_measurement_evidence_schema",
+    "load_judge_measurement_recipient_policy_schema",
+    "load_judge_measurement_verification_receipt_schema",
+    "load_judge_verification_result_schema",
     "ACCEPTANCE_PREDICATE_FORMAT_VERSION",
     "CAPTURED_EVALUATION_REQUEST_FORMAT_VERSION",
     "EVALUATION_REQUEST_FORMAT_VERSION",

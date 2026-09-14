@@ -37,11 +37,19 @@ choose a representative sample or a suitable threshold for you.
 3. Select prompts and expected outputs without inspecting subject outcomes.
 4. Choose `exact_match` for literal closed answers or
    `normalized_nll_per_utf8_byte` for teacher-forced expected-continuation
-   likelihood regression, or bind an explicitly authorized deterministic text
-   scorer for a task-specific unit-interval result.
+   likelihood regression. Select `judge` for bounded rubric-based ratings of
+   frozen answers, or bind an explicitly authorized deterministic text scorer
+   for a task-specific unit-interval result.
 5. Select the threshold, unit, conservative interval bound, and failure action.
 6. Freeze the JSONL bytes, field mapping, optional exact prefix, and SHA-256.
 7. Freeze the policy bytes and distribute an independent copy to verifiers.
+
+The JSONL and policy shapes below describe native exact match, normalized NLL
+and deterministic extensions. Judge requests also freeze a rubric, independent
+unit mapping, repetitions, reference mode and collection budgets. Follow the
+[judge policy contract](../reference/judge-measurements.md) for that scorer's
+uncertainty and recipient acceptance rules; captured evaluator records follow
+the [captured-results guide](captured-results.md).
 
 A reviewable claim is:
 

@@ -145,6 +145,7 @@ where = ["src"]
 "invarlock" = [
   "_data/contracts/*.json",
   "_data/public_evidence/*.json",
+  "_data/examples/native-judge/*",
 ]
 
 [tool.setuptools.exclude-package-data]

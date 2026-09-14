@@ -14,6 +14,30 @@ installed.
 python examples/captured-results/wheel_smoke.py --cli invarlock
 ```
 
+The three-scorer rehearsal checks the public capture and retained-judge import
+helpers, then runs v2 exact-match, normalized-NLL and judge requests through
+signed evaluation, independent verification and reports:
+
+```bash
+python examples/captured-results/scorer_wheel_smoke.py --cli invarlock \
+  --fixture examples/judge-measurements
+```
+
+For an isolated recipient check, copy the script and fixture directory outside
+the checkout and run them with the candidate wheel's Python and executable.
+This requires only the core package; Inspect and provider SDKs must be absent.
+The NLL likelihood facts are authored synthetic inputs for contract testing,
+not measured model evidence. The retained one-case judge fixture stays
+insufficient evidence under its existing policy. No model or judge is called,
+and each CLI command has a 60-second timeout.
+
+The separate [Harness likelihood reference](references/harness-likelihood/README.md)
+retains real CPU measurements from unmodified `lm-eval==0.4.12`, followed by the
+installed signed journey. Its six same-model pairs establish likelihood capture
+compatibility, not model quality. `harness_likelihood_rehearsal.py` performs the
+bounded model capture; `harness_likelihood_handoff.py` independently checks and
+imports its original facts using only the core package.
+
 The native rehearsal and handoff helpers produce captured records for external
 evaluators. They do not add a second CLI or SDK namespace. Runtime pipelines
 remain ordinary upstream integrations; their exported records enter through

@@ -18,17 +18,22 @@ invarlock report evidence/
 ![InvarLock paired release-regression architecture](../assets/evaluation-verification-flow.svg)
 
 `evaluate` executes, imports, or compares captured baseline-versus-subject
-records and publishes one atomic evidence directory. Native execution/import
-retains pack v1, native artifact/schedule/runtime anchors, and receipt v1/v2.
-Captured comparison uses pack v2, complete-run/request/policy/signer anchors,
-trust profile v2, and receipt v3 scoped to `captured_comparison`. Both use the
-same CLI and `invarlock.engine` SDK facade. Native-only acceptance APIs reject
+records and publishes one atomic evidence directory. Native exact-match/NLL and
+deterministic-extension execution/import retain pack v1, native
+artifact/schedule/runtime anchors, and receipt v1/v2. Captured built-in and
+recorded-score comparisons use pack v2, complete-run/request/policy/signer anchors,
+trust profile v2, and receipt v3 scoped to `captured_comparison`.
+The bounded judge workflow collects or imports frozen-answer measurements, validates their
+complete planned schedule, and emits a judge evidence envelope with its own
+recipient policy and verification receipt. It preserves fixed-benchmark judge
+uncertainty separately from deterministic comparison statistics. All three use
+the same CLI; the native and captured SDK facade is `invarlock.engine`. Native-only acceptance APIs reject
 captured scope. `report` renders the stored result without changing the pack or
 discovering an adjacent receipt; unsigned captured packs remain local reports.
 
 ## Transaction boundaries
 
-For native execution/import:
+For native exact-match/NLL and deterministic-extension execution/import:
 
 | Transaction | Reads | Writes | Independent trust required | Acceptance authority |
 | --- | --- | --- | --- | --- |
@@ -39,11 +44,15 @@ For native execution/import:
 The same pack can be rendered many times and verified by many independent
 authorities without changing a byte in the evidence directory.
 
-Captured evaluation recomputes supported deterministic scores or carries
-explicitly attributed recorded scores; it does not execute a runtime or confer
-verdict authority on external evaluator observations. Signed captured verification
+Captured exact-match/NLL comparisons score supplied case facts; other declared
+metrics can use explicitly attributed recorded scores. They do not authenticate
+native model execution. Evaluator profiles qualified as observation-only retain
+that limit. Signed captured verification
 replays the complete comparison under independent pins and a recipient-owned
-work budget. An unsigned pack is not independently authenticated, though an
+work budget. Captured judge requests instead collect or import bounded ratings
+and use the judge envelope and recipient policy. They preserve supplied-answer
+provenance; native judge evidence additionally retains the runtime capture.
+An unsigned pack is not independently authenticated, though an
 attempt to verify it can produce an external signed rejection. A valid receipt
 signature does not mean the technical verdict passes. The
 [captured-results guide](../user-guide/captured-results.md) defines both paths.
@@ -63,7 +72,8 @@ The native runtime layers are:
 
 ## Trust boundaries
 
-The following native anchors are not substitutes for captured run/request pins.
+The following native pack-v1 anchors are not substitutes for captured run/request
+pins or the [judge recipient policy](judge-measurements.md#replay-authentication-and-acceptance).
 
 The evidence-signing key authenticates the bundle bytes and identifies the
 signer. It does not make the submitted assertions true. Verification therefore requires inputs that
@@ -115,6 +125,13 @@ The GGUF, TensorRT-LLM, and Hugging Face vision-text providers are first-party
 optional distributions. They implement the same ABI and register through the
 `invarlock.runtime_providers` entry-point group. Numeric diagnostics are a
 separate observation-only package and have no acceptance authority.
+The fifth optional distribution, `invarlock-inspect-judge`, adapts bounded
+collection logs to core judge measurements. Its `inspect` extra supplies the
+provider SDK collection path. Offline import, schedule replay, analysis, signing,
+independent verification, and reporting live in core and do not import or require
+Inspect or OpenAI SDKs. `evaluate` invokes the installed collector when a judge
+request requires new ratings, under its explicit budgets. Preflight, retained-call
+import, verification and reporting make no provider calls.
 
 ```text
 invarlock
@@ -128,12 +145,13 @@ first-party optional distributions
 ├── invarlock-runtime-gguf
 ├── invarlock-runtime-tensorrt-llm
 ├── invarlock-runtime-hf-vision-text
-└── invarlock-diagnostics (observation only)
+├── invarlock-diagnostics (observation only)
+└── invarlock-inspect-judge (bounded collection adapter)
 ```
 
 See [Runtime providers](runtime-providers.md) for the extension contract.
 
-## Data flow
+## Native data flow
 
 1. The request loader resolves all file references beneath the request root,
    without following symbolic links, and authenticates the exact source bytes.
@@ -142,24 +160,20 @@ See [Runtime providers](runtime-providers.md) for the extension contract.
    Docker or Podman worker per side. Both workers score the same schedule, and
    the host validates their complete side results. Import mode authenticates a
    supplied canonical schedule and complete runtime sidecars.
-3. The engine computes a deterministic comparison ID and either derives one of
-   two built-in paired metrics or replays one explicitly authorized
-   deterministic text scorer. Exact match replays paired outcome counts, an
-   exact McNemar probability, and the versioned Newcombe 95% interval.
-   Normalized NLL and
-   scorer-extension deltas use the fixed 2,048-replicate schedule-resampling
-   interval. The scorer owns only per-record values in `[0, 1]`; the core owns
-   means, subject-minus-baseline percentage-point delta, interval, and policy
-   arithmetic. Policy reads the conservative bound of the selected interval.
-   When the policy includes coupled sample controls, core also checks the
-   authenticated record count and observed interval width. All three
-   conditions must pass.
-4. Publication stages a closed inventory, signs the canonical manifest, and
-   renames the directory into place without replacing an existing destination.
+3. The engine selects exact match, normalized NLL, native judge, or an explicitly
+   authorized deterministic text scorer. Exact match replays paired outcome
+   counts, the exact McNemar probability and Newcombe 95% interval. Normalized
+   NLL and scorer-extension deltas use the fixed 2,048-replicate schedule interval.
+   Native judge freezes the exact native capture, derives answer-dependent plan
+   bindings, collects bounded ratings through the installed optional integration,
+   and applies its fixed-benchmark analysis. Each scorer preserves its own
+   statistical assumptions and conservative policy bound.
+4. Publication stages a closed inventory, signs its manifest or judge envelope,
+   and renames the directory into place without replacing an existing destination.
 5. Verification treats the submitted bundle as untrusted, replays all semantic
    bindings, and signs a receipt outside it.
-6. Reporting reads only the signature-authenticated bundle and writes only the
-   optional presentation output.
+6. Reporting replays retained evidence and writes optional presentation outputs.
+   It reports authentication and policy state separately from recipient acceptance.
 
 Run mode and import mode differ only before bundle assembly. Run mode asks each
 isolated worker to emit the sidecars. Import mode authenticates supplied
@@ -171,6 +185,11 @@ schedule and record IDs establish the pairing invariant.
 
 The exact inventory is documented in [Evidence artifacts](artifacts.md); the
 decision and receipt shapes are documented in [Reports and receipts](reports.md).
+
+The [judge measurement reference](judge-measurements.md) defines the separate
+frozen-answer collection and replay flow, missing-measurement handling, fixed
+benchmark statistical scope, and recipient-owned plan, result, and signer pins.
+A report does not authorize acceptance or claim human agreement with a judge.
 
 ## Stable and internal surfaces
 

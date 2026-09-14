@@ -88,9 +88,11 @@ pack, suppress a verifier error, or reinterpret a failed policy result.
 - [ ] For a scorer extension, confirm the same paired-resampling method and
       lower-bound `delta_min_pp` rule are used, and that strict replay used the
       explicitly authorized scorer registry.
-- [ ] Treat LLM judges and any network, human, external-model, SQL-execution,
-      code-execution, or model-similarity result as observation-only evidence,
-      not an acceptance scorer.
+- [ ] Keep every LLM judge outside the acceptance-scorer boundary. For the
+      bounded frozen-answer judge profile, verify its separate plan, retained
+      measurements, analysis, signer, and recipient policy. Treat unsupported
+      judge, network, human, SQL/code-execution, and model-similarity results as
+      observation-only evidence.
 - [ ] Confirm the verdict uses the policy-relevant conservative bound: lower
       for exact-match delta and upper for normalized NLL.
 - [ ] If sample qualification is present, confirm its minimum and maximum match

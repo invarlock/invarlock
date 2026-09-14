@@ -71,9 +71,10 @@ unless a versioned policy and replayable scorer explicitly authorize them.
 - Use a verifier-replayable scorer extension for task-specific F1, structured
   extraction, VQA normalization, or another deterministic text score computed
   only from authenticated record facts.
-- Keep model-judge results as authenticated observations until the judge,
-  prompt, references, and calibration have an independently verifiable
-  acceptance contract.
+- Use the bounded judge-measurement workflow when fixed answers, a declared
+  rubric, a supported text judge, repeated ratings, and independent-unit
+  analysis fit the decision. Keep other model-judge results as authenticated
+  observations.
 
 ## Prepare a meaningful paired schedule
 

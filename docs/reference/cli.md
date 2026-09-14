@@ -20,7 +20,7 @@ Use `invarlock --version` for the installed version and `invarlock --help` for
 the authoritative option list. The core commands have the same transaction
 boundaries as the [Python facade](api-guide.md).
 
-The captured-results flow compares existing records without inference while
+The deterministic captured-results flow compares existing records without inference while
 retaining an explicit captured-evidence and verifier-receipt scope. See the
 [captured-results guide](../user-guide/captured-results.md).
 
@@ -77,7 +77,8 @@ invarlock evaluate REQUEST \
   [--json]
 ```
 
-For native run/import requests, `evaluate` loads one closed YAML request and runs
+For native exact-match/NLL and deterministic-extension run/import requests,
+`evaluate` loads one closed YAML request and runs
 the complete execution-free preflight before any worker starts. It then prepares or validates the canonical
 schedule, executes or imports paired runtime records, derives the selected
 metric and its paired interval, applies the policy to the conservative bound,
@@ -120,8 +121,8 @@ publishes the evidence directory. Import requests do not launch workers.
 
 | Input | Required | Environment alternative | Purpose |
 | --- | --- | --- | --- |
-| `REQUEST` | Except setup actions | None | Existing readable YAML governed by native `evaluation_request.schema.json` or captured `evaluation_request_v2.schema.json`; its parent is the request root |
-| `--signing-key PATH` | Except captured `--unsigned` and setup actions | `INVARLOCK_SIGNING_KEY` | Ed25519 evidence-signing private-key file |
+| `REQUEST` | Except setup actions | None | Existing readable YAML governed by native v1, captured v2 or frozen-answer judge v3; its parent is the request root |
+| `--signing-key PATH` | For signed publication; native run/import requires it | `INVARLOCK_SIGNING_KEY` | Ed25519 evidence-signing private-key file; captured and frozen-answer judge requests permit explicit `--unsigned` |
 | `--allow-installed-scorers` | Only for a scorer-bound request | `INVARLOCK_ALLOW_INSTALLED_SCORERS` | Authorize loading and executing the exact installed scorer bound by the request and policy |
 | `--runtime-profile FILE` | No | None | Explicit closed JSON runtime settings for run requests; maximum 16 KiB |
 | `--runtime-image IMAGE` | Run mode from host | `INVARLOCK_RUNTIME_IMAGE` | Local OCI image reference; must contain a digest or be paired with the digest option |
@@ -140,14 +141,26 @@ publishes the evidence directory. Import requests do not launch workers.
 | `--runtime-cpus DECIMAL` | No | `INVARLOCK_RUNTIME_CPUS` | Per-worker CPU ceiling; defaults to `4` and accepts up to three decimal places |
 | `--runtime-memory-mib INTEGER` | No | `INVARLOCK_RUNTIME_MEMORY_MIB` | Per-worker memory ceiling in MiB; defaults to `65536` |
 | `--runtime-user UID:GID` | No | `INVARLOCK_RUNTIME_USER` | Numeric non-root worker identity; defaults to `65532:65532` |
-| `--preflight` | No | None | Perform execution-free qualification and emit `invarlock/evaluation-preflight-v2` |
-| `--json` | No | None | Emit one compact `invarlock/evaluation-result-v1` object |
+| `--preflight` | No | None | Perform the selected workflow's execution-free validation; native requests emit `invarlock/evaluation-preflight-v2` |
+| `--json` | No | None | Emit the selected workflow's versioned status JSON, described below |
 
 Runtime image, device, entrypoint and resource controls apply only to run-mode
 requests. Import evidence already records its runtime identity, so `evaluate`
 rejects explicit run controls for an import request instead of silently ignoring
 them. The command also fails if the request's execution mode changes between
 mode detection and full loading.
+
+### Native judge scoring
+
+A native request can select `comparison.metric: judge` with its own rubric,
+analysis policy and private collection workspace. `evaluate` captures or imports
+the native answers and calls the optional installed collector, then publishes
+judge evidence. Preflight makes no calls; interrupted judging retains its
+checkpoint and leaves the final output absent for continuation. Native runtime
+resources and artifact authentication still apply. `verify` replays the native
+capture and judgments offline using a judge recipient policy; `report` displays
+model, runtime, rubric, judge identity, outcomes and uncertainty. See the
+[judge reference](judge-measurements.md) for the policy and supported profile.
 
 ### Captured evaluation controls
 
@@ -160,7 +173,7 @@ pins. `--max-bootstrap-draws` controls the caller-owned captured work allowance
 (default 102,400,000). Runtime, container, and scorer-extension flags are rejected
 for this mode. Native resource limits are unchanged.
 
-`--init DIRECTORY --example classification|extraction|judge`, `--keygen DIRECTORY`,
+`--init DIRECTORY --example classification|extraction|judge|native-judge`, `--keygen DIRECTORY`,
 and `--freeze-cases FILE` are mutually exclusive setup actions on `evaluate`, without
 a request argument. `--case-set-output FILE` optionally writes the canonical case
 set. These actions emit `invarlock/evaluation-setup-v1` with `--json` and
@@ -170,7 +183,13 @@ do not evaluate or establish assurance.
 invarlock evaluate --freeze-cases cases.json --case-set-output frozen-cases.json --json
 ```
 
-Captured preflight emits `invarlock/evaluation-preflight-v3`; captured publication
+When `comparison.metric: judge` is selected, captured requests use the judge
+recipe, private workspace and optional retained measurements. Preflight and
+evaluation return judge result envelopes; `--max-bootstrap-draws` does not apply.
+Without retained measurements, judging uses the installed collector under the
+recipe's explicit budgets. Verification uses a judge recipient policy.
+
+Deterministic captured preflight emits `invarlock/evaluation-preflight-v3`; captured publication
 emits `invarlock/evaluation-result-v2`. The
 [captured-results guide](../user-guide/captured-results.md) gives the request,
 complete trust profile, and output fields. `--fail-on-policy` applies after either
@@ -437,7 +456,7 @@ receipts](reports.md#verification-result) for the complete field matrix.
 ## `report`
 
 ```text
-invarlock report EVIDENCE [--html report.html] [--markdown report.md] [--junit results.xml] [--explain] [--json]
+invarlock report EVIDENCE [--html report.html] [--markdown report.md] [--junit results.xml] [--explain] [--case-id ID]... [--json]
 ```
 
 `report` verifies the bundle's closed inventory, checksums, reference digests,
@@ -451,6 +470,7 @@ authentication before rendering `reports/evaluation.report.json`.
 | `--markdown PATH` | No | Write Markdown outside the pack |
 | `--junit PATH` | No | Write recorded policy checks as JUnit XML outside the pack |
 | `--explain` | No | Add a concise explanation of the decision and evidence bindings |
+| `--case-id ID` | No | Select one retained judge case for detailed inspection; repeat for up to 50 cases |
 | `--json` | No | Emit one compact machine-readable rendering result instead of the text view |
 
 Every output option refuses to overwrite an existing file. By default, `report`
@@ -464,6 +484,12 @@ and native calls requesting Markdown or JUnit, emit
 All destinations are checked up front; a later write failure leaves earlier
 completed outputs accurately listed. There is no automatic receipt discovery.
 Unsigned captured reports remain explicitly local, without independent assurance.
+
+Judge evidence and evidence sets show the first 50 case IDs by default. Repeat
+`--case-id` to render any specific retained cases in HTML or in the expanded
+text/Markdown view produced by `--explain`. Selection changes presentation only;
+the report still replays the complete retained measurement set. Other evidence
+formats reject this option.
 
 Captured text, HTML and Markdown reports include the baseline and subject run
 IDs, complete-run digests, attributed artifact digests and evaluator source
@@ -573,3 +599,22 @@ runtime inventory.
 - [Evaluation lifecycle](lifecycle.md) explains write boundaries and retry
   behavior.
 - [Reports and receipts](reports.md) defines JSON results and formatted reports.
+
+## Frozen-answer judge evidence
+
+The versioned judge request uses the same `evaluate`, `verify` and `report`
+commands. See [judge measurements](judge-measurements.md) for import preflight,
+bounded reports and independent recipient policy verification. Judge
+verification returns an unsigned local result. `--receipt` requires both
+`--verifier-signing-key` and `--verifier-identity` and writes a separately signed
+judge receipt outside the evidence. Its JSON `ok` field is true only when
+`accepted` is true.
+
+
+## Deterministic and judge evidence sets
+
+Use the existing `evaluate` requests for each component, then index the two
+packs and run `verify` with an independent composition recipient policy.
+`report` shows their metrics together. Both components must bind the same
+original runs and case set; their statistical methods retain separate meanings.
+See [evidence sets](evidence-sets.md) for commands, policies and exit codes.

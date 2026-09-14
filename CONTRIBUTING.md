@@ -10,9 +10,12 @@ invarlock report evidence/
 ```
 
 The `invarlock evaluate`, `invarlock verify`, and `invarlock report` commands
-compare captured evaluator exports, apply metric and slice policies, and verify
-signed evidence. Use `invarlock --help` for that workflow; `invarlock evaluate --help` describes controlled execution or
-import, including the optional run-mode resource profile.
+run or import native comparisons with exact-match, normalized-NLL or judge scoring,
+compare captured evaluator exports, and replay imported judge measurements.
+They apply the corresponding policy
+and verify signed evidence. Use `invarlock --help` for these workflows;
+`invarlock evaluate --help` describes controlled execution or import, including
+the optional run-mode resource profile.
 See the [captured-results guide](docs/user-guide/captured-results.md).
 Changes should make these workflows easier to understand, safer to execute,
 or easier to verify. Preserve the distinct assurance meaning of each evidence
@@ -85,7 +88,7 @@ listed below. Run them for the affected surface before requesting review.
   behind the same `invarlock.engine` facade.
 - `contracts/` contains the shipped JSON contracts.
 - `addins/` contains the independently installable GGUF, TensorRT-LLM,
-  Hugging Face vision-text, and diagnostics packages.
+  Hugging Face vision-text, diagnostics, and Inspect judge collection packages.
 - `tests/` mirrors the maintained runtime, contract, evidence, CLI, and release
   surfaces.
 - `scripts/` contains repository checks, release validation, and security
@@ -158,8 +161,8 @@ as the complete pull-request check:
 | Coverage across the repository | `make coverage-enforce` on Linux; CI enforces 95% combined and branch coverage, including per-file checks |
 | Documentation or public command examples | `make docs-check` and `python -m pytest tests/docs -q`; exercise the documented commands |
 | Entry points, imports, packaged schemas, or dependencies | `make addins-install-smoke`; this includes `dist-check` and isolated wheel consumers |
-| Captured evaluation behavior | Build and install the candidate wheel, then run `python examples/captured-results/wheel_smoke.py` |
-| Native evaluator capture or mapping | Follow the captured-results example with explicit model, protocol, and environment inputs; verify captured outputs in a separate wheel-only recipient |
+| Captured evaluation behavior | Build and install the candidate wheel, then run `python examples/captured-results/wheel_smoke.py` and `python examples/captured-results/scorer_wheel_smoke.py --fixture examples/judge-measurements` |
+| Native evaluator capture or mapping | Follow the captured-results example with explicit model, protocol, and environment inputs; verify captured outputs in a separate wheel-only recipient; the [Harness likelihood reference](examples/captured-results/references/harness-likelihood/README.md) covers real NLL capture and offline replay |
 | Evidence interpretation or verification | `make release-retained-evidence-compatibility`; retain the declared outcomes of historical evidence |
 | Inspect qualification semantics | `make evaluator-inspect-semantics`; run a fresh source-bound qualification and preserve historical profiles and evidence |
 | Batch evaluator qualification semantics | `make evaluator-batch-semantics`; replay the current profile's native rows and retain separate source-bound qualification artifacts |
@@ -195,7 +198,8 @@ recorded comparison decisions, and independent verification.
 Tests must exercise production code and assert meaningful outcomes. A passing
 test that only restates fixture data is not evidence that a user journey works.
 `make dist-check` builds and validates the core, diagnostics, GGUF connector,
-Hugging Face vision-text connector, and TensorRT-LLM connector distributions.
+Hugging Face vision-text connector, TensorRT-LLM connector, and Inspect judge
+preparation distributions.
 
 For runtime launcher changes, run the opt-in real-container journey with a
 working Docker or Podman engine. Commit the source being tested, create its

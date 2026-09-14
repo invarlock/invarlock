@@ -27,7 +27,8 @@
               "json_fields",
               "json_exact",
               "token_f1",
-              "recorded"
+              "recorded",
+              "normalized_nll_per_utf8_byte"
             ]
           },
           "configuration": {
@@ -124,6 +125,10 @@
               "unit",
               "rubric_digest"
             ]
+          },
+          "ratio_max": {
+            "type": "number",
+            "exclusiveMinimum": 0
           }
         },
         "required": [
@@ -134,7 +139,6 @@
           "unit",
           "aggregation",
           "minimum_count",
-          "maximum_regression",
           "maximum_interval_width"
         ],
         "allOf": [
@@ -174,6 +178,65 @@
               },
               "required": [
                 "configuration"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "normalized_nll_per_utf8_byte"
+                }
+              },
+              "required": [
+                "kind"
+              ]
+            },
+            "then": {
+              "properties": {
+                "configuration": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "configuration_digest": {
+                      "type": "string",
+                      "pattern": "^sha256:[a-f0-9]{64}$"
+                    },
+                    "baseline_tokenizer_digest": {
+                      "type": "string",
+                      "pattern": "^sha256:[a-f0-9]{64}$"
+                    },
+                    "subject_tokenizer_digest": {
+                      "type": "string",
+                      "pattern": "^sha256:[a-f0-9]{64}$"
+                    }
+                  },
+                  "required": [
+                    "configuration_digest",
+                    "baseline_tokenizer_digest",
+                    "subject_tokenizer_digest"
+                  ]
+                },
+                "direction": {
+                  "const": "lower"
+                },
+                "unit": {
+                  "const": "nats_per_utf8_byte"
+                },
+                "maximum_regression": false,
+                "score_key": false,
+                "accepted_provenance": false
+              },
+              "required": [
+                "ratio_max"
+              ]
+            },
+            "else": {
+              "properties": {
+                "ratio_max": false
+              },
+              "required": [
+                "maximum_regression"
               ]
             }
           }

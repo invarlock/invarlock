@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 from typing import Any
 
+import pytest
 import yaml
 
 
@@ -60,7 +62,7 @@ def test_ci_runs_the_repository_gates() -> None:
     assert _step(fast, "Set up uv")["with"]["version"] == "0.10.10"
     assert _step(fast, "Run fast repository gates")["run"] == "make verify-fast"
     assert _step(fast, "Build, install, and validate distributions")["run"] == (
-        "make addins-install-smoke"
+        "make addins-install-smoke inspect-judge-sdk-test"
     )
     assert _step(fast, "Lint workflows")["run"].endswith("make workflow-lint\n")
 
@@ -74,7 +76,7 @@ def test_ci_runs_the_repository_gates() -> None:
     )
     assert _step(minimum, "Check command surface")["run"] == "make cli-smoke-core"
     assert _step(minimum, "Build, install, and validate distributions")["run"] == (
-        "make addins-install-smoke"
+        "make addins-install-smoke inspect-judge-sdk-test"
     )
     assert minimum["timeout-minutes"] >= 35
 
@@ -101,7 +103,7 @@ def test_manual_full_ci_uses_standard_repository_and_distribution_gates() -> Non
     assert _step(full, "Install documentation linters")["run"] == "npm ci"
     assert _step(full, "Run complete repository gates")["run"] == "make verify"
     assert _step(full, "Build, install, and validate distributions")["run"] == (
-        "make addins-install-smoke"
+        "make addins-install-smoke inspect-judge-sdk-test"
     )
 
 
@@ -142,3 +144,54 @@ def test_docs_ci_reports_for_every_pull_request_and_scopes_pushes() -> None:
     }
     assert len(paths) == len(expected_paths)
     assert set(paths) == expected_paths
+
+
+@pytest.mark.parametrize(
+    "failures, expected_calls, expected_status", [(0, 2, 0), (1, 3, 0), (3, 3, 7)]
+)
+def test_policy_install_retries_are_bounded_and_fail_closed(
+    failures, expected_calls, expected_status
+):
+    install = _step(
+        _load(".github/workflows/ci.yml")["jobs"]["policy-engine-interop"],
+        "Install pinned policy engines",
+    )["run"]
+    fake_tools = """
+calls=0
+go() {
+  calls=$((calls + 1))
+  printf '%s\\n' "$*"
+  if [ "$calls" -le "$FAILURES" ]; then return 7; fi
+  return 0
+}
+sleep() { :; }
+"""
+    result = subprocess.run(
+        [
+            "bash",
+            "-e",
+            "-o",
+            "pipefail",
+            "-c",
+            f"FAILURES={failures}\n" + fake_tools + install,
+        ],
+        text=True,
+        capture_output=True,
+        timeout=10,
+    )
+    assert result.returncode == expected_status
+    calls = result.stdout.splitlines()
+    assert len(calls) == expected_calls
+    assert all(
+        line
+        in {
+            "install github.com/open-policy-agent/opa@v1.17.0",
+            "install cuelang.org/go/cmd/cue@v0.16.1",
+        }
+        for line in calls
+    )
+    if expected_status == 0:
+        assert calls[-1] == "install cuelang.org/go/cmd/cue@v0.16.1"
+    else:
+        assert all("opa@v1.17.0" in line for line in calls)
+    assert "GOSUMDB" not in install and "GOINSECURE" not in install

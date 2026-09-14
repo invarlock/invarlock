@@ -170,6 +170,7 @@ def expected_distribution_paths(version: str) -> set[str]:
     projects = (
         ("", "invarlock"),
         ("addins/", "invarlock_diagnostics"),
+        ("addins/", "invarlock_inspect_judge"),
         ("addins/", "invarlock_runtime_gguf"),
         ("addins/", "invarlock_runtime_hf_vision_text"),
         ("addins/", "invarlock_runtime_tensorrt_llm"),

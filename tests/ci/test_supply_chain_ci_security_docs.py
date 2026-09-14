@@ -93,6 +93,9 @@ def test_end_of_file_hook_preserves_canonical_signed_evidence_bytes() -> None:
         "build-attestation.json",
         "examples/integrations/spdx-ai-observation/source/model-aibom.spdx3.json",
         "examples/integrations/spdx-ai-observation/source/model-artifact.identity.json",
+        "examples/captured-results/references/harness-likelihood/capture/raw-results.json",
+        "examples/captured-results/references/harness-likelihood/evidence/manifest.json",
+        "examples/captured-results/references/harness-likelihood/verification.receipt.json",
         "tests/fixtures/compatibility/v0.13.0/package/verification.receipt.json",
     ):
         assert excluded.search(path)
@@ -106,6 +109,14 @@ def test_end_of_file_hook_preserves_canonical_signed_evidence_bytes() -> None:
     assert not excluded.search(
         "examples/integrations/spdx-ai-observation/observation-payload.json"
     )
+    assert not excluded.search(
+        "examples/captured-results/references/harness-likelihood/README.md"
+    )
+    assert not excluded.search(
+        "examples/captured-results/references/harness-likelihood/reference.json"
+    )
+    check_json = next(hook for hook in hooks if hook["id"] == "check-json")
+    assert "exclude" not in check_json
 
 
 def test_capture_annotation_allowance_requires_exact_path_and_empty_default() -> None:
@@ -199,3 +210,63 @@ def test_full_ci_pins_make_to_setup_python() -> None:
     assert _step(full["steps"], "Run complete repository gates")["run"] == (
         "make verify"
     )
+
+
+@pytest.mark.parametrize(
+    ("description", "target", "paths"),
+    [
+        (
+            "Captured harness source pins",
+            "match",
+            (
+                "examples/captured-results/harness_model_comparison.py",
+                "examples/captured-results/harness_likelihood_rehearsal.py",
+            ),
+        ),
+        (
+            "Captured likelihood tokenizer source pins",
+            "match",
+            ("examples/captured-results/harness_likelihood_rehearsal.py",),
+        ),
+        (
+            "Judge acceptance signer key-file size bounds",
+            "line",
+            ("src/invarlock/judge_measurements/acceptance.py",),
+        ),
+        (
+            "Judge evidence signing key-file size bounds",
+            "line",
+            ("src/invarlock/judge_measurements/evidence.py",),
+        ),
+    ],
+)
+def test_public_source_allowances_are_rule_and_exact_path_scoped(
+    description: str, target: str, paths: tuple[str, ...]
+) -> None:
+    config = tomllib.loads(Path(".gitleaks.toml").read_text(encoding="utf-8"))
+    allowance = next(
+        item
+        for item in config["allowlists"]
+        if item["description"].startswith(description)
+    )
+    assert allowance["targetRules"] == ["generic-api-key"]
+    assert allowance["condition"] == "AND"
+    assert allowance["regexTarget"] == target
+    assert set(allowance) == {
+        "description",
+        "targetRules",
+        "condition",
+        "regexTarget",
+        "paths",
+        "regexes",
+    }
+    assert len(allowance["paths"]) == len(paths)
+    for path in paths:
+        assert any(re.search(pattern, path) for pattern in allowance["paths"])
+        for other_path in ("prefix/" + path, path + ".bak", "unrelated.py"):
+            assert not any(
+                re.search(pattern, other_path) for pattern in allowance["paths"]
+            )
+    for pattern in allowance["regexes"]:
+        assert pattern.startswith("^")
+        assert pattern.endswith("$")

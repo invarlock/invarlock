@@ -542,6 +542,8 @@ def load_payloads(
         },
         "output": {"evidence": "evidence"},
     }
+    if "metric" in normalized["comparison"]:
+        authored["comparison"]["metric"] = normalized["comparison"]["metric"]
     try:
         expected_request = normalize_captured_request(
             authored,

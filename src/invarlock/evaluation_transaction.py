@@ -10,7 +10,7 @@ import stat
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, overload
+from typing import TYPE_CHECKING, Any, overload
 
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
@@ -25,6 +25,7 @@ from invarlock.core.evaluation_request import (
     EvaluationRequest,
     EvaluationRequestError,
     ImportSideRequest,
+    _validate_judge_workspace_inputs,
     evaluation_request_mode,
     load_evaluation_request,
 )
@@ -95,6 +96,9 @@ from invarlock.runtime_security_helpers import (
     remote_code_allowed,
     third_party_plugins_allowed,
 )
+
+if TYPE_CHECKING:
+    from invarlock.judge_measurements.workflow import JudgeWorkflowResult
 
 _MAX_POLICY_BYTES = 4 * 1024 * 1024
 _MAX_REQUEST_INPUT_BYTES = 64 * 1024 * 1024
@@ -241,6 +245,7 @@ class EvaluationPreflightResult:
     runtime_image_digests: dict[str, str] | None = None
     sample_qualification: dict[str, object] | None = None
     format_version: str = "invarlock/evaluation-preflight-v2"
+    judge: dict[str, Any] | None = None
 
     def as_json(self) -> str:
         payload: dict[str, object] = {
@@ -261,6 +266,8 @@ class EvaluationPreflightResult:
             payload["runtime_image_digests"] = self.runtime_image_digests
         if self.sample_qualification is not None:
             payload["sample_qualification"] = self.sample_qualification
+        if self.judge is not None:
+            payload["judge"] = self.judge
         return json.dumps(
             payload,
             allow_nan=False,
@@ -284,6 +291,7 @@ class _PreparedEvaluation:
     selected_metric: str
     sample_requirements: dict[str, int | float]
     observations: tuple[EvidenceObservation, ...]
+    judge: dict[str, Any] | None = None
 
 
 @dataclass
@@ -701,6 +709,13 @@ def _normalized_request(
             }
             for observation in observations
         ]
+    if request.comparison.judge is not None:
+        normalized_comparison = normalized["comparison"]
+        assert isinstance(normalized_comparison, dict)
+        normalized_comparison["judge"] = {
+            "workspace": "judge-workspace",
+            "signer_identity": request.comparison.judge.signer_identity,
+        }
     return normalized
 
 
@@ -854,32 +869,8 @@ def _prepare_evaluation_inputs(
         raise EvaluationTransactionError(
             "captured evaluation requests must use the captured evaluation path"
         )
+    _validate_judge_workspace_inputs(request)
     artifact_digests: dict[str, str] | None = None
-    if authenticate_artifacts and request.execution.mode == "run":
-        artifact_digests = {}
-        for side_name, side in (
-            ("baseline", request.comparison.baseline),
-            ("subject", request.comparison.subject),
-        ):
-            provider = selected_registry.get_runtime_provider(side.runtime.provider)
-            artifact_path = side.artifact.path
-            assert artifact_path is not None
-            try:
-                identity = provider.authenticate_artifact(
-                    ModelRuntimeSpec(
-                        provider_name=side.runtime.provider,
-                        model_id=side.artifact.model_id,
-                        settings=side.runtime.settings,
-                    ),
-                    artifact_path,
-                )
-                artifact_digests[side_name] = sha256_digest(
-                    encode_artifact_identity(identity)
-                )
-            except (TypeError, ValueError) as exc:
-                raise EvaluationTransactionError(
-                    f"{side_name} artifact could not be authenticated: {exc}"
-                ) from exc
 
     if request.execution.mode == "import":
         schedule_path = request.execution.schedule
@@ -936,17 +927,24 @@ def _prepare_evaluation_inputs(
         else request.comparison.metric
     )
     assert selected_metric is not None
-    _preflight_policy(
-        policy_payload,
-        metric=selected_metric,
-        policy_digest=policy_digest,
-        scorer_binding=request.comparison.scorer_extension,
-    )
-    sample_requirements = policy_sample_requirements(
-        policy_payload,
-        metric=selected_metric,
-        scorer_binding=request.comparison.scorer_extension,
-    )
+    judge = None
+    sample_requirements: dict[str, int | float] = {}
+    if selected_metric == "judge":
+        from invarlock.judge_measurements.native_workflow import preflight_native_judge
+
+        judge = preflight_native_judge(request, schedule.to_payload(), policy_bytes)
+    else:
+        _preflight_policy(
+            policy_payload,
+            metric=selected_metric,
+            policy_digest=policy_digest,
+            scorer_binding=request.comparison.scorer_extension,
+        )
+        sample_requirements = policy_sample_requirements(
+            policy_payload,
+            metric=selected_metric,
+            scorer_binding=request.comparison.scorer_extension,
+        )
     minimum_record_count = sample_requirements.get("minimum_record_count")
     if (
         isinstance(minimum_record_count, int)
@@ -969,6 +967,32 @@ def _prepare_evaluation_inputs(
             raise EvaluationTransactionError(
                 "required scorer extension is not installed or enabled"
             )
+    if authenticate_artifacts and request.execution.mode == "run":
+        artifact_digests = {}
+        for side_name, side in (
+            ("baseline", request.comparison.baseline),
+            ("subject", request.comparison.subject),
+        ):
+            provider = selected_registry.get_runtime_provider(side.runtime.provider)
+            artifact_path = side.artifact.path
+            assert artifact_path is not None
+            try:
+                identity = provider.authenticate_artifact(
+                    ModelRuntimeSpec(
+                        provider_name=side.runtime.provider,
+                        model_id=side.artifact.model_id,
+                        settings=side.runtime.settings,
+                    ),
+                    artifact_path,
+                )
+                artifact_digests[side_name] = sha256_digest(
+                    encode_artifact_identity(identity)
+                )
+            except (TypeError, ValueError) as exc:
+                raise EvaluationTransactionError(
+                    f"{side_name} artifact could not be authenticated: {exc}"
+                ) from exc
+
     observations = _load_request_observations(request)
     _validate_output_destination(request)
     return _PreparedEvaluation(
@@ -984,6 +1008,7 @@ def _prepare_evaluation_inputs(
         selected_metric=selected_metric,
         sample_requirements=sample_requirements,
         observations=observations,
+        judge=judge,
     )
 
 
@@ -1030,7 +1055,7 @@ def preflight_evaluation_request(
     signing_key_path: Path | None,
     unsigned: bool = False,
     max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
-) -> CapturedEvaluationPreflightResult: ...
+) -> CapturedEvaluationPreflightResult | JudgeWorkflowResult: ...
 
 
 @overload
@@ -1044,7 +1069,9 @@ def preflight_evaluation_request(
     registry: CoreRegistry | None = None,
     unsigned: bool = False,
     max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
-) -> EvaluationPreflightResult | CapturedEvaluationPreflightResult: ...
+) -> (
+    EvaluationPreflightResult | CapturedEvaluationPreflightResult | JudgeWorkflowResult
+): ...
 
 
 def preflight_evaluation_request(
@@ -1057,7 +1084,9 @@ def preflight_evaluation_request(
     registry: CoreRegistry | None | _Omitted = _OMITTED,
     unsigned: bool = False,
     max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
-) -> EvaluationPreflightResult | CapturedEvaluationPreflightResult:
+) -> (
+    EvaluationPreflightResult | CapturedEvaluationPreflightResult | JudgeWorkflowResult
+):
     """Validate an evaluation transaction without execution or filesystem mutation."""
 
     try:
@@ -1146,6 +1175,8 @@ def preflight_evaluation_request(
             checks.append("scorer_binding")
         if prepared.sample_requirements:
             checks.append("sample_record_count")
+        if prepared.judge is not None:
+            checks.append("judge_collection")
         normalized_runtime_digests: dict[str, str] | None = None
         artifact_digests = prepared.artifact_digests
         if request.execution.mode == "run":
@@ -1239,11 +1270,12 @@ def preflight_evaluation_request(
                 side: sha256_digest(evidence.artifact_identity)
                 for side, evidence in imported_sides.items()
             }
+            imported_runtimes: dict[str, str] = {}
             for side_name, side in (
                 ("baseline", request.comparison.baseline),
                 ("subject", request.comparison.subject),
             ):
-                _validate_import_side(
+                imported_runtimes[side_name] = _validate_import_side(
                     side,
                     imported_sides[side_name],
                     side=side_name,
@@ -1269,6 +1301,22 @@ def preflight_evaluation_request(
                 raise EvaluationTransactionError(
                     "imported paired records must use canonical JSON"
                 )
+            if prepared.selected_metric == "judge":
+                normalized_runtime_digests = imported_runtimes
+                derived = derive_paired_records(
+                    schedule=prepared.schedule,
+                    metric="exact_match",
+                    baseline=imported_sides["baseline"],
+                    subject=imported_sides["subject"],
+                    baseline_identity_digest=artifact_digests["baseline"],
+                    subject_identity_digest=artifact_digests["subject"],
+                    baseline_runtime_digest=imported_runtimes["baseline"],
+                    subject_runtime_digest=imported_runtimes["subject"],
+                )
+                if records_payload != derived:
+                    raise EvaluationTransactionError(
+                        "imported paired records do not equal verifier-derived pairs"
+                    )
         assert artifact_digests is not None
         assert set(artifact_digests) == {"baseline", "subject"}
         normalized_request = _normalized_request(
@@ -1316,6 +1364,7 @@ def preflight_evaluation_request(
             checks=tuple(checks),
             runtime_image_digests=normalized_runtime_digests,
             sample_qualification=sample_qualification,
+            judge=prepared.judge,
         )
     except CapturedEvaluationError as exc:
         error = EvaluationPreflightError(str(exc))
@@ -1333,6 +1382,10 @@ def preflight_evaluation_request(
         TypeError,
         ValueError,
     ) as exc:
+        from invarlock.judge_measurements.workflow import JudgeWorkflowError
+
+        if isinstance(exc, JudgeWorkflowError):
+            raise
         raise EvaluationPreflightError(str(exc)) from exc
 
 
@@ -1348,7 +1401,7 @@ def evaluate_request_file(
     registry: CoreRegistry | None = None,
     unsigned: bool = False,
     max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
-) -> EvaluationTransactionResult: ...
+) -> EvaluationTransactionResult | JudgeWorkflowResult: ...
 
 
 @overload
@@ -1358,7 +1411,7 @@ def evaluate_request_file(
     signing_key_path: Path | None,
     unsigned: bool = False,
     max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
-) -> CapturedEvaluationTransactionResult: ...
+) -> CapturedEvaluationTransactionResult | JudgeWorkflowResult: ...
 
 
 @overload
@@ -1373,7 +1426,11 @@ def evaluate_request_file(
     registry: CoreRegistry | None = None,
     unsigned: bool = False,
     max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
-) -> EvaluationTransactionResult | CapturedEvaluationTransactionResult: ...
+) -> (
+    EvaluationTransactionResult
+    | CapturedEvaluationTransactionResult
+    | JudgeWorkflowResult
+): ...
 
 
 def evaluate_request_file(
@@ -1387,7 +1444,11 @@ def evaluate_request_file(
     registry: CoreRegistry | None | _Omitted = _OMITTED,
     unsigned: bool = False,
     max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
-) -> EvaluationTransactionResult | CapturedEvaluationTransactionResult:
+) -> (
+    EvaluationTransactionResult
+    | CapturedEvaluationTransactionResult
+    | JudgeWorkflowResult
+):
     """Execute or import, authenticate, and publish one closed request."""
 
     try:
@@ -1488,114 +1549,169 @@ def evaluate_request_file(
             )
         finally:
             os.close(output_probe.descriptor)
-        if request.execution.mode == "import":
-            assert request.execution.records is not None
-            assert request.execution.baseline is not None
-            assert request.execution.subject is not None
-            baseline_evidence = _side_evidence(
-                request, request.execution.baseline, side="baseline"
-            )
-            subject_evidence = _side_evidence(
-                request, request.execution.subject, side="subject"
-            )
-        else:
-            if runtime_executor is not None:
-                executed = runtime_executor.execute(
-                    request,
-                    registry=registry,
-                    schedule_bytes=canonical_schedule,
-                    policy_digest=policy_digest,
+        normalized = _normalized_request(request, schedule, observations)
+
+        def capture() -> tuple[
+            RuntimeSideEvidence, RuntimeSideEvidence, str, str, dict[str, Any]
+        ]:
+            if request.execution.mode == "import":
+                assert request.execution.records is not None
+                assert request.execution.baseline is not None
+                assert request.execution.subject is not None
+                baseline_evidence = _side_evidence(
+                    request, request.execution.baseline, side="baseline"
+                )
+                subject_evidence = _side_evidence(
+                    request, request.execution.subject, side="subject"
                 )
             else:
-                assert execution_resolver is not None
-                executed = execute_runtime_comparison(
+                if runtime_executor is not None:
+                    executed = runtime_executor.execute(
+                        request,
+                        registry=registry,
+                        schedule_bytes=canonical_schedule,
+                        policy_digest=policy_digest,
+                    )
+                else:
+                    assert execution_resolver is not None
+                    executed = execute_runtime_comparison(
+                        request,
+                        registry=registry,
+                        resource_resolver=execution_resolver,
+                        schedule_bytes=canonical_schedule,
+                        policy_digest=policy_digest,
+                    )
+                baseline_evidence = executed.baseline
+                subject_evidence = executed.subject
+            # Import and live workers converge at the same host-side verifier.  A
+            # worker-reported digest is never accepted without independently
+            # validating all six files and reproducing the artifact identity.
+            baseline_runtime = _validate_import_side(
+                request.comparison.baseline,
+                baseline_evidence,
+                side="baseline",
+                provider=registry.get_runtime_provider(
+                    request.comparison.baseline.runtime.provider
+                ),
+                task=request.comparison.task,
+                metric=request.comparison.collection_metric,
+                schedule=schedule,
+                policy_digest=policy_digest,
+            )
+            subject_runtime = _validate_import_side(
+                request.comparison.subject,
+                subject_evidence,
+                side="subject",
+                provider=registry.get_runtime_provider(
+                    request.comparison.subject.runtime.provider
+                ),
+                task=request.comparison.task,
+                metric=request.comparison.collection_metric,
+                schedule=schedule,
+                policy_digest=policy_digest,
+            )
+            if request.execution.mode == "run":
+                expected_runtime_digests = preflight_result.runtime_image_digests
+                assert expected_runtime_digests is not None
+                if baseline_runtime != expected_runtime_digests["baseline"]:
+                    raise EvaluationTransactionError(
+                        "baseline validated runtime digest does not match preflight"
+                    )
+                if subject_runtime != expected_runtime_digests["subject"]:
+                    raise EvaluationTransactionError(
+                        "subject validated runtime digest does not match preflight"
+                    )
+                if baseline_runtime != executed.baseline_runtime_digest:
+                    raise EvaluationTransactionError(
+                        "baseline worker runtime digest does not match its validated receipt"
+                    )
+                if subject_runtime != executed.subject_runtime_digest:
+                    raise EvaluationTransactionError(
+                        "subject worker runtime digest does not match its validated receipt"
+                    )
+            baseline_digest = sha256_digest(baseline_evidence.artifact_identity)
+            subject_digest = sha256_digest(subject_evidence.artifact_identity)
+            derived = derive_paired_records(
+                schedule=schedule,
+                metric="exact_match" if selected_metric == "judge" else selected_metric,
+                baseline=baseline_evidence,
+                subject=subject_evidence,
+                baseline_identity_digest=baseline_digest,
+                subject_identity_digest=subject_digest,
+                baseline_runtime_digest=baseline_runtime,
+                subject_runtime_digest=subject_runtime,
+                scorer_binding=request.comparison.scorer_extension,
+                scorer_registry=scorer_registry,
+            )
+            if request.execution.mode == "import":
+                assert request.execution.records is not None
+                imported_records_raw = _read_request_file(
+                    request.root,
+                    request.execution.records,
+                    label="imported paired records",
+                )
+                imported_records = _parse_object(
+                    imported_records_raw, label="imported paired records"
+                )
+                if imported_records_raw != canonical_json_bytes(imported_records):
+                    raise EvaluationTransactionError(
+                        "imported paired records must use canonical JSON"
+                    )
+                if imported_records != derived:
+                    raise EvaluationTransactionError(
+                        "imported paired records do not equal verifier-derived pairs"
+                    )
+            return (
+                baseline_evidence,
+                subject_evidence,
+                baseline_runtime,
+                subject_runtime,
+                derived,
+            )
+
+        if selected_metric == "judge":
+            from invarlock.judge_measurements.native_workflow import (
+                evaluate_native_judge,
+            )
+
+            def capture_judge() -> tuple[RuntimeSideEvidence, RuntimeSideEvidence]:
+                baseline, subject, _, _, _ = capture()
+                return baseline, subject
+
+            output_anchor = _prepare_output_parent(
+                request.root, request.output.evidence
+            )
+            try:
+                _revalidate_output_parent(
+                    output_anchor, request.output.evidence, published=False
+                )
+                judge_result = evaluate_native_judge(
                     request,
-                    registry=registry,
-                    resource_resolver=execution_resolver,
-                    schedule_bytes=canonical_schedule,
-                    policy_digest=policy_digest,
+                    normalized_request=normalized,
+                    schedule=schedule.to_payload(),
+                    policy_bytes=policy_bytes,
+                    signing_key=signing_key,
+                    capture=capture_judge,
+                    observations=observations,
+                    expected_artifact_digests=preflight_result.artifact_digests,
+                    expected_runtime_digests=preflight_result.runtime_image_digests,
                 )
-            baseline_evidence = executed.baseline
-            subject_evidence = executed.subject
-        # Import and live workers converge at the same host-side verifier.  A
-        # worker-reported digest is never accepted without independently
-        # validating all six files and reproducing the artifact identity.
-        baseline_runtime = _validate_import_side(
-            request.comparison.baseline,
+                _revalidate_output_parent(
+                    output_anchor, request.output.evidence, published=True
+                )
+                return judge_result
+            finally:
+                output_anchor.close()
+
+        (
             baseline_evidence,
-            side="baseline",
-            provider=registry.get_runtime_provider(
-                request.comparison.baseline.runtime.provider
-            ),
-            task=request.comparison.task,
-            metric=request.comparison.collection_metric,
-            schedule=schedule,
-            policy_digest=policy_digest,
-        )
-        subject_runtime = _validate_import_side(
-            request.comparison.subject,
             subject_evidence,
-            side="subject",
-            provider=registry.get_runtime_provider(
-                request.comparison.subject.runtime.provider
-            ),
-            task=request.comparison.task,
-            metric=request.comparison.collection_metric,
-            schedule=schedule,
-            policy_digest=policy_digest,
-        )
-        if request.execution.mode == "run":
-            expected_runtime_digests = preflight_result.runtime_image_digests
-            assert expected_runtime_digests is not None
-            if baseline_runtime != expected_runtime_digests["baseline"]:
-                raise EvaluationTransactionError(
-                    "baseline validated runtime digest does not match preflight"
-                )
-            if subject_runtime != expected_runtime_digests["subject"]:
-                raise EvaluationTransactionError(
-                    "subject validated runtime digest does not match preflight"
-                )
-            if baseline_runtime != executed.baseline_runtime_digest:
-                raise EvaluationTransactionError(
-                    "baseline worker runtime digest does not match its validated receipt"
-                )
-            if subject_runtime != executed.subject_runtime_digest:
-                raise EvaluationTransactionError(
-                    "subject worker runtime digest does not match its validated receipt"
-                )
-        normalized = _normalized_request(request, schedule, observations)
+            baseline_runtime,
+            subject_runtime,
+            derived,
+        ) = capture()
         baseline_digest = sha256_digest(baseline_evidence.artifact_identity)
         subject_digest = sha256_digest(subject_evidence.artifact_identity)
-        derived = derive_paired_records(
-            schedule=schedule,
-            metric=selected_metric,
-            baseline=baseline_evidence,
-            subject=subject_evidence,
-            baseline_identity_digest=baseline_digest,
-            subject_identity_digest=subject_digest,
-            baseline_runtime_digest=baseline_runtime,
-            subject_runtime_digest=subject_runtime,
-            scorer_binding=request.comparison.scorer_extension,
-            scorer_registry=scorer_registry,
-        )
-        if request.execution.mode == "import":
-            assert request.execution.records is not None
-            imported_records_raw = _read_request_file(
-                request.root,
-                request.execution.records,
-                label="imported paired records",
-            )
-            imported_records = _parse_object(
-                imported_records_raw, label="imported paired records"
-            )
-            if imported_records_raw != canonical_json_bytes(imported_records):
-                raise EvaluationTransactionError(
-                    "imported paired records must use canonical JSON"
-                )
-            if imported_records != derived:
-                raise EvaluationTransactionError(
-                    "imported paired records do not equal verifier-derived pairs"
-                )
 
         comparison_id = _comparison_id(
             normalized,
@@ -1678,6 +1794,10 @@ def evaluate_request_file(
         TypeError,
         ValueError,
     ) as exc:
+        from invarlock.judge_measurements.workflow import JudgeWorkflowError
+
+        if isinstance(exc, JudgeWorkflowError):
+            raise
         raise EvaluationTransactionError(str(exc)) from exc
     return EvaluationTransactionResult(
         evidence_path=publication.evidence_path.resolve(),

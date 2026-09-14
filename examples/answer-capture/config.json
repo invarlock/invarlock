@@ -1,0 +1,32 @@
+{
+  "baseline": {
+    "provider": "offline-fixture",
+    "model": "toy",
+    "revision": "fixture-1",
+    "tokenizer": "whitespace-fixture-1",
+    "artifact_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "generation": {"prompt": "Answer the question."}
+  },
+  "subject": {
+    "provider": "offline-fixture",
+    "model": "toy",
+    "revision": "fixture-1",
+    "tokenizer": "whitespace-fixture-1",
+    "artifact_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "generation": {"prompt": "Answer concisely."}
+  },
+  "limits": {
+    "concurrency": 2,
+    "deadline_unix_seconds": 1,
+    "call_timeout_seconds": 30,
+    "max_calls": 2,
+    "max_input_tokens_per_call": 32,
+    "max_output_tokens_per_call": 32,
+    "max_output_bytes_per_call": 4096,
+    "max_total_input_tokens": 64,
+    "max_total_output_tokens": 64,
+    "max_cost_microusd": 128,
+    "input_microusd_per_million_tokens": 1000000,
+    "output_microusd_per_million_tokens": 1000000
+  }
+}

@@ -13,6 +13,14 @@ from invarlock.evaluation_comparison.capacity import (
     check_missing_id_capacity,
     missing_pair,
 )
+from invarlock.evaluation_comparison.likelihood import (
+    LIKELIHOOD_METRIC,
+    likelihood_statistics,
+    likelihood_value,
+    validate_likelihood_bindings,
+    validate_likelihood_policy,
+    validate_likelihood_record,
+)
 from invarlock.evaluation_record_contracts import contracts
 from invarlock.evaluation_record_contracts.contracts import (
     EvaluationRecordsError,
@@ -88,6 +96,7 @@ def make_run(
             "metadata",
             "error",
             "context",
+            "likelihood",
         }:
             raise EvaluationRecordsError(
                 "record has unknown fields; map them explicitly in the adapter"
@@ -112,7 +121,12 @@ def make_run(
 
 
 def _check_run(value: dict[str, Any]) -> None:
+    from invarlock.evaluator_capture import verify_input_projection
+
     validate(value, "run")
+    for row in value["records"]:
+        verify_input_projection(row)
+        validate_likelihood_record(row, value)
     ids = [row["id"] for row in value["records"]]
     if len(ids) != len(set(ids)):
         raise EvaluationRecordsError(
@@ -154,6 +168,8 @@ def _check_policy(policy: dict[str, Any]) -> None:
                 raise EvaluationRecordsError(
                     "judge/human provenance requires an approved rubric digest"
                 )
+        elif metric["kind"] == LIKELIHOOD_METRIC:
+            validate_likelihood_policy(metric)
         else:
             if "score_key" in metric or "accepted_provenance" in metric:
                 raise EvaluationRecordsError(
@@ -237,6 +253,9 @@ def _metric_result(
     pairs: list[tuple[dict[str, Any], dict[str, Any]]],
 ) -> dict[str, Any]:
     recorded = metric["kind"] == "recorded"
+    likelihood = metric["kind"] == LIKELIHOOD_METRIC
+    if likelihood:
+        validate_likelihood_bindings(pairs, metric)
     if recorded:
         for run in (baseline, candidate):
             if (
@@ -257,6 +276,8 @@ def _metric_result(
                 value = (
                     float(row["scores"][metric["score_key"]])
                     if recorded
+                    else likelihood_value(row)
+                    if likelihood
                     else score(
                         metric["kind"],
                         row["expected"],
@@ -288,26 +309,41 @@ def _metric_result(
         "decision": "insufficient_evidence",
         "reasons": [],
     }
+    if likelihood:
+        result.update(ratio=None, interval_unit="ratio")
     if missing or len(pairs) < metric["minimum_count"]:
         result["reasons"] = [
-            "missing results" if missing else "minimum record count not met"
+            "missing reference-continuation likelihood facts or errored results; supply typed likelihood for every pair"
+            if missing and likelihood
+            else "missing results"
+            if missing
+            else "minimum record count not met"
         ]
         return result
     left_values, right_values = values
-    b = math.fsum(left_values) / len(left_values)
-    c = math.fsum(right_values) / len(right_values)
+    try:
+        b = math.fsum(left_values) / len(left_values)
+        c = math.fsum(right_values) / len(right_values)
+    except OverflowError as exc:
+        raise EvaluationRecordsError(
+            "metric arithmetic exceeded finite numeric range"
+        ) from exc
     seed = digest(
         [
             {key: left[key] for key in ("id", "input", "expected", "metadata")}
             for left, _ in pairs
         ]
     )
-    interval = _interval(
-        left_values,
-        right_values,
-        seed,
-        metric["kind"] in _BINARY_METRICS,
-    )
+    if likelihood:
+        ratio, interval = likelihood_statistics(left_values, right_values, seed)
+        result["ratio"] = ratio
+    else:
+        interval = _interval(
+            left_values,
+            right_values,
+            seed,
+            metric["kind"] in _BINARY_METRICS,
+        )
     if not all(
         math.isfinite(v) for v in (b, c, c - b, interval["lower"], interval["upper"])
     ):
@@ -319,11 +355,14 @@ def _metric_result(
         and interval["lower"] < -metric["maximum_regression"]
     ):
         reasons.append("lower interval bound exceeds allowed regression")
-    if (
-        metric["direction"] == "lower"
-        and interval["upper"] > metric["maximum_regression"]
+    if metric["direction"] == "lower" and interval["upper"] > (
+        metric["ratio_max"] if likelihood else metric["maximum_regression"]
     ):
-        reasons.append("upper interval bound exceeds allowed regression")
+        reasons.append(
+            "upper ratio interval bound exceeds ratio_max"
+            if likelihood
+            else "upper interval bound exceeds allowed regression"
+        )
     if c < metric.get("subject_minimum", -math.inf) or c > metric.get(
         "subject_maximum", math.inf
     ):
@@ -363,9 +402,12 @@ def compare_runs(
         raise EvaluationRecordsError(
             "baseline/subject record IDs differ; export the complete paired schedule"
         )
+    from invarlock.evaluator_capture import verify_input_pair
+
     pairs = []
     for record_id in sorted(baseline_rows):
         left, right = baseline_rows[record_id], candidate_rows[record_id]
+        verify_input_pair(left, right)
         for key in ("input", "expected", "metadata"):
             if canonical_json_bytes(left[key]) != canonical_json_bytes(right[key]):
                 raise EvaluationRecordsError(
@@ -403,7 +445,7 @@ def compare_runs(
         if "insufficient_evidence" in decisions
         else "pass"
     )
-    result = {
+    result: dict[str, Any] = {
         "format": "invarlock/multi-metric-comparison-v1",
         "decision": decision,
         "bindings": {
@@ -419,5 +461,9 @@ def compare_runs(
             "A policy pass does not establish truthful model execution, general quality, safety or compliance.",
         ],
     }
+    if any(metric["kind"] == LIKELIHOOD_METRIC for metric in policy["metrics"]):
+        result["limitations"].append(
+            "Normalized NLL replays captured reference-continuation likelihood facts; their model execution, tokenizer and configuration claims are source assertions, not independently established runtime facts."
+        )
     validate(result, "comparison")
     return result

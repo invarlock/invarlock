@@ -29,6 +29,9 @@ MAX_METADATA_BYTES = 1_048_576
 MAX_ARCHIVE_MEMBERS = 50_000
 RUNTIME_PACKAGE_SUFFIXES = frozenset({".json", ".py", ".pyi", ".yaml", ".yml"})
 RUNTIME_PACKAGE_FILENAMES = frozenset({"py.typed"})
+NATIVE_STARTER_DATA_FILES = frozenset(
+    {"_data/examples/native-judge/README.md", "_data/examples/native-judge/cases.jsonl"}
+)
 OS_METADATA_FILENAMES = frozenset({".DS_Store", "Thumbs.db", "desktop.ini"})
 IMPORT_AFFECTING_SUFFIXES = frozenset({".pth"})
 EXECUTABLE_PAYLOAD_SUFFIXES = frozenset(
@@ -572,6 +575,10 @@ def _checkout_package_files(
         if (
             path.suffix not in RUNTIME_PACKAGE_SUFFIXES
             and path.name not in RUNTIME_PACKAGE_FILENAMES
+            and not (
+                spec.package_path == "invarlock"
+                and relative.as_posix() in NATIVE_STARTER_DATA_FILES
+            )
         ):
             raise ReleasePreflightError(
                 "checkout runtime package contains an unexpected file"

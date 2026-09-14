@@ -122,16 +122,34 @@
         "metric": {
           "enum": [
             "exact_match",
-            "normalized_nll_per_utf8_byte"
+            "normalized_nll_per_utf8_byte",
+            "judge"
           ]
         },
-        "scorer_extension": {"$ref": "#/$defs/scorerExtensionBinding"}
+        "scorer_extension": {"$ref": "#/$defs/scorerExtensionBinding"},
+        "judge": {"$ref": "#/$defs/judgeCollection"}
       },
       "additionalProperties": false,
       "oneOf": [
         {"required": ["metric"], "not": {"required": ["scorer_extension"]}},
         {"required": ["scorer_extension"], "not": {"required": ["metric"]}}
-      ]
+      ],
+      "if": {"required": ["metric"], "properties": {"metric": {"const": "judge"}}},
+      "then": {"required": ["judge"]},
+      "else": {"not": {"required": ["judge"]}}
+    },
+    "judgeCollection": {
+      "type": "object",
+      "required": ["workspace", "signer_identity"],
+      "properties": {
+        "workspace": {"$ref": "#/$defs/safeReference"},
+        "signer_identity": {
+          "type": "string",
+          "maxLength": 256,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}(?![\\s\\S])"
+        }
+      },
+      "additionalProperties": false
     },
     "scorerExtensionBinding": {
       "type": "object",

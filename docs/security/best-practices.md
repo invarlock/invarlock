@@ -159,9 +159,11 @@ authorization source.
 An acceptance scorer executes inside the evaluation and verifier trust
 boundaries. Keep it deterministic and local, and reject implementations that
 use a network, external model, human judgment, SQL or code execution,
-model-based semantic similarity, or an LLM judge. Attach judge or review
-results as authenticated observations when useful; observations remain outside
-policy arithmetic. The extension declaration and replay checks do not provide
+model-based semantic similarity, or an LLM judge. Use the separate bounded
+judge-measurement workflow when its frozen-answer profile fits; it has its own
+plan, replay, statistics, and recipient policy. Other judge or review results
+may be attached as authenticated observations and remain outside policy
+arithmetic. The extension declaration and replay checks do not provide
 process isolation; enforce these restrictions with reviewed code and the
 deployment sandbox.
 

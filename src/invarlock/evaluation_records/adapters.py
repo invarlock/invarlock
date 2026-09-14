@@ -8,12 +8,12 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, cast
 
-from invarlock.evaluation_comparison.comparison import make_run
 from invarlock.evaluation_record_contracts.contracts import (
     MAX_INPUT_BYTES,
     MAX_RECORDS,
     EvaluationRecordsError,
 )
+from invarlock.evaluator_capture import capture_evaluator_run
 from invarlock.evidence_pack_json import parse_json_bytes
 
 ADAPTERS = ("invarlock", "jsonl", "inspect-json", "lm-eval-samples", "promptfoo-jsonl")
@@ -271,6 +271,7 @@ def load_run(
     run_id: str | None = None,
     artifact_digest: str | None = None,
     score_provenance: Mapping[str, Any] | None = None,
+    input_projection: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Import a native export or a canonical run with explicit source identities."""
     from invarlock.captured_contracts import read_file
@@ -286,6 +287,7 @@ def load_run(
         run_id=run_id,
         artifact_digest=artifact_digest,
         score_provenance=score_provenance,
+        input_projection=input_projection,
     )
 
 
@@ -297,6 +299,7 @@ def _parse_run_bytes(
     run_id: str | None = None,
     artifact_digest: str | None = None,
     score_provenance: Mapping[str, Any] | None = None,
+    input_projection: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Parse secured immutable bytes without reopening the source path."""
     if adapter not in ADAPTERS:
@@ -323,7 +326,13 @@ def _parse_run_bytes(
                 _check_run(value)
                 if any(
                     v is not None
-                    for v in (source, run_id, artifact_digest, score_provenance)
+                    for v in (
+                        source,
+                        run_id,
+                        artifact_digest,
+                        score_provenance,
+                        input_projection,
+                    )
                 ):
                     raise EvaluationRecordsError(
                         "canonical run identities cannot be overridden at import"
@@ -334,7 +343,7 @@ def _parse_run_bytes(
             raise EvaluationRecordsError(
                 "native import requires source name/version, run_id and artifact_digest from your pipeline"
             )
-        return make_run(
+        return capture_evaluator_run(
             records,
             source=dict(source),
             run_id=run_id,
@@ -343,6 +352,7 @@ def _parse_run_bytes(
             if score_provenance is not None
             else None,
             source_digest="sha256:" + hashlib.sha256(raw).hexdigest(),
+            input_projection=input_projection,
         )
     except (
         ValueError,

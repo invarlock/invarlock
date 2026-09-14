@@ -39,6 +39,14 @@ from tests._evaluation_support import (
 )
 
 
+@pytest.mark.parametrize("kind", ["unknown", "native-judge"])
+def test_recorded_example_factory_does_not_guess_native_or_unknown_kinds(kind):
+    with pytest.raises(
+        ValueError, match="example must be classification, extraction or judge"
+    ):
+        example_project(kind)
+
+
 @pytest.mark.parametrize(
     "change",
     [

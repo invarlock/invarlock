@@ -1,0 +1,55 @@
+format_version: invarlock/evaluation-request-v1
+comparison:
+  baseline:
+    artifact:
+      model_id: org/baseline
+      locator: hf://org/baseline@bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+      path: artifacts/baseline
+    runtime:
+      provider: hf_transformers
+      settings:
+        batch_size: 1
+        checkpoint_tree_sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        context_length: 2048
+        immutable_revision: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+        max_output_tokens: 128
+        offline: true
+        seed: 0
+        timeout_seconds: 300
+        tokenizer_metadata_sha256: cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  subject:
+    artifact:
+      model_id: org/subject
+      locator: hf://org/subject@bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+      path: artifacts/subject
+    runtime:
+      provider: hf_transformers
+      settings:
+        batch_size: 1
+        checkpoint_tree_sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        context_length: 2048
+        immutable_revision: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+        max_output_tokens: 128
+        offline: true
+        seed: 0
+        timeout_seconds: 300
+        tokenizer_metadata_sha256: cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  dataset:
+    path: cases.jsonl
+    sha256: 5a5e31e9c33c901ef587df59053822a3c3397c00b6c84e3bfd1a50e6afae30a7
+    format: jsonl
+    name: grounded-qa-starter
+    split: validation
+    input_field: prompt
+    expected_output_field: expected
+    id_field: case_id
+  policy: judge-policy.json
+  task: text_causal
+  metric: judge
+  judge:
+    workspace: judge-work
+    signer_identity: evaluation-signer
+execution:
+  mode: run
+output:
+  evidence: evidence

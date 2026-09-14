@@ -36,8 +36,95 @@ Request paths resolve beneath the request's parent directory. CLI
 `--baseline-run`, `--subject-run`, and `--output` overrides resolve from the
 caller's working directory and must remain inside that request root. They change
 locations, not adapters or identity pins. A source's `expected_run_digest` still
-has to match after an override. Runtime/container and installed-scorer controls
-do not apply to captured requests.
+has to match after an override. Native runtime/container controls do not apply to captured requests. Judge
+collection uses the installed collector and explicit budgets described below.
+
+## Use the three built-in scorers
+
+An existing evaluator can supply records to all three scorers. Each scorer needs
+different facts; naming an evaluator or retaining its aggregate score cannot
+supply missing facts.
+
+| Scorer | Required per-case facts | Comparison |
+| --- | --- | --- |
+| `exact_match` | Output and reference strings | Paired correctness change |
+| `normalized_nll_per_utf8_byte` | Reference-continuation log probabilities, byte/token counts and identity bindings | Ratio of mean normalized NLL, using the native paired interval |
+| `judge` | Task text and frozen answer text, plus a declared rubric and retained judge calls | Repeated ratings aggregated over declared independent units |
+
+Set `comparison.metric` explicitly to select one scorer. For exact match or NLL,
+it must agree with the single metric in `comparison.policy`. Omitting it retains
+the existing multi-metric comparison-policy behavior. Missing likelihood facts
+produce insufficient evidence; InvarLock does not estimate them from generated
+answers, token counts alone or an evaluator's summary score.
+
+Use `invarlock.engine.capture_evaluator_run` to preserve canonical per-case
+records and `evaluator_input_capabilities` to inspect available facts before
+selecting a scorer. The [maintained capture example](https://github.com/invarlock/invarlock/blob/main/examples/evaluator-qualification/maintained/CAPTURE.md)
+covers the evaluator shortlist and distinguishes tested capture paths from
+upstream qualification. Keep using your evaluator's environment; InvarLock can
+consume its retained exports in a separate environment.
+
+For a complete measured NLL example, replay the
+[Harness likelihood reference](https://github.com/invarlock/invarlock/blob/main/examples/captured-results/references/harness-likelihood/README.md).
+It retains six real same-model CPU pairs, their exact continuation and tokenizer
+bindings, signed evaluation and independent recipient verification. This is an
+integration conformance result, not a model-quality benchmark.
+
+For structured task inputs, a source may declare an explicit text projection:
+
+```yaml
+comparison:
+  baseline:
+    path: baseline.jsonl
+    adapter: jsonl
+    input_projection:
+      kind: json-pointer
+      pointer: /input/question
+```
+
+Apply the same projection to the subject. The pointer must select an existing
+string beneath `/input/` or `/context/`. InvarLock retains and verifies the
+original input, context and projection configuration; it never invents a prompt
+by converting a structured object to text. Canonical `invarlock` runs already contain
+their bindings and reject a projection override.
+
+## Judge captured answers
+
+Keep the captured request's baseline and subject source definitions and replace
+its comparison policy selection with:
+
+```yaml
+comparison:
+  metric: judge
+  policy: judge-policy.json
+  judge:
+    workspace: judge-work
+    signer_identity: evaluation-signer
+```
+
+This is a fragment of the complete request, not a replacement for the baseline
+and subject fields. `judge-policy.json` uses the same
+`invarlock/native-judge-policy-v1` recipe as native judging. InvarLock derives the
+plan from the captured records, checks the full call reservation and collects
+ratings through the installed collector. Preflight makes no calls. Resuming
+uses the frozen identities and admitted trials in the private workspace.
+
+Alternatively, set `comparison.judge.measurements: measurements.json` to import
+retained ratings entirely offline. `prepare_evaluator_judge(recipe, baseline,
+subject)` returns the frozen plan and analysis policy for your own collector.
+`import_judge_sources` assembles canonical retained-call shards and validates
+their requests, responses, attempts and source positions against that plan.
+Existing scalar ratings without these facts cannot be imported as judge evidence.
+Captured judging limits each run to 128 MiB, the recipe to 4 MiB and retained
+measurements to 384 MiB, with a shared 384 MiB input allowance. Each file is read
+once under the remaining allowance before parsing.
+The [judge reference](../reference/judge-measurements.md) describes the retained
+format, optional per-case references and recipient-owned judge trust profile.
+
+Captured judging produces judge evidence and uses that judge trust profile,
+rather than the deterministic captured trust profile below. It authenticates
+captured inputs and scoring replay; it does not assert that InvarLock executed
+the original model. Reports identify the evaluator and retained model context.
 
 ## Signed handoff
 

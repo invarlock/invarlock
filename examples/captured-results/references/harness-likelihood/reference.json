@@ -1,0 +1,85 @@
+{
+  "format": "invarlock/harness-likelihood-reference-v1",
+  "scope": "same-model-cpu-likelihood-compatibility",
+  "case_count": 6,
+  "anchors": {
+    "baseline_run_digest": "sha256:2557cb25141521b847edd839aa51aab39f2e5bf3054b60ffa0d70138dcf66897",
+    "request_digest": "sha256:6bad9bc08b5ddfe0af552aafe94678d41582352e02412b9ec8c14c6dc8c91f77",
+    "subject_run_digest": "sha256:2eb7a8bd4a30ce00a7b11a6e215f7d6d94673b35a3caf7d3ec48c1b34d087444"
+  },
+  "signer_fingerprint": "sha256:f153155f4476daa4777ec0bc9977a7477b242ca62f7519c0daeff73ba3ff7a86",
+  "retained_verifier": {
+    "identity": "harness-recipient",
+    "signing_key_fingerprint": "sha256:b6829c31bdea7bb4646192f34c62b923c7ad22a76d8fee9815dd79f4b138ff22",
+    "trust_profile_digest": "sha256:7d1c3906498296d32134e847e2609df1f4951859334fe33712c1b0cd0f501de4"
+  },
+  "expected_decision": "pass",
+  "expected_ratio": 1.0,
+  "expected_interval": {
+    "lower": 1.0,
+    "mass": 0.95,
+    "method": "paired_percentile_bootstrap_sha256_v1",
+    "replicates": 2048,
+    "upper": 1.0
+  },
+  "expected_mean_nll": 1.9267758581373426,
+  "invarlock_wheel": {
+    "version": "0.15.0",
+    "source_commit": "9a2eb7f8fedf373c2c468ecdc60bb84709dcd1b2",
+    "sha256": "sha256:6b808c9152186d21277bf1e0292a77abc42b4aa64ee5e64b85921914ca260688"
+  },
+  "files": {
+    "capture/manifest.json": {
+      "sha256": "sha256:b63c9a8b15da8261369be4ade43dc0fdd108c0ba5bd5e40484d4a8610a862395",
+      "byte_size": 4173
+    },
+    "capture/raw-results.json": {
+      "sha256": "sha256:b680ed88e66f26db180596204e6f817616e9c0d8501838af2c6ba060c0cb382f",
+      "byte_size": 12445
+    },
+    "evidence/checksums.sha256": {
+      "sha256": "sha256:2a195ea6f6b79a946cf75c20b20355919f13596f9cad1910a87fc35ed57c091b",
+      "byte_size": 436
+    },
+    "evidence/inputs/policy.json": {
+      "sha256": "sha256:916e8f62417e330e65ed4e78f437c3569c6ffc61133a2084dcf85ee77f87014a",
+      "byte_size": 689
+    },
+    "evidence/manifest.json": {
+      "sha256": "sha256:c0d9f8adfe6e6f7a0ec3987525f59a12207d1b3b43ea34f76c1f91ed8593b886",
+      "byte_size": 1162
+    },
+    "evidence/manifest.signature.json": {
+      "sha256": "sha256:cdc34d62dbb7d5946b88e141741d0e35c5b7df63e67b74db982b88fd1e30246d",
+      "byte_size": 464
+    },
+    "evidence/records/baseline.json": {
+      "sha256": "sha256:2557cb25141521b847edd839aa51aab39f2e5bf3054b60ffa0d70138dcf66897",
+      "byte_size": 7092
+    },
+    "evidence/records/subject.json": {
+      "sha256": "sha256:2eb7a8bd4a30ce00a7b11a6e215f7d6d94673b35a3caf7d3ec48c1b34d087444",
+      "byte_size": 7091
+    },
+    "evidence/reports/evaluation.report.json": {
+      "sha256": "sha256:27ef773a63373fbd3d3524b691046d0f33c9108fe284b1c529bba49ad2272ff5",
+      "byte_size": 1436
+    },
+    "evidence/request.json": {
+      "sha256": "sha256:6bad9bc08b5ddfe0af552aafe94678d41582352e02412b9ec8c14c6dc8c91f77",
+      "byte_size": 465
+    },
+    "signer.public.pem": {
+      "sha256": "sha256:6dda2c25a06da09bc49731e0fb630c2819cd0de348e32bd21fb1aac0137f8cb4",
+      "byte_size": 113
+    },
+    "verification.receipt.json": {
+      "sha256": "sha256:bbc773bfb9f105b004a7d76a3440994fe96c80a28cac9c851e21be9bca729aab",
+      "byte_size": 1742
+    },
+    "verifier.public.pem": {
+      "sha256": "sha256:102bae8e29b9752fd6ca3304305bad5a128be189bfeb8592ea03f2f592b9f97f",
+      "byte_size": 113
+    }
+  }
+}

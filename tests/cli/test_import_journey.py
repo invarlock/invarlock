@@ -172,6 +172,7 @@ def _materialize_request(
     capability_metrics: tuple[str, ...] | None = None,
     scorer_binding: ScorerExtensionBinding | None = None,
     scorer_registry: ScorerExtensionRegistry | None = None,
+    policy_document: dict[str, Any] | None = None,
 ) -> dict[str, object]:
     (tmp_path / "imports").mkdir()
     schedule = build_runtime_behavioral_schedule_from_material(
@@ -190,23 +191,27 @@ def _materialize_request(
     schedule_path = tmp_path / "inputs/schedule.json"
     schedule_path.parent.mkdir(parents=True)
     schedule_path.write_bytes(canonical_runtime_behavioral_schedule_json(schedule))
-    policy = {
-        "resolved_policy": {
-            "metrics": (
-                {
-                    "scorer_extension": {
-                        "scorer_id": scorer_binding.scorer_id,
-                        "scorer_version": scorer_binding.scorer_version,
-                        "descriptor_sha256": scorer_binding.descriptor_sha256,
-                        "configuration_sha256": scorer_binding.configuration_sha256,
-                        "delta_min_pp": -100.0,
+    policy = (
+        policy_document
+        if policy_document is not None
+        else {
+            "resolved_policy": {
+                "metrics": (
+                    {
+                        "scorer_extension": {
+                            "scorer_id": scorer_binding.scorer_id,
+                            "scorer_version": scorer_binding.scorer_version,
+                            "descriptor_sha256": scorer_binding.descriptor_sha256,
+                            "configuration_sha256": scorer_binding.configuration_sha256,
+                            "delta_min_pp": -100.0,
+                        }
                     }
-                }
-                if scorer_binding is not None
-                else {"exact_match": {"delta_min_pp": -100.0}}
-            )
+                    if scorer_binding is not None
+                    else {"exact_match": {"delta_min_pp": -100.0}}
+                )
+            }
         }
-    }
+    )
     policy_path = tmp_path / "inputs/policy.json"
     policy_path.write_bytes(canonical_json_bytes(policy))
     observation_path = tmp_path / "inputs/subject-variance.json"

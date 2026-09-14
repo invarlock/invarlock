@@ -1,0 +1,238 @@
+[
+  {
+    "artifact": "plan",
+    "path": [
+      "profile_id"
+    ],
+    "value": "pairwise-preference-v1"
+  },
+  {
+    "artifact": "plan",
+    "path": [
+      "judge",
+      "tools"
+    ],
+    "value": true
+  },
+  {
+    "artifact": "plan",
+    "path": [
+      "judge",
+      "config",
+      "temperature"
+    ],
+    "value": 3
+  },
+  {
+    "artifact": "plan",
+    "path": [
+      "judge",
+      "approved_resolved_models"
+    ],
+    "value": []
+  },
+  {
+    "artifact": "plan",
+    "path": [
+      "schedule",
+      "repetitions"
+    ],
+    "value": 0
+  },
+  {
+    "artifact": "plan",
+    "path": [
+      "schedule",
+      "max_attempts"
+    ],
+    "value": 4
+  },
+  {
+    "artifact": "plan",
+    "path": [
+      "schedule",
+      "order"
+    ],
+    "value": "adaptive"
+  },
+  {
+    "artifact": "plan",
+    "path": [
+      "schedule",
+      "trial_id_scheme"
+    ],
+    "value": "delimiter-v1"
+  },
+  {
+    "artifact": "plan",
+    "path": [
+      "schedule",
+      "retry_on"
+    ],
+    "value": [
+      "parse_error"
+    ]
+  },
+  {
+    "artifact": "plan",
+    "path": [
+      "parser",
+      "id"
+    ],
+    "value": "arbitrary-python"
+  },
+  {
+    "artifact": "plan",
+    "path": [
+      "scale",
+      "ratings",
+      0,
+      "value"
+    ],
+    "value": -1
+  },
+  {
+    "artifact": "plan",
+    "path": [
+      "sampling",
+      "unit_weighting"
+    ],
+    "value": "custom"
+  },
+  {
+    "artifact": "plan",
+    "path": [
+      "rubric",
+      "sha256"
+    ],
+    "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+  },
+  {
+    "artifact": "plan",
+    "path": [
+      "prompt",
+      "references"
+    ],
+    "value": [
+      {
+        "id": "ref",
+        "text": "x",
+        "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "url": "https://example.com"
+      }
+    ]
+  },
+  {
+    "artifact": "measurements",
+    "path": [
+      "source_profile"
+    ],
+    "value": "inspect-unqualified"
+  },
+  {
+    "artifact": "measurements",
+    "path": [
+      "sources",
+      0,
+      "media_type"
+    ],
+    "value": "application/octet-stream"
+  },
+  {
+    "artifact": "measurements",
+    "path": [
+      "sources",
+      0,
+      "encoding"
+    ],
+    "value": "base64"
+  },
+  {
+    "artifact": "measurements",
+    "path": [
+      "sources",
+      0,
+      "byte_size"
+    ],
+    "value": 16777217
+  },
+  {
+    "artifact": "measurements",
+    "path": [
+      "trials",
+      0,
+      "side"
+    ],
+    "value": "candidate"
+  },
+  {
+    "artifact": "measurements",
+    "path": [
+      "trials",
+      0,
+      "repetition"
+    ],
+    "value": 11
+  },
+  {
+    "artifact": "measurements",
+    "path": [
+      "trials",
+      0,
+      "attempts",
+      0,
+      "role"
+    ],
+    "value": "answer_generator"
+  },
+  {
+    "artifact": "measurements",
+    "path": [
+      "trials",
+      0,
+      "attempts",
+      0,
+      "status"
+    ],
+    "value": "unknown"
+  },
+  {
+    "artifact": "measurements",
+    "path": [
+      "trials",
+      0,
+      "attempts",
+      0,
+      "source",
+      "attempt_index"
+    ],
+    "value": 3
+  },
+  {
+    "artifact": "measurements",
+    "path": [
+      "trials",
+      0,
+      "parse",
+      "value"
+    ],
+    "value": 1.01
+  },
+  {
+    "artifact": "measurements",
+    "path": [
+      "trials",
+      0,
+      "selected_attempt"
+    ],
+    "value": 0
+  },
+  {
+    "artifact": "measurements",
+    "path": [
+      "completeness",
+      "status"
+    ],
+    "value": "passed"
+  }
+]

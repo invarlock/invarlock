@@ -24,6 +24,14 @@ The claim covers the submitted records. Questions about other inputs, model
 safety, model intent, and deployment fitness remain explicit complementary
 review domains.
 
+The formal argument below concerns native exact-match/NLL and deterministic
+extension pack-v1 evidence. [Captured comparisons](../user-guide/captured-results.md)
+authenticate supplied case facts and replay, with independent run/request pins.
+[Judge evidence](../reference/judge-measurements.md) adds a bounded measurement
+plan, retained ratings and its own recipient policy; native judge evidence also
+retains runtime provenance. Judge agreement with humans and broader model quality
+require separate validation and do not follow from a passing receipt.
+
 ## Top-level claim
 
 Let:

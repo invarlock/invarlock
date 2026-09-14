@@ -265,12 +265,13 @@ The perplexity ratio is verifier-derived interpretation only. It is not a
 selectable metric and has no policy threshold, confidence interval, or verdict
 authority.
 
-The built-in HF provider supports both built-in metrics for `text_causal`. The
+The built-in HF provider supports exact-match and normalized-NLL collection for `text_causal`. The
 first-party GGUF, TensorRT-LLM, and Hugging Face vision-text add-ins currently
 support exact match for their declared tasks. Import execution support remains
 provider-specific: both imported provider receipts must declare the selected
-task and collection metric. A scorer extension collects authenticated text
-outputs through the exact-match provider surface before verifier replay.
+task and collection metric. Judge and deterministic scorer extensions collect authenticated text outputs
+through the exact-match provider surface. Judge then performs separately bounded
+collection against those frozen outputs; deterministic extensions replay locally.
 
 ## Deterministic scorer extension
 
@@ -315,8 +316,15 @@ Replay runs twice and must produce byte-identical canonical results.
 Separately installed and explicitly authorized scorer packages may implement
 deterministic token F1, structured extraction, or VQA answer normalization. SQL
 or code execution, model-based semantic similarity, network and human scoring,
-external models, and LLM judges are excluded until separate authenticated
-contracts exist. Judge outputs remain optional authenticated observations.
+external models, and LLM judges are excluded from the scorer-extension contract.
+Use the built-in `metric: judge` for bounded rubric-based text grading through
+the installed native workflow. It uses the same run/import request lifecycle and
+retains runtime provenance, while replaying judgments through its bounded judge
+contract. Supply `comparison.judge: {workspace: judge-work, signer_identity:
+evaluation-signer}` and a native judge policy. Frozen-answer v3 requests remain
+available when native provider provenance is unavailable. See the
+[judge reference](../reference/judge-measurements.md) and the complete
+[native starter](https://github.com/invarlock/invarlock/blob/main/examples/native-judge/README.md).
 
 ## Authenticated optional observations
 

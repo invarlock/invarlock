@@ -303,6 +303,8 @@ def _metric_views(
     metrics: list[MetricView] = []
     for m in comparison["metrics"]:
         policy = policy_metrics.get(m["name"])
+        likelihood = m["kind"] == "normalized_nll_per_utf8_byte"
+        change = m["ratio"] if likelihood else m["delta"]
         binary = m["kind"] in {
             "exact_match",
             "normalized_match",
@@ -326,7 +328,7 @@ def _metric_views(
             math.isfinite(value * 100) for value in display_values if value is not None
         )
         scale = 100 if percentage else 1
-        unit = "pp" if percentage else m["unit"]
+        unit = "ratio" if likelihood else "pp" if percentage else m["unit"]
         suffix = "%" if percentage else " " + m["unit"]
         missing = len(m["missing_ids"])
         complete = m["count"] - missing
@@ -363,7 +365,9 @@ def _metric_views(
             higher = m["direction"] == "higher"
             threshold = (
                 (
-                    -policy["maximum_regression"]
+                    policy["ratio_max"]
+                    if likelihood
+                    else -policy["maximum_regression"]
                     if higher
                     else policy["maximum_regression"]
                 )
@@ -371,14 +375,16 @@ def _metric_views(
                 else None
             )
             label = (
-                "Paired 95% confidence interval"
+                "95% paired-schedule ratio resampling interval"
+                if likelihood
+                else "Paired 95% confidence interval"
                 if binary
                 else "95% paired-schedule resampling interval"
             )
             visual = IntervalView(
                 interval["lower"] * scale,
                 interval["upper"] * scale,
-                m["delta"] * scale,
+                change * scale,
                 threshold * scale if threshold is not None else None,
                 label,
                 unit,
@@ -387,7 +393,7 @@ def _metric_views(
                 bound = interval["lower" if higher else "upper"]
                 checks.append(
                     CheckView(
-                        "Allowed change",
+                        "Maximum NLL ratio" if likelihood else "Allowed change",
                         number(bound * scale) + " " + unit,
                         (">= " if higher else "<= ")
                         + number(cast(float, threshold) * scale)
@@ -454,7 +460,9 @@ def _metric_views(
             "Higher values are better."
             if m["direction"] == "higher"
             else "Lower values are better.",
-            "Recorded scoring basis: expected and output values, scored when the comparison was created."
+            "Recorded scoring basis: captured reference-continuation likelihood facts; NLL means, ratio and interval were recomputed when the comparison was created. Model execution and the supplied likelihood facts are not independently established."
+            if likelihood
+            else "Recorded scoring basis: expected and output values, scored when the comparison was created."
             if m["scoring_assurance"] == "recomputed"
             else "Recorded scoring basis: external measurements or judgments, aggregated when the comparison was created.",
             f"{complete:,} usable pairs; {missing:,} missing results; {m['count']:,} included pairs. Counts in overlapping slices must not be added together.",
@@ -478,8 +486,8 @@ def _metric_views(
                 if m["subject_mean"] is None
                 else number(m["subject_mean"] * scale) + suffix,
                 change="Unavailable"
-                if m["delta"] is None
-                else number(m["delta"] * scale, signed=True) + " " + unit,
+                if change is None
+                else number(change * scale, signed=not likelihood) + " " + unit,
                 count=f"{complete:,}",
                 explanation=explanation,
                 checks=tuple(checks),

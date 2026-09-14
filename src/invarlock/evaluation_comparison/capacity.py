@@ -21,6 +21,10 @@ def missing_pair(
         left["error"] is not None
         or right["error"] is not None
         or (
+            metric["kind"] == "normalized_nll_per_utf8_byte"
+            and any("likelihood" not in row for row in (left, right))
+        )
+        or (
             metric["kind"] == "recorded"
             and any(metric["score_key"] not in row["scores"] for row in (left, right))
         )

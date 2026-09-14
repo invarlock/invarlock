@@ -16,9 +16,10 @@ The facade deliberately groups these stable surfaces:
 
 | Surface | Exports |
 | --- | --- |
-| Transactions | `evaluate_request_file`, `verify_evidence`, `render_evidence`, `verify_signed_verification_receipt`, `write_acceptance_attestation`, `verify_acceptance_attestation` |
+| Transactions | `evaluate_request_file`, `verify_evidence`, `render_evidence`, native/captured receipt verification, judge verification and signed judge receipts, acceptance attestations |
 | Request | `load_evaluation_request`, `EvaluationRequest`, `EvaluationRequestError` |
 | Captured authoring | `CapturedEvaluationRequest`, `make_run`, `load_run`, `write_run`, `run_digest`, `physical_file_digest`, `freeze_case_set`, `case_set_digest`, `validate_run_case_set`, `compare_runs`, `comparison_policy_digest`, `normalize_captured_request`, `captured_request_digest`, `EvaluationRecordsError`, `DEFAULT_MAX_BOOTSTRAP_DRAWS` |
+| Evaluator scorer inputs | `CapturedSourceRequest`, `CapturedJudgeRequest`, `capture_evaluator_run`, `evaluator_input_capabilities`, `prepare_evaluator_judge`, `import_judge_sources` |
 | Trust profiles | `load_trust_inputs`, `TrustInputs`, `CapturedTrustInputs`, `TrustInputsError` |
 | Results and errors | Evaluation, verification, reporting, receipt, and evidence-pack result types |
 | OCI host execution | Per-side launch values, host executor, and environment-backed launch resolution |
@@ -116,6 +117,8 @@ The result types are:
 | `CapturedEvaluationPreflightResult` | `requested_authentication`, run/policy/request digests, record/scope counts, required/allowed draws, `output`, `checks`, `as_json()` |
 | `CapturedEvaluationTransactionResult` | `evidence_path`, `comparison_id`, run/policy/request/manifest digests, `authentication`, `policy_verdict`, `as_json()` |
 | `ReceiptVerification` | `ok`, `signed`, `statement`, `verifier_fingerprint`, `errors` |
+| `JudgeVerificationResult` | `authenticated`, `replayed`, `verified`, `accepted`, decision, policy/evidence bindings, errors |
+| `JudgeReceiptVerification` | `ok`, `signed`, authenticated `statement`, embedded local `result`, verifier fingerprint, errors |
 
 `EvaluationTransactionResult.policy_verdict` is optional presentation metadata
 from publication. It is not added to `as_json()` and does not establish
@@ -255,7 +258,7 @@ render_evidence(
 ```
 
 Typed native requests return native evaluation/preflight results; typed captured
-requests return captured results. A path is dispatched after loading and returns
+requests return captured results, or `JudgeWorkflowResult` when selecting judge. A path is dispatched after loading and returns
 the corresponding union. The signatures above summarize both families: omit
 native runtime/executor/registry/scorer keywords entirely for captured calls,
 including explicit `None`. Omission and explicit null preserve their distinct
@@ -693,6 +696,82 @@ verify_signed_verification_receipt(
 There is no separate receipt-verification CLI command. Applications and
 automation use this Python facade when consuming a receipt issued by another
 verifier.
+
+### Judge verification results and receipts
+
+Native `evaluate_request_file` also accepts `metric: judge` in a run/import
+request. It retains the normal native resource and signing-key requirements and
+returns `JudgeWorkflowResult`, whose JSON has `kind: judge`, the evidence path,
+analysis decision and collection stop state. Native preflight retains
+`EvaluationPreflightResult` and adds judge model, unit, trial and budget metadata.
+The installed optional collector reads credentials from its process environment;
+callers do not pass keys in the request or plan. Recipient replay requires only
+the core package. Native judge evidence includes a bound runtime capture, whereas
+ordinary frozen-answer import makes no runtime-provenance claim.
+
+Captured v2 requests also select `metric: judge`; both preflight and evaluation
+return `JudgeWorkflowResult`. `CapturedJudgeRequest` supplies the private
+workspace, signer identity and optional retained measurements path.
+`prepare_evaluator_judge(recipe, baseline, subject)` freezes a plan and analysis
+policy without calls. `import_judge_sources(sources, plan=plan,
+baseline_run=baseline, subject_run=subject)` accepts a mapping of source IDs to
+unchanged canonical retained-call JSON bytes, validates all trial bindings and
+returns the measurements object. Import does not invoke a provider or Inspect.
+
+`verify_judge_evidence` and `verify_judge_evidence_with_policy` replay bounded
+judge evidence under an external judge recipient policy and return an unsigned
+`JudgeVerificationResult`. `write_signed_judge_verification_receipt` signs that
+complete validated result, its recipient-policy digest, the verifier identity
+and verifier key fingerprint under the judge receipt domain. The destination and
+signing key must remain outside the submitted evidence.
+
+`verify_signed_judge_verification_receipt` authenticates a received receipt
+against caller-owned verifier identity, fingerprint and recipient-policy digest.
+It does not reopen evidence. `replay_signed_judge_verification_receipt` adds exact
+fresh evidence replay under the external recipient policy. Use
+`verify_stored_judge_result` for the same fresh comparison when the stored object
+is an unsigned local result rather than a signed receipt.
+
+```python
+from pathlib import Path
+from invarlock.engine import (
+    replay_signed_judge_verification_receipt,
+    verify_judge_evidence_with_policy,
+    verify_signed_judge_verification_receipt,
+    write_signed_judge_verification_receipt,
+)
+
+policy = Path("recipient/judge-policy.json")
+evidence = Path("judge-evidence")
+receipt = Path("recipient/judge.receipt.json")
+local = verify_judge_evidence_with_policy(evidence, policy)
+fingerprint = write_signed_judge_verification_receipt(
+    evidence,
+    local,
+    receipt,
+    recipient_policy_path=policy,
+    verifier_identity="release-verifier",
+    verifier_signing_key_path=Path("recipient/verifier.pem"),
+)
+authenticated = verify_signed_judge_verification_receipt(
+    receipt,
+    expected_verifier_identity="release-verifier",
+    expected_verifier_fingerprint=fingerprint,
+    expected_recipient_policy_sha256=local.recipient_policy_sha256,
+)
+assert authenticated.ok
+assert replay_signed_judge_verification_receipt(
+    receipt,
+    evidence_path=evidence,
+    recipient_policy_path=policy,
+    expected_verifier_identity="release-verifier",
+    expected_verifier_fingerprint=fingerprint,
+).accepted
+```
+
+These APIs preserve `bounded-judge-fixed-benchmark-v1`. Receipt authentication
+does not establish that the benchmark represents deployment traffic or that the
+judge is correct outside the retained rubric and cases.
 
 ## Evidence pack result types
 
