@@ -1,4 +1,4 @@
-"""Check the retained K2 pilot archive and replay its signed corrected evidence."""
+"""Check a retained K2 pilot archive and replay its signed evidence."""
 
 from __future__ import annotations
 
@@ -17,6 +17,11 @@ from invarlock.judge_measurements.acceptance import (
 from invarlock.judge_measurements.evidence import replay_judge_evidence
 
 WORKFLOWS = ("grounded_qa", "extraction")
+LEGACY_EXPECTATION = {
+    "accepted": False,
+    "decision": "insufficient_evidence",
+    "analysis_reasons": ["maximum_interval_width_exceeded"],
+}
 
 
 def sha(raw: bytes) -> str:
@@ -52,7 +57,10 @@ def read_archive(bundle: Path, expected_sha256: str) -> dict[str, bytes]:
             names.add(entry.filename)
         files = {entry.filename: archive.read(entry) for entry in entries}
     manifest = parse_json_bytes(files["reference.json"], label="pilot reference")
-    if manifest["format"] != "invarlock/judge-pilot-reference-v1":
+    if manifest["format"] not in {
+        "invarlock/judge-pilot-reference-v1",
+        "invarlock/judge-pilot-reference-v2",
+    }:
         raise ValueError("unsupported pilot reference")
     if set(manifest["files"]) != set(files) - {"reference.json"}:
         raise ValueError("pilot reference file inventory differs")
@@ -62,9 +70,42 @@ def read_archive(bundle: Path, expected_sha256: str) -> dict[str, bytes]:
     return files
 
 
+def validation_contract(manifest: dict) -> tuple[str, dict[str, dict]]:
+    """Return the active evidence root and independently pinned expectations."""
+    if manifest["format"] == "invarlock/judge-pilot-reference-v1":
+        return "corrected", {
+            workflow: dict(LEGACY_EXPECTATION) for workflow in WORKFLOWS
+        }
+    pilot = manifest.get("pilot")
+    if not isinstance(pilot, dict) or set(pilot) != {"path", "workflows"}:
+        raise ValueError("pilot reference metadata differs")
+    root = pilot["path"]
+    if not isinstance(root, str) or not re.fullmatch(r"[A-Za-z0-9_-]+", root):
+        raise ValueError("pilot reference path is invalid")
+    expected = pilot["workflows"]
+    if not isinstance(expected, dict) or set(expected) != set(WORKFLOWS):
+        raise ValueError("pilot workflow inventory differs")
+    for workflow, outcome in expected.items():
+        if (
+            not isinstance(outcome, dict)
+            or set(outcome) != {"accepted", "decision", "analysis_reasons"}
+            or not isinstance(outcome["accepted"], bool)
+            or outcome["decision"]
+            not in {"pass", "regression", "insufficient_evidence"}
+            or not isinstance(outcome["analysis_reasons"], list)
+            or any(
+                not isinstance(reason, str) or not reason
+                for reason in outcome["analysis_reasons"]
+            )
+        ):
+            raise ValueError(f"{workflow}: pilot outcome expectation differs")
+    return root, expected
+
+
 def validate_reference(bundle: Path, expected_sha256: str) -> dict:
     files = read_archive(bundle, expected_sha256)
     manifest = parse_json_bytes(files["reference.json"], label="pilot reference")
+    active_root, expectations = validation_contract(manifest)
     results = {}
     with tempfile.TemporaryDirectory(prefix="judge-pilot-reference-") as directory:
         root = Path(directory).resolve()
@@ -73,7 +114,7 @@ def validate_reference(bundle: Path, expected_sha256: str) -> dict:
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(raw)
         for workflow in WORKFLOWS:
-            current = root / "corrected" / workflow
+            current = root / active_root / workflow
             receipt = parse_json_bytes(
                 (current / "receipt.json").read_bytes(), label="retained receipt"
             )
@@ -92,9 +133,14 @@ def validate_reference(bundle: Path, expected_sha256: str) -> dict:
                 raise ValueError(
                     f"{workflow}: signed receipt or evidence replay failed"
                 )
-            if result.accepted or result.decision != "insufficient_evidence":
+            expectation = expectations[workflow]
+            if (
+                result.accepted != expectation["accepted"]
+                or result.decision != expectation["decision"]
+                or analysis.decision != expectation["decision"]
+            ):
                 raise ValueError(f"{workflow}: unexpected recipient outcome")
-            if analysis.reasons != ("maximum_interval_width_exceeded",):
+            if analysis.reasons != tuple(expectation["analysis_reasons"]):
                 raise ValueError(f"{workflow}: unexpected analysis reason")
             results[workflow] = {
                 "authenticated": result.authenticated,
@@ -108,7 +154,12 @@ def validate_reference(bundle: Path, expected_sha256: str) -> dict:
         "archive_sha256": expected_sha256,
         "reference_manifest_sha256": sha(files["reference.json"]),
         "workflows": results,
-        "historical_replay": "retained separately; not promoted to current evidence",
+        "active_result_root": active_root,
+        "historical_replay": (
+            "retained separately; not promoted to current evidence"
+            if manifest["format"] == "invarlock/judge-pilot-reference-v1"
+            else "not included in this reference"
+        ),
         "human_review": manifest["human_review"],
         "final_plans": manifest["final_plans"],
         "new_model_calls": 0,

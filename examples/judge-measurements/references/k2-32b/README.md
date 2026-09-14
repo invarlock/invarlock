@@ -42,3 +42,8 @@ The separate [judge pilot reference](../k2-32b-pilot/README.md) retains correcte
 measurements, signed replay receipts and the original incomplete history. This
 frozen-answer archive remains unchanged; human rubric review and final-plan
 activation are still pending. Keep the judge outcomes from blinded reviewers.
+
+The [Luna xHigh pilot reference](../k2-32b-luna-xhigh-pilot/README.md) repeats
+the same pilot schedule with a different judge configuration and retains a
+descriptive comparison. It also contains outcomes, so keep it from blinded
+reviewers until their labels are frozen.

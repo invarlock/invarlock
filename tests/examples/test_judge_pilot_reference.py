@@ -18,6 +18,15 @@ ROOT = Path(__file__).parents[2]
 REFERENCE = ROOT / "examples/judge-measurements/references/k2-32b-pilot"
 ARCHIVE_SHA256 = "44966ad7be58b0f0ebe8ca3054cd92c9321ff366c4801e53032005eef60d2d58"
 MANIFEST_SHA256 = "2915ccd99540f75967672bd7127e83b8903b771b8906a1b064d0580034c6097c"
+LUNA_REFERENCE = (
+    ROOT / "examples/judge-measurements/references/k2-32b-luna-xhigh-pilot"
+)
+LUNA_ARCHIVE_SHA256 = (
+    "4d8f50e1cba0056d2118695a4dab73cce4a5ab10829320e2f8ea4b0c48d0e766"
+)
+LUNA_MANIFEST_SHA256 = (
+    "161d7aad0bb9fe83c8e2e100452e86094ca3a780b5de882f65704ecd79ac7b80"
+)
 HISTORY_SHA256 = {
     "grounded_qa": "02f849fda940ec6436b0b66283f4fbe0329643673535428fa309e9cc83cbbb13",
     "extraction": "4acdeecc5b1f8c2bff6d60844bf4b05e77a9d6a56fe4bd61d30049b26edc1892",
@@ -37,6 +46,11 @@ def extracted(files, tmp_path_factory):
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(raw)
     return root
+
+
+@pytest.fixture(scope="module")
+def luna_files():
+    return ref.read_archive(LUNA_REFERENCE / "reference.zip", LUNA_ARCHIVE_SHA256)
 
 
 def test_physical_archive_pins_and_public_inventory(files):
@@ -83,6 +97,7 @@ def test_complete_signed_pilot_replays_with_unchanged_negative_outcomes():
     assert result["human_review"] == "pending"
     assert result["final_plans"] == "not_activated"
     assert result["new_model_calls"] == 0
+    assert result["active_result_root"] == "corrected"
     for workflow in ref.WORKFLOWS:
         reviewed = result["workflows"][workflow]
         assert (
@@ -102,6 +117,124 @@ def test_complete_signed_pilot_replays_with_unchanged_negative_outcomes():
         assert Decimal(interval["upper"]) - Decimal(interval["lower"]) == Decimal(
             "1.007489336443204"
         )
+
+
+def test_luna_archive_replays_signed_advisory_results(luna_files):
+    metadata = json.loads((LUNA_REFERENCE / "archive.json").read_bytes())
+    assert metadata["archive"]["sha256"] == LUNA_ARCHIVE_SHA256
+    assert metadata["archive"]["size_bytes"] == (
+        LUNA_REFERENCE / "reference.zip"
+    ).stat().st_size
+    assert metadata["reference_manifest_sha256"] == LUNA_MANIFEST_SHA256
+    assert ref.sha(luna_files["reference.json"]) == LUNA_MANIFEST_SHA256
+
+    result = ref.validate_reference(
+        LUNA_REFERENCE / "reference.zip", LUNA_ARCHIVE_SHA256
+    )
+    assert result["active_result_root"] == "pilot"
+    assert result["human_review"] == "pending"
+    assert result["final_plans"] == "not_activated"
+    assert result["new_model_calls"] == 0
+    for workflow in ref.WORKFLOWS:
+        reviewed = result["workflows"][workflow]
+        assert reviewed["verified"]
+        assert reviewed["authenticated"]
+        assert reviewed["replayed"]
+        assert not reviewed["accepted"]
+        assert reviewed["decision"] == "insufficient_evidence"
+        assert reviewed["analysis"]["reasons"] == [
+            "maximum_interval_width_exceeded"
+        ]
+        assert reviewed["analysis"]["counts"]["completed_trials"] == 240
+
+
+def test_luna_archive_has_exact_public_inventory(luna_files):
+    attribution = {
+        "ATTRIBUTION.md",
+        "SGD-LICENSE.txt",
+        "SGD-README.md",
+        "SQuAD-README.md",
+        "SQuAD-SOFTWARE-LICENSE.txt",
+        "source-attribution.json",
+    }
+    workflow_files = {
+        "analysis-replayed.json",
+        "analysis_policy.json",
+        "audit/copied-sol-bound-analysis-policy.json",
+        "baseline_run.json",
+        "collection.json",
+        "evidence/analysis_policy.json",
+        "evidence/analysis_result.json",
+        "evidence/baseline_run.json",
+        "evidence/case_set.json",
+        "evidence/envelope.json",
+        "evidence/measurements.json",
+        "evidence/plan.json",
+        "evidence/subject_run.json",
+        "measurements-collected.json",
+        "plan.json",
+        "receipt.json",
+        "recipient.json",
+        "report.html",
+        "report.md",
+        "report.xml",
+        "subject_run.json",
+    }
+    expected = {"reference.json"}
+    expected.update(f"attribution/{name}" for name in attribution)
+    for workflow in ref.WORKFLOWS:
+        expected.update(f"pilot/{workflow}/{name}" for name in workflow_files)
+    expected.update(
+        {
+            "provenance/execution.json",
+            "provenance/policy-binding-correction.json",
+            "provenance/post-collection-integrity.json",
+            "provenance/runtime-source-files.json",
+            "summaries/comparison-summary.json",
+            "summaries/usage-summary.json",
+            "summaries/verified-pilot-summary.json",
+        }
+    )
+    assert set(luna_files) == expected
+    for name, raw in luna_files.items():
+        assert not any(
+            part in name.lower()
+            for part in (
+                "authorization",
+                "checkpoint",
+                "human_review",
+                "final_validation",
+                "private-key",
+            )
+        )
+        for prohibited in (
+            b"PRIVATE KEY",
+            b"/private/",
+            b"/Users/",
+            b"/tmp/",
+            b"OPENAI_API_KEY",
+            b"Authorization:",
+            b"Bearer ",
+            b"approved_ceiling_usd",
+        ):
+            assert prohibited not in raw, name
+
+
+@pytest.mark.parametrize("workflow", ref.WORKFLOWS)
+def test_luna_policy_correction_changes_only_plan_binding(luna_files, workflow):
+    active = json.loads(luna_files[f"pilot/{workflow}/analysis_policy.json"])
+    copied = json.loads(
+        luna_files[f"pilot/{workflow}/audit/copied-sol-bound-analysis-policy.json"]
+    )
+    correction = json.loads(
+        luna_files["provenance/policy-binding-correction.json"]
+    )["workflows"][workflow]
+    assert copied["plan_sha256"] == correction["original_plan_sha256"]
+    assert active["plan_sha256"] == correction["luna_plan_sha256"]
+    assert ref.sha(luna_files[f"pilot/{workflow}/analysis_policy.json"]) == correction[
+        "derived_policy_sha256"
+    ]
+    assert {**copied, "plan_sha256": active["plan_sha256"]} == active
 
 
 @pytest.mark.parametrize("workflow", ref.WORKFLOWS)
@@ -212,6 +345,83 @@ def test_report_replays_the_retained_advisory_result(extracted, tmp_path, workfl
 def test_wrong_archive_pin_fails_before_replay():
     with pytest.raises(ValueError, match="expected SHA-256 pin"):
         ref.read_archive(REFERENCE / "reference.zip", "0" * 64)
+
+
+def test_version_two_declares_active_evidence_and_expected_outcomes():
+    expected = {
+        workflow: {
+            "accepted": False,
+            "decision": "insufficient_evidence",
+            "analysis_reasons": ["maximum_interval_width_exceeded"],
+        }
+        for workflow in ref.WORKFLOWS
+    }
+    root, outcomes = ref.validation_contract(
+        {
+            "format": "invarlock/judge-pilot-reference-v2",
+            "pilot": {"path": "pilot", "workflows": expected},
+        }
+    )
+    assert root == "pilot"
+    assert outcomes == expected
+
+
+def test_version_two_allows_advisory_pass_without_recipient_acceptance():
+    outcomes = {
+        workflow: {
+            "accepted": False,
+            "decision": "pass",
+            "analysis_reasons": [],
+        }
+        for workflow in ref.WORKFLOWS
+    }
+    assert ref.validation_contract(
+        {
+            "format": "invarlock/judge-pilot-reference-v2",
+            "pilot": {"path": "pilot", "workflows": outcomes},
+        }
+    ) == ("pilot", outcomes)
+
+
+def test_version_two_rejects_unknown_decision():
+    outcomes = {
+        workflow: {
+            "accepted": False,
+            "decision": "fail",
+            "analysis_reasons": [],
+        }
+        for workflow in ref.WORKFLOWS
+    }
+    with pytest.raises(ValueError, match="outcome expectation differs"):
+        ref.validation_contract(
+            {
+                "format": "invarlock/judge-pilot-reference-v2",
+                "pilot": {"path": "pilot", "workflows": outcomes},
+            }
+        )
+
+
+@pytest.mark.parametrize(
+    "path", ["../pilot", "pilot/results", "/pilot", "pilot\\run"]
+)
+def test_version_two_rejects_unsafe_active_evidence_path(path):
+    with pytest.raises(ValueError, match="path is invalid"):
+        ref.validation_contract(
+            {
+                "format": "invarlock/judge-pilot-reference-v2",
+                "pilot": {
+                    "path": path,
+                    "workflows": {
+                        workflow: {
+                            "accepted": False,
+                            "decision": "insufficient_evidence",
+                            "analysis_reasons": ["maximum_interval_width_exceeded"],
+                        }
+                        for workflow in ref.WORKFLOWS
+                    },
+                },
+            }
+        )
 
 
 @pytest.mark.parametrize(
