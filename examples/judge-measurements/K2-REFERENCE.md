@@ -170,3 +170,11 @@ optionally supply the final measurements for descriptive agreement. Omitting
 `--measurements` records the completed review without a judge comparison; it
 cannot activate a plan. Never use final-validation judgments to revise the
 rubric while still describing that final subset as untouched validation.
+
+## Completed held-out comparison
+
+The [Luna xHigh held-out reference](references/k2-32b-luna-xhigh-heldout/README.md)
+retains all 10,260 ratings, signed offline replay and separate AI-review results.
+Both frozen comparison policies pass; this does not establish improvement or
+independent-human judge accuracy. The original candidate files and pilot archives
+remain unchanged.

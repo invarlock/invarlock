@@ -14,8 +14,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with the three built-in scorers and their distinct evidence contracts.
 - Retained the corrected 480-trial K2 judge pilot, signed offline replay and
   original incomplete history. Both advisory analyses remain insufficient
-  evidence under unchanged interval-width requirements; human labels and
-  final-plan activation remain pending.
+  evidence under unchanged interval-width requirements.
+- Retained all 10,260 Luna xHigh held-out judge ratings, signed offline
+  verification and separate AI-review labels and disagreements. Both frozen
+  comparison policies pass; AI agreement is not independent-human accuracy.
+  Reference replay supports explicit caller-selected archive byte limits while
+  preserving the smaller pilot defaults.
 
 - Added a real LM Evaluation Harness likelihood reference with pinned CPU
   measurements, source-preserving import, independent signed verification and
