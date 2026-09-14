@@ -37,3 +37,8 @@ Preserve [source attribution](ATTRIBUTION.md), the
 [SGD data license](SGD-LICENSE.txt), and the accurately scoped
 [SQuAD software license](SQuAD-SOFTWARE-LICENSE.txt). Complete original publisher
 README files and pinned dataset source metadata are inside the archive.
+
+The separate [judge pilot reference](../k2-32b-pilot/README.md) retains corrected
+measurements, signed replay receipts and the original incomplete history. This
+frozen-answer archive remains unchanged; human rubric review and final-plan
+activation are still pending. Keep the judge outcomes from blinded reviewers.

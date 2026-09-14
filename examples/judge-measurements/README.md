@@ -130,3 +130,8 @@ pilot plans, reviewer sheets and pending final plans, see
 [Freeze a K2 judge reference](K2-REFERENCE.md). That archive retains frozen inputs
 and plans, without judge outcomes. Its final plans remain candidate documents
 until the pilot rubric review is recorded.
+
+The [retained K2 pilot](references/k2-32b-pilot/README.md) now contains 480
+complete corrected judge trials and the unchanged original incomplete history.
+Both corrected analyses remain insufficient evidence under their frozen width
+requirements. Human labels are pending and final plans remain inactive.
