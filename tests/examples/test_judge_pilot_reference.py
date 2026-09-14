@@ -18,12 +18,8 @@ ROOT = Path(__file__).parents[2]
 REFERENCE = ROOT / "examples/judge-measurements/references/k2-32b-pilot"
 ARCHIVE_SHA256 = "44966ad7be58b0f0ebe8ca3054cd92c9321ff366c4801e53032005eef60d2d58"
 MANIFEST_SHA256 = "2915ccd99540f75967672bd7127e83b8903b771b8906a1b064d0580034c6097c"
-LUNA_REFERENCE = (
-    ROOT / "examples/judge-measurements/references/k2-32b-luna-xhigh-pilot"
-)
-LUNA_ARCHIVE_SHA256 = (
-    "4d8f50e1cba0056d2118695a4dab73cce4a5ab10829320e2f8ea4b0c48d0e766"
-)
+LUNA_REFERENCE = ROOT / "examples/judge-measurements/references/k2-32b-luna-xhigh-pilot"
+LUNA_ARCHIVE_SHA256 = "4d8f50e1cba0056d2118695a4dab73cce4a5ab10829320e2f8ea4b0c48d0e766"
 LUNA_MANIFEST_SHA256 = (
     "161d7aad0bb9fe83c8e2e100452e86094ca3a780b5de882f65704ecd79ac7b80"
 )
@@ -122,9 +118,10 @@ def test_complete_signed_pilot_replays_with_unchanged_negative_outcomes():
 def test_luna_archive_replays_signed_advisory_results(luna_files):
     metadata = json.loads((LUNA_REFERENCE / "archive.json").read_bytes())
     assert metadata["archive"]["sha256"] == LUNA_ARCHIVE_SHA256
-    assert metadata["archive"]["size_bytes"] == (
-        LUNA_REFERENCE / "reference.zip"
-    ).stat().st_size
+    assert (
+        metadata["archive"]["size_bytes"]
+        == (LUNA_REFERENCE / "reference.zip").stat().st_size
+    )
     assert metadata["reference_manifest_sha256"] == LUNA_MANIFEST_SHA256
     assert ref.sha(luna_files["reference.json"]) == LUNA_MANIFEST_SHA256
 
@@ -142,9 +139,7 @@ def test_luna_archive_replays_signed_advisory_results(luna_files):
         assert reviewed["replayed"]
         assert not reviewed["accepted"]
         assert reviewed["decision"] == "insufficient_evidence"
-        assert reviewed["analysis"]["reasons"] == [
-            "maximum_interval_width_exceeded"
-        ]
+        assert reviewed["analysis"]["reasons"] == ["maximum_interval_width_exceeded"]
         assert reviewed["analysis"]["counts"]["completed_trials"] == 240
 
 
@@ -226,14 +221,15 @@ def test_luna_policy_correction_changes_only_plan_binding(luna_files, workflow):
     copied = json.loads(
         luna_files[f"pilot/{workflow}/audit/copied-sol-bound-analysis-policy.json"]
     )
-    correction = json.loads(
-        luna_files["provenance/policy-binding-correction.json"]
-    )["workflows"][workflow]
+    correction = json.loads(luna_files["provenance/policy-binding-correction.json"])[
+        "workflows"
+    ][workflow]
     assert copied["plan_sha256"] == correction["original_plan_sha256"]
     assert active["plan_sha256"] == correction["luna_plan_sha256"]
-    assert ref.sha(luna_files[f"pilot/{workflow}/analysis_policy.json"]) == correction[
-        "derived_policy_sha256"
-    ]
+    assert (
+        ref.sha(luna_files[f"pilot/{workflow}/analysis_policy.json"])
+        == correction["derived_policy_sha256"]
+    )
     assert {**copied, "plan_sha256": active["plan_sha256"]} == active
 
 
@@ -401,9 +397,7 @@ def test_version_two_rejects_unknown_decision():
         )
 
 
-@pytest.mark.parametrize(
-    "path", ["../pilot", "pilot/results", "/pilot", "pilot\\run"]
-)
+@pytest.mark.parametrize("path", ["../pilot", "pilot/results", "/pilot", "pilot\\run"])
 def test_version_two_rejects_unsafe_active_evidence_path(path):
     with pytest.raises(ValueError, match="path is invalid"):
         ref.validation_contract(
