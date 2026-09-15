@@ -144,6 +144,8 @@ while strengthening evidence verification, runtime isolation and release checks.
   provider capabilities and evaluation-source identities; changed modes during
   loading; and run-only options on import. Captured imports, artifact attestation
   and reference replay reject oversized, replaced or non-regular inputs.
+- **Judge preflight:** keep text and JSON output consistent for captured and
+  hosted inputs, including the maximum planned attempt count.
 - **Judge integrity:** reject reused Inspect provider response IDs across retained
   segments and resumed collection, rating text contradicted by a provider refusal,
   tool call or non-assistant role, overlapping workspaces, changed runtime or
