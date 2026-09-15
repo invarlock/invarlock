@@ -71,3 +71,10 @@ src/**/*.py[co]
 src/*.egg-info/
 src/*.egg-info/**
 src/**/.DS_Store
+
+!requirements/workflows/accelerate-upstream-wheel.txt
+!scripts/security/build_hardened_accelerate_wheel.py
+!scripts/security/accelerate_checkpoint_files.py
+!addins/gguf/LICENSE
+!addins/multimodal/LICENSE
+!addins/tensorrt_llm/LICENSE

@@ -61,7 +61,7 @@ def test_make_runtime_smoke_uses_the_built_image_offline() -> None:
     assert "--env HOME=/tmp --env PYTHONDONTWRITEBYTECODE=1" in block
     assert "--entrypoint python $(RUNTIME_IMAGE)" in block
     assert "import accelerate, safetensors, torch, transformers" in block
-    assert "accelerate.__version__ == '1.14.0'" in block
+    assert "accelerate.__version__ == '1.14.0+invarlock.1'" in block
     assert "safetensors.__version__ == '0.8.0'" in block
     assert "transformers.__version__ == '5.14.1'" in block
 
@@ -76,7 +76,7 @@ def test_make_cuda_runtime_smoke_requires_a_visible_gpu() -> None:
     )
     assert "--entrypoint python $(RUNTIME_IMAGE_CUDA)" in block
     assert "import accelerate, safetensors, torch, transformers" in block
-    assert "accelerate.__version__ == '1.14.0'" in block
+    assert "accelerate.__version__ == '1.14.0+invarlock.1'" in block
     assert "safetensors.__version__ == '0.8.0'" in block
     assert "transformers.__version__ == '5.14.1'" in block
     assert "assert torch.__version__ == '2.13.0+cu126'" in block

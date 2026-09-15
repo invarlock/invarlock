@@ -663,12 +663,12 @@ def test_first_party_addin_rejects_substituted_optional_dependency_marker(
 ) -> None:
     copied = tmp_path / "addins"
     shutil.copytree(built_addins, copied)
-    wheel = next(copied.glob("invarlock_runtime_hf_vision_text-*.whl"))
+    wheel = next(copied.glob("invarlock_inspect_judge-*.whl"))
     files = _read_wheel_files(wheel)
     metadata = next(name for name in files if name.endswith(".dist-info/METADATA"))
-    assert b'extra == "runtime"' in files[metadata]
+    assert b'extra == "inspect"' in files[metadata]
     files[metadata] = files[metadata].replace(
-        b'extra == "runtime"', b'extra == "unbound"', 1
+        b'extra == "inspect"', b'extra == "unbound"', 1
     )
     _write_wheel_files(wheel, files)
 

@@ -74,13 +74,18 @@ execution already produced the complete provider sidecars; the final section
 uses the repository fixture to exercise that secondary path without model
 inference.
 
-## 1. Install the HF provider
+## 1. Install the host CLI
 
 ```bash
-python -m pip install "invarlock[hf]"
+python -m pip install invarlock
 invarlock --version
 invarlock evaluate --help
 ```
+
+The core includes the HF provider. Model execution dependencies are supplied by
+the runtime image, including the source-derived hardened Accelerate wheel.
+For host-side model preparation from a source checkout, use the
+[repository runtime setup](runtime-providers.md#hugging-face-transformers).
 
 Build or obtain the runtime image from the same release you intend to run. It
 must be available locally under a digest-bearing reference or exact image ID.

@@ -38,7 +38,9 @@ jobs:
           key: ${{ runner.os }}-pip-3.12-container-front-door-${{ hashFiles('requirements/workflows/ci-hf-py312.txt') }}
 
       - name: Install test dependencies
-        run: python -m pip install --require-hashes -r requirements/workflows/ci-hf-py312.txt
+        run: |
+          python scripts/security/build_hardened_accelerate_wheel.py bootstrap
+          python -m pip install --require-hashes --find-links runtime/wheels -r requirements/workflows/ci-hf-py312.txt
 
       - name: Install candidate wheel
         shell: bash

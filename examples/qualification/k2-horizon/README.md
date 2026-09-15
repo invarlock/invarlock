@@ -94,9 +94,19 @@ after observing a decision result.
 
 ## CPU preparation
 
-Install the candidate wheel and its Hugging Face extra for later downloads.
-Run commands from this repository, with the installed wheel available to
-Python. Ordinary InvarLock onboarding remains GPU-free.
+Use the matching source checkout to prepare the verified Hugging Face
+dependency group for later downloads, then install the candidate wheel into
+that environment:
+
+```bash
+python scripts/security/build_hardened_accelerate_wheel.py bootstrap
+uv sync --locked --extra ci --group hf
+. .venv/bin/activate
+python -m pip install --no-deps --force-reinstall dist/invarlock-*.whl
+```
+
+Run commands from this repository, with the installed candidate wheel available
+to Python. Ordinary InvarLock onboarding remains GPU-free.
 
 ```bash
 python -m examples.qualification.k2_campaign plan \

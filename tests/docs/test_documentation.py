@@ -286,17 +286,20 @@ def test_auxiliary_docs_track_the_product_and_release_surface() -> None:
     assert "shared MMLU-Pro semantic artifact" in notices
 
     core_section = notices.split("## Core distribution", maxsplit=1)[1].split(
-        "## Hugging Face extra", maxsplit=1
+        "## Hugging Face runtime group", maxsplit=1
     )[0]
-    hf_section = notices.split("## Hugging Face extra", maxsplit=1)[1].split(
+    hf_section = notices.split("## Hugging Face runtime group", maxsplit=1)[1].split(
         "## First-party optional distributions", maxsplit=1
     )[0]
     assert _code_table_names(core_section) == _declared_dependency_names(
         "pyproject.toml"
     )
-    assert _code_table_names(hf_section) == _declared_dependency_names(
-        "pyproject.toml", extra="hf"
-    )
+    assert _code_table_names(hf_section) == {
+        re.match(r"[A-Za-z0-9][A-Za-z0-9._-]*", requirement).group(0).lower()
+        for requirement in tomllib.loads(_read("pyproject.toml"))["dependency-groups"][
+            "hf"
+        ]
+    }
 
     scripts = text_by_path["scripts/README.md"]
     for argument in (

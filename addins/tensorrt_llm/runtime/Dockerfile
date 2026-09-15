@@ -7,7 +7,7 @@ COPY requirements/workflows/core-py312.txt /requirements/workflows/core-py312.tx
 COPY requirements/workflows/runtime-wheel-build-py312.txt /requirements/workflows/runtime-wheel-build-py312.txt
 COPY pyproject.toml README.md LICENSE MANIFEST.in /project/
 COPY src /project/src
-COPY addins/tensorrt_llm/pyproject.toml addins/tensorrt_llm/README.md /addin/
+COPY addins/tensorrt_llm/pyproject.toml addins/tensorrt_llm/README.md addins/tensorrt_llm/LICENSE /addin/
 COPY addins/tensorrt_llm/src /addin/src
 
 FROM ${WHEEL_BUILD_BASE} AS public-wheel

@@ -42,6 +42,7 @@ RUN case "${EVALUATOR_RUNTIME}" in cpu|cu129) ;; *) exit 2 ;; esac \
       --no-compile \
       --no-deps \
       --require-hashes \
+      --find-links /opt/invarlock/runtime-wheels \
       -r /tmp/lm-evaluation-harness-requirements.txt \
     && python -m pip install \
       --no-compile \

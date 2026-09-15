@@ -23,7 +23,7 @@ evaluation, bundle publication, and independent verification.
 
 | Artifact you need to evaluate | Provider | Packaging | Start with |
 | --- | --- | --- | --- |
-| Local Hugging Face safetensors checkpoint | `hf_transformers` | Built into `invarlock`; execution dependencies in `invarlock[hf]` | Run mode |
+| Local Hugging Face safetensors checkpoint | `hf_transformers` | Built into `invarlock`; execution dependencies in the maintained runtime image | Run mode |
 | Local Hugging Face vision-text checkpoint | `hf_vision_text` | `invarlock-runtime-hf-vision-text` add-in | Run mode with authenticated image content store |
 | GGUF file used by `llama.cpp` | `llama_cpp` | `invarlock-runtime-gguf` add-in | Run mode after runtime inspection |
 | TensorRT-LLM engine bundle | `tensorrt_llm` | `invarlock-runtime-tensorrt-llm` add-in | Run mode after GPU-bound inspection |
@@ -129,12 +129,20 @@ documented in their sections below.
 
 ## Hugging Face Transformers
 
-`hf_transformers` is the canonical built-in provider. Install its runtime
-dependencies with:
+`hf_transformers` is the canonical built-in provider. The public core package
+supplies the host CLI; the maintained runtime image supplies model execution
+dependencies. For host-side model preparation or development, run from the
+matching source checkout with `uv` 0.10.10:
 
 ```bash
-python -m pip install "invarlock[hf]"
+python scripts/security/build_hardened_accelerate_wheel.py bootstrap
+uv sync --locked --group hf
 ```
+
+Bootstrap authenticates the upstream wheel and the derived
+`accelerate==1.14.0+invarlock.1` wheel before `uv` consumes it. The `hf` repository
+group uses the generated `runtime/wheels` directory. The public package has no
+full inference extra; use the maintained image or this source-bound setup.
 
 Strict run mode expects locally materialized safetensors and tokenizer files.
 It binds the immutable revision or checkpoint-tree digest, tokenizer metadata
@@ -454,8 +462,9 @@ needed for execution-free media preflight:
 ```
 
 The heavier Torch and Transformers inference dependencies belong in the
-digest-pinned runtime image. The `[runtime]` extra is for development that
-executes the model outside that maintained image.
+digest-pinned runtime image, which derives and hash-checks the hardened
+Accelerate dependency during its build. The base add-in has no full inference
+extra.
 
 `hf_vision_text` evaluates `vision_text_generation` schedules containing one
 `prompt` text part and one `image` content part per record. Schedule content

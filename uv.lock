@@ -15,8 +15,8 @@ resolution-markers = [
 
 [[package]]
 name = "accelerate"
-version = "1.14.0"
-source = { registry = "https://pypi.org/simple" }
+version = "1.14.0+invarlock.1"
+source = { registry = "runtime/wheels" }
 dependencies = [
     { name = "huggingface-hub" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.14'" },
@@ -27,9 +27,8 @@ dependencies = [
     { name = "safetensors" },
     { name = "torch" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/8d/75/94cd5d389649578aca399e5aa822637eec18319a1dadc400ffe2f9a7493f/accelerate-1.14.0.tar.gz", hash = "sha256:41b9c4377a54e0b460a959b0defa1b736e4ca0a2373252d9a539964c2afe3c8d", size = 412167, upload-time = "2026-06-11T13:45:52.326Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a8/db/253133d7e7cb40d3af384bb2f5c0b4a2b7fdcffbc95c688cc67a20a3c103/accelerate-1.14.0-py3-none-any.whl", hash = "sha256:e94390c2863b873be18f623f9df48a0d8fe5eff13ea7f1a00092b0a7904888c6", size = 389246, upload-time = "2026-06-11T13:45:50.477Z" },
+    { path = "accelerate-1.14.0+invarlock.1-py3-none-any.whl" },
 ]
 
 [[package]]
@@ -871,14 +870,12 @@ ci = [
     { name = "build" },
     { name = "hypothesis" },
     { name = "mypy" },
-    { name = "peft" },
     { name = "pillow" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pytest-xdist" },
     { name = "ruff" },
     { name = "setuptools" },
-    { name = "torchao" },
     { name = "twine" },
     { name = "types-jsonschema" },
     { name = "wheel" },
@@ -890,7 +887,6 @@ dev = [
     { name = "mkdocs-material" },
     { name = "mkdocs-mermaid2-plugin" },
     { name = "mypy" },
-    { name = "peft" },
     { name = "pillow" },
     { name = "pre-commit" },
     { name = "pymdown-extensions" },
@@ -898,7 +894,6 @@ dev = [
     { name = "pytest-cov" },
     { name = "pytest-xdist" },
     { name = "ruff" },
-    { name = "torchao" },
     { name = "twine" },
     { name = "types-jsonschema" },
     { name = "wheel" },
@@ -909,15 +904,6 @@ docs-ci = [
     { name = "mkdocs-material" },
     { name = "mkdocs-mermaid2-plugin" },
     { name = "pymdown-extensions" },
-]
-hf = [
-    { name = "accelerate" },
-    { name = "protobuf" },
-    { name = "safetensors" },
-    { name = "sentencepiece" },
-    { name = "tiktoken" },
-    { name = "torch" },
-    { name = "transformers" },
 ]
 precommit-ci = [
     { name = "pre-commit" },
@@ -938,15 +924,48 @@ security-ci = [
 
 [package.dev-dependencies]
 example-peft = [
+    { name = "accelerate" },
     { name = "peft" },
+    { name = "protobuf" },
+    { name = "safetensors" },
+    { name = "sentencepiece" },
+    { name = "tiktoken" },
+    { name = "torch" },
+    { name = "transformers" },
 ]
 example-torchao = [
+    { name = "accelerate" },
+    { name = "protobuf" },
+    { name = "safetensors" },
+    { name = "sentencepiece" },
+    { name = "tiktoken" },
+    { name = "torch" },
     { name = "torchao" },
+    { name = "transformers" },
+]
+hf = [
+    { name = "accelerate" },
+    { name = "protobuf" },
+    { name = "safetensors" },
+    { name = "sentencepiece" },
+    { name = "tiktoken" },
+    { name = "torch" },
+    { name = "transformers" },
+]
+runtime-test = [
+    { name = "accelerate" },
+    { name = "peft" },
+    { name = "protobuf" },
+    { name = "safetensors" },
+    { name = "sentencepiece" },
+    { name = "tiktoken" },
+    { name = "torch" },
+    { name = "torchao" },
+    { name = "transformers" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "accelerate", marker = "extra == 'hf'", specifier = ">=1.14.0" },
     { name = "build", marker = "extra == 'ci'", specifier = ">=0.10.0" },
     { name = "build", marker = "extra == 'dev'", specifier = ">=0.10.0" },
     { name = "build", marker = "extra == 'release-ci'", specifier = ">=0.10.0" },
@@ -967,15 +986,12 @@ requires-dist = [
     { name = "msgpack", marker = "extra == 'security-ci'", specifier = ">=1.2.1" },
     { name = "mypy", marker = "extra == 'ci'", specifier = "==2.3.1" },
     { name = "mypy", marker = "extra == 'dev'", specifier = "==2.3.1" },
-    { name = "peft", marker = "extra == 'ci'", specifier = "==0.20.0" },
-    { name = "peft", marker = "extra == 'dev'", specifier = "==0.20.0" },
     { name = "pillow", marker = "extra == 'ci'", specifier = ">=11.3,<13" },
     { name = "pillow", marker = "extra == 'dev'", specifier = ">=11.3,<13" },
     { name = "pip", marker = "extra == 'security-ci'", specifier = ">=26.2" },
     { name = "pip-audit", marker = "extra == 'security-ci'", specifier = ">=2.8" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=4.6.1" },
     { name = "pre-commit", marker = "extra == 'precommit-ci'", specifier = ">=4.6.1" },
-    { name = "protobuf", marker = "extra == 'hf'", specifier = ">=4.25" },
     { name = "pymdown-extensions", marker = "extra == 'dev'", specifier = ">=11.0.0" },
     { name = "pymdown-extensions", marker = "extra == 'docs-ci'", specifier = ">=11.0.0" },
     { name = "pytest", marker = "extra == 'ci'", specifier = ">=9.1.1" },
@@ -988,15 +1004,8 @@ requires-dist = [
     { name = "rich", specifier = ">=13.0" },
     { name = "ruff", marker = "extra == 'ci'", specifier = "==0.16.7" },
     { name = "ruff", marker = "extra == 'dev'", specifier = "==0.16.7" },
-    { name = "safetensors", marker = "extra == 'hf'", specifier = ">=0.8.0" },
-    { name = "sentencepiece", marker = "extra == 'hf'", specifier = ">=0.2.2" },
     { name = "setuptools", marker = "extra == 'ci'", specifier = ">=83.0.0" },
     { name = "setuptools", marker = "extra == 'release-ci'", specifier = ">=83.0.0" },
-    { name = "tiktoken", marker = "extra == 'hf'", specifier = ">=0.9.0" },
-    { name = "torch", marker = "extra == 'hf'", specifier = ">=2.11.0,!=2.12.0" },
-    { name = "torchao", marker = "extra == 'ci'", specifier = "==0.18.0" },
-    { name = "torchao", marker = "extra == 'dev'", specifier = "==0.18.0" },
-    { name = "transformers", marker = "extra == 'hf'", specifier = ">=5.14.1" },
     { name = "twine", marker = "extra == 'ci'", specifier = ">=4.0.0" },
     { name = "twine", marker = "extra == 'dev'", specifier = ">=4.0.0" },
     { name = "twine", marker = "extra == 'release-ci'", specifier = ">=4.0.0" },
@@ -1007,11 +1016,49 @@ requires-dist = [
     { name = "wheel", marker = "extra == 'dev'", specifier = ">=0.48.0" },
     { name = "wheel", marker = "extra == 'release-ci'", specifier = "==0.48.0" },
 ]
-provides-extras = ["hf", "dev", "ci", "docs-ci", "precommit-ci", "release-ci", "security-ci"]
+provides-extras = ["dev", "ci", "docs-ci", "precommit-ci", "release-ci", "security-ci"]
 
 [package.metadata.requires-dev]
-example-peft = [{ name = "peft", specifier = "==0.20.0" }]
-example-torchao = [{ name = "torchao", specifier = "==0.18.0" }]
+example-peft = [
+    { name = "accelerate", specifier = "==1.14.0+invarlock.1" },
+    { name = "peft", specifier = "==0.20.0" },
+    { name = "protobuf", specifier = ">=4.25" },
+    { name = "safetensors", specifier = ">=0.8.0" },
+    { name = "sentencepiece", specifier = ">=0.2.2" },
+    { name = "tiktoken", specifier = ">=0.9.0" },
+    { name = "torch", specifier = ">=2.11.0,!=2.12.0" },
+    { name = "transformers", specifier = ">=5.14.1" },
+]
+example-torchao = [
+    { name = "accelerate", specifier = "==1.14.0+invarlock.1" },
+    { name = "protobuf", specifier = ">=4.25" },
+    { name = "safetensors", specifier = ">=0.8.0" },
+    { name = "sentencepiece", specifier = ">=0.2.2" },
+    { name = "tiktoken", specifier = ">=0.9.0" },
+    { name = "torch", specifier = ">=2.11.0,!=2.12.0" },
+    { name = "torchao", specifier = "==0.18.0" },
+    { name = "transformers", specifier = ">=5.14.1" },
+]
+hf = [
+    { name = "accelerate", specifier = "==1.14.0+invarlock.1" },
+    { name = "protobuf", specifier = ">=4.25" },
+    { name = "safetensors", specifier = ">=0.8.0" },
+    { name = "sentencepiece", specifier = ">=0.2.2" },
+    { name = "tiktoken", specifier = ">=0.9.0" },
+    { name = "torch", specifier = ">=2.11.0,!=2.12.0" },
+    { name = "transformers", specifier = ">=5.14.1" },
+]
+runtime-test = [
+    { name = "accelerate", specifier = "==1.14.0+invarlock.1" },
+    { name = "peft", specifier = "==0.20.0" },
+    { name = "protobuf", specifier = ">=4.25" },
+    { name = "safetensors", specifier = ">=0.8.0" },
+    { name = "sentencepiece", specifier = ">=0.2.2" },
+    { name = "tiktoken", specifier = ">=0.9.0" },
+    { name = "torch", specifier = ">=2.11.0,!=2.12.0" },
+    { name = "torchao", specifier = "==0.18.0" },
+    { name = "transformers", specifier = ">=5.14.1" },
+]
 
 [[package]]
 name = "isoduration"

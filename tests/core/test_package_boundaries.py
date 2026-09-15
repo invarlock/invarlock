@@ -167,3 +167,21 @@ def test_core_enumeration_does_not_import_addin_or_guard_execution_modules() -> 
 def test_custom_observability_package_is_not_part_of_core() -> None:
     assert not list(OBSERVABILITY_ROOT.glob("*.py"))
     assert not (OBSERVABILITY_ROOT / "py.typed").exists()
+
+
+def test_public_extras_do_not_resolve_an_unqualified_model_runtime() -> None:
+    metadata = tomllib.loads(PYPROJECT_PATH.read_text(encoding="utf-8"))
+    extras = metadata["project"]["optional-dependencies"]
+    assert "hf" not in extras
+    forbidden = ("accelerate", "torch", "transformers", "peft", "torchao")
+    for requirements in extras.values():
+        assert not any(item.startswith(forbidden) for item in requirements)
+    vision = tomllib.loads((MULTIMODAL_ADDIN / "pyproject.toml").read_text())
+    assert "runtime" not in vision["project"].get("optional-dependencies", {})
+
+    groups = metadata["dependency-groups"]
+    assert "accelerate==1.14.0+invarlock.1" in groups["hf"]
+    for name in ("runtime-test", "example-peft", "example-torchao"):
+        assert {"include-group": "hf"} in groups[name]
+    assert metadata["tool"]["uv"]["find-links"] == ["runtime/wheels"]
+    assert (REPO_ROOT / "runtime/wheels/README.md").is_file()

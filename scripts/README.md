@@ -29,6 +29,11 @@ and security checks.
   Local installation checks and both release wheel jobs run this same inventory
   before optional add-ins are installed.
 - `security/` generates the SBOM and runs dependency vulnerability checks.
+  `build_hardened_accelerate_wheel.py bootstrap` authenticates the upstream
+  Accelerate build input and the deterministic hardened wheel in `runtime/wheels`
+  before repository runtime installation. Both CPU and CUDA images use the same
+  derivation. The audit retains the upstream vulnerability identity and requires
+  the exact derived artifact before recognizing the checkpoint remediation.
 - `authenticated_runtime_build.py` consumes an authenticated Git archive,
   validates Dockerfile base overrides as named `repository@sha256:...`
   manifest references, and can publish a no-clobber build statement. Raw local

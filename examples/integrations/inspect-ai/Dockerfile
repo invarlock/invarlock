@@ -30,6 +30,7 @@ RUN case "${EVALUATOR_RUNTIME}" in cpu|cu129) ;; *) exit 2 ;; esac \
       --no-compile \
       --no-deps \
       --require-hashes \
+      --find-links /opt/invarlock/runtime-wheels \
       -r /opt/invarlock/evaluator-locks/inspect-ai-runtime-requirements.txt \
     && python -m pip check \
     && python -c 'import importlib.metadata; assert importlib.metadata.version("inspect-ai") == "0.3.254"'

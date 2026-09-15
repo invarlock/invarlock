@@ -252,3 +252,23 @@ def test_coverage_gate_rejects_incomplete_execution(shards, checks, accepted):
         check=False,
     )
     assert (result.returncode == 0) is accepted
+
+
+def test_main_ci_runs_hardened_accelerate_apis_in_installed_linux_environment() -> None:
+    workflow = _load(".github/workflows/ci.yml")
+    for name in ("verify-fast", "verify-full"):
+        job = workflow["jobs"][name]
+        assert job["runs-on"] == "ubuntu-latest"
+        steps = job["steps"]
+        smoke = next(
+            step
+            for step in steps
+            if step.get("name") == "Check installed hardened Accelerate APIs"
+        )
+        assert smoke["run"] == "python -I tests/scripts/hardened_accelerate_checks.py"
+        assert "if" not in smoke
+        install = next(
+            step for step in steps if step.get("name") == "Install dependencies"
+        )
+        assert steps.index(install) < steps.index(smoke)
+        assert "--no-deps --force-reinstall dist/*.whl" in install["run"]

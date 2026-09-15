@@ -170,7 +170,8 @@ jobs:
           cache: npm
       - name: Install build tooling
         run: |
-          python -m pip install --require-hashes -r requirements/workflows/ci-hf-py313.txt
+          python scripts/security/build_hardened_accelerate_wheel.py bootstrap
+          python -m pip install --require-hashes --find-links runtime/wheels -r requirements/workflows/ci-hf-py313.txt
           python -m pip install --require-hashes -r requirements/workflows/docs-ci-py313.txt
           python -m pip install --require-hashes -r requirements/workflows/release-security-py313.txt
           python -m build --wheel --no-isolation
@@ -183,6 +184,7 @@ jobs:
       - name: Audit maintained dependency locks
         id: dependency_audit
         run: |
+          python scripts/security/build_hardened_accelerate_wheel.py bootstrap
           python scripts/security/cve_audit.py \
             --out-json artifacts/supply-chain/cve-audit.json \
             --out-md artifacts/supply-chain/cve-audit.md

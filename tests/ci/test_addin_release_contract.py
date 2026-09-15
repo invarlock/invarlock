@@ -73,21 +73,7 @@ def test_provider_addins_require_the_exact_matching_core_release() -> None:
     assert not any(
         str(item).startswith(("torch", "transformers")) for item in multimodal_base
     )
-    multimodal_dependencies = multimodal_project["optional-dependencies"]
-    assert isinstance(multimodal_dependencies, dict)
-    multimodal_runtime = multimodal_dependencies["runtime"]
-    assert isinstance(multimodal_runtime, list)
-    assert not any(str(item).startswith("pillow>=") for item in multimodal_runtime)
-    assert any(str(item).startswith("accelerate>=") for item in multimodal_runtime)
-    assert any(str(item).startswith("protobuf>=") for item in multimodal_runtime)
-    assert any(str(item).startswith("sentencepiece>=") for item in multimodal_runtime)
-    assert any(str(item).startswith("tiktoken>=") for item in multimodal_runtime)
-    assert any(str(item).startswith("torch>=") for item in multimodal_runtime)
-    assert any(str(item).startswith("torchvision>=") for item in multimodal_runtime)
-    assert any(str(item).startswith("transformers>=") for item in multimodal_runtime)
-    assert any(
-        str(item).startswith("safetensors>=0.8.0") for item in multimodal_runtime
-    )
+    assert "runtime" not in multimodal_project.get("optional-dependencies", {})
 
 
 def test_multimodal_smoke_exercises_the_current_runtime_surface() -> None:
@@ -95,7 +81,7 @@ def test_multimodal_smoke_exercises_the_current_runtime_surface() -> None:
 
     for expected in (
         "import accelerate, safetensors, torch, torchvision, transformers",
-        "accelerate.__version__ == '1.14.0'",
+        "accelerate.__version__ == '1.14.0+invarlock.1'",
         "safetensors.__version__ == '0.8.0'",
         "transformers.__version__ == '5.14.1'",
         "_resolve_vision_text_model_loader",
@@ -163,3 +149,11 @@ def test_optional_judge_sdk_has_hashed_release_gate_without_source_shadowing() -
     release = (REPO_ROOT / ".github/workflows/release.yml").read_text()
     assert "make addins-install-smoke inspect-judge-sdk-test" in ci
     assert "bash scripts/inspect_judge_sdk_gate.sh" in release
+
+
+def test_runtime_image_build_contexts_include_declared_addin_licenses() -> None:
+    dockerignore = (REPO_ROOT / ".dockerignore").read_text()
+    for name in ("gguf", "multimodal", "tensorrt_llm"):
+        dockerfile = (ADDINS[name] / "runtime/Dockerfile").read_text()
+        assert f"addins/{name}/LICENSE /addin/" in dockerfile
+        assert f"!addins/{name}/LICENSE" in dockerignore

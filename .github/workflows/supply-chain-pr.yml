@@ -34,6 +34,7 @@ jobs:
 
       - name: Audit maintained dependency locks
         run: |
+          python scripts/security/build_hardened_accelerate_wheel.py bootstrap
           python scripts/security/cve_audit.py \
             --out-json artifacts/supply-chain/cve-audit.json \
             --out-md artifacts/supply-chain/cve-audit.md
@@ -359,9 +360,8 @@ jobs:
           . .hf-venv/bin/activate
           python -m pip install --upgrade --require-hashes -r requirements/workflows/pip-bootstrap.txt
           python -m pip install dist/*.whl --no-deps --no-compile
-          python -m pip install --no-compile --require-hashes -r requirements/workflows/hf-py313.txt
-          python -m pip download --no-deps --only-binary=:all: \
-            --dest .hf-audit-wheels accelerate==1.14.0
+          python scripts/security/build_hardened_accelerate_wheel.py bootstrap
+          python -m pip install --no-compile --require-hashes --find-links runtime/wheels -r requirements/workflows/hf-py313.txt
           site_packages="$(python - <<'PY'
           import site
           paths = site.getsitepackages()
@@ -375,11 +375,11 @@ jobs:
           python scripts/security/run_pip_audit.py \
             --path "${{ steps.hf_surface.outputs.site_packages }}" \
             --installed-lock requirements/workflows/hf-py313.txt \
-            --installed-lock-sha256 e7e1564252e03538f2ff66c730db66ff1478de66777beb621e129264a66a310e \
+            --installed-lock-sha256 034d95f20a71249b0321ac33d50f6b1eb9b16773ae891a2a43d3efe4fca64ec9 \
             --installed-bootstrap-lock requirements/workflows/pip-bootstrap.txt \
             --installed-bootstrap-lock-sha256 8639968bea3cd8bc234d2a6d38f2c54e5d1b09c3474ac954278c99c2fa44e944 \
             --installed-project-wheel dist/*.whl \
-            --installed-wheel .hf-audit-wheels/accelerate-1.14.0-py3-none-any.whl \
+            --installed-wheel runtime/wheels/accelerate-1.14.0+invarlock.1-py3-none-any.whl \
             --report artifacts/supply-chain/hf-pip-audit.json
 
       - name: Upload HF installed audit
