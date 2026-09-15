@@ -57,8 +57,10 @@ distributions: `invarlock`, `invarlock-diagnostics`,
 `invarlock-runtime-tensorrt-llm`, and `invarlock-inspect-judge`. The optional
 packages live under `addins/`; their provider-specific runtime dependencies
 stay outside the core wheel.
-Candidate and published core wheels exercise the standalone captured-evaluation workflow,
-including signing, independent verification, reports, and rejection exit codes,
+Candidate and published core wheels use `scripts/release/core_wheel_consumers.py`,
+the same consumer suite as local installed-wheel validation. It stages quickstart,
+captured, judge, three-scorer and retained approval journeys outside the checkout
+and checks signing, independent verification, reports and rejection exit codes
 before the optional packages are installed.
 
 ## Local checks

@@ -4,7 +4,7 @@ This retained pilot contains 480 complete judge trials: 40 frozen cases per
 workflow, two answers per case and three ratings per answer. Both grounded QA
 and slot extraction are `insufficient_evidence` because their 40-unit effect
 intervals have width `1.007489336443204`, above the frozen maximum of `1`.
-These are advisory policy results and do not activate the final plans.
+These are advisory policy results for the pilot schedule.
 
 ## What is retained
 
@@ -57,8 +57,9 @@ model names alone.
 
 Repetitions are clustered within answers, and answer pairs are clustered within
 cases; the 240 ratings per workflow are not independent tasks. Sol ratings are
-not human truth. Matching Sol does not establish accuracy, while disagreement
-does not establish that Luna is wrong. The configurations ran in separate
+not an independent correctness standard. Matching Sol does not establish
+accuracy, while disagreement does not establish that Luna is wrong. The
+configurations ran in separate
 observation windows under a rate-limited collector, so their durations are not
 a general latency comparison.
 
@@ -84,20 +85,20 @@ both workflows. A required recipient cannot accept the retained advisory
 evidence. The independently obtained archive pin gives authority to the included
 public-key anchors; keys copied from an untrusted submitted package would not.
 
-## Human review and claim limits
+## Claim limits
 
-The unchanged pilot archive records pending human labels and inactive final
-plans; the subsequent comparison is linked below. This reference does
-not establish human agreement, judge accuracy, rubric validity, inter-rater
-reliability, broad model quality, model equivalence or deployment approval.
+This pilot measures the judge's ratings under the frozen rubric. It does not
+establish agreement with independent reference labels, judge accuracy, rubric
+validity, inter-rater reliability, broad model quality, model equivalence or
+deployment approval.
 Hosted model identity does not reveal or authenticate model weights. Replay
 checks the recorded signed evidence and does not repeat or independently attest
 the provider execution.
 
 The archive contains judge outcomes and answer roles. Keep it from blinded
 reviewers until their labels are frozen; provide only the separate blinded review
-sheets in the [frozen-answer reference](../k2-32b/README.md). No human sheets,
-final-validation holdout, private keys, credential material, operator
+sheets in the [frozen-answer reference](../k2-32b/README.md). No reference-rating
+sheets, final-validation holdout, private keys, credential material, operator
 authorization, collector console logs or checkpoint files are included.
 Preserve the original dataset terms when redistributing retained text; SQuAD's
 software MIT license does not relicense all Wikipedia-derived dataset material,
@@ -106,6 +107,5 @@ and SGD-derived data remains under CC BY-SA 4.0.
 ## Subsequent comparison
 
 The [completed Luna held-out reference](../k2-32b-luna-xhigh-heldout/README.md)
-contains separate final measurements and AI-review results. Review status inside
-this pilot archive describes the retained snapshot; it does not describe the
-subsequent comparison or change this pilot outcome.
+contains separate final measurements and a reference-label comparison. The pilot
+archive retains its original study metadata and insufficient-evidence outcome.

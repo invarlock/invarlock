@@ -29,8 +29,8 @@ extension pack-v1 evidence. [Captured comparisons](../user-guide/captured-result
 authenticate supplied case facts and replay, with independent run/request pins.
 [Judge evidence](../reference/judge-measurements.md) adds a bounded measurement
 plan, retained ratings and its own recipient policy; native judge evidence also
-retains runtime provenance. Judge agreement with humans and broader model quality
-require separate validation and do not follow from a passing receipt.
+retains runtime provenance. Judge accuracy and broader model quality require
+separate validation and do not follow from a passing receipt.
 
 ## Top-level claim
 

@@ -6,10 +6,10 @@ new judge outcomes. Pilot review uses 40 cases per workflow. Final membership
 is frozen at 422 QA clusters and 1,288 extraction clusters; final-validation
 review uses 80 cases per workflow, balanced across its two strata.
 
-**Final plans are candidates pending pilot rubric review.** Only pilot plans
-are executable measurement-plan documents. Final plans and policies remain
-inside an explicit candidate wrapper until the pilot review confirms or revises
-the rubric. Changing the rubric must preserve frozen final membership.
+The archive preserves executable pilot plans and final plans and policies inside
+explicit candidate wrappers. These are the original study inputs; the separate
+[held-out reference](../k2-32b-luna-xhigh-heldout/README.md) retains executed final
+plans and measurements. Changing a rubric must preserve frozen final membership.
 
 From the source checkout with InvarLock installed, validate without model calls:
 
@@ -27,9 +27,9 @@ rechecks every original source block, endpoint, protocol and planned QA case.
 Internal consistency does not independently authenticate omitted original files.
 
 For selection rules, exact frozen protocol and the build command, see the
-[K2 reference guide](../../K2-REFERENCE.md). Give human reviewers only the
-appropriate rubric-development or final-validation sheet from the archive,
-keeping source roles and native scores withheld until their judgments are frozen.
+[K2 reference guide](../../K2-REFERENCE.md). For a blinded label comparison, use
+only the appropriate rubric-development or final-validation sheet from the archive,
+keeping source roles and native scores withheld until the labels are frozen.
 The sheet itself contains the frozen rubric, allowed labels and empty rating and
 notes fields needed to record the review.
 
@@ -40,8 +40,8 @@ README files and pinned dataset source metadata are inside the archive.
 
 The separate [judge pilot reference](../k2-32b-pilot/README.md) retains corrected
 measurements, signed replay receipts and the original incomplete history. This
-frozen-answer archive remains unchanged; human rubric review and final-plan
-activation are still pending. Keep the judge outcomes from blinded reviewers.
+frozen-answer archive remains unchanged. Judge outcomes are separate from the
+blinded rating sheets.
 
 The [Luna xHigh pilot reference](../k2-32b-luna-xhigh-pilot/README.md) repeats
 the same pilot schedule with a different judge configuration and retains a

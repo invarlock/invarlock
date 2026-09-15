@@ -316,8 +316,8 @@ rest when their classification requires it; use encrypted transport; restrict
 read access independently from signing authority; and define retention and
 deletion periods before evaluation. Public-evidence screening detects selected
 disclosure patterns, not every secret, identifier, copyrighted passage, or
-personal-data category. A human or domain-specific disclosure review remains
-required before publication.
+personal-data category. Apply the publication owner's domain-specific disclosure
+review before publication.
 
 Keep the immutable evidence bundle for as long as the decision must remain
 auditable. Retain receipts and the historical evidence-signer and verifier authorization

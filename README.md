@@ -98,6 +98,13 @@ for the complete claim boundary and assumptions.
 
 ## Check captured evaluation results
 
+The examples on this branch describe its source revision. Install that checkout
+as shown below, or use a wheel built from it with matching example files. Retain
+the source commit and wheel SHA-256 when sharing a local build; development
+version metadata alone does not identify it. For a published wheel, use the
+documentation and examples from its matching release tag, as described in
+[matching wheels and examples](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/getting-started.md#matching-wheels-and-examples).
+
 The core wheel scores existing evaluation records using exact match, normalized
 NLL or judge measurements. Deterministic extensions also cover normalized labels,
 numeric tolerances, structured fields and token overlap. Exact match and NLL
@@ -105,7 +112,8 @@ replay retained facts offline. Judge requests can import retained calls or colle
 new ratings under explicit budgets without regenerating the evaluated answers.
 
 ```bash
-python -m pip install invarlock
+# From the reviewed source checkout:
+python -m pip install .
 invarlock evaluate request.yaml --signing-key signing-key.pem
 invarlock verify evidence/ --trust-profile trust/trust-inputs.json \
   --receipt verification.receipt.json
@@ -143,8 +151,8 @@ baseline and subject answers, freezes their runtime provenance, and grades them
 under one declared rubric and judge configuration. The policy fixes the cases, independent
 units, rating scale, repetitions, model identity and decision thresholds before
 model execution. Answer and rendered-request digests are derived automatically
-from the frozen captures. Evidence retains each request,
-response, error, attempt, and source mapping so a recipient can authenticate and
+from the frozen captures. Evidence retains requests, responses, sanitized error
+outcomes, attempts and source mappings so a recipient can authenticate and
 replay the comparison offline.
 
 ```bash

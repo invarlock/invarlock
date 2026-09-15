@@ -2,13 +2,19 @@
 
 Judge evidence compares repeated ratings of frozen baseline and subject answers
 under one declared rubric. The `text-frozen-answer-v1` profile retains accessible
-requests, responses, errors, attempts and source mappings for offline replay.
+requests, responses, sanitized error outcomes, attempts and source mappings for
+offline replay. Failed calls omit private raw error/response details; their
+admission and full budget reservation remain recorded.
 
 !!! info "Reference"
 
     - **Surface:** Judge request, measurement, analysis and evidence contracts
     - **Stability:** Additive versioned formats; native metric selection and separately scoped judge evidence
     - **Use this page when:** Running a native judge scorer, importing ratings or reviewing judge evidence
+
+Use the core wheel, optional collection package and example files from the same
+source revision. For released packages, use their matching release documentation;
+see [matching wheels and examples](../user-guide/getting-started.md#matching-wheels-and-examples).
 
 ## Native scorer
 
@@ -219,6 +225,11 @@ provider-client retries, no tools or cache, and no inherited model settings.
 An admitted call without a retained result is an ambiguous timeout that cannot
 be retried. `verify` and `report` make no provider calls.
 
+Each available provider response ID must identify exactly one retained Inspect
+call across trials, source segments and resumed collection. Reusing a response
+under a new local event ID is rejected. Generic retained-record imports keep
+their own declared source identity semantics.
+
 `openai/gpt-5.6-sol` and `openai/gpt-5.6-luna` additionally require an explicit
 non-null `reasoning_effort` in their approved plans. The Inspect adapter passes
 that exact value to the SDK and requires the retained provider request to match
@@ -229,7 +240,11 @@ pilot completed all planned calls, while both 40-unit analyses remained
 maximum. The earlier pilot omitted this control and remains a separate
 incomplete run. See the
 [retained pilot and offline replay](https://github.com/invarlock/invarlock/tree/main/examples/judge-measurements/references/k2-32b-pilot).
-Human rubric review and final-plan activation remain pending.
+The completed [Luna held-out reference](https://github.com/invarlock/invarlock/tree/main/examples/judge-measurements/references/k2-32b-luna-xhigh-heldout)
+retains both executed final plans, all 10,260 ratings and the completed
+reference-label comparison. The original pilot archive remains unchanged.
+Rubric development and reference-label review are study-design choices, not
+additional requirements of the native judge workflow.
 
 Install matching packages and use the installed command:
 
@@ -258,6 +273,9 @@ offline import. The optional `execution.collection.scorer_id` defaults to `judge
 after changing only the final output destination. Runtime resource profiles,
 installed deterministic scorer execution and bootstrap overrides do not apply to
 frozen-answer v3 requests; they retain their normal meaning for native v1 requests.
+
+Cost admission uses the declared per-call reservation. Retained token use and
+available SDK cost fields support accounting, but do not verify a provider invoice.
 
 ## Replay, authentication and acceptance
 
@@ -356,6 +374,12 @@ selection changes presentation only and the complete measurement set is still
 replayed.
 JUnit records regression as failure and insufficient evidence as error. The
 current request carries one metric; it uses the shared metric presentation.
+
+The primary gate table shows the measured interval endpoints and required
+directional threshold, along with completeness, independent-unit count and
+precision requirements. It distinguishes evidence of a violation from bounds
+that remain inconclusive. Method and family-confidence information apply to the
+declared fixed benchmark; required and advisory roles remain explicit.
 
 ## Statistical scope
 

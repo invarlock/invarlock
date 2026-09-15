@@ -6,6 +6,11 @@ It preserves selected raw records, complete source metadata, an outcome-free
 eligible inventory, source-file hashes and row mappings, endpoint identities,
 protocol/model snapshots, source attribution and license notices.
 
+This optional reference-study workflow documents frozen selection, rubric
+development and comparison against separately recorded labels. Native judge
+evaluation uses its declared recipe directly; these study helpers are not
+additional execution or acceptance requirements.
+
 ```bash
 python examples/judge_measurements_reference.py build \
   --campaign-root campaign \
@@ -61,13 +66,12 @@ The retained campaign yields:
 | English grounded QA | 3,600 | 462 | 40 | 422 | 219 answerable; 203 unanswerable |
 | Slot extraction | 4,000 | 1,328 | 40 | 1,288 | 706 has span; 582 empty span |
 
-Rubric-development review includes all 40 pilot cases per workflow. Complete it
-before declaring the final rubric and plan immutable. Current final plans are
-candidates pending pilot review: confirm the rubric unchanged or regenerate the
-plans before any final call. Keep the already frozen final membership unchanged.
-Each `final/candidate_plan.json` wraps the candidate plan and policy; it is not
-an executable measurement-plan document. Only `pilot/plan.json` is executable
-at this stage.
+The reference study uses all 40 pilot cases per workflow for rubric development
+before freezing the final rubric and plan. Preserve the already frozen final
+membership if the rubric changes. In the original frozen-answer archive, each
+`final/candidate_plan.json` wraps the candidate plan and policy; it is not an
+executable measurement-plan document. Its `pilot/plan.json` files are executable.
+The separate held-out reference retains the executed final plans.
 
 Untouched final-validation review selects 40 cases per stratum from final using
 its own hash ranking. Give reviewers only the appropriate file under
@@ -113,20 +117,20 @@ Retained source notices distinguish the SQuAD software's MIT license from datase
 and Wikipedia-derived material. Preserve the source terms and attribution;
 source-derived data does not inherit the software repository's Apache license.
 
-## Complete a human review and activate a final plan
+## Optional reference labels and final-plan derivation
 
-The maintained helper `examples/judge_measurements_review.py` accepts one
-reviewer's completed sheet. Give that reviewer only the blinded sheet and have
-them fill both response rating fields for every case. Keep the order, prompts,
+The study helper `examples/judge_measurements_review.py` accepts one completed
+reference-rating sheet. For a blinded comparison, supply only the blinded sheet
+and record both response rating fields for every case. Keep the order, prompts,
 answers, rubric, scale and IDs unchanged. Optional notes are limited to 4,096
 UTF-8 bytes per case. Use a pseudonymous reviewer identifier in retained records.
 
 Before collecting judgments, freeze the descriptive comparison protocol:
 `single-reviewer-exact-label-v1` compares each scheduled judge repetition to the
-one human rating for that answer. It reports exact matches, confusion counts and
-missing-trial coverage. Missing trials are excluded from the agreement denominator
-and remain visible in coverage. Repeated calls do not increase the human sample
-size. This protocol sets no agreement pass threshold and estimates neither
+one reference rating for that answer. It reports exact matches, confusion counts
+and missing-trial coverage. Missing trials are excluded from the agreement denominator
+and remain visible in coverage. Repeated calls do not increase the reference
+sample size. This protocol sets no agreement pass threshold and estimates neither
 inter-rater reliability nor population accuracy. The operator must explicitly
 confirm the rubric or require a revision; a numerical agreement score cannot
 make that decision automatically.
@@ -153,7 +157,7 @@ revealing case IDs and baseline/subject orientation in `reconciled-labels.json`.
 It replays supplied measurements against the exact frozen plan and answer runs;
 measurements from a different plan or answer set cannot be used.
 
-`--activate` requires every pilot response to have an allowed human rating, the
+`--activate` requires every pilot response to have an allowed reference rating, the
 explicit `rubric_confirmed` outcome and complete retained pilot measurements. It
 copies the exact candidate `plan.json` and `analysis_policy.json` into the review
 output, preserving frozen final membership. Retain `review-record.json` and all
@@ -174,7 +178,7 @@ rubric while still describing that final subset as untouched validation.
 ## Completed held-out comparison
 
 The [Luna xHigh held-out reference](references/k2-32b-luna-xhigh-heldout/README.md)
-retains all 10,260 ratings, signed offline replay and separate AI-review results.
-Both frozen comparison policies pass; this does not establish improvement or
-independent-human judge accuracy. The original candidate files and pilot archives
-remain unchanged.
+retains all 10,260 ratings, signed offline replay and the completed reference-label
+comparison. Both frozen comparison policies pass; this does not establish
+improvement or general judge accuracy. The original candidate files and pilot
+archives remain unchanged.
