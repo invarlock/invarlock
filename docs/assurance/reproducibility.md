@@ -130,7 +130,7 @@ The verifier checks each external value against the corresponding:
 - request/evidence cross-bindings.
 
 Every digest anchor is exact. A different artifact identity, schedule, or image
-digest fails verification even when a human-readable locator or source file
+digest fails verification even when a displayed locator or source file
 appears equivalent.
 
 ## Rerun control matrix

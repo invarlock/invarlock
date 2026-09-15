@@ -434,9 +434,9 @@ Bounds entirely beyond tolerated degradation establish regression; bounds that
 still straddle the decision boundary remain inconclusive. Minimum-unit and
 precision checks also apply, and incomplete scheduled trials prevent complete-
 case inference. `decision_role: required` controls the conjunction of metrics;
-advisory metrics cannot independently authorize recipient acceptance. This is
-a policy role, not a human-review request. Optional reference-label studies
-assess the judge's usefulness but are not inputs required by runtime replay.
+advisory metrics cannot independently authorize recipient acceptance.
+Optional reference-label studies assess the judge's usefulness but are not
+inputs required by runtime replay.
 See [judge statistics](../reference/judge-measurements.md#statistical-scope).
 
 ## Verifier-owned replay

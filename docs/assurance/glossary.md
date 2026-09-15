@@ -51,7 +51,7 @@
 **Comparison ID**
 : For native pack-v1, a stable identifier derived from the normalized request,
   authenticated artifact identities, schedule and policy bytes, runtime digests, and paired records.
-  It identifies one closed comparison; it is not a human authorization.
+  It identifies one closed comparison.
 
 **Comparison report**
 : For native pack-v1, the current `invarlock/comparison-report-v3` document
@@ -201,7 +201,7 @@
 
 **Required decision role**
 : A judge analysis policy setting that includes a metric in the required
-  conjunction. It does not require human review. Advisory results remain
+  conjunction. Advisory results remain
   visible but cannot independently establish recipient acceptance.
 
 **Verifier**

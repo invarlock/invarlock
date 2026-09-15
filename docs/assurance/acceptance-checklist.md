@@ -138,7 +138,7 @@ verifier's signed result; its contract differs from native and captured receipts
 See [judge verification](../reference/judge-measurements.md).
 
 A judge policy's `decision_role: required` makes that metric part of the required
-conjunction; it does not request human approval. Reference-label studies and
+conjunction. Reference-label studies and
 independent reruns can support a broader reliance decision but are not runtime
 prerequisites. Optional per-case references are judge inputs only when the
 plan selects `reference_mode: per_case`; they are separate from such studies.

@@ -136,7 +136,7 @@ def select(
             review.append(row["id"])
             count[stratum] += 1
     if any(count[s] != sizes["human_review"] for s in WORKFLOWS[workflow]):
-        raise ValueError("infeasible human review selection")
+        raise ValueError("infeasible reference-label selection")
     result["human_review"] = review
     return result
 

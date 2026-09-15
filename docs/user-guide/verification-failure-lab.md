@@ -80,7 +80,7 @@ Expected result: the evidence remains authentic and integrity-valid, the
 replayed policy verdict is `fail`, verification exits `7`, and
 `policy-rejected.receipt.json` is a verifier-signed rejection. This is a valid
 measurement outcome rather than an infrastructure or cryptographic failure.
-Evaluation itself exits `0` because evidence publication succeeded. Its human
+Evaluation itself exits `0` because evidence publication succeeded. Its terminal
 summary shows the recorded policy failure separately from publication; recipient
 verification has not yet occurred at that point.
 

@@ -195,7 +195,7 @@ receipt file alone does not establish acceptance.
 
 Use `--json` in automation. A successful result includes the core verifier
 fields plus the receipt path and verifier identity. Check the structured
-meaning rather than a human substring:
+fields instead of matching fragments of terminal output:
 
 ```json
 {

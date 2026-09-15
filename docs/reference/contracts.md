@@ -203,7 +203,7 @@ Each comparison side has the same closed shape:
 
 | Path | Type | Requirement | Meaning |
 | --- | --- | --- | --- |
-| `artifact.model_id` | String | Yes | Human-stable artifact name; URL syntax is rejected |
+| `artifact.model_id` | String | Yes | Display name for the artifact; URL syntax is rejected |
 | `artifact.locator` | String | Yes | Portable source locator bound into request intent |
 | `artifact.path` | Safe relative path | Required in run mode | Artifact path below the request root |
 | `runtime.provider` | Provider name | Yes | Selected runtime-provider ABI implementation |
@@ -271,8 +271,8 @@ callers supply `ScorerExtensionRegistry(allow_installed=False)`. Their exact
 version, descriptor and configuration bindings remain mandatory. Additional
 implementations, such as a VQA normalization scorer, require separate
 installation or caller injection and explicit authorization. SQL or code
-execution, model-based semantic similarity, network services, human review, and
-LLM judges require different trust contracts. The bounded
+execution, model-based semantic similarity, network services, externally
+supplied ratings, and LLM judges require different trust contracts. The bounded
 frozen-answer judge formats provide one such contract for their declared text
 profile; other judge outputs can be attached as authenticated observations
 without acceptance authority.

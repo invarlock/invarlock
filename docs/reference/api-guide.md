@@ -181,7 +181,7 @@ else:
     assert result.runtime_records() == ()
 ```
 
-`runtime_records()` never exposes records for aggregate-only, human-review,
+`runtime_records()` never exposes records for aggregate-only, externally rated,
 nondeterministic-judge, or unsupported-replay profiles. See [Evaluator
 qualification](evaluator-qualification.md) for the contracts, private
 evaluator path, and maintained matrix.
