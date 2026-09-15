@@ -195,6 +195,95 @@ def _captured_record_context(records: list[dict[str, Any]]) -> dict[str, Any]:
     return result
 
 
+def _interval_observed(interval: dict[str, Any] | None) -> str:
+    if interval is None:
+        return "Unavailable; incomplete planned schedule"
+    return (
+        f"mean {interval['mean']}; lower {interval['lower']}; upper {interval['upper']}"
+    )
+
+
+def _policy_checks(
+    analysis: dict[str, Any], policy: dict[str, Any]
+) -> tuple[CheckView, ...]:
+    """Expose numerical requirements without recomputing inference decisions."""
+    counts = analysis["counts"]
+    role = policy["decision_role"]
+    complete = counts["incomplete_trials"] == 0
+    checks = [
+        CheckView(
+            name="Schedule completeness",
+            observed=f"{counts['completed_trials']}/{counts['expected_trials']} completed trials",
+            required=f"{counts['expected_trials']}/{counts['expected_trials']} completed trials ({role})",
+            passed=True if complete else None,
+        ),
+        CheckView(
+            name="Independent units",
+            observed=f"{counts['complete_units']} complete / {counts['scheduled_units']} scheduled",
+            required=f"at least {policy['minimum_units']} complete independent units ({role})",
+            passed=True
+            if complete and counts["complete_units"] >= policy["minimum_units"]
+            else None,
+        ),
+    ]
+    gates = {gate["name"]: gate for gate in analysis["gates"]}
+    names = ["paired_effect"]
+    if policy["subject_bound"] is not None:
+        names.append("subject_bound")
+    for name in names:
+        interval = analysis[
+            "effect_interval" if name == "paired_effect" else "subject_interval"
+        ]
+        gate = gates.get(name)
+        decision = gate["decision"] if gate else "insufficient_evidence"
+        width = None
+        if interval is not None:
+            with localcontext(Context(prec=100)):
+                width = Decimal(interval["upper"]) - Decimal(interval["lower"])
+        checks.append(
+            CheckView(
+                name=f"{name} precision",
+                observed=str(width) if width is not None else "Unavailable",
+                required=f"interval width <= {policy['maximum_interval_width']} ({role})",
+                passed=True
+                if width is not None
+                and width <= Decimal(policy["maximum_interval_width"])
+                else None,
+            )
+        )
+        threshold = Decimal(
+            policy["allowed_degradation"]
+            if name == "paired_effect"
+            else policy["subject_bound"]
+        )
+        if name == "paired_effect" and policy["direction"] == "higher":
+            threshold = threshold.copy_negate()
+        requirement = (
+            f"lower >= {threshold}; adverse if upper < {threshold}"
+            if policy["direction"] == "higher"
+            else f"upper <= {threshold}; adverse if lower > {threshold}"
+        )
+        outcome = {
+            "pass": "satisfied",
+            "regression": "adverse",
+            "insufficient_evidence": "inconclusive",
+        }[decision]
+        checks.append(
+            CheckView(
+                name=name,
+                observed=f"{_interval_observed(interval)}; {outcome}",
+                required=f"{requirement} ({role})",
+                passed=True
+                if decision == "pass"
+                else False
+                if decision == "regression"
+                else None,
+                explanation=", ".join(gate["reasons"] if gate else analysis["reasons"]),
+            )
+        )
+    return tuple(checks)
+
+
 def _view(
     publication: Any,
     artifacts: dict[str, dict[str, Any]],
@@ -217,20 +306,7 @@ def _view(
     }[analysis["decision"]]
     if analysis["reasons"]:
         explanation += " " + ", ".join(analysis["reasons"])
-    checks = tuple(
-        CheckView(
-            name=gate["name"],
-            observed=gate["decision"],
-            required="pass" if required else "pass (advisory only)",
-            passed=True
-            if gate["decision"] == "pass"
-            else False
-            if gate["decision"] == "regression"
-            else None,
-            explanation=", ".join(gate["reasons"]),
-        )
-        for gate in analysis["gates"]
-    )
+    checks = _policy_checks(analysis, policy)
     # Floats are display geometry only. Decision arithmetic and exact strings are retained.
     interval = None
     if effect is not None:
@@ -252,6 +328,10 @@ def _view(
     baseline_mean = (
         _baseline_mean(plan, artifacts["measurements"]) if subject is not None else None
     )
+    with localcontext(Context(prec=100)):
+        confidence = (
+            format((1 - Decimal(policy["alpha"])) * 100, "f").rstrip("0").rstrip(".")
+        )
     metric = MetricView(
         name=policy["metric_name"],
         scope="Fixed benchmark; equal independent-unit weights"
@@ -278,6 +358,18 @@ def _view(
             else "Decision role: advisory; this metric does not gate required decisions.",
             f"Allowed degradation: {policy['allowed_degradation']} ({policy['direction']} is better).",
             f"Minimum units: {policy['minimum_units']}; maximum interval width: {policy['maximum_interval_width']}.",
+            f"Two-sided Hoeffding intervals ({analysis['method']}); family confidence at least {confidence}% "
+            f"(alpha {policy['alpha']}; comparison family size {policy['comparison_family_size']}); "
+            "Bonferroni error allocation alpha / comparison family size per interval.",
+            "Effect is subject minus baseline; tabulated interval endpoints and widths retain analysis precision.",
+            "Inconclusive checks do not establish a bound: completeness, minimum units and precision must be met before an interval can establish satisfaction or an adverse result.",
+            *(
+                (
+                    f"Subject interval (descriptive; no subject bound configured): {_interval_observed(subject)}.",
+                )
+                if policy["subject_bound"] is None
+                else ()
+            ),
             "Baseline and subject means describe the same complete schedule with equal independent-unit weights.",
             "Repetitions do not increase the number of independent units.",
         ),
