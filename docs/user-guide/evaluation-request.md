@@ -338,9 +338,10 @@ scorer_extension:
 
 The digests are illustrative. The descriptor binds supported tasks, text
 output, configuration schema, replay mode, unit-interval value semantics,
-arithmetic-mean aggregation, higher-is-better direction, and disabled network,
-external-model, and human judgment. The configuration digest covers canonical
-JSON configuration bytes.
+arithmetic-mean aggregation and higher-is-better direction. Network access,
+external models and externally assigned ratings are excluded from deterministic
+extension replay. The configuration digest covers canonical JSON configuration
+bytes.
 
 Providers collect ordinary authenticated text outputs. The scorer receives
 exactly `expected_output`, `output_text`, and `output_sha256` for each ordered
@@ -360,7 +361,7 @@ Replay runs twice and must produce byte-identical canonical results.
 
 Separately installed and explicitly authorized scorer packages may implement
 deterministic token F1, structured extraction, or VQA answer normalization. SQL
-or code execution, model-based semantic similarity, network and human scoring,
+or code execution, model-based semantic similarity, network services and externally assigned ratings,
 external models, and LLM judges are excluded from the scorer-extension contract.
 Use the built-in [`judge` scorer](#judge) for bounded rubric-based text grading
 with its separate collection and replay contract.

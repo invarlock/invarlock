@@ -132,7 +132,7 @@ acceptance and decision fields. A local result can be unsigned; an optional
 judge receipt authenticates that result for handoff under its own receipt
 contract. See [judge measurements](../reference/judge-measurements.md).
 
-An upstream judge or human scalar may be evaluated as a captured `recorded`
+An externally assigned scalar rating may be evaluated as a captured `recorded`
 metric when policy explicitly approves its provenance. That verifies retained
 scores and their aggregation, not the original judgment or the bounded judge
 trial contract. Judge accuracy studies are complementary evidence selected by
@@ -221,8 +221,8 @@ policy pins the scorer ID, version, descriptor digest, and configuration
 digest. The registry must resolve that exact binding, and replay must produce
 the same canonical result twice. Scorer code is part of the verifier's trusted
 computing base: review and distribute it with the same discipline as verifier
-code. A deterministic extension scorer must not use a network, external model, human
-judgment, or LLM judge. InvarLock checks the authenticated scorer identity and
+code. A deterministic extension scorer must not use a network, external model, externally assigned
+ratings, or LLM judge. InvarLock checks the authenticated scorer identity and
 deterministic replay; it does not sandbox extension code or prove those
 operational restrictions. The native `judge` scorer collects or imports bounded
 ratings under a separate evidence and recipient-policy contract. Only live

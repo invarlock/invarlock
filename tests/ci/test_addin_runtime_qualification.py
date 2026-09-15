@@ -662,7 +662,7 @@ def _qualification_case(
         "source_bundle": source_bundle,
         "candidate_manifest": candidate_manifest,
         "summary": inputs / "qualification summary.json",
-        "report": inputs / "human report.html",
+        "report": inputs / "terminal report.html",
         "resource_root": inputs / "vision resources",
         "content_store": "image content store",
     }

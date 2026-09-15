@@ -1,11 +1,10 @@
 """Verifier-replayable scorer extension boundary.
 
-Exact match and normalized NLL remain package-owned acceptance metrics.  This
-module defines the smaller boundary for optional, task-specific scorers: an
-authorized installed extension receives only authenticated per-record facts and
-returns finite per-record values plus one deterministic aggregate.  Network,
-external-model, and human/LLM judgment are deliberately outside this acceptance
-boundary.
+This module defines the boundary for optional deterministic text scorers. An
+authorized extension receives authenticated per-record facts and returns finite
+per-record values. Network services, external models and externally assigned
+ratings are outside this extension boundary. The native judge scorer uses its
+own retained-measurement contract.
 
 Extensions do not define aggregate or direction semantics.  Every replayed
 record value is a finite unit-interval score where higher is better, and core
@@ -241,8 +240,8 @@ class ScorerExtensionDescriptor:
             or self.uses_human_judgment is not False
         ):
             raise ScorerExtensionError(
-                "network, external-model, human, and LLM judges are not eligible "
-                "for acceptance replay"
+                "network services, external models, and externally assigned ratings "
+                "are not eligible for deterministic extension replay"
             )
 
 

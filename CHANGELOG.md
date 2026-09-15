@@ -769,7 +769,7 @@ from the same canonical JSON.
   acceptance ranges, and render accuracy deltas consistently in percentage
   points.
 - Shared report-outline facts with Markdown reports and `report explain` so
-  the human Markdown, HTML, and CLI explain surfaces expose the same high-level
+  the Markdown, HTML, and CLI explain surfaces expose the same high-level
   decision, policy, and guard-signal facts before their detailed sections.
 - Made `report explain --evaluation-report` explain the supplied
   `evaluation.report.json` directly so portable reviewer bundles no longer need

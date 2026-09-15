@@ -607,6 +607,7 @@ and constructs new score-free evaluation records. It does not rerun generation,
 change native scores, assert native runtime qualification, or imply endorsement by
 model or dataset authors.
 """
+# Retained v1 reference text is compared byte-for-byte during archive replay.
 README = """# K2 frozen-answer judge reference
 
 This bundle freezes outcome-blind pilot and final subsets of an existing paired

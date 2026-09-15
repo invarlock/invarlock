@@ -543,7 +543,7 @@ def _extract_generated_output(output: bytes) -> str:
     """Return byte-exact generated text without llama.cpp control framing.
 
     The first-party runtime patches b10015 so normal EOG termination emits no
-    human-readable marker.  An unpatched backend emits `` [end of text]`` on
+    display marker.  An unpatched backend emits `` [end of text]`` on
     EOG; that stream is ambiguous with model-authored text and therefore fails
     closed rather than being stripped heuristically.
     """

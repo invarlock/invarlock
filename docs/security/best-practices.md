@@ -159,11 +159,11 @@ authorization source.
 
 A deterministic extension scorer executes inside the evaluation and verifier trust
 boundaries. Keep it deterministic and local, and reject implementations that
-use a network, external model, human judgment, SQL or code execution,
+use a network, external model, externally assigned ratings, SQL or code execution,
 model-based semantic similarity, or an LLM judge. Selecting the built-in `judge`
 scorer uses its own plan, retained measurements, statistics and recipient policy
 for native or captured answers. Captured `recorded` metrics may also use approved
-upstream judge/human scores, with explicit provenance; replay checks their
+externally assigned scores, with explicit provenance; replay checks their
 aggregation rather than reproducing the source judgment. The extension
 declaration and replay checks do not provide
 process isolation; enforce these restrictions with reviewed code and the

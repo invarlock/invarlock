@@ -118,7 +118,7 @@ pack-v1. Captured and judge evidence use the distinct bindings described below.
 Captured verification authenticates complete baseline and subject runs, normalized
 request, policy and signer against caller-owned pins. It pairs unique IDs and
 checks retained case facts, then recomputes deterministic metrics or aggregates
-recorded scores. Approved recorded judge/human scores remain source judgments;
+recorded scores. Approved externally assigned scores remain source judgments;
 they are not replayable bounded judge trials merely because their provenance is
 pinned. Missing metric facts produce insufficient evidence rather than a
 favorable subset result.

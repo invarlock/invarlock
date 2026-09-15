@@ -252,8 +252,8 @@ input/output kinds, the configuration-schema digest, and these v1 semantics:
 - each result is a finite higher-is-better value in `[0, 1]`;
 - the core computes the arithmetic mean, subject-minus-baseline percentage-
   point delta, and fixed 2,048-replicate paired interval; and
-- network access, an external model, and human judgment are forbidden in an
-  acceptance scorer.
+- network access, external models and externally assigned ratings are forbidden
+  in a deterministic extension scorer.
 
 The independently supplied policy must contain
 `resolved_policy.metrics.scorer_extension` with the same `scorer_id`,

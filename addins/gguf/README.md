@@ -87,7 +87,7 @@ evidence. The local tag is only a build handle.
 
 The image applies the tracked
 `runtime/llama-completion-user-output.patch` to the pinned b10015 source. Normal
-EOG termination remains enabled, while llama.cpp's human-readable
+EOG termination remains enabled, while llama.cpp's
 `[end of text]` console marker is kept out of the generated-text stream. The
 provider rejects that marker if an unpatched executable emits it; it never
 guesses whether marker-shaped bytes were backend control or model-authored text.

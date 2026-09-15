@@ -24,6 +24,7 @@ from invarlock.judge_measurements.contracts import (
 )
 
 MAX_NOTES = 4096
+# Retain the published reference protocol metadata and serialized field names.
 PROTOCOL = {
     "id": "single-reviewer-exact-label-v1",
     "unit": "frozen answer",
@@ -121,23 +122,23 @@ def reconcile(sheet: dict, selection: dict) -> list[dict]:
 
 
 def agreement(labels: list[dict], measurements: dict) -> dict:
-    human = {(row["case_id"], row["side"]): row["rating"] for row in labels}
+    reference_labels = {(row["case_id"], row["side"]): row["rating"] for row in labels}
     confusion: Counter = Counter()
     scheduled = incomplete = 0
     for trial in measurements["trials"]:
         key = (trial["case_id"], trial["side"])
-        if key not in human:
+        if key not in reference_labels:
             continue
         scheduled += 1
         if trial["status"] != "complete":
             incomplete += 1
         else:
-            confusion[human[key], trial["parse"]["rating"]] += 1
+            confusion[reference_labels[key], trial["parse"]["rating"]] += 1
     compared = sum(confusion.values())
     matches = sum(count for (a, b), count in confusion.items() if a == b)
     return {
         "protocol": PROTOCOL,
-        "reviewed_answers": len(human),
+        "reviewed_answers": len(reference_labels),
         "scheduled_trials": scheduled,
         "incomplete_trials": incomplete,
         "compared_trials": compared,

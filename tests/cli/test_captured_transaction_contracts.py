@@ -560,7 +560,7 @@ def test_version_is_safe_without_distribution_or_package_version(monkeypatch):
     assert result.stdout.strip() == "InvarLock unknown"
 
 
-def test_setup_error_is_literal_in_human_output(tmp_path):
+def test_setup_error_is_literal_in_terminal_output(tmp_path):
     cases = tmp_path / "cases.json"
     cases.write_bytes(b"[]")
     result = RUNNER.invoke(app, ["evaluate", "--freeze-cases", str(cases)])

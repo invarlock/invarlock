@@ -98,7 +98,7 @@ suppress a verifier error, or reinterpret a failed policy result.
 - [ ] Keep LLM judges outside the deterministic scorer-extension boundary.
       Use the separate bounded judge contract when selecting `judge`; its
       acceptance checks are listed below. A captured `recorded` metric can
-      apply policy to approved upstream judge or human scores, but replay
+      apply policy to approved externally assigned scores, but replay
       checks their aggregation and provenance rather than reconstructing the
       original judgment.
 - [ ] Confirm the verdict uses the policy-relevant conservative bound: lower

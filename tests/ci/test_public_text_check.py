@@ -43,6 +43,10 @@ def public_text():
         ),
         ("Adversarial\naudit completed.", "review_process_status"),
         ("Requires human approval.", "review_staffing_language"),
+        ("Human judgment is excluded.", "review_staffing_language"),
+        ("Open the human-readable report.", "review_staffing_language"),
+        ("The human output is complete.", "review_staffing_language"),
+        ("Human judgement is excluded.", "review_staffing_language"),
         ("It does not request human approval.", "review_staffing_language"),
         ("This is not a human-review request.", "review_staffing_language"),
         ("No human\nreview is required.", "review_staffing_language"),
@@ -77,6 +81,7 @@ Strict CUDA/container validation passed on a CUDA-capable host.
 Artifacts use repository-relative paths and placeholder digests.
 The integration branch receives dependency updates.
 Recorded-score provenance can name a human or judge source.
+The descriptor field `uses_human_judgment` is false.
 The required metric participates in the policy conjunction.
 Reference-label studies retain their source attribution.
 """

@@ -206,8 +206,8 @@ scorer semantics while retaining captured-input assurance. `normalized_match` an
 `unicode_version`; a recipient with an incompatible Unicode environment refuses
 replay without issuing a receipt. `recorded` instead selects a `score_key` and
 exact `accepted_provenance` (`kind`, `source`, `version`, `unit`, `rubric_digest`).
-The verifier authenticates attributed values and paired arithmetic, not the
-judge, human, measurement apparatus or external metric implementation.
+The verifier authenticates attributed values and paired arithmetic; it does not
+reproduce or authenticate the original scoring process.
 
 An independent planned case set can be pinned in policy as
 `expected_case_set_digest`. Use `freeze_case_set`, `case_set_digest`, and

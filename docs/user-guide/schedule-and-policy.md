@@ -369,7 +369,7 @@ optional but coupled and use the same ranges.
 Separately installed scorer packages may implement deterministic token F1,
 structured-field extraction, and VQA answer normalization and require explicit
 authorization. Executable SQL/code tests, model-based semantic similarity,
-network or human scoring, and external-model calls are outside this extension
+network services or externally assigned ratings, and external-model calls are outside this extension
 contract. The built-in `metric: judge` has its own bounded collection, retained
 measurement, analysis-policy and recipient contracts. Other judge summaries may
 be attached as observations, which have no acceptance authority.

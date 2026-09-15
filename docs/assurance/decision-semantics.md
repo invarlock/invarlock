@@ -380,7 +380,7 @@ $$
 Potential separately implemented scorers include deterministic token F1,
 structured-field extraction, and VQA answer normalization. The scorer-extension v1 contract
 does not admit SQL or code execution, model-based semantic similarity, network
-services, human judgment, external models, or LLM judges. Those sources do not
+services, externally assigned ratings, external models, or LLM judges. Those sources do not
 execute through the deterministic extension contract.
 
 The native `judge` scorer uses a separate bounded measurement decision contract. It
@@ -411,7 +411,7 @@ every metric and slice; its marginal intervals do not provide simultaneous
 family-wide coverage.
 
 Captured `recorded` metrics can apply policy to upstream scores, including judge
-or human ratings with explicit approved provenance and rubric binding. Replay
+or other externally assigned ratings with explicit approved provenance and rubric binding. Replay
 recomputes aggregation and decision arithmetic, not the upstream judgment.
 Missing facts or insufficient count produce `insufficient_evidence`; a violated
 regression or subject bound produces `regression`; an otherwise acceptable but

@@ -294,7 +294,7 @@ can use these without installed-scorer authorization. SDK callers supply a
 `ScorerExtensionRegistry(allow_installed=False)`. Other implementations, such as
 a separately supplied VQA normalization scorer, require explicit authorization.
 SQL or code execution, model-based semantic similarity,
-network or human services, and LLM judges are outside scorer-extension
+network services or externally assigned ratings, and LLM judges are outside scorer-extension
 acceptance replay. The built-in `judge` scorer replays its bounded measurement
 contract and, for native run/import evidence, its retained runtime capture. Its
 report shows both evaluated model identities, runtime settings and digests,

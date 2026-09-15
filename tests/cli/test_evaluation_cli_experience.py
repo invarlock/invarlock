@@ -143,9 +143,9 @@ def _verify_args(
     ]
 
 
-def test_human_evaluate_preserves_json_result_and_evidence_bytes(project):
+def test_terminal_evaluate_preserves_json_result_and_evidence_bytes(project):
     first = evaluate(project, "json", "--unsigned", "--json")
-    second = evaluate(project, "human", "--unsigned")
+    second = evaluate(project, "terminal", "--unsigned")
     assert first.exit_code == second.exit_code == 0
     payload = json.loads(first.stdout)
     assert set(payload) == {
@@ -187,13 +187,15 @@ def test_human_evaluate_preserves_json_result_and_evidence_bytes(project):
         "records/subject.json",
         "reports/evaluation.report.json",
     }
-    assert inventory == _inventory(project[1] / "human")
+    assert inventory == _inventory(project[1] / "terminal")
 
 
 @pytest.mark.parametrize(
     "missing,expected", [(False, "regression"), (True, "insufficient_evidence")]
 )
-def test_human_adverse_decisions_preserve_recorded_verdict(project, missing, expected):
+def test_terminal_adverse_decisions_preserve_recorded_verdict(
+    project, missing, expected
+):
     _, root = project
     path = root / "inputs/subject.json"
     value = json.loads(path.read_text())
@@ -204,21 +206,23 @@ def test_human_adverse_decisions_preserve_recorded_verdict(project, missing, exp
         value["records"][0]["error"] = "capture incomplete"
     path.chmod(0o644)
     path.write_bytes(canonical_json_bytes(value))
-    human = evaluate(project, "human", "--unsigned")
+    terminal = evaluate(project, "terminal", "--unsigned")
     machine = evaluate(project, "json", "--unsigned", "--json")
-    assert human.exit_code == machine.exit_code == 0, human.output + machine.output
+    assert terminal.exit_code == machine.exit_code == 0, (
+        terminal.output + machine.output
+    )
     assert json.loads(machine.stdout)["policy_verdict"] == expected
-    assert f"Recorded policy result: {expected}" in human.stdout
-    assert f"{39 if missing else 40} usable pairs" in human.stdout
-    assert f"{1 if missing else 0} missing results" in human.stdout
+    assert f"Recorded policy result: {expected}" in terminal.stdout
+    assert f"{39 if missing else 40} usable pairs" in terminal.stdout
+    assert f"{1 if missing else 0} missing results" in terminal.stdout
     assert (
         "missing results"
         if missing
         else "lower interval bound exceeds allowed regression"
-    ) in human.stdout
-    assert "Signing: Unsigned local evidence" in human.stdout
-    assert "Independent verification: not performed" in human.stdout
-    assert _inventory(root / "human") == _inventory(root / "json")
+    ) in terminal.stdout
+    assert "Signing: Unsigned local evidence" in terminal.stdout
+    assert "Independent verification: not performed" in terminal.stdout
+    assert _inventory(root / "terminal") == _inventory(root / "json")
 
 
 @pytest.mark.parametrize(
@@ -244,13 +248,13 @@ def test_evaluate_bad_request_is_a_machine_readable_failure(
         path.write_text("not: [valid")
     original = _inventory(tmp_path)
     forbidden = _forbid_report_work(monkeypatch)
-    human = runner.invoke(
+    terminal = runner.invoke(
         app, ["evaluate", str(path), "--unsigned"], color=color, terminal_width=80
     )
     machine = runner.invoke(app, ["evaluate", str(path), "--unsigned", "--json"])
-    assert human.exit_code == machine.exit_code == 2
+    assert terminal.exit_code == machine.exit_code == 2
     forbidden.assert_not_called()
-    rendered = Text.from_ansi(human.output).plain
+    rendered = Text.from_ansi(terminal.output).plain
     assert "FAIL" in rendered
     errors = json.loads(machine.stdout)["errors"]
     assert errors
@@ -269,7 +273,7 @@ def test_invalid_evaluate_option_is_usage_error_before_publication(project):
     assert not (project[1] / "result").exists()
 
 
-def test_human_evaluate_error_does_not_interpret_brackets(project, monkeypatch):
+def test_terminal_evaluate_error_does_not_interpret_brackets(project, monkeypatch):
     def rejected(*args, **kwargs):
         raise captured_evaluation.CapturedEvaluationError(
             "expected signer [red]required-key[/red]"
@@ -282,7 +286,9 @@ def test_human_evaluate_error_does_not_interpret_brackets(project, monkeypatch):
     assert not (project[1] / "output").exists()
 
 
-def test_human_verify_uses_recipient_inputs_and_rejects_wrong_signer(project, tmp_path):
+def test_terminal_verify_uses_recipient_inputs_and_rejects_wrong_signer(
+    project, tmp_path
+):
     runner, root = project
     signer_path, signer = _keygen(runner, tmp_path / "signer")
     assert evaluate(project, "signed", "--signing-key", str(signer_path)).exit_code == 0
@@ -299,16 +305,18 @@ def test_human_verify_uses_recipient_inputs_and_rejects_wrong_signer(project, tm
         tmp_path / "receipt.json",
     )
     machine = runner.invoke(app, args)
-    human_args = list(args)
-    human_args[human_args.index("--receipt") + 1] = str(tmp_path / "human-receipt.json")
-    human = runner.invoke(
+    terminal_args = list(args)
+    terminal_args[terminal_args.index("--receipt") + 1] = str(
+        tmp_path / "terminal-receipt.json"
+    )
+    terminal = runner.invoke(
         app,
-        [arg for arg in human_args if arg != "--json"],
+        [arg for arg in terminal_args if arg != "--json"],
     )
     assert machine.exit_code == 0, machine.output
     assert json.loads(machine.stdout)["ok"] is True
-    assert human.exit_code == 0, human.output
-    assert "PASS Independent captured verification complete" in human.stdout
+    assert terminal.exit_code == 0, terminal.output
+    assert "PASS Independent captured verification complete" in terminal.stdout
     _, wrong_signer = _keygen(runner, tmp_path / "wrong-signer")
     wrong = list(args)
     wrong[wrong.index("--expected-signer") + 1] = wrong_signer
@@ -554,11 +562,11 @@ def test_report_signed_manifest_presents_recorded_adverse_result_without_replay(
     report = runner.invoke(app, ["report", str(root / "signed-regression"), "--json"])
     assert report.exit_code == 0, report.output
     assert json.loads(report.stdout)["ok"] is True
-    human = runner.invoke(
+    terminal = runner.invoke(
         app, ["report", str(source), *(["--explain"] if explain else [])]
     )
-    assert human.exit_code == 0, human.output
-    text = " ".join(Text.from_ansi(human.stdout).plain.split())
+    assert terminal.exit_code == 0, terminal.output
+    text = " ".join(Text.from_ansi(terminal.stdout).plain.split())
     assert ("More evidence needed" if missing else "Policy not met") in text
     if missing:
         assert "Unavailable" in text
@@ -615,18 +623,20 @@ def test_authenticated_adverse_result_keeps_policy_verification_status(
     payload = json.loads(result.stdout)
     assert payload["integrity_ok"] is True
     assert payload["decision"] == expected
-    human_args = [arg for arg in args if arg != "--json"]
-    human_args[human_args.index("--receipt") + 1] = str(tmp_path / "human-receipt.json")
-    human = runner.invoke(app, human_args)
-    assert human.exit_code == 7, human.output
-    assert human.stdout.startswith(
+    terminal_args = [arg for arg in args if arg != "--json"]
+    terminal_args[terminal_args.index("--receipt") + 1] = str(
+        tmp_path / "terminal-receipt.json"
+    )
+    terminal = runner.invoke(app, terminal_args)
+    assert terminal.exit_code == 7, terminal.output
+    assert terminal.stdout.startswith(
         "FAIL captured evidence does not satisfy the approved policy\n"
     )
-    assert "Evidence integrity: verified" in human.stdout
-    assert "PASS Independent captured verification complete" not in human.stdout
-    assert "Policy result: fail" in human.stdout
-    assert f"Recorded decision: {expected}" in human.stdout
-    assert f"{39 if missing else 40} usable pairs" in human.stdout
+    assert "Evidence integrity: verified" in terminal.stdout
+    assert "PASS Independent captured verification complete" not in terminal.stdout
+    assert "Policy result: fail" in terminal.stdout
+    assert f"Recorded decision: {expected}" in terminal.stdout
+    assert f"{39 if missing else 40} usable pairs" in terminal.stdout
 
 
 @pytest.mark.parametrize("value", [None, [], {}, {"comparison": None}])

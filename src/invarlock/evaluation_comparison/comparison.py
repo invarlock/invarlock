@@ -177,7 +177,7 @@ def _check_policy(policy: dict[str, Any]) -> None:
                 and provenance["rubric_digest"] is None
             ):
                 raise EvaluationRecordsError(
-                    "judge/human provenance requires an approved rubric digest"
+                    "recorded rating provenance requires an approved rubric digest"
                 )
         elif metric["kind"] == LIKELIHOOD_METRIC:
             validate_likelihood_policy(metric)
