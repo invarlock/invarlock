@@ -111,6 +111,8 @@ def test_offline_bundle_script_builds_manifested_tarball(tmp_path: Path):
             "v1.2.3",
             "--repo",
             "invarlock/invarlock",
+            "--certificate-identity",
+            "https://github.com/invarlock/invarlock/.github/workflows/sign.yml@refs/tags/v1.2.3",
             "--dist-dir",
             str(dist_dir),
             "--sbom",
@@ -139,7 +141,7 @@ def test_offline_bundle_script_builds_manifested_tarball(tmp_path: Path):
     assert manifest["schema"] == "invarlock/release-offline-bundle-v1"
     assert manifest["bundle"]["tag"] == "v1.2.3"
     assert manifest["verification"]["certificate_identity"] == (
-        "repo:invarlock/invarlock@refs/tags/v1.2.3"
+        "https://github.com/invarlock/invarlock/.github/workflows/sign.yml@refs/tags/v1.2.3"
     )
     assert [row["path"] for row in manifest["distributions"]] == [
         "dist/invarlock-1.2.3-py3-none-any.whl"

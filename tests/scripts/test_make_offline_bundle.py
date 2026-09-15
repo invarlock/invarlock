@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 import tarfile
 from pathlib import Path
+
+import pytest
 
 
 def _write(path: Path, content: str) -> None:
@@ -28,6 +31,8 @@ def _run_bundle(
             "v0.3.12",
             "--repo",
             "invarlock/invarlock",
+            "--certificate-identity",
+            "https://github.com/invarlock/invarlock/.github/workflows/sign.yml@refs/tags/v0.3.12",
             "--dist-dir",
             str(dist_dir),
             "--sbom",
@@ -92,7 +97,7 @@ def test_make_offline_bundle_packages_release_materials(tmp_path: Path) -> None:
     assert manifest["schema"] == "invarlock/release-offline-bundle-v1"
     assert manifest["bundle"]["tag"] == "v0.3.12"
     assert manifest["verification"]["certif" + "icate_identity"] == (
-        "repo:invarlock/invarlock@refs/tags/v0.3.12"
+        "https://github.com/invarlock/invarlock/.github/workflows/sign.yml@refs/tags/v0.3.12"
     )
     assert manifest["sbom"]["path"] == "invarlock-0.3.12-sbom.cdx.json"
 
@@ -108,6 +113,128 @@ def test_make_offline_bundle_packages_release_materials(tmp_path: Path) -> None:
     assert wheel_record["sigstore_sidecars"] == [
         "dist/invarlock-0.3.12-py3-none-any.whl.sigstore.json"
     ]
+
+
+@pytest.mark.parametrize("missing", [False, True])
+@pytest.mark.parametrize("with_ledger", [False, True])
+def test_nested_addins_require_their_own_signed_inventory(
+    tmp_path, missing, with_ledger
+):
+    script = (
+        Path(__file__).resolve().parents[2] / "scripts/release/make_offline_bundle.sh"
+    )
+    dist, provenance, output, sbom = (
+        tmp_path / "dist",
+        tmp_path / "provenance",
+        tmp_path / "output",
+        tmp_path / "sbom.json",
+    )
+    for name in ("invarlock-0.3.12.whl", "addins/invarlock_runtime_gguf-0.3.12.whl"):
+        _write(dist / name, name)
+        if not (missing and name.startswith("addins/")):
+            _write(dist / (name + ".sigstore.json"), "{}")
+    if with_ledger:
+        _write(
+            dist / "SHA256SUMS",
+            "".join(
+                f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.relative_to(dist).as_posix()}\n"
+                for path in sorted(dist.rglob("*.whl"))
+            ),
+        )
+    _write(provenance / "attestation.jsonl", "{}")
+    _write(sbom, "{}")
+    proc = _run_bundle(script, dist, sbom, provenance, output)
+    if missing:
+        assert proc.returncode != 0
+        assert "missing Sigstore bundle" in proc.stderr
+        assert not list(output.glob("*.tar.gz"))
+        return
+    assert proc.returncode == 0, proc.stderr
+    with tarfile.open(next(output.glob("*.tar.gz"))) as archive:
+        root = "invarlock-0.3.12-offline-bundle/"
+        manifest = json.load(archive.extractfile(root + "release_manifest.json"))
+        assert len(manifest["distributions"]) == 2
+        records = [
+            *manifest["distributions"],
+            *manifest["distribution_signatures"],
+            *manifest["provenance_bundles"],
+            *manifest["supporting_files"],
+            manifest["sbom"],
+        ]
+        assert {root + row["path"] for row in records} == {
+            item.name
+            for item in archive.getmembers()
+            if item.isfile() and not item.name.endswith("/release_manifest.json")
+        }
+        for row in records:
+            payload = archive.extractfile(root + row["path"]).read()
+            assert hashlib.sha256(payload).hexdigest() == row["sha256"]
+            assert len(payload) == row["size_bytes"]
+        readme = archive.extractfile(root + "README.txt").read().decode()
+        assert manifest["verification"]["certificate_identity"] in readme
+
+
+@pytest.mark.parametrize(
+    "alter", ["digest", "omission", "duplicate", "traversal", "encoding"]
+)
+def test_offline_bundle_rejects_invalid_distribution_ledger(tmp_path, alter):
+    script = (
+        Path(__file__).resolve().parents[2] / "scripts/release/make_offline_bundle.sh"
+    )
+    dist, provenance, output, sbom = (
+        tmp_path / "dist",
+        tmp_path / "provenance",
+        tmp_path / "output",
+        tmp_path / "sbom.json",
+    )
+    name = "invarlock-0.3.12.whl"
+    _write(dist / name, "wheel")
+    _write(dist / (name + ".sigstore.json"), "{}")
+    _write(provenance / "attestation.jsonl", "{}")
+    _write(sbom, "{}")
+    digest = hashlib.sha256(b"wheel").hexdigest()
+    line = f"{digest}  {name}\n"
+    contents = {
+        "digest": f"{'0' * 64}  {name}\n",
+        "omission": "",
+        "duplicate": line * 2,
+        "traversal": f"{digest}  ../{name}\n",
+        "encoding": "",
+    }[alter]
+    _write(dist / "SHA256SUMS", contents)
+    if alter == "encoding":
+        (dist / "SHA256SUMS").write_bytes(b"\xff")
+    proc = _run_bundle(script, dist, sbom, provenance, output)
+    assert proc.returncode != 0
+    assert "checksum ledger" in proc.stderr
+    assert not list(output.glob("*.tar.gz"))
+
+
+@pytest.mark.parametrize("alter", ["cross_directory_sidecar", "extra_file", "symlink"])
+def test_offline_inventory_rejects_unbound_or_linked_files(tmp_path, alter):
+    script = (
+        Path(__file__).resolve().parents[2] / "scripts/release/make_offline_bundle.sh"
+    )
+    dist, provenance, output, sbom = (
+        tmp_path / "dist",
+        tmp_path / "provenance",
+        tmp_path / "output",
+        tmp_path / "sbom.json",
+    )
+    _write(dist / "invarlock-0.3.12.whl", "wheel")
+    _write(dist / "invarlock-0.3.12.whl.sigstore.json", "{}")
+    _write(provenance / "attestation.jsonl", "{}")
+    _write(sbom, "{}")
+    if alter == "cross_directory_sidecar":
+        _write(dist / "addins/invarlock-0.3.12.whl", "other wheel")
+    elif alter == "extra_file":
+        _write(dist / "unlisted.txt", "unexpected")
+    else:
+        (dist / "linked.whl").symlink_to(dist / "invarlock-0.3.12.whl")
+        _write(dist / "linked.whl.sigstore.json", "{}")
+    proc = _run_bundle(script, dist, sbom, provenance, output)
+    assert proc.returncode != 0
+    assert not list(output.glob("*.tar.gz"))
 
 
 def test_make_offline_bundle_dry_run_writes_nothing(tmp_path: Path) -> None:
@@ -131,6 +258,8 @@ def test_make_offline_bundle_dry_run_writes_nothing(tmp_path: Path) -> None:
             "v0.3.12",
             "--repo",
             "invarlock/invarlock",
+            "--certificate-identity",
+            "https://github.com/invarlock/invarlock/.github/workflows/sign.yml@refs/tags/v0.3.12",
             "--dist-dir",
             str(dist_dir),
             "--sbom",
@@ -172,6 +301,8 @@ def test_make_offline_bundle_rejects_path_like_bundle_name(tmp_path: Path) -> No
             "v0.3.12",
             "--repo",
             "invarlock/invarlock",
+            "--certificate-identity",
+            "https://github.com/invarlock/invarlock/.github/workflows/sign.yml@refs/tags/v0.3.12",
             "--dist-dir",
             str(dist_dir),
             "--sbom",
@@ -317,6 +448,8 @@ def test_make_offline_bundle_supports_relative_output_dir(tmp_path: Path) -> Non
             "v0.3.12",
             "--repo",
             "invarlock/invarlock",
+            "--certificate-identity",
+            "https://github.com/invarlock/invarlock/.github/workflows/sign.yml@refs/tags/v0.3.12",
             "--dist-dir",
             str(dist_dir),
             "--sbom",
