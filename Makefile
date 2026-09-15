@@ -240,6 +240,7 @@ coverage-qualification-report:  ## Enforce retained qualification coverage measu
 coverage-release:  ## Enforce branch-aware coverage for release helpers
 	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage erase
 	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) PYTHONPATH=src $(PYTEST) $(PYTEST_WORKER_ARGS) -q \
+		tests/scripts/test_core_wheel_consumers.py \
 		tests/scripts/test_first_party_distribution_validation.py \
 		tests/scripts/test_release_distribution_validation_edges.py \
 		tests/scripts/test_release_preflight.py \
@@ -258,6 +259,8 @@ coverage-release:  ## Enforce branch-aware coverage for release helpers
 coverage-release-report:  ## Enforce retained release coverage measurements
 	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc --include='scripts/release/*.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage xml --rcfile=scripts/release.coveragerc --include='scripts/release/*.py' -o reports/release-cov.xml --fail-under=95
+	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc \
+		--include='scripts/release/core_wheel_consumers.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc \
 		--include='scripts/release/first_party_distribution_validation.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc \
@@ -749,36 +752,8 @@ addins-install-smoke: dist-check  ## Install and discover all six wheels in a di
 		"$$smoke_venv/bin/python" -m pip install --require-hashes -r $(ADDINS_SMOKE_RELEASE_LOCK); \
 		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -m pip install --no-deps --force-reinstall dist/*.whl; \
 		"$$smoke_venv/bin/python" -m pip check; \
-		consumer_root="$$smoke_venv/quickstart-consumer"; \
-		mkdir "$$consumer_root"; \
-		cp examples/quickstart/run.py "$$consumer_root/run.py"; \
-		cp examples/captured-results/wheel_smoke.py "$$consumer_root/captured-wheel-smoke.py"; \
-		cp examples/captured-results/scorer_wheel_smoke.py "$$consumer_root/scorer-wheel-smoke.py"; \
-		mkdir "$$consumer_root/judge"; \
-		for judge_file in wheel_smoke.py request.yaml plan.json measurements.json baseline_run.json subject_run.json analysis_policy.json collection.json; do \
-			cp "examples/judge-measurements/$$judge_file" "$$consumer_root/judge/"; \
-		done; \
-		cp -R examples/acceptance-handoff/golden "$$consumer_root/golden"; \
-		( cd "$$consumer_root"; PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= \
-			"$$smoke_venv/bin/python" run.py --fixture golden ); \
-		( cd "$$consumer_root"; PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= \
-			"$$smoke_venv/bin/python" captured-wheel-smoke.py --cli "$$smoke_venv/bin/invarlock" ); \
-		( cd "$$consumer_root" && PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= \
-			"$$smoke_venv/bin/python" judge/wheel_smoke.py --fixture judge --cli "$$smoke_venv/bin/invarlock" ); \
-		( cd "$$consumer_root"; PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= \
-			"$$smoke_venv/bin/python" scorer-wheel-smoke.py --fixture judge --cli "$$smoke_venv/bin/invarlock" ); \
-		approval_root="$$smoke_venv/deployment-consumer"; \
-		cp -R examples/ci/standalone-consumer "$$approval_root"; \
-		mkdir "$$approval_root/incoming"; \
-		cp -R examples/evaluator-qualification/signed-transactions/deployment-approval-inspect-ai/evidence "$$approval_root/incoming/evidence"; \
-		cp examples/evaluator-qualification/signed-transactions/deployment-approval-inspect-ai/verification.receipt.json "$$approval_root/incoming/verification.receipt.json"; \
-		( cd "$$approval_root"; PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= \
-			"$$smoke_venv/bin/python" review/verify_deployment_receipt.py \
-			--approval-inputs review/inspect-ai-deployment-approval-inputs.json \
-			--evidence incoming/evidence \
-			--policy review/policy/acceptance.json \
-			--receipt incoming/verification.receipt.json \
-			--output deployment-approval.json ); \
+		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" scripts/release/core_wheel_consumers.py \
+			--cli "$$smoke_venv/bin/invarlock"; \
 		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -m pip install --no-deps --force-reinstall dist/addins/*.whl; \
 		"$$smoke_venv/bin/python" -m pip check; \
 		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -m invarlock_addins.gguf.conformance; \

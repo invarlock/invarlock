@@ -99,6 +99,7 @@ def test_release_helpers_have_an_individual_branch_coverage_ratchet() -> None:
         + MAKE.target("coverage-release-report").text
     )
     for script in (
+        "core_wheel_consumers.py",
         "first_party_distribution_validation.py",
         "release_distribution_validation.py",
         "release_preflight.py",

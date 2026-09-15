@@ -87,9 +87,9 @@ def test_first_party_addins_share_test_and_distribution_gates() -> None:
     assert core_install in install_smoke
     assert addin_install in install_smoke
     assert install_smoke.index(core_install) < install_smoke.index(
-        "run.py --fixture golden"
+        "scripts/release/core_wheel_consumers.py"
     )
-    assert install_smoke.index("review/verify_deployment_receipt.py") < (
+    assert install_smoke.index("scripts/release/core_wheel_consumers.py") < (
         install_smoke.index(addin_install)
     )
     assert "-m pip check" in install_smoke

@@ -120,7 +120,7 @@ def test_rehearsal_detects_broken_recipient_or_report(monkeypatch, fault):
 
 def test_release_smokes_run_judge_before_addins():
     make = (ROOT / "Makefile").read_text()
-    assert make.index("judge/wheel_smoke.py --fixture judge") < make.index(
+    assert make.index("scripts/release/core_wheel_consumers.py") < make.index(
         "pip install --no-deps --force-reinstall dist/addins/*.whl"
     )
     workflow = (ROOT / ".github/workflows/release.yml").read_text()
@@ -131,6 +131,6 @@ def test_release_smokes_run_judge_before_addins():
         section = workflow.split(f"- name: {title}", 1)[1].split("\n      - name:", 1)[
             0
         ]
-        assert section.index("judge/wheel_smoke.py --fixture judge") < section.index(
+        assert section.index("scripts/release/core_wheel_consumers.py") < section.index(
             install
         )
