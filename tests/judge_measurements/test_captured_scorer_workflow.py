@@ -67,6 +67,44 @@ def test_captured_judge_preflight_never_collects_or_writes(tmp_path, monkeypatch
 
 
 @pytest.mark.parametrize("hosted", [False, True])
+@pytest.mark.parametrize("imported", [False, True])
+def test_captured_judge_preflight_text_and_json_agree(
+    tmp_path, collector, hosted, imported
+):
+    path, value, recipe, runs = _request(tmp_path)
+    if hosted:
+        from tests.evaluation_records.test_hosted_service_identity import identity
+
+        for side, run in zip(("baseline", "subject"), runs, strict=True):
+            run.update(artifact_digest=None, service_identity=identity())
+            run["service_identity"]["deployment"] = side
+            (tmp_path / f"{side}.json").write_text(json.dumps(run))
+    plan, _ = finalize_native_plan(recipe, *runs)
+    if imported:
+        (tmp_path / "measurements.json").write_text(
+            json.dumps(_incomplete_measurements(plan=plan))
+        )
+        value["comparison"]["judge"]["measurements"] = "measurements.json"
+        path.write_text(yaml.safe_dump(value))
+    args = ["evaluate", str(path), "--preflight", "--unsigned"]
+    structured = CliRunner().invoke(app, [*args, "--json"])
+    text = CliRunner().invoke(app, args)
+    assert structured.exit_code == 0, structured.output
+    assert text.exit_code == 0, text.output
+    payload = json.loads(structured.output)
+    expected_attempts = (
+        plan["schedule"]["expected_trials"] * plan["schedule"]["max_attempts"]
+    )
+    assert payload["maximum_attempts"] == expected_attempts
+    assert f"maximum attempts: {expected_attempts}" in text.output
+    assert "Judge preflight complete" in text.output
+    assert payload["network_calls"] == 0
+    collector[1].assert_not_called()
+    assert not (tmp_path / "evidence").exists()
+    assert not (tmp_path / "judge-work").exists()
+
+
+@pytest.mark.parametrize("hosted", [False, True])
 def test_captured_import_judgments_uses_same_offline_cli_and_report(tmp_path, hosted):
     path, value, recipe, runs = _request(tmp_path)
     if hosted:
