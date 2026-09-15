@@ -9,6 +9,7 @@ description = "First-party TensorRT-LLM runtime provider add-in for InvarLock"
 readme = "README.md"
 requires-python = ">=3.12"
 license = "Apache-2.0"
+license-files = ["LICENSE"]
 dependencies = ["invarlock==0.15.0"]
 
 [project.entry-points."invarlock.runtime_providers"]

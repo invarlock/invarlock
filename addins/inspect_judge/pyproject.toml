@@ -9,6 +9,7 @@ description = "Bounded optional Inspect judge collection planning and retained e
 readme = "README.md"
 requires-python = ">=3.12"
 license = "Apache-2.0"
+license-files = ["LICENSE"]
 dependencies = ["invarlock==0.15.0"]
 
 [project.optional-dependencies]
