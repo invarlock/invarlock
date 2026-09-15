@@ -412,15 +412,21 @@ representative request. Run each qualification only inside its intended
 digest-pinned runtime. None of these commands supplies or qualifies a
 production model fixture.
 
-Maintained qualification adds a signed image prerequisite around those
+Maintained qualification adds a signed canary prerequisite around those
 provider checks. Run `runtime-qualification-canary` at the repository root, or
-the provider's `qualify-canary` target, once for a small representative request
-through one exact image digest. Retain its evidence, signed verification
-receipt, and verifier-owned trust profile. Subsequent readiness and evidence
-targets require those paths as `CANARY_EVIDENCE`, `CANARY_RECEIPT`, and
-`CANARY_TRUST_PROFILE`; they strictly reverify the canary and require its
-runtime-image digest to equal the image being qualified. The retained canary
-may be reused while that exact digest remains unchanged.
+the provider's `qualify-canary` target, for a small representative request
+through one exact image digest. Retain its evidence, signed strict-pass receipt,
+original verifier-owned trust profile, and referenced verifier private key.
+Subsequent readiness and evidence targets require `CANARY_EVIDENCE`,
+`CANARY_RECEIPT`, and `CANARY_TRUST_PROFILE`. They authenticate the saved receipt,
+check the evidence inventory and checksum chain, and require matching image
+digest, per-side runtime-provider identities, task, acceptance binding, and
+CPU/CUDA device class. Acceptance matching requires the same built-in metric or
+the same scorer ID, version, descriptor digest and configuration digest; CUDA
+indices may differ. A change to any required match needs a new signed canary.
+This prerequisite does not rerun full semantic verification. These targets still
+require the original verifier private key; standalone receipt checking can use
+an independently trusted public key.
 
 This signed canary is a real end-to-end transaction. By contrast, readiness is
 execution-free and starts no model worker. The sequence prevents many jobs

@@ -362,14 +362,20 @@ make runtime-qualification-canary \
   CANDIDATE_WHEEL_MANIFEST="$CANDIDATE_WHEEL_MANIFEST"
 ```
 
-Retain the canary evidence, its strictly verified signed receipt, and the
-verifier-owned trust profile together. They may be reused by later readiness
-and evidence targets only while `IMAGE_DIGEST` is unchanged. A new image digest
-requires a new signed canary.
+Retain the canary evidence, its signed strict-pass verification receipt, and the
+verifier-owned trust profile together. Later readiness and evidence targets can
+reuse it only when the image digest, baseline and subject runtime-provider
+identities, task, acceptance binding, and device class match. The acceptance
+binding is the same built-in metric, or the same scorer ID, version, descriptor
+digest and configuration digest. Device matching distinguishes CPU from CUDA;
+CUDA indices may differ. Run a new signed canary when any required match changes.
 
-Before destroying the verifier signing key, export its Ed25519 public key into
-the retained trust unit. The maintained checker can then replay the signed
-receipt after transfer without private material:
+Keep the original canary trust profile and its referenced verifier private key
+available while using `runtime-qualification-readiness` or
+`runtime-qualification-evidence`. These targets read that key to authenticate the
+retained receipt and do not expose a public-key override. For standalone receipt
+checking after transfer or archival, retain an independently trusted Ed25519
+verifier public key. The checker supports that key without the private material:
 
 ```bash
 python scripts/qualification_receipt_check.py \
@@ -379,10 +385,12 @@ python scripts/qualification_receipt_check.py \
   --verifier-public-key "$PWD/canary/verifier-public.pem"
 ```
 
-The supplied public key is authenticated by the verifier fingerprint in the
-signed receipt; a substituted key, changed profile, policy, anchor, receipt, or
-evidence manifest fails closed. The trust-profile digest remains the digest of
-the profile used when the receipt was created.
+The checker verifies the receipt signature against the supplied public key and
+requires its fingerprint to match the receipt. Obtain that key through a trusted
+channel. Changed profile, policy, anchor, receipt or evidence-manifest bindings
+fail verification. Keep the original profile unchanged: its digest must match
+the profile used when the receipt was created. This standalone check does not
+replace the private key required by the readiness and evidence targets.
 
 Next, run readiness for each planned request with the same source binding,
 image, verifier inputs, fresh destinations, and retained canary inputs:
@@ -409,8 +417,10 @@ must be distinct absent paths with existing real parent directories. They may
 not use symlinked parents or be placed inside the evidence destination. The
 source archive is limited to 512 MiB and 50,000 members; an execution-source
 file is limited to 32 MiB. Readiness starts no model worker and publishes no
-result. It also strictly reverifies the retained canary and its exact image
-binding. Use the same variables with `make runtime-qualification-evidence`
+result. Its canary prerequisite authenticates the retained signed strict-pass
+receipt, checks the evidence inventory and checksum chain, and enforces the
+image and request compatibility described above. It does not rerun full semantic
+verification of the canary. Use the same variables with `make runtime-qualification-evidence`
 plus `SUMMARY` and optional `REPORT` only after readiness succeeds. Carry the
 same `QUALIFICATION_DEVICE`, and any CPU, memory, or user controls, into that
 command.

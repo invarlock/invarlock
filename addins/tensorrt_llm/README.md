@@ -137,7 +137,9 @@ Bootstrap a signed end-to-end transaction once for the exact image with
 verified receipt, and verifier-owned trust profile. Supply those paths to each
 later `qualify-preflight` and `qualify-evidence` call as `CANARY_EVIDENCE`,
 `CANARY_RECEIPT`, and `CANARY_TRUST_PROFILE`. A different image digest requires
-a new signed canary.
+a new signed canary. Keep the original verifier private key available for
+readiness. Reuse also requires matching providers, task, acceptance binding and
+device class; see the [canary compatibility rules](../../docs/reference/runtime-providers.md).
 Set `QUALIFICATION_DEVICE` to an explicit GPU such as `cuda:0`, then set
 `QUALIFICATION_CPUS`, `QUALIFICATION_MEMORY_MIB`, and `QUALIFICATION_USER` for
 the bounded workers. Keep all four values unchanged through canary, preflight,
@@ -164,7 +166,8 @@ make -C addins/tensorrt_llm qualify-canary \
 ```
 
 Run `make -C addins/tensorrt_llm qualify-preflight` for each target request
-before allocating a full engine run. It reverifies the signed canary and checks
+before allocating a full engine run. It authenticates the saved canary receipt,
+checks evidence integrity and compatibility, and checks
 the target configuration without starting a model worker.
 `make -C addins/tensorrt_llm qualify-evidence` then runs the public
 evaluate-to-verify transaction. Supply the request, evidence key, image

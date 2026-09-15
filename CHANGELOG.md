@@ -145,7 +145,8 @@ while strengthening evidence verification, runtime isolation and release checks.
   loading; and run-only options on import. Captured imports, artifact attestation
   and reference replay reject oversized, replaced or non-regular inputs.
 - **Judge integrity:** reject reused Inspect provider response IDs across retained
-  segments and resumed collection, overlapping workspaces, changed runtime or
+  segments and resumed collection, rating text contradicted by a provider refusal,
+  tool call or non-assistant role, overlapping workspaces, changed runtime or
   artifact identities, underfunded plans and missing native capture. Configured
   hosted calls explicitly select and validate standard processing and reject
   inherited safety identifiers. Historical requests and signed evidence retain
@@ -164,6 +165,11 @@ while strengthening evidence verification, runtime isolation and release checks.
 
 #### Runtime and dependency safeguards
 
+- **Release packaging:** include and validate the license text in every add-in
+  wheel and source distribution. Offline review bundles inventory nested add-ins,
+  require adjacent Sigstore sidecars, reject unlisted or linked files, and use
+  the independently supplied signing-certificate identity. Runtime qualification
+  guides state the canary key lifecycle and all enforced reuse conditions.
 - **Runtime safety:** validate safetensors shard paths and storage before native
   loading. Real-container checks cover network isolation, read-only inputs, key
   separation, limits, interruption and cleanup, including outputs owned by a
