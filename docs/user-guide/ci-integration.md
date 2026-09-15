@@ -28,6 +28,11 @@ The action runs the same public transactions documented by the
 3. The action uploads the evidence directory, verification JSON, signed
    receipt, and HTML report. It never uploads the verifier private key.
 
+This action and its deployment consumer are native pack-v1 integrations.
+Captured packs and judge evidence use different trust and receipt contracts;
+use the [captured CI workflow](captured-results.md#preflight-and-local-ci) or
+[judge recipient workflow](../reference/judge-measurements.md) for those families.
+
 ## Inputs
 
 Every trust input must come from verifier-controlled configuration rather than

@@ -50,7 +50,7 @@ limit will be operationally cheap.
 | Function | Required shape | Additional constraints | Result type |
 | --- | --- | --- | --- |
 | `spectral_observation` | Exactly two dimensions | At least one row and column | `SpectralObservation` |
-| `rmt_observation` | Exactly two dimensions | At least two rows and one column; every standardized column must have nonzero sample deviation | `RmtObservation` |
+| `rmt_observation` | Exactly two dimensions | At least two rows and one varying column; constant columns are reported and excluded | `RmtObservation` |
 | `variance_observation` | One or more dimensions | At least one value; scalar/zero-dimensional input is rejected; singleton input reports population variance `0.0` and sample variance `null` | `VarianceObservation` |
 
 Catch `DiagnosticInputError` when a caller needs to distinguish an invalid
@@ -89,8 +89,9 @@ the full calculation is not operationally justified, and record that choice.
 
 ### Covariance and Marchenko--Pastur reference
 
-`rmt_observation` standardizes columns, computes covariance eigenvalues, and
-reports theoretical Marchenko--Pastur reference edges:
+`rmt_observation` excludes constant columns, standardizes the remaining columns
+by population deviation, computes covariance eigenvalues, and reports theoretical
+Marchenko--Pastur reference edges:
 
 ```python
 import numpy as np
@@ -152,8 +153,13 @@ evaluation request:
 ```python
 from pathlib import Path
 
-from invarlock_addins.diagnostics import canonical_observation_bytes
+from invarlock_addins.diagnostics import (
+    canonical_observation_bytes,
+    spectral_observation,
+)
 
+observation = spectral_observation([[3.0, 0.0], [0.0, 1.0]])
+Path("observations").mkdir(exist_ok=True)
 Path("observations/subject-spectral.json").write_bytes(
     canonical_observation_bytes(observation)
 )
@@ -185,7 +191,7 @@ investigation record:
 - how the array was selected, reshaped, standardized, or projected;
 - package and NumPy versions;
 - the observation JSON; and
-- the human interpretation, clearly separated from the verified decision.
+- the interpretation, clearly separated from the verified decision.
 
 When diagnostic work leads to a new acceptance rule, define and calibrate that
 rule outside the current bundle, review it, then create a new versioned policy

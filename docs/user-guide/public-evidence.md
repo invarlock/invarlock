@@ -72,18 +72,6 @@ It recomputes aggregates of recorded scores and does not add a native runtime qu
 The reference includes an offline recipient helper, source attribution and the
 full signed payload.
 
-## Evidence not yet created
-
-The following comparisons have no pack in the current index. They may be added
-when a 400-record evaluation completes the same strict verification,
-independent-receipt, and disclosure-review path.
-
-| Comparison | Intended runtime | Publication state |
-| --- | --- | --- |
-| Gemma 4 12B vision-text checkpoint and authenticated derivative | Hugging Face vision-text add-in | Evidence not yet created |
-| Qwen 3.5 27B and Qwen 3.6 27B vision-text checkpoints | Hugging Face vision-text add-in | Evidence not yet created |
-| Qwen2.5 0.5B Q8_0 and Q4_K_M artifacts | GGUF/llama.cpp add-in | Evidence not yet created |
-
 ## Publication boundary
 
 The source tree has two carriers:

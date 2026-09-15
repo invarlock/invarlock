@@ -13,6 +13,10 @@ The example uses the public InvarLock verifier and needs no service account. Its
 of invocation. A deployment consumer must use the checked directories and prevent
 later writes or substitutions before loading them.
 
+This handoff consumes native pack-v1 evidence and its native acceptance
+attestation. Captured packs and judge envelopes are different assurance
+contracts and cannot be substituted, even when their signed decisions pass.
+
 ## Select the package and the contents separately
 
 A ModelKit digest identifies the exact OCI manifest bytes. It does not identify

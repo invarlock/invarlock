@@ -27,9 +27,11 @@ should not be synthesized.
 | Import authentication | Sidecar, schedule, runtime-manifest, or pair mismatch | No published evidence directory |
 | Publication | Signing, staging, parent identity, or destination error | No partial published destination |
 | Verification | Nonzero result with integrity, policy, or anchor errors | Bundle unchanged; signed rejection receipt when the transaction completed |
-| Reporting | Invalid bundle or existing HTML destination | Bundle unchanged; no new HTML |
+| Reporting | Invalid evidence, output collision, or failed output write | Evidence unchanged; earlier completed outputs may remain after a later write fails |
 
-Use machine-readable output for the first two core transactions:
+Use machine-readable output for evaluation and verification. The example below
+uses native pack-v1 trust anchors; captured and judge evidence need their own
+[trust contracts](evidence-and-verification.md).
 
 ```bash
 invarlock evaluate request.yaml --signing-key evidence-signer.pem --json
@@ -82,7 +84,8 @@ new destination in the request or verify command. For a disposable tutorial,
 start from a fresh copy of `examples/`. Do not remove or mutate an artifact that
 has already been distributed.
 
-HTML rendering is also no-clobber. Choose a new `--html` path.
+HTML, Markdown and JUnit rendering are also no-clobber. Choose fresh output
+paths and inspect `written_outputs` if a multi-output render failed.
 
 ## Request path is rejected
 
@@ -267,9 +270,14 @@ verdict and independently pin the verifier fingerprint.
 
 ## A received receipt does not validate
 
-The stable receipt reader checks six independent relationships: verifier
-signature, verifier identity and fingerprint, pack manifest digest, policy
-digest, both runtime digests, and evidence-signer fingerprint.
+The native receipt reader checks the verifier signature, independently pinned
+verifier identity and fingerprint, pack manifest digest, policy bytes, both
+artifact and runtime anchors, canonical schedule, and evidence-signer anchor.
+A v2 native receipt also requires its independent request anchor; GGUF evidence
+requires this form. An optional expected trust-profile digest can constrain the
+verifier configuration. Captured receipts instead require complete-run and
+request pins. Missing native artifact or schedule arguments raise `TypeError`;
+follow the [complete receipt example](evidence-and-verification.md#validate-a-received-receipt).
 
 Classify the error before retrying:
 
@@ -278,7 +286,7 @@ Classify the error before retrying:
 | Signature or embedded public-key mismatch | Receipt was changed, malformed, or signed by another key. |
 | Verifier identity or fingerprint mismatch | Caller trust configuration does not authorize the signer. |
 | Manifest digest mismatch | Receipt belongs to another pack or pack bytes changed. |
-| Policy/runtime/evidence-signer anchor mismatch | Caller and verifier did not use the same independently maintained trust inputs. |
+| Policy/artifact/schedule/runtime/request/signer anchor mismatch | Caller and verifier did not use the same independently maintained trust inputs. |
 | Receipt is inside the evidence pack | The closed bundle was modified or packaged incorrectly. |
 
 Do not read expected values from the failing receipt to silence these errors.
@@ -291,6 +299,21 @@ Exact match is literal Unicode string equality. Whitespace, case, punctuation,
 and line endings are significant. If normalization is part of the desired
 metric, define and authenticate it before provider observation; do not normalize
 only one side after execution.
+
+## Judge collection or replay fails
+
+Confirm the request family first: native v1 `metric: judge` collects model
+answers before judging, captured v2 `metric: judge` uses evaluator records, and
+frozen-answer v3 selects `judge_import` or `judge_collect`. Their evidence uses
+the separate judge recipient policy rather than native pack-v1 trust flags.
+
+Preflight must pass before collection. Check the complete recipe reservations,
+installed collector and supported configuration. For interrupted collection,
+resume the same private workspace with unchanged identities; do not regenerate
+answers or replace failed attempts. A changed model, input, rubric or policy
+requires a new workspace. Offline imports need retained calls and source
+bindings; scalar ratings alone cannot supply them. See the
+[judge workflow and recovery rules](evaluation-request.md#judge).
 
 ## Normalized NLL fails closed
 

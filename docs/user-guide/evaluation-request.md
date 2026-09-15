@@ -25,7 +25,10 @@ secrets, or authorize its own runtime digest.
 Captured records use the separate `invarlock/evaluation-request-v2` contract
 with `execution.mode: captured` through the same `evaluate` command. Follow
 [Captured results](captured-results.md) for that request, run pins, and independent
-verification. The native v1 shapes below remain unchanged.
+verification. Frozen-answer `invarlock/evaluation-request-v3` requests select
+`judge_import` or `judge_collect` when the runs and judge plan are already
+prepared; see the [judge request contract](../reference/judge-measurements.md).
+The native v1 shapes below support all three built-in scorers.
 
 ## Choose the execution mode
 
@@ -246,6 +249,48 @@ byte-weighted loss. It measures expected-continuation likelihood regression
 under the authenticated prompt, target, provider, and runtime; it is not a
 general model-quality measure.
 
+### `judge`
+
+Select this built-in scorer when generated text needs bounded rubric-based
+ratings. Keep the native baseline, subject, dataset and execution fields, and
+add this comparison fragment:
+
+```yaml
+comparison:
+  metric: judge
+  policy: judge-policy.json
+  judge:
+    workspace: judge-work
+    signer_identity: evaluation-signer
+```
+
+The policy uses `invarlock/native-judge-policy-v1` and binds the rubric,
+judge identity and configuration, rating scale, independent-unit assignments,
+repetitions, analysis thresholds and collection budgets. Create a complete
+starting workspace with `invarlock evaluate --init demo --example native-judge`.
+Its illustrative model digests and two cases must be replaced before use.
+
+Native judging requires exactly one text input part per record; image/content
+inputs are rejected. Run mode first collects authenticated answers through the
+provider's text-output surface and freezes the runtime capture. Import mode
+authenticates complete provider sidecars bound to the same judge policy. Both then collect ratings
+through the separately installed collector. Preflight validates prerequisites
+and complete reservations without model or judge calls. The model workers remain
+network-disabled; judge collection has its own explicit authorization and limits.
+
+The private judge workspace supports resuming admitted trials against the same
+frozen answers. Changed models, data, rubric, policy or runtime identities need
+a new workspace. Repeated ratings do not create more independent tasks. Unless
+`plan.prompt.reference_mode: per_case` is selected, authenticated expected
+outputs are not sent to the judge.
+
+Judge evidence has a separate envelope, analysis and recipient-policy contract;
+it does not use the comparison-report-v3 interval or native pack-v1 receipt
+shown for exact match and NLL. Follow the
+[native judge starter](https://github.com/invarlock/invarlock/blob/main/examples/native-judge/README.md)
+through collection, independent verification, reporting and recovery, and use the
+[judge reference](../reference/judge-measurements.md) for exact contracts.
+
 ### Derived perplexity interpretation
 
 For a normalized-NLL report, InvarLock derives token-normalized NLL when both
@@ -317,14 +362,8 @@ Separately installed and explicitly authorized scorer packages may implement
 deterministic token F1, structured extraction, or VQA answer normalization. SQL
 or code execution, model-based semantic similarity, network and human scoring,
 external models, and LLM judges are excluded from the scorer-extension contract.
-Use the built-in `metric: judge` for bounded rubric-based text grading through
-the installed native workflow. It uses the same run/import request lifecycle and
-retains runtime provenance, while replaying judgments through its bounded judge
-contract. Supply `comparison.judge: {workspace: judge-work, signer_identity:
-evaluation-signer}` and a native judge policy. Frozen-answer v3 requests remain
-available when native provider provenance is unavailable. See the
-[judge reference](../reference/judge-measurements.md) and the complete
-[native starter](https://github.com/invarlock/invarlock/blob/main/examples/native-judge/README.md).
+Use the built-in [`judge` scorer](#judge) for bounded rubric-based text grading
+with its separate collection and replay contract.
 
 ## Authenticated optional observations
 
@@ -382,7 +421,8 @@ for one scheduled record remain coupled. The upper bound controls the
 normalized-NLL policy. A favorable point estimate cannot override an interval
 that crosses the policy limit.
 
-Each metric policy may optionally add a coupled record-count and interval-width
+For exact match, normalized NLL and deterministic extensions, a metric policy
+may optionally add a coupled record-count and interval-width
 requirement. Exact match and scorer extensions pair `minimum_record_count` with
 `maximum_interval_width_pp`; normalized NLL pairs it with
 `maximum_interval_width_ratio`. Exact match may independently add
@@ -431,8 +471,9 @@ allow different digest-pinned images or devices. Workers that share a generic
 or identical CUDA selector run sequentially; workers assigned explicitly
 different CUDA indexes can run in parallel.
 
-The request cannot enable network or remote code. Runtime-image identity,
-device selection, resource ceilings, and worker identity remain
+The request cannot enable network or remote code in model workers. Native judge
+collection uses the separately authorized collector described above. Runtime-image
+identity, device selection, resource ceilings, and worker identity remain
 caller-controlled so submitted YAML cannot grant itself host capabilities.
 
 ## Import mode

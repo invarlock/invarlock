@@ -177,14 +177,21 @@ self-authorize. Verify the receipt through the Python facade with a deliberately
 wrong expected verifier fingerprint:
 
 ```python
+import json
 from pathlib import Path
 
 from invarlock.engine import verify_signed_verification_receipt
 
+anchors = json.loads(Path("trusted-inputs/input-digests.json").read_text())
 result = verify_signed_verification_receipt(
     Path("accepted.receipt.json"),
     Path("artifacts/evidence"),
     policy_path=Path("policy/acceptance.json"),
+    expected_artifact_digests={
+        "baseline": anchors["baseline_artifact"],
+        "subject": anchors["subject_artifact"],
+    },
+    expected_schedule_digest=anchors["canonical_schedule"],
     expected_runtime_digests={
         "baseline": "sha256:" + "1" * 64,
         "subject": "sha256:" + "2" * 64,
@@ -196,7 +203,7 @@ result = verify_signed_verification_receipt(
     expected_verifier_fingerprint="sha256:" + "0" * 64,
 )
 assert not result.ok
-assert result.errors
+assert "receipt verifier key does not match caller expectation" in result.errors
 ```
 
 Expected result: the receipt signature may be cryptographically valid while
