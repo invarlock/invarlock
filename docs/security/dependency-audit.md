@@ -18,7 +18,7 @@ When `make security` reports an advisory:
 1. confirm the affected distribution and installed version from the isolated
    audit environment;
 2. read the upstream advisory and fixed-version information;
-3. determine whether the vulnerable code is reachable in the core, HF extra,
+3. determine whether the vulnerable code is reachable in the core, HF runtime,
    GGUF, TensorRT-LLM, vision-text, Inspect judge collection, diagnostics,
    build, or documentation surface;
 4. prefer upgrading, removing, or constraining the dependency;
@@ -48,6 +48,42 @@ not hide future advisories against its upstream code. A dependency removal
 requires a consistent installed dependency closure, execution of the supported
 path, and checks that the omitted packages are absent. Historical signed packs
 and their declared identities are not rewritten to describe a newer image.
+
+## Hardened Accelerate runtime
+
+The maintained HF closures use `accelerate==1.14.0+invarlock.1`. Bootstrap
+verifies the pinned upstream wheel, derives the checkpoint-loading fix, and
+checks the fixed derived digest before an installer can use the wheel:
+
+```bash
+python scripts/security/build_hardened_accelerate_wheel.py bootstrap
+```
+
+The same source-derived wheel supplies repository runtime groups and OCI
+builds. Runtime requirement locks allow only its SHA-256. The separate
+`accelerate-upstream-wheel.txt` is an authenticated build input, not an
+installable runtime closure.
+
+The lock audit verifies the derived artifact before scanning Accelerate under
+its upstream `1.14.0` identity. It retains raw findings and records
+`GHSA-4j2p-28q2-5m79` and `PYSEC-2026-3804` as remediated only when the exact
+artifact binding succeeds. New advisories still block. A missing wheel,
+changed hash, unsupported local version, or invalid scanner output fails
+closed. The local version never exempts the remaining upstream code from
+vulnerability checks.
+
+The checkpoint APIs open index-selected paths relative to a pinned directory
+and deserialize through an open file descriptor. They reject traversal,
+symlinks, FIFOs and other special files. Materialize cache links
+before using these direct APIs. The caller selects the checkpoint root and
+must keep its contents immutable while loaded tensors remain in use; pinning a
+file prevents pathname replacement, not writes to that same file. Linux and
+macOS are the supported descriptor implementations.
+
+Before replacing this derivation with an upstream release, run the same
+installed adversarial checks and the maintained Transformers, PEFT and Harness
+journeys. Update every runtime lock and image together, retain the upstream
+advisory scan, and preserve historical runtime identities and evidence.
 
 ## Exception decision
 
@@ -93,7 +129,7 @@ artifact locations in the allowlist or issue.
 ## Installed packages and approved locks
 
 An ordinary installed-package audit does not inherit a requirements-file
-exception. The HF audit can bind one installed package to an approved lock
+exception. The HF audit binds the hardened package to its authenticated lock
 using `--installed-lock`, its literal `--installed-lock-sha256`, and an
 `--installed-wheel`. The wheel must match the package name, version and SHA-256
 recorded in that exact lock. Its authenticated payload must match the installed
@@ -108,14 +144,18 @@ binding. This checks inventory; it does not authenticate every dependency file.
 The HF installation uses `--no-compile` so unverified bytecode cannot substitute
 for the authenticated Python source. The full installed `pip-audit` scan still
 runs without advisory-ignore flags. The report preserves its raw findings and
-separately identifies accepted and blocking findings. Only the matching package,
-version and advisory can receive the existing approved decision; other installed
-surfaces, changed locks and unmatched findings remain blocking. Scanner errors
+separately identifies accepted, remediated and blocking findings. Only the matching package,
+version and advisory can receive an approved exception or authenticated
+remediation decision; other installed surfaces, changed locks and unmatched
+findings remain blocking. Scanner errors
 and invalid output cannot become successful audits.
 
 Changing the HF lock requires reviewing and updating its literal audit digest.
-A successful bound audit means the approved exception applies to those exact
-installed bytes. It does not mean the upstream vulnerability has been fixed.
+For the hardened wheel, the audit verifies its derivation and installed payload,
+then scans the full inventory with Accelerate mapped to its upstream version.
+Its report separates remediated findings from blocking findings. An exception
+for another package would apply only to its approved bytes and would not claim
+that its upstream vulnerability had been fixed.
 
 ## Review and removal
 

@@ -13,6 +13,7 @@ import os
 import re
 import stat
 import subprocess
+import tempfile
 import zipfile
 from email.parser import BytesParser
 from pathlib import Path, PurePosixPath
@@ -116,6 +117,11 @@ def _lock(value: str, pin: str) -> tuple[bytes, dict[str, tuple[str, set[str]]]]
     _require(
         re.fullmatch(r"[0-9a-f]{64}", pin) and _sha(data) == pin, "lock SHA256 mismatch"
     )
+    return data, parse_locked_pins(data)
+
+
+def parse_locked_pins(data: bytes) -> dict[str, tuple[str, set[str]]]:
+    """Parse the exact hashed package inventory without resolving dependencies."""
     pins: dict[str, tuple[str, set[str]]] = {}
     pending = ""
     for raw in data.decode("utf-8").splitlines():
@@ -139,7 +145,7 @@ def _lock(value: str, pin: str) -> tuple[bytes, dict[str, tuple[str, set[str]]]]
         pins[package] = (match[2], set(re.findall(r"sha256:([0-9a-f]{64})", match[3])))
         pending = ""
     _require(not pending and bool(pins), "incomplete or empty lock")
-    return data, pins
+    return pins
 
 
 def _metadata(data: bytes) -> tuple[str, str]:
@@ -253,8 +259,10 @@ def _inventory(root: Path) -> tuple[dict[str, str], dict[str, Path]]:
         _require(item.is_dir(), "dist-info must be a directory")
         name, version = _metadata(_read(item / "METADATA"))
         _require(name not in versions, "duplicate installed distribution")
+        suffix = f"-{version}.dist-info"
         _require(
-            item.name == f"{name.replace('-', '_')}-{version}.dist-info",
+            item.name.endswith(suffix)
+            and _name(item.name.removesuffix(suffix)) == name,
             "installed dist-info identity mismatch",
         )
         versions[name], locations[name] = version, item
@@ -386,6 +394,17 @@ def bind_installation(args: argparse.Namespace, entries: list) -> dict:
         "unapproved bootstrap lock source",
     )
     wheel_data, files, dist, package, version = _wheel(Path(args.installed_wheel))
+    if __package__:
+        from . import hardened_accelerate_audit as hardened
+    else:
+        import hardened_accelerate_audit as hardened
+    remediation = None
+    if package == hardened.PACKAGE and version == hardened.HARDENED_VERSION:
+        remediation = hardened.verify_wheel(Path(args.installed_wheel))
+        _require(
+            args.installed_lock != hardened.SOURCE_LOCK,
+            "source-only wheel lock is not a runtime installation",
+        )
     approvals = [
         entry
         for entry in entries
@@ -393,11 +412,15 @@ def bind_installation(args: argparse.Namespace, entries: list) -> dict:
         and version in entry.versions
         and args.installed_lock in entry.allowed_sources
     ]
-    _require(bool(approvals), "component or lock source has no approved exception")
+    _require(
+        bool(approvals) or remediation is not None,
+        "component or lock source has no approved exception or authenticated remediation",
+    )
     _require(
         package in lock
         and lock[package][0] == version
-        and _sha(wheel_data) in lock[package][1],
+        and _sha(wheel_data) in lock[package][1]
+        and (remediation is None or lock[package][1] == {_sha(wheel_data)}),
         "wheel is not the exact locked artifact",
     )
     project_data, project_files, project_dist, project, project_version = _wheel(
@@ -445,7 +468,14 @@ def bind_installation(args: argparse.Namespace, entries: list) -> dict:
         "installed_distribution_inventory": installed,
         **component,
         "approved_advisories": sorted({entry.advisory for entry in approvals}),
-        "scope": "Exact installed distribution names and versions; byte authentication of the excepted component only. Other dependencies remain fully audited without exceptions. Trusted workflow filesystem ownership is required throughout the audit.",
+        "remediation": remediation,
+        "scan_distribution_inventory": {
+            name: (
+                hardened.UPSTREAM_VERSION if remediation and name == package else pin
+            )
+            for name, pin in installed.items()
+        },
+        "scope": "Exact installed distribution names and versions; byte authentication of the identified component. A verified derived wheel is scanned using its upstream identity. Other dependencies remain fully audited. Trusted workflow filesystem ownership is required throughout the audit.",
     }
 
 
@@ -488,14 +518,23 @@ def _classify(raw: object, binding: dict, returncode: int) -> tuple[list, list]:
             record = {"name": name, "version": version, "finding": finding}
             # Only registered canonical IDs authorize acceptance. Scanner aliases
             # remain visible but cannot turn an unrelated ID into an exception.
-            applies = (
-                name == binding["package"]
-                and version == binding["version"]
-                and finding["id"] in binding["approved_advisories"]
+            applies = name == binding["package"] and (
+                (
+                    version == binding["version"]
+                    and finding["id"] in binding["approved_advisories"]
+                )
+                or (
+                    binding.get("remediation")
+                    and version == binding["remediation"]["upstream_version"]
+                    and finding["id"] in binding["remediation"]["remediated_advisories"]
+                )
             )
             (accepted if applies else blocking).append(record)
     _require(
-        observed == binding["installed_distribution_inventory"],
+        observed
+        == binding.get(
+            "scan_distribution_inventory", binding["installed_distribution_inventory"]
+        ),
         "scanner inventory differs from authenticated installed inventory",
     )
     _require(
@@ -505,14 +544,38 @@ def _classify(raw: object, binding: dict, returncode: int) -> tuple[list, list]:
     return accepted, blocking
 
 
+def scan_upstream_inventory(inventory: dict[str, str], report: dict):
+    """Audit exact upstream identities without installing or resolving artifacts."""
+    requirements = "".join(
+        f"{name}=={version}\n" for name, version in sorted(inventory.items())
+    )
+    with tempfile.TemporaryDirectory(prefix="upstream-audit-") as temporary:
+        path = Path(temporary) / "requirements.txt"
+        path.write_text(requirements, encoding="utf-8")
+        command = [
+            "pip-audit",
+            "--requirement",
+            str(path),
+            "--no-deps",
+            "--disable-pip",
+            "--format",
+            "json",
+        ]
+        report["scanner_command"] = command
+        report["scanner_requirements"] = requirements
+        report["scanner_requirements_sha256"] = _sha(requirements.encode())
+        return subprocess.run(command, check=False, capture_output=True, timeout=300)
+
+
 def run_bound_audit(args: argparse.Namespace, load_allowlist) -> int:
     report: dict = {
         "status": "blocked",
         "accepted_findings": [],
+        "remediated_findings": [],
         "blocking_findings": [],
         "raw_stdout": "",
         "raw_stderr": "",
-        "scope": "Temporary component exception; not a clean vulnerability scan.",
+        "scope": "Authenticated component audit with raw upstream findings retained; remediation and temporary exceptions are separately classified.",
     }
     try:
         required = [
@@ -534,11 +597,16 @@ def run_bound_audit(args: argparse.Namespace, load_allowlist) -> int:
         report["allowlist_sha256"] = _sha(policy_data)
         binding = bind_installation(args, entries)
         report["binding"] = binding
-        command = ["pip-audit", "--path", args.path[0], "--format", "json"]
-        report["scanner_command"] = command
-        completed = subprocess.run(
-            command, check=False, capture_output=True, timeout=300
-        )
+        if binding["remediation"]:
+            completed = scan_upstream_inventory(
+                binding["scan_distribution_inventory"], report
+            )
+        else:
+            command = ["pip-audit", "--path", args.path[0], "--format", "json"]
+            report["scanner_command"] = command
+            completed = subprocess.run(
+                command, check=False, capture_output=True, timeout=300
+            )
         report.update(
             {
                 "scanner_returncode": completed.returncode,
@@ -551,7 +619,10 @@ def run_bound_audit(args: argparse.Namespace, load_allowlist) -> int:
         raw = _json(completed.stdout)
         report["raw_findings"] = raw
         accepted, blocking = _classify(raw, binding, completed.returncode)
-        report["accepted_findings"], report["blocking_findings"] = accepted, blocking
+        report[
+            "remediated_findings" if binding["remediation"] else "accepted_findings"
+        ] = accepted
+        report["blocking_findings"] = blocking
         _require(
             _read(Path(args.allowlist)) == policy_data, "allowlist changed during audit"
         )
@@ -561,7 +632,11 @@ def run_bound_audit(args: argparse.Namespace, load_allowlist) -> int:
             "installed binding changed during audit",
         )
         report["status"] = (
-            "blocked" if blocking else "accepted_exception" if accepted else "clean"
+            "blocked"
+            if blocking
+            else ("remediated" if binding["remediation"] else "accepted_exception")
+            if accepted
+            else "clean"
         )
     except (
         OSError,
@@ -578,10 +653,15 @@ def run_bound_audit(args: argparse.Namespace, load_allowlist) -> int:
         if isinstance(exc, subprocess.TimeoutExpired):
             report["raw_stdout_base64"] = base64.b64encode(exc.stdout or b"").decode()
             report["raw_stderr_base64"] = base64.b64encode(exc.stderr or b"").decode()
-    if not args.report:
+    write_report(report, args.report)
+    return 0 if report["status"] in {"clean", "accepted_exception", "remediated"} else 1
+
+
+def write_report(report: dict, report_path: str | None) -> None:
+    if not report_path:
         print(json.dumps(report, indent=2))
-        return 1
-    destination = _safe_path(Path(args.report))
+        return
+    destination = _safe_path(Path(report_path))
     destination.parent.mkdir(parents=True, exist_ok=True)
     _safe_path(destination)
     fd = os.open(
@@ -599,5 +679,4 @@ def run_bound_audit(args: argparse.Namespace, load_allowlist) -> int:
             stream.write("\n")
     finally:
         os.close(fd)
-    print(f"Installed audit: {report['status']}; report: {args.report}")
-    return 0 if report["status"] in {"clean", "accepted_exception"} else 1
+    print(f"Dependency audit: {report['status']}; report: {report_path}")

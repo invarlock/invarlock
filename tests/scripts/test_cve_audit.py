@@ -434,7 +434,7 @@ def test_query_osv_batch_fails_closed_on_transport_or_response_shape(
         module.query_osv_batch([component], 1, enrich=False)
 
 
-def test_query_osv_batch_filters_malformed_vulnerabilities_and_can_enrich(
+def test_query_osv_batch_rejects_malformed_vulnerabilities_and_can_enrich(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     module = _load_script_module()
@@ -454,6 +454,13 @@ def test_query_osv_batch_filters_malformed_vulnerabilities_and_can_enrich(
 
     monkeypatch.setattr(module, "enrich_osv_results", enrich)
 
+    with pytest.raises(RuntimeError, match="invalid vulnerabilities"):
+        module.query_osv_batch([component], 1, enrich=True)
+    monkeypatch.setattr(
+        module,
+        "_read_json_url",
+        lambda *_a, **_k: {"results": [{"vulns": [{"id": "GHSA-valid"}]}]},
+    )
     result = module.query_osv_batch([component], 1, enrich=True)
     assert result == {component.key: [{"id": "GHSA-valid"}]}
     assert observed == [result]
@@ -461,7 +468,8 @@ def test_query_osv_batch_filters_malformed_vulnerabilities_and_can_enrich(
     monkeypatch.setattr(
         module, "_read_json_url", lambda *_args, **_kwargs: {"results": [None]}
     )
-    assert module.query_osv_batch([component], 1, enrich=False) == {component.key: []}
+    with pytest.raises(RuntimeError, match="invalid component result"):
+        module.query_osv_batch([component], 1, enrich=False)
 
 
 def test_osv_enrichment_caches_results_and_falls_back_on_transport_failure(
@@ -594,6 +602,7 @@ def test_build_report_uses_network_query_and_inventory_provenance(
 ) -> None:
     module = _load_script_module()
     component = _component(module)
+    (tmp_path / "uv.lock").write_text("version = 1\n")
     monkeypatch.setattr(module, "collect_inventory", lambda _root: [component])
     monkeypatch.setattr(module, "load_allowlist", lambda _path: {})
     observed: list[tuple[int, bool]] = []
