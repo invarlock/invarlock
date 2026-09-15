@@ -70,11 +70,12 @@ When using InvarLock:
 
 1. **Keep dependencies updated**: install a current InvarLock release and audit
    the complete environment, including optional provider runtimes.
-2. **Verify with external trust anchors**: supply the policy, baseline and
-   subject artifact-identity digests, canonical schedule digest, both expected
-   runtime digests, expected evidence-signer fingerprint, and, for GGUF,
-   normalized-request digest independently of the evidence bundle. Write and
-   retain a separately signed verifier receipt.
+2. **Verify with external trust anchors**: use the trust contract for the
+   evidence workflow. Native deterministic evidence binds policy, artifact,
+   schedule, runtime and signer identities; GGUF also requires a request pin.
+   Captured evidence uses run/request/policy/signer pins; bounded judge evidence
+   uses its recipient-policy contract. Obtain expected values independently of
+   the submitted bundle and retain a separately signed verifier receipt.
 3. **Inspect authenticated evidence**: use `invarlock report` only after the
    bundle has passed independent verification.
 4. **Isolate sensitive workloads**: use virtual environments or containers and
@@ -84,8 +85,11 @@ When using InvarLock:
    mounts plus an isolated writable output directory; the evidence-signing key
    remains in the host process and is never mounted into a model worker. A local
    key file is not isolation from compromise of that host process.
-5. **Keep evaluation offline by default**: leave `INVARLOCK_ALLOW_NETWORK=0`
-   unless an explicitly authorized provider operation requires network access.
+5. **Scope network access**: native model workers use the network-disabled
+   runtime boundary. The process-local guard leaves `INVARLOCK_ALLOW_NETWORK=0`
+   by default. Hosted answer capture and optional live judge collection are
+   separately configured network operations; their explicit credentials and
+   budgets do not authorize network access inside a native model worker.
 6. **Audit requests**: review every request, referenced input, output
    destination, provider, and policy before evaluation.
 
@@ -93,18 +97,19 @@ When using InvarLock:
 
 InvarLock includes several security features:
 
-- **Python-process network guard by default**: Python socket creation requires
-  explicit opt-in; strict evidence additionally requires an independently
-  enforced network-disabled container boundary.
+- **Runtime network controls**: the native runtime's Python-process network
+  guard requires explicit opt-in for socket creation. Native execution also
+  uses an independently enforced network-disabled container boundary. Offline
+  captured and judge verification do not call a provider.
 - **Supply chain checks**: SBOM generation and dependency auditing in CI
 - **Evidence-pack signatures**: Ed25519 manifest signatures authenticate the
   canonical pack when the verifier receives the expected evidence-signer
   fingerprint independently.
-- **Closed evidence binding**: the signed manifest binds the normalized request,
-  paired schedule and records, comparison report, and runtime-side provider
-  evidence carried by the bundle. The verifier also requires an external
-  policy, baseline and subject artifact-identity digests, canonical schedule
-  digest, and both expected runtime digests.
+- **Closed evidence binding**: each evidence format binds its declared inputs,
+  observations, analysis and policy. Native deterministic packs additionally
+  bind their schedule and runtime-side provider evidence. Captured and judge
+  formats preserve their own source and measurement semantics; converting
+  supplied records does not turn them into proof of native execution.
 - **Independent verifier receipts**: verification can write a separately signed
   receipt that binds the verifier identity, decision, policy, trust inputs, and
   evidence digest. The receipt is not stored inside the signed evidence pack.

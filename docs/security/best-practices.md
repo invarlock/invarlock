@@ -7,8 +7,8 @@ container, key-management, and model-safety controls.
 !!! warning "Security guidance"
 
     **In plain language:** Keep signing authority, fixed inputs, and
-    acceptance decisions separate so one compromised role cannot silently
-    manufacture a trusted result.
+    acceptance expectations explicit so teams can detect incorrect handoffs,
+    unintended inputs and tampering before relying on a result.
 
     **Objective:** Operate evidence production and verification while
     preserving key separation, immutable inputs, independent anchors, and
@@ -135,8 +135,9 @@ digest or typed immutable identity determines equality.
 
 The request expresses comparison intent. Runtime image digest, device, and
 optional provider support resources come from caller-owned configuration. Keep
-network, remote code, and third-party plugin access disabled unless a separate
-risk review explicitly authorizes them.
+network and remote code disabled for native model workers. A risk approval does
+not override strict runtime restrictions. Authorize optional provider and scorer
+code explicitly; live judge collection uses its separate bounded network path.
 
 The in-process network guard is defense in depth, not a sandbox or host
 firewall. Use container or infrastructure-level egress controls for an
@@ -156,14 +157,15 @@ pass the same explicit `ScorerExtensionRegistry` to evaluation and
 verification. Installed code or a binding submitted inside evidence is not an
 authorization source.
 
-An acceptance scorer executes inside the evaluation and verifier trust
+A deterministic extension scorer executes inside the evaluation and verifier trust
 boundaries. Keep it deterministic and local, and reject implementations that
 use a network, external model, human judgment, SQL or code execution,
-model-based semantic similarity, or an LLM judge. Use the separate bounded
-judge-measurement workflow when its frozen-answer profile fits; it has its own
-plan, replay, statistics, and recipient policy. Other judge or review results
-may be attached as authenticated observations and remain outside policy
-arithmetic. The extension declaration and replay checks do not provide
+model-based semantic similarity, or an LLM judge. Selecting the built-in `judge`
+scorer uses its own plan, retained measurements, statistics and recipient policy
+for native or captured answers. Captured `recorded` metrics may also use approved
+upstream judge/human scores, with explicit provenance; replay checks their
+aggregation rather than reproducing the source judgment. The extension
+declaration and replay checks do not provide
 process isolation; enforce these restrictions with reviewed code and the
 deployment sandbox.
 
@@ -182,7 +184,7 @@ property of the container engine, driver, and host configuration.
 
 ## Establish independent anchors
 
-The verification operator should obtain these values independently of the
+For native pack-v1 evidence, the verification operator should obtain these values independently of the
 submitted pack:
 
 - exact acceptance-policy bytes;
@@ -201,6 +203,12 @@ Store them in protected CI or release configuration. A closed
 protect the referenced verifier key separately and do not populate the profile
 by parsing the evidence immediately before verification.
 
+Captured comparison instead uses `invarlock/trust-inputs-v2` with complete-run
+and normalized-request pins. Bounded judge evidence uses its separate recipient
+policy, including native-capture bindings when present. Keep the evidence format
+and verification scope explicit when selecting trust inputs; see the
+[trust model](trust-model.md#captured-hosted-and-judge-trust-inputs).
+
 `invarlock evaluate` always completes its execution-free validation before it
 allocates accelerators. Run it with `--preflight` when you want to stop at that
 boundary and inspect the exact request, signing key, and runtime-image options.
@@ -214,6 +222,12 @@ configuration qualification, not as evidence that execution or policy will
 pass. For a scorer-bound request, the same preflight must load the explicitly
 authorized scorer and validate its exact descriptor, configuration schema, and
 task compatibility before compute is allocated.
+
+### Optional runtime release qualification
+
+The following source-bound canary and readiness targets are maintainer and
+runtime-release controls. Ordinary `evaluate`, `verify` and `report` use does
+not require these targets, a retained reference study, or a Git checkout.
 
 For release qualification, first use `runtime-qualification-canary` or the
 provider's `qualify-canary` target to run one representative, strictly verified
@@ -250,7 +264,9 @@ recreates that commit's archive with system Git and compares the complete
 execution-source inventory and bytes with the supplied bundle. A copied tar
 whose PAX comment merely names another commit is rejected.
 
-Run the complete verification transaction:
+### Verify the selected evidence
+
+Run the complete native verification transaction:
 
 ```bash
 invarlock verify evidence/ \
@@ -265,6 +281,21 @@ transaction produced one; it records which anchors and evidence were verified.
 Before automation relies on a receipt, verify it against the expected verifier
 identity and fingerprint from the same independent configuration class. The
 receipt's embedded public key is not an authorization record.
+
+## Live collection and hosted captures
+
+Native model workers remain offline. Live judge collection is an explicitly
+configured external call path with declared call, token, cost, timeout and
+retention bounds. Limit credentials to that collector and keep them out of
+requests, logs and evidence. Inspect task, answer and optional reference content
+against the provider's data-handling requirements before collection. Offline
+measurement import, verification and reporting need no judge credentials.
+
+Hosted-service captures retain the declared service configuration and observation
+window, not model-weight identity. Keep capture scripts, retries and scheduling
+under caller control and collect a fresh run for requalification; the engine does
+not continuously monitor the endpoint. See
+[hosted requalification](../user-guide/hosted-service-requalification.md).
 
 ## Precommit schedule and run selection
 
@@ -365,7 +396,7 @@ new image is byte-identical or that the old result remains trustworthy.
 
 ## Review before acceptance
 
-Use the one-screen [acceptance checklist](../assurance/acceptance-checklist.md).
+Use the [acceptance checklist](../assurance/acceptance-checklist.md).
 Pay particular attention to:
 
 - whether the finite schedule matches the intended decision scope;

@@ -1,9 +1,9 @@
 # Decision semantics
 
 !!! abstract "Assurance note"
-    **In plain language:** InvarLock recomputes every score from authenticated
-    paired records, derives the metric's paired interval, and applies the policy
-    to the conservative bound. When the policy qualifies sample size,
+    **In plain language:** For native exact match and NLL, InvarLock recomputes
+    scores from authenticated paired records, derives the paired interval, and
+    applies the policy to the conservative bound. When the policy qualifies sample size,
     precision, or exact-match side accuracy, those checks must pass too. A
     favorable point value cannot override a threshold, count, width, or side-
     accuracy failure.
@@ -19,14 +19,15 @@
     independent artifact and schedule anchors, and the metric-specific paired
     interval recorded in the report.
 
-InvarLock makes one decision over one authenticated, ordered, finite schedule.
+The native exact-match, normalized-NLL and deterministic extension contract
+makes one decision over one authenticated, ordered, finite schedule.
 It reports a point comparison and a verifier-replayed paired interval. Exact
 match uses a paired Newcombe 95% effect-size interval. Normalized NLL and an
 authorized scorer extension use deterministic paired resampling over the
 authenticated schedule.
 
-New evaluations emit `invarlock/comparison-report-v3`. Strict verification
-continues to replay v2 reports without side-accuracy qualification and v1
+New evaluations under that contract emit `invarlock/comparison-report-v3`.
+Strict verification continues to replay v2 reports without side-accuracy qualification and v1
 reports with their original exact-match interval method, so signed historical
 evidence keeps its original meaning.
 
@@ -379,8 +380,8 @@ $$
 Potential separately implemented scorers include deterministic token F1,
 structured-field extraction, and VQA answer normalization. The scorer-extension v1 contract
 does not admit SQL or code execution, model-based semantic similarity, network
-services, human judgment, external models, or LLM judges. Judge outputs may be
-authenticated observations, but observations do not enter acceptance.
+services, human judgment, external models, or LLM judges. Those sources do not
+execute through the deterministic extension contract.
 
 The native `judge` scorer uses a separate bounded measurement decision contract. It
 retains and replays the declared judge requests, responses, attempts, parsing,
@@ -397,9 +398,51 @@ be positive and no greater than 200. Normalized NLL uses positive
 through 10,000. The canonical v3 report records the minimum, maximum, observed
 values, units, individual results, and combined `sample_qualification.passed`.
 
+## Captured comparison and bounded judge decisions
+
+Captured exact-match and normalized-NLL requests use the
+`invarlock/multi-metric-comparison-v1` contract. Its binary metrics use paired
+Newcombe intervals in score units; continuous delta metrics use
+`paired_mean_shake256_percentile_v1`, which differs from the native SHA-256
+resampling method. Captured NLL reuses the native mean-ratio arithmetic and
+`paired_percentile_bootstrap_sha256_v1`, seeded from the sorted scope's retained
+case facts rather than a native provider schedule. Captured policy evaluates
+every metric and slice; its marginal intervals do not provide simultaneous
+family-wide coverage.
+
+Captured `recorded` metrics can apply policy to upstream scores, including judge
+or human ratings with explicit approved provenance and rubric binding. Replay
+recomputes aggregation and decision arithmetic, not the upstream judgment.
+Missing facts or insufficient count produce `insufficient_evidence`; a violated
+regression or subject bound produces `regression`; an otherwise acceptable but
+overly wide interval produces `insufficient_evidence`. All metric/slice rows
+must pass for the comparison to pass. See the
+[captured policy contract](../reference/evaluation-records.md).
+
+Selecting `judge` instead uses `fixed-benchmark-hoeffding-v1` over bounded,
+independent units. Replay averages repetitions within cases and cases within
+units before calculating equal-unit means. Repetitions and additional cases in
+one unit do not increase the inference sample size. The Hoeffding bound targets
+the fixed benchmark's average expected score under the declared independence
+assumption; it is not the schedule-composition bootstrap described above.
+Bonferroni adjustment uses the declared family size and error budget, including
+published advisory intervals. Constant observed ratings still have positive
+interval width unless the declared support itself is constant.
+
+Judge gates distinguish `pass`, `regression` and `insufficient_evidence`.
+Bounds entirely beyond tolerated degradation establish regression; bounds that
+still straddle the decision boundary remain inconclusive. Minimum-unit and
+precision checks also apply, and incomplete scheduled trials prevent complete-
+case inference. `decision_role: required` controls the conjunction of metrics;
+advisory metrics cannot independently authorize recipient acceptance. This is
+a policy role, not a human-review request. Optional reference-label studies
+assess the judge's usefulness but are not inputs required by runtime replay.
+See [judge statistics](../reference/judge-measurements.md#statistical-scope).
+
 ## Verifier-owned replay
 
-The evidence signer cannot supply an accepted aggregate directly. Verification:
+For native pack-v1 evidence, the evidence signer cannot supply an accepted
+aggregate directly. Verification:
 
 - reconstructs the canonical schedule and record order;
 - derives exact-match or normalized-NLL record scores from authenticated facts,
