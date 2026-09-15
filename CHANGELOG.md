@@ -72,6 +72,9 @@ while strengthening evidence verification, runtime isolation and release checks.
   reference-label comparison with disagreements and provenance. Both frozen
   held-out policies pass; label agreement does not establish general judge
   accuracy. Reference replay accepts explicit archive byte limits.
+  Current reference bundles and review records use v2 formats with neutral
+  reference-label fields. An offline upgrade preserves frozen study inputs and
+  original archive verification; replay summaries retain recorded label sources.
 - **Qualification tooling:** a five-model K2 campaign harness binds immutable
   pairs, workflow cases and bounded capture. Image preparation and CPU probes
   retain dependency and security findings. Candidate configurations remain
