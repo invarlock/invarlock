@@ -37,9 +37,17 @@ def render(root: Path, project: Path) -> str:
         if parsed.scheme or parsed.netloc:
             if parsed.scheme not in {"https", "mailto"}:
                 raise ValueError(f"unsupported README URL: {url}")
-            if re.search(
-                r"(?:github.com/invarlock/invarlock/(?:blob|tree)|raw.githubusercontent.com/invarlock/invarlock)/(?:main|staging/next)/",
-                url,
+            repository_prefixes = {
+                "github.com": (
+                    "/invarlock/invarlock/blob/",
+                    "/invarlock/invarlock/tree/",
+                ),
+                "raw.githubusercontent.com": ("/invarlock/invarlock/",),
+            }
+            if any(
+                parsed.path.startswith(prefix + branch + "/")
+                for prefix in repository_prefixes.get(parsed.hostname, ())
+                for branch in ("main", "staging/next")
             ):
                 raise ValueError(f"unversioned repository resource: {url}")
             return match.group()

@@ -88,3 +88,32 @@ def test_picture_cleanup_preserves_literal_examples(tmp_path):
     result = readme.render(tmp_path, project(tmp_path, source))
     assert result.startswith("<p>\n\n\n\n</p>")
     assert '```html\n<picture><source srcset="x"></picture>\n  \n```' in result
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://github.com/invarlock/invarlock/tree/staging/next/docs",
+        "https://GITHUB.COM/invarlock/invarlock/blob/main/README.md",
+        "https://raw.githubusercontent.com/invarlock/invarlock/main/README.md",
+    ],
+)
+def test_mutable_repository_urls_are_rejected(tmp_path, url):
+    with pytest.raises(ValueError, match="unversioned repository resource"):
+        readme.render(tmp_path, project(tmp_path, f"[Link]({url})"))
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://githubXcom/invarlock/invarlock/blob/main/README.md",
+        "https://rawXgithubusercontent.com/invarlock/invarlock/main/README.md",
+        "https://example.com/github.com/invarlock/invarlock/blob/main/README.md",
+        "https://github.com/invarlock/invarlock/blob/v1.2.3/README.md",
+        "https://raw.githubusercontent.com/invarlock/invarlock/v1.2.3/README.md",
+        "https://github.com/another/repo/blob/main/README.md",
+    ],
+)
+def test_other_hosts_paths_and_versioned_resources_are_preserved(tmp_path, url):
+    source = f"[Link]({url})"
+    assert readme.render(tmp_path, project(tmp_path, source)) == source
