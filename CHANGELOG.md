@@ -83,6 +83,9 @@ while strengthening evidence verification, runtime isolation and release checks.
 
 ### Changed
 
+- Repository README links follow the selected branch or tag; package descriptions
+  pin documentation, examples and images to the package release version.
+
 #### Reports, commands and capacity
 
 - **Reports:** policy decisions, model/service identities, baseline/subject

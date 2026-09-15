@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "invarlock-runtime-gguf"
 version = "0.15.0"
 description = "First-party GGUF runtime provider add-in for InvarLock"
-readme = "README.md"
+readme = "packaging/README.md"
 requires-python = ">=3.12"
 license = "Apache-2.0"
 license-files = ["LICENSE"]

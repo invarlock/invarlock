@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "invarlock-diagnostics"
 version = "0.15.0"
 description = "Observation-only numeric diagnostics for InvarLock evidence workflows"
-readme = "README.md"
+readme = "packaging/README.md"
 requires-python = ">=3.12"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
