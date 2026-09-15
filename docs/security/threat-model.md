@@ -117,7 +117,8 @@ The plan binds the original task text, frozen answers, rubric, judge configurati
 reference mode, independent units and repetition schedule. Retained attempts and
 call, token, cost, timeout and storage limits constrain collection. They do not
 prove that a compromised operator or provider supplied truthful measurements,
-that the rubric reflects user needs, or that the judge agrees with human review.
+that the rubric reflects user needs, or that the judge agrees with independent
+reference labels.
 
 Task text and answers remain untrusted content inside the judge prompt. Explicit
 rendering and digest checks expose changed inputs; they do not eliminate prompt

@@ -33,15 +33,21 @@ def test_release_capture_runs_from_installed_core_before_addins(
         step for step in workflow["jobs"][job]["steps"] if step.get("name") == step_name
     )
     script = step["run"]
-    invocation = 'python captured-wheel-smoke.py --cli "${evaluation_cli}"'
+    invocation = (
+        'python scripts/release/core_wheel_consumers.py --cli "$(command -v invarlock)"'
+    )
     assert invocation in script
     assert script.index(core_install) < script.index(invocation)
     assert script.index(invocation) < script.index(addin_install)
-    assert 'evaluation_cli="$(command -v invarlock)"' in script
-    assert (
-        'cp examples/captured-results/wheel_smoke.py "${quickstart_root}/captured-wheel-smoke.py"'
-        in script
-    )
-    assert 'cd "${quickstart_root}"' in script[: script.index(invocation)]
     assert "unset PYTHONPATH" in script[: script.index(invocation)]
     assert "export PYTHONSAFEPATH=1" in script[: script.index(invocation)]
+
+
+def test_local_install_uses_shared_core_consumers_before_addins():
+    script = (
+        (ROOT / "Makefile").read_text().split("addins-install-smoke: dist-check", 1)[1]
+    )
+    invocation = '"$$smoke_venv/bin/python" scripts/release/core_wheel_consumers.py'
+    assert script.index("dist/*.whl") < script.index(invocation)
+    assert script.index(invocation) < script.index("dist/addins/*.whl")
+    assert '--cli "$$smoke_venv/bin/invarlock"' in script

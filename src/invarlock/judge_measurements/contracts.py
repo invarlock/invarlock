@@ -1304,6 +1304,7 @@ def validate_measurements(
     completed = 0
     source_positions: set[tuple[str, int, int]] = set()
     source_events: set[tuple[str, str]] = set()
+    provider_response_ids: set[str] = set()
 
     for trial in raw["trials"]:
         trial_raw = cast(dict[str, Any], trial)
@@ -1346,6 +1347,14 @@ def validate_measurements(
             if event in source_events:
                 _fail("retained model events must belong to exactly one attempt")
             source_events.add(event)
+            # The pinned Inspect projection records the provider response ID.
+            # It cannot represent independent calls in separate retained shards.
+            # Generic retained JSON does not promise this identity semantics.
+            response_id = attempt["request_id"]
+            if inspect_collections and response_id is not None:
+                if response_id in provider_response_ids:
+                    _fail("retained Inspect provider response IDs must be unique")
+                provider_response_ids.add(response_id)
         if trial_raw["status"] == "complete":
             completed += 1
         if replayed.get(expected_id) != trial_raw:

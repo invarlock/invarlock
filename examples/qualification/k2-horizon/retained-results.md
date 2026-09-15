@@ -142,11 +142,6 @@ artifacts, preserved source records and metric outcomes, and independent
 recipient bindings. Other historical comparisons have no published current
 captured pack.
 
-## Optional studies
-
-Additional models, runtime and quantization comparisons, strict routing and QA,
-tool trajectories, stability, cascades, retrieval, decoding and judging remain
-optional research. They have no delivery commitment and need not be completed
-to use standalone InvarLock. Their preparation does not establish experimental
-results. Required software correctness, security, integration checks and release
-review remain separate acceptance gates.
+Additional model, runtime, quantization or workflow comparisons require their
+own captured measurements and declared policies. These retained results do not
+establish outcomes for other configurations.

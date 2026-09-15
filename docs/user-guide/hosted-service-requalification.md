@@ -8,6 +8,10 @@
     **Prerequisites:** A capture harness with service access, a reviewed baseline
     and case set, policy fixed before capture, the core wheel, and independent trust inputs.
 
+Use a wheel and example files from the same source revision. For released
+packages, use their matching documentation; see
+[matching wheels and examples](getting-started.md#matching-wheels-and-examples).
+
 Use this workflow when the evaluated subject is a hosted model or an application
 using one. Your harness makes fresh service calls and retains the results;
 InvarLock imports those results through `execution.mode: captured`. The core
@@ -71,6 +75,12 @@ where needed for attribution, after applying the approved secret-handling rules.
 Record the harness source identity and the start and end of the observation
 window. Preserve failed and superseded attempts according to the declared rules;
 do not silently replace them with successful calls.
+
+The HTTP example enforces request deadlines using elapsed time from a monotonic
+clock. UTC timestamps describe observation windows and request ordering; replay
+checks those bounds separately because the system clock can change during
+capture. Recorded timings are source observations, not independent proof of how
+long a remote service executed.
 
 A hosted canonical run uses `artifact_digest: null` and the explicit
 `service_identity` described in the [record reference](../reference/evaluation-records.md#hosted-service-identity).

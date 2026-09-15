@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from invarlock.judge_measurements import contracts as c
+from tests.judge_measurements.test_analysis import _bundle, _retain, _runs
 from tests.judge_measurements.test_contracts import _measurements, _plan, _run
 
 
@@ -440,3 +441,79 @@ def test_gpt56_projection_is_version_bound_and_preserves_approved_semantics(
         c.JudgeMeasurementContractError, match="projection|messages differ"
     ):
         c._check_retained_inspect_event(attempt, event, collection)
+
+
+@pytest.mark.parametrize("segments", [1, 3])
+def test_provider_response_reuse_cannot_inflate_trials(retained, segments):
+    plan, measurements = _bundle(repetitions=3)
+    baseline, subject = _runs(plan)
+    template = retained[1]
+    source_template = measurements["sources"][0]
+    measurements["source_profile"] = "retained-inspect-model-events-v1"
+    measurements["sources"] = []
+    for segment in range(segments):
+        source_id = f"inspect-segment-{segment}"
+        source = copy.deepcopy(template)
+        source["records"] = []
+        source["collection"].update(
+            max_calls=96,
+            max_input_tokens=96 * 2000,
+            max_output_tokens=96 * 128,
+            max_cost_microusd=96 * 10000,
+        )
+        for trial in measurements["trials"][segment::segments]:
+            attempt = trial["attempts"][0]
+            attempt["request_id"] = "reused-response-" + trial["side"]
+            attempt["source"].update(
+                source_id=source_id, record_index=len(source["records"])
+            )
+            event = copy.deepcopy(
+                template["records"][0 if trial["side"] == "baseline" else 1]["events"][
+                    0
+                ]
+            )
+            event["uuid"] = attempt["source"]["model_event_id"]
+            event["output"].update(
+                model=attempt["resolved_model"],
+                request_id=attempt["request_id"],
+                usage=copy.deepcopy(attempt["usage"]),
+                completion=attempt["response"]["text"],
+            )
+            native(event)
+            source["records"].append({"trial": trial, "events": [event]})
+        payload = c.canonical_payload(source)
+        measurements["sources"].append(
+            dict(
+                source_template,
+                source_id=source_id,
+                profile=measurements["source_profile"],
+                content=payload.decode(),
+                byte_size=len(payload),
+                sha256=hashlib.sha256(payload).hexdigest(),
+            )
+        )
+    assert len(measurements["trials"]) == 96
+    with pytest.raises(c.JudgeMeasurementContractError, match="provider response ID"):
+        c.validate_measurements(
+            measurements, plan, baseline_run=baseline, subject_run=subject
+        )
+
+
+@pytest.mark.parametrize("request_id", [None, "repeated"])
+def test_generic_source_does_not_impose_provider_response_identity(request_id):
+    plan, measurements = _bundle(repetitions=3)
+    for trial in measurements["trials"]:
+        trial["attempts"][0]["request_id"] = request_id
+    _retain(measurements)
+    baseline, subject = _runs(plan)
+    c.validate_measurements(
+        measurements, plan, baseline_run=baseline, subject_run=subject
+    )
+
+
+def test_retained_inspect_unavailable_response_ids_are_not_duplicates(retained):
+    for record in retained[1]["records"]:
+        record["trial"]["attempts"][0]["request_id"] = None
+        record["events"][0]["output"]["request_id"] = None
+        native(record["events"][0])
+    replay(retained)

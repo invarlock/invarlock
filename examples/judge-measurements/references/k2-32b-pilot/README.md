@@ -79,12 +79,11 @@ recorded comparison matched the installed historical runtime to source
 live evaluator, whose launcher used a mutable checkout without a source pin.
 Current replay does not rerun that historical environment or promote its result.
 
-## Human review and claim limits
+## Claim limits
 
-The unchanged pilot archive records pending human labels and inactive final
-plans; the subsequent comparison is linked below. This archive does
-not establish agreement with human judgments, rubric validity, judge accuracy,
-inter-rater reliability, broad model quality or deployment approval. No policy,
+This pilot measures the judge's ratings under the frozen rubric. It does not
+establish agreement with independent reference labels, rubric validity, judge
+accuracy, inter-rater reliability, broad model quality or deployment approval. No policy,
 case membership, rubric or answer was relaxed to obtain a passing outcome.
 Hosted judge identity does not reveal or authenticate its model weights.
 Verification reconstructs signed recorded results; it does not repeat model
@@ -93,8 +92,8 @@ execution or independently attest the original provider execution.
 This archive contains judge outcomes and answer roles. **Do not send it to a
 blinded reviewer before their judgments are frozen.** Give that reviewer only
 the separately prepared rubric-development sheets described in the
-[frozen-answer reference](../k2-32b/README.md). No human sheets, final-validation
-holdout, native role map, private keys or operator logs are included here.
+[frozen-answer reference](../k2-32b/README.md). No reference-rating sheets,
+final-validation holdout, native role map, private keys or operator logs are included here.
 Preserve the original dataset terms when redistributing the retained text;
 SQuAD's software MIT license does not relicense all Wikipedia-derived dataset
 material, and SGD-derived data retains CC BY-SA 4.0.
@@ -102,6 +101,5 @@ material, and SGD-derived data retains CC BY-SA 4.0.
 ## Subsequent comparison
 
 The [completed Luna held-out reference](../k2-32b-luna-xhigh-heldout/README.md)
-contains separate final measurements and AI-review results. Review status inside
-this pilot archive describes the retained snapshot; it does not describe the
-subsequent comparison or change this pilot outcome.
+contains separate final measurements and a reference-label comparison. The pilot
+archive retains its original study metadata and insufficient-evidence outcome.

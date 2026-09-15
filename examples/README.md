@@ -119,8 +119,8 @@ For the underlying contracts, see the
 
 The [K2 Horizon campaign](qualification/k2-horizon/README.md) is a separate
 maintainer qualification protocol with CPU preparation and tests. Its five
-model configurations remain candidates pending a reviewed runtime and actual
-GPU execution; they do not replace the established examples above.
+model configurations require exact-image runtime checks and actual GPU
+execution to establish qualification; CPU preparation alone does not qualify them.
 
 ## Frozen answers and combined checks
 

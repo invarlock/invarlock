@@ -375,22 +375,10 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     assert "is_relative_to(site)" in install_smoke
     assert "first-party version mismatch" in install_smoke
     assert "release tag/version mismatch" in install_smoke
-    assert "examples/quickstart/run.py" in install_smoke
-    assert "examples/acceptance-handoff/golden" in install_smoke
-    assert "python run.py --fixture golden" in install_smoke
-    assert "examples/ci/standalone-consumer/." in install_smoke
-    assert (
-        "examples/evaluator-qualification/signed-transactions/"
-        "deployment-approval-inspect-ai/evidence"
-    ) in install_smoke
-    assert "signed-transactions/inspect-ai/" not in install_smoke
-    assert "review/verify_deployment_receipt.py" in install_smoke
-    assert install_smoke.index(core_install) < install_smoke.index(
-        "python run.py --fixture golden"
-    )
-    assert install_smoke.index("review/verify_deployment_receipt.py") < (
-        install_smoke.index(addin_install)
-    )
+    consumers = "scripts/release/core_wheel_consumers.py"
+    assert install_smoke.index(core_install) < install_smoke.index(consumers)
+    assert install_smoke.index(consumers) < install_smoke.index(addin_install)
+
     assert (
         _step(build["steps"], "Install smoke from wheel")["env"][
             "INVARLOCK_RELEASE_TAG"
@@ -844,22 +832,8 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     assert "get_plugin_info" in smoke["run"]
     assert "is_relative_to(site)" in smoke["run"]
     assert "first-party version mismatch" in smoke["run"]
-    assert "examples/quickstart/run.py" in smoke["run"]
-    assert "examples/acceptance-handoff/golden" in smoke["run"]
-    assert "python run.py --fixture golden" in smoke["run"]
-    assert "examples/ci/standalone-consumer/." in smoke["run"]
-    assert (
-        "examples/evaluator-qualification/signed-transactions/"
-        "deployment-approval-inspect-ai/evidence"
-    ) in smoke["run"]
-    assert "signed-transactions/inspect-ai/" not in smoke["run"]
-    assert "review/verify_deployment_receipt.py" in smoke["run"]
-    assert smoke["run"].index(core_install) < smoke["run"].index(
-        "python run.py --fixture golden"
-    )
-    assert smoke["run"].index("review/verify_deployment_receipt.py") < (
-        smoke["run"].index(addin_install)
-    )
+    assert smoke["run"].index(core_install) < smoke["run"].index(consumers)
+    assert smoke["run"].index(consumers) < smoke["run"].index(addin_install)
 
     assert "record_testpypi_promotion" not in jobs
 

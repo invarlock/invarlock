@@ -386,38 +386,7 @@ jobs:
           python -m pip install --require-hashes -r requirements/workflows/release-install-py313.txt
           python -m pip install --no-deps --force-reinstall dist/*.whl
           python -m pip check
-          quickstart_root="$(mktemp -d)"
-          approval_root="$(mktemp -d)"
-          trap 'rm -rf "${quickstart_root}" "${approval_root}"' EXIT
-          cp examples/quickstart/run.py "${quickstart_root}/run.py"
-          cp examples/captured-results/wheel_smoke.py "${quickstart_root}/captured-wheel-smoke.py"
-          mkdir "${quickstart_root}/judge"
-          cp examples/judge-measurements/{wheel_smoke.py,request.yaml,plan.json,measurements.json,baseline_run.json,subject_run.json,analysis_policy.json} "${quickstart_root}/judge/"
-          cp -R examples/acceptance-handoff/golden "${quickstart_root}/golden"
-          evaluation_cli="$(command -v invarlock)"
-          (
-            cd "${quickstart_root}"
-            python run.py --fixture golden
-            python captured-wheel-smoke.py --cli "${evaluation_cli}"
-            python judge/wheel_smoke.py --fixture judge --cli "${evaluation_cli}"
-          )
-          cp -R examples/ci/standalone-consumer/. "${approval_root}/"
-          mkdir "${approval_root}/incoming"
-          cp -R examples/evaluator-qualification/signed-transactions/deployment-approval-inspect-ai/evidence \
-            "${approval_root}/incoming/evidence"
-          cp examples/evaluator-qualification/signed-transactions/deployment-approval-inspect-ai/verification.receipt.json \
-            "${approval_root}/incoming/verification.receipt.json"
-          (
-            cd "${approval_root}"
-            python review/verify_deployment_receipt.py \
-              --approval-inputs review/inspect-ai-deployment-approval-inputs.json \
-              --evidence incoming/evidence \
-              --policy review/policy/acceptance.json \
-              --receipt incoming/verification.receipt.json \
-              --output deployment-approval.json
-          )
-          rm -rf "${quickstart_root}" "${approval_root}"
-          trap - EXIT
+          python scripts/release/core_wheel_consumers.py --cli "$(command -v invarlock)"
           python -m pip install --no-deps --force-reinstall dist/addins/*.whl
           python -m pip check
           invarlock --help
@@ -1036,38 +1005,7 @@ jobs:
           python -m pip install --require-hashes -r requirements/workflows/release-install-py313.txt
           python -m pip install --no-deps --force-reinstall wheelhouse/invarlock-*.whl
           python -m pip check
-          quickstart_root="$(mktemp -d)"
-          approval_root="$(mktemp -d)"
-          trap 'rm -rf "${quickstart_root}" "${approval_root}"' EXIT
-          cp examples/quickstart/run.py "${quickstart_root}/run.py"
-          cp examples/captured-results/wheel_smoke.py "${quickstart_root}/captured-wheel-smoke.py"
-          mkdir "${quickstart_root}/judge"
-          cp examples/judge-measurements/{wheel_smoke.py,request.yaml,plan.json,measurements.json,baseline_run.json,subject_run.json,analysis_policy.json} "${quickstart_root}/judge/"
-          cp -R examples/acceptance-handoff/golden "${quickstart_root}/golden"
-          evaluation_cli="$(command -v invarlock)"
-          (
-            cd "${quickstart_root}"
-            python run.py --fixture golden
-            python captured-wheel-smoke.py --cli "${evaluation_cli}"
-            python judge/wheel_smoke.py --fixture judge --cli "${evaluation_cli}"
-          )
-          cp -R examples/ci/standalone-consumer/. "${approval_root}/"
-          mkdir "${approval_root}/incoming"
-          cp -R examples/evaluator-qualification/signed-transactions/deployment-approval-inspect-ai/evidence \
-            "${approval_root}/incoming/evidence"
-          cp examples/evaluator-qualification/signed-transactions/deployment-approval-inspect-ai/verification.receipt.json \
-            "${approval_root}/incoming/verification.receipt.json"
-          (
-            cd "${approval_root}"
-            python review/verify_deployment_receipt.py \
-              --approval-inputs review/inspect-ai-deployment-approval-inputs.json \
-              --evidence incoming/evidence \
-              --policy review/policy/acceptance.json \
-              --receipt incoming/verification.receipt.json \
-              --output deployment-approval.json
-          )
-          rm -rf "${quickstart_root}" "${approval_root}"
-          trap - EXIT
+          python scripts/release/core_wheel_consumers.py --cli "$(command -v invarlock)"
           python -m pip install --no-deps --force-reinstall wheelhouse/invarlock_*.whl
           python -m pip check
           invarlock --help

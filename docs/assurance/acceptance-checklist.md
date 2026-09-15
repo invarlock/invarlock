@@ -8,7 +8,7 @@
     **Question:** Has a decision owner established every prerequisite needed to rely
     on one signed evidence decision?
 
-    **Decision use:** Use this as the final human acceptance gate after strict
+    **Decision use:** Use this for recipient-owned acceptance after strict
     verification, before an evidence pack supports a downstream decision.
 
     **Evidence:** Independently sourced anchors, a verified immutable pack, a

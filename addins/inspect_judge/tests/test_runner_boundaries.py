@@ -251,6 +251,7 @@ def test_live_stop_reason_reports_actual_admission_boundary(
             await asyncio.Future()
         event = copy.deepcopy(inputs["export"]["samples"][0]["events"][0])
         event["uuid"] = f"event-{len(calls)}"
+        event["output"]["request_id"] = f"response-{len(calls)}"
         event["input"] = request["messages"]
         event["call"]["request"]["messages"] = request["messages"]
         return event

@@ -1,8 +1,6 @@
 """The three-scorer installed-wheel rehearsal uses production CLI and SDK paths."""
 
 import importlib.util
-import re
-import shlex
 import shutil
 import sys
 from pathlib import Path
@@ -61,15 +59,15 @@ def test_three_scorers_use_v2_cli_and_public_sdk_with_scoped_receipts(
 def test_install_smoke_copies_every_fixture_needed_by_three_scorer_consumer(
     tmp_path, monkeypatch, capsys
 ):
-    # Exercise the actual Makefile fixture inventory from an isolated consumer
-    # directory, so checkout-only files cannot hide a release handoff omission.
-    makefile = (ROOT / "Makefile").read_text()
-    inventory = re.search(r"for judge_file in ([^;]+); do", makefile)
-    assert inventory is not None
+    # Exercise the release helper's actual fixture inventory outside the checkout,
+    # so checkout-only files cannot hide a release handoff omission.
+    from scripts.release.core_wheel_consumers import FILES
+
     fixture = tmp_path / "judge"
     fixture.mkdir()
-    for name in shlex.split(inventory.group(1)):
-        shutil.copy2(FIXTURE / name, fixture / name)
+    for source, destination in FILES:
+        if Path(destination).parent == Path("judge"):
+            shutil.copy2(ROOT / source, tmp_path / destination)
     module = _module()
     calls, _ = _transport(monkeypatch, module)
     monkeypatch.setattr(

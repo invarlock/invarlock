@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Reorganized the root README around a runnable signed-evidence quickstart,
+  the three built-in scorers, supported integration routes and retained examples.
+  Detailed contracts and runtime setup remain in the linked guides.
+
 - Refined evidence reports with aligned comparison identities, collapsible shared
   settings, labelled interval scales and change requirements, metric navigation,
   readable configuration previews and compact result summaries. Assurance checks
@@ -38,8 +42,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   original incomplete history. Both advisory analyses remain insufficient
   evidence under unchanged interval-width requirements.
 - Retained all 10,260 Luna xHigh held-out judge ratings, signed offline
-  verification and separate AI-review labels and disagreements. Both frozen
-  comparison policies pass; AI agreement is not independent-human accuracy.
+  verification and a completed reference-label comparison with retained
+  disagreements and label-source provenance. Both frozen comparison policies
+  pass; label agreement does not establish general judge accuracy.
   Reference replay supports explicit caller-selected archive byte limits while
   preserving the smaller pilot defaults.
 
@@ -206,6 +211,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unchanged.
 
 ### Fixed
+
+- Reject duplicate provider response IDs across retained Inspect judge calls and
+  resumed collection, including calls split across source segments. Generic
+  imports retain their declared identity semantics and historical evidence bytes
+  remain unchanged.
+- Show numeric judge interval endpoints, directional thresholds, precision and
+  completeness requirements in the primary report, including adverse and
+  inconclusive results.
+- Share the installed core consumer suite across local validation and both
+  release artifact gates so exact match, NLL and judge receive the same isolated
+  wheel checks. Clarify matching source/wheel installation and completed
+  reference-label comparison scope.
 
 - Select standard processing explicitly for configured hosted judge calls,
   validate the retained tier, and reject inherited safety identifiers before

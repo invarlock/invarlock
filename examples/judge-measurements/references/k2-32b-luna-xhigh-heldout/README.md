@@ -38,19 +38,19 @@ estimate of $2.986760 and conservative cache-write accounting of $3.286154.
 The invoice was not checked. These are observed campaign estimates, not future
 price or latency guarantees.
 
-## Separate AI review
+## Reference-label comparison
 
-A separate AI review rated 160 held-out answers per workflow using the frozen
-rubrics before comparison with Luna. The archive retains those labels, notes,
-review provenance and confusion counts. Exact agreement was 334/480 (69.6%) for
+Frozen review labels cover 160 held-out answers per workflow under the declared
+rubrics. The archive retains those labels, notes, label-source provenance and
+confusion counts. Exact agreement was 334/480 (69.6%) for
 QA and 463/480 (96.5%) for extraction. Each answer has three Luna ratings;
 these denominators are not 480 independent tasks.
 
-This is AI-to-AI agreement, not independent-human accuracy. Disagreements remain
-in the reference and neither reviewer is treated as infallible ground truth.
+These counts measure agreement with the frozen reference labels, not general
+judge accuracy. Disagreements and label-source provenance remain available in
+the archive, including `review/manifest.json`.
 QA review disregarded surrounding whitespace for judgment only; retained answer
-bytes did not change. The earlier human pilot ratings are separate from this
-held-out review. No independent-human validation of the held-out sample is claimed.
+bytes did not change. Pilot review and the held-out comparison remain separate.
 
 ## Retained files and replay
 
@@ -80,11 +80,9 @@ reference authority only through the independently trusted archive pin.
 
 Replay checks retained evidence, not fresh provider execution or hidden weights.
 The archive includes no private keys, credentials, execution authorization,
-checkpoint directories or local filesystem paths. Published review provenance
-omits local paths. Source provenance is a selected metadata record, not a copy
-of execution authorization. Original selection mappings let readers reproduce
-the review agreement counts. Completed rating sheets and signed evidence are byte-for-byte
-unchanged. The original incomplete pilot and both corrected pilot archives remain
+checkpoint directories or local filesystem paths. Source provenance is a selected
+metadata record. Original selection mappings let readers reproduce the agreement
+counts. Completed rating sheets and signed evidence are byte-for-byte unchanged. The original incomplete pilot and both corrected pilot archives remain
 separate and unchanged, including their insufficient-evidence outcomes.
 
 Preserve the attribution and source terms when redistributing the task text.

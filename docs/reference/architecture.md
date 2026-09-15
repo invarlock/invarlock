@@ -189,7 +189,7 @@ decision and receipt shapes are documented in [Reports and receipts](reports.md)
 The [judge measurement reference](judge-measurements.md) defines the separate
 frozen-answer collection and replay flow, missing-measurement handling, fixed
 benchmark statistical scope, and recipient-owned plan, result, and signer pins.
-A report does not authorize acceptance or claim human agreement with a judge.
+A report does not authorize acceptance or establish judge accuracy.
 
 ## Stable and internal surfaces
 

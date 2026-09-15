@@ -851,6 +851,12 @@ class _LiveCheckpoint:
             for sample in self.samples.values()
             for event in sample["events"]
         }
+        self.response_owners = {
+            attempt["request_id"]: trial_id
+            for trial_id, trial in self.trials.items()
+            for attempt in trial["attempts"]
+            if attempt["request_id"] is not None
+        }
         self.spent_calls = sum(
             len(sample["events"]) for sample in self.samples.values()
         )
@@ -967,6 +973,12 @@ class _LiveCheckpoint:
             expected_request_sha256=_sha(expected_request),
         )
         _check_retained_inspect_event(trial["attempts"][0], event, self.collection)
+        response_id = trial["attempts"][0]["request_id"]
+        if response_id is not None:
+            _require(
+                self.response_owners.get(response_id, trial_id) == trial_id,
+                "duplicate provider response ID",
+            )
         sizes = self._sizes(trial, [event])
         prior_sizes = self.sizes[trial_id]
         self.record_bytes += sizes[0] - prior_sizes[0]
@@ -977,6 +989,11 @@ class _LiveCheckpoint:
         else:
             self.spent_calls += 1
         self.event_ids.add(event["uuid"])
+        for attempt in self.trials[trial_id]["attempts"]:
+            if attempt["request_id"] is not None:
+                del self.response_owners[attempt["request_id"]]
+        if response_id is not None:
+            self.response_owners[response_id] = trial_id
         self.samples[trial_id] = candidate
         self.trials[trial_id] = trial
 

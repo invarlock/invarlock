@@ -31,6 +31,7 @@ SUPPORT_TESTS = (
     "tests/scripts/test_build_cache_free_lm_eval_wheel.py",
     "tests/scripts/test_build_restricted_openai_evals_wheel.py",
     "tests/scripts/test_check_repo_cruft.py",
+    "tests/scripts/test_core_wheel_consumers.py",
     "tests/scripts/test_cve_audit.py",
     "tests/scripts/test_filter_scorecard_sarif.py",
     "tests/scripts/test_first_party_distribution_validation.py",

@@ -5,6 +5,11 @@
     **Audience:** Evaluator and release-integration engineers.
     **Prerequisites:** Paired records, a policy, and the core `invarlock` wheel.
 
+Use the core wheel and examples from the same source revision. For a released
+wheel, use its matching release documentation. Record the source commit and wheel
+SHA-256 when sharing a local build; see
+[matching wheels and examples](getting-started.md#matching-wheels-and-examples).
+
 Use the core `evaluate`, `verify`, and `report` commands when an evaluator has
 already produced paired records. The request binds the baseline, subject,
 policy, and output location without introducing a separate command namespace.

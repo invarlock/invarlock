@@ -1278,6 +1278,9 @@ def test_reference_capacity_7728_completed_trials_shards_and_replays(data):
                 digest, case_id, sample["metadata"]["side"], 1
             )
             sample["events"][0]["uuid"] = f"event-{len(exported['samples'])}"
+            sample["events"][0]["output"]["request_id"] = (
+                f"response-{len(exported['samples'])}"
+            )
             exported["samples"].append(sample)
     options = replace(
         options,
@@ -1352,6 +1355,7 @@ def test_live_collection_replays_only_at_boundaries_for_thousands_of_slots(
         counts["calls"] += 1
         event = copy.deepcopy(data[1]["samples"][0]["events"][0])
         event["uuid"] = f"live-{counts['calls']}"
+        event["output"]["request_id"] = f"response-{counts['calls']}"
         event["input"] = request["messages"]
         event["call"]["request"]["messages"] = request["messages"]
         event["config"]["max_connections"] = options.concurrency
@@ -1503,3 +1507,69 @@ def test_live_incremental_reservations_charge_admissions_once(data):
     assert state.spent_calls == 1
     assert admission["uuid"] not in state.event_ids
     assert event["uuid"] in state.event_ids
+
+
+@pytest.mark.parametrize("sharded", [False, True])
+def test_import_rejects_duplicate_provider_response_ids(data, monkeypatch, sharded):
+    import invarlock_addins.inspect_judge.collector as collector
+
+    if sharded:
+        monkeypatch.setattr(collector, "MAX_SOURCE_BYTES", 5000)
+    exported = copy.deepcopy(data[1])
+    exported["samples"][1]["events"][0]["output"]["request_id"] = exported["samples"][
+        0
+    ]["events"][0]["output"]["request_id"]
+    with pytest.raises(JudgeMeasurementContractError, match="provider response ID"):
+        ingest(data, exported)
+
+
+def test_live_checkpoint_preserves_response_ownership_across_resume(data):
+    from invarlock_addins.inspect_judge.collector import _LiveCheckpoint
+
+    checkpoint = ingest(data)
+    state = _LiveCheckpoint(
+        plan=data[0],
+        options=data[3],
+        exported=copy.deepcopy(data[1]),
+        checkpoint=checkpoint,
+        frozen_inputs=data[2],
+    )
+    first, second = copy.deepcopy(data[1]["samples"])
+    # Replay of this call retains its ownership; a new event UUID cannot borrow
+    # a different call's provider response identity after checkpoint resume.
+    state.replace_event(first["id"], first["events"][0])
+    event = second["events"][0]
+    event["uuid"] = "new-event-with-reused-response"
+    event["output"]["request_id"] = first["events"][0]["output"]["request_id"]
+    with pytest.raises(InspectJudgeError, match="provider response ID"):
+        state.replace_event(second["id"], event)
+    assert state.trials[second["id"]] == checkpoint["trials"][1]
+
+
+def test_retry_cannot_reuse_a_prior_attempt_provider_response_id(data):
+    _allow_two_attempts(data)
+    events = data[1]["samples"][0]["events"]
+    success = copy.deepcopy(events[0])
+    success["uuid"] = "event-transport-retry"
+    _failure(events[0], "transport_error")
+    events[0]["output"]["request_id"] = success["output"]["request_id"]
+    events.append(success)
+    with pytest.raises(JudgeMeasurementContractError, match="provider response ID"):
+        ingest(data)
+
+
+def test_live_checkpoint_allows_unavailable_response_ids(data):
+    from invarlock_addins.inspect_judge.collector import _LiveCheckpoint
+
+    state = _LiveCheckpoint(
+        plan=data[0],
+        options=data[3],
+        exported=copy.deepcopy(data[1]),
+        checkpoint=ingest(data),
+        frozen_inputs=data[2],
+    )
+    for sample in copy.deepcopy(data[1]["samples"]):
+        event = sample["events"][0]
+        event["output"]["request_id"] = None
+        state.replace_event(sample["id"], event)
+    assert state.response_owners == {}
