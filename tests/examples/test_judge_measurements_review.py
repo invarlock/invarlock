@@ -21,7 +21,12 @@ def frozen():
 
 
 def filled(files, stage="rubric_development"):
-    sheet = review.decode(files, f"human_review/{stage}/grounded_qa.json")
+    sheet = review.decode(
+        files,
+        ref.review_path(
+            stage, "grounded_qa", reference_format=ref.reference_format(files)
+        ),
+    )
     labels = [r["label"] for r in sheet["scale"]["ratings"]]
     for row in sheet["cases"]:
         row["response_1_rating"] = labels[0]
@@ -100,6 +105,9 @@ def kwargs(tmp_path, frozen, **overrides):
 def test_complete_review_freezes_record_and_refuses_overwrite(tmp_path, frozen):
     args = kwargs(tmp_path, frozen)
     result = review.complete_review(**args)
+    assert result["format"] == "invarlock/k2-single-reviewer-record-v2"
+    assert result["agreement_protocol"]["id"] == "single-reviewer-exact-label-v2"
+    assert "human" not in ref.canonical_payload(result).decode()
     assert result["activation"] == "not_activated"
     assert result["agreement"] is None
     assert result["completed_review_sha256"] == ref.sha(
@@ -177,6 +185,15 @@ def test_agreement_counts_all_repetitions_and_missing_without_inflating_answers(
     assert result["scheduled_trials"] == 4
     assert result["incomplete_trials"] == 1
     assert result["exact_agreement"] == {"numerator": 2, "denominator": 3}
+    assert result["confusion"] == [
+        {"reference_label": "good", "judge": "bad", "count": 1},
+        {"reference_label": "good", "judge": "good", "count": 2},
+    ]
+    assert result["protocol"]["id"] == "single-reviewer-exact-label-v2"
+    assert result["protocol"]["aggregation"] == (
+        "compare every scheduled judge repetition to one reference label"
+    )
+    assert "human" not in ref.canonical_payload(result).decode()
     assert "not inter-rater reliability" in result["protocol"]["scope"]
 
 
@@ -326,3 +343,67 @@ def test_review_cli_freezes_result_and_reports_overwrite_error(
         review.main()
     assert exc.value.code == 2
     assert "Review validation failed" in capsys.readouterr().err
+
+
+@pytest.fixture(scope="module")
+def current_bundle(tmp_path_factory, frozen):
+    pin, files = frozen
+    root = tmp_path_factory.mktemp("current-reference")
+    legacy = root / "legacy"
+    legacy.mkdir()
+    for name, payload in files.items():
+        path = legacy / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(payload)
+    current = root / "current"
+    ref.rebind_bundle(
+        legacy,
+        current,
+        ref.obj(ROOT / "examples/judge-measurements/k2-judge-templates.json"),
+        pin,
+    )
+    current_pin = ref.sha(ref.read(current / "reference.json"))
+    return current, current_pin, review.pinned_files(current, current_pin)
+
+
+@pytest.mark.parametrize("stage", ["rubric_development", "final_validation"])
+def test_current_bundle_reviews_use_neutral_records(tmp_path, current_bundle, stage):
+    bundle, pin, files = current_bundle
+    assert ref.reference_format(files) == "invarlock/k2-judge-answer-reference-v2"
+    assert f"reference_review/{stage}/grounded_qa.json" in files
+    completed = tmp_path / "completed.json"
+    completed.write_bytes(ref.canonical_payload(filled(files, stage)))
+    output = tmp_path / "review"
+    result = review.complete_review(
+        bundle=bundle,
+        expected_sha256=pin,
+        completed=completed,
+        reviewer="reviewer-1",
+        outcome="rubric_confirmed",
+        output=output,
+    )
+    assert result["format"] == "invarlock/k2-single-reviewer-record-v2"
+    assert result["agreement_protocol"]["id"] == "single-reviewer-exact-label-v2"
+    labels = ref.obj(output / "reconciled-labels.json")
+    selection = review.decode(files, "grounded_qa/selection.json")
+    expected = selection[
+        "pilot" if stage == "rubric_development" else "reference_review"
+    ]
+    assert {row["case_id"] for row in labels} == set(expected)
+    assert "human" not in ref.canonical_payload(result).decode()
+
+
+def test_legacy_final_review_reconciles_retained_selection(frozen):
+    _, files = frozen
+    assert ref.reference_format(files) == "invarlock/k2-judge-answer-reference-v1"
+    selection = review.decode(files, "grounded_qa/selection.json")
+    labels = review.reconcile(filled(files, "final_validation"), selection)
+    assert {row["case_id"] for row in labels} == set(selection["human_review"])
+
+
+def test_final_reconciliation_rejects_ambiguous_selection(frozen):
+    _, files = frozen
+    selection = review.decode(files, "grounded_qa/selection.json")
+    selection["reference_review"] = selection["human_review"]
+    with pytest.raises(ValueError):
+        review.reconcile(filled(files, "final_validation"), selection)

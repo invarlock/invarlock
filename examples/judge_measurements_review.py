@@ -24,11 +24,11 @@ from invarlock.judge_measurements.contracts import (
 )
 
 MAX_NOTES = 4096
-# Retain the published reference protocol metadata and serialized field names.
+# Newly produced records use neutral terminology, including for legacy inputs.
 PROTOCOL = {
-    "id": "single-reviewer-exact-label-v1",
+    "id": "single-reviewer-exact-label-v2",
     "unit": "frozen answer",
-    "aggregation": "compare every scheduled judge repetition to the one human label",
+    "aggregation": "compare every scheduled judge repetition to one reference label",
     "missing": "retain incomplete trials in coverage; exclude from agreement denominator",
     "statistics": "exact label matches and confusion counts only; no pass threshold or confidence interval",
     "scope": "descriptive agreement for this reviewed subset; not inter-rater reliability or population accuracy",
@@ -98,7 +98,11 @@ def validate_review(sheet: dict, template: dict) -> None:
 
 def reconcile(sheet: dict, selection: dict) -> list[dict]:
     workflow, stage = sheet["workflow"], sheet["stage"]
-    ids = selection["pilot" if stage == "rubric_development" else "human_review"]
+    ids = (
+        selection["pilot"]
+        if stage == "rubric_development"
+        else ref.review_case_ids(selection)
+    )
     mapping = {
         "review-" + ref.rank(workflow, stage + "_id", case_id): case_id
         for case_id in ids
@@ -145,7 +149,7 @@ def agreement(labels: list[dict], measurements: dict) -> dict:
         "exact_matches": matches,
         "exact_agreement": {"numerator": matches, "denominator": compared},
         "confusion": [
-            {"human": a, "judge": b, "count": count}
+            {"reference_label": a, "judge": b, "count": count}
             for (a, b), count in sorted(confusion.items())
         ],
     }
@@ -184,7 +188,10 @@ def complete_review(
         "final_validation",
     }:
         raise ValueError("unsupported review workflow or stage")
-    template = decode(files, f"human_review/{stage}/{workflow}.json")
+    template = decode(
+        files,
+        ref.review_path(stage, workflow, reference_format=ref.reference_format(files)),
+    )
     validate_review(sheet, template)
     if activate and (stage != "rubric_development" or outcome != "rubric_confirmed"):
         raise ValueError("activation requires a complete rubric-confirmed pilot review")
@@ -213,7 +220,7 @@ def complete_review(
     labels = reconcile(sheet, decode(files, f"{workflow}/selection.json"))
     labels_digest = write_new(output / "reconciled-labels.json", labels)
     result = {
-        "format": "invarlock/k2-single-reviewer-record-v1",
+        "format": "invarlock/k2-single-reviewer-record-v2",
         "reviewer": reviewer,
         "reference_manifest_sha256": expected_sha256,
         "workflow": workflow,

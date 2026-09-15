@@ -90,7 +90,12 @@ def test_physical_archive_pins_and_public_inventory(files):
 
 def test_complete_signed_pilot_replays_with_unchanged_negative_outcomes():
     result = ref.validate_reference(REFERENCE / "reference.zip", ARCHIVE_SHA256)
-    assert result["human_review"] == "pending"
+    assert result["format"] == "invarlock/judge-reference-replay-v2"
+    assert "human_review" not in result
+    assert result["reference_review"] == {
+        "archived_status": "pending",
+        "label_source": "not_recorded",
+    }
     assert result["final_plans"] == "not_activated"
     assert result["new_model_calls"] == 0
     assert result["active_result_root"] == "corrected"
@@ -129,7 +134,12 @@ def test_luna_archive_replays_signed_advisory_results(luna_files):
         LUNA_REFERENCE / "reference.zip", LUNA_ARCHIVE_SHA256
     )
     assert result["active_result_root"] == "pilot"
-    assert result["human_review"] == "pending"
+    assert result["format"] == "invarlock/judge-reference-replay-v2"
+    assert "human_review" not in result
+    assert result["reference_review"] == {
+        "archived_status": "pending",
+        "label_source": "not_recorded",
+    }
     assert result["final_plans"] == "not_activated"
     assert result["new_model_calls"] == 0
     for workflow in ref.WORKFLOWS:
@@ -614,6 +624,12 @@ def test_reference_cli_prints_replayed_json(monkeypatch, capsys):
     )
     runpy.run_path(sys.argv[0], run_name="__main__")
     result = json.loads(capsys.readouterr().out)
+    assert result["format"] == "invarlock/judge-reference-replay-v2"
+    assert "human_review" not in result
+    assert result["reference_review"] == {
+        "archived_status": "pending",
+        "label_source": "not_recorded",
+    }
     assert result["archive_sha256"] == LUNA_ARCHIVE_SHA256
     assert result["reference_manifest_sha256"] == LUNA_MANIFEST_SHA256
     assert result["active_result_root"] == "pilot"
