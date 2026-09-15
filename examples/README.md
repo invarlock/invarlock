@@ -1,31 +1,28 @@
 # Runnable examples
 
-The transaction journeys below execute InvarLock's public transaction. Each
-listed command produces a signed evidence
-pack, verifies it against separately generated trust inputs, and renders an
-evidence report. The self-contained examples create both sets of keys;
-an acceptance workflow should have the verifier owner choose and hold its own
-trust anchors and signing key.
+Choose an example by the result you want to inspect. Use package and example
+files from the same source revision or release.
 
-For a small offline frozen-answer rating example, see
-[judge measurements](judge-measurements/README.md). It intentionally demonstrates
-insufficient evidence and unsigned reporting.
-The same directory also contains a
-[K2 Horizon 32B judge reference](judge-measurements/K2-REFERENCE.md) built from
-the retained grounded-QA and extraction campaign. It freezes the pilot and final
-case membership without presenting uncollected ratings as evidence.
+| Start here | What it demonstrates |
+| --- | --- |
+| [CPU quickstart](quickstart/README.md) | Verify retained evidence and create a receipt and report without model inference |
+| [Captured results](captured-results/README.md) | Evaluate existing records with exact match, normalized NLL or judge scoring |
+| [Native judge](native-judge/README.md) | Capture native answers, freeze them and collect bounded ratings |
+| [Judge import](judge-measurements/README.md) | Replay retained ratings offline; the small fixture intentionally has insufficient evidence |
+| [Hosted service](hosted-service/README.md) | Capture a fresh bounded HTTP comparison with explicit service identity |
+| [Retained comparisons](captured-results/references/README.md) | Inspect signed real-model routing, likelihood and HTTP results with their declared decisions |
+| [Held-out judge reference](judge-measurements/references/k2-32b-luna-xhigh-heldout/README.md) | Replay all 10,260 ratings across the fixed QA and extraction schedules |
+| [ModelKit handoff](../docs/user-guide/modelkit-handoff.md) | Check a delivered package against evidence and current recipient policy |
 
-To gate results from an existing evaluator, start with the separate
-[captured-results examples](captured-results/README.md). Their installed-wheel
-smoke covers exact match, normalized NLL and judge imports using authored
-contract fixtures. The [Harness likelihood reference](captured-results/references/harness-likelihood/README.md)
-adds real CPU measurements and an independently replayable signed pack for one
-same-model NLL integration profile. Neither substitutes for task-quality evidence.
-For native answer capture followed by judging, use the
-[native judge starter](native-judge/README.md).
-For an artifact handoff, the
-[ModelKit guide](../docs/user-guide/modelkit-handoff.md) checks delivered
-package contents and recipient acceptance at the actual model directories.
+## Run a model-backed integration
+
+The commands below are launcher entry points; their linked integration guides
+provide complete invocations. Each completed transaction writes a signed evidence
+pack, a verifier receipt and an evidence report. They require caller-owned evidence and verifier
+keys and a new external trust-root directory. Signed evaluator bridges also
+require builder keys. The offline evidence-handoff example uses separate
+disposable example keys. A production recipient supplies its own trust anchors
+and controls its verifier signing key.
 
 | Journey | Command | What actually runs |
 | --- | --- | --- |
@@ -34,7 +31,7 @@ package contents and recipient acceptance at the actual model directories.
 | PEFT LoRA merge | `make example-peft-lora` | Real adapter training, save, reload, merge, model scoring, verification, and reporting |
 | TorchAO INT8 | `make example-torchao-int8` | Real weight-only quantization, exact dense-state materialization, authenticated live-kernel observations, and checkpoint comparison |
 | GGUF with llama.cpp | `make example-gguf-llama-cpp` | An official Qwen3.5-0.8B Q8 GGUF and its authenticated Q5 derivative executed through a source-bound llama.cpp image |
-| BF16-to-GGUF deployment | `make example-gguf-deployment` | Closed Qwen3.5 9B and Ministral 3 8B profiles executed as BF16 with Transformers and as source-derived Q5_K_M GGUFs with llama.cpp |
+| BF16-to-GGUF deployment | `make example-gguf-deployment` | Closed Qwen3.5 9B, Qwen3.8 27B and Ministral 3 8B profiles executed as BF16 with Transformers and as source-derived Q5_K_M GGUFs with llama.cpp |
 | LM Evaluation Harness | `make example-lm-evaluation-harness` | Real upstream per-record runs imported through a configuration- and sample-bound adapter; aggregate scores are ignored |
 | TensorRT-LLM | `make example-tensorrt-llm` | A pinned-runtime Qwen3-0.6B compatibility fixture that builds BF16 and calibrated FP8 engines on two H100 GPUs |
 | Evidence handoff | `make example-evidence-handoff` | Imported paired records, separate evidence and verifier keys, policy rejection, and byte-tamper rejection |
@@ -79,27 +76,30 @@ runtime settings explicitly.
 | LM Evaluation Harness | The common requirements plus the pinned Harness dependency; model execution is offline after the image build |
 | TensorRT-LLM | Linux, Docker with two visible H100 GPUs, and roughly 20 GB of temporary disk |
 
-Exact time and disk use depend on the local image and dependency caches. Every
-complete journey requires a checkout with no tracked source changes because
+Exact time and disk use depend on the local image and dependency caches. Every model-backed
+journey requires a checkout with no tracked source changes because
 its runtime is authenticated against the committed tree.
 
 ## Inspect inputs without starting a runtime
 
 The Hugging Face, vision-text, PEFT, and TorchAO journeys support
-preparation-only mode:
+preparation-only mode. These disposable setup examples explicitly generate
+throwaway trust material with `--ephemeral-trust-root`; they do not establish
+recipient acceptance. Use caller-owned keys and trust roots for a real handoff,
+as described in [integration setup](integrations/README.md).
 
 ```bash
 make example-hf-transformers \
-  EXAMPLE_ARGS="--prepare-only --workspace /tmp/invarlock-hf-inputs"
+  EXAMPLE_ARGS="--prepare-only --ephemeral-trust-root --workspace /tmp/invarlock-hf-inputs"
 
 make example-hf-vision-text \
-  EXAMPLE_ARGS="--prepare-only --workspace /tmp/invarlock-vision-inputs"
+  EXAMPLE_ARGS="--prepare-only --ephemeral-trust-root --workspace /tmp/invarlock-vision-inputs"
 
 make example-peft-lora \
-  EXAMPLE_ARGS="--prepare-only --workspace /tmp/invarlock-peft-inputs"
+  EXAMPLE_ARGS="--prepare-only --ephemeral-trust-root --workspace /tmp/invarlock-peft-inputs"
 
 make example-torchao-int8 \
-  EXAMPLE_ARGS="--prepare-only --workspace /tmp/invarlock-torchao-inputs"
+  EXAMPLE_ARGS="--prepare-only --ephemeral-trust-root --workspace /tmp/invarlock-torchao-inputs"
 ```
 
 Preparation writes the request, policy, schedule, keys, trust profile, and the

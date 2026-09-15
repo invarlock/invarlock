@@ -22,11 +22,13 @@ response or fix SLA.
   accelerator details.
 - The exact command or minimal script that failed.
 - A minimal redacted evaluation request and, when relevant, its policy.
-- The full error and traceback.
+- The error and traceback with secrets, private paths and sensitive content removed.
 - For verification or reporting defects, the smallest safe reproducer using an
   evidence bundle or signed verification receipt. Do not attach signing keys,
   private model artifacts, credentials, or sensitive data.
-- Whether the issue reproduces on the latest released version.
+- Whether the issue reproduces on the latest released version. For a local
+  build, include its source commit and package installation method; version
+  metadata alone may not distinguish it from a released wheel.
 
 ## Before filing
 

@@ -120,10 +120,11 @@ teams, and internal AI teams with a release-review process.
   />
 </p>
 
-Once you have prepared a request, signing key and independent trust profile:
+For a captured deterministic comparison, prepare a request, signing key and
+independent trust profile:
 
 ```bash
-invarlock evaluate request.yaml --preflight --json
+invarlock evaluate request.yaml --signing-key signing-key.pem --preflight --json
 invarlock evaluate request.yaml --signing-key signing-key.pem
 invarlock verify evidence/ --trust-profile trust/trust-inputs.json \
   --receipt verification.receipt.json
@@ -133,6 +134,8 @@ invarlock report evidence/ --html report.html
 Use the evidence destination declared in your request. The
 [captured-results guide](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/captured-results.md)
 provides complete setup instructions, keys and trust-profile preparation.
+Native runs also need runtime resources; judge receipt issuance uses its own
+verifier-key and identity options. Follow the linked guide for that workflow.
 
 | Command | What it does |
 | --- | --- |

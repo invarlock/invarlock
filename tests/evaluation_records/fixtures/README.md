@@ -1,7 +1,7 @@
 # Native export fixtures
 
 The three batch fixtures below retain decision-relevant native fields from locally executed
-upstream evaluation runs on 2026-09-05. Each run contains 40 synthetic cases;
+upstream evaluation runs. Each run contains 40 synthetic cases;
 no model service was called. They test actual export interoperability and do
 not demonstrate model performance, customer use or representative data.
 
@@ -20,7 +20,7 @@ Native import computes the digest of these exact fixture bytes, not the larger
 original log. Tests also exercise malformed and unsupported shapes separately.
 
 `promptfoo-0.121.19-assertion-failure.json` is a separate single-row capture from
-a real local model call through Promptfoo 0.121.19 on 2026-09-06. The model returned
+a real local model call through Promptfoo 0.121.19. The model returned
 text successfully but failed the native `equals` assertion. It retains the
 original assertion, output, score, latency and `failureReason: 1` fields while
 omitting volatile HTTP metadata and unrelated logging fields. It demonstrates

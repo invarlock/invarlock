@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Aligned the documentation overview, user guides, API and assurance references
+  with native, captured and judge workflows. Corrected receipt-verification
+  examples, scorer authorization, hosted identity and report semantics; clarified
+  required integration keys and coordinated release-package coverage.
+
 - Reorganized the root README around a runnable signed-evidence quickstart,
   the three built-in scorers, supported integration routes and retained examples.
   Detailed contracts and runtime setup remain in the linked guides.

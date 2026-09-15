@@ -39,8 +39,10 @@ through `tests/integration/conftest.py`.
   evidence without merging their statistical meanings.
 - `tests/examples/` covers public launchers, installed scorer journeys and
   unchanged retained references, including the real Harness likelihood capture.
-- `tests/reporting/` covers public evidence schemas and behavioral observation
-  validation.
+- `tests/reporting/` covers report views, comparison identities, interval charts,
+  format consistency, escaping and local output behavior. Public evidence and
+  behavioral-observation contracts also have dedicated tests in the evidence
+  and repository-check suites.
 - `tests/cli/` covers the installed `evaluate`, `verify`, and `report` surface,
   including fail-closed behavior.
 - `tests/integration/` covers the offline public example, packaging isolation,

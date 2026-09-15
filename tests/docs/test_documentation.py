@@ -227,7 +227,9 @@ def test_readme_first_run_commands_track_checked_in_surfaces() -> None:
 
 
 def test_public_docs_describe_the_release_assurance_surface() -> None:
-    text = "\n".join(_read(relative) for relative in CORE_DOCS).lower()
+    text = " ".join(
+        "\n".join(_read(relative) for relative in CORE_DOCS).lower().split()
+    )
     for phrase in (
         "baseline",
         "subject",
@@ -629,7 +631,7 @@ def test_public_example_includes_every_required_input_and_verify_anchor() -> Non
         "make example-hf-vision-text",
         "make example-peft-lora",
         "make example-evidence-handoff",
-        "separately generated trust inputs",
+        "caller-owned evidence and verifier",
         "evidence report",
     ):
         assert fragment in example
