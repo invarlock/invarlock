@@ -631,7 +631,8 @@ def test_committed_judge_example_preflights_and_renders(tmp_path, monkeypatch):
         ],
     )
     assert result.exit_code == 0, result.output
-    assert "1 case; 1 independent unit; 2/2 completed trials" in report.read_text()
+    assert "1 case" in report.read_text()
+    assert "1 independent unit; 2/2 completed trials" in report.read_text()
     assert (
         json.loads(result.stdout)["assurance"]["recipient_acceptance"]
         == "not_performed"

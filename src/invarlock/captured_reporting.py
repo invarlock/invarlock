@@ -7,9 +7,8 @@ discover receipts, replay runs, or recompute scores.
 
 from __future__ import annotations
 
-import hashlib
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 from invarlock.captured_contracts import (
     CAPTURED_PACK_FORMAT,
@@ -20,15 +19,12 @@ from invarlock.captured_contracts import (
     load_payloads,
     read_file,
 )
-from invarlock.evidence_pack_contract import canonical_json_bytes
 from invarlock.evidence_pack_json import (
     StrictJsonError,
     parse_json_bytes,
 )
 from invarlock.record_reporting import (
-    _captured_context,
-    _captured_identities,
-    _metric_views,
+    _assemble_view,
 )
 from invarlock.report_presentation import (
     ReportView,
@@ -64,10 +60,6 @@ def is_captured_manifest(path: Path) -> bool:
         ):
             return True
     raise CapturedReportError("evidence manifest format or kind is unsupported")
-
-
-def _digest(raw: bytes) -> str:
-    return "sha256:" + hashlib.sha256(raw).hexdigest()
 
 
 def _load(
@@ -131,46 +123,7 @@ def _view(
         raise CapturedReportError("captured report contains no metrics")
     if seen != expected:
         raise CapturedReportError("captured report omits configured metric scopes")
-    subjects, context, changes, context_details = _captured_context(payloads)
-    return ReportView(
-        title="InvarLock captured comparison report",
-        family="Captured evaluation evidence",
-        decision=str(comparison.get("decision")),
-        summary="Recorded comparison of baseline and candidate results.",
-        context=context,
-        changes=changes,
-        subjects=subjects,
-        details=context_details,
-        metrics=_metric_views(
-            comparison, cast(dict[str, dict[str, Any]], policy_by_name)
-        ),
-        assurance=(
-            ("Pack format", CAPTURED_PACK_FORMAT),
-            (
-                "Authentication",
-                "Signed manifest verified."
-                if manifest["authentication"] == "signed"
-                else "Unsigned local evidence; no signer authentication.",
-            ),
-            ("Replay and scoring", "Not performed by report."),
-            ("Independent acceptance", "Not performed by report."),
-        ),
-        identity=(
-            ("Manifest", _digest(canonical_json_bytes(manifest))),
-            ("Comparison", str(manifest.get("comparison_id"))),
-            ("Evidence signer", signer),
-            *_captured_identities(payloads),
-        ),
-        next_steps=(
-            "Review the stored comparison and its policy.",
-            "Use independent verification before treating this evidence as accepted.",
-        ),
-        limitations=(
-            "Scoring and replay were not performed.",
-            "Model and prompt context is evaluator-recorded provenance, not independent execution or model-identity attestation.",
-        ),
-        technical=comparison,
-    )
+    return _assemble_view(comparison, payloads, manifest, signer)
 
 
 __all__ = [

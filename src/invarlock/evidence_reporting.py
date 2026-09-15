@@ -1232,6 +1232,8 @@ def _report_view(
             threshold=comparison["maximum" if ratio else "minimum"],
             label=label,
             unit=unit,
+            threshold_direction="maximum" if ratio else "minimum",
+            neutral=1.0 if ratio else 0.0,
         ),
         notes=tuple(notes),
     )

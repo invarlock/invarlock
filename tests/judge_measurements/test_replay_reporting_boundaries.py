@@ -120,7 +120,8 @@ def test_reports_preserve_decision_and_role_without_gating_advisory_metrics(
     assert result.facts["assurance"]["policy_decision"] == outcome
     assert result.facts["assurance"]["decision_role"] == role
     assert f"Decision role: {role}" in result.text
-    assert "16 cases; 16 independent units;" in result.text
+    assert "16 cases" in result.text
+    assert "16 independent units;" in result.text
     assert "completed trials" in result.text
     assert f"Decision role: {role}" in html_path.read_text()
     suite = fromstring(junit_path.read_bytes())
@@ -152,7 +153,7 @@ def test_reports_show_descriptive_baseline_and_correct_signing_next_step(
 ):
     publication, _ = _publish(tmp_path, baseline=1, subject=0, signed=signed)
     result = render_judge_evidence(publication.path)
-    assert "| 1.000000000000000 | 0" in result.text
+    assert "| 1 | 0" in result.text
     assert "equal independent-unit weights" in result.text
     assert result.facts["descriptive_means"]["baseline"] == "1.000000000000000"
     signing_step = "republish the same retained inputs"

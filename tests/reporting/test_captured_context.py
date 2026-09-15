@@ -192,7 +192,10 @@ def test_large_context_has_bounded_expansion_and_explicit_truncation():
     assert "truncated" in str(context)
 
 
-def test_both_captured_adapters_show_escaped_context_without_mutating_evidence():
+@pytest.mark.parametrize("message_source", ["effective", "http"])
+def test_both_captured_adapters_show_escaped_context_without_mutating_evidence(
+    message_source,
+):
     baseline, subject, policy = example_project("classification")
     policy["metrics"] = policy["metrics"][:1]
     policy["slices"] = []
@@ -208,6 +211,9 @@ def test_both_captured_adapters_show_escaped_context_without_mutating_evidence()
                 "role": side,
                 "effective_messages": messages,
             }
+            if message_source == "http":
+                row["context"].pop("effective_messages")
+                row["context"]["http_observation"] = {"request": {"messages": messages}}
     snapshot = build_pack(baseline, subject, policy)
     original = dict(snapshot.files)
     comparison = pack_json(snapshot, "report")
@@ -265,4 +271,102 @@ def test_scoring_notes_describe_stored_comparison_not_report_execution(example, 
                 f"Recorded scoring basis: {basis} when the comparison was created."
                 in metric.notes
             )
-            assert "Scoring and replay were not performed by report." in metric.notes
+            assert (
+                "Scoring and replay were not performed by report." not in metric.notes
+            )
+        assert (
+            dict(view.assurance)["Replay and scoring"]
+            == "Scoring and replay were not performed by report."
+        )
+
+
+def http_inputs():
+    runs = inputs()
+    for run in runs.values():
+        for row in run["records"]:
+            messages = row["context"].pop("effective_messages")
+            row["context"]["http_observation"] = {"request": {"messages": messages}}
+    return runs
+
+
+def test_http_request_projection_is_paired_and_does_not_claim_backend_prompts():
+    runs = http_inputs()
+    for row in runs["subject"]["records"]:
+        row["context"]["http_observation"]["request"]["messages"].pop(0)
+    runs["subject"]["records"].reverse()
+    original = deepcopy(runs)
+    _, context, changes, details = record_reporting._captured_context(runs)
+    assert (
+        "Recorded HTTP request messages are unchanged across all 3 paired cases."
+        in changes
+    )
+    assert dict(context)["Baseline HTTP request message roles"] == "user"
+    assert (
+        "do not establish hidden backend instructions"
+        in dict(context)["Prompt observation scope"]
+    )
+    assert "effective message roles" not in str(context)
+    assert details == ()
+    assert runs == original
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "missing",
+        "duplicate",
+        "unpaired",
+        "extra_field",
+        "nontext",
+        "malformed_request",
+        "mixed_sources",
+    ],
+)
+def test_http_request_projection_requires_strict_shapes_and_complete_pairing(mutation):
+    runs = http_inputs()
+    rows = runs["subject"]["records"]
+    request = rows[-1]["context"]["http_observation"]["request"]
+    if mutation == "missing":
+        request.pop("messages")
+    elif mutation == "duplicate":
+        rows[-1]["id"] = rows[0]["id"]
+    elif mutation == "unpaired":
+        rows[-1]["id"] = "different-case"
+    elif mutation == "extra_field":
+        request["messages"][0]["tool_calls"] = []
+    elif mutation == "nontext":
+        request["messages"][0]["content"] = [{"type": "image_url"}]
+    elif mutation == "malformed_request":
+        rows[-1]["context"]["http_observation"]["request"] = []
+    else:
+        for row in rows:
+            row["context"]["effective_messages"] = row["context"].pop(
+                "http_observation"
+            )["request"]["messages"]
+    _, _, changes, details = record_reporting._captured_context(runs)
+    assert "Prompt comparison unavailable in this report projection" in str(changes)
+    assert "were not recorded" not in str(changes)
+    assert details == ()
+
+
+def test_http_system_preview_remains_bounded_and_effective_source_takes_priority():
+    runs = http_inputs()
+    instruction = "<script>" + "x" * 10000
+    for row in runs["subject"]["records"]:
+        row["context"]["http_observation"]["request"]["messages"][0]["content"] = (
+            instruction
+        )
+    _, context, changes, details = record_reporting._captured_context(runs)
+    assert details[0][1]["system_instruction"] == instruction[:4096]
+    assert details[0][1]["truncated"] is True
+    assert details[0][1]["sha256"] == hashlib.sha256(instruction.encode()).hexdigest()
+    assert "all other HTTP request messages are unchanged" in str(changes)
+    assert "context.http_observation.request.messages" in details[0][1]["source"]
+    assert "Private user" not in str(details)
+    for run in runs.values():
+        for row in run["records"]:
+            row["context"]["effective_messages"] = [{"role": "user", "content": "same"}]
+    _, context, changes, details = record_reporting._captured_context(runs)
+    assert "Recorded effective messages are unchanged" in str(changes)
+    assert "HTTP request message roles" not in str(context)
+    assert details == ()

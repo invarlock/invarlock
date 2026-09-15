@@ -298,7 +298,11 @@ def test_report_shows_ratio_units_and_captured_basis(with_policy, missing):
         assert metric.interval is None
     else:
         assert metric.change == "0.75 ratio"
-        assert metric.baseline == "2 nats_per_utf8_byte"
+        assert metric.baseline == "2 nats / byte"
+        assert metric.interval.neutral == 1
+        assert metric.interval.threshold_direction == (
+            "maximum" if with_policy else None
+        )
         assert metric.interval.unit == "ratio"
         assert metric.interval.estimate == 0.75
         if with_policy:
@@ -446,7 +450,9 @@ def test_signed_captured_likelihood_replay_receipt_and_reports(
     manifest, payloads, signer, _ = _load(request.evidence)
     view = _view(manifest, payloads, signer)
     assert view.decision == expected_decision
+    assert view.technical["metrics"][0]["unit"] == "nats_per_utf8_byte"
     for rendered in (render_html(view), render_markdown(view)):
-        assert "nats_per_utf8_byte" in rendered
+        assert "nats / byte" in rendered
+        assert "No absolute minimum score" not in rendered
         assert "ratio" in rendered
         assert "captured reference-continuation likelihood facts" in rendered

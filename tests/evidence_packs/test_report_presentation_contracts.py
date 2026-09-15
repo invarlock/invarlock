@@ -54,7 +54,10 @@ def test_display_without_optional_context_does_not_invent_evidence() -> None:
     assert '<figure class="interval">' not in html
     assert '<svg class="mark"' in html
     assert 'aria-hidden="true" focusable="false"' in html
-    assert 'class="check-unknown">Unavailable' in html
+    assert (
+        'class="check-unknown"><span class="check-label" aria-hidden="true">Result</span>Unavailable'
+        in html
+    )
     for text in (html, markdown):
         assert "More evidence needed" in text
         assert "No complete pairs" in text
