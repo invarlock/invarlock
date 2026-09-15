@@ -287,11 +287,14 @@ replay results. Verification requires the caller to authorize the same scorer
 in a `ScorerExtensionRegistry`, runs it twice, and reconstructs the complete
 report. A stored scorer result is never accepted as an aggregate assertion.
 
-The scorer-extension v1 contract is suitable for separately supplied
-deterministic text scorers such as token F1, structured-field extraction, or VQA
-answer normalization. Those scorers are separately installed and require
-explicit authorization. SQL or code execution, model-based semantic similarity,
-network or human services, and LLM judges are outside scorer-extension
+The scorer-extension v1 contract supports deterministic text replay. Core ships
+`invarlock.normalized_match`, `invarlock.numeric_tolerance`,
+`invarlock.json_fields`, `invarlock.json_exact` and `invarlock.token_f1`; the CLI
+can use these without installed-scorer authorization. SDK callers supply a
+`ScorerExtensionRegistry(allow_installed=False)`. Other implementations, such as
+a separately supplied VQA normalization scorer, require explicit authorization.
+SQL or code execution, model-based semantic similarity,
+network services or externally assigned ratings, and LLM judges are outside scorer-extension
 acceptance replay. The built-in `judge` scorer replays its bounded measurement
 contract and, for native run/import evidence, its retained runtime capture. Its
 report shows both evaluated model identities, runtime settings and digests,
@@ -595,17 +598,22 @@ use the selected text or JSON mode; argument-parser errors remain usage errors.
 
 ```bash
 invarlock evaluate request.yaml --signing-key signing-key.pem
-invarlock verify evidence/ --policy policy.json --receipt verification.receipt.json
+invarlock verify evidence/ --trust-profile recipient/trust-inputs.json \
+  --receipt verification.receipt.json
 invarlock report evidence/
 ```
 
-The core commands retain JSON output for automation. `report` regenerates HTML
-and Markdown from bounded, structurally validated evidence and does not score,
-replay arithmetic, verify a signature, or authorize a signer.
+The trust profile must independently supply the captured policy, complete-run
+and request pins, evidence signer, and verifier identity and key. The core
+commands retain JSON output for automation. `report` regenerates presentations
+from bounded evidence after checking the closed inventory, payload digests,
+canonical JSON, cross-file bindings and embedded signature for signed packs. It
+does not recompute scores or replay comparison arithmetic, and the embedded
+signer does not authorize itself as a recipient trust anchor.
 
-Captured reports distinguish unsigned local evidence, a signature that has not
-been independently verified, and unavailable signing information in a
-comparison-only view. They preserve `pass`, `regression` and
+Captured reports distinguish unsigned local evidence, an embedded signature
+validated without recipient authorization, and unavailable signing information
+in a comparison-only view. They preserve `pass`, `regression` and
 `insufficient_evidence` as the recorded decisions. A `regression` decision means
 a policy bound failed, which can be an absolute floor even when the observed
 candidate improved. Missing paired results remain missing; overlapping scope
@@ -634,7 +642,7 @@ workflow and its assurance limits.
 | Policy rejection | True | `fail` | Signed rejection receipt when completion reached | Authentic evidence did not meet the policy |
 | Integrity rejection | False | Unavailable or untrusted | Signed rejection receipt when safe completion reached | Pack must not be used |
 | Precondition failure | Not completed | Unavailable | May be absent | Caller input or structure prevented completed verification |
-| Render success only | Embedded signature authenticated | Stored verdict only | None | Inspection of evidence, not independent acceptance |
+| Render success only | Embedded signature checked for signed packs; unsigned evidence remains local | Recorded verdict only | None | Inspection of evidence, not independent acceptance |
 
 ## Related documentation
 
@@ -648,7 +656,9 @@ workflow and its assurance limits.
 
 For bounded frozen-answer ratings, see [judge measurements](judge-measurements.md).
 Judge reports keep offline replay, signer authentication and recipient acceptance
-distinct and use additive judge-specific JSON formats. They show the first 50
+distinct and use additive judge-specific JSON formats. Rendering replays the
+retained measurements; `verify` performs envelope signature authentication
+against the recipient policy. They show the first 50
 case IDs by default; repeat `report --case-id ID` to inspect any retained cases
 without loading every answer and judge response into one report. Case selection
 does not change the complete replay or the recorded policy decision.

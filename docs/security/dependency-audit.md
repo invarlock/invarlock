@@ -19,7 +19,8 @@ When `make security` reports an advisory:
    audit environment;
 2. read the upstream advisory and fixed-version information;
 3. determine whether the vulnerable code is reachable in the core, HF extra,
-   GGUF, TensorRT-LLM, diagnostics, build, or documentation surface;
+   GGUF, TensorRT-LLM, vision-text, Inspect judge collection, diagnostics,
+   build, or documentation surface;
 4. prefer upgrading, removing, or constraining the dependency;
 5. run the relevant package, runtime, and repository checks; and
 6. remove obsolete allowlist entries in the same change.

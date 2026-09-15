@@ -23,9 +23,11 @@ execution or freshly measure a service.
 ## Prepare the request
 
 `invarlock evaluate --init demo --example classification` creates synthetic
-paired runs, policy, and `demo/request.yaml`. `extraction` and `judge` are the
-other starter choices. Replace these illustrative inputs and thresholds with
-reviewed records before drawing conclusions about a model.
+paired runs, policy, and `demo/request.yaml`. `extraction` demonstrates structured
+extraction; `judge` demonstrates comparison of recorded scalar ratings and does
+not collect bounded judge measurements. Use `--example native-judge` for native
+answer generation followed by bounded judging. Replace illustrative inputs and
+thresholds before drawing conclusions about a model.
 
 ```yaml
 format_version: invarlock/evaluation-request-v2

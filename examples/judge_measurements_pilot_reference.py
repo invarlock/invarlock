@@ -174,6 +174,7 @@ def validate_reference(
                 "analysis": analysis.to_dict(),
             }
     return {
+        "format": "invarlock/judge-reference-replay-v2",
         "archive_sha256": expected_sha256,
         "reference_manifest_sha256": sha(files["reference.json"]),
         "workflows": results,
@@ -183,7 +184,10 @@ def validate_reference(
             if manifest["format"] == "invarlock/judge-pilot-reference-v1"
             else "not included in this reference"
         ),
-        "human_review": manifest["human_review"],
+        "reference_review": {
+            "archived_status": manifest["human_review"],
+            "label_source": manifest.get("reviewer_type", "not_recorded"),
+        },
         "final_plans": manifest["final_plans"],
         "new_model_calls": 0,
     }

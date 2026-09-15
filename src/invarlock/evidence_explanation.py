@@ -1,4 +1,4 @@
-"""Human policy checks derived from an already validated canonical report.
+"""Policy checks derived from an already validated canonical report.
 
 These views are presentation only. Callers must authenticate and validate the
 report first; this module never supplies verification authority or a verdict.

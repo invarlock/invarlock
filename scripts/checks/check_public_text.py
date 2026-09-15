@@ -90,6 +90,13 @@ RULES: tuple[Rule, ...] = (
         "state the public result without describing the review mechanism",
     ),
     Rule(
+        "review_staffing_language",
+        re.compile(
+            r"(?i)\bhuman[\s-]+(?:approval|review|judg(?:ment|ement)|readable|output|report|summary)\b"
+        ),
+        "describe the policy or reference-label requirement without staffing language",
+    ),
+    Rule(
         "avoidable_remote_validation_claim",
         re.compile(
             r"(?i)\b(?:private|remote|private\s+remote)\s+"

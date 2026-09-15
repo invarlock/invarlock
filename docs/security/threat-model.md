@@ -8,7 +8,7 @@ verifier can detect from claims that require controls outside InvarLock.
 !!! warning "Security guidance"
 
     **In plain language:** InvarLock can detect tampering and inconsistent
-    evidence, but it cannot prove that an honest runtime executed or that the
+    evidence, but it cannot independently attest execution or prove that the
     chosen test and threshold are sufficient.
 
     **Objective:** Identify threats to one evidence transaction and distinguish
@@ -57,6 +57,11 @@ deployment controls must protect sensitive model, dataset, and key material.
 
 ## Adversaries and failure sources
 
+Trusted participants exchanging intended results are the normal workflow.
+Independent expectations catch stale configuration, wrong captures and transport
+mistakes as well as intentional substitution. They can be maintained within one
+team; independence does not require different organizations.
+
 The model considers accidental corruption, unsafe input, a malicious evidence
 submitter, compromised evidence signer or verifier environments, compromised provider
 add-ins, key theft, and a decision owner who obtains trust anchors from the submitted
@@ -82,6 +87,9 @@ can only reason about the facts in that bundle.
 
 ## Threats, controls, and residual risk
 
+The artifact, ordered-schedule and runtime controls in this table describe native
+pack-v1. Captured and judge evidence use the distinct bindings described below.
+
 | Threat | InvarLock control | Residual risk |
 | --- | --- | --- |
 | File changed, removed, inserted, or renamed after publication | Complete checksummed inventory, manifest binding, no-extra-files check, canonical paths, and evidence signature | An evidence signer can sign fabricated but internally consistent files. |
@@ -101,16 +109,33 @@ can only reason about the facts in that bundle.
 | Report differs from machine evidence | Renderer authenticates the bundle and reads the canonical bound report | Screenshots, copied text, or externally modified HTML are not acceptance records. Verify the bundle and receipt. |
 | Evidence signer or verifier private key is stolen | Ed25519 signatures expose stable fingerprints suitable for pinning and rotation | Key storage, compromise detection, revocation, and incident response are external. |
 | Trusted envelope signer substitutes a self-signed technical receipt | Acceptance verification authenticates the embedded receipt and requires exactly one independently trusted receipt-verifier identity/fingerprint record | The recipient must maintain and securely distribute the receipt-verifier registry and its revocation state. |
-| Old evidence is placed in a newly issued envelope | Envelope age and receipt-authenticated evidence age are evaluated separately; missing authoritative evidence time rejects when an evidence-age limit is configured | v0.13 receipts have no authenticated issuance time and cannot satisfy a recipient policy that requires bounded evidence age. |
+| Old evidence is placed in a newly issued envelope | Envelope age and receipt-authenticated evidence age are evaluated separately; missing authoritative evidence time rejects when an evidence-age limit is configured | Native v1/v2 receipts retain the v0.13 no-timestamp contract, including newly created receipts; they cannot satisfy a recipient policy requiring bounded evidence age. |
 | Recipient policy contains contradictory duplicate trust records | Both trust registries reject repeated identity/fingerprint pairs regardless of array order or status, and signer lookup requires exactly one match | The engine cannot decide which identities or keys the recipient should authorize. |
 | A historical receipt is reformatted during wrapping | The predicate authenticates `receipt.raw_base64` and its digest while requiring parsed content to agree with those exact supplied bytes | Byte preservation does not make the historical receipt current or change its original contract semantics. |
+
+## Captured and hosted evidence
+
+Captured verification authenticates complete baseline and subject runs, normalized
+request, policy and signer against caller-owned pins. It pairs unique IDs and
+checks retained case facts, then recomputes deterministic metrics or aggregates
+recorded scores. Approved externally assigned scores remain source judgments;
+they are not replayable bounded judge trials merely because their provenance is
+pinned. Missing metric facts produce insufficient evidence rather than a
+favorable subset result.
+
+For hosted captures, the service descriptor binds declared configuration and an
+observation window. Its digest is not a weight digest, execution attestation or
+guarantee about later requests. Collection, scheduling, credential custody and
+provider data-handling controls belong to the caller's capture environment.
+Verification operates offline without service credentials.
 
 ## Bounded judge collection
 
 Selecting `judge` adds a measurement source to the evaluation transaction.
 Native requests freeze authenticated runtime answers; captured requests retain
 the evaluator's supplied-answer provenance. Both can collect bounded ratings,
-and captured or frozen-answer requests can import retained calls. Verification
+and captured or frozen-answer requests can import retained calls. Native
+`execution.mode: import` imports provider answer evidence before judge collection. Verification
 and reporting replay those measurements offline.
 
 The plan binds the original task text, frozen answers, rubric, judge configuration,
@@ -135,7 +160,7 @@ by that contract.
 
 ## Trust-boundary data flow
 
-The critical transitions are:
+For native pack-v1 evidence, the critical transitions are:
 
 ```text
 host CLI -> separately pinned per-side OCI workers -> paired records -> host-signed pack
@@ -331,8 +356,8 @@ InvarLock does not claim to:
 - authorize deployment or replace domain-specific review;
 - secure a host, container engine, kernel, accelerator, or multi-tenant system;
 - issue or revoke identities and keys;
-- demonstrate external CUE, Open Policy Agent, or other policy-engine
-  authentication or evaluation of the acceptance envelope; or
+- guarantee that arbitrary external CUE, Open Policy Agent, or other policy-engine
+  integrations authenticate or evaluate the acceptance envelope correctly; or
 - establish the baseline as correct or trustworthy.
 
 See [Security practices](best-practices.md) for operating guidance and the

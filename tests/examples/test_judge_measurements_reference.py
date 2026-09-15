@@ -95,8 +95,8 @@ def test_selection_is_outcome_free_stable_and_cluster_disjoint():
     assert selected == ref.select(list(reversed(rows)), "grounded_qa")
     assert len(selected["pilot"]) == 40
     assert len(selected["final"]) == 160
-    assert len(selected["human_review"]) == 80
-    assert set(selected["human_review"]) <= set(selected["final"])
+    assert len(selected["reference_review"]) == 80
+    assert set(selected["reference_review"]) <= set(selected["final"])
     assert not set(selected["pilot"]) & set(selected["final"])
     altered = copy.deepcopy(rows)
     altered[0]["native_score"] = 1
@@ -149,14 +149,14 @@ def test_frozen_contracts_bind_answers_requests_and_cluster_units():
     assert plan["judge"]["requested_model"] == "openai/gpt-5.6-sol"
 
 
-def test_human_review_does_not_expose_roles_scores_or_case_ids():
+def test_reference_review_does_not_expose_roles_scores_or_case_ids():
     campaign = campaign_fixture()["workflows"]["grounded_qa"]
     selection = ref.select(campaign["inventory"], "grounded_qa")
     template = ref.obj(
         Path(__file__).parents[2]
         / "examples/judge-measurements/k2-judge-templates.json"
     )["grounded_qa"]
-    review = ref.human_review("grounded_qa", campaign["raw"], selection, template)
+    review = ref.reference_review("grounded_qa", campaign["raw"], selection, template)
     assert review["format"] == "invarlock/blinded-answer-review-v2"
     assert review["rubric"]["text"] == template["plan"]["rubric"]["text"]
     assert review["rubric"]["sha256"] == ref.sha(
@@ -303,7 +303,7 @@ def repin(bundle, name, data):
 
 def test_blinded_review_substitution_fails_even_with_updated_file_hash(bundle):
     path, _ = bundle
-    name = "human_review/final_validation/grounded_qa.json"
+    name = "reference_review/final_validation/grounded_qa.json"
     changed = ref.obj(path / name)
     changed["cases"][0]["native_score"] = 1
     repin(path, name, ref.canonical_payload(changed))
@@ -655,8 +655,8 @@ def test_separate_pilot_review_and_candidate_final_plan_status():
     files = ref.derive(campaign, templates)
     status = json.loads(files["study_status.json"])
     assert status["final_plan_status"] == "candidate_pending_pilot_review"
-    pilot = json.loads(files["human_review/rubric_development/grounded_qa.json"])
-    final = json.loads(files["human_review/final_validation/grounded_qa.json"])
+    pilot = json.loads(files["reference_review/rubric_development/grounded_qa.json"])
+    final = json.loads(files["reference_review/final_validation/grounded_qa.json"])
     assert len(pilot["cases"]) == 40 and len(final["cases"]) == 80
     assert pilot["stage"] == "rubric_development"
     assert not {r["review_id"] for r in pilot["cases"]} & {
@@ -675,7 +675,7 @@ def test_separate_pilot_review_and_candidate_final_plan_status():
         != files["grounded_qa/final/candidate_plan.json"]
     )
     with pytest.raises(ValueError, match="stage"):
-        ref.human_review(
+        ref.reference_review(
             "grounded_qa",
             campaign["workflows"]["grounded_qa"]["raw"],
             {},
@@ -870,3 +870,138 @@ def test_retained_public_reference_archive_replays_offline():
         assert "grounded_qa/final/plan.json" not in source.namelist()
         for name in ("ATTRIBUTION.md", "SGD-LICENSE.txt", "SQuAD-SOFTWARE-LICENSE.txt"):
             assert source.read("attribution/" + name) == (package / name).read_bytes()
+
+
+@pytest.fixture(scope="module")
+def legacy_reference():
+    import zipfile
+
+    package = (
+        Path(__file__).parents[2] / "examples/judge-measurements/references/k2-32b"
+    )
+    archive = package / "reference.zip"
+    pin = ref.obj(package / "archive.json")["reference_manifest_sha256"]
+    with zipfile.ZipFile(archive) as packed:
+        files = {name: packed.read(name) for name in packed.namelist()}
+    return archive, pin, files
+
+
+def test_upgrade_preserves_every_study_byte_and_original_archive(
+    legacy_reference, tmp_path, monkeypatch, capsys
+):
+    archive, pin, original = legacy_reference
+    archive_digest = ref.sha(archive.read_bytes())
+    upgraded = tmp_path / "current"
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "reference",
+            "upgrade",
+            "--bundle",
+            str(archive),
+            "--output",
+            str(upgraded),
+            "--expected-sha256",
+            pin,
+        ],
+    )
+    ref.main()
+    result = json.loads(capsys.readouterr().out)
+    assert result["ok"] and result["new_model_calls"] == 0
+    current = ref.authenticated_bundle_files(upgraded, result["manifest_sha256"])
+    assert ref.reference_format(current) == ref.FORMAT
+    expected_names = set()
+    for name, data in original.items():
+        if name.startswith("human_review/"):
+            name = name.replace("human_review/", "reference_review/", 1)
+        expected_names.add(name)
+        if name in {"reference.json", "README.md"}:
+            continue
+        if name.endswith("/selection.json"):
+            selected = json.loads(data)
+            selected["reference_review"] = selected.pop("human_review")
+            data = ref.canonical_payload(selected)
+        assert current[name] == data, name
+    assert set(current) == expected_names
+    assert current["README.md"] == ref.README.encode()
+    assert "human" not in ref.README.lower()
+    assert all("human" not in name for name in current)
+    assert "human" not in ref.canonical_payload(result).decode()
+    assert ref.sha(archive.read_bytes()) == archive_digest
+    # Directory upgrades use the same pinned snapshot path and are idempotent.
+    again = tmp_path / "again"
+    repeated = ref.upgrade_bundle(upgraded, again, result["manifest_sha256"])
+    assert repeated["manifest_sha256"] == result["manifest_sha256"]
+    with pytest.raises(ValueError, match="must be new"):
+        ref.upgrade_bundle(upgraded, again, result["manifest_sha256"])
+
+
+@pytest.mark.parametrize("pin", [None, "", "a" * 63, "A" * 64, "z" * 64, "0" * 64])
+def test_upgrade_requires_an_independent_manifest_pin(legacy_reference, tmp_path, pin):
+    archive, _, _ = legacy_reference
+    output = tmp_path / "rejected"
+    with pytest.raises(ValueError, match="pin|SHA-256"):
+        ref.upgrade_bundle(archive, output, pin)
+    assert not output.exists()
+
+
+@pytest.mark.parametrize("alter", ["readme", "format", "mixed_selection", "mixed_path"])
+def test_current_format_rejects_rehashed_semantic_substitutions(bundle, alter):
+    path, _ = bundle
+    if alter == "readme":
+        repin(path, "README.md", b"A different explanation\n")
+    elif alter == "format":
+        manifest = ref.obj(path / "reference.json")
+        manifest["format"] = ref.LEGACY_FORMAT
+        (path / "reference.json").write_bytes(ref.canonical_payload(manifest))
+    elif alter == "mixed_selection":
+        selection = ref.obj(path / "grounded_qa/selection.json")
+        selection["human_review"] = selection["reference_review"]
+        repin(path, "grounded_qa/selection.json", ref.canonical_payload(selection))
+    else:
+        current = "reference_review/final_validation/grounded_qa.json"
+        legacy = "human_review/final_validation/grounded_qa.json"
+        (path / legacy).parent.mkdir(parents=True)
+        repin(path, legacy, (path / current).read_bytes())
+    with pytest.raises(ValueError, match="explanation|derivation|inventory"):
+        ref.validate_bundle(path)
+
+
+def test_legacy_explanation_remains_strictly_authenticated(legacy_reference, tmp_path):
+    _, _, files = legacy_reference
+    bundle = tmp_path / "legacy"
+    for name, data in files.items():
+        path = bundle / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+    repin(bundle, "README.md", ref.README.encode())
+    with pytest.raises(ValueError, match="explanation"):
+        ref.validate_bundle(bundle)
+
+
+def test_upgrade_without_judge_templates_preserves_the_frozen_inputs(bundle, tmp_path):
+    path, _ = bundle
+    no_plans = tmp_path / "inputs"
+    original = ref.build(tmp_path, no_plans)
+    output = tmp_path / "upgraded-inputs"
+    upgraded = ref.upgrade_bundle(no_plans, output, original["manifest_sha256"])
+    assert upgraded["manifest_sha256"] == original["manifest_sha256"]
+    assert not (output / "judge_templates.json").exists()
+    assert (output / "grounded_qa/raw.json").read_bytes() == (
+        path / "grounded_qa/raw.json"
+    ).read_bytes()
+
+
+@pytest.mark.parametrize(
+    "version", [None, 2, [], "invarlock/k2-judge-answer-reference-v3"]
+)
+def test_reference_format_rejects_unknown_versions(version):
+    files = {"reference.json": ref.canonical_payload({"format": version})}
+    with pytest.raises(ValueError, match="unsupported reference format"):
+        ref.reference_format(files)
+
+
+@pytest.mark.parametrize("ids", [None, [], ["same", "same"], [123], [""]])
+def test_review_selection_rejects_invalid_ids(ids):
+    with pytest.raises(ValueError, match="invalid reference review case IDs"):
+        ref.review_case_ids({"pilot": [], "final": [], "reference_review": ids})

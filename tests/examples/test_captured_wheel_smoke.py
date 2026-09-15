@@ -142,7 +142,7 @@ def test_wheel_smoke_reports_failed_command_diagnostics_and_cleans_up(monkeypatc
         ("missed_regression", RuntimeError),
         ("render_claims_verified", AssertionError),
         ("render_changed_evidence", AssertionError),
-        ("human_claims_verified", AssertionError),
+        ("terminal_claims_verified", AssertionError),
     ],
 )
 def test_wheel_smoke_rejects_incomplete_or_contradictory_results(
@@ -156,7 +156,7 @@ def test_wheel_smoke_rejects_incomplete_or_contradictory_results(
             command[1:3] == ["evaluate", "classification/request.yaml"]
             and completed.returncode == 0
         ):
-            if fault_name == "human_claims_verified" and "--json" not in command:
+            if fault_name == "terminal_claims_verified" and "--json" not in command:
                 completed.stdout = completed.stdout.replace(
                     "Independent verification: not performed",
                     "Independent verification: passed",

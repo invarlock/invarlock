@@ -14,13 +14,20 @@
     **Evidence:** Independently sourced anchors, a verified immutable pack, a
     signed verifier receipt, and the decision-owner-maintained decision record.
 
-Use this checklist for one `invarlock/evidence-pack-v1` decision. A checked item means
-the decision owner established it independently; it must not mean merely that the
-bundle contains a matching assertion.
+Use this checklist for one native exact-match, normalized-NLL or deterministic
+extension `invarlock/evidence-pack-v1` decision. For captured comparisons and
+bounded judge evidence, use the contract-specific checks below.
 
-**Hard stop:** one unchecked required item means the evidence has not completed
-this acceptance gate. Record an exception outside the pack; do not modify the
-pack, suppress a verifier error, or reinterpret a failed policy result.
+This is a decision-owner checklist, not an additional runtime approval workflow.
+Apply conditional items only when relevant and record which operational checks
+your decision requires. Independent expectations can be maintained by the same
+team that evaluates models; their authority comes from approved inputs outside
+the submitted evidence. A checked item means those expectations were established,
+not merely that the bundle contains a matching assertion.
+
+An unmet verifier requirement or configured policy check prevents acceptance.
+Record organizational exceptions outside the pack; do not modify the pack,
+suppress a verifier error, or reinterpret a failed policy result.
 
 ## Before evaluation
 
@@ -88,11 +95,12 @@ pack, suppress a verifier error, or reinterpret a failed policy result.
 - [ ] For a scorer extension, confirm the same paired-resampling method and
       lower-bound `delta_min_pp` rule are used, and that strict replay used the
       explicitly authorized scorer registry.
-- [ ] Keep every LLM judge outside the acceptance-scorer boundary. For the
-      bounded frozen-answer judge profile, verify its separate plan, retained
-      measurements, analysis, signer, and recipient policy. Treat unsupported
-      judge, network, human, SQL/code-execution, and model-similarity results as
-      observation-only evidence.
+- [ ] Keep LLM judges outside the deterministic scorer-extension boundary.
+      Use the separate bounded judge contract when selecting `judge`; its
+      acceptance checks are listed below. A captured `recorded` metric can
+      apply policy to approved externally assigned scores, but replay
+      checks their aggregation and provenance rather than reconstructing the
+      original judgment.
 - [ ] Confirm the verdict uses the policy-relevant conservative bound: lower
       for exact-match delta and upper for normalized NLL.
 - [ ] If sample qualification is present, confirm its minimum and maximum match
@@ -108,6 +116,32 @@ pack, suppress a verifier error, or reinterpret a failed policy result.
       attestation limitations before approving downstream use.
 - [ ] If the result lies on or near a policy boundary, independently rerun it
       or record why one run is sufficient for this decision.
+
+## Captured and judge evidence
+
+For a captured comparison, use `invarlock/trust-inputs-v2` with independently
+approved complete baseline and subject run digests, normalized-request digest,
+policy bytes and signer fingerprint. Confirm the signed v3 receipt names
+`captured_comparison` and that every required metric and slice passes. Read each
+row's `scoring_assurance`: recorded scores retain source judgments; recomputed
+scores derive from retained facts. Hosted-service descriptors identify declared
+configuration and an observation window, not underlying model weights or future
+service behavior. See [captured verification](../user-guide/captured-results.md#signed-handoff).
+
+For native, captured or frozen-answer judge evidence, use an independently
+maintained `invarlock/judge-measurement-recipient-policy-v1`. Check its exact
+run, case-set, plan, measurement, analysis-policy and analysis-result pins, plus
+`native_capture_sha256` when present. Confirm `authenticated`, `replayed`,
+`verified` and `accepted`, and inspect `decision` separately. A signed judge
+receipt is optional for local verification and needed when transporting the
+verifier's signed result; its contract differs from native and captured receipts.
+See [judge verification](../reference/judge-measurements.md).
+
+A judge policy's `decision_role: required` makes that metric part of the required
+conjunction. Reference-label studies and
+independent reruns can support a broader reliance decision but are not runtime
+prerequisites. Optional per-case references are judge inputs only when the
+plan selects `reference_mode: per_case`; they are separate from such studies.
 
 ## Present and retain
 

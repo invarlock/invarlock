@@ -16,16 +16,19 @@
     glossary.
 
 **Acceptance policy**
-: Exact JSON bytes that define the metric threshold. The evidence signer binds one
-  copy; the verifier supplies the expected copy independently.
+: Exact JSON bytes that define metric thresholds and applicable decision
+  controls. The evidence signer binds one copy; the verifier supplies the expected copy independently.
 
 **Anchor**
 : A value controlled by the verifier rather than selected from submitted
-  evidence. InvarLock verification requires policy bytes, baseline and subject
+  evidence. Native pack-v1 verification requires policy bytes, baseline and subject
   artifact-identity digests, the canonical schedule digest, both runtime
   digests, and the expected evidence-signer fingerprint as anchors. When
   either side uses `llama_cpp`, it also requires an independently approved
-  normalized-request digest.
+  normalized-request digest. Captured verification instead pins complete runs,
+  normalized request, policy and signer; judge verification uses an independent
+  recipient policy binding its own evidence objects and signer. Independence
+  concerns control of expectations, not the number of people or organizations.
 
 **Assurance claim**
 : A scoped statement supported by evidence, enforcement, and explicit
@@ -46,22 +49,38 @@
   profile, not a claim of RFC 8785 JSON Canonicalization Scheme conformance.
 
 **Comparison ID**
-: Stable identifier derived from the normalized request, authenticated artifact
-  identities, schedule and policy bytes, runtime digests, and paired records.
-  It identifies one closed comparison; it is not a human authorization.
+: For native pack-v1, a stable identifier derived from the normalized request,
+  authenticated artifact identities, schedule and policy bytes, runtime digests, and paired records.
+  It identifies one closed comparison.
 
 **Comparison report**
-: The current `invarlock/comparison-report-v3` document derived from paired
-  records and policy. It contains the baseline mean, subject mean, comparison
+: For native pack-v1, the current `invarlock/comparison-report-v3` document
+  derived from paired records and policy. It contains the baseline mean, subject mean, comparison
   value, metric-specific paired interval, threshold, optional sample
   qualification, optional exact-match side-accuracy qualification, and
   finite-schedule verdict. Strict verification also preserves signed v1 and v2
-  report semantics.
+  report semantics. Captured comparisons use `invarlock/multi-metric-comparison-v1`;
+  bounded judge evidence has a separate analysis result.
+
+**Captured comparison**
+: Replay over retained evaluator records. Deterministic scores are recomputed;
+  recorded scores retain the source judgment while aggregation is replayed.
+  Complete-run pins identify the supplied facts without asserting native model
+  execution. Published evidence uses `invarlock/evidence-pack-v2`.
+
+**Bounded judge measurement**
+: Repeated ratings of frozen answers under a declared rubric, trial schedule
+  and bounded scale. Retained calls support offline parsing and analysis replay.
+  `fixed-benchmark-hoeffding-v1` uses independent units and a declared family
+  error budget; it does not establish judge agreement with reference labels or
+  population-wide model quality.
 
 **Evidence pack**
-: The immutable `invarlock/evidence-pack-v1` directory containing the request,
+: For native exact-match, NLL and deterministic extensions, the immutable
+  `invarlock/evidence-pack-v1` directory containing the request,
   identities, provider material, schedule, paired records, report, inventory,
-  checksums, and evidence signature.
+  checksums, and evidence signature. Captured and judge evidence use their own
+  formats and trust inputs; these formats do not convey interchangeable claims.
 
 **Finite-sample decision**
 : A result over the exact scheduled records. Exact match uses a paired Newcombe
@@ -84,8 +103,14 @@
   not execution attestation.
 
 **Independent verification**
-: Replay of submitted evidence using anchors obtained outside that evidence,
-  followed by a separately signed receipt.
+: Replay of submitted evidence using anchors obtained outside that evidence.
+  Native and captured verification can publish a separate signed receipt;
+  bounded judge verification returns a local result and optionally signs it.
+
+**Hosted service identity**
+: A digest-bound descriptor of the declared service configuration and observation
+  window. Hosted runs use `artifact_digest: null`; a service descriptor does not
+  identify hidden weights or guarantee later service behavior.
 
 **Material digest**
 : SHA-256 identity of exact authenticated material. It is distinct from the
@@ -167,9 +192,17 @@
   IDs, exact inputs and their digests, and expected outputs.
 
 **Signed verification receipt**
-: The external `invarlock/evidence-verification-receipt-v1` statement binding
-  the pack manifest, independent anchors, verifier identity, and replayed
-  verdict under the verifier's Ed25519 signature.
+: An external verifier-signed statement binding evidence, independent anchors
+  and the replay result. Native pack-v1 uses
+  `invarlock/evidence-verification-receipt-v1`, or v2 when a normalized-request
+  anchor is included. Captured evidence uses v3 with explicit captured scope;
+  judge evidence uses `invarlock/judge-measurement-verification-receipt-v1`.
+  The receipt format, not its version number alone, determines its assurance.
+
+**Required decision role**
+: A judge analysis policy setting that includes a metric in the required
+  conjunction. Advisory results remain
+  visible but cannot independently establish recipient acceptance.
 
 **Verifier**
 : The actor that supplies independent acceptance anchors, replays the bundle,

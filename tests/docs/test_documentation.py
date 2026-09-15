@@ -227,7 +227,9 @@ def test_readme_first_run_commands_track_checked_in_surfaces() -> None:
 
 
 def test_public_docs_describe_the_release_assurance_surface() -> None:
-    text = "\n".join(_read(relative) for relative in CORE_DOCS).lower()
+    text = " ".join(
+        "\n".join(_read(relative) for relative in CORE_DOCS).lower().split()
+    )
     for phrase in (
         "baseline",
         "subject",
@@ -261,6 +263,7 @@ def test_auxiliary_docs_track_the_product_and_release_surface() -> None:
         "addins/gguf/pyproject.toml",
         "addins/multimodal/pyproject.toml",
         "addins/tensorrt_llm/pyproject.toml",
+        "addins/inspect_judge/pyproject.toml",
     )
     distributions = {
         tomllib.loads(_read(relative))["project"]["name"]
@@ -272,6 +275,7 @@ def test_auxiliary_docs_track_the_product_and_release_surface() -> None:
         "invarlock-runtime-gguf",
         "invarlock-runtime-hf-vision-text",
         "invarlock-runtime-tensorrt-llm",
+        "invarlock-inspect-judge",
     }
     for distribution in distributions:
         assert distribution in workflows
@@ -495,43 +499,29 @@ def test_workflow_diagram_tracks_current_transactions() -> None:
     svg = _read("docs/assets/evaluation-verification-flow.svg")
     diagram = svg.lower()
     for phrase in (
-        "request.yaml",
-        "baseline artifact",
-        "subject artifact",
-        "execute native / import observations / compare captured runs",
+        "native run or import",
+        "captured records",
+        "hosted-service runs",
+        "frozen answers",
         "invarlock evaluate",
-        "paired comparison and interval",
-        "native pack v1 · captured pack v2",
-        "canonical evidence directory",
-        "native artifact/runtime/schedule or captured run/request pins",
+        "exact match · normalized nll · judge",
+        "native, captured and judge evidence keep their own contracts",
+        "independent recipient trust inputs",
         "invarlock verify",
-        "authenticate signed pack · replay under independent anchors",
-        "signed verification receipt",
-        "technical result",
-        "native-only acceptance stays separate",
+        "authenticate, bind and replay offline",
+        "optional signed receipt",
         "invarlock report",
-        "HTML · Markdown · JUnit",
-        "evidence summary",
+        "a report does not replace verification",
+        "explicit unsigned evaluation is local",
+        "deployment remains your decision",
     ):
-        assert phrase.lower() in diagram
+        assert phrase in diagram
     for stale in (
-        "spectral -&gt; RMT",
-        "evaluation.report.json",
-        "report html",
-        "nonzero: rejected",
+        "canonical evidence directory",
+        "native pack v1 · captured pack v2",
+        "paired comparison and interval",
     ):
-        assert stale.lower() not in diagram
-    for connection in (
-        'd="M 530 99 L 565 99"',
-        'd="M 1100 99 L 1065 99"',
-        'd="M 815 141 L 815 163"',
-        'd="M 815 241 L 815 263"',
-        'd="M 510 680 L 510 700"',
-        'd="M 440 775 L 440 795"',
-        'd="M 650 775 C 700 783 790 788 840 795"',
-    ):
-        assert connection in svg
-    assert 'd="M 610 794 L 640 794"' not in svg
+        assert stale not in diagram
 
     dependency_svg = _read("docs/assets/reference-evidence-dependency.svg")
     assert "manifest + anchors + verdict" in dependency_svg
@@ -629,7 +619,7 @@ def test_public_example_includes_every_required_input_and_verify_anchor() -> Non
         "make example-hf-vision-text",
         "make example-peft-lora",
         "make example-evidence-handoff",
-        "separately generated trust inputs",
+        "caller-owned evidence and verifier",
         "evidence report",
     ):
         assert fragment in example

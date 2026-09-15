@@ -15,10 +15,10 @@ invarlock verify evidence/
 invarlock report evidence/
 ```
 
-![InvarLock paired release-regression architecture](../assets/evaluation-verification-flow.svg)
+![Native, captured and judge evaluation with separate verification and reporting](../assets/evaluation-verification-flow.svg)
 
 `evaluate` executes, imports, or compares captured baseline-versus-subject
-records and publishes one atomic evidence directory. Native exact-match/NLL and
+records and publishes evidence for the selected workflow. Native exact-match/NLL and
 deterministic-extension execution/import retain pack v1, native
 artifact/schedule/runtime anchors, and receipt v1/v2. Captured built-in and
 recorded-score comparisons use pack v2, complete-run/request/policy/signer anchors,
@@ -82,7 +82,7 @@ are not selected by the bundle:
 - the exact policy file;
 - the expected baseline and subject artifact-identity digests;
 - the expected canonical schedule digest;
-- expected baseline and subject runtime image digests; and
+- expected baseline and subject runtime image digests;
 - the expected evidence-signer fingerprint; and
 - for GGUF evidence, the expected normalized-request digest.
 
@@ -172,7 +172,9 @@ See [Runtime providers](runtime-providers.md) for the extension contract.
    and renames the directory into place without replacing an existing destination.
 5. Verification treats the submitted bundle as untrusted, replays all semantic
    bindings, and signs a receipt outside it.
-6. Reporting replays retained evidence and writes optional presentation outputs.
+6. Reporting checks retained evidence and writes optional presentation outputs.
+   Native and captured directory-pack reports display the recorded comparison;
+   judge reports additionally replay retained measurements.
    It reports authentication and policy state separately from recipient acceptance.
 
 Run mode and import mode differ only before bundle assembly. Run mode asks each

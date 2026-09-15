@@ -31,7 +31,7 @@ runtime or introduce an unchecked CUDA closure.
 Python-version-specific, hash-pinned dependency closures installed before the
 coordinated local release wheels. Both are compiled from
 `release-install.in`, which is the exact union of the external base
-dependencies declared by the core and four optional first-party
+dependencies declared by the core and five optional first-party
 distributions. That closure includes NumPy for diagnostics and Pillow for the
 vision-text host package. Heavy inference stacks exposed only through optional
 runtime extras are deliberately outside this coordinated base-install gate.
@@ -39,9 +39,13 @@ runtime extras are deliberately outside this coordinated base-install gate.
 These workflow locks cover repository automation and runtime-image builds; they
 are not a substitute for each distribution's declared metadata. The release
 build validates the `invarlock`, diagnostics, GGUF connector, Hugging Face
-vision-text connector, and TensorRT-LLM connector distributions separately,
-then installs all five wheels together against the matching Python 3.12 or
+vision-text connector, TensorRT-LLM connector, and Inspect judge collection
+distributions separately, then installs all six wheels together against the matching Python 3.12 or
 3.13 closure in a disposable environment.
+
+The separate `inspect-judge-tests-py312.txt` and `inspect-judge-tests-py313.txt`
+locks pin the live judge SDK extra for its installed-package gate. They do not
+add provider SDKs to the base core or coordinated base-install closure.
 
 ## Refresh
 

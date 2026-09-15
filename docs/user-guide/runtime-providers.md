@@ -36,12 +36,21 @@ built-in `hf_transformers` integration also declares
 likelihoods over the authenticated local checkpoint. When authenticated
 tokenizer contracts and paired token counts are comparable, the verifier may
 render a token-weighted perplexity ratio as interpretation only. The GGUF,
-TensorRT-LLM, and vision-text add-ins remain exact-match only.
+TensorRT-LLM, and vision-text add-ins expose exact-match text collection.
+The built-in `judge` scorer and deterministic extensions use that same
+authenticated text-output surface, then score the frozen answers separately.
+They do not require the provider to advertise a `judge` metric. Native judging
+currently requires exactly one text input part, so it cannot grade the
+vision-text add-in's image schedules.
 
-| Metric | Hugging Face text | Vision-text | GGUF | TensorRT-LLM | Use when |
+| Provider collection metric | Hugging Face text | Vision-text | GGUF | TensorRT-LLM | Use when |
 | --- | --- | --- | --- | --- | --- |
 | `exact_match` | Yes | Yes | Yes | Yes | Exact generated text is the release criterion |
 | `normalized_nll_per_utf8_byte` | Yes | No | No | No | Expected-continuation likelihood regression is the release criterion; tokenizers may differ |
+
+For native judging, follow the [judge request workflow](evaluation-request.md#judge).
+Judge collection, evidence and recipient verification have separate contracts;
+the provider still owns the original artifact and answer-capture provenance.
 
 ## Common provider workflow
 

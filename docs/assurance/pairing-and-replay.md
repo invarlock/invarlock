@@ -2,7 +2,7 @@
 
 !!! abstract "Assurance note"
     **In plain language:** Baseline and subject results are comparable only
-    when they cover the same records in the same order with the same inputs.
+    when they cover the same paired records with the same inputs.
     Any mismatch stops verification instead of being averaged away.
 
     **Question:** How does verification establish that baseline and subject
@@ -14,9 +14,12 @@
     **Evidence:** The canonical schedule, ordered provider observations,
     record and input digests, derived paired records, and exact replay checks.
 
-Pairing is the central comparison invariant. The baseline and subject must
-produce one successful observation for every scheduled record, in exactly the
-same order, with the same record identity and input digest.
+Pairing is the central comparison invariant. In native pack-v1 evidence, the
+baseline and subject must produce one successful observation for every scheduled
+record, in exactly the same order, with the same record identity and input digest.
+The derivation below describes that native contract. Captured comparisons pair
+by unique record ID, while judge replay additionally binds each scheduled trial;
+their rules are described below.
 
 ## Notation
 
@@ -56,7 +59,9 @@ The `invarlock/runtime-behavioral-schedule-v1` document contains:
 - a unique, safe logical `record_id` for each record;
 - an ordered array of authenticated text or content input parts and its
   lowercase SHA-256 digest; and
-- nonempty `expected_output` used by all supported metrics.
+- nonempty `expected_output` retained with each scheduled record. Exact match
+  compares against it and NLL scores its continuation. Native judging includes
+  it in judge prompts only when the plan selects per-case reference mode.
 
 The loader rejects unknown fields, unsafe logical names, duplicate record IDs,
 empty material, hosted-dataset revisions that are not canonical, and an input
@@ -166,7 +171,7 @@ these observations all fail closed:
 The verifier never sorts, intersects, truncates, or drops records to manufacture
 a paired subset.
 
-## Run and import equivalence
+## Native run and import equivalence
 
 Run mode asks installed providers to authenticate and score both artifacts.
 Import mode accepts complete provider evidence created elsewhere. Both modes
@@ -181,6 +186,28 @@ See the [evaluation request guide](../user-guide/evaluation-request.md) for the
 two request shapes and the
 [provider contracts](../reference/contracts.md#provider-contracts) for their
 versioned documents.
+
+## Captured records and judge trials
+
+Captured comparison requires equal sets of unique record IDs and canonical
+equality of each pair's input, expected value and metadata. It sorts pairs by
+record ID, so differing export order alone is not a pairing failure. Explicit
+text projection also retains and verifies the original input/context binding.
+The complete run digests still identify the exact submitted runs, including
+original record order. Missing IDs or changed paired facts reject comparison;
+missing metric facts or errored results yield `insufficient_evidence` for the
+applicable metric instead of silently dropping cases.
+
+Bounded judge replay binds frozen runs, the case set, declared case-to-unit
+mapping and every case/side/repetition slot. It retains attempts, parses and
+source locations; a failed or incomplete scheduled trial cannot be replaced
+by a favorable extra sample. Repetitions are averaged within each case and cases
+within each unit. The independently declared units determine the inference
+sample size. Native judge evidence additionally retains and replays its provider
+capture; captured or frozen-answer imports retain supplied-source provenance.
+
+See [captured records](../reference/evaluation-records.md) and
+[judge measurements](../reference/judge-measurements.md) for these contracts.
 
 ## Replay guarantees and limits
 

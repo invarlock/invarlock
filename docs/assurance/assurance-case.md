@@ -17,7 +17,7 @@
 
 InvarLock supports one narrow assurance claim: a named subject satisfied a
 caller-approved acceptance policy relative to a named baseline on one authenticated,
-ordered evaluation schedule, under the runtime identities recorded for that
+ordered evaluation schedule, under the identities and measurement provenance recorded for that
 transaction.
 
 The claim covers the submitted records. Questions about other inputs, model
@@ -30,7 +30,13 @@ authenticate supplied case facts and replay, with independent run/request pins.
 [Judge evidence](../reference/judge-measurements.md) adds a bounded measurement
 plan, retained ratings and its own recipient policy; native judge evidence also
 retains runtime provenance. Judge accuracy and broader model quality require
-separate validation and do not follow from a passing receipt.
+separate validation when those claims matter to the decision; such studies are
+not prerequisites for running or verifying the bounded judge workflow.
+
+Trusted teams can use these checks to catch ordinary handoff mistakes: the wrong
+model, stale policy, incomplete capture or mismatched report. Independent anchors
+mean separately controlled expectations, not a requirement for separate people
+or organizations.
 
 ## Top-level claim
 
@@ -112,7 +118,7 @@ and
 | Verifier anchors are controlled outside the evidence submission path. | Otherwise the evidence signer can choose the expected policy, artifacts, schedule, runtimes, signer, and GGUF request. | Anchors parsed from the bundle or supplied by the same actor without independent review. |
 | Schedule and policy were selected before subject results were inspected. | Post-result selection can preserve perfect internal consistency while biasing the result. | Cherry-picked records, changed expected outputs, favorable run selection, or threshold tuning. |
 | Provider measurements are credible enough for the decision context. | Replay checks consistency, not physical execution truth. | Compromised evaluation environment or provider, missing external attestation where one is required. |
-| Selected scorer code was reviewed and independently authorized. | A scorer extension executes code that determines per-record values, although the core retains aggregation and policy arithmetic. | Scorer authorization copied from the request, substituted installed package, malicious scorer code, or an extension that uses a network, external model, human judgment, or LLM judge. |
+| Selected scorer code was reviewed and independently authorized. | A scorer extension executes code that determines per-record values, although the core retains aggregation and policy arithmetic. | Scorer authorization copied from the request, substituted installed package, malicious scorer code, or an extension that uses a network, external model, externally assigned ratings, or LLM judge. |
 | The baseline is an appropriate reference. | The result is relative to that baseline. | Backdoored, obsolete, misidentified, or otherwise unsuitable baseline. |
 | The finite schedule matches the intended decision scope. | No population inference or representativeness test is performed. | Unsupported generalization to users, tasks, languages, or conditions not scheduled. |
 
@@ -167,7 +173,7 @@ Use three review states rather than collapsing every outcome into pass/fail:
 
 | State | Meaning | Action |
 | --- | --- | --- |
-| Verified pass | Integrity and replay succeeded; policy verdict is `pass`; required operational assumptions were explicitly approved. | May support the scoped decision recorded by the decision owner. |
+| Verified pass | Integrity and replay succeeded; policy verdict is `pass`. | May support the scoped decision after the decision owner assesses applicable operational assumptions. |
 | Verified policy fail | Integrity and replay succeeded; policy verdict is `fail`. | Preserve the signed failure receipt; do not publish or describe as accepted. |
 | Not verified | Format, inventory, signature, anchor, runtime, pairing, or replay failed. | Treat as no accepted evidence. Diagnose without bypassing the failed check. |
 

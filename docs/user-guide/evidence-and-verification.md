@@ -195,7 +195,7 @@ receipt file alone does not establish acceptance.
 
 Use `--json` in automation. A successful result includes the core verifier
 fields plus the receipt path and verifier identity. Check the structured
-meaning rather than a human substring:
+fields instead of matching fragments of terminal output:
 
 ```json
 {
@@ -228,6 +228,7 @@ The receipt is canonical JSON containing:
 
 - the evidence manifest digest;
 - external policy digest;
+- baseline and subject artifact anchors and canonical schedule anchor;
 - baseline and subject runtime anchors;
 - expected evidence-signer fingerprint;
 - the normalized-request anchor when either side uses `llama_cpp`;
@@ -254,6 +255,11 @@ verification = verify_signed_verification_receipt(
     Path("verification.receipt.json"),
     Path("evidence"),
     policy_path=Path("trusted/acceptance.json"),
+    expected_artifact_digests={
+        "baseline": "sha256:" + "5" * 64,
+        "subject": "sha256:" + "6" * 64,
+    },
+    expected_schedule_digest="sha256:" + "7" * 64,
     expected_runtime_digests={
         "baseline": "sha256:" + "1" * 64,
         "subject": "sha256:" + "2" * 64,
@@ -265,11 +271,23 @@ verification = verify_signed_verification_receipt(
 
 if not verification.ok:
     raise SystemExit("; ".join(verification.errors))
+assert verification.statement is not None
+if not verification.statement["verdict"]["ok"]:
+    raise SystemExit("authenticated receipt records a rejection")
 ```
 
+The placeholders must come from independently maintained trust configuration.
 The function binds the receipt to the supplied pack manifest, policy bytes,
-runtime digests, evidence-signer fingerprint, verifier identity, and verifier
-fingerprint. It does not discover authorization from the receipt itself.
+artifact and schedule digests, runtime digests, evidence-signer fingerprint,
+verifier identity, and verifier fingerprint. It does not discover authorization
+from the receipt itself. Its `ok` authenticates the statement, including an
+authentic rejection; separately require `statement.verdict.ok` for acceptance.
+
+Supply `expected_request_digest` when validating a v2 native receipt, including
+GGUF evidence. When receipt issuance used a trust profile, also supply its
+independently obtained `expected_trust_profile_digest`. Omitting that argument
+expects a receipt with no recorded profile digest, as produced with explicit
+trust options; it does not disable the profile check.
 
 ## Report semantics
 
@@ -304,8 +322,13 @@ The HTML starts with the recorded policy decision and named baseline and
 subject. Each configured check shows its own status; expandable sections hold
 exact values, identities and technical details. Display rounding does not
 change the underlying evidence. The self-contained report works offline.
-`report --json` returns rendering status and the optional HTML path. A
-successful render exits `0` for both passing and failing recorded policies.
+`report --json` returns rendering status. Default and HTML-only native calls
+retain the v1 JSON shape; adding `--markdown` or `--junit` selects v2 with
+requested, written, and failed output details. All destinations are no-clobber
+and must remain outside evidence. A successful render exits `0` for both
+passing and failing recorded policies. See the
+[report reference](../reference/reports.md) for output contracts and partial-write
+recovery.
 
 The report verifies the embedded signature without pinning that signer to an
 independent allowlist, and it does not validate a verification receipt. Treat
@@ -350,6 +373,8 @@ The evaluation handoff contains:
 The verifier obtains elsewhere:
 
 - the policy file;
+- expected baseline and subject artifact-identity digests;
+- expected canonical schedule digest;
 - expected baseline and subject runtime digests;
 - expected evidence-signer fingerprint;
 - expected normalized-request digest when either side uses `llama_cpp`;
@@ -358,8 +383,11 @@ The verifier obtains elsewhere:
 
 The receipt verifier obtains elsewhere:
 
-- expected verifier identity and fingerprint; and
-- the same policy, runtime, and evidence-signer anchors named by the receipt.
+- expected verifier identity and fingerprint;
+- the same policy, artifact, schedule, runtime, and evidence-signer anchors
+  named by the receipt; and
+- the request anchor for a v2 native receipt and, when required, the expected
+  verifier trust-profile digest.
 
 After transport, rerun receipt validation against the received evidence and
 anchors. Do not rely solely on a successful check performed before transfer.
@@ -386,7 +414,8 @@ Before relying on a result, confirm:
 - the command exited with the expected status;
 - a signed receipt exists outside the bundle;
 - the receipt verifier identity and fingerprint match an independent registry;
-- policy and both runtime anchors came from the decision authority;
+- policy, artifact, schedule, and both runtime anchors came from the decision
+  authority;
 - the evidence-signer fingerprint was pinned independently;
 - no verification error was waived;
 - the metric and threshold match the intended claim; and

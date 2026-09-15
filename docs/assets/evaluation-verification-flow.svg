@@ -1,201 +1,77 @@
-<svg
-  xmlns="http://www.w3.org/2000/svg"
-  width="1600"
-  height="880"
-  viewBox="0 0 1600 880"
-  role="img"
-  aria-labelledby="title desc"
->
-  <title id="title">InvarLock evaluate, verify, and report flow</title>
-  <desc id="desc">
-    One evaluate, verify, report surface supports native run/import and captured
-    records. Native evidence retains pack v1 and receipt v1/v2. Captured records
-    use pack v2, recipient run/request/policy/signer anchors, and receipt v3 scoped
-    to captured comparison. Only native scope can authorize native acceptance.
-    Unsigned captured packs are local reports; signed captured records authenticate
-    submitted inputs and arithmetic, not model execution or recorded judgments.
-    Reports render HTML, Markdown, or JUnit without modifying evidence.
-  </desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="900" viewBox="0 0 1040 900" role="img" aria-labelledby="title desc">
+  <title id="title">One workflow: evaluate, verify, report</title>
+  <desc id="desc">Run or import a native comparison, use captured evaluator records, or judge frozen answers. Exact match, normalized NLL and judge scoring have distinct evidence requirements. Evaluate publishes evidence. A recipient verifies it with independent trust inputs and can issue a signed verification receipt. Report explains the evidence without granting verification or deployment approval. Hosted-service comparisons require fresh executions collected by your harness; verification stays offline.</desc>
   <defs>
-    <marker
-      id="arrow"
-      viewBox="0 0 10 10"
-      refX="8.25"
-      refY="5"
-      markerWidth="6.7"
-      markerHeight="6.7"
-      orient="auto-start-reverse"
-    >
-      <path d="M 0.75 1 L 9.5 5 L 0.75 9 z" fill="#1b2b25" />
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 1 1 L 9 5 L 1 9 z" fill="#66776e"/>
     </marker>
     <style>
-      .section-label {
-        font: 700 25px Sora, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      }
-      .box-title {
-        fill: #1b2b25;
-        font: 700 24px Sora, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      }
-      .box-text {
-        fill: #1b2b25;
-        font: 18px "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-      }
-      .small-text {
-        fill: #5a675f;
-        font: 17px Sora, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      }
-      .micro-text {
-        fill: #5a675f;
-        font: 14px Sora, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      }
-      .band-input {
-        fill: #fff8ea;
-        stroke: #0f7669;
-        stroke-width: 3;
-        stroke-dasharray: 13 10;
-      }
-      .band-output {
-        fill: #fff8ea;
-        stroke: #2d7a5f;
-        stroke-width: 3;
-        stroke-dasharray: 13 10;
-      }
-      .band-verify {
-        fill: #fff8ea;
-        stroke: #b56a3d;
-        stroke-width: 3;
-        stroke-dasharray: 13 10;
-      }
-      .box-input {
-        fill: #f3ecde;
-        stroke: #0f7669;
-        stroke-width: 3;
-      }
-      .box-output {
-        fill: #f3ecde;
-        stroke: #2d7a5f;
-        stroke-width: 3;
-      }
-      .box-verify {
-        fill: #f3ecde;
-        stroke: #b56a3d;
-        stroke-width: 3;
-      }
-      .arrow {
-        fill: none;
-        stroke: #1b2b25;
-        stroke-width: 3;
-        stroke-linecap: round;
-        stroke-linejoin: round;
-        marker-end: url(#arrow);
-      }
+      text { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #203c32; }
+      .heading { font-size: 26px; font-weight: 700; }
+      .label { font-size: 20px; font-weight: 650; }
+      .body { font-size: 19px; fill: #465e52; }
+      .note { font-size: 17px; fill: #465e52; }
+      .command { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 25px; font-weight: 700; }
+      .card { fill: #fffdf8; stroke: #b8c6bd; stroke-width: 1.5; }
+      .line { fill: none; stroke: #66776e; stroke-width: 2; marker-end: url(#arrow); }
     </style>
   </defs>
+  <rect width="1040" height="900" rx="20" fill="#f4f0e6"/>
+  <text x="40" y="47" class="heading">Your comparison, your requirements</text>
+  <text x="40" y="78" class="body">Baseline and subject · paired cases · scorer · policy</text>
 
-  <rect width="1600" height="880" fill="#f3ecde" />
+  <g id="comparison-inputs">
+    <rect x="40" y="103" width="304" height="115" rx="12" class="card"/>
+    <text x="60" y="137" class="label">Native run or import</text>
+    <text x="60" y="169" class="body">Pinned model artifacts</text>
+    <text x="60" y="196" class="body">and runtime evidence</text>
+    <rect x="368" y="103" width="304" height="115" rx="12" class="card"/>
+    <text x="388" y="137" class="label">Captured records</text>
+    <text x="388" y="169" class="body">Evaluator exports or</text>
+    <text x="388" y="196" class="body">fresh hosted-service runs</text>
+    <rect x="696" y="103" width="304" height="115" rx="12" class="card"/>
+    <text x="716" y="137" class="label">Frozen answers</text>
+    <text x="716" y="169" class="body">Declared rubric and</text>
+    <text x="716" y="196" class="body">retained or new judge calls</text>
+  </g>
+  <path id="inputs-to-evaluate" d="M 192 218 V 240 H 848 V 218 M 520 218 V 265" class="line"/>
 
-  <rect x="70" y="45" width="1460" height="300" rx="22" class="band-input" />
-  <text x="105" y="165" class="section-label" fill="#0f7669">1. Request /</text>
-  <text x="105" y="199" class="section-label" fill="#0f7669">Evaluate</text>
+  <g id="evaluate">
+    <rect x="180" y="267" width="680" height="117" rx="14" fill="#e1eee4" stroke="#4c8065" stroke-width="2"/>
+    <text x="520" y="303" text-anchor="middle" class="command">invarlock evaluate</text>
+    <text x="520" y="335" text-anchor="middle" class="label">Exact match · Normalized NLL · Judge</text>
+    <text x="520" y="363" text-anchor="middle" class="body">Validate inputs, derive the supported analysis, apply policy</text>
+  </g>
+  <path id="evaluate-to-evidence" d="M 520 384 V 416" class="line"/>
+  <g id="evidence">
+    <rect x="180" y="418" width="680" height="107" rx="14" class="card"/>
+    <text x="520" y="452" text-anchor="middle" class="heading">Evidence for the declared workflow</text>
+    <text x="520" y="482" text-anchor="middle" class="body">Identities · observations · policy · analysis · signature</text>
+    <text x="520" y="509" text-anchor="middle" class="note">Native, captured and judge evidence keep their own contracts</text>
+  </g>
 
-  <rect x="260" y="71" width="270" height="56" rx="10" class="box-input" />
-  <text x="395" y="107" text-anchor="middle" class="box-title">Baseline artifact</text>
-
-  <rect x="565" y="57" width="500" height="84" rx="10" class="box-input" />
-  <text x="815" y="84" text-anchor="middle" class="box-title">request.yaml</text>
-  <text x="815" y="108" text-anchor="middle" class="micro-text">
-    artifacts or captured runs · metrics · policy
-  </text>
-  <text x="815" y="128" text-anchor="middle" class="micro-text">
-    run / import / captured · output
-  </text>
-
-  <rect x="1100" y="71" width="270" height="56" rx="10" class="box-input" />
-  <text x="1235" y="107" text-anchor="middle" class="box-title">Subject artifact</text>
-
-  <rect x="515" y="163" width="600" height="78" rx="12" class="box-input" />
-  <text x="815" y="196" text-anchor="middle" class="box-title">invarlock evaluate</text>
-  <text x="815" y="222" text-anchor="middle" class="micro-text">
-    execute native / import observations / compare captured runs
-  </text>
-
-  <rect x="385" y="263" width="860" height="66" rx="12" class="box-input" />
-  <text x="815" y="291" text-anchor="middle" class="box-title">
-    Paired comparison and interval
-  </text>
-  <text x="815" y="315" text-anchor="middle" class="micro-text">
-    native scorer or captured metrics/slices → paired intervals
-  </text>
-
-  <path d="M 530 99 L 565 99" class="arrow" />
-  <path d="M 1100 99 L 1065 99" class="arrow" />
-  <path d="M 815 141 L 815 163" class="arrow" />
-  <path d="M 815 241 L 815 263" class="arrow" />
-
-  <rect x="70" y="365" width="1460" height="170" rx="22" class="band-output" />
-  <text x="105" y="435" class="section-label" fill="#2d7a5f">2. Canonical</text>
-  <text x="105" y="469" class="section-label" fill="#2d7a5f">Evidence</text>
-
-  <rect x="355" y="382" width="920" height="136" rx="12" class="box-output" />
-  <text x="815" y="416" text-anchor="middle" class="box-title">Canonical evidence directory</text>
-  <text x="815" y="449" text-anchor="middle" class="box-text">native pack v1 · captured pack v2 (signed or unsigned local)</text>
-  <text x="815" y="478" text-anchor="middle" class="micro-text">
-    normalized request · complete native or captured identities · policy
-  </text>
-  <text x="815" y="500" text-anchor="middle" class="micro-text">
-    records/report · closed inventory · checksums · explicit authentication
-  </text>
-
-  <path d="M 815 329 L 815 382" class="arrow" />
-
-  <rect x="70" y="555" width="1460" height="310" rx="22" class="band-verify" />
-  <text x="105" y="700" class="section-label" fill="#b56a3d">3. Verify /</text>
-  <text x="105" y="734" class="section-label" fill="#b56a3d">Report</text>
-
-  <rect x="260" y="575" width="500" height="105" rx="12" class="box-verify" />
-  <text x="510" y="608" text-anchor="middle" class="box-title">Independent trust inputs</text>
-  <text x="510" y="633" text-anchor="middle" class="micro-text">
-    native artifact/runtime/schedule or captured run/request pins
-  </text>
-  <text x="510" y="654" text-anchor="middle" class="micro-text">
-    independent policy · evidence-signer fingerprint
-  </text>
-  <text x="510" y="675" text-anchor="middle" class="micro-text">
-    verifier key · verifier identity
-  </text>
-
-  <rect x="260" y="700" width="500" height="75" rx="12" class="box-verify" />
-  <text x="510" y="730" text-anchor="middle" class="box-title">invarlock verify</text>
-  <text x="510" y="754" text-anchor="middle" class="micro-text">
-    authenticate signed pack · replay under independent anchors
-  </text>
-
-  <rect x="840" y="700" width="500" height="75" rx="12" class="box-output" />
-  <text x="1090" y="730" text-anchor="middle" class="box-title">invarlock report</text>
-  <text x="1090" y="754" text-anchor="middle" class="micro-text">
-    inspect pack · render stored result · no implicit receipt
-  </text>
-
-  <rect x="210" y="795" width="460" height="56" rx="10" class="box-output" />
-  <text x="440" y="819" text-anchor="middle" class="box-title">Signed verification receipt</text>
-  <text x="440" y="842" text-anchor="middle" class="micro-text">
-    native v1/v2 or captured-scoped v3 · verdict
-  </text>
-
-  <rect x="690" y="795" width="300" height="56" rx="10" class="box-verify" />
-  <text x="840" y="819" text-anchor="middle" class="box-title">Technical result</text>
-  <text x="840" y="842" text-anchor="middle" class="micro-text">native-only acceptance stays separate</text>
-
-  <rect x="1010" y="795" width="370" height="56" rx="10" class="box-output" />
-  <text x="1195" y="819" text-anchor="middle" class="box-title">HTML · Markdown · JUnit</text>
-  <text x="1195" y="842" text-anchor="middle" class="micro-text">
-    evidence summary
-  </text>
-
-  <path d="M 510 680 L 510 700" class="arrow" />
-  <path d="M 715 518 C 715 555 795 575 795 635 C 795 695 785 737 760 737" class="arrow" />
-  <path d="M 965 518 C 965 585 1025 645 1090 700" class="arrow" />
-  <path d="M 440 775 L 440 795" class="arrow" />
-  <path d="M 650 775 C 700 783 790 788 840 795" class="arrow" />
-  <path d="M 1090 775 C 1090 785 1160 790 1195 795" class="arrow" />
+  <path id="evidence-to-verify" d="M 430 525 V 549 H 24 V 716 H 38" class="line"/>
+  <path id="evidence-to-report" d="M 750 525 V 668" class="line"/>
+  <g id="recipient-trust">
+    <rect x="40" y="571" width="490" height="81" rx="12" fill="#fff3df" stroke="#c49b60" stroke-width="1.5"/>
+    <text x="285" y="602" text-anchor="middle" class="label">Independent recipient trust inputs</text>
+    <text x="285" y="631" text-anchor="middle" class="body">Expected identities, policy and authorized signer</text>
+  </g>
+  <path id="trust-to-verify" d="M 285 652 V 668" class="line"/>
+  <g id="verify">
+    <rect x="40" y="670" width="490" height="92" rx="12" class="card"/>
+    <text x="285" y="706" text-anchor="middle" class="command">invarlock verify</text>
+    <text x="285" y="738" text-anchor="middle" class="body">Authenticate, bind and replay offline</text>
+  </g>
+  <g id="report">
+    <rect x="560" y="670" width="440" height="92" rx="12" class="card"/>
+    <text x="780" y="706" text-anchor="middle" class="command">invarlock report</text>
+    <text x="780" y="738" text-anchor="middle" class="body">Explain the retained comparison</text>
+  </g>
+  <path id="verify-to-receipt" d="M 285 762 V 784" class="line"/>
+  <path id="report-to-output" d="M 780 762 V 784" class="line"/>
+  <text x="285" y="809" text-anchor="middle" class="label">Verification result + optional signed receipt</text>
+  <text x="780" y="809" text-anchor="middle" class="label">HTML · terminal · Markdown</text>
+  <text x="780" y="836" text-anchor="middle" class="note">Automation formats depend on the workflow</text>
+  <text x="40" y="871" class="note">A report does not replace verification. Explicit unsigned evaluation is local. Deployment remains your decision.</text>
 </svg>

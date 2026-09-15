@@ -20,6 +20,11 @@ with an earlier transaction. That material narrows ambiguity; it is not remote
 execution attestation and does not promise bit-for-bit numerical reproduction
 on every machine.
 
+The runtime identity vector below describes native pack-v1 provider evidence.
+Captured comparisons retain complete evaluator runs and source provenance;
+bounded judge evidence retains its own plan, measurements and analysis, with
+native runtime capture only when produced through the native workflow.
+
 ## Reproducibility vocabulary
 
 | Term | Question | InvarLock support |
@@ -61,9 +66,10 @@ $$
 with schedule digest $d_{\mathcal S}$, policy digest $d_{\pi}$, metric $m$,
 and comparison identifier $c$.
 
-Equality of recorded vectors is a necessary condition for a strict same-input,
-same-configuration comparison of two packs. It is not sufficient to prove that
-either declared execution occurred.
+Compare the input and configuration components when assessing a same-input,
+same-configuration rerun; the observation component may differ because it
+contains the result being compared. Agreement on recorded identities does not
+prove that either declared execution occurred.
 
 ## Bound material
 
@@ -124,7 +130,7 @@ The verifier checks each external value against the corresponding:
 - request/evidence cross-bindings.
 
 Every digest anchor is exact. A different artifact identity, schedule, or image
-digest fails verification even when a human-readable locator or source file
+digest fails verification even when a displayed locator or source file
 appears equivalent.
 
 ## Rerun control matrix
@@ -178,6 +184,31 @@ For boundary decisions:
    not only the verdict;
 4. record every material environment difference; and
 5. investigate disagreement instead of selecting the favorable run.
+
+## Captured, hosted and judge reruns
+
+For captured evidence, preserve the complete source exports, explicit field or
+text projection, canonical run digests, policy and normalized request. Offline
+verification repeats the declared score derivation or recorded-score aggregation
+without calling the original evaluator. Replaying retained likelihood facts
+checks their arithmetic and bindings; tokenizer and execution facts remain
+assertions of the capture source.
+
+A hosted run declares `artifact_digest: null` and a `service_identity` containing
+configuration and an observation window. Its descriptor digest identifies those
+declarations, not hidden weights or later service behavior. A fresh service
+capture is a new observation even if the endpoint name is unchanged. Callers
+schedule and collect those observations; InvarLock does not provide a hosted
+runtime or continuous monitoring service. See
+[hosted requalification](../user-guide/hosted-service-requalification.md).
+
+Judge verification replays retained requests, responses, attempts, parsing and
+fixed-benchmark analysis offline. A fresh collection can produce different
+ratings under the same model name and configuration. Preserve the plan, frozen
+answers, independent-unit mapping, repetitions, budgets and source provenance
+when comparing collections. Additional repetitions do not create additional
+independent units. Optional reference-label studies can test judge agreement;
+they do not change the replay claim or become runtime prerequisites.
 
 ## Worked classification
 

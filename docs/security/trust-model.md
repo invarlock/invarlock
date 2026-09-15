@@ -2,7 +2,9 @@
 
 InvarLock separates evidence creation, technical verification, portable
 recipient acceptance, and presentation into four transactions. The separation
-matters only when their inputs and keys are controlled independently.
+preserves the team's intended comparison when inputs and signing roles are
+controlled independently. The same organization or operator can maintain those
+roles using separately approved expectations and distinct evidence/verifier keys.
 
 !!! warning "Security guidance"
 
@@ -24,6 +26,10 @@ matters only when their inputs and keys are controlled independently.
     envelope signer, recipient, or receipt-verifier roles; designing
     trust-anchor distribution; or evaluating whether a signed result supports
     a proposed reliance decision.
+
+The equations and runtime anchors below describe native pack-v1 evidence.
+Captured comparisons and bounded judge measurements have separate trust inputs;
+their boundaries are summarized after the anchor matrix.
 
 ## Trust statement
 
@@ -104,6 +110,33 @@ request digest from the submitted bundle makes the check circular.
 An anchor source must be protected from the evidence submitter for the threat
 it addresses. Merely storing the same value in two files does not create
 independence.
+
+## Captured, hosted and judge trust inputs
+
+Captured comparison uses `invarlock/trust-inputs-v2`: independent complete-run
+pins, normalized-request pin, policy bytes, signer fingerprint and verifier
+identity/key. Its v3 receipt states `captured_comparison` scope and each metric's
+recorded or recomputed scoring assurance. These anchors do not substitute for
+native artifact, schedule and runtime anchors.
+
+A captured hosted run uses a declared `service_identity` and
+`artifact_digest: null`. The complete-run pin covers the descriptor's
+configuration and observation window. It does not authenticate hidden weights,
+provider-internal execution or subsequent service behavior.
+
+Bounded judge evidence uses its own recipient policy to pin the signer,
+intended subject, frozen runs, case set, plan, measurements, analysis policy
+and result. Native judge evidence additionally binds `native_capture_sha256`.
+Offline verification returns separate authentication, replay, verification,
+acceptance and decision fields. A local result can be unsigned; an optional
+judge receipt authenticates that result for handoff under its own receipt
+contract. See [judge measurements](../reference/judge-measurements.md).
+
+An externally assigned scalar rating may be evaluated as a captured `recorded`
+metric when policy explicitly approves its provenance. That verifies retained
+scores and their aggregation, not the original judgment or the bounded judge
+trial contract. Judge accuracy studies are complementary evidence selected by
+the decision owner, not a prerequisite for runtime verification.
 
 ## Signed bytes are not truthful measurements
 
@@ -188,8 +221,8 @@ policy pins the scorer ID, version, descriptor digest, and configuration
 digest. The registry must resolve that exact binding, and replay must produce
 the same canonical result twice. Scorer code is part of the verifier's trusted
 computing base: review and distribute it with the same discipline as verifier
-code. A deterministic extension scorer must not use a network, external model, human
-judgment, or LLM judge. InvarLock checks the authenticated scorer identity and
+code. A deterministic extension scorer must not use a network, external model, externally assigned
+ratings, or LLM judge. InvarLock checks the authenticated scorer identity and
 deterministic replay; it does not sandbox extension code or prove those
 operational restrictions. The native `judge` scorer collects or imports bounded
 ratings under a separate evidence and recipient-policy contract. Only live
@@ -216,8 +249,8 @@ were authorized for their distinct roles at the decision time.
 
 ### Runtime and provider
 
-Runtime receipts bind an integration implementation, artifact identity, scoring
-observation, execution settings, device facts, and outer image digest. The host
+For native model execution, runtime receipts bind an integration implementation,
+artifact identity, scoring observation, execution settings, device facts, and outer image digest. The host
 prepares the canonical schedule, then launches a separately digest-pinned
 Docker or Podman worker for each side. Each worker runs with network disabled,
 a read-only container root, reduced privileges, read-only job, artifact, and
@@ -291,9 +324,13 @@ The recipient verifier:
 - retains the exact supplied receipt bytes in `receipt.raw_base64`, with a
   digest over those decoded bytes and parsed-content equality.
 
-A v0.13 receipt has no authenticated issuance time. Wrapping it cannot invent
-one, so it cannot satisfy a recipient policy that requires bounded evidence
-age. Creating a fresh envelope changes transport metadata only.
+The native v1/v2 receipt formats retained from v0.13 have no authenticated
+issuance time, including receipts created by the current implementation.
+Wrapping them cannot invent one: `receipt_issued_at` remains null, so they cannot
+satisfy a recipient policy that requires bounded evidence age. Creating a fresh
+envelope changes transport metadata only. This portable acceptance path supports
+native pack-v1 receipts; captured and judge receipts retain separate handoff
+contracts.
 
 This boundary authenticates and policy-evaluates the portable projection; it
 does not replace full evidence replay with `invarlock verify`. The envelope is

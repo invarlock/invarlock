@@ -208,11 +208,11 @@ def test_signed_captured_payload_tamper_is_rejected_without_unsigned_fallback(
     )
 
 
-@pytest.mark.parametrize("human", [False, True], ids=["json", "human"])
+@pytest.mark.parametrize("terminal", [False, True], ids=["json", "terminal"])
 def test_tampered_signature_is_rejected_without_rendering_or_fallback(
     tmp_path: Path,
     no_presentation,
-    human: bool,
+    terminal: bool,
 ) -> None:
     evidence = _pack(tmp_path, signed=True)
     signature_path = evidence / "manifest.signature.json"
@@ -222,7 +222,7 @@ def test_tampered_signature_is_rejected_without_rendering_or_fallback(
     signature["signature"]["value"] = base64.b64encode(raw).decode("ascii")
     signature_path.chmod(0o644)
     signature_path.write_bytes(canonical_json_bytes(signature))
-    if not human:
+    if not terminal:
         payload = _rejected_report(evidence, tmp_path, no_presentation)
         assert "captured manifest signature is invalid" in payload["errors"][0]
     else:

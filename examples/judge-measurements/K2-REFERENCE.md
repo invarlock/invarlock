@@ -20,6 +20,25 @@ python examples/judge_measurements_reference.py pack --bundle reference --output
 python examples/judge_measurements_reference.py validate --bundle reference.zip
 ```
 
+Current bundles use `invarlock/k2-judge-answer-reference-v2`, with
+`reference_review` selection fields and review-sheet directories. To use the
+retained v1 archive with the current layout, create a new bundle offline:
+
+```bash
+python examples/judge_measurements_reference.py upgrade \
+  --bundle examples/judge-measurements/references/k2-32b/reference.zip \
+  --output reference \
+  --expected-sha256 ee8afde57d48879d9681fe8f3a6a1218aabf371d12b54967eae3246316771363
+```
+
+Obtain the input pin from an independent trusted copy. Upgrading changes the
+bundle format, review paths, selection-field name and explanatory README. It
+preserves every selected case, source record, answer, blinded sheet, judge plan
+and policy byte-for-byte. It makes no model calls and does not change the review
+or qualification status. The output has a new manifest digest; record it through
+the same independent approval process before using it as a verification anchor.
+Original v1 bundles remain verifiable with their original pins.
+
 If pilot review changes a rubric, first unpack and validate the retained reference,
 then rebuild only its derived plans and review sheets from the independently pinned
 frozen subset:
@@ -47,7 +66,9 @@ membership in original source files that are not included.
 
 ## Frozen selection
 
-The public seed is `invarlock-k2-32b-judge-reference-v1`. SHA-256 ranks the compact
+The public seed is `invarlock-k2-32b-judge-reference-v1`. Format upgrades retain
+the original ranking salts, including the final review-subset salt, so they
+cannot change which cases are selected. SHA-256 ranks the compact
 sorted UTF-8 JSON array `[seed, workflow, split, case_id]`; case ID breaks ties.
 Ranking uses case IDs and source metadata, never outputs or scores. English QA
 requires complete A/B captures and a matching planned case. Extraction requires
@@ -75,7 +96,7 @@ The separate held-out reference retains the executed final plans.
 
 Untouched final-validation review selects 40 cases per stratum from final using
 its own hash ranking. Give reviewers only the appropriate file under
-`human_review/rubric_development/` or `human_review/final_validation/`. The final
+`reference_review/rubric_development/` or `reference_review/final_validation/`. The final
 review sheets contain 80 anonymous paired responses with
 hashed presentation order and response position, without native scores, source
 case IDs or A/B role labels. Each sheet includes the frozen rubric, allowed
@@ -126,9 +147,11 @@ answers, rubric, scale and IDs unchanged. Optional notes are limited to 4,096
 UTF-8 bytes per case. Use a pseudonymous reviewer identifier in retained records.
 
 Before collecting judgments, freeze the descriptive comparison protocol:
-`single-reviewer-exact-label-v1` compares each scheduled judge repetition to the
-one reference rating for that answer. It reports exact matches, confusion counts
-and missing-trial coverage. Missing trials are excluded from the agreement denominator
+`single-reviewer-exact-label-v2` compares each scheduled judge repetition to the
+one reference rating for that answer. New review records use
+`invarlock/k2-single-reviewer-record-v2`; confusion entries identify the
+`reference_label` and judge label explicitly. The protocol reports exact matches,
+confusion counts and missing-trial coverage. Missing trials are excluded from the agreement denominator
 and remain visible in coverage. Repeated calls do not increase the reference
 sample size. This protocol sets no agreement pass threshold and estimates neither
 inter-rater reliability nor population accuracy. The operator must explicitly

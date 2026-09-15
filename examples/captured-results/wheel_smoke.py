@@ -196,7 +196,7 @@ def main() -> None:
                 if p.is_file()
             }
             run("report", str(evidence), *options, "--json", expected=2)
-            human = run(
+            terminal = run(
                 "evaluate",
                 request,
                 "--signing-key",
@@ -204,8 +204,8 @@ def main() -> None:
                 "--output",
                 f"{example}/artifacts/text-evidence",
             )
-            assert "Independent verification: not performed" in human
-            assert "Recorded policy result: pass" in human
+            assert "Independent verification: not performed" in terminal
+            assert "Recorded policy result: pass" in terminal
             print(
                 f"{example}: installed comparison, signed receipt, text summaries and rendering pass"
             )

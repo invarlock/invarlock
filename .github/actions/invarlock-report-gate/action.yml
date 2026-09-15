@@ -48,7 +48,7 @@ inputs:
     required: false
     default: reports/invarlock/verification.result.json
   html-output:
-    description: New path for the self-contained human report.
+    description: New path for the self-contained report.
     required: false
     default: reports/invarlock/evidence.html
   artifact-name:

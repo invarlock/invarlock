@@ -28,7 +28,8 @@ Internal consistency does not independently authenticate omitted original files.
 
 For selection rules, exact frozen protocol and the build command, see the
 [K2 reference guide](../../K2-REFERENCE.md). For a blinded label comparison, use
-only the appropriate rubric-development or final-validation sheet from the archive,
+the guide’s `upgrade` command to produce the current bundle layout, then give
+reviewers only the appropriate sheet under `reference_review/`,
 keeping source roles and native scores withheld until the labels are frozen.
 The sheet itself contains the frozen rubric, allowed labels and empty rating and
 notes fields needed to record the review.

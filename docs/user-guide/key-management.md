@@ -92,7 +92,7 @@ script computes the InvarLock form directly. Evidence-signer fingerprints must r
 verifiers through an authenticated channel separate from the submitted evidence.
 Verifier fingerprints must likewise reach receipt verifiers independently.
 
-Compute a fingerprint from a public or private PEM without printing private
+Compute a fingerprint from a private PEM without printing private
 material:
 
 ```python
@@ -191,6 +191,11 @@ result = verify_signed_verification_receipt(
     Path("verification.receipt.json"),
     Path("evidence"),
     policy_path=Path("trusted/acceptance.json"),
+    expected_artifact_digests={
+        "baseline": "sha256:" + "5" * 64,
+        "subject": "sha256:" + "6" * 64,
+    },
+    expected_schedule_digest="sha256:" + "7" * 64,
     expected_runtime_digests={
         "baseline": "sha256:" + "1" * 64,
         "subject": "sha256:" + "2" * 64,
@@ -201,10 +206,20 @@ result = verify_signed_verification_receipt(
 )
 if not result.ok:
     raise RuntimeError(result.errors)
+assert result.statement is not None
+if not result.statement["verdict"]["ok"]:
+    raise RuntimeError("authenticated receipt records a rejection")
 ```
 
 Every expected value in that example must come from caller-owned trust
-configuration. Do not fill it from `result.statement`.
+configuration. Do not fill it from `result.statement`. Receipt authentication
+and a passing signed verdict are separate checks. For a v2 native receipt,
+also supply the independent `expected_request_digest`; GGUF requires that
+anchor. See [receipt validation](evidence-and-verification.md#validate-a-received-receipt)
+for trust-profile binding and the complete handoff rules. A receipt issued
+using a trust profile requires its independently obtained
+`expected_trust_profile_digest`; omission expects a receipt with no recorded
+profile digest.
 
 ## Validate the key setup
 

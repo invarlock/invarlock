@@ -72,7 +72,12 @@ def test_heldout_signed_receipts_and_policy_outcomes_replay():
         REFERENCE / "reference.zip", PIN, max_expanded_bytes=EXPANDED
     )
     assert result["new_model_calls"] == 0
-    assert result["human_review"] == "heldout_ai_review_only"
+    assert result["format"] == "invarlock/judge-reference-replay-v2"
+    assert "human_review" not in result
+    assert result["reference_review"] == {
+        "archived_status": "heldout_ai_review_only",
+        "label_source": "ai",
+    }
     for outcome in result["workflows"].values():
         assert outcome["authenticated"] and outcome["replayed"] and outcome["verified"]
         assert outcome["accepted"] and outcome["decision"] == "pass"

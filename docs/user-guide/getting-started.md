@@ -32,7 +32,10 @@ invarlock report evidence/
     keys.
 
 To check results from an existing evaluator without preparing an OCI runtime,
-start with [Captured results](captured-results.md). The same commands and SDK
+start with [Captured results](captured-results.md). Native requests support
+`exact_match`, `normalized_nll_per_utf8_byte`, and `judge`; this tutorial uses
+normalized NLL. For rubric-based grading of native answers, use the
+[judge request workflow](evaluation-request.md#judge). The same commands and SDK
 support multiple metrics and slices with explicit captured assurance. This page
 walks through native execution and its independent receipt. For periodic or
 incident-triggered hosted evaluation, follow
@@ -359,7 +362,8 @@ the terminal layout to decide acceptance.
 
 ## Interpret the result
 
-Every current `invarlock/comparison-report-v3` report records:
+Native exact-match and normalized-NLL `invarlock/comparison-report-v3` reports
+record:
 
 - a point estimate over all authenticated records;
 - a paired Newcombe 95% interval plus regression/improvement counts and an
@@ -373,8 +377,8 @@ Every current `invarlock/comparison-report-v3` report records:
 - a verdict controlled by the conservative interval bound and any configured
   sample and side-accuracy qualification.
 
-For exact match, the lower bound must clear the percentage-point floor. For
-byte-normalized NLL, the upper bound must remain below the ratio ceiling. Its
+For exact match, the lower bound must meet or exceed the percentage-point floor.
+For byte-normalized NLL, the upper bound must be at or below the ratio ceiling. Its
 interval resamples paired schedule positions, so each baseline observation
 stays coupled to its subject observation.
 

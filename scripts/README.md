@@ -23,7 +23,11 @@ and security checks.
   dependency closure and all six wheels in a disposable environment, runs
   `pip check`, and exercises provider discovery and conformance without using
   the checkout or user site. It selects the maintained Python 3.12 or 3.13
-  lock for the invoking interpreter.
+  lock for the invoking interpreter. The shared `release/core_wheel_consumers.py`
+  stages five consumers outside the checkout: quickstart, captured evaluation,
+  judge replay, the three-scorer SDK journey and a retained deployment receipt.
+  Local installation checks and both release wheel jobs run this same inventory
+  before optional add-ins are installed.
 - `security/` generates the SBOM and runs dependency vulnerability checks.
 - `authenticated_runtime_build.py` consumes an authenticated Git archive,
   validates Dockerfile base overrides as named `repository@sha256:...`

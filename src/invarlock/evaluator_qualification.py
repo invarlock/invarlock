@@ -4,7 +4,7 @@ Evaluator-specific execution and native-output parsing stay outside the core.
 This module authenticates a closed normalized export, its independent schedule,
 the retained upstream output, and the exact runner/dependency identities chosen
 by the profile owner. Deterministic per-record exports can become runtime-import
-facts; aggregate, human, or model-judge outputs remain observation-only.
+facts; aggregate or externally rated outputs remain observation-only.
 """
 
 from __future__ import annotations
