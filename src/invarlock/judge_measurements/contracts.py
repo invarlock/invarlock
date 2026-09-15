@@ -903,7 +903,17 @@ def _provider_completion(response: dict[str, Any]) -> object:
         and isinstance(choices[0].get("message"), dict)
         and isinstance(choices[0]["message"].get("content"), str)
     ):
-        content = choices[0]["message"]["content"]
+        message = choices[0]["message"]
+        if (
+            message.get("role", "assistant") != "assistant"
+            or message.get("refusal") not in (None, "")
+            or message.get("tool_calls") not in (None, [])
+            or message.get("function_call") is not None
+        ):
+            _fail(
+                "retained Inspect provider response must be a tool-free assistant message without refusal"
+            )
+        content = message["content"]
         try:
             return parse_json_bytes(
                 content.encode("utf-8"), label="provider completion"
