@@ -234,15 +234,13 @@ their own declared source identity semantics.
 non-null `reasoning_effort` in their approved plans. The Inspect adapter passes
 that exact value to the SDK and requires the retained provider request to match
 it. This bounded SDK support does not qualify either model's judging quality.
-The K2 reference selects `none` for Sol explicitly. Its corrected 480-trial
-pilot completed all planned calls, while both 40-unit analyses remained
-`insufficient_evidence` because their interval width exceeded the frozen
-maximum. The earlier pilot omitted this control and remains a separate
-incomplete run. See the
-[retained pilot and offline replay](https://github.com/invarlock/invarlock/tree/main/examples/judge-measurements/references/k2-32b-pilot).
-The completed [Luna held-out reference](https://github.com/invarlock/invarlock/tree/main/examples/judge-measurements/references/k2-32b-luna-xhigh-heldout)
-retains both executed final plans, all 10,260 ratings and the completed
-reference-label comparison. The original pilot archive remains unchanged.
+The [retained K2 pilot](https://github.com/invarlock/invarlock/tree/main/examples/judge-measurements/references/k2-32b-pilot)
+binds Sol effort `none` and 480 completed trials. Both 40-unit analyses remain
+`insufficient_evidence` because their interval widths exceed the frozen
+maximum. The [Luna held-out reference](https://github.com/invarlock/invarlock/tree/main/examples/judge-measurements/references/k2-32b-luna-xhigh-heldout)
+retains two executed final plans, 10,260 ratings and their reference-label
+comparison. Each archive retains its own plan, source identity and outcome;
+none qualifies a different judge model, effort or rubric.
 Rubric development and reference-label review are study-design choices, not
 additional requirements of the native judge workflow.
 
@@ -292,7 +290,11 @@ the intended subject under `bounded-judge-fixed-benchmark-v1`.
 The recipient maintains its own `judge-measurement-recipient-policy-v1` outside
 the submitted evidence. It pins the signer identity and public-key fingerprint,
 intended subject, exact artifact digests, metric and bounded decision scope.
-An embedded public key cannot authorize itself.
+An embedded public key cannot authorize itself. For a local subject,
+`intended_subject` equals its attributed artifact digest. For a hosted subject,
+it equals `invarlock.engine.evaluated_subject_digest(subject_run)`, the digest of
+the complete service descriptor. Neither identity replaces the complete-run
+pin or establishes current hosted behavior.
 
 A complete policy has this shape. The recipient obtains every value through its
 own approval process: the signer identity and key fingerprint come from a trusted
@@ -448,9 +450,10 @@ process and excludes provider calls, network limits, checkpoint synchronization,
 signing and report generation. Run the maintained capacity test on the intended
 recipient host before selecting an operational allowance.
 
-The corrected retained pilot completed 480 trials in 265.454 seconds, with
+The retained 480-trial pilot completed in 265.454 seconds, with
 260,271 input tokens, 3,868 output tokens and no incomplete trials. This one-run
-observation used a 128-token output cap and does not forecast the final study.
+observation used a 128-token output cap and does not predict performance for
+another plan or host.
 The final K2 plan caps output at 256 tokens, while the retained response contract
 allows up to 1 MiB. Measure response-size tails, provider throughput, errors and
 checkpoint overhead on the intended workload before estimating final collection

@@ -18,7 +18,7 @@ must be recomputed by `exact_match`, `normalized_match`, `numeric_tolerance`,
 the deterministic component. The judge policy must declare `required`.
 
 Both components must bind identical complete run digests, original case-set
-digest and subject artifact. Matching case IDs alone is insufficient. Inputs,
+digest and evaluated subject identity. Matching case IDs alone is insufficient. Inputs,
 references, metadata and answers must match through those complete bindings.
 Judge repetitions do not create additional deterministic records.
 
@@ -95,6 +95,15 @@ existing signer, plan, measurement, result and intended-subject pins.
   "statistical_scope": "component-methods-no-joint-confidence"
 }
 ```
+
+The example above is for a local artifact. For a hosted subject,
+`shared_inputs.subject_artifact_sha256` must be `null` and
+`shared_inputs.subject_service_identity_sha256` must contain
+`invarlock.engine.evaluated_subject_digest(subject_run)`. The latter hashes the
+complete service descriptor; it does not identify immutable weights. Local
+artifact policies omit the service field. The judge recipient policy must pin
+the same evaluated subject in `intended_subject`, and both components still
+require the exact complete-run digests.
 
 All composition digests use the `sha256:` prefix. Index and trust-profile pins
 hash exact file bytes; original-run and case-set pins use their canonical public

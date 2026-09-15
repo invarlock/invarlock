@@ -147,8 +147,8 @@ invarlock evaluate release-check/request.yaml
 ```
 
 Replace the illustrative digest with the exact local CUDA image identity. Keep
-the signing-key path in a caller-controlled location; the host reads it only
-when signing the validated evidence bundle.
+the signing-key path in a caller-controlled location; the host validates it
+during preflight and uses it to sign the validated evidence bundle.
 
 Equivalent explicit options are often clearer for one-off runs:
 
@@ -196,6 +196,24 @@ The primary artifact path remains in `request.yaml`. Executable, source, and
 tokenizer-support resources remain caller-controlled when they are provider
 inputs. The TensorRT-LLM runner is instead installed in and authenticated from
 the selected runtime image; a submitted request cannot replace it.
+
+## Optional judge collection
+
+The installed Inspect judge collector has a separate, explicitly budgeted hosted
+collection boundary. Native model workers remain offline. These environment
+inputs apply only when new judge ratings are collected:
+
+| Variable | Behavior |
+| --- | --- |
+| `OPENAI_API_KEY` | Required nonempty credential for the configured collector; never retain it in a request or evidence |
+| `OPENAI_BASE_URL`, `OPENAI_API_BASE` | Presence is rejected, including an empty value; custom endpoints are unsupported |
+| `OPENAI_SAFETY_IDENTIFIER` | Presence is rejected; inherited identifier controls are unsupported |
+
+Collection preflight checks this environment and the pinned optional
+dependencies without making calls. Offline retained-measurement import,
+verification and reporting need neither credentials nor these SDKs. See
+[judge measurements](judge-measurements.md#frozen-answer-requests-and-preflight)
+for the configuration and reservation limits.
 
 ## Security switches
 

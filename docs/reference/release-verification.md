@@ -55,7 +55,7 @@ repository workflow:
    and entry-point discovery;
 10. audits the installed dependency surface and generates an SBOM;
 11. records all twelve archives in one SHA-256 ledger and attaches build-provenance
-    attestations during the tag run; and
+    attestations during the tag run;
 12. after a complete TestPyPI or PyPI publication, verifies every hosted
     archive against that tag-run ledger, installs the hosted wheels together,
     and repeats the conformance smoke; and
@@ -246,8 +246,8 @@ TestPyPI; later releases use `complete` and publish all six projects in one
 dispatch.
 
 Configure a protected `v*` tag ruleset that blocks updates and deletion. Protect
-each project-scoped PyPI environment with required reviewers and an appropriate
-deployment policy. These repository controls provide the authorization layer
+each project-scoped PyPI environment with an appropriate release authorization
+and deployment policy. These repository controls provide the authorization layer
 around the workflow's commit, tag-run artifact, ledger, and trusted-publisher
 identity.
 
@@ -366,7 +366,7 @@ If a defect is discovered after publication:
 3. preserve the tag, provenance, hashes, and incident record needed to explain
    existing installations;
 4. fix forward under a new version rather than overwriting published files;
-5. rerun the complete local, TestPyPI, provenance, and production checks; and
+5. rerun the complete local, provenance, production and any selected TestPyPI checks; and
 6. reconcile documentation and public-evidence links to the replacement.
 
 Yanking is a discovery warning, not remote uninstallation or revocation of

@@ -34,7 +34,7 @@ invarlock-qualify-evaluator qualify PROFILE SCHEDULE EXPORT RAW_OUTPUT \
 
 This command is evaluator-neutral: it never executes or dispatches to a named
 evaluator. It authenticates one already-normalized export and independently
-recomputes deterministic exact-match records. See [Evaluator
+recomputes the supported deterministic metric declared by its profile. See [Evaluator
 qualification](evaluator-qualification.md).
 
 ## Root command
@@ -123,7 +123,7 @@ publishes the evidence directory. Import requests do not launch workers.
 | --- | --- | --- | --- |
 | `REQUEST` | Except setup actions | None | Existing readable YAML governed by native v1, captured v2 or frozen-answer judge v3; its parent is the request root |
 | `--signing-key PATH` | For signed publication; native run/import requires it | `INVARLOCK_SIGNING_KEY` | Ed25519 evidence-signing private-key file; captured and frozen-answer judge requests permit explicit `--unsigned` |
-| `--allow-installed-scorers` | Only for a scorer-bound request | `INVARLOCK_ALLOW_INSTALLED_SCORERS` | Authorize loading and executing the exact installed scorer bound by the request and policy |
+| `--allow-installed-scorers` | Only for a separately installed scorer | `INVARLOCK_ALLOW_INSTALLED_SCORERS` | Authorize loading and executing the exact installed scorer bound by the request and policy |
 | `--runtime-profile FILE` | No | None | Explicit closed JSON runtime settings for run requests; maximum 16 KiB |
 | `--runtime-image IMAGE` | Run mode from host | `INVARLOCK_RUNTIME_IMAGE` | Local OCI image reference; must contain a digest or be paired with the digest option |
 | `--runtime-image-digest DIGEST` | When not embedded in image; recommended explicitly | `INVARLOCK_RUNTIME_IMAGE_DIGEST` | Pinned lowercase OCI `sha256:...` identity |
@@ -149,6 +149,11 @@ requests. Import evidence already records its runtime identity, so `evaluate`
 rejects explicit run controls for an import request instead of silently ignoring
 them. The command also fails if the request's execution mode changes between
 mode detection and full loading.
+
+The five shipped deterministic scorer IDs are available without
+`--allow-installed-scorers`; see [scorer extensions](contracts.md#deterministic-scorer-extension).
+The flag enables discovery of separately installed scorer code, which must still
+match the request and policy bindings.
 
 ### Native judge scoring
 
@@ -333,7 +338,9 @@ invarlock verify EVIDENCE \
   [--json]
 ```
 
-Native evidence uses one closed `invarlock/trust-inputs-v1` object:
+Native exact-match/NLL and deterministic-extension evidence uses one closed
+`invarlock/trust-inputs-v1` object. Native judge evidence instead requires the
+[judge recipient policy](judge-measurements.md#replay-authentication-and-acceptance):
 
 ```json
 {
@@ -403,6 +410,10 @@ invarlock verify EVIDENCE \
 `verify` treats the bundle as untrusted. It requires all acceptance anchors
 from the caller and writes a signed receipt outside the bundle.
 
+The following table describes native pack-v1 verification. With a trust profile,
+the profile supplies the trust fields; the explicit alternatives are not also
+required. Judge and evidence-set inputs use their separate policies.
+
 | Input | Required | Environment alternative | Meaning |
 | --- | --- | --- | --- |
 | `EVIDENCE` | Yes | None | Existing readable evidence-pack directory |
@@ -418,7 +429,7 @@ from the caller and writes a signed receipt outside the bundle.
 | `--receipt PATH` | Yes | None | New receipt path outside the pack |
 | `--verifier-signing-key PATH` | Yes | `INVARLOCK_VERIFIER_SIGNING_KEY` | Independent verifier Ed25519 private key |
 | `--verifier-identity TEXT` | Yes | `INVARLOCK_VERIFIER_IDENTITY` | Stable verifier name placed in the receipt |
-| `--allow-installed-scorers` | Only for scorer-bound evidence | `INVARLOCK_ALLOW_INSTALLED_SCORERS` | Independently authorize loading and replaying the exact installed scorer pinned by the request and policy |
+| `--allow-installed-scorers` | Only for a separately installed scorer | `INVARLOCK_ALLOW_INSTALLED_SCORERS` | Independently authorize loading and replaying the exact installed scorer pinned by the request and policy |
 | `--json` | No | None | Emit one compact verification result |
 
 Use either `--trust-profile` or all explicit trust-anchor options, never both.
@@ -459,9 +470,11 @@ receipts](reports.md#verification-result) for the complete field matrix.
 invarlock report EVIDENCE [--html report.html] [--markdown report.md] [--junit results.xml] [--explain] [--case-id ID]... [--json]
 ```
 
-`report` verifies the bundle's closed inventory, checksums, reference digests,
-canonical JSON, and the embedded signature when the pack declares signed
-authentication before rendering `reports/evaluation.report.json`.
+For native and captured directory packs, `report` checks the closed inventory,
+checksums, reference digests, canonical JSON and embedded signature when signed,
+then renders `reports/evaluation.report.json` without a full comparison replay.
+Judge and evidence-set reports replay their retained judge measurements under
+their own contracts. None of these paths performs recipient acceptance.
 
 | Input | Required | Meaning |
 | --- | --- | --- |
@@ -481,6 +494,12 @@ and `html` (a path or `null`) for native default/HTML-only calls. Captured calls
 and native calls requesting Markdown or JUnit, emit
 `invarlock/evidence-report-v2` with `kind`, `ok`, `pack_manifest_digest`,
 `requested_outputs`, `written_outputs`, `failed_output`, and `errors`.
+Judge reports emit `invarlock/judge-evidence-report-v1` with `kind: judge`
+and `evidence_digest`; evidence-set reports emit
+`invarlock/evidence-set-report-v1` with `kind: evidence_set` and `index_sha256`.
+Both include output maps and their scoped report facts. These formats do not
+reuse the native manifest identity field.
+
 All destinations are checked up front; a later write failure leaves earlier
 completed outputs accurately listed. There is no automatic receipt discovery.
 Unsigned captured reports remain explicitly local, without independent assurance.
@@ -512,8 +531,8 @@ safe renderer, not a substitute for `invarlock verify`.
 
 Core text output separates operation completion, recorded policy result and
 independent verification. `evaluate` prints `Evidence created` and the recorded
-policy result. A published policy failure still exits `0`; publication does not
-establish recipient acceptance. Preflight shows the mode, paired record count,
+policy result. A published policy failure exits `0` unless `--fail-on-policy` requests a
+nonzero policy gate; publication does not establish recipient acceptance. Preflight shows the mode, paired record count,
 destination and number of validated checks, without execution or publication.
 
 `verify` distinguishes an authentic policy rejection from evidence integrity or
@@ -545,9 +564,9 @@ bytes. Output files and directories are no-clobber by design.
 | `0` | Requested transaction completed successfully |
 | `1` | Operational write failure where the command reports one explicitly, such as an HTML output error |
 | `2` | Invalid invocation, missing trust input, request/evaluation failure, or high-level verification/report rejection |
-| `4` | Captured evidence structural/contract rejection |
+| `4` | Captured structural/contract rejection, or judge/evidence-set authentication or replay failure |
 | `6` | Captured authenticated binding or source-integrity rejection |
-| `7` | Completed captured verification policy rejection, or CLI evaluation policy gate after successful publication |
+| `7` | Completed captured policy rejection, verified but unaccepted judge/evidence-set result, or evaluation policy gate after publication |
 | Other nonzero | A lower-level evidence-pack status surfaced by a transaction; reject and inspect machine output |
 
 Do not build automation that accepts a particular nonzero value. The

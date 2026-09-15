@@ -55,7 +55,8 @@ The acceptance predicate and recipient policy are described in
 [Acceptance attestations](acceptance-attestations.md). The detailed InvarLock
 receipt remains the authoritative replayable result.
 Native pack v1 and receipt v1/v2 retain their published meanings. Captured pack
-v2 and receipt v3 are the only captured evidence family; legacy monolithic
+v2 and receipt v3 are the deterministic captured evidence family; captured
+`metric: judge` uses the separate judge envelope and receipt. Legacy monolithic
 comparison evidence is not accepted. A captured receipt's
 `verification_scope: captured_comparison` does not qualify native execution,
 acceptance attestations, ModelKit acceptance, or deployment approval. See
@@ -123,8 +124,8 @@ runs and policy bytes, including source versions and per-record context. Their
 independent run digests include outputs, so they are not pre-execution context
 identities. Replaying signed captured evidence verifies the comparison;
 it does not prove that an untrusted capture worker executed the declared model.
-The native rehearsal's recipient independently pins the protocol and capture
-before reconstructing those runs.
+The [captured rehearsal](../user-guide/captured-results.md) independently pins
+the protocol and capture before reconstructing those runs.
 
 ## Provider contracts
 
@@ -208,6 +209,11 @@ Each comparison side has the same closed shape:
 | `runtime.provider` | Provider name | Yes | Selected runtime-provider ABI implementation |
 | `runtime.settings` | Object of JSON scalars | Yes | Provider-owned settings validated against capabilities |
 
+For `metric: judge`, `comparison.judge` additionally requires a private
+`workspace` and `signer_identity`, and `comparison.policy` names the closed
+`invarlock/native-judge-policy-v1` recipe. Its code-enforced plan and analysis
+bindings are described in [judge measurements](judge-measurements.md#native-scorer).
+
 `comparison.policy` is always a safe relative path. `comparison.dataset` is
 mode-specific:
 
@@ -258,12 +264,15 @@ code. The verifier runs the scorer twice, requires identical canonical
 results, then independently reconstructs the core-owned aggregate, paired
 interval, threshold comparison, and verdict.
 
-This boundary can support deterministic text scorers such as token F1,
-structured-field extraction, or VQA answer normalization when separately
-implemented and authorized. Those scorer packages are separately installed and
-require explicit authorization. SQL or code execution, model-based semantic
-similarity, network services,
-human review, and LLM judges require different trust contracts. The bounded
+Core ships `invarlock.normalized_match`, `invarlock.numeric_tolerance`,
+`invarlock.json_fields`, `invarlock.json_exact` and `invarlock.token_f1` through
+this boundary. The CLI enables them without `--allow-installed-scorers`; SDK
+callers supply `ScorerExtensionRegistry(allow_installed=False)`. Their exact
+version, descriptor and configuration bindings remain mandatory. Additional
+implementations, such as a VQA normalization scorer, require separate
+installation or caller injection and explicit authorization. SQL or code
+execution, model-based semantic similarity, network services, human review, and
+LLM judges require different trust contracts. The bounded
 frozen-answer judge formats provide one such contract for their declared text
 profile; other judge outputs can be attached as authenticated observations
 without acceptance authority.
@@ -411,6 +420,10 @@ not sufficient.
 
 ## Parser and path limits
 
+These are native v1 request limits. Captured comparisons use the separate
+[capacity limits](evaluation-capacity.md); judge recipes and measurements use
+[judge operational bounds](judge-measurements.md#operational-bounds-and-measured-reference-workload).
+
 | Boundary | Limit or rule |
 | --- | --- |
 | Request YAML | At most 1 MiB, 64 nested levels, and 10,000 syntax nodes |
@@ -425,8 +438,9 @@ unsafe scalar types, and non-canonical scalar spellings. File reads repeat
 component-by-component no-follow checks at use time, so a path that passed the
 first parse cannot be replaced with a symbolic link unnoticed.
 
-The built-in comparison metrics are `exact_match` and
-`normalized_nll_per_utf8_byte`. Exact-match reports include paired outcome
+The built-in deterministic native metrics are `exact_match` and
+`normalized_nll_per_utf8_byte`; native `judge` uses the separately described
+[judge analysis policy](judge-measurements.md). Exact-match reports include paired outcome
 counts, an exact two-sided McNemar probability, and a versioned paired Newcombe
 95% interval whose lower bound controls policy. Current v3 reports and
 historical v2 reports use the continuity-corrected method; strict verification
@@ -497,9 +511,6 @@ separate JSON Schema file:
 | `invarlock/evidence-input-identity-v1` | One input role, material digest, and optional locator/media type |
 | `invarlock/paired-records-v1` | Verifier-derived baseline/subject scores in schedule order |
 | `invarlock/runtime-side-report-v1` | Minimal link from one side to its provider observation |
-| `invarlock/scorer-extension-descriptor-v1` | One scorer's capabilities, input facts, result semantics, and trust constraints |
-| `invarlock/scorer-extension-binding-v1` | Exact scorer identity and canonical configuration selected by the request |
-| `invarlock/scorer-extension-result-v1` | Ordered unit-interval record results and core-owned arithmetic mean from replay |
 | `invarlock/comparison-report-v3` | Current canonical means, point comparison, metric-specific paired interval, optional sample and exact-match side-accuracy qualification, threshold, and verdict |
 | `invarlock/comparison-report-v2` | Historical canonical report without side-accuracy qualification; accepted for backward verification, not emitted for new evaluations |
 | `invarlock/comparison-report-v1` | Legacy canonical report replayed with its original exact-match interval method; accepted for backward verification, not emitted for new evaluations |
