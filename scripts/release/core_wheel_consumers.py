@@ -86,14 +86,13 @@ def run_consumers(cli: str) -> None:
             ),
         )
         # Reject source imports before any consumer can produce misleading evidence.
+        installed_import_check = (
+            "from pathlib import Path; import sysconfig; import invarlock; "
+            "assert Path(invarlock.__file__).resolve().is_relative_to("
+            "Path(sysconfig.get_path('purelib')).resolve())"
+        )
         subprocess.run(
-            [
-                sys.executable,
-                "-c",
-                "from pathlib import Path; import sysconfig; import invarlock; "
-                "assert Path(invarlock.__file__).resolve().is_relative_to("
-                "Path(sysconfig.get_path('purelib')).resolve())",
-            ],
+            [sys.executable, "-c", installed_import_check],
             cwd=root,
             env=environment,
             check=True,
