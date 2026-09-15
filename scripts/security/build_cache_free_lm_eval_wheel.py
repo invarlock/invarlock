@@ -164,6 +164,7 @@ def build_derived_wheel(
     derived_dist_info: str,
     derived_wheel_name: str,
     patches: dict[str, Callable[[bytes], bytes]],
+    compression: int = zipfile.ZIP_DEFLATED,
 ) -> Path:
     """Build one deterministic local-version wheel from the pinned upstream wheel."""
 
@@ -207,11 +208,11 @@ def build_derived_wheel(
     if destination.exists() or destination.is_symlink():
         raise DerivationError("derived wheel output already exists")
     with zipfile.ZipFile(
-        destination, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9
+        destination, "x", compression=compression, compresslevel=9
     ) as archive:
         for name in sorted(renamed, key=lambda item: item == derived_record):
             info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
-            info.compress_type = zipfile.ZIP_DEFLATED
+            info.compress_type = compression
             info.create_system = 3
             info.external_attr = 0o100644 << 16
             archive.writestr(info, renamed[name])

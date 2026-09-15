@@ -20,10 +20,12 @@ The `invarlock` distribution declares these direct runtime dependencies in
 | `pyyaml` | [yaml/pyyaml](https://github.com/yaml/pyyaml) | MIT | Evaluation request parsing |
 | `jsonschema` | [python-jsonschema/jsonschema](https://github.com/python-jsonschema/jsonschema) | MIT | Public contract validation |
 
-## Hugging Face extra
+## Hugging Face runtime group
 
-The built-in Hugging Face provider is installed with the `hf` extra. Its direct
-optional dependencies are:
+The built-in Hugging Face provider executes in the maintained runtime image.
+The repository `hf` dependency group supplies the same stack for preparation
+and development, including the verified source-derived Accelerate wheel. Its
+direct dependencies are:
 
 | Component | Upstream | License | Use |
 | --- | --- | --- | --- |
@@ -41,10 +43,10 @@ The release builds the core and five optional Python distributions:
 
 | Distribution | Direct runtime dependency boundary |
 | --- | --- |
-| `invarlock` | Core dependencies above; the Hugging Face stack is an optional extra |
+| `invarlock` | Core dependencies above; the Hugging Face stack belongs to the runtime image and repository groups |
 | `invarlock-diagnostics` | NumPy, licensed under BSD 3-Clause |
 | `invarlock-runtime-gguf` | A compatible `invarlock` core distribution |
-| `invarlock-runtime-hf-vision-text` | A compatible `invarlock` core distribution; its `runtime` extra adds the Hugging Face stack and Pillow (HPND) |
+| `invarlock-runtime-hf-vision-text` | A compatible `invarlock` core distribution and Pillow (HPND); the runtime image supplies the inference stack |
 | `invarlock-runtime-tensorrt-llm` | A compatible `invarlock` core distribution |
 | `invarlock-inspect-judge` | A compatible `invarlock` core distribution; its `inspect` extra adds Inspect AI, the OpenAI client and `httpx` |
 
