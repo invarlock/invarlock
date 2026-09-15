@@ -6,6 +6,7 @@ import argparse
 import copy
 import hashlib
 import io
+import re
 import stat
 import tempfile
 import zipfile
@@ -25,13 +26,18 @@ from invarlock.judge_measurements.contracts import (
     validate_measurement_plan,
 )
 
-FORMAT = "invarlock/k2-judge-answer-reference-v1"
+FORMAT = "invarlock/k2-judge-answer-reference-v2"
+LEGACY_FORMAT = "invarlock/k2-judge-answer-reference-v1"
+# Authenticate the original explanation without retaining it as current copy.
+LEGACY_README_SHA256 = (
+    "281b7f7a8ff6b2c9646809e6b0847ccc6322baef664f1c6ce821093f65955fbb"
+)
 SEED = "invarlock-k2-32b-judge-reference-v1"
 WORKFLOWS = {
     "grounded_qa": ("answerable", "unanswerable"),
     "extraction": ("has_span", "empty_span"),
 }
-SIZES = {"pilot": 20, "human_review": 40}
+SIZES = {"pilot": 20, "reference_review": 40}
 ASSESSMENT = "remaining-tp2-remaining316-assessment-03"
 PREPARATION = "remaining-tp2-four-roles-preparation-04/bundles"
 PLANNED = "cluster-policy-companion/final-layout-04/grounded_qa-planned-cases.json"
@@ -62,7 +68,52 @@ def safe_path(root: Path, name: str) -> Path:
 
 
 def rank(workflow: str, split: str, case_id: str) -> str:
+    # Keep the published sample unchanged across the terminology migration.
+    if split == "reference_review":
+        split = "human_review"
     return sha(canonical_payload([SEED, workflow, split, case_id]))
+
+
+def review_key(reference_format: str = FORMAT) -> str:
+    if reference_format == FORMAT:
+        return "reference_review"
+    if reference_format == LEGACY_FORMAT:
+        return "human_review"
+    raise ValueError("unsupported reference format")
+
+
+def reference_format(files: dict[str, bytes]) -> str:
+    manifest = parse_json_bytes(files["reference.json"], label="reference manifest")
+    value = manifest["format"]
+    review_key(value)
+    return value
+
+
+def review_path(stage: str, workflow: str, reference_format: str = FORMAT) -> str:
+    if (
+        stage not in {"rubric_development", "final_validation"}
+        or workflow not in WORKFLOWS
+    ):
+        raise ValueError("unsupported blinded review stage or workflow")
+    return f"{review_key(reference_format)}/{stage}/{workflow}.json"
+
+
+def review_case_ids(selection: dict) -> list[str]:
+    keys = {"reference_review", "human_review"} & selection.keys()
+    if len(keys) != 1:
+        raise ValueError("missing or ambiguous reference review selection")
+    key = next(iter(keys))
+    if set(selection) != {"pilot", "final", key}:
+        raise ValueError("unexpected reference selection fields")
+    ids = selection[key]
+    if (
+        not isinstance(ids, list)
+        or not 0 < len(ids) <= 4000
+        or not all(isinstance(value, str) and 0 < len(value) <= 128 for value in ids)
+        or len(ids) != len(set(ids))
+    ):
+        raise ValueError("invalid reference review case IDs")
+    return ids
 
 
 def select(
@@ -129,15 +180,15 @@ def select(
     count = Counter()
     review = []
     for row in sorted(
-        inventory, key=lambda r: (rank(workflow, "human_review", r["id"]), r["id"])
+        inventory, key=lambda r: (rank(workflow, "reference_review", r["id"]), r["id"])
     ):
         stratum = row["metadata"]["slice"]
-        if row["id"] in final_ids and count[stratum] < sizes["human_review"]:
+        if row["id"] in final_ids and count[stratum] < sizes["reference_review"]:
             review.append(row["id"])
             count[stratum] += 1
-    if any(count[s] != sizes["human_review"] for s in WORKFLOWS[workflow]):
+    if any(count[s] != sizes["reference_review"] for s in WORKFLOWS[workflow]):
         raise ValueError("infeasible reference-label selection")
-    result["human_review"] = review
+    result["reference_review"] = review
     return result
 
 
@@ -412,7 +463,7 @@ def bind_contracts(template: dict, runs: dict, split: str) -> dict:
     return {"plan": plan, "analysis_policy": policy}
 
 
-def human_review(
+def reference_review(
     workflow: str,
     raw: dict,
     selection: dict,
@@ -426,7 +477,7 @@ def human_review(
     chosen = (
         selection["pilot"]
         if stage == "rubric_development"
-        else selection["human_review"]
+        else review_case_ids(selection)
     )
     for case_id in sorted(chosen, key=lambda i: rank(workflow, stage + "_order", i)):
         a, b = by_role["A"][case_id], by_role["B"][case_id]
@@ -460,7 +511,10 @@ def human_review(
     }
 
 
-def derive(campaign: dict, templates: dict | None) -> dict[str, bytes]:
+def derive(
+    campaign: dict, templates: dict | None, *, reference_format: str = FORMAT
+) -> dict[str, bytes]:
+    selection_key = review_key(reference_format)
     if templates is not None and set(templates) != set(WORKFLOWS):
         raise ValueError("judge templates must explicitly cover both workflows")
     if set(campaign) != {"sources", "workflows"} or set(campaign["workflows"]) != set(
@@ -483,6 +537,7 @@ def derive(campaign: dict, templates: dict | None) -> dict[str, bytes]:
     }
     for workflow, value in campaign["workflows"].items():
         selection = select(value["inventory"], workflow)
+        selection[selection_key] = selection.pop("reference_review")
         inventory_by_id = {row["id"]: row for row in value["inventory"]}
         selected = set(selection["pilot"] + selection["final"])
         for role in ("A", "B"):
@@ -536,13 +591,15 @@ def derive(campaign: dict, templates: dict | None) -> dict[str, bytes]:
         output[f"{workflow}/selection.json"] = canonical_payload(selection)
         if templates is not None:
             for stage in ("rubric_development", "final_validation"):
-                output[f"human_review/{stage}/{workflow}.json"] = canonical_payload(
-                    human_review(
-                        workflow,
-                        value["raw"],
-                        selection,
-                        templates[workflow],
-                        stage,
+                output[review_path(stage, workflow, reference_format)] = (
+                    canonical_payload(
+                        reference_review(
+                            workflow,
+                            value["raw"],
+                            selection,
+                            templates[workflow],
+                            stage,
+                        )
                     )
                 )
         for split in ("pilot", "final"):
@@ -607,7 +664,6 @@ and constructs new score-free evaluation records. It does not rerun generation,
 change native scores, assert native runtime qualification, or imply endorsement by
 model or dataset authors.
 """
-# Retained v1 reference text is compared byte-for-byte during archive replay.
 README = """# K2 frozen-answer judge reference
 
 This bundle freezes outcome-blind pilot and final subsets of an existing paired
@@ -633,6 +689,8 @@ cluster appears twice across pilot and final within a workflow. QA is English
 only; both sides must be complete. All excluded and eligible population counts
 are reported from the retained inventory; full original inputs can be cross-checked
 only when the optional campaign root is available.
+Format upgrades retain the original split salts implemented in rank(), including
+the review-subset salt, so changing the layout cannot change the selected cases.
 
 Rubric-development review includes every pilot case (40 per workflow). Complete
 this review before declaring a final rubric and plan immutable. Current final
@@ -644,14 +702,14 @@ for the collection API at this stage.
 
 The untouched final-validation review takes 40 cases per stratum from final with
 its own hash ranking. Give reviewers only the appropriate
-human_review/rubric_development/<workflow>.json or
-human_review/final_validation/<workflow>.json. That file contains the frozen
+reference_review/rubric_development/<workflow>.json or
+reference_review/final_validation/<workflow>.json. That file contains the frozen
 rubric, allowed rating labels, empty rating and notes fields, anonymous review
 IDs, unchanged input and two responses with independently hashed position order;
 it exposes no native scores, source IDs or A/B role labels. Review order is also
 independently ranked. Blinding is procedural: the full bundle and public
 deterministic algorithm allow the study operator to recover the mapping. Freeze
-human judgments before giving reviewers the full source bundle.
+reference labels before giving reviewers the full source bundle.
 
 Judge plans and analysis policies, when supplied, are separately frozen per
 workflow and split. They bind exact answers and rendered requests; repetitions
@@ -722,13 +780,14 @@ def build(campaign_root: Path, output: Path, templates: dict | None = None) -> d
 def authenticated_bundle_files(bundle: Path, expected_sha256: str) -> dict[str, bytes]:
     """Return one content-pinned snapshot of a closed reference directory."""
 
+    require_manifest_pin(expected_sha256)
     validate_bundle(bundle, expected_sha256=expected_sha256)
     manifest_bytes = read(bundle / "reference.json", 1024 * 1024)
     if sha(manifest_bytes) != expected_sha256:
         raise ValueError("independent reference manifest pin mismatch")
     manifest = parse_json_bytes(manifest_bytes, label="reference manifest")
     files = manifest["files"]
-    retained: dict[str, bytes] = {}
+    retained: dict[str, bytes] = {"reference.json": manifest_bytes}
     total = 0
     for name, pin in files.items():
         size = pin["size_bytes"]
@@ -745,6 +804,11 @@ def authenticated_bundle_files(bundle: Path, expected_sha256: str) -> dict[str, 
     return retained
 
 
+def require_manifest_pin(value: str) -> None:
+    if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value):
+        raise ValueError("an independent reference manifest SHA-256 pin is required")
+
+
 def rebind_bundle(
     bundle: Path,
     output: Path,
@@ -753,6 +817,38 @@ def rebind_bundle(
 ) -> dict:
     """Rebuild derived plans and review sheets over an authenticated frozen subset."""
     retained = authenticated_bundle_files(bundle, expected_sha256)
+    return rebuild_bundle(retained, output, templates)
+
+
+def upgrade_bundle(bundle: Path, output: Path, expected_sha256: str) -> dict:
+    """Publish the current reference format without changing the frozen study."""
+    require_manifest_pin(expected_sha256)
+    if bundle.is_dir():
+        retained = authenticated_bundle_files(bundle, expected_sha256)
+    else:
+        # Validate the same bounded snapshot used for reconstruction, not a path
+        # that could be replaced between validation and reading.
+        payload = read(bundle, MAX_ARCHIVE_BYTES)
+        with tempfile.TemporaryDirectory(
+            prefix="invarlock-reference-upgrade-"
+        ) as directory:
+            snapshot = Path(directory) / "reference.zip"
+            snapshot.write_bytes(payload)
+            validate_archive(snapshot, expected_sha256=expected_sha256)
+        with zipfile.ZipFile(io.BytesIO(payload)) as packed:
+            retained = {name: packed.read(name) for name in packed.namelist()}
+    templates = (
+        parse_json_bytes(retained["judge_templates.json"], label="judge templates")
+        if "judge_templates.json" in retained
+        else None
+    )
+    return rebuild_bundle(retained, output, templates)
+
+
+def rebuild_bundle(
+    retained: dict[str, bytes], output: Path, templates: dict | None
+) -> dict:
+    """Reconstruct derived outputs from an already authenticated snapshot."""
 
     def retained_json(name: str) -> Any:
         return parse_json_bytes(retained[name], label=name)
@@ -775,6 +871,7 @@ def rebind_bundle(
     files = {
         **derive(campaign, templates),
         **{name: retained[name] for name in notice_names},
+        "README.md": README.encode(),
     }
     if sum(map(len, files.values())) > MAX_BUNDLE_BYTES:
         raise ValueError("reference bundle exceeds total byte budget")
@@ -812,7 +909,7 @@ def validate_bundle(
     if (
         set(manifest)
         != {"format", "seed", "selection", "files", "new_model_calls", "assurance"}
-        or manifest["format"] != FORMAT
+        or manifest["format"] not in (FORMAT, LEGACY_FORMAT)
         or manifest["seed"] != SEED
         or manifest["selection"] != "pilot-balanced-then-all-remaining-clusters-v1"
         or manifest["new_model_calls"] != 0
@@ -863,7 +960,7 @@ def validate_bundle(
     templates = (
         json_file("judge_templates.json") if "judge_templates.json" in files else None
     )
-    reproduced = derive(campaign, templates)
+    reproduced = derive(campaign, templates, reference_format=manifest["format"])
     if any(files.get(name) != value for name, value in reproduced.items()):
         raise ValueError("reference derivation does not reproduce retained artifacts")
     notice_names = set(NOTICE_FILES) | {
@@ -874,7 +971,12 @@ def validate_bundle(
     if set(files) != set(reproduced) | notice_names:
         raise ValueError("unexpected derived artifact inventory")
     if (
-        files["README.md"] != README.encode()
+        sha(files["README.md"])
+        != (
+            sha(README.encode())
+            if manifest["format"] == FORMAT
+            else LEGACY_README_SHA256
+        )
         or files["attribution/ATTRIBUTION.md"] != ATTRIBUTION.encode()
     ):
         raise ValueError("reference explanation or attribution was changed")
@@ -887,6 +989,10 @@ def validate_bundle(
     if campaign_root is not None:
         restored = capture_campaign(campaign_root)
         restored_notices, pins = notices(campaign_root)
+        # The legacy explanation was independently checked against its exact
+        # published digest above; source notices must still match byte-for-byte.
+        if manifest["format"] == LEGACY_FORMAT:
+            restored_notices["README.md"] = files["README.md"]
         restored["sources"].update(pins)
         if restored != campaign or any(
             files[name] != value for name, value in restored_notices.items()
@@ -1023,6 +1129,10 @@ def main() -> None:
     rebind.add_argument("--output", type=Path, required=True)
     rebind.add_argument("--judge-templates", type=Path, required=True)
     rebind.add_argument("--expected-sha256", required=True)
+    upgrade = commands.add_parser("upgrade")
+    upgrade.add_argument("--bundle", type=Path, required=True)
+    upgrade.add_argument("--output", type=Path, required=True)
+    upgrade.add_argument("--expected-sha256", required=True)
     args = parser.parse_args()
     try:
         result = (
@@ -1041,6 +1151,8 @@ def main() -> None:
                 args.expected_sha256,
             )
             if args.command == "rebind"
+            else upgrade_bundle(args.bundle, args.output, args.expected_sha256)
+            if args.command == "upgrade"
             else validate_reference(
                 args.bundle, args.campaign_root, args.expected_sha256
             )
