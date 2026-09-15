@@ -7,332 +7,178 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+InvarLock brings native execution, captured evaluator records and bounded judge
+scoring into the same `evaluate`, `verify` and `report` workflow. This update also
+adds hosted-service comparisons, clearer reports and new retained references,
+while strengthening evidence verification, runtime isolation and release checks.
+
 ### Added
 
-- Added bounded HTTP capture and a separate installed-wheel recipient handoff
-  for declared text-completion profiles. A fixed task-outcome example retains
-  resulting files and executable check results, rather than judging a completion
-  message alone; it does not qualify arbitrary coding agents.
-- Added explicit hosted-service identity to captured runs, binding configuration,
-  harness and observation windows without asserting immutable model weights.
-  Documented periodic and incident-triggered requalification through fresh
-  capture, signed evaluation, offline verification and scoped reporting.
-- Retained two real 400-pair Mistral 7B comparisons with distinct base and
-  instruction-tuned checkpoints: a likelihood regression and a local HTTP
-  exact-match comparison. Both preserve original measurements, signed evidence,
-  independently reconstructed review inputs and offline verification. The HTTP
-  policy passes without an absolute quality floor; neither reference establishes
-  broad model quality or external-provider qualification.
+#### Evaluation and integrations
 
-- Completed per-case reference forwarding in the answer-capture judge example
-  and aligned overview, integration, verification and security documentation
-  with the three built-in scorers and their distinct evidence contracts.
-- Retained the corrected 480-trial K2 judge pilot, signed offline replay and
-  original incomplete history. Both advisory analyses remain insufficient
-  evidence under unchanged interval-width requirements.
-- Retained all 10,260 Luna xHigh held-out judge ratings, signed offline
-  verification and a completed reference-label comparison with retained
-  disagreements and label-source provenance. Both frozen comparison policies
-  pass; label agreement does not establish general judge accuracy.
-  Reference replay supports explicit caller-selected archive byte limits while
-  preserving the smaller pilot defaults.
+- **Three built-in scorers:** exact match, normalized NLL and `judge` work through
+  native run/import and supported captured-evaluator profiles. Captured SDK
+  helpers preserve source identities, explicit task-text projections, typed
+  likelihood facts, multiple metrics, slices and recorded-score provenance.
+  Deterministic extensions cover normalized matching, numeric tolerance,
+  structured fields, whole-document `json_exact` and token F1.
+- **Bounded judging:** native judging retains authenticated runtime answers;
+  frozen-answer workflows collect bounded new ratings through the optional
+  `invarlock-inspect-judge[inspect]` package or import retained calls offline.
+  Plans bind rubrics, independent units, reasoning settings, optional per-case
+  references and collection budgets. References are not exposed to the evaluated
+  model. Interrupted collection resumes the original answers and admitted trials;
+  exhausted storage produces an explicit insufficient-evidence result.
+- **Judge handoff:** offline preflight, replay, recipient-policy verification and
+  a separate Ed25519 verification receipt bind the result, policy and verifier
+  identity. A packaged `--init --example native-judge` starter and bounded
+  answer-capture example cover setup and retained-call import. Verification and
+  reporting require no provider calls.
+- **Evidence sets:** recipients can require deterministic and judge checks over
+  the same frozen answers, with independent component verification and a shared
+  report. Composition preserves each component's statistical meaning and provides
+  no joint confidence guarantee.
+- **Captured evidence:** optional signing, independent run/request/policy/signer
+  pins and arithmetic replay accompany explicit unsigned local evaluation.
+  Complete-run and planned-case pins reject changed inputs, shared omissions
+  and changed references. Native runtime provenance and supplied observations
+  retain different assurance claims.
+- **Integration examples:** classification, extraction and recorded-score
+  onboarding; real local-model Inspect, Harness and Promptfoo rehearsals; and
+  a ModelKit handoff with package/content identity checks, independent replay
+  and optional complete-request binding. Repackaging cannot override recipient
+  expectations.
 
-- Added a real LM Evaluation Harness likelihood reference with pinned CPU
-  measurements, source-preserving import, independent signed verification and
-  reports. Its six paired cases establish same-model integration conformance.
-- Made exact match, normalized NLL and judge scoring available to captured
-  evaluator workflows, with explicit source text projections, typed likelihood
-  bindings, offline retained-call import and evaluator context in reports.
-- Added opt-in per-case judge references without changing existing request bytes
-  or exposing reference answers to the evaluated model.
+#### Hosted services and retained references
 
-- Added `judge` as a native run/import scorer through `evaluate`, `verify` and
-  `report`. Native judging freezes authenticated runtime answers, derives the
-  measurement plan bindings, executes bounded installed collection, and retains
-  the complete runtime capture for offline verification.
-- Added a packaged `--init --example native-judge` starter and native model,
-  runtime, rubric and collection context in judge reports. Interrupted collection
-  resumes original answers and admitted trials; exhausted storage produces an
-  explicit terminal insufficient-evidence result.
-- Reject judge workspaces that overlap inputs or model artifacts, changed
-  artifact/runtime identities on resume, underfunded live plans and native-source
-  runs submitted without their runtime capture, before billable judging.
-
-- Added recipient-level composition of deterministic and bounded judge evidence
-  over the same frozen answers, with independent component verification and a
-  shared report. Component statistical meanings remain separate; the combined
-  policy provides no joint confidence guarantee.
-- Added a maintained bounded answer-capture example that freezes baseline and
-  subject runs before repeated judging.
-
-- Added versioned frozen-answer judge import requests, offline preflight,
-  recipient-policy verification and bounded JSON, HTML, Markdown and JUnit
-  reports that distinguish replay, signer authentication and policy acceptance.
-  Judge verification now separates its unsigned local result from an external
-  Ed25519 receipt that binds the complete result, recipient policy, verifier
-  identity and verifier key under a judge-specific signature domain.
-
-- Added shared comparison context to native and captured HTML and Markdown
-  reports, including run and artifact digests, evaluator source, recorded model
-  identity, workflow, dataset and prompt changes. Missing metadata remains
-  explicit; report rendering preserves evidence and does not establish
-  independent recipient acceptance.
-
-- Added the complete 4,000-pair K2 Horizon 32B routing captured reference with
-  an unchanged signed pack, independent recipient replay and source attribution.
-  Replay preserves the recorded regression; it adds no native runtime
-  qualification claim.
-
-- Extended `evaluate`, `verify`, and `report` with captured-result comparison,
-  bounded report regeneration, and explicit unsigned-local assurance states.
-- Added an explicit run-mode runtime resource profile with closed fields,
-  command-line overrides and visible configuration origins during preflight.
-  Resource selection does not change policy or signer authorization.
-
-- Added caller-owned bootstrap work budgets to captured comparison and signed
-  replay, with a default of 102,400,000 planned draws. Excessive combined metric
-  and slice work is rejected before scoring; callers can explicitly override
-  their own local budget without changing the signed acceptance policy.
-- Added early rejection of missing-result ID arrays that would exceed the
-  comparison byte limit across overlapping metrics and slices.
-- Added early record-count rejection and bounded validation diagnostics so
-  oversized schedules do not print their complete contents in errors.
-
-- Expanded captured comparisons and signed evidence to 50,000 planned cases,
-  including binary paired intervals, with separate 128 MiB input and 384 MiB
-  complete evidence limits. Runtime schedules retain their separate limits.
-
-- Added optional policy pins for planned case membership, rejecting shared
-  omissions and changed references during comparison and signed replay.
-- Added `json_exact` whole-document structured-output scoring with binary paired
-  intervals, signed replay and a separate built-in scorer identity.
-
-- Added optional complete-run digest pins that reject changed evaluation inputs,
-  including path overrides, before signing or publishing captured results.
-
-- Added reusable captured-evaluation SDK helpers for native export parsers,
-  multiple typed metrics, data slices, explicit recorded-score provenance, and
-  JSON, HTML, Markdown and JUnit reports behind the core commands.
-- Added optional signed captured evidence with independently supplied run
-  identities and policy, full arithmetic replay, bounded inputs and atomic
-  publication without replacing previous results.
-- Added shared normalized-match, numeric-tolerance, structured-field and token-F1
-  scorers to captured comparisons, the core scorer registry and deterministic
-  evaluator qualification with independently bound reference text.
-- Added runnable classification, extraction and recorded-judge onboarding
-  examples and an integration guide for existing evaluation pipelines.
-- Added real local-model rehearsals for Inspect, LM Evaluation Harness and
-  Promptfoo, with retained native exports, measured call latency, and separate
-  installed-wheel recipient verification across classification, JSON extraction
-  and arithmetic workflows.
-- Added a standalone ModelKit example that verifies package and model-content
-  identities, replays signed evidence, and applies current recipient acceptance
-  against both actual model directories. A pinned KitOps test exercises
-  repackaging and an independent recipient.
-- Added a five-model K2 Horizon campaign harness with immutable model pairs,
-  logical tensor measurements, frozen workflow cases, bounded native capture,
-  and independent captured-result replay. The configurations remain unqualified
-  candidates until the runtime and actual GPU campaigns pass their gates.
-- Added a native K2 image verification helper that reconstructs inputs, observes
-  installed dependencies and CPU execution, and retains raw security findings
-  with explicit applicability decisions. Missing or unresolved reviews keep
-  runtime readiness blocked; CPU success does not qualify a GPU model.
+- **Service requalification:** captured service identities bind observed
+  configuration, harness and observation windows without asserting hidden model
+  weights. Bounded HTTP capture and an installed-wheel handoff support declared
+  text-completion profiles. Fresh collection is required for each recheck;
+  verifying historical evidence does not measure the current service.
+- **Task outcomes:** a fixed example retains resulting files and executable check
+  results for review alongside the completion message. It demonstrates outcome
+  capture without qualifying arbitrary coding agents.
+- **Real comparison references:** two distinct Mistral 7B checkpoints provide
+  400-pair likelihood and local HTTP comparisons with signed evidence and
+  independent replay. The likelihood policy rejects; the HTTP policy passes
+  without an absolute quality floor. A six-case Harness likelihood reference
+  establishes same-model integration conformance. None establishes broad model
+  quality or external-provider qualification.
+- **K2 references:** a complete 4,000-pair routing reference preserves its recorded
+  regression. Corrected 480-trial judge pilots and the original incomplete pilot
+  remain retained with their insufficient-evidence outcomes. The held-out
+  reference retains all 10,260 Luna xHigh ratings, offline verification and a
+  reference-label comparison with disagreements and provenance. Both frozen
+  held-out policies pass; label agreement does not establish general judge
+  accuracy. Reference replay accepts explicit archive byte limits.
+- **Qualification tooling:** a five-model K2 campaign harness binds immutable
+  pairs, workflow cases and bounded capture. Image preparation and CPU probes
+  retain dependency and security findings. Candidate configurations remain
+  unqualified until their actual runtime and GPU gates pass; these captured
+  references add no native K2 runtime qualification claim.
 
 ### Changed
 
-- Refined evidence reports with aligned comparison identities, collapsible shared
-  settings, labelled interval scales and change requirements, metric navigation,
-  readable configuration previews and compact result summaries. Assurance checks
-  appear beside the verdict, score counts beneath their values, and comparison
-  fields and decision checks stack into labelled rows on small screens. HTML,
-  Markdown and terminal views share comparison grouping; adverse overviews open
-  automatically. Reports support the system dark theme with a light print view. Captured CLI and
-  SDK reports share presentation assembly while retaining their validation
-  boundaries. Captured HTTP request context and complete exact-match counts
-  remain distinct from hidden service instructions and missing observations.
+#### Reports, commands and capacity
 
-- Aligned the documentation overview, user guides, API and assurance references
-  with native, captured and judge workflows. Corrected receipt-verification
-  examples, scorer authorization, hosted identity and report semantics; clarified
-  required integration keys and coordinated release-package coverage. Updated
-  the workflow diagram for judge and hosted-service inputs and completed the
-  root distribution and retained-data notices.
+- **Reports:** policy decisions, model/service identities, baseline/subject
+  changes, uncertainty and numeric requirements lead the presentation. HTML
+  includes a complete result overview, accessible metric/scope tabs, direct links,
+  a Show all view, mobile layouts, dark mode and complete print output. HTML,
+  Markdown and terminal reports share comparison grouping; exact-match counts,
+  missing results, absolute floors and judge completeness/precision checks remain
+  visible. The logo and report assets work offline.
+- **Command experience:** output distinguishes publication, recorded policy
+  results and independent verification while preserving exit codes. Grouped help
+  and reusable run-mode runtime profiles expose effective settings during
+  preflight; profiles do not select policy or authorize signers. Reporting
+  preserves evidence bytes and does not replace recipient verification.
+- **Captured capacity:** comparisons support up to 50,000 planned cases, with
+  separate 128 MiB input and 384 MiB complete-evidence limits. A caller-owned
+  default budget of 102,400,000 bootstrap draws bounds combined metric/slice
+  work and can be explicitly overridden without changing signed policy. Early
+  admission checks and bounded diagnostics reject oversized work; incremental
+  canonical encoding reduces allocations without changing digests. Native
+  runtime schedules retain their separate limits.
 
-- Reorganized the root README around a runnable signed-evidence quickstart,
-  the three built-in scorers, supported integration routes and retained examples.
-  Detailed contracts and runtime setup remain in the linked guides.
+#### CI, packaging and documentation
 
-- Split Python 3.13 coverage into four disjoint concurrent groups and removed
-  duplicate behavior runs. The required gate still enforces the same combined,
-  domain and per-file coverage thresholds; Python 3.12 remains a separate gate.
-  The 50,000-record signed-recipient case runs without coverage tracing, while
-  the 12,000-record case remains instrumented. Local verification uses bounded
-  parallel workers, and per-test timings are retained for diagnosis.
-- Matched dependency caches to installed workflow locks, removed duplicate docs
-  builds, extended pre-commit checks to all pull requests, cancelled obsolete
-  hygiene runs and included all five add-in source trees in security analysis.
-
-- Added a complete multi-result overview and metric tabs to HTML reports, with
-  scope grouping, keyboard navigation, direct links and a Show all view. All
-  outcomes remain visible in the overview and every metric is included in print.
-
-- Made core command output distinguish publication, recorded policy results and
-  independent verification, while preserving transaction and rejection exit
-  codes. Grouped help makes runtime configuration easier to find.
-- Simplified report labels and explanations across CLI help, documentation and
-  examples while preserving integrity checks and independent verification requirements.
-  HTML reports use the InvarLock logo without requiring external assets.
-- Redesigned reports with policy checks, missing counts, absolute floors,
-  interval diagrams, readable likelihood interpretation and explicit assurance
-  limits. Reports retain recorded decisions, escape external labels, and bound
-  configuration and missing-ID previews without changing evidence bytes.
-
-- Clarified captured-comparison capacity limits, caller-owned work budgets and
-  capacity-error recovery in the public reference documentation.
-- Captured digest and size checks encode canonical JSON incrementally, reducing
-  whole-artifact allocations while preserving existing digests and signatures.
-
-- Added full H100 80GB HBM3 devices to the K2 candidate hardware checks alongside
-  H200, requiring matching devices with MIG disabled and the existing security
-  driver minimum. The bounded launcher now caps host memory at 280 GiB and
-  rejects UID 0 before plan reads or container operations. Actual GPU preflight
-  and model qualification remain required.
-- Updated coordinated Python tooling, documentation dependencies, and pinned
-  CI actions. Python dependency updates now use the uv ecosystem so the root
-  manifest and lock are proposed together; hashed workflow locks remain
-  separately checked.
-- Added installed captured signing, verification, report, and rejection checks
-  to both candidate and published wheel validation before optional packages
-  are installed.
+- **CI execution:** four disjoint Python 3.13 coverage groups run concurrently,
+  with duplicate behavior runs removed and all existing coverage thresholds
+  preserved. Python 3.12 remains a separate gate. The 50,000-record recipient
+  check runs without tracing; the 12,000-record case remains under coverage.
+  Bounded local parallelism, retained test timings, lock-aware caches and
+  cancellation of obsolete runs support faster feedback.
+- **Release checks:** local, candidate and published-wheel gates share isolated
+  core consumers for exact match, NLL and judge before optional packages are
+  installed. All six distributions participate in coordinated validation;
+  security analysis includes all five add-in source trees. Dependency updates
+  coordinate the root manifest and uv lock with separately checked workflow
+  locks. Pre-commit covers all pull requests and docs build once per docs job.
+- **Documentation:** the README, workflow diagram and docs landing page now lead
+  with runnable tasks and supported integration routes. Guides, API references,
+  assurance notes, security guidance and third-party notices describe the current
+  contracts; receipt examples include required independent anchors and separate
+  authenticity from the signed verdict. Production release publication updates
+  tagged docs, `latest` and `stable`; TestPyPI and bootstrap runs cannot do so.
 
 ### Removed
 
-- Removed the separate captured-comparison command namespace and monolithic
-  project/evidence contracts. Use captured v2 requests with `evaluate`, directory
-  packs with `verify` and `report`, and SDK helpers from `invarlock.engine`.
-  Recreate captured evidence from reviewed source records and independently
-  approve its new run/request pins; there is no automatic legacy conversion.
-  Native v1 packs, v1/v2 receipts, and the v0.13 compatibility covenant remain
-  unchanged.
+- **Separate captured command and contracts:** use captured v2 requests through
+  `evaluate`, directory packs through `verify` and `report`, and the
+  `invarlock.engine` SDK in place of the separate captured-comparison namespace
+  and monolithic project/evidence contracts. Recreate affected captured evidence
+  from reviewed source records and independently approve its new run/request
+  pins; there is no automatic legacy conversion. Native v1 packs, native v1/v2
+  receipts and the v0.13 compatibility covenant remain unchanged.
 
 ### Fixed
 
-- Hardened captured JSONL imports, artifact attestation and retained-reference
-  replay against oversized, replaced or non-regular inputs; escaped hostile
-  control characters in dynamic evaluation, verification, setup, reporting,
-  evaluator qualification and XML output; rejected request mode changes during
-  loading and run-only controls on import requests; and closed raw file
-  descriptors and incomplete report outputs when stream construction fails.
+#### Verification and publication
 
-- Consolidated receipt, report, evaluator-qualification and runtime-sidecar file
-  publication around private staging and retained file descriptors. Publication
-  rejects substituted sources and changed parent directories, synchronizes the
-  destination entry, and preserves completed or competing files on failure.
-  Captured evidence retains its original staging identity through publication;
-  artifact attestation checks both the file and its ancestor directories.
-  Linux workers can publish sidecars beneath writable output mounts that allow
-  traversal without directory listing.
+- **Identity and input checks:** reject contradictory request tasks, schedules,
+  provider capabilities and evaluation-source identities; changed modes during
+  loading; and run-only options on import. Captured imports, artifact attestation
+  and reference replay reject oversized, replaced or non-regular inputs.
+- **Judge integrity:** reject reused Inspect provider response IDs across retained
+  segments and resumed collection, overlapping workspaces, changed runtime or
+  artifact identities, underfunded plans and missing native capture. Configured
+  hosted calls explicitly select and validate standard processing and reject
+  inherited safety identifiers. Historical requests and signed evidence retain
+  their original replay semantics.
+- **Safe output and cleanup:** publish receipts, reports, qualification results
+  and runtime sidecars through private staging and retained descriptors, rejecting
+  source/parent substitution without overwriting competing files. Close owned
+  files, streams and runtime resources even after setup or cleanup errors. Escape
+  hostile dynamic labels and control characters across terminal and XML output;
+  preserve JSON error mode, literal error details and scorer-specific units.
+- **Evaluator semantics:** preserve valid Promptfoo responses after quality-check
+  failures while rejecting conflicting execution status. Current Inspect, five
+  batch and eleven scalar qualification profiles bind literal input domains,
+  native settings and complete environments, covering normalization boundaries
+  without rewriting historical qualification authority or evidence.
 
-- Bound installed dependency exceptions to the exact approved lock, wheel and
-  installed payload, with owner-only audit reports and rejection of ambiguous
-  metadata. The time-bounded Accelerate exception tracked in [#227](https://github.com/invarlock/invarlock/issues/227)
-  remains an explicit residual risk, not an upstream vulnerability fix.
-- Retry transient pinned policy-engine installation failures without relaxing
-  artifact checksum validation.
+#### Runtime and dependency safeguards
 
-- Restored the evaluator image build inputs excluded by the root Docker context
-  allowlist and removed obsolete paths. Build-input checks cover current Harness,
-  Inspect and OpenAI Evals recipes.
-
-- Reject duplicate provider response IDs across retained Inspect judge calls and
-  resumed collection, including calls split across source segments. Generic
-  imports retain their declared identity semantics and historical evidence bytes
-  remain unchanged.
-- Show numeric judge interval endpoints, directional thresholds, precision and
-  completeness requirements in the primary report, including adverse and
-  inconclusive results.
-- Share the installed core consumer suite across local validation and both
-  release artifact gates so exact match, NLL and judge receive the same isolated
-  wheel checks. Clarify matching source/wheel installation and completed
-  reference-label comparison scope.
-
-- Select standard processing explicitly for configured hosted judge calls,
-  validate the retained tier, and reject inherited safety identifiers before
-  collection. Historical requests without a tier remain replayable unchanged.
-
-- Close all pinned captured-evidence directory descriptors even when one close
-  reports an error, including failures during input setup or caller execution.
-- Release owned files, subprocess streams and runtime resources when setup or
-  cleanup fails across evaluation, provider integrations and maintained examples.
-  Preserve output cleanup and environment restoration after earlier errors.
-
-- Validate safetensors shard references and storage layout before calling the
-  strict HF model loader, rejecting traversal, symbolic links and special files
-  before native weight loading. Retain the separate loaded-state identity check.
-
-- Kept core report failures in JSON when requested and preserved literal error
-  details such as signer fingerprints in text output.
-- Published report files through private, fully flushed staging entries without
-  replacing existing destinations or deleting concurrently replaced output.
-- Displayed sample-count, precision and side-accuracy requirements in both
-  report formats, and matched interval labels and units to the actual scorer.
-
-- Excluded operating-system metadata from distributions and rejected it anywhere
-  in wheel or source archives during release validation.
-- Made private K2 JIT storage executable and added a bounded CPU host-library
-  compile-and-load check before runtime finalization. Container network and
-  filesystem restrictions remain enforced.
-- Omitted unused GLib from the native K2 package selection after native consumer
-  inspection and an actual removal/import check, retaining GPU and compiler tools.
-- Built the signed whole Expat release as matched local runtime and development
-  packages for the native K2 image, preserving narrow and wide library variants
-  and verifying installed package, payload, and loaded-version identities.
-  Remaining OS findings continue to block security readiness without review.
-- Removed obsolete Ubuntu pip/venv bootstrap packages from the native K2
-  image after runtime installation and recorded the OS inventory after cleanup.
-- Installed the authenticated pip bootstrap wheel offline before downloading
-  native K2 runtime dependencies. Core wheels retain their actual filename and
-  version, with bounded metadata checks rejecting relabeled distributions.
-- Rejected signed evidence whose request task, canonical schedule and provider
-  capabilities disagree, and checked the canonical evaluation-source identity
-  digest during recipient acceptance. Existing signed formats remain unchanged.
-- Allowed the ModelKit recipient example to require the existing complete-request
-  digest during independent technical replay. Package and signature checks cannot
-  override a mismatched recipient expectation; older requests remain valid.
-- Preserved valid Promptfoo responses after failed quality assertions instead
-  of classifying them as execution errors. Conflicting native failure fields
-  now fail import, while actual execution failures remain insufficient evidence.
-- Defined a separate Inspect literal-pair qualification domain that rejects
-  boundary-normalization collisions while preserving supported whitespace and
-  punctuation. Native differential checks and new qualification artifacts
-  retain the original profile and signed evidence unchanged.
-- Added separate current profiles for five batch evaluators that validate
-  native row identities, metric configuration and score details. Boundary
-  audits expose unsupported renderer behavior, and complete profile bindings
-  prevent dependency changes without review from reusing qualification authority.
-- Added current profiles for eleven scalar evaluators with explicit native
-  settings, source bindings and literal input domains. Boundary audits cover
-  whitespace, case, Unicode, empty strings and trailing NUL characters while
-  preserving historical runner and evidence identities.
-- Bound current qualification environments to the invoking Python interpreter
-  and prevented publication from replacing an output directory created during
-  execution.
-- Added real-container checks for network isolation, read-only inputs, key
-  separation, resource and output limits, interruption, exact-container cleanup,
-  and prevention of evidence publication after failed execution.
-- Fixed cleanup of partial Linux worker output owned by a different numeric
-  user. A bounded helper uses the selected non-root user and pinned image,
-  preserves the original evaluation error, and reports any retained files.
-- Remediated maintained dependency-audit findings by updating pip, wheel, and
-  Material for MkDocs, and removing unused NLTK and ROUGE dependencies from the
-  fixed evaluator images. Derived wheels keep authenticated upstream inputs
-  in the audit inventory and preserve selected scorer code. Historical signed
-  evidence retains its original identities.
-
-- Connected successful production publication to serialized, tagged
-  documentation publishing that atomically updates the immutable version path,
-  `latest`, and `stable`, without allowing TestPyPI or bootstrap runs to update
-  GitHub Pages.
+- **Runtime safety:** validate safetensors shard paths and storage before native
+  loading. Real-container checks cover network isolation, read-only inputs, key
+  separation, limits, interruption and cleanup, including outputs owned by a
+  different numeric user. Failed execution cannot publish completed evidence.
+- **Build readiness:** restore current evaluator Docker build inputs and remove
+  obsolete allowlist paths; reject OS metadata in distributions. K2 preparation
+  authenticates bootstrap wheels and core metadata, verifies bounded JIT loading
+  and complete Expat package identities, and removes unused GLib and obsolete
+  bootstrap packages. Candidate checks include full H100 devices alongside H200,
+  reject root execution and enforce host limits. Unresolved security findings
+  still block readiness.
+- **Dependency auditing:** update affected tooling and remove unused NLTK/ROUGE
+  exposure from restricted evaluator images while retaining authenticated upstream
+  audit inputs. Installed exceptions bind the approved lock, wheel and payload,
+  reject ambiguous metadata and keep audit reports owner-only. The time-bounded
+  Accelerate exception tracked in [#227](https://github.com/invarlock/invarlock/issues/227)
+  remains a residual risk, not an upstream fix. Pinned policy-engine installation
+  retries preserve artifact checksum validation.
 
 ## [0.15.0] - 2026-08-16
 
