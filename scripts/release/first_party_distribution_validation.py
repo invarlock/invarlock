@@ -137,9 +137,9 @@ def _validate_addin_license(
                     "add-in wheel license or license metadata differs"
                 )
         with tarfile.open(sdist) as archive:
-            member = archive.extractfile(f"{spec.sdist_root}/LICENSE")
-            if member is None or member.read(len(expected) + 1) != expected:
-                raise ReleasePreflightError("add-in sdist license text differs")
+            # The preceding distribution-pair validation checks supplemental
+            # file type and exact source bytes; also require the license entry.
+            archive.getmember(f"{spec.sdist_root}/LICENSE")
     except KeyError as exc:
         raise ReleasePreflightError(
             "add-in distribution is missing license text"
