@@ -172,6 +172,8 @@ def _prepare(
         "cases": len(baseline["records"]),
         "independent_units": units,
         "planned_trials": plan["schedule"]["expected_trials"],
+        "maximum_attempts": plan["schedule"]["expected_trials"]
+        * plan["schedule"]["max_attempts"],
         "judge": plan["judge"],
         "network_calls": 0,
         "baseline_run_digest": run_digest(baseline),

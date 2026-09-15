@@ -38,6 +38,13 @@ def test_first_party_distribution_versions_match_core() -> None:
         assert _module_version(path, name) == core_version
 
 
+def test_all_addins_ship_the_declared_license_text() -> None:
+    expected = (REPO_ROOT / "LICENSE").read_bytes()
+    for path in ADDINS.values():
+        assert _project(path)["license-files"] == ["LICENSE"]
+        assert (path / "LICENSE").read_bytes() == expected
+
+
 def test_local_distribution_gate_validates_all_first_party_source_parity() -> None:
     makefile = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
     dist_check = makefile.split("dist-check:", 1)[1].split("addins-install-smoke:", 1)[

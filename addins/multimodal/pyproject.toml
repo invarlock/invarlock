@@ -9,6 +9,7 @@ description = "First-party Hugging Face vision-text runtime provider for InvarLo
 readme = "README.md"
 requires-python = ">=3.12"
 license = "Apache-2.0"
+license-files = ["LICENSE"]
 dependencies = ["invarlock==0.15.0", "pillow>=11.3,<13"]
 
 [project.optional-dependencies]

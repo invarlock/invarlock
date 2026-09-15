@@ -17,6 +17,9 @@ InvarLock ships six coordinated Python distributions:
 | `invarlock-diagnostics` | Optional observation-only numeric diagnostics |
 | `invarlock-inspect-judge` | Optional bounded collection and import adapter; provider SDKs require its `inspect` extra |
 
+Each add-in wheel and source distribution includes the repository license text;
+the coordinated distribution gate checks its contents and wheel metadata.
+
 All six use the same release version. Provider add-ins declare that exact core
 dependency and must also match runtime-provider ABI `1` when loaded.
 
@@ -290,9 +293,11 @@ and the ABI accepted by the installed core. A conformance pass verifies the
 install surface and lightweight provider contract, not a native runtime model
 run. Before qualification fan-out, produce and strictly verify one signed
 canary through the exact digest-pinned runtime image. Retain its evidence,
-signed receipt, and verifier-owned trust profile for the maintained readiness
-and evidence targets. Reuse is limited to that exact image digest; a canary does
-not establish model-specific load, memory, backend, or execution success.
+signed receipt, original verifier-owned trust profile and referenced verifier
+private key for the maintained readiness and evidence targets. Reuse requires
+matching image, providers, task, acceptance binding and CPU/CUDA device class;
+see [canary compatibility](runtime-providers.md). A canary does not establish
+model-specific load, memory, backend, or execution success.
 
 An example hash-enforced download/install flow is:
 
@@ -337,6 +342,7 @@ scripts/release/make_offline_bundle.sh \
   --version X.Y.Z \
   --tag vX.Y.Z \
   --repo OWNER/REPO \
+  --certificate-identity "https://github.com/OWNER/REPO/.github/workflows/SIGNING_WORKFLOW.yml@refs/tags/vX.Y.Z" \
   --dist-dir release-material/dist \
   --sbom release-material/sbom.json \
   --provenance-dir release-material/provenance \
@@ -344,9 +350,14 @@ scripts/release/make_offline_bundle.sh \
 ```
 
 This script assembles existing material; it does not fetch or manufacture
-provenance. Every distribution must already have a Sigstore sidecar. Inspect
-the generated `release_manifest.json`, verify each file digest, then follow the
-bundle's `README.txt` identity and issuer checks. The current GitHub workflow
+provenance. Supply the independently approved certificate identity of the actual
+signing workflow; a repository OIDC subject is not its certificate identity.
+The assembler inventories nested directories, including `dist/addins`. Every
+distribution must have its own adjacent Sigstore sidecar; unlisted files and
+symbolic links are rejected. When the release `SHA256SUMS` ledger is present,
+its entries must match every distribution path and digest; the manifest retains
+the ledger as a supporting file. Inspect the generated `release_manifest.json`,
+verify each file digest, then follow the bundle's `README.txt` identity and issuer checks. The current GitHub workflow
 uploads a build-provenance bundle but does not automatically create this
 offline archive, so maintainers must deliberately collect compatible sidecars
 and run the assembler.

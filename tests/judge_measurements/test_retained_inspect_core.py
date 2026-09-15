@@ -113,6 +113,37 @@ def test_retained_inspect_normalized_and_native_events_replay_in_core(retained):
     replay(retained)
 
 
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("role", "tool"),
+        ("role", None),
+        ("refusal", "Cannot judge this answer"),
+        ("refusal", False),
+        ("tool_calls", [{"type": "function", "function": {"name": "lookup"}}]),
+        ("tool_calls", {}),
+        ("function_call", {"name": "lookup", "arguments": "{}"}),
+    ],
+)
+def test_rating_content_cannot_hide_unsupported_provider_outcomes(
+    retained, field, value
+):
+    _, event, _ = event_parts(retained)
+    call = native(event)
+    call["response"]["choices"][0]["message"][field] = value
+    with pytest.raises(c.JudgeMeasurementContractError, match="provider response"):
+        replay(retained)
+
+
+def test_explicit_empty_provider_fields_preserve_completed_ratings(retained):
+    for record in retained[1]["records"]:
+        call = native(record["events"][0])
+        call["response"]["choices"][0]["message"].update(
+            role="assistant", refusal=None, tool_calls=[], function_call=None
+        )
+    replay(retained)
+
+
 def test_explicit_standard_tier_replays_without_rewriting_historical_events(retained):
     for record in retained[1]["records"]:
         native(record["events"][0])

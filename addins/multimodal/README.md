@@ -228,9 +228,12 @@ make -C addins/multimodal qualify-evidence \
 
 `qualify-canary` runs one real, strictly verified transaction for the exact
 image. Retain its evidence, receipt, and verifier-owned trust profile; a new
-image digest requires a new signed canary. `qualify-preflight` reverifies that
-canary, then runs execution-free checks before starting either target model
-worker.
+image digest requires a new signed canary. Keep its referenced verifier private
+key available. Reuse also requires matching providers, task, acceptance binding
+and device class; see the [canary compatibility rules](../../docs/reference/runtime-providers.md).
+`qualify-preflight` authenticates the saved receipt, checks evidence integrity
+and compatibility, then runs execution-free checks before starting either
+target model worker.
 `RESOURCE_ROOT` and `CONTENT_STORE` are the Make equivalents of the two
 environment bindings above; readiness authenticates the schedule-selected
 objects before a GPU is allocated.

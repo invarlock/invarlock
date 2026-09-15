@@ -180,6 +180,113 @@ def test_first_party_addin_artifacts_match_exact_source(
     }
 
 
+def test_addin_archives_include_source_bound_license_text(built_addins):
+    expected = (ROOT / "LICENSE").read_bytes()
+    for wheel in built_addins.glob("*.whl"):
+        with zipfile.ZipFile(wheel) as archive:
+            license_name = next(
+                name
+                for name in archive.namelist()
+                if name.endswith(".dist-info/licenses/LICENSE")
+            )
+            assert archive.read(license_name) == expected
+            metadata = archive.read(
+                license_name.replace("licenses/LICENSE", "METADATA")
+            )
+            assert b"License-File: LICENSE\n" in metadata
+            assert b"License-Expression: Apache-2.0\n" in metadata
+    for sdist in built_addins.glob("*.tar.gz"):
+        with tarfile.open(sdist) as archive:
+            license_name = sdist.name.removesuffix(".tar.gz") + "/LICENSE"
+            assert archive.extractfile(license_name).read() == expected
+
+
+@pytest.mark.parametrize("alter", ["omit", "replace", "metadata"])
+def test_addin_wheel_license_cannot_be_removed_or_replaced(
+    built_addins, tmp_path, alter
+):
+    dist = tmp_path / "dist"
+    shutil.copytree(built_addins, dist)
+    wheel = next(dist.glob("invarlock_runtime_gguf-*.whl"))
+    with zipfile.ZipFile(wheel) as archive:
+        files = {name: archive.read(name) for name in archive.namelist()}
+    license_name = next(name for name in files if name.endswith("/licenses/LICENSE"))
+    if alter == "omit":
+        del files[license_name]
+    elif alter == "replace":
+        files[license_name] = b"different terms"
+    else:
+        metadata = license_name.replace("licenses/LICENSE", "METADATA")
+        files[metadata] = files[metadata].replace(b"License-File: LICENSE\n", b"")
+    _rewrite_record(files)
+    with zipfile.ZipFile(wheel, "w") as archive:
+        for name, data in files.items():
+            archive.writestr(name, data)
+    with pytest.raises(ReleasePreflightError, match="license"):
+        validate_first_party_addin_distributions(
+            repo_root=ROOT, expected_version=VERSION, dist_dir=dist
+        )
+
+
+@pytest.mark.parametrize("alter", ["missing", "replace", "symlink"])
+def test_addin_source_license_must_match_repository(built_addins, tmp_path, alter):
+    repo = tmp_path / "repo"
+    project = repo / "addins/gguf"
+    project.mkdir(parents=True)
+    (repo / "LICENSE").write_bytes((ROOT / "LICENSE").read_bytes())
+    source = project / "LICENSE"
+    if alter == "replace":
+        source.write_bytes(b"different terms")
+    elif alter == "symlink":
+        source.symlink_to(repo / "LICENSE")
+    spec = distribution_validation.DistributionValidationSpec(
+        project_root=project,
+        distribution_name="invarlock-runtime-gguf",
+        version=VERSION,
+        package_path="invarlock_addins/gguf",
+    )
+    with pytest.raises(ReleasePreflightError, match="license text differs"):
+        validation_module._validate_addin_license(
+            spec,
+            repo_root=repo,
+            wheel=next(built_addins.glob("invarlock_runtime_gguf-*.whl")),
+            sdist=next(built_addins.glob("invarlock_runtime_gguf-*.tar.gz")),
+        )
+
+
+@pytest.mark.parametrize("alter", ["omit", "replace"])
+def test_addin_sdist_license_cannot_be_removed_or_replaced(
+    built_addins, tmp_path, alter
+):
+    dist = tmp_path / "dist"
+    shutil.copytree(built_addins, dist)
+    sdist = next(dist.glob("invarlock_runtime_gguf-*.tar.gz"))
+    rewritten = sdist.with_suffix(".rewritten")
+    license_name = sdist.name.removesuffix(".tar.gz") + "/LICENSE"
+    with (
+        tarfile.open(sdist, "r:gz") as source,
+        tarfile.open(rewritten, "w:gz") as target,
+    ):
+        for member in source.getmembers():
+            stream = source.extractfile(member) if member.isreg() else None
+            payload = stream.read() if stream is not None else None
+            if member.name == license_name:
+                if alter == "omit":
+                    continue
+                payload = b"different terms"
+                member.size = len(payload)
+            target.addfile(member, io.BytesIO(payload) if payload is not None else None)
+    rewritten.replace(sdist)
+    with pytest.raises(
+        ReleasePreflightError, match="license|sdist supplemental source"
+    ):
+        validate_first_party_addin_distributions(
+            repo_root=ROOT,
+            expected_version=VERSION,
+            dist_dir=dist,
+        )
+
+
 def test_first_party_artifacts_include_core_and_all_addins(
     built_core: Path, built_addins: Path
 ) -> None:
