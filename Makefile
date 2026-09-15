@@ -8,6 +8,9 @@ RUFF := $(PYTHON) -m ruff
 MYPY := $(PYTHON) -m mypy
 MKDOCS := $(PYTHON) -m mkdocs
 PYTEST_WORKERS ?= 0
+TEST_EXCLUDES ?=
+COVERAGE_ARTIFACT_DIR ?= artifacts/coverage
+COVERAGE_COMBINED_FILE ?= $(CURDIR)/.coverage.combined
 OPA ?= opa
 CUE ?= cue
 PYTEST_WORKER_ARGS := $(if $(filter-out 0,$(PYTEST_WORKERS)),-n $(PYTEST_WORKERS),)
@@ -36,7 +39,7 @@ COVERAGE_QUALIFICATION_FILE ?= $(CURDIR)/.coverage.qualification
 COVERAGE_RELEASE_FILE ?= $(CURDIR)/.coverage.release
 COVERAGE_EXAMPLES_FILE ?= $(CURDIR)/.coverage.examples
 COVERAGE_MAINTENANCE_FILE ?= $(CURDIR)/.coverage.maintenance
-COVERAGE_TARGET_JOBS ?= 3
+COVERAGE_TARGET_JOBS ?= 1
 VERIFY_TARGET_JOBS ?= 3
 
 MYPY_TYPED_SURFACE := \
@@ -70,6 +73,8 @@ RELEASE_EXAMPLE_COVERAGE_FILES := \
 
 .PHONY: help install dev-install lock-sync test test-fast test-parallel test-integration addins-test
 .PHONY: coverage coverage-addins coverage-qualification coverage-release coverage-examples coverage-maintenance coverage-enforce coverage-enforce-parallel
+.PHONY: coverage-report coverage-core-report coverage-addins-report coverage-qualification-report coverage-release-report coverage-examples-report coverage-maintenance-report coverage-linux-check
+.PHONY: coverage-collect-core coverage-collect-examples coverage-collect-support coverage-collect-addins verify-checks
 .PHONY: compatibility-test trust-smoke trust-boundary-demo example-evidence-handoff example-acceptance-handoff example-quickstart example-hf-transformers example-hf-vision-text example-peft-lora
 .PHONY: evaluator-qualification evaluator-replayable-imports evaluator-upstream-qualification evaluator-replayable-corpus evaluator-docs-matrix-check evaluator-scalar-semantics
 .PHONY: evaluator-inspect-semantics evaluator-batch-semantics
@@ -105,13 +110,13 @@ lock-sync:  ## Check that uv.lock matches pyproject.toml
 test: compatibility-test  ## Run the complete test suite
 	$(MAKE) ensure-python
 	PYTHONPATH=src $(PYTEST) $(PYTEST_WORKER_ARGS) -q \
-		--ignore=tests/compatibility tests
+		--ignore=tests/compatibility $(TEST_EXCLUDES) tests
 
 test-fast: compatibility-test  ## Run tests that need no network, GPU, or long-lived runtime
 	$(MAKE) ensure-python
 	PYTHONPATH=src $(PYTEST) $(PYTEST_WORKER_ARGS) -q \
 		-m "not integration and not slow and not manual and not gpu" \
-		--ignore=tests/compatibility tests
+		--ignore=tests/compatibility $(TEST_EXCLUDES) tests
 
 test-parallel: PYTEST_WORKERS = auto
 test-parallel:  ## Run the fast suite with pytest-xdist
@@ -138,6 +143,11 @@ coverage:  ## Run the fast suite with statement-and-branch coverage
 		-m "not integration and not slow and not manual and not gpu" tests \
 		--cov=src/invarlock --cov-branch --cov-report=term-missing \
 		--cov-report=xml:reports/cov.xml --cov-fail-under=95
+	$(MAKE) coverage-core-report
+
+coverage-core-report:  ## Enforce retained core coverage measurements
+	COVERAGE_FILE=$(COVERAGE_CORE_FILE) $(PYTHON) -m coverage report --rcfile=pyproject.toml --include='src/invarlock/*' --omit='*/tests/*,*/test_*,*/__init__.py' --fail-under=95
+	COVERAGE_FILE=$(COVERAGE_CORE_FILE) $(PYTHON) -m coverage xml --rcfile=pyproject.toml --include='src/invarlock/*' --omit='*/tests/*,*/test_*,*/__init__.py' -o reports/cov.xml --fail-under=95
 	$(MAKE) coverage-check-files
 
 .PHONY: coverage-check-files
@@ -162,6 +172,11 @@ coverage-addins: coverage-linux-check  ## Enforce branch-aware coverage for opti
 		--cov-branch --cov-report=term-missing \
 		--cov-report=xml:reports/addins-cov.xml \
 		--cov-fail-under=95
+	$(MAKE) coverage-addins-report
+
+coverage-addins-report:  ## Enforce retained addins coverage measurements
+	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) $(PYTHON) -m coverage report --rcfile=scripts/addins.coveragerc --include='addins/*' --omit='addins/*/tests/*' --fail-under=95
+	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) $(PYTHON) -m coverage xml --rcfile=scripts/addins.coveragerc --include='addins/*' --omit='addins/*/tests/*' -o reports/addins-cov.xml --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) $(PYTHON) -m coverage report \
 		--include='addins/diagnostics/src/*' \
 		--fail-under=95
@@ -200,6 +215,11 @@ coverage-qualification:  ## Enforce branch-aware coverage for qualification tool
 		--cov-report=term-missing \
 		--cov-report=xml:reports/qualification-cov.xml \
 		--cov-fail-under=95
+	$(MAKE) coverage-qualification-report
+
+coverage-qualification-report:  ## Enforce retained qualification coverage measurements
+	COVERAGE_FILE=$(COVERAGE_QUALIFICATION_FILE) $(PYTHON) -m coverage report --rcfile=scripts/qualification.coveragerc --include='scripts/authenticated_runtime_build.py,scripts/qualification_precheck.py,scripts/qualification_candidate_wheels.py,scripts/qualification_receipt_check.py,scripts/qualification_render_preflight.py,scripts/qualification_source.py,scripts/runtime_qualification.py,scripts/tensorrt_llm_canary_preflight.py' --fail-under=95
+	COVERAGE_FILE=$(COVERAGE_QUALIFICATION_FILE) $(PYTHON) -m coverage xml --rcfile=scripts/qualification.coveragerc --include='scripts/authenticated_runtime_build.py,scripts/qualification_precheck.py,scripts/qualification_candidate_wheels.py,scripts/qualification_receipt_check.py,scripts/qualification_render_preflight.py,scripts/qualification_source.py,scripts/runtime_qualification.py,scripts/tensorrt_llm_canary_preflight.py' -o reports/qualification-cov.xml --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_QUALIFICATION_FILE) $(PYTHON) -m coverage report --rcfile=scripts/qualification.coveragerc \
 		--include='scripts/authenticated_runtime_build.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_QUALIFICATION_FILE) $(PYTHON) -m coverage report --rcfile=scripts/qualification.coveragerc \
@@ -233,6 +253,11 @@ coverage-release:  ## Enforce branch-aware coverage for release helpers
 		--cov-report=term-missing \
 		--cov-report=xml:reports/release-cov.xml \
 		--cov-fail-under=95
+	$(MAKE) coverage-release-report
+
+coverage-release-report:  ## Enforce retained release coverage measurements
+	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc --include='scripts/release/*.py' --fail-under=95
+	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage xml --rcfile=scripts/release.coveragerc --include='scripts/release/*.py' -o reports/release-cov.xml --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc \
 		--include='scripts/release/first_party_distribution_validation.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc \
@@ -255,10 +280,15 @@ coverage-examples:  ## Enforce branch-aware coverage for example launchers
 		--cov-branch \
 		--cov-report=term-missing \
 		--cov-report=xml:reports/examples-cov.xml
+	$(MAKE) coverage-examples-report
+
+coverage-examples-report:  ## Enforce retained examples coverage measurements
+	COVERAGE_FILE=$(COVERAGE_EXAMPLES_FILE) $(PYTHON) -m coverage report --rcfile=scripts/examples.coveragerc --include='examples/*' --fail-under=0
+	COVERAGE_FILE=$(COVERAGE_EXAMPLES_FILE) $(PYTHON) -m coverage xml --rcfile=scripts/examples.coveragerc --include='examples/*' -o reports/examples-cov.xml --fail-under=0
 	@exemptions="$$(grep -Ev '^(#|$$)' examples/coverage-exemptions.txt | paste -sd, -)"; \
 		test -n "$$exemptions"; \
 		COVERAGE_FILE=$(COVERAGE_EXAMPLES_FILE) $(PYTHON) -m coverage report \
-			--omit="$$exemptions" --fail-under=95
+			--include='examples/*' --omit="$$exemptions" --fail-under=95
 	@find examples -type f -name '*.py' \
 		! -name '__init__.py' | sort | \
 		while IFS= read -r source; do \
@@ -275,6 +305,7 @@ coverage-maintenance:  ## Measure maintained repository checks and security tool
 	COVERAGE_FILE=$(COVERAGE_MAINTENANCE_FILE) $(PYTHON) -m coverage erase
 	COVERAGE_FILE=$(COVERAGE_MAINTENANCE_FILE) PYTHONPATH=src:. $(PYTEST) $(PYTEST_WORKER_ARGS) -q \
 		tests/ci/test_coverage_branch_rate.py \
+		tests/ci/test_coverage_shards.py \
 		tests/ci/test_public_evidence_audit.py \
 		tests/ci/test_public_text_check.py \
 		tests/judge_measurements/test_statistics_calibration.py \
@@ -293,18 +324,31 @@ coverage-maintenance:  ## Measure maintained repository checks and security tool
 		--cov-report=term-missing \
 		--cov-report=xml:reports/maintenance-cov.xml \
 		--cov-fail-under=95
-	@git ls-files 'scripts/checks/*.py' 'scripts/security/*.py' \
+	$(MAKE) coverage-maintenance-report
+
+coverage-maintenance-report:  ## Enforce retained maintenance coverage measurements
+	COVERAGE_FILE=$(COVERAGE_MAINTENANCE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/maintenance.coveragerc --include='scripts/checks/*.py,scripts/security/*.py,scripts/ci/*.py,scripts/prepare_qualification_suites.py' --fail-under=95
+	COVERAGE_FILE=$(COVERAGE_MAINTENANCE_FILE) $(PYTHON) -m coverage xml --rcfile=scripts/maintenance.coveragerc --include='scripts/checks/*.py,scripts/security/*.py,scripts/ci/*.py,scripts/prepare_qualification_suites.py' -o reports/maintenance-cov.xml --fail-under=95
+	@git ls-files 'scripts/checks/*.py' 'scripts/security/*.py' 'scripts/ci/*.py' \
 		'scripts/prepare_qualification_suites.py' | \
 		while IFS= read -r source; do \
 			COVERAGE_FILE=$(COVERAGE_MAINTENANCE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/maintenance.coveragerc --include="$$source" --fail-under=95 || exit $$?; \
 		done
 
 coverage-enforce: PYTEST_WORKERS = 2
-coverage-enforce: coverage-linux-check  ## Enforce branch-aware coverage in parallel by default
-	$(MAKE) -j $(COVERAGE_TARGET_JOBS) \
-		coverage coverage-addins coverage-qualification \
-		coverage-release coverage-examples coverage-maintenance \
-		PYTEST_WORKERS=$(PYTEST_WORKERS)
+coverage-enforce: coverage-linux-check  ## Run disjoint coverage suites and enforce every domain
+	$(MAKE) -j $(COVERAGE_TARGET_JOBS) coverage-collect-core coverage-collect-examples coverage-collect-support coverage-collect-addins PYTEST_WORKERS=$(PYTEST_WORKERS)
+	$(MAKE) coverage-report
+
+coverage-collect-core coverage-collect-examples coverage-collect-support coverage-collect-addins: coverage-collect-%: coverage-linux-check
+	$(PYTHON) scripts/ci/coverage_runner.py run $* --artifact-dir "$(COVERAGE_ARTIFACT_DIR)" --workers $(PYTEST_WORKERS)
+
+coverage-report: coverage-linux-check  ## Combine all successful shards and enforce unchanged coverage requirements
+	$(PYTHON) scripts/ci/coverage_runner.py combine "$(COVERAGE_ARTIFACT_DIR)" --output "$(COVERAGE_COMBINED_FILE)"
+	$(MAKE) coverage-core-report coverage-addins-report coverage-qualification-report coverage-release-report coverage-examples-report coverage-maintenance-report \
+		COVERAGE_CORE_FILE="$(COVERAGE_COMBINED_FILE)" COVERAGE_ADDINS_FILE="$(COVERAGE_COMBINED_FILE)" \
+		COVERAGE_QUALIFICATION_FILE="$(COVERAGE_COMBINED_FILE)" COVERAGE_RELEASE_FILE="$(COVERAGE_COMBINED_FILE)" \
+		COVERAGE_EXAMPLES_FILE="$(COVERAGE_COMBINED_FILE)" COVERAGE_MAINTENANCE_FILE="$(COVERAGE_COMBINED_FILE)"
 	$(PYTHON) scripts/checks/check_coverage_branch_rate.py \
 		reports/cov.xml reports/addins-cov.xml \
 		reports/qualification-cov.xml reports/release-cov.xml \
@@ -583,7 +627,7 @@ verify:  ## Run repository, product, docs, and contract gates in parallel by def
 	$(MAKE) -j $(VERIFY_TARGET_JOBS) \
 		public-evidence-audit contracts-check test addins-test \
 		cli-smoke-core lint docs-check-build \
-		PYTEST_WORKERS=$(PYTEST_WORKERS)
+		PYTEST_WORKERS=$(PYTEST_WORKERS) TEST_EXCLUDES=--ignore=tests/examples
 	$(MAKE) examples-check PYTEST_WORKERS=$(PYTEST_WORKERS)
 
 verify-fast: PYTEST_WORKERS = 2
@@ -592,8 +636,12 @@ verify-fast:  ## Run local gates in parallel without network, GPU, or downloads
 	$(MAKE) -j $(VERIFY_TARGET_JOBS) \
 		public-evidence-audit contracts-check test-fast addins-test \
 		cli-smoke-core lint \
-		PYTEST_WORKERS=$(PYTEST_WORKERS)
+		PYTEST_WORKERS=$(PYTEST_WORKERS) TEST_EXCLUDES=--ignore=tests/examples
 	$(MAKE) examples-check PYTEST_WORKERS=$(PYTEST_WORKERS)
+
+verify-checks:  ## Run non-test repository gates; CI behavioral coverage runs separately
+	$(MAKE) repo-cruft-check
+	$(MAKE) -j $(VERIFY_TARGET_JOBS) public-evidence-audit contracts-check cli-smoke-core lint
 
 contracts-check:  ## Check that packaged contracts match repository contracts
 	PYTHONPATH=src $(PYTHON) scripts/checks/sync_packaged_contracts.py --check

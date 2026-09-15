@@ -3,6 +3,7 @@ branch = True
 parallel = True
 patch = subprocess
 include =
+    scripts/ci/*.py
     scripts/checks/*.py
     scripts/prepare_qualification_suites.py
     scripts/security/*.py

@@ -47,7 +47,10 @@ def test_coverage_checks_untracked_runtime_files_without_requiring_staging(tmp_p
     collection = makefile.target("coverage").text
     recipe = makefile.target("coverage-check-files").text
     assert "--cov-fail-under=95" in collection
-    assert "$(MAKE) coverage-check-files" in collection
+    assert "$(MAKE) coverage-core-report" in collection
+    assert (
+        "$(MAKE) coverage-check-files" in makefile.target("coverage-core-report").text
+    )
     assert "--fail-under=95" in recipe
     assert "git ls-files" not in recipe
     program = recipe.split("-c '", 1)[1].split("' |", 1)[0]
