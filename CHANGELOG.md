@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Reorganized the root README around a runnable signed-evidence quickstart,
+  the three built-in scorers, supported integration routes and retained examples.
+  Detailed contracts and runtime setup remain in the linked guides.
+
 - Refined evidence reports with aligned comparison identities, collapsible shared
   settings, labelled interval scales and change requirements, metric navigation,
   readable configuration previews and compact result summaries. Assurance checks

@@ -170,52 +170,37 @@ def test_readme_links_to_the_schema_valid_public_request() -> None:
     jsonschema.Draft202012Validator(schema).validate(request)
 
 
-def test_readme_hierarchy_promotes_evaluator_neutral_evidence_paths() -> None:
+def test_readme_leads_with_a_runnable_workflow_and_scoped_capabilities() -> None:
     readme = _read("README.md")
     headings = (
-        "## Evidence paths",
-        "## Decision boundary",
-        "## Try the signed handoff locally",
-        "## Inspect published evidence",
-        "## Run, verify, and report",
-        "## The release-regression decision",
-        "## Import and qualify evaluator results",
-        "## Hand off acceptance",
-        "## Providers and diagnostics",
-        "## Documentation",
+        "## Quickstart",
+        "## What can you use it for?",
+        "## One workflow: evaluate, verify, report",
+        "## Choose a scorer",
+        "## Keep your evaluator—or run the comparison here",
+        "## Inspect real retained examples",
+        "## What verification establishes",
+        "## Documentation and contributing",
     )
     positions = [readme.index(heading) for heading in headings]
-
     assert positions == sorted(positions)
-    evidence_paths = readme[positions[0] : positions[1]]
-    for phrase in (
-        "Native execution",
-        "Adapter support",
-        "Replay authority",
-        "Signed-journey maturity",
-        "evaluator-neutral contracts",
-    ):
-        assert phrase in evidence_paths
-    assert evidence_paths.index("evaluation-verification-flow.svg") < (
-        evidence_paths.index("| Axis |")
-    )
 
-    introduction = readme[: positions[0]]
-    assert "in-toto/DSSE" not in introduction
-    decision_boundary = " ".join(readme[positions[1] : positions[2]].split())
-    for phrase in (
-        "one precise question",
-        "authenticated evidence and independently supplied trust anchors",
-        "reproducible, portable, and suitable for recipient-controlled approval",
-        "Broader deployment, safety, compliance, and organizational decisions",
-        "complete claim boundary and assumptions",
-    ):
-        assert phrase in decision_boundary
-    assert "## Scope and non-goals" not in readme
+    quickstart = readme[positions[0] : positions[1]]
+    assert "python -m pip install ." in quickstart
+    assert "python examples/quickstart/run.py" in quickstart
+    assert "--fixture examples/acceptance-handoff/golden" in quickstart
+    assert "makes no new model calls" in quickstart
 
-    acceptance = readme[positions[7] : positions[8]]
-    assert "in-toto/DSSE" in acceptance
-    assert "**Compatibility note:**" in acceptance
+    scorers = readme[positions[3] : positions[4]]
+    for metric in ("exact_match", "normalized_nll_per_utf8_byte", "judge"):
+        assert f"(`{metric}`)" in scorers
+    integrations = readme[positions[4] : positions[5]]
+    assert "An aggregate score cannot substitute" in integrations
+    assert "verifying old evidence does not measure" in integrations
+    boundary = " ".join(readme[positions[6] : positions[7]].split())
+    assert "does not independently rerun" in boundary
+    assert "recipient's current policy" in boundary
+    assert "v0.13 evidence and receipts remain verifiable and ingestible" in boundary
 
 
 def test_readme_first_run_commands_track_checked_in_surfaces() -> None:
@@ -234,8 +219,9 @@ def test_readme_first_run_commands_track_checked_in_surfaces() -> None:
     receipt_path = (
         "public_evidence/evidence/mistral-7b-weight-scale-hf/verification.receipt.json"
     )
-    assert report_path in readme
-    assert receipt_path in readme
+    assert "https://github.com/invarlock/invarlock/tree/main/public_evidence" in readme
+    assert REPO_ROOT.joinpath(report_path).is_dir()
+    assert REPO_ROOT.joinpath(receipt_path).is_file()
     assert evidence_root.joinpath("evidence/manifest.json").is_file()
     assert evidence_root.joinpath("verification.receipt.json").is_file()
 

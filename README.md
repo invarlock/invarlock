@@ -11,7 +11,7 @@
   </picture>
 </p>
 
-<p align="center"><em>Run or import paired release-regression evidence. Verify it independently. Hand off a recipient-controlled decision.</em></p>
+<p align="center"><em>Evaluate model changes. Verify the evidence. Share the result.</em></p>
 
 <p align="center">
   <a href="https://github.com/invarlock/invarlock/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/invarlock/invarlock/ci.yml?branch=main&label=CI&logo=github&labelColor=18150f" /></a>
@@ -21,192 +21,56 @@
   <a href="https://www.python.org/downloads/release/python-3120/"><img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12%2B-1f3a7a?logo=python&logoColor=f4efe3&labelColor=18150f" /></a>
 </p>
 
-Using independently supplied trust inputs, an artifact recipient can check
-whether a local model derivative or captured hosted-service observation
-satisfies an agreed release-regression policy.
+**InvarLock evaluates model changes and produces evidence that another team can
+verify independently.** Compare a candidate—the *subject*—with an approved
+baseline, using tests and acceptance thresholds you choose. Run a supported
+comparison through InvarLock, or bring per-case records from your existing
+evaluation workflow.
 
-InvarLock is an open-source assurance engine for one paired
-baseline-versus-subject decision. It can execute both sides on the same
-deterministic schedule or import complete authenticated per-record material
-from another controlled evaluation. A closed request binds the artifacts,
-evaluation source or schedule, runtime and evaluator identities, scoring
-contract, and policy. InvarLock recomputes the permitted comparison and
-publishes a signed evidence bundle; a separate verifier replays that bundle
-against independently supplied trust anchors.
+The result is a signed evidence bundle, a separate verification receipt and a
+report explaining the comparison. Your customer or internal reviewer can check
+the retained result against agreed inputs and policy without rerunning model
+inference.
 
-## Evidence paths
+- **Three native scorers:** exact match, normalized NLL and bounded LLM judging.
+- **Existing workflows:** supported evaluator exports and a Python capture SDK.
+- **Offline verification:** replay the supported analysis with recipient-owned
+  trust inputs; no provider credentials needed.
+- **Reviewable results:** model and service identities, measured changes,
+  uncertainty bounds and the checks that passed or failed.
 
-Native execution, independently replayable import, and captured records use the
-same evaluation, independent verification, and reporting transaction:
+## Quickstart
 
-<p align="center">
-  <img
-    src="https://raw.githubusercontent.com/invarlock/invarlock/main/docs/assets/evaluation-verification-flow.svg"
-    alt="A pinned paired evaluation request runs baseline and subject providers, publishes signed evidence, is independently verified, and is rendered as a report"
-    width="100%"
-  />
-</p>
+Try a signed evidence check on a regular CPU. **Python 3.12+** is required;
+no GPU, model download, API key or container engine is needed for this example.
 
-For artifact delivery, the workflow continues from technical verification to a
-recipient-controlled decision:
-
-> authenticated evaluation → portable signed evidence → independent technical
-> verification → recipient-controlled acceptance
-
-An evaluation operator publishes the evidence; the artifact recipient controls
-the acceptance policy and decision.
+From a checkout of this repository:
 
 ```bash
-invarlock evaluate request.yaml
-invarlock verify evidence/
-invarlock report evidence/
-```
-
-Native execution receives pinned artifacts, evaluation source, runtime, scorer
-and policy; InvarLock runs both sides and derives the paired result. Exact match,
-normalized NLL and judge scoring share this workflow, with their own evidence
-and verification requirements. Existing evaluators can supply per-case facts
-through installed export parsers or the canonical capture SDK, which normalize
-records into evaluator-neutral contracts. Framework launch
-and qualification examples retain their own pinned profiles. Their status is
-recorded on three independent axes:
-
-| Axis | Values | Meaning |
-| --- | --- | --- |
-| Adapter support | Maintained or external | Whether an adapter and pinned upstream entry point are maintained; this grants no decision authority |
-| Replay authority | Independently replayable or observation-only | Whether complete ordered facts can be deterministically recomputed, or can only be preserved as authenticated context |
-| Signed-journey maturity | Retained or not yet demonstrated | Whether a model-running signed `evaluate` → `verify` → `report` OCI transaction has been retained |
-
-The stable qualification result expresses replay authority as
-`verdict_authority` or `observation_only`. Adapter support and signed-journey
-maturity are catalog metadata, not fields that an imported result can claim
-for itself.
-
-## Decision boundary
-
-InvarLock answers one precise question: whether a subject satisfies an
-agreed release-regression policy relative to a baseline, using authenticated
-evidence and independently supplied trust anchors. It makes that decision
-reproducible, portable, and suitable for recipient-controlled approval.
-
-The decision remains bounded by the supplied evidence and identities. Broader
-deployment, safety, compliance, and organizational decisions remain with their
-corresponding controls and reviewers. See the
-[threat model](https://github.com/invarlock/invarlock/blob/main/docs/security/threat-model.md#explicit-non-goals)
-and [assurance case](https://github.com/invarlock/invarlock/blob/main/docs/assurance/assurance-case.md)
-for the complete claim boundary and assumptions.
-
-## Check captured evaluation results
-
-The examples on this branch describe its source revision. Install that checkout
-as shown below, or use a wheel built from it with matching example files. Retain
-the source commit and wheel SHA-256 when sharing a local build; development
-version metadata alone does not identify it. For a published wheel, use the
-documentation and examples from its matching release tag, as described in
-[matching wheels and examples](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/getting-started.md#matching-wheels-and-examples).
-
-The core wheel scores existing evaluation records using exact match, normalized
-NLL or judge measurements. Deterministic extensions also cover normalized labels,
-numeric tolerances, structured fields and token overlap. Exact match and NLL
-replay retained facts offline. Judge requests can import retained calls or collect
-new ratings under explicit budgets without regenerating the evaluated answers.
-
-```bash
-# From the reviewed source checkout:
+python -m venv .venv
+. .venv/bin/activate
 python -m pip install .
-invarlock evaluate request.yaml --signing-key signing-key.pem
-invarlock verify evidence/ --trust-profile trust/trust-inputs.json \
-  --receipt verification.receipt.json
-invarlock report evidence/
+python examples/quickstart/run.py \
+  --fixture examples/acceptance-handoff/golden
 ```
 
-`evaluate` publishes one atomic evidence pack, `verify` checks it with
-recipient-owned anchors, and `report` renders it without changing evidence.
+The command verifies retained evidence against the example's separate trust
+inputs, issues a new signed receipt and writes an HTML report. It prints:
 
-Prepare the request, independent captured trust profile, and keys using the
-[captured-results guide](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/captured-results.md).
-Its starter records and thresholds are illustrative. Captured verification
-authenticates inputs and arithmetic, not runtime execution; recorded judgments
-remain explicit and cannot authorize native acceptance or deployment.
-
-For a hosted endpoint or application, follow the
-[requalification workflow](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/hosted-service-requalification.md):
-approve a baseline and policy, capture fresh service executions, then evaluate,
-verify offline and report. Captured service identity records the configuration,
-harness and observation window without claiming immutable weights. Periodic and
-incident-triggered campaigns use your own harness and scheduler; replay of old
-evidence is not a fresh service measurement.
-
-The [local HTTP reference](https://github.com/invarlock/invarlock/blob/main/examples/hosted-service/references/mistral-7b-http/README.md)
-retains 400 paired cases from two distinct full 7B checkpoints, original responses,
-signed evidence and offline verification. It demonstrates that captured workflow;
-its comparative pass does not establish adequate task quality or qualify an
-external provider.
-
-## Evaluate with a native judge scorer
-
-Select `metric: judge` alongside `exact_match` and
-`normalized_nll_per_utf8_byte` in a native evaluation request. InvarLock captures
-baseline and subject answers, freezes their runtime provenance, and grades them
-under one declared rubric and judge configuration. The policy fixes the cases, independent
-units, rating scale, repetitions, model identity and decision thresholds before
-model execution. Answer and rendered-request digests are derived automatically
-from the frozen captures. Evidence retains requests, responses, sanitized error
-outcomes, attempts and source mappings so a recipient can authenticate and
-replay the comparison offline.
-
-```bash
-invarlock evaluate judge-request.yaml --preflight --json
-invarlock evaluate judge-request.yaml --signing-key signing-key.pem
-invarlock verify judge-evidence/ --trust-profile judge-recipient-policy.json
-invarlock report judge-evidence/ --html judge-report.html
+```text
+PASS signed evidence verified
+Decision: pass
 ```
 
-All three scorers also accept captured records from existing evaluator workflows.
-Each requires its own per-case facts: outputs and references for exact match,
-reference-continuation likelihoods for NLL, and frozen text plus retained ratings
-for judging. See the [captured-results guide](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/captured-results.md#use-the-three-built-in-scorers).
-An evaluator's aggregate score cannot replace those facts.
+Open `invarlock-quickstart-output/evidence.html`. The same directory contains
+`verification.receipt.json` and `verification.result.json`. This demonstrates
+verification and reporting of a fixed comparison; it makes no new model calls.
 
-The [Mistral 7B likelihood reference](https://github.com/invarlock/invarlock/blob/main/examples/captured-results/references/mistral-7b-likelihood/README.md)
-compares distinct base and instruction-tuned checkpoints over 400 fixed public
-narrative continuations, retaining the measured likelihoods and installed signed
-handoff. The original six-pair
-[same-model control](https://github.com/invarlock/invarlock/blob/main/examples/captured-results/references/harness-likelihood/README.md)
-remains available. These references demonstrate their declared integration
-profiles; they do not qualify the full evaluator matrix or establish broad model
-quality.
+<details>
+<summary>Use a published wheel instead</summary>
 
-`evaluate` performs live collection through the optional
-`invarlock-inspect-judge[inspect]` package, with explicit call, token, cost, timeout
-and checkpoint controls. The core wheel verifies and reports retained evidence
-offline without provider credentials or Inspect. Start with
-`invarlock evaluate --init my-judge --example native-judge`; its model pins are
-placeholders to replace with your own native runtime inputs. The first profile supports bounded text ratings
-of fixed answers; it does not turn arbitrary evaluator scores into replayable
-judge evidence. See the
-[judge measurement reference](https://github.com/invarlock/invarlock/blob/main/docs/reference/judge-measurements.md).
-
-[Evidence sets](https://github.com/invarlock/invarlock/blob/main/docs/reference/evidence-sets.md)
-let a recipient require deterministic and bounded judge checks on the same
-frozen answers, while preserving each component's statistical meaning. Start
-with the [answer capture example](https://github.com/invarlock/invarlock/blob/main/examples/answer-capture/README.md)
-when baseline and subject answers have not yet been collected.
-
-
-For controlled evaluations, `invarlock evaluate --help`
-groups the main workflow separately from advanced runtime options. Run requests
-can use `--runtime-profile runtime.json` to reuse explicit container resources;
-`--preflight` checks the resolved setup before execution. The profile configures
-execution resources, not policy or signer trust. See the
-[CLI reference](https://github.com/invarlock/invarlock/blob/main/docs/reference/cli.md)
-for its closed fields, precedence and validation.
-
-## Try the signed handoff locally
-
-The five-minute wheel workflow verifies retained signed evidence against
-independent anchors, issues a fresh verifier-signed receipt, and renders an HTML
-report. It needs only Python 3.12 or newer and a regular CPU.
+Start in an empty directory and download the examples matching the installed
+release:
 
 ```bash
 python -m venv .venv
@@ -223,215 +87,169 @@ tar -xzf "v${INVARLOCK_VERSION}.tar.gz" --strip-components=3 \
 python run.py --fixture golden
 ```
 
-The command prints `Decision: pass` and the paths to the signed receipt,
-machine-readable verification result, and evidence report. The versioned example
-files stay outside the package; the command imports only the installed wheel.
-Use this archive recipe for a released wheel only. For a local build, copy the
-examples from the same checkout that built the wheel. A missing matching tag is
-an error, never a reason to fall back to a mutable branch. See the
-[installation convention](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/getting-started.md#matching-wheels-and-examples).
-The fuller [offline handoff example](https://github.com/invarlock/invarlock/tree/main/examples/acceptance-handoff)
-also builds fixture evidence and exercises ten fail-closed recipient scenarios.
+</details>
 
-## Inspect published evidence
+Use documentation and examples from the same release as a published wheel.
+For local builds, use the exact source checkout that built the package; retain
+its commit and wheel digest when sharing it. A missing release archive is an
+error, never a reason to substitute another version. See
+[matching wheels and examples](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/getting-started.md#matching-wheels-and-examples).
 
-The repository carries strictly verified signed evidence packs across the
-built-in text runtime and first-party GGUF/llama.cpp, vision-text, and
-TensorRT-LLM runtimes. Each uses a pinned public qualification suite and
-includes an independently signed verification receipt.
+## What can you use it for?
 
-```bash
-make public-evidence-audit
-invarlock report \
-  public_evidence/evidence/mistral-7b-weight-scale-hf/evidence
-python -m json.tool \
-  public_evidence/evidence/mistral-7b-weight-scale-hf/verification.receipt.json
-```
+| Your task | Starting point |
+| --- | --- |
+| Check a fine-tune, quantized model or runtime change against a baseline | [Model-change workflows](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/change-scenarios.md) |
+| Add a verifiable comparison to an existing evaluator or CI pipeline | [Captured results](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/captured-results.md) |
+| Grade frozen answers under a task-specific rubric | [Judge scoring](https://github.com/invarlock/invarlock/blob/main/docs/reference/judge-measurements.md) |
+| Recheck a hosted service after a change or on a schedule | [Hosted-service requalification](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/hosted-service-requalification.md) |
+| Send evidence to a customer or internal release reviewer | [Evidence and verification](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/evidence-and-verification.md) |
 
-Start with the
-[public evidence index](https://github.com/invarlock/invarlock/tree/main/public_evidence)
-for the maintained inventory and interpretation limits. Reporting authenticates
-and explains the signed bundle. Acceptance remains a separate,
-recipient-controlled decision under current policy. Technical verification
-obtains the expected artifact, schedule, evaluated policy, runtime, evidence
-signer, and verifier anchors through channels independent of the submitted
-pack.
+These workflows fit teams that repeatedly need to produce, check or retain
+evidence supporting a model change: model suppliers, fine-tuning and optimization
+teams, and internal AI teams with a release-review process.
 
-## Run, verify, and report
+## One workflow: evaluate, verify, report
 
-Install the built-in Hugging Face provider for a native text comparison:
+<p align="center">
+  <img
+    src="https://raw.githubusercontent.com/invarlock/invarlock/main/docs/assets/evaluation-verification-flow.svg"
+    alt="A pinned paired evaluation publishes signed evidence, a separate recipient verifies it, and a report explains the result"
+    width="100%"
+  />
+</p>
+
+Once you have prepared a request, signing key and independent trust profile:
 
 ```bash
-python -m pip install "invarlock[hf]"
-```
-
-For the native command below, start from the
-[complete run request](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/evaluation-request.md#complete-run-request)
-and replace every illustrative digest with one derived from the exact input.
-Import mode instead starts from the repository's
-[schema-valid import request](https://github.com/invarlock/invarlock/blob/main/examples/request.yaml)
-and omits `--runtime-image` and `--runtime-image-digest`; the request binds the
-complete imported provider sidecars.
-
-```bash
-invarlock evaluate request.yaml \
-  --signing-key evidence-signer.pem \
-  --runtime-image registry.example/invarlock-runtime@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
-  --runtime-image-digest sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-
-invarlock verify artifacts/evidence-001/ \
-  --trust-profile trust/trust-inputs.json \
+invarlock evaluate request.yaml --preflight --json
+invarlock evaluate request.yaml --signing-key signing-key.pem
+invarlock verify evidence/ --trust-profile trust/trust-inputs.json \
   --receipt verification.receipt.json
-
-invarlock report artifacts/evidence-001/ --html evidence.html --explain
+invarlock report evidence/ --html report.html
 ```
 
-`evaluate --preflight --json` returns the machine-readable result of complete
-execution-free validation. Native run mode delegates to a caller-authorized,
-digest-addressed Docker or Podman image. Import mode authenticates and replays
-complete provider sidecars and ordered per-record evidence locally.
-The [getting-started guide](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/getting-started.md)
-and [runtime-provider guide](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/runtime-providers.md)
-cover request construction, image preparation, device selection, host-only
-signing keys, and independently derived verifier inputs.
+Use the evidence destination declared in your request. The
+[captured-results guide](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/captured-results.md)
+provides complete setup instructions, keys and trust-profile preparation.
 
-## The release-regression decision
+| Command | What it does |
+| --- | --- |
+| `evaluate` | Runs or imports a declared comparison, applies policy and publishes evidence. Preflight checks setup without execution. |
+| `verify` | Checks signatures, bound identities and supported analysis against the recipient's independent expectations; can issue a signed receipt. |
+| `report` | Explains the identities, results, uncertainty and policy checks in the retained evidence. Rendering does not replace independent verification. |
 
-For native run/import requests, both sides score the same authenticated records
-in the same order. Select one of three built-in scorers:
+The HTML report supports multiple metrics and slices, with an overview and
+per-result detail. Terminal and Markdown outputs support review; JSON and JUnit
+support automation where the selected workflow provides them. See the
+[CLI reference](https://github.com/invarlock/invarlock/blob/main/docs/reference/cli.md)
+for output options and policy exit codes.
 
-| Metric | Point comparison | Policy verdict |
+## Choose a scorer
+
+The same native and captured entry points support three built-in scorers, each
+with its own required observations and statistical treatment:
+
+| Scorer | Required observations | Comparison |
 | --- | --- | --- |
-| `exact_match` | Subject accuracy minus baseline accuracy, with paired regression and improvement counts | Lower bound of the paired Newcombe 95% interval is at least `delta_min_pp` |
-| `normalized_nll_per_utf8_byte` | Ratio of arithmetic means of per-record byte-normalized expected-continuation NLL | Upper bound of the paired schedule-resampling interval is at most `ratio_max` |
-| `judge` | Repeated bounded ratings of frozen answers, aggregated by declared independent units | Fixed-benchmark uncertainty bound satisfies the declared degradation and optional subject threshold |
+| Exact match (`exact_match`) | Answers and reference answers for paired cases | Accuracy change with a paired uncertainty interval |
+| Normalized NLL (`normalized_nll_per_utf8_byte`) | Reference-continuation log probabilities, UTF-8 byte counts and bound tokenizer metadata | Ratio of mean byte-normalized NLL, with paired resampling |
+| Judge (`judge`) | Frozen task text and answers, declared rubric and retained judge calls | Bounded ratings aggregated by declared independent units |
 
-The conservative interval bound controls the policy; the point value remains
-descriptive. A policy may also require a minimum paired-record count and
-maximum interval width. Exact match includes an exact two-sided McNemar test;
-normalized NLL uses 2,048 deterministic paired schedule-resampling replicates.
-Normalized NLL specifically measures expected-continuation likelihood
-regression; broader model-quality claims require other evidence.
+Policy uses the conservative uncertainty bound, with the configured sample,
+precision and quality requirements. A point estimate alone does not decide the
+result. [Schedule and policy](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/schedule-and-policy.md)
+explains the statistical scope and thresholds.
 
-For task-specific deterministic scoring, a request may bind one authorized
-scorer extension. The extension derives one replayable value per record while
-the core retains ownership of pairing, aggregation, intervals, and policy.
-See [schedule and policy](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/schedule-and-policy.md)
-for the full statistical contract and threshold guidance.
+Judge collection uses the optional `invarlock-inspect-judge[inspect]` package
+with explicit call, token, cost, timeout and checkpoint limits. Importing retained
+ratings, verification and reporting work offline in the core wheel. Start with
+`invarlock evaluate --init my-judge --example native-judge` and replace the
+illustrative model pins with your actual runtime inputs. See
+[judge scoring](https://github.com/invarlock/invarlock/blob/main/docs/reference/judge-measurements.md)
+for the supported rubric, reference and collection profiles.
 
-## Import and qualify evaluator results
+Task-specific deterministic extensions cover normalized labels, numeric
+tolerances, structured fields and token overlap.
+[Evidence sets](https://github.com/invarlock/invarlock/blob/main/docs/reference/evidence-sets.md)
+can require multiple complementary checks on the same frozen answers while
+preserving each check's meaning.
 
-The core exposes one evaluator-neutral qualification contract as versioned
-JSON, the `invarlock-qualify-evaluator` companion CLI, and
-`invarlock.engine.qualify_evaluator_export` for Python callers. Open-source or
-proprietary evaluators reached through an SDK, CLI, or API normalize into that
-same boundary outside the core.
+## Keep your evaluator—or run the comparison here
 
-Independent replay requires complete ordered per-record evidence that passes
-identity, provenance, schedule, and deterministic recomputation requirements.
-Aggregate-only outputs and judge results outside the bounded judge measurement
-profile remain observation-only.
-A signed observation proves what was supplied; a replayable source additionally
-requires the identity, schedule, and recomputation guarantees above.
+**Use existing records.** Installed parsers cover selected Inspect AI, LM
+Evaluation Harness and Promptfoo export profiles, plus canonical JSON and generic
+JSONL. The [capture SDK](https://github.com/invarlock/invarlock/blob/main/docs/reference/api-guide.md)
+lets other pipelines supply the required per-case facts. Structured inputs need
+an explicit text projection for judging; normalized NLL needs actual likelihood
+measurements. An aggregate score cannot substitute for missing observations.
+The [qualification matrix](https://github.com/invarlock/invarlock/blob/main/docs/reference/evaluator-qualification.md)
+distinguishes installed support, replay authority and retained runtime evidence
+for each declared profile.
 
-The maintained
-[evaluator qualification matrix](https://github.com/invarlock/invarlock/blob/main/docs/reference/evaluator-qualification.md)
-groups recognizable upstream evaluators by role and records adapter support,
-source version, replay authority, and retained signed-journey maturity. Each
-independently replayable import starts with
-retained output from a pinned real model evaluation, passes through a
-source-shaped adapter, and completes the closed import replay. LM Evaluation
-Harness and Inspect AI additionally include retained 400-record native signed
-OCI transactions for Qwen3.5 9B over a shared balanced MMLU-Pro schedule. LM
-Evaluation Harness also retains a Gemma 4 12B instruction-to-QAT transaction
-to demonstrate a second model family. Their adapters and profiles are
-example-owned; new profiles extend the same evaluator-neutral engine contract.
-The retained
-[proof map](https://github.com/invarlock/invarlock/blob/main/examples/evaluator-qualification/signed-transactions/README.md#proof-map)
-links each upstream output, qualified import, signed transaction, and verifier
-receipt.
+**Run a native comparison.** Hugging Face Transformers is the built-in runtime.
+Optional GGUF/llama.cpp, TensorRT-LLM and Hugging Face vision-text packages provide
+additional runtime profiles. Native run mode uses a caller-authorized,
+digest-addressed Docker or Podman image. Follow the
+[getting-started guide](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/getting-started.md)
+for artifact pins, runtime setup and independent verification inputs.
+The [import request](https://github.com/invarlock/invarlock/blob/main/examples/request.yaml)
+uses complete retained provider sidecars and omits `--runtime-image` and `--runtime-image-digest`.
 
-The
-[`examples/integrations/`](https://github.com/invarlock/invarlock/tree/main/examples/integrations)
-directory contains maintained artifact-producing journeys for Hugging Face,
-PEFT, TorchAO, GGUF/llama.cpp, TensorRT-LLM, Hugging Face vision-text, and LM
-Evaluation Harness, plus the compact Inspect AI bridge. OpenAI Evals has a
-maintained native adapter without retained signed-journey evidence. The
-[model-change workflow guide](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/change-scenarios.md)
-maps common model and runtime changes to native execution, optional-runtime, or
-import boundaries.
+**Recheck a hosted service.** Your harness records fresh executions, service
+configuration and observation windows. InvarLock compares those captured facts
+and verifies the resulting evidence offline. Hosted identity describes the
+observed service; it does not claim access to hidden model weights. Your scheduler
+initiates periodic comparisons—verifying old evidence does not measure the
+service again.
 
-## Hand off acceptance
+## Inspect real retained examples
 
-The detailed signed verification receipt remains the replayable technical
-result. An optional in-toto/DSSE acceptance attestation transports that result
-and its exact subject binding. The artifact recipient still applies separate
-envelope and receipt trust, independent envelope and evidence freshness,
-contract-version, signer-status, and verdict policy.
+The repository includes signed evidence, receipts and replay instructions from
+actual model runs. Each reference establishes its declared workflow and scope:
 
-Recipients can consume the acceptance envelope with a standalone reference
-verifier and maintained OPA/Rego or CUE policy configuration. The example
-authenticates the envelope and embedded receipt, then applies current recipient
-policy. Its conformance fixtures cover an accepted delivery, policy rejection,
-subject tampering, an untrusted signer, stale evidence, and an unsupported
-contract.
+| Reference | Retained work |
+| --- | --- |
+| [Native model and runtime comparisons](https://github.com/invarlock/invarlock/tree/main/public_evidence) | Pinned text, GGUF, vision-text and TensorRT-LLM comparisons |
+| [Evaluator handoffs](https://github.com/invarlock/invarlock/blob/main/examples/evaluator-qualification/signed-transactions/README.md) | 400-record Qwen3.5 9B Harness and Inspect journeys; a Gemma instruction-to-QAT comparison |
+| [Hosted HTTP capture](https://github.com/invarlock/invarlock/blob/main/examples/hosted-service/references/mistral-7b-http/README.md) | 400 paired cases from distinct Mistral 7B base and instruction checkpoints behind a local HTTP service |
+| [Likelihood comparison](https://github.com/invarlock/invarlock/blob/main/examples/captured-results/references/mistral-7b-likelihood/README.md) | Distinct Mistral 7B checkpoints on 400 fixed narrative continuations |
+| [Bounded judge comparison](https://github.com/invarlock/invarlock/blob/main/examples/judge-measurements/references/k2-32b-luna-xhigh-heldout/README.md) | 10,260 retained ratings across 1,710 QA and extraction cases, with offline replay |
 
-Acceptance-policy interoperability applies current recipient policy to the
-authenticated projection. `invarlock verify` performs complete evidence-pack
-replay. See the
-[policy-engine interoperability reference](https://github.com/invarlock/invarlock/blob/main/docs/reference/policy-engine-interop.md).
+A comparative pass is not proof of adequate task quality or representative
+production performance. The local HTTP example does not qualify an external
+provider; repeated judge ratings are not additional independent cases.
 
-> **Compatibility note:** v0.13 evidence and receipts remain permanently
-> verifiable and permanently ingestible as first-class dossier inputs. Every
-> acceptance outcome remains controlled by the recipient's current policy.
+## What verification establishes
 
-## Providers and diagnostics
+A recipient supplies its expected identities, policy and signer trust through a
+channel independent of the submitted bundle. InvarLock checks the package and
+reconstructs the supported analysis against those expectations. Native runtime
+bindings and imported observations retain different provenance claims.
 
-Hugging Face Transformers is the built-in reference provider and supports both
-built-in metrics. First-party optional GGUF/llama.cpp, TensorRT-LLM, and Hugging
-Face vision-text packages are independently installable runtime integrations
-with their own dependency sets. The vision-text add-in supports exact-match
-comparisons over authenticated prompt and image parts. See
-[runtime providers](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/runtime-providers.md).
+Verification checks retained evidence; it does not independently rerun the
+original model execution. It does not establish that the chosen benchmark covers
+production traffic, that a rubric captures every requirement, or that a passing
+comparison authorizes deployment. Read the
+[assurance case](https://github.com/invarlock/invarlock/blob/main/docs/assurance/assurance-case.md)
+and [trust model](https://github.com/invarlock/invarlock/blob/main/docs/security/trust-model.md)
+for the precise guarantees and assumptions.
 
-Spectral, random-matrix, and variance summaries live in the optional
-`invarlock-diagnostics` package. They are observation-only diagnostics. Their
-canonical JSON can be attached to the signed bundle and appears in a separate
-report section. The selected paired comparison and policy remain the sole
-technical-verdict inputs. See
-[diagnostics](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/diagnostics.md).
+For artifact-delivery automation, optional
+[acceptance attestations](https://github.com/invarlock/invarlock/blob/main/docs/reference/acceptance-attestations.md)
+and [OPA/Rego or CUE policies](https://github.com/invarlock/invarlock/blob/main/docs/reference/policy-engine-interop.md)
+consume the authenticated result under recipient-controlled policy.
+v0.13 evidence and receipts remain verifiable and ingestible; acceptance always
+uses the recipient's current policy. InvarLock is pre-1.0, with explicit artifact
+format versions and a Python API that may evolve between minor releases.
 
-## Documentation
+## Documentation and contributing
 
-- **Run and review:** [getting started](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/getting-started.md),
-  [evaluation requests](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/evaluation-request.md),
-  [schedule and policy](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/schedule-and-policy.md), and
-  [evidence and verification](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/evidence-and-verification.md).
-- **Understand the claim:** [assurance case](https://github.com/invarlock/invarlock/blob/main/docs/assurance/assurance-case.md),
-  [decision semantics](https://github.com/invarlock/invarlock/blob/main/docs/assurance/decision-semantics.md), and
-  [trust model](https://github.com/invarlock/invarlock/blob/main/docs/security/trust-model.md).
-- **Integrate:** [CLI](https://github.com/invarlock/invarlock/blob/main/docs/reference/cli.md),
-  [contracts](https://github.com/invarlock/invarlock/blob/main/docs/reference/contracts.md),
-  [judge measurements](https://github.com/invarlock/invarlock/blob/main/docs/reference/judge-measurements.md),
-  [acceptance attestations](https://github.com/invarlock/invarlock/blob/main/docs/reference/acceptance-attestations.md),
-  [compatibility covenant](https://github.com/invarlock/invarlock/blob/main/docs/reference/compatibility.md),
-  [evaluator qualification](https://github.com/invarlock/invarlock/blob/main/docs/reference/evaluator-qualification.md),
-  [policy-engine interoperability](https://github.com/invarlock/invarlock/blob/main/docs/reference/policy-engine-interop.md),
-  [runtime providers](https://github.com/invarlock/invarlock/blob/main/docs/reference/runtime-providers.md), and
-  [Python API](https://github.com/invarlock/invarlock/blob/main/docs/reference/api-guide.md).
+- [Getting started](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/getting-started.md) · [Examples](https://github.com/invarlock/invarlock/tree/main/examples) · [CLI](https://github.com/invarlock/invarlock/blob/main/docs/reference/cli.md) · [Python API](https://github.com/invarlock/invarlock/blob/main/docs/reference/api-guide.md)
+- [Contributing](https://github.com/invarlock/invarlock/blob/main/CONTRIBUTING.md) for development setup and required checks.
+- [Discussions](https://github.com/invarlock/invarlock/discussions) for questions and integration ideas; [Issues](https://github.com/invarlock/invarlock/issues) for reproducible bugs.
+- [Security policy](https://github.com/invarlock/invarlock/blob/main/SECURITY.md) for private vulnerability reports.
 
-InvarLock is pre-1.0. Canonical artifact formats carry explicit format versions;
-the Python embedding facade may evolve between minor releases.
-
-Questions and design discussions belong in
-[GitHub Discussions](https://github.com/invarlock/invarlock/discussions). Report
-bugs through [GitHub Issues](https://github.com/invarlock/invarlock/issues) and
-security concerns through
-[SECURITY.md](https://github.com/invarlock/invarlock/blob/main/SECURITY.md).
-
-If you ship or receive derived model artifacts and want to co-publish a real
-evidence-and-receipt handoff using the open engine, start a
-[design-partner discussion](https://github.com/invarlock/invarlock/discussions/new?category=ideas).
-
-Apache-2.0 — see the
-[license](https://github.com/invarlock/invarlock/blob/main/LICENSE).
+Apache-2.0. See [LICENSE](https://github.com/invarlock/invarlock/blob/main/LICENSE)
+and [third-party notices](https://github.com/invarlock/invarlock/blob/main/THIRD_PARTY_NOTICES.md)
+for dependency and retained-data terms.
