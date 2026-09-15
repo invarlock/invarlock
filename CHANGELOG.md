@@ -9,28 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Aligned the documentation overview, user guides, API and assurance references
-  with native, captured and judge workflows. Corrected receipt-verification
-  examples, scorer authorization, hosted identity and report semantics; clarified
-  required integration keys and coordinated release-package coverage. Updated
-  the workflow diagram for judge and hosted-service inputs and completed the
-  root distribution and retained-data notices.
-
-- Reorganized the root README around a runnable signed-evidence quickstart,
-  the three built-in scorers, supported integration routes and retained examples.
-  Detailed contracts and runtime setup remain in the linked guides.
-
-- Refined evidence reports with aligned comparison identities, collapsible shared
-  settings, labelled interval scales and change requirements, metric navigation,
-  readable configuration previews and compact result summaries. Assurance checks
-  appear beside the verdict, score counts beneath their values, and comparison
-  fields and decision checks stack into labelled rows on small screens. HTML,
-  Markdown and terminal views share comparison grouping; adverse overviews open
-  automatically. Reports support the system dark theme with a light print view. Captured CLI and
-  SDK reports share presentation assembly while retaining their validation
-  boundaries. Captured HTTP request context and complete exact-match counts
-  remain distinct from hidden service instructions and missing observations.
-
+- Added bounded HTTP capture and a separate installed-wheel recipient handoff
+  for declared text-completion profiles. A fixed task-outcome example retains
+  resulting files and executable check results, rather than judging a completion
+  message alone; it does not qualify arbitrary coding agents.
 - Added explicit hosted-service identity to captured runs, binding configuration,
   harness and observation windows without asserting immutable model weights.
   Documented periodic and incident-triggered requalification through fresh
@@ -96,22 +78,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   explicit; report rendering preserves evidence and does not establish
   independent recipient acceptance.
 
-- Hardened captured JSONL imports, artifact attestation and retained-reference
-  replay against oversized, replaced or non-regular inputs; escaped hostile
-  control characters in dynamic evaluation, verification, setup, reporting,
-  evaluator qualification and XML output; rejected request mode changes during
-  loading and run-only controls on import requests; and closed raw file
-  descriptors and incomplete report outputs when stream construction fails.
-
-- Consolidated receipt, report, evaluator-qualification and runtime-sidecar file
-  publication around private staging and retained file descriptors. Publication
-  rejects substituted sources and changed parent directories, synchronizes the
-  destination entry, and preserves completed or competing files on failure.
-  Captured evidence retains its original staging identity through publication;
-  artifact attestation checks both the file and its ancestor directories.
-  Linux workers can publish sidecars beneath writable output mounts that allow
-  traversal without directory listing.
-
 - Added the complete 4,000-pair K2 Horizon 32B routing captured reference with
   an unchanged signed pack, independent recipient replay and source attribution.
   Replay preserves the recorded regression; it adds no native runtime
@@ -174,6 +140,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Refined evidence reports with aligned comparison identities, collapsible shared
+  settings, labelled interval scales and change requirements, metric navigation,
+  readable configuration previews and compact result summaries. Assurance checks
+  appear beside the verdict, score counts beneath their values, and comparison
+  fields and decision checks stack into labelled rows on small screens. HTML,
+  Markdown and terminal views share comparison grouping; adverse overviews open
+  automatically. Reports support the system dark theme with a light print view. Captured CLI and
+  SDK reports share presentation assembly while retaining their validation
+  boundaries. Captured HTTP request context and complete exact-match counts
+  remain distinct from hidden service instructions and missing observations.
+
+- Aligned the documentation overview, user guides, API and assurance references
+  with native, captured and judge workflows. Corrected receipt-verification
+  examples, scorer authorization, hosted identity and report semantics; clarified
+  required integration keys and coordinated release-package coverage. Updated
+  the workflow diagram for judge and hosted-service inputs and completed the
+  root distribution and retained-data notices.
+
+- Reorganized the root README around a runnable signed-evidence quickstart,
+  the three built-in scorers, supported integration routes and retained examples.
+  Detailed contracts and runtime setup remain in the linked guides.
+
+- Split Python 3.13 coverage into four disjoint concurrent groups and removed
+  duplicate behavior runs. The required gate still enforces the same combined,
+  domain and per-file coverage thresholds; Python 3.12 remains a separate gate.
+  The 50,000-record signed-recipient case runs without coverage tracing, while
+  the 12,000-record case remains instrumented. Local verification uses bounded
+  parallel workers, and per-test timings are retained for diagnosis.
+- Matched dependency caches to installed workflow locks, removed duplicate docs
+  builds, extended pre-commit checks to all pull requests, cancelled obsolete
+  hygiene runs and included all five add-in source trees in security analysis.
+
 - Added a complete multi-result overview and metric tabs to HTML reports, with
   scope grouping, keyboard navigation, direct links and a Show all view. All
   outcomes remain visible in the overview and every metric is included in print.
@@ -218,6 +216,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unchanged.
 
 ### Fixed
+
+- Hardened captured JSONL imports, artifact attestation and retained-reference
+  replay against oversized, replaced or non-regular inputs; escaped hostile
+  control characters in dynamic evaluation, verification, setup, reporting,
+  evaluator qualification and XML output; rejected request mode changes during
+  loading and run-only controls on import requests; and closed raw file
+  descriptors and incomplete report outputs when stream construction fails.
+
+- Consolidated receipt, report, evaluator-qualification and runtime-sidecar file
+  publication around private staging and retained file descriptors. Publication
+  rejects substituted sources and changed parent directories, synchronizes the
+  destination entry, and preserves completed or competing files on failure.
+  Captured evidence retains its original staging identity through publication;
+  artifact attestation checks both the file and its ancestor directories.
+  Linux workers can publish sidecars beneath writable output mounts that allow
+  traversal without directory listing.
+
+- Bound installed dependency exceptions to the exact approved lock, wheel and
+  installed payload, with owner-only audit reports and rejection of ambiguous
+  metadata. The time-bounded Accelerate exception tracked in [#227](https://github.com/invarlock/invarlock/issues/227)
+  remains an explicit residual risk, not an upstream vulnerability fix.
+- Retry transient pinned policy-engine installation failures without relaxing
+  artifact checksum validation.
 
 - Restored the evaluator image build inputs excluded by the root Docker context
   allowlist and removed obsolete paths. Build-input checks cover current Harness,
