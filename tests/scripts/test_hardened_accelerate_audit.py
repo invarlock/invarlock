@@ -204,6 +204,78 @@ def test_local_uv_component_is_included_in_upstream_audit(surface):
     assert components[0].remediation["wheel_sha256"] == surface.proof["wheel_sha256"]
 
 
+@pytest.mark.parametrize(
+    "requirement",
+    ["accelerate>=1.14.0", "accelerate @ https://example.invalid/accelerate.whl"],
+)
+def test_accelerate_requirements_cannot_evade_exact_pin_validation(
+    surface, requirement
+):
+    surface.lock.write_text(requirement + "\n")
+    with pytest.raises(ValueError, match="exact authenticated pin"):
+        cve_audit.parse_requirement_lock(surface.lock, surface.root)
+
+
+@pytest.mark.parametrize("mutation", ["missing-version", "duplicate", "editable"])
+def test_uv_inventory_rejects_ambiguous_or_unscannable_accelerate(surface, mutation):
+    package = (
+        '[[package]]\nname = "accelerate"\nversion = "1.14.0"\n'
+        'source = { registry = "https://pypi.org/simple" }\n'
+    )
+    if mutation == "missing-version":
+        package = package.replace('version = "1.14.0"\n', "")
+    elif mutation == "duplicate":
+        package *= 2
+    else:
+        package = package.replace(
+            '{ registry = "https://pypi.org/simple" }', '{ editable = "." }'
+        )
+    lock = surface.root / "uv.lock"
+    lock.write_text("version = 1\n" + package)
+    message = (
+        "unsupported Accelerate lock source"
+        if mutation == "editable"
+        else "missing or duplicate Accelerate uv identity"
+    )
+    with pytest.raises(ValueError, match=message):
+        cve_audit.parse_uv_lock(lock, surface.root)
+
+
+@pytest.mark.parametrize("mutation", [None, "lock", "inventory"])
+def test_cve_report_rechecks_authenticated_inputs_after_query(
+    surface, monkeypatch, mutation
+):
+    def query(components, batch_size, *, enrich):
+        assert len(components) == 1
+        assert components[0].scan_version == "1.14.0"
+        if mutation == "lock":
+            surface.lock.write_text(surface.lock.read_text() + "# changed\n")
+        elif mutation == "inventory":
+            (surface.lock.parent / "added.txt").write_text("another==2.0\n")
+        return {components[0].key: [{"id": "PYSEC-2026-3804"}]}
+
+    monkeypatch.setattr(cve_audit, "query_osv_batch", query)
+    args = cve_audit.parse_args(["--repo-root", str(surface.root)])
+    if mutation:
+        message = (
+            "lock changed during CVE audit"
+            if mutation == "lock"
+            else "remediation binding changed during CVE audit"
+        )
+        with pytest.raises(ValueError, match=message):
+            cve_audit.build_report(args)
+    else:
+        report = cve_audit.build_report(args)
+        assert len(report["findings"]) == 1
+        assert report["findings"][0]["status"] == "remediated"
+        assert report["raw_osv_results"][0]["version"] == "1.14.0"
+        assert report["sources"]["inventory_sha256"] == {
+            "requirements/workflows/hf.txt": hashlib.sha256(
+                surface.lock.read_bytes()
+            ).hexdigest()
+        }
+
+
 def test_enrichment_cannot_replace_unknown_id_with_remediated_id(surface, monkeypatch):
     component = cve_audit.parse_requirement_lock(surface.lock, surface.root)[0]
     monkeypatch.setattr(

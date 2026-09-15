@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import runpy
+import subprocess
 import sys
 from datetime import date, timedelta
 from pathlib import Path
@@ -304,3 +306,47 @@ def test_requirement_scan_handles_external_paths_and_ignores_unpinned_lines(
         == 7
     )
     assert observed == ["pip-audit", "-r", str(requirement)]
+
+
+@pytest.mark.parametrize("surface", ["requirements", "installed"])
+def test_direct_script_entrypoint_fails_closed_before_scanner(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, surface: str
+) -> None:
+    script = Path(__file__).resolve().parents[2] / "scripts/security/run_pip_audit.py"
+    report = tmp_path / "audit.json"
+    if surface == "requirements":
+        requirement = tmp_path / "requirements.txt"
+        requirement.write_text(
+            "accelerate==1.14.0+invarlock.1 --hash=sha256:" + "0" * 64 + "\n"
+            "-r unbound-dependencies.txt\n",
+            encoding="utf-8",
+        )
+        arguments = ["--requirement", str(requirement)]
+        error = "lock requires exact marker-free hashed package pins"
+    else:
+        arguments = [
+            "--path",
+            str(tmp_path / "site-packages"),
+            "--installed-lock",
+            "requirements/workflows/hf.txt",
+        ]
+        error = "bound installed mode requires one --path and all installed binding/report options"
+
+    def unexpected_scan(*_args, **_kwargs):
+        pytest.fail("invalid binding reached the external vulnerability scanner")
+
+    monkeypatch.chdir(tmp_path)
+    # Match Python's sibling-module lookup when executing this file directly.
+    monkeypatch.syspath_prepend(str(script.parent))
+    monkeypatch.setattr(sys, "argv", [str(script), *arguments, "--report", str(report)])
+    monkeypatch.setattr(subprocess, "run", unexpected_scan)
+
+    with pytest.raises(SystemExit) as result:
+        runpy.run_path(str(script), run_name="__main__")
+
+    assert result.value.code == 1
+    payload = json.loads(report.read_text(encoding="utf-8"))
+    assert payload["status"] == "blocked"
+    assert error in payload["error"]
+    assert payload["remediated_findings"] == []
+    assert "scanner_command" not in payload
