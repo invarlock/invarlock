@@ -128,6 +128,11 @@ while strengthening evidence verification, runtime isolation and release checks.
 
 ### Removed
 
+- **Public inference extras:** the core `hf` and vision-text `runtime` extras
+  are replaced by maintained runtime images and source-checkout dependency
+  groups. Bootstrap the verified runtime wheelhouse before `uv sync --group hf`;
+  development and CI tooling extras no longer install PEFT or TorchAO. The
+  lightweight core install remains unchanged.
 - **Separate captured command and contracts:** use captured v2 requests through
   `evaluate`, directory packs through `verify` and `report`, and the
   `invarlock.engine` SDK in place of the separate captured-comparison namespace
@@ -185,11 +190,12 @@ while strengthening evidence verification, runtime isolation and release checks.
   still block readiness.
 - **Dependency auditing:** update affected tooling and remove unused NLTK/ROUGE
   exposure from restricted evaluator images while retaining authenticated upstream
-  audit inputs. Installed exceptions bind the approved lock, wheel and payload,
-  reject ambiguous metadata and keep audit reports owner-only. The time-bounded
-  Accelerate exception tracked in [#227](https://github.com/invarlock/invarlock/issues/227)
-  remains a residual risk, not an upstream fix. Pinned policy-engine installation
-  retries preserve artifact checksum validation.
+  audit inputs. Maintained HF environments use an authenticated, deterministic
+  `accelerate==1.14.0+invarlock.1` wheel that hardens checkpoint loading and
+  replaces the temporary Accelerate exception. Audits bind the derived wheel,
+  exact locks and installed payload, retain raw upstream findings and reject
+  new advisories or changed artifacts. Pinned policy-engine installation retries
+  preserve artifact checksum validation.
 
 ## [0.15.0] - 2026-08-16
 

@@ -43,18 +43,6 @@ Issues = "https://github.com/invarlock/invarlock/issues"
 Changelog = "https://github.com/invarlock/invarlock/blob/v0.15.0/CHANGELOG.md"
 
 [project.optional-dependencies]
-# Canonical built-in Hugging Face runtime. GGUF and TensorRT-LLM are separate
-# first-party distributions under addins/.
-hf = [
-  "accelerate>=1.14.0",
-  "torch>=2.11.0,!=2.12.0",
-  "transformers>=5.14.1",
-  "safetensors>=0.8.0",
-  "protobuf>=4.25",
-  "sentencepiece>=0.2.2",
-  "tiktoken>=0.9.0",
-]
-
 # Development dependencies
 dev = [
   "pytest>=9.1.1",
@@ -73,8 +61,6 @@ dev = [
   "build>=0.10.0",
   "wheel>=0.48.0",
   "twine>=4.0.0",
-  "peft==0.20.0",
-  "torchao==0.18.0",
 ]
 
 ci = [
@@ -90,8 +76,6 @@ ci = [
   "build>=0.10.0",
   "wheel>=0.48.0",
   "twine>=4.0.0",
-  "peft==0.20.0",
-  "torchao==0.18.0",
 ]
 
 docs-ci = [
@@ -121,13 +105,34 @@ security-ci = [
   "cyclonedx-bom>=4.1",
 ]
 
+# Runtime preparation is source-bound and uses the verified generated wheelhouse.
+# Public extras contain tooling only; they cannot supply this local wheel.
 [dependency-groups]
+hf = [
+  "accelerate==1.14.0+invarlock.1",
+  "torch>=2.11.0,!=2.12.0",
+  "transformers>=5.14.1",
+  "safetensors>=0.8.0",
+  "protobuf>=4.25",
+  "sentencepiece>=0.2.2",
+  "tiktoken>=0.9.0",
+]
+runtime-test = [
+  {include-group = "hf"},
+  "peft==0.20.0",
+  "torchao==0.18.0",
+]
 example-peft = [
+  {include-group = "hf"},
   "peft==0.20.0",
 ]
 example-torchao = [
+  {include-group = "hf"},
   "torchao==0.18.0",
 ]
+
+[tool.uv]
+find-links = ["runtime/wheels"]
 
 [project.entry-points."invarlock.runtime_providers"]
 hf_transformers = "invarlock.runtime_providers.hf_transformers:HFTransformersProvider"

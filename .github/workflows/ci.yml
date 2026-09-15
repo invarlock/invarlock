@@ -89,9 +89,12 @@ jobs:
           version: "0.10.10"
       - name: Install dependencies
         run: |
-          python -m pip install --require-hashes -r requirements/workflows/ci-hf-py313.txt
+          python scripts/security/build_hardened_accelerate_wheel.py bootstrap
+          python -m pip install --require-hashes --find-links runtime/wheels -r requirements/workflows/ci-hf-py313.txt
           python -m build --wheel --no-isolation
           python -m pip install --no-deps --force-reinstall dist/*.whl
+      - name: Check installed hardened Accelerate APIs
+        run: python -I tests/scripts/hardened_accelerate_checks.py
       - name: Install actionlint
         run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
       - name: Exercise installed captured evaluation workflows
@@ -150,7 +153,8 @@ jobs:
           version: "0.10.10"
       - name: Install dependencies
         run: |
-          python -m pip install --require-hashes -r requirements/workflows/ci-hf-py312.txt
+          python scripts/security/build_hardened_accelerate_wheel.py bootstrap
+          python -m pip install --require-hashes --find-links runtime/wheels -r requirements/workflows/ci-hf-py312.txt
           python -m build --wheel --no-isolation
           python -m pip install --no-deps --force-reinstall dist/*.whl
       - name: Run minimum-Python tests
@@ -183,7 +187,8 @@ jobs:
           cache-dependency-path: requirements/workflows/ci-hf-py313.txt
       - name: Install dependencies
         run: |
-          python -m pip install --require-hashes -r requirements/workflows/ci-hf-py313.txt
+          python scripts/security/build_hardened_accelerate_wheel.py bootstrap
+          python -m pip install --require-hashes --find-links runtime/wheels -r requirements/workflows/ci-hf-py313.txt
           python -m build --wheel --no-isolation
           python -m pip install --no-deps --force-reinstall dist/*.whl
       - name: Collect disjoint test coverage
@@ -222,7 +227,8 @@ jobs:
           cache-dependency-path: requirements/workflows/ci-hf-py313.txt
       - name: Install dependencies
         run: |
-          python -m pip install --require-hashes -r requirements/workflows/ci-hf-py313.txt
+          python scripts/security/build_hardened_accelerate_wheel.py bootstrap
+          python -m pip install --require-hashes --find-links runtime/wheels -r requirements/workflows/ci-hf-py313.txt
           python -m build --wheel --no-isolation
           python -m pip install --no-deps --force-reinstall dist/*.whl
       - name: Download coverage measurements
@@ -275,10 +281,13 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: |
-          python -m pip install --require-hashes -r requirements/workflows/ci-hf-py313.txt
+          python scripts/security/build_hardened_accelerate_wheel.py bootstrap
+          python -m pip install --require-hashes --find-links runtime/wheels -r requirements/workflows/ci-hf-py313.txt
           python -m pip install --require-hashes -r requirements/workflows/docs-ci-py313.txt
           python -m build --wheel --no-isolation
           python -m pip install --no-deps --force-reinstall dist/*.whl
+      - name: Check installed hardened Accelerate APIs
+        run: python -I tests/scripts/hardened_accelerate_checks.py
       - name: Install documentation linters
         run: npm ci
       - name: Install actionlint
@@ -312,6 +321,7 @@ jobs:
         run: python scripts/security/run_pip_audit.py
       - name: Audit maintained dependency locks
         run: |
+          python scripts/security/build_hardened_accelerate_wheel.py bootstrap
           python scripts/security/cve_audit.py \
             --out-json artifacts/supply-chain/cve-audit.json \
             --out-md artifacts/supply-chain/cve-audit.md

@@ -99,9 +99,13 @@ install:  ## Install the core package
 	$(MAKE) ensure-python
 	$(PIP) install -e .
 
-dev-install:  ## Install development dependencies
+dev-install: runtime-wheelhouse  ## Install development and runtime test dependencies
 	$(MAKE) ensure-python
-	$(PIP) install -e ".[dev]"
+	uv sync --locked --extra dev --group runtime-test
+
+.PHONY: runtime-wheelhouse
+runtime-wheelhouse:  ## Build and verify the pinned hardened Accelerate wheel
+	$(PYTHON) scripts/security/build_hardened_accelerate_wheel.py bootstrap
 
 lock-sync:  ## Check that uv.lock matches pyproject.toml
 	UV_NO_CACHE=1 uv lock --check
@@ -316,7 +320,11 @@ coverage-maintenance:  ## Measure maintained repository checks and security tool
 		tests/scripts/test_sync_packaged_contracts.py \
 		tests/scripts/test_sync_packaged_public_evidence.py \
 		tests/scripts/test_prepare_qualification_suites.py \
+		tests/scripts/test_accelerate_checkpoint_files.py \
 		tests/scripts/test_build_cache_free_lm_eval_wheel.py \
+		tests/scripts/test_build_hardened_accelerate_wheel.py \
+		tests/scripts/test_hardened_accelerate_audit.py \
+		tests/scripts/test_hardened_accelerate_installed.py \
 		tests/scripts/test_build_restricted_openai_evals_wheel.py \
 		tests/scripts/test_refresh_pinned_requirements.py \
 		tests/scripts/test_cve_audit.py \
@@ -429,57 +437,57 @@ evaluator-upstream-qualification:  ## Reproduce the retained historical corpora 
 	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py execute-replayable
 	$(MAKE) evaluator-qualification
 
-evaluator-replayable-corpus:  ## Re-execute and check the pinned Qwen3 model corpus
+evaluator-replayable-corpus: runtime-wheelhouse  ## Re-execute and check the pinned Qwen3 model corpus
 	PYTHONPATH=src:. HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
-		uv run --isolated --locked --extra hf python \
+		uv run --isolated --locked --group hf python \
 		examples/evaluator-qualification/authoritative/generate_cases.py --check
 
 acceptance-policy-interop:  ## Run standalone OPA and CUE acceptance-policy fixtures
 	$(PYTHON) examples/policy-engine-interop/build_fixtures.py --check
 	$(PYTHON) examples/policy-engine-interop/run.py --opa "$(OPA)" --cue "$(CUE)"
 
-example-hf-transformers:  ## Run a real one-command Hugging Face comparison
-	PYTHONPATH=src uv run --isolated --locked --extra hf python \
+example-hf-transformers: runtime-wheelhouse  ## Run a real one-command Hugging Face comparison
+	PYTHONPATH=src uv run --isolated --locked --group hf python \
 		-m examples.integrations.launch hf-transformers $(EXAMPLE_ARGS)
 
-example-hf-vision-text:  ## Compare two pinned Qwen2-VL checkpoints on an authenticated image fixture
-	PYTHONPATH=src:addins/multimodal/src uv run --isolated --locked --extra hf \
+example-hf-vision-text: runtime-wheelhouse  ## Compare two pinned Qwen2-VL checkpoints on an authenticated image fixture
+	PYTHONPATH=src:addins/multimodal/src uv run --isolated --locked --group hf \
 		--with ./addins/multimodal python \
 		-m examples.integrations.launch hf-vision-text $(EXAMPLE_ARGS)
 
-example-peft-lora:  ## Train and merge with PEFT, then evaluate, verify, and report
-	PYTHONPATH=src uv run --isolated --locked --extra hf --group example-peft python \
+example-peft-lora: runtime-wheelhouse  ## Train and merge with PEFT, then evaluate, verify, and report
+	PYTHONPATH=src uv run --isolated --locked --group hf --group example-peft python \
 		-m examples.integrations.launch peft-lora $(EXAMPLE_ARGS)
 
-example-torchao-int8:  ## Quantize with TorchAO, then evaluate, verify, and report
-	PYTHONPATH=src uv run --isolated --locked --extra hf --group example-torchao python \
+example-torchao-int8: runtime-wheelhouse  ## Quantize with TorchAO, then evaluate, verify, and report
+	PYTHONPATH=src uv run --isolated --locked --group hf --group example-torchao python \
 		-m examples.integrations.launch torchao-int8 $(EXAMPLE_ARGS)
 
 example-gguf-llama-cpp:  ## Compare two pinned GGUF quantizations with llama.cpp
 	PYTHONPATH=src:addins/gguf/src uv run --isolated --locked --with . \
 		--with ./addins/gguf python -m examples.integrations.gguf_llama_cpp $(EXAMPLE_ARGS)
 
-example-gguf-deployment:  ## Compare a pinned BF16 profile with a source-derived Q5_K_M GGUF
-	PYTHONPATH=src:addins/gguf/src uv run --isolated --locked --with '.[hf]' \
+example-gguf-deployment: runtime-wheelhouse  ## Compare a pinned BF16 profile with a source-derived Q5_K_M GGUF
+	PYTHONPATH=src:addins/gguf/src uv run --isolated --locked --group hf \
 		--with ./addins/gguf python -m examples.integrations.gguf_deployment $(EXAMPLE_ARGS)
 
 example-spdx-ai-observation:  ## Check the bounded SPDX 3.0.1 AI observation fixture
 	PYTHONPATH=src:. $(PYTHON) -m examples.integrations.spdx_ai_observation --check
 
-example-lm-evaluation-harness:  ## Import real per-record LM Evaluation Harness output
-	PYTHONPATH=src:. uv run --isolated --locked --extra hf python \
+example-lm-evaluation-harness: runtime-wheelhouse  ## Import real per-record LM Evaluation Harness output
+	PYTHONPATH=src:. uv run --isolated --locked --group hf python \
 		examples/integrations/lm-evaluation-harness/launch.py $(EXAMPLE_ARGS)
 
-example-inspect-ai:  ## Run Inspect AI through the signed evaluator transaction
-	PYTHONPATH=src:. uv run --isolated --locked --extra hf python \
+example-inspect-ai: runtime-wheelhouse  ## Run Inspect AI through the signed evaluator transaction
+	PYTHONPATH=src:. uv run --isolated --locked --group hf python \
 		examples/integrations/inspect-ai/launch.py $(EXAMPLE_ARGS)
 
-example-openai-evals:  ## Run OpenAI Evals through the signed evaluator transaction
-	PYTHONPATH=src:. uv run --isolated --locked --extra hf python \
+example-openai-evals: runtime-wheelhouse  ## Run OpenAI Evals through the signed evaluator transaction
+	PYTHONPATH=src:. uv run --isolated --locked --group hf python \
 		examples/integrations/openai-evals/launch.py $(EXAMPLE_ARGS)
 
-example-tensorrt-llm:  ## Compare BF16 and calibrated FP8 Qwen3 TensorRT-LLM engines
-	PYTHONPATH=src:addins/tensorrt_llm/src:. uv run --isolated --locked --extra hf \
+example-tensorrt-llm: runtime-wheelhouse  ## Compare BF16 and calibrated FP8 Qwen3 TensorRT-LLM engines
+	PYTHONPATH=src:addins/tensorrt_llm/src:. uv run --isolated --locked --group hf \
 		--with . --with ./addins/tensorrt_llm python \
 		examples/integrations/tensorrt-llm/showcase.py $(EXAMPLE_ARGS)
 
@@ -534,8 +542,8 @@ hf-provider-smoke:  ## Exercise the canonical built-in Hugging Face provider
 
 local-hf-pipeline-smoke: hf-provider-smoke  ## CI alias for the built-in provider smoke
 
-local-hf-pipeline-smoke-locked:  ## Run the built-in provider smoke in the locked environment
-	uv run --isolated --locked --extra hf --extra ci $(MAKE) hf-provider-smoke
+local-hf-pipeline-smoke-locked: runtime-wheelhouse  ## Run the built-in provider smoke in the locked environment
+	uv run --isolated --locked --group runtime-test --extra ci $(MAKE) hf-provider-smoke
 
 container-front-door-smoke: runtime-image  ## Run the host-to-container evaluation smoke
 	INVARLOCK_RUN_CONTAINER_SMOKE=1 INVARLOCK_CONTAINER_ENGINE=$(CONTAINER_ENGINE) \
@@ -710,12 +718,12 @@ workflow-lint: actionlint  ## Run workflow linting
 
 security: supply-chain-security cve-audit  ## Run supply-chain security gates
 
-supply-chain-security:  ## Generate an SBOM and audit the isolated tool environment
+supply-chain-security: runtime-wheelhouse  ## Generate an SBOM and audit the isolated tool environment
 	@command -v uv >/dev/null 2>&1 || { echo "uv is required" >&2; exit 1; }
 	$(SECURITY_RUN) bash -c 'scripts/security/generate_sbom.sh --scope tool-environment --python "$$(command -v python)" "$(SECURITY_ARTIFACT_DIR)/sbom.json"'
 	$(SECURITY_RUN) python scripts/security/run_pip_audit.py
 
-cve-audit:  ## Audit locked dependencies against OSV
+cve-audit: runtime-wheelhouse  ## Audit locked dependencies against OSV
 	@command -v uv >/dev/null 2>&1 || { echo "uv is required" >&2; exit 1; }
 	$(SECURITY_RUN) python scripts/security/cve_audit.py \
 		--out-json "$(SECURITY_ARTIFACT_DIR)/cve-audit.json" \
@@ -847,7 +855,7 @@ runtime-smoke:  ## Check the canonical runtime image imports
 		--tmpfs "/tmp:rw,noexec,nosuid,nodev,size=4g" \
 		--env HOME=/tmp --env PYTHONDONTWRITEBYTECODE=1 \
 		--entrypoint python $(RUNTIME_IMAGE) \
-		-c "import accelerate, safetensors, torch, transformers; assert accelerate.__version__ == '1.14.0'; assert safetensors.__version__ == '0.8.0'; assert transformers.__version__ == '5.14.1'; print('runtime image imports ok')"
+		-c "import accelerate, safetensors, torch, transformers; assert accelerate.__version__ == '1.14.0+invarlock.1'; assert safetensors.__version__ == '0.8.0'; assert transformers.__version__ == '5.14.1'; print('runtime image imports ok')"
 
 runtime-smoke-podman: CONTAINER_ENGINE=podman
 runtime-smoke-podman: runtime-smoke  ## Smoke the runtime image with Podman
@@ -860,7 +868,7 @@ runtime-smoke-cuda:  ## Confirm the CUDA runtime imports and sees an NVIDIA GPU
 		--tmpfs "/tmp:rw,noexec,nosuid,nodev,size=4g" \
 		--env HOME=/tmp --env PYTHONDONTWRITEBYTECODE=1 \
 		--entrypoint python $(RUNTIME_IMAGE_CUDA) \
-		-c "import os; import accelerate, safetensors, torch, transformers; assert accelerate.__version__ == '1.14.0'; assert safetensors.__version__ == '0.8.0'; assert transformers.__version__ == '5.14.1'; assert torch.__version__ == '2.13.0+cu126'; assert torch.version.cuda == '12.6'; assert torch.cuda.is_available(); assert os.environ.get('TORCH_DISABLE_NATIVE_JIT') == '1'; left = torch.ones((1, 64, 1), device='cuda'); right = torch.ones((1, 1, 11), device='cuda'); assert tuple(torch.bmm(left, right).shape) == (1, 64, 11); print(torch.cuda.get_device_name(0))"
+		-c "import os; import accelerate, safetensors, torch, transformers; assert accelerate.__version__ == '1.14.0+invarlock.1'; assert safetensors.__version__ == '0.8.0'; assert transformers.__version__ == '5.14.1'; assert torch.__version__ == '2.13.0+cu126'; assert torch.version.cuda == '12.6'; assert torch.cuda.is_available(); assert os.environ.get('TORCH_DISABLE_NATIVE_JIT') == '1'; left = torch.ones((1, 64, 1), device='cuda'); right = torch.ones((1, 1, 11), device='cuda'); assert tuple(torch.bmm(left, right).shape) == (1, 64, 11); print(torch.cuda.get_device_name(0))"
 
 runtime-smoke-cuda-podman: CONTAINER_ENGINE=podman
 runtime-smoke-cuda-podman: runtime-smoke-cuda  ## Smoke the CUDA runtime image with Podman
@@ -873,7 +881,7 @@ runtime-smoke-cuda129:  ## Confirm the CUDA 12.9 runtime executes on an NVIDIA G
 		--tmpfs "/tmp:rw,noexec,nosuid,nodev,size=4g" \
 		--env HOME=/tmp --env PYTHONDONTWRITEBYTECODE=1 \
 		--entrypoint python $(RUNTIME_IMAGE_CUDA129) \
-		-c "import os; import accelerate, safetensors, torch, transformers; assert accelerate.__version__ == '1.14.0'; assert safetensors.__version__ == '0.8.0'; assert transformers.__version__ == '5.14.1'; assert torch.__version__ == '2.13.0+cu129'; assert torch.version.cuda == '12.9'; assert torch.cuda.is_available(); assert os.environ.get('TORCH_DISABLE_NATIVE_JIT') == '1'; left = torch.ones((1, 64, 1), device='cuda'); right = torch.ones((1, 1, 11), device='cuda'); assert tuple(torch.bmm(left, right).shape) == (1, 64, 11); print(torch.cuda.get_device_name(0))"
+		-c "import os; import accelerate, safetensors, torch, transformers; assert accelerate.__version__ == '1.14.0+invarlock.1'; assert safetensors.__version__ == '0.8.0'; assert transformers.__version__ == '5.14.1'; assert torch.__version__ == '2.13.0+cu129'; assert torch.version.cuda == '12.9'; assert torch.cuda.is_available(); assert os.environ.get('TORCH_DISABLE_NATIVE_JIT') == '1'; left = torch.ones((1, 64, 1), device='cuda'); right = torch.ones((1, 1, 11), device='cuda'); assert tuple(torch.bmm(left, right).shape) == (1, 64, 11); print(torch.cuda.get_device_name(0))"
 
 ##@ Housekeeping
 pre-commit:  ## Run configured pre-commit hooks

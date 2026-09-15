@@ -1241,3 +1241,20 @@ def test_repo_hygiene_covers_integration_branch_and_renames() -> None:
     )
     assert "--diff-filter=ACMR" in generated["run"]
     assert "--diff-filter=ACMR" in large["run"]
+
+
+def test_runtime_workflow_installs_verify_the_derived_wheel_before_resolution() -> None:
+    for path in sorted(WORKFLOWS.glob("*.yml")):
+        for step in _steps(_load(path)):
+            command = str(step.get("run", ""))
+            for line in command.splitlines():
+                if "pip install" not in line or not any(
+                    lock in line for lock in ("/ci-hf-", "/hf-py")
+                ):
+                    continue
+                assert "--find-links runtime/wheels" in line, (path, step)
+                prefix = command.split(line, 1)[0]
+                assert (
+                    "python scripts/security/build_hardened_accelerate_wheel.py bootstrap"
+                    in prefix
+                ), (path, step)

@@ -4,9 +4,8 @@ absl-py==2.5.0 \
     --hash=sha256:0c996f25c0490700fadabe6351630f6111534fa0ae252cc6d2014ea3b141135f \
     --hash=sha256:0f17b89f2a4eaaedc4f28c622998aa690564b3012a396a4ffad0821007fe03ba
     # via rouge-score
-accelerate==1.14.0 \
-    --hash=sha256:41b9c4377a54e0b460a959b0defa1b736e4ca0a2373252d9a539964c2afe3c8d \
-    --hash=sha256:e94390c2863b873be18f623f9df48a0d8fe5eff13ea7f1a00092b0a7904888c6
+accelerate==1.14.0+invarlock.1 \
+    --hash=sha256:5406d926d81114b891df4d2abf27ba08d4b11c2c085ec1261d0bfc2d7e4225a6
     # via
     #   -c requirements/workflows/runtime-image.in
     #   lm-eval

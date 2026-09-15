@@ -175,8 +175,10 @@ authority. They may be equal when both sides intentionally used one runtime.
 ## Provider is unavailable
 
 The base package includes the HF text provider and can authenticate its local
-snapshot identity for import mode without Torch or Transformers. Install
-`invarlock[hf]` before run-mode execution. GGUF, TensorRT-LLM, and Hugging Face
+snapshot identity for import mode without Torch or Transformers. Run-mode
+execution requires the maintained HF runtime image; host-side model preparation
+uses the [source runtime setup](runtime-providers.md#hugging-face-transformers).
+GGUF, TensorRT-LLM, and Hugging Face
 vision-text providers are separate first-party add-ins and must be installed
 and qualified in their required runtimes. A
 request naming an undiscoverable provider fails before evidence publication.

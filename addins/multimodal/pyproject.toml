@@ -12,18 +12,6 @@ license = "Apache-2.0"
 license-files = ["LICENSE"]
 dependencies = ["invarlock==0.15.0", "pillow>=11.3,<13"]
 
-[project.optional-dependencies]
-runtime = [
-  "accelerate>=1.14.0",
-  "protobuf>=4.25",
-  "safetensors>=0.8.0",
-  "sentencepiece>=0.2.1",
-  "tiktoken>=0.9.0",
-  "torch>=2.11.0,!=2.12.0",
-  "torchvision>=0.26.0",
-  "transformers>=5.14.1",
-]
-
 [project.entry-points."invarlock.runtime_providers"]
 hf_vision_text = "invarlock_addins.multimodal.provider:HFVisionTextProvider"
 

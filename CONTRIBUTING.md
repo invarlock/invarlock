@@ -31,7 +31,9 @@ environment, and install the development dependencies:
 ```bash
 python3.13 -m venv .venv
 source .venv/bin/activate
-python -m pip install -e ".[dev,hf]"
+python -m pip install uv==0.10.10
+python scripts/security/build_hardened_accelerate_wheel.py bootstrap
+uv sync --locked --extra dev --group runtime-test
 npm ci
 ```
 
@@ -44,6 +46,10 @@ python -m pip install uv==0.10.10
 go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
 ```
 
+The bootstrap verifies and builds the pinned hardened Accelerate wheel in
+`runtime/wheels`. Repository runtime groups use that wheel; the public tooling
+extras do not install model execution dependencies.
+
 Add Go's binary directory to `PATH`. These tools are not installed by the
 Python development extra.
 
@@ -51,7 +57,9 @@ For an exact Linux x86_64 CI reproduction, create a separate Python 3.13
 environment and run:
 
 ```bash
-python -m pip install --require-hashes -r requirements/workflows/ci-hf-py313.txt
+python scripts/security/build_hardened_accelerate_wheel.py bootstrap
+python -m pip install --require-hashes --find-links runtime/wheels \
+  -r requirements/workflows/ci-hf-py313.txt
 python -m build --wheel --no-isolation
 python -m pip install --no-deps --force-reinstall dist/*.whl
 ```

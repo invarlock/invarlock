@@ -128,3 +128,7 @@ benchmarks/results/
 
 # Worktree scratch dirs
 /.worktrees/
+
+# Verified runtime dependencies are rebuilt from authenticated source inputs.
+/runtime/wheels/*.whl
+/runtime/wheels/.upstream/

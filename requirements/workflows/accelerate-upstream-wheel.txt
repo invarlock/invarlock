@@ -1,0 +1,4 @@
+# Authenticated build input only; never install this upstream wheel into a runtime.
+# Update together with scripts/security/build_hardened_accelerate_wheel.py.
+accelerate==1.14.0 \
+    --hash=sha256:e94390c2863b873be18f623f9df48a0d8fe5eff13ea7f1a00092b0a7904888c6

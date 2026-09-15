@@ -8,7 +8,14 @@ documentation, release, security, and runtime-image builds.
 `requirements/workflows/` contains the complete maintained lock surface. The
 core and tooling locks stay independent of a model runtime. Hugging Face locks
 resolve the published Torch distribution for their target platform, while
-runtime-image locks select the container's Torch backend explicitly.
+runtime-image locks select the container's Torch backend explicitly. All
+maintained HF closures select `accelerate==1.14.0+invarlock.1`, built and verified
+from the authenticated upstream wheel by
+`scripts/security/build_hardened_accelerate_wheel.py bootstrap`. Run bootstrap
+before installing those locks with `--find-links runtime/wheels`; the lock
+authenticates the derived wheel hash. OCI builds use the same derivation.
+`accelerate-upstream-wheel.txt` records the build input only and must not be
+installed as a runtime dependency.
 The CPU and aarch64 locks share `runtime-image.in`. The CUDA runtime uses
 `runtime-image-cu126.in` so its platform-specific wheel closure remains
 explicit while matching the patched Torch release used by the CPU images.
@@ -33,8 +40,8 @@ coordinated local release wheels. Both are compiled from
 `release-install.in`, which is the exact union of the external base
 dependencies declared by the core and five optional first-party
 distributions. That closure includes NumPy for diagnostics and Pillow for the
-vision-text host package. Heavy inference stacks exposed only through optional
-runtime extras are deliberately outside this coordinated base-install gate.
+vision-text host package. Heavy inference stacks in repository dependency groups and maintained runtime
+images are outside this coordinated base-install gate.
 
 These workflow locks cover repository automation and runtime-image builds; they
 are not a substitute for each distribution's declared metadata. The release
@@ -55,7 +62,8 @@ Refresh them with:
 bash scripts/security/refresh_pinned_requirements.sh
 ```
 
-That compiler refreshes the workflow locks from the repository's ordinary
+The compiler first bootstraps and verifies the derived runtime wheel. It then
+refreshes the workflow locks from the repository's ordinary
 runtime and tooling inputs. Two minimal bootstrap surfaces are maintained
 separately:
 

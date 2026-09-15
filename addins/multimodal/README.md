@@ -12,22 +12,20 @@ through InvarLock's runtime-provider ABI. It supports one bounded transaction:
 - `exact_match` evidence through the ordinary `evaluate`, `verify`, and
   `report` path.
 
-The base add-in declares Pillow for execution-free host preflight; the
-`[runtime]` extra adds the model inference stack. The core supplies the
+The base add-in declares Pillow for execution-free host preflight. The
+maintained runtime image supplies the model inference stack, including the
+source-derived hardened Accelerate wheel. The core supplies the
 ordered, content-addressed input contract. This add-in
 supplies image decoding, Hugging Face processor behavior, and vision-text
 inference, keeping the integration independently installable and ready for
 separate qualification.
 
 Install the base wheel in the host environment used for preflight and provider
-discovery. Install the inference extra only in an environment that executes the
-model; the maintained runtime image supplies those heavier dependencies:
+discovery. Model execution uses the maintained runtime image:
 
 ```console
 PYTHON=/path/to/venv/bin/python
 "$PYTHON" -m pip install invarlock-runtime-hf-vision-text
-# Development outside the maintained image only:
-"$PYTHON" -m pip install 'invarlock-runtime-hf-vision-text[runtime]'
 ```
 
 The install above is the standalone conformance path. Maintained qualification

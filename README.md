@@ -197,6 +197,9 @@ additional runtime profiles. Native run mode uses a caller-authorized,
 digest-addressed Docker or Podman image. Follow the
 [getting-started guide](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/getting-started.md)
 for artifact pins, runtime setup and independent verification inputs.
+Host-side model preparation uses the matching checkout's
+[HF runtime group](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/runtime-providers.md#hugging-face-transformers)
+after bootstrapping its verified hardened Accelerate wheel.
 The [import request](https://github.com/invarlock/invarlock/blob/main/examples/request.yaml)
 uses complete retained provider sidecars and omits `--runtime-image` and `--runtime-image-digest`.
 

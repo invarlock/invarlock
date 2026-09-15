@@ -10,6 +10,8 @@ FROM scratch AS runtime-inputs
 COPY requirements/workflows/runtime-image-py312.txt /requirements/workflows/runtime-image-py312.txt
 COPY requirements/workflows/runtime-image-py312-aarch64.txt /requirements/workflows/runtime-image-py312-aarch64.txt
 COPY requirements/workflows/runtime-wheel-build-py312.txt /requirements/workflows/runtime-wheel-build-py312.txt
+COPY scripts/security/build_hardened_accelerate_wheel.py scripts/security/accelerate_checkpoint_files.py scripts/security/build_cache_free_lm_eval_wheel.py /runtime-build/scripts/security/
+COPY requirements/workflows/accelerate-upstream-wheel.txt /requirements/workflows/accelerate-upstream-wheel.txt
 COPY pyproject.toml README.md LICENSE MANIFEST.in /project/
 COPY contracts /project/contracts
 COPY src /project/src
@@ -22,6 +24,8 @@ ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH}
 COPY --from=runtime-inputs /requirements/workflows/runtime-wheel-build-py312.txt /tmp/runtime-wheel-build.txt
 COPY --from=runtime-inputs /project /project
+COPY --from=runtime-inputs /runtime-build /runtime-build
+RUN python /runtime-build/scripts/security/build_hardened_accelerate_wheel.py bootstrap --output-directory /wheelhouse
 RUN python -m pip install \
       --require-hashes \
       --no-deps \
@@ -70,8 +74,11 @@ RUN --mount=type=bind,from=runtime-inputs,source=/requirements,target=/mnt/requi
     esac)" \
     && python -m pip install \
       --require-hashes \
+      --find-links /mnt/wheelhouse \
       --extra-index-url "${PYTORCH_EXTRA_INDEX_URL}" \
       -r "${requirements_path}" \
+    && install -d /opt/invarlock/runtime-wheels \
+    && install -m 0644 /mnt/wheelhouse/accelerate-*.whl /opt/invarlock/runtime-wheels/ \
     && set -- /mnt/wheelhouse/invarlock-*.whl \
     && test "$#" -eq 1 \
     && install -d /opt/invarlock/artifacts \

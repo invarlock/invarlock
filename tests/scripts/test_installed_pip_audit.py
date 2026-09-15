@@ -651,3 +651,167 @@ def test_report_descriptor_closes_when_stream_adoption_fails(surface, monkeypatc
     else:
         os.close(opened[0])
         pytest.fail("report descriptor leaked when stream creation failed")
+
+
+@pytest.fixture
+def hardened_surface(surface, monkeypatch):
+    from scripts.security import hardened_accelerate_audit as hardened
+
+    shutil.rmtree(surface.root / surface.dist)
+    surface.dist = f"accelerate-{hardened.HARDENED_VERSION}.dist-info"
+    surface.files = _wheel(surface.wheel, "accelerate", hardened.HARDENED_VERSION)
+    _install(surface.root, surface.files, surface.dist)
+    surface.lock.write_text(
+        f"accelerate=={hardened.HARDENED_VERSION} --hash=sha256:{_digest(surface.wheel.read_bytes())}\n"
+    )
+    _set(surface, "--installed-lock-sha256", _digest(surface.lock.read_bytes()))
+    surface.policy.write_text(json.dumps({"owner": "test", "entries": []}))
+    surface.raw["dependencies"][0]["vulns"][0]["id"] = sorted(
+        hardened.REMEDIATED_ADVISORIES
+    )[0]
+    trusted_data = surface.wheel.read_bytes()
+
+    def verify(path):
+        if path.read_bytes() != trusted_data:
+            raise ValueError("hardened wheel differs from trusted derivation")
+        return {
+            "package": "accelerate",
+            "version": hardened.HARDENED_VERSION,
+            "upstream_version": hardened.UPSTREAM_VERSION,
+            "wheel_sha256": _digest(trusted_data),
+            "derivation": {"verified": True},
+            "remediated_advisories": sorted(hardened.REMEDIATED_ADVISORIES),
+        }
+
+    monkeypatch.setattr(hardened, "verify_wheel", verify)
+    surface.scan_requirements = []
+
+    def scanner(command, **kwargs):
+        surface.calls.append(command)
+        surface.scan_requirements.append(
+            Path(command[command.index("--requirement") + 1]).read_text()
+        )
+        assert "--no-deps" in command and "--disable-pip" in command
+        assert "--ignore-vuln" not in command
+        return SimpleNamespace(
+            returncode=1,
+            stdout=json.dumps(surface.raw).encode(),
+            stderr=b"upstream finding",
+        )
+
+    monkeypatch.setattr(binding.subprocess, "run", scanner)
+    return surface
+
+
+def test_hardened_installed_audit_scans_upstream_identity_and_retains_raw(
+    hardened_surface,
+):
+    surface = hardened_surface
+    assert audit.main(surface.args) == 0
+    report = json.loads(surface.report.read_text())
+    assert report["status"] == "remediated"
+    assert report["accepted_findings"] == []
+    assert report["raw_findings"] == surface.raw
+    assert (
+        report["remediated_findings"][0]["finding"]
+        == surface.raw["dependencies"][0]["vulns"][0]
+    )
+    assert (
+        report["binding"]["installed_distribution_inventory"]["accelerate"]
+        == "1.14.0+invarlock.1"
+    )
+    assert report["binding"]["scan_distribution_inventory"]["accelerate"] == "1.14.0"
+    assert surface.scan_requirements == [
+        "accelerate==1.14.0\ninvarlock==0.15.0\npip==26.2\n"
+    ]
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "unknown-id",
+        "alias",
+        "derived-scan",
+        "skip",
+        "modified-wheel",
+        "modified-payload",
+        "additional-hash",
+        "missing-package",
+    ],
+)
+def test_hardened_installed_remediation_fails_closed(hardened_surface, mutation):
+    surface = hardened_surface
+    finding = surface.raw["dependencies"][0]["vulns"][0]
+    if mutation in {"unknown-id", "alias"}:
+        if mutation == "alias":
+            finding["aliases"] = [finding["id"]]
+        finding["id"] = "GHSA-new-advisory"
+    elif mutation == "derived-scan":
+        surface.raw["dependencies"][0]["version"] = "1.14.0+invarlock.1"
+    elif mutation == "skip":
+        surface.raw["dependencies"][0] = {
+            "name": "accelerate",
+            "skip_reason": "unknown local version",
+        }
+    elif mutation == "modified-wheel":
+        surface.wheel.write_bytes(surface.wheel.read_bytes() + b"changed")
+        surface.lock.write_text(
+            f"accelerate==1.14.0+invarlock.1 --hash=sha256:{_digest(surface.wheel.read_bytes())}\n"
+        )
+        _set(surface, "--installed-lock-sha256", _digest(surface.lock.read_bytes()))
+    elif mutation == "modified-payload":
+        (surface.root / "accelerate/__init__.py").write_bytes(b"changed")
+    elif mutation == "additional-hash":
+        surface.lock.write_text(
+            surface.lock.read_text().strip() + " --hash=sha256:" + "0" * 64 + "\n"
+        )
+        _set(surface, "--installed-lock-sha256", _digest(surface.lock.read_bytes()))
+    elif mutation == "missing-package":
+        surface.raw["dependencies"].pop()
+    assert audit.main(surface.args) == 1
+    report = json.loads(surface.report.read_text())
+    assert report["status"] == "blocked"
+    assert report.get("error") or report["blocking_findings"]
+
+
+def test_plain_path_cannot_skip_local_accelerate(hardened_surface):
+    with pytest.raises(SystemExit, match="requires all installed binding"):
+        audit.main(
+            [
+                "--path",
+                str(hardened_surface.root),
+                "--allowlist",
+                str(hardened_surface.policy),
+            ]
+        )
+    assert hardened_surface.calls == []
+
+
+def test_source_only_lock_cannot_authorize_installed_runtime(hardened_surface):
+    surface = hardened_surface
+    source = surface.lock.parent / "accelerate-upstream-wheel.txt"
+    source.write_bytes(surface.lock.read_bytes())
+    _set(
+        surface,
+        "--installed-lock",
+        "requirements/workflows/accelerate-upstream-wheel.txt",
+    )
+    assert audit.main(surface.args) == 1
+    assert "source-only wheel lock is not a runtime" in surface.report.read_text()
+    assert surface.calls == []
+
+
+def test_inventory_normalizes_distribution_spelling_but_rejects_ambiguity(tmp_path):
+    root = tmp_path / "site"
+    metadata = root / "jaraco.classes-3.4.0.dist-info"
+    metadata.mkdir(parents=True)
+    (metadata / "METADATA").write_text("Name: jaraco.classes\nVersion: 3.4.0\n")
+    assert binding._inventory(root)[0] == {"jaraco-classes": "3.4.0"}
+    alias = root / "jaraco_classes-3.4.0.dist-info"
+    shutil.copytree(metadata, alias)
+    with pytest.raises(ValueError, match="duplicate installed distribution"):
+        binding._inventory(root)
+    shutil.rmtree(alias)
+    (metadata / "METADATA").write_text("Name: other\nVersion: 3.4.0\n")
+    with pytest.raises(ValueError, match="installed dist-info identity mismatch"):
+        binding._inventory(root)

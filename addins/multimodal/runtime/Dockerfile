@@ -6,7 +6,7 @@ ARG SOURCE_DATE_EPOCH=0
 FROM scratch AS runtime-inputs
 COPY requirements/workflows/multimodal-runtime-py312.txt /requirements/multimodal-runtime-py312.txt
 COPY requirements/workflows/runtime-wheel-build-py312.txt /requirements/runtime-wheel-build-py312.txt
-COPY addins/multimodal/pyproject.toml addins/multimodal/README.md /addin/
+COPY addins/multimodal/pyproject.toml addins/multimodal/README.md addins/multimodal/LICENSE /addin/
 COPY addins/multimodal/src /addin/src
 
 FROM ${WHEEL_BUILD_BASE} AS addin-wheel
