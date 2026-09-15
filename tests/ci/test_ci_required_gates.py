@@ -35,6 +35,7 @@ def test_ci_runs_the_repository_gates() -> None:
         "verify-fast",
         "minimum-python",
         "coverage",
+        "coverage-tests",
         "verify-full",
         "supply-chain",
     }
@@ -60,7 +61,7 @@ def test_ci_runs_the_repository_gates() -> None:
     fast = jobs["verify-fast"]
     _assert_core_wheel_install(fast)
     assert _step(fast, "Set up uv")["with"]["version"] == "0.10.10"
-    assert _step(fast, "Run fast repository gates")["run"] == "make verify-fast"
+    assert _step(fast, "Run repository checks")["run"] == "make verify-checks"
     assert _step(fast, "Build, install, and validate distributions")["run"] == (
         "make addins-install-smoke inspect-judge-sdk-test"
     )
@@ -82,15 +83,33 @@ def test_ci_runs_the_repository_gates() -> None:
 
     coverage = jobs["coverage"]
     _assert_core_wheel_install(coverage)
-    capacity = _step(coverage, "Check full-capacity signed verification")
+    capacity = _step(fast, "Check full-capacity signed verification")
     assert capacity["run"] == (
         "python -m pytest -q 'tests/evaluation_comparison/test_capacity.py::"
         "test_full_capacity_signed_independent_recipient[50000]'"
     )
-    assert coverage["steps"].index(capacity) < coverage["steps"].index(
-        _step(coverage, "Enforce coverage")
+    assert set(coverage["needs"]) == {"coverage-tests", "verify-fast"}
+    assert "always()" in coverage["if"]
+    assert _step(coverage, "Enforce coverage")["run"] == "make coverage-report"
+    shards = jobs["coverage-tests"]
+    _assert_core_wheel_install(shards)
+    assert shards["strategy"]["fail-fast"] is False
+    assert set(shards["strategy"]["matrix"]["shard"]) == {
+        "core",
+        "examples",
+        "support",
+        "addins",
+    }
+    assert (
+        _step(shards, "Retain coverage and test timings")["with"][
+            "include-hidden-files"
+        ]
+        is True
     )
-    assert _step(coverage, "Enforce coverage")["run"] == "make coverage-enforce"
+    assert (
+        _step(coverage, "Download coverage measurements")["with"]["pattern"]
+        == "coverage-shard-*"
+    )
 
     supply_chain = jobs["supply-chain"]
     audit = _step(supply_chain, "Audit maintained dependency locks")
@@ -207,3 +226,30 @@ sleep() { :; }
     else:
         assert all("opa@v1.17.0" in line for line in calls)
     assert "GOSUMDB" not in install and "GOINSECURE" not in install
+
+
+@pytest.mark.parametrize(
+    "shards,checks,accepted",
+    [
+        ("success", "success", True),
+        ("failure", "success", False),
+        ("success", "failure", False),
+        ("skipped", "success", False),
+        ("cancelled", "success", False),
+        ("success", "skipped", False),
+        ("", "success", False),
+    ],
+)
+def test_coverage_gate_rejects_incomplete_execution(shards, checks, accepted):
+    import os
+
+    workflow = _load(".github/workflows/ci.yml")
+    command = _step(
+        workflow["jobs"]["coverage"], "Require successful test and capacity checks"
+    )["run"]
+    result = subprocess.run(
+        ["bash", "-c", command],
+        env={**os.environ, "SHARD_RESULT": shards, "CHECK_RESULT": checks},
+        check=False,
+    )
+    assert (result.returncode == 0) is accepted

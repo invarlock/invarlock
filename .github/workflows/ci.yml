@@ -105,8 +105,10 @@ jobs:
           INVARLOCK_KIT_BINARY_SHA256="$(sha256sum "$INVARLOCK_KIT_BINARY" | cut -d ' ' -f1)"
           export INVARLOCK_KIT_BINARY_SHA256
           python -m pytest -q tests/integration/test_modelkit_cli.py
-      - name: Run fast repository gates
-        run: make verify-fast
+      - name: Run repository checks
+        run: make verify-checks
+      - name: Check full-capacity signed verification
+        run: python -m pytest -q 'tests/evaluation_comparison/test_capacity.py::test_full_capacity_signed_independent_recipient[50000]'
       - name: Build, install, and validate distributions
         run: make addins-install-smoke inspect-judge-sdk-test
       - name: Lint workflows
@@ -147,10 +149,14 @@ jobs:
       - name: Build, install, and validate distributions
         run: make addins-install-smoke inspect-judge-sdk-test
 
-  coverage:
+  coverage-tests:
     if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.full) }}
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [core, examples, support, addins]
     env:
       PYTHON: python
       PYTHONPATH: ${{ github.workspace }}/src
@@ -168,10 +174,60 @@ jobs:
           python -m pip install --require-hashes -r requirements/workflows/ci-hf-py313.txt
           python -m build --wheel --no-isolation
           python -m pip install --no-deps --force-reinstall dist/*.whl
-      - name: Check full-capacity signed verification
-        run: python -m pytest -q 'tests/evaluation_comparison/test_capacity.py::test_full_capacity_signed_independent_recipient[50000]'
+      - name: Collect disjoint test coverage
+        run: make coverage-collect-${{ matrix.shard }} PYTEST_WORKERS=2
+      - name: Retain coverage and test timings
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: coverage-shard-${{ matrix.shard }}
+          path: artifacts/coverage/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
+  coverage:
+    if: ${{ always() && !(github.event_name == 'workflow_dispatch' && inputs.full) }}
+    needs: [coverage-tests, verify-fast]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PYTHON: python
+      PYTHONPATH: ${{ github.workspace }}/src
+    steps:
+      - name: Require successful test and capacity checks
+        env:
+          SHARD_RESULT: ${{ needs.coverage-tests.result }}
+          CHECK_RESULT: ${{ needs.verify-fast.result }}
+        run: test "$SHARD_RESULT" = success && test "$CHECK_RESULT" = success
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.13'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --require-hashes -r requirements/workflows/ci-hf-py313.txt
+          python -m build --wheel --no-isolation
+          python -m pip install --no-deps --force-reinstall dist/*.whl
+      - name: Download coverage measurements
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          pattern: coverage-shard-*
+          path: artifacts/coverage/
+          merge-multiple: true
       - name: Enforce coverage
-        run: make coverage-enforce
+        run: make coverage-report
+      - name: Retain coverage reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: coverage-reports
+          path: reports/*cov.xml
+          if-no-files-found: error
+          retention-days: 7
 
   verify-full:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.full }}
