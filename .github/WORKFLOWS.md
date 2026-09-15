@@ -5,21 +5,31 @@ Workflow YAML is linted with `make workflow-lint`.
 
 ## Continuous integration
 
-- `ci.yml` runs `verify-fast`, the Python 3.12 suite, coverage enforcement,
+- `ci.yml` runs repository checks, the Python 3.12 suite, Python 3.13 coverage,
   manual full verification, distribution checks, and the tag supply-chain
-  backstop. Its fast job also downloads a checksum-pinned KitOps executable
-  and exercises real package creation, repackaging, and recipient validation.
+  backstop. Its `verify-fast` job runs `make verify-checks`, downloads a
+  checksum-pinned KitOps executable, exercises installed package journeys and
+  checks signed verification at full capacity. Four separate coverage jobs run
+  disjoint test groups. The required `coverage` job accepts only complete,
+  successful measurements from the same source and enforces every coverage
+  threshold. Per-test timings are retained to diagnose slow runs.
 - `container-front-door-smoke.yml` builds the final runtime image and exercises
   `evaluate`, `verify`, and `report` through the installed command surface.
   It also checks network isolation with positive controls, resource limits,
   interruption, exact-container cleanup, and failed evidence publication.
-- `pre-commit.yml` runs the repository pre-commit hooks.
-- `repo-hygiene.yml` rejects generated artifacts and oversized files.
+- `pre-commit.yml` runs the repository hooks for every pull request, including
+  changes to shell scripts, TOML files and dependency locks.
+- `repo-hygiene.yml` rejects generated artifacts and oversized files. Obsolete
+  runs are cancelled; only the checks that inspect a change's history fetch it.
+
+Python dependency caches use each job's installed workflow locks as their keys.
+When adding an installation step or locked environment, include its lockfile in
+that job's `cache-dependency-path`.
 
 ## Documentation
 
-- `docs-ci.yml` lints and builds the current documentation and smoke-checks the
-  documented CLI command surface.
+- `docs-ci.yml` lints and builds the current documentation once and smoke-checks
+  the documented CLI command surface through `make docs-live-fast`.
 - `docs-publish.yml` serializes MkDocs publication to `gh-pages`. `main` pushes
   update `latest`, while the production release workflow calls it from the
   exact release tag to update the immutable version path, `latest`, and
@@ -27,7 +37,8 @@ Workflow YAML is linted with `make workflow-lint`.
 
 ## Security and release
 
-- `codeql.yml` performs static analysis.
+- `codeql.yml` analyzes core code, maintained scripts and all five shipped
+  add-in source trees.
 - `supply-chain-pr.yml` audits the core and Hugging Face install surfaces and
   scans the pull-request delta for secrets.
 - `scorecards.yml` publishes OpenSSF Scorecard results.
@@ -40,10 +51,10 @@ Workflow YAML is linted with `make workflow-lint`.
   disabled and a candidate version exercises the Linux release gates without
   creating or moving a tag.
 
-The release workflow builds, validates, attests, and publishes five Python
+The release workflow builds, validates, attests, and publishes six Python
 distributions: `invarlock`, `invarlock-diagnostics`,
-`invarlock-runtime-gguf`, `invarlock-runtime-hf-vision-text`, and
-`invarlock-runtime-tensorrt-llm`. The optional
+`invarlock-runtime-gguf`, `invarlock-runtime-hf-vision-text`,
+`invarlock-runtime-tensorrt-llm`, and `invarlock-inspect-judge`. The optional
 packages live under `addins/`; their provider-specific runtime dependencies
 stay outside the core wheel.
 Candidate and published core wheels exercise the standalone captured-evaluation workflow,

@@ -1,0 +1,16 @@
+[run]
+branch = True
+parallel = True
+relative_files = True
+patch = subprocess
+source =
+    src/invarlock
+    addins
+    scripts
+    examples
+omit =
+    */tests/*
+
+[report]
+show_missing = True
+precision = 2

@@ -66,8 +66,10 @@ Run the local gate before opening a pull request:
 make verify-fast
 ```
 
-`make verify`, `make verify-fast`, and `make coverage-enforce` run independent
-suites concurrently and use bounded pytest-xdist workers. Pass overrides as
+`make verify` and `make verify-fast` run independent suites concurrently with
+bounded pytest-xdist workers. Examples run once, separately from the other tests.
+`make coverage-enforce` runs disjoint groups with two workers per group;
+locally, one group runs at a time to avoid CPU contention. Pass overrides as
 Make command-line arguments when diagnosing a failure sequentially:
 
 ```bash
@@ -184,11 +186,21 @@ review their changes and repeat affected validation before committing.
 The complete coverage gate requires Linux descriptor execution. On another
 operating system, run the relevant portable target such as `make
 coverage-examples`, and report the full Linux result from CI separately.
-The CI coverage job first runs the 50,000-record signed-recipient capacity
-case without tracing, then runs the coverage suites. The 12,000-record case
-remains under subprocess branch coverage. Both cases retain the same verification
-assertions and watchdog; the large case is classified as slow and is also included
-in `make verify`. This separates full-capacity validation from tracing overhead.
+CI collects Python 3.13 coverage in separate core, examples, support-tooling and
+add-in jobs. Each test belongs to one group. The required `coverage` gate combines
+all four successful measurements and enforces the existing domain, per-file and
+aggregate branch thresholds. Missing, failed or mismatched measurements cannot
+pass. Test timing reports are retained with each group's coverage data.
+
+The `verify-fast` CI job runs `make verify-checks`, the installed-package journeys
+and the 50,000-record signed-recipient case without tracing. Its success is also
+required by the coverage gate. Python 3.13 behavioral tests run under coverage;
+the separate Python 3.12 suite checks the minimum supported interpreter. Local
+`make verify-fast` still includes its behavioral tests.
+
+The 12,000-record capacity case remains under subprocess branch coverage. Both
+capacity cases retain the same assertions and watchdog; the large case is
+classified as slow and is also included in `make verify`.
 
 Coverage includes newly added example launchers: successful execution in a
 separate smoke job does not collect their branch coverage. Add meaningful
