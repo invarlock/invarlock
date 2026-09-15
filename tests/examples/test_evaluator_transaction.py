@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import importlib
 import json
+import shlex
 import subprocess
 import sys
 import types
@@ -115,6 +116,28 @@ def test_evaluator_transaction_worker_images_include_flat_script_dependencies(
         assert f"/opt/invarlock/examples/{helper}" in dockerfile
     assert "COPY examples/integrations/evaluator_transaction" in dockerfile
     assert "/opt/invarlock/examples/evaluator_transaction" in dockerfile
+
+
+@pytest.mark.parametrize(
+    "evaluator", ["lm-evaluation-harness", "inspect-ai", "openai-evals"]
+)
+def test_evaluator_image_copy_inputs_are_explicitly_allowlisted(evaluator: str) -> None:
+    dockerfile = (ROOT / "examples/integrations" / evaluator / "Dockerfile").read_text(
+        encoding="utf-8"
+    )
+    rules = set((ROOT / ".dockerignore").read_text(encoding="utf-8").splitlines())
+    sources = [
+        source
+        for line in dockerfile.replace("\\\n", " ").splitlines()
+        if line.startswith("COPY ")
+        for source in shlex.split(line)[1:-1]
+    ]
+    assert sources
+    for source in sources:
+        path = ROOT / source
+        assert path.exists(), f"{evaluator} COPY input does not exist: {source}"
+        rule = f"!{source}/**" if path.is_dir() else f"!{source}"
+        assert rule in rules, f"{evaluator} COPY input is not allowlisted: {source}"
 
 
 def test_evaluator_transaction_dataset_digest_matches_the_staging_writer() -> None:
