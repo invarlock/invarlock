@@ -1,12 +1,12 @@
 <p align="center">
-  
-    
+
+
     <img
       src="https://raw.githubusercontent.com/invarlock/invarlock/v0.15.0/docs/assets/invarlock-logo.svg"
       alt="InvarLock"
       width="420"
     />
-  
+
 </p>
 
 <p align="center"><em>Evaluate model changes. Verify the evidence. Share the result.</em></p>

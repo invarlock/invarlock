@@ -30,9 +30,6 @@ def render(root: Path, project: Path) -> str:
     if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:[a-zA-Z0-9.+-]*)", version):
         raise ValueError("invalid package version")
     source = (project / "README.md").read_text()
-    # PyPI removes source elements; publish the same explicit fallback everywhere.
-    source = re.sub(r"<source\b[^>]*>", "", source)
-    source = source.replace("<picture>", "").replace("</picture>", "")
 
     def replace(match: re.Match[str]) -> str:
         url = match.group("url") or match.group("target")
@@ -72,11 +69,16 @@ def render(root: Path, project: Path) -> str:
             + (match.group("end") or match.group("close"))
         )
 
+    def markup(part: str) -> str:
+        # PyPI removes source elements; publish the explicit fallback.
+        part = re.sub(r"<source\b[^>]*>", "", part)
+        part = part.replace("<picture>", "").replace("</picture>", "")
+        return re.sub(r"(?m)^[ \t]+$", "", LINK.sub(replace, part))
+
     # Examples are literal shell/Python input, not rendered resource references.
     parts = re.split(r"(^```[^\n]*\n.*?^```[^\n]*(?:\n|$))", source, flags=re.M | re.S)
     return "".join(
-        part if index % 2 else LINK.sub(replace, part)
-        for index, part in enumerate(parts)
+        part if index % 2 else markup(part) for index, part in enumerate(parts)
     )
 
 

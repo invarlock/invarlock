@@ -81,3 +81,10 @@ def test_cli(tmp_path, monkeypatch):
     readme.main()
     monkeypatch.setattr("sys.argv", ["package_readme", "--check"])
     readme.main()
+
+
+def test_picture_cleanup_preserves_literal_examples(tmp_path):
+    source = '<p>\n  <picture>\n    <source srcset="x">\n  </picture>\n</p>\n```html\n<picture><source srcset="x"></picture>\n  \n```\n'
+    result = readme.render(tmp_path, project(tmp_path, source))
+    assert result.startswith("<p>\n\n\n\n</p>")
+    assert '```html\n<picture><source srcset="x"></picture>\n  \n```' in result
