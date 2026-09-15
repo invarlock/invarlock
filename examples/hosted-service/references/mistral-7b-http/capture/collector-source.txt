@@ -1,0 +1,911 @@
+"""Bounded OpenAI-compatible HTTP capture and offline canonical import.
+
+The HTTP collector is a source of observations, not a verifier of provider
+execution. Protocol and capture pins must reach recipients independently.
+"""
+
+from __future__ import annotations
+
+import argparse
+import base64
+import hashlib
+import http.client
+import json
+import math
+import os
+import re
+import stat
+import subprocess
+import sys
+import time
+from contextlib import contextmanager
+from datetime import UTC, datetime
+from pathlib import Path
+from urllib.parse import urlsplit
+
+MAX_FILE_BYTES = 64 * 1024 * 1024
+FORMAT = "invarlock/hosted-service-protocol-v1"
+CAPTURE_FORMAT = "invarlock/hosted-service-capture-v1"
+# Worker termination/reaping can finish after the response deadline. This
+# allowance applies only to failed deadline attempts, never to successful answers.
+DEADLINE_CLEANUP_SECONDS = 1.0
+
+
+def checked(condition, message):
+    if not condition:
+        raise ValueError(message)
+
+
+def exact(value, fields, label):
+    checked(
+        isinstance(value, dict) and set(value) == set(fields), f"invalid {label} fields"
+    )
+
+
+def encoded(value):
+    return (
+        json.dumps(
+            value,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
+        + "\n"
+    ).encode()
+
+
+def digest(raw):
+    return "sha256:" + hashlib.sha256(raw).hexdigest()
+
+
+def decode(raw):
+    def pairs(items):
+        result = {}
+        for key, value in items:
+            checked(key not in result, "duplicate JSON key")
+            result[key] = value
+        return result
+
+    def constant(value):
+        raise ValueError("non-finite JSON number")
+
+    return json.loads(raw, object_pairs_hook=pairs, parse_constant=constant)
+
+
+def contains_credential(value, token):
+    pending = [value]
+    while pending:
+        item = pending.pop()
+        if isinstance(item, str) and token in item:
+            return True
+        if isinstance(item, dict):
+            pending.extend(item)
+            pending.extend(item.values())
+        elif isinstance(item, list):
+            pending.extend(item)
+    return False
+
+
+def credential_error(raw, token):
+    if not token:
+        return None
+    if token.encode() in raw:
+        return "credential_echo"
+    try:
+        value = decode(raw)
+    except (ValueError, TypeError, RecursionError):
+        # Without a complete JSON inspection, retaining a response may retain
+        # an escaped credential. Keep only the sanitized failure classification.
+        return "uninspectable_response"
+    return "credential_echo" if contains_credential(value, token) else None
+
+
+def ordinary_parent(path):
+    checked(".." not in Path(path).parts, "parent traversal is forbidden")
+    path = Path(os.path.abspath(path))
+    for parent in (path.parent, *path.parent.parents):
+        checked(not parent.is_symlink(), "symlink parent is forbidden")
+    return path
+
+
+@contextmanager
+def parent_descriptor(path):
+    """Anchor all traversed parents without following symlinks, including races."""
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    descriptor = os.open(path.anchor, flags)
+    try:
+        for component in path.parent.parts[1:]:
+            child = os.open(component, flags, dir_fd=descriptor)
+            os.close(descriptor)
+            descriptor = child
+        yield descriptor
+    finally:
+        os.close(descriptor)
+
+
+def create_directory(path):
+    path = ordinary_parent(path)
+    with parent_descriptor(path) as parent:
+        os.mkdir(path.name, mode=0o700, dir_fd=parent)
+    return path
+
+
+def read(path):
+    checked(".." not in Path(path).parts, "parent traversal is forbidden")
+    path = ordinary_parent(path)
+    with parent_descriptor(path) as parent:
+        descriptor = os.open(
+            path.name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=parent
+        )
+    info = os.fstat(descriptor)
+    if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_FILE_BYTES:
+        os.close(descriptor)
+        raise ValueError("expected bounded regular file")
+    with os.fdopen(descriptor, "rb") as stream:
+        raw = stream.read(MAX_FILE_BYTES + 1)
+    checked(len(raw) <= MAX_FILE_BYTES, "file exceeds byte bound")
+    return raw
+
+
+def write(path, value):
+    path = ordinary_parent(path)
+    raw = encoded(value)
+    checked(len(raw) <= MAX_FILE_BYTES, "output exceeds byte bound")
+    with parent_descriptor(path) as parent:
+        descriptor = os.open(
+            path.name,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+            0o600,
+            dir_fd=parent,
+        )
+    with os.fdopen(descriptor, "wb") as stream:
+        stream.write(raw)
+    return digest(raw)
+
+
+def endpoint(url):
+    checked(isinstance(url, str) and len(url) <= 2048, "invalid endpoint")
+    value = urlsplit(url)
+    checked(
+        value.scheme in ("https", "http")
+        and value.hostname
+        and not value.username
+        and not value.password
+        and not value.query
+        and not value.fragment
+        and value.path == "/v1/chat/completions"
+        and (value.scheme == "https" or value.hostname in ("127.0.0.1", "::1")),
+        "endpoint requires HTTPS or literal loopback HTTP, without credentials or query",
+    )
+    checked(value.port is None or 1 <= value.port <= 65535, "invalid endpoint port")
+    return value
+
+
+def identity_text(value, maximum=512):
+    return (
+        isinstance(value, str)
+        and 0 < len(value) <= maximum
+        and bool(value.strip())
+        and re.search(r"[\x00-\x1f\x7f\ud800-\udfff]", value) is None
+    )
+
+
+def check_digest(value):
+    checked(
+        isinstance(value, str) and re.fullmatch(r"sha256:[0-9a-f]{64}", value),
+        "invalid SHA-256 digest",
+    )
+
+
+def validate_protocol(protocol):
+    from invarlock.engine import (
+        case_set_digest,
+        comparison_policy_digest,
+        freeze_case_set,
+    )
+
+    exact(
+        protocol,
+        {
+            "format",
+            "services",
+            "harness",
+            "configuration",
+            "limits",
+            "cases",
+            "policy",
+            "collector_source_digest",
+            "environment",
+            "journey_source_digest",
+        },
+        "protocol",
+    )
+    checked(protocol["format"] == FORMAT, "unsupported protocol")
+    checked(
+        len(encoded(protocol)) <= MAX_FILE_BYTES // 4,
+        "protocol exceeds total capture budget",
+    )
+    checked(
+        isinstance(protocol["environment"], dict)
+        and len(encoded(protocol["environment"])) <= 65536,
+        "invalid declared environment",
+    )
+    check_digest(protocol["collector_source_digest"])
+    check_digest(protocol["journey_source_digest"])
+    exact(protocol["services"], {"baseline", "subject"}, "services")
+    for service in protocol["services"].values():
+        exact(
+            service,
+            {
+                "provider",
+                "service",
+                "deployment",
+                "endpoint",
+                "model",
+                "expected_observed_model",
+                "exposed_revision",
+            },
+            "service",
+        )
+        endpoint(service["endpoint"])
+        checked(
+            all(
+                identity_text(service[k])
+                for k in ("provider", "service", "deployment", "model")
+            ),
+            "invalid service identity",
+        )
+        checked(
+            all(
+                service[k] is None or identity_text(service[k])
+                for k in ("expected_observed_model", "exposed_revision")
+            ),
+            "invalid observed identity",
+        )
+    exact(protocol["harness"], {"name", "version", "source_digest"}, "harness")
+    checked(
+        identity_text(protocol["harness"]["name"], 128)
+        and identity_text(protocol["harness"]["version"], 128),
+        "invalid harness identity",
+    )
+    check_digest(protocol["harness"]["source_digest"])
+    configuration = protocol["configuration"]
+    exact(
+        configuration, {"temperature", "system_prompt", "max_tokens"}, "configuration"
+    )
+    checked(
+        type(configuration["temperature"]) in (int, float)
+        and configuration["temperature"] == 0,
+        "temperature must be zero",
+    )
+    checked(
+        isinstance(configuration["system_prompt"], str)
+        and len(configuration["system_prompt"]) <= 16384,
+        "invalid system prompt",
+    )
+    checked(
+        type(configuration["max_tokens"]) is int
+        and 1 <= configuration["max_tokens"] <= 4096,
+        "invalid token bound",
+    )
+    limits = protocol["limits"]
+    exact(
+        limits,
+        {
+            "max_calls",
+            "max_total_output_tokens",
+            "timeout_seconds",
+            "max_response_bytes",
+            "max_wall_seconds",
+        },
+        "limits",
+    )
+    for name, maximum in (
+        ("max_calls", 1000),
+        ("max_total_output_tokens", 100000),
+        ("max_response_bytes", 1024 * 1024),
+    ):
+        checked(
+            type(limits[name]) is int and 1 <= limits[name] <= maximum,
+            f"invalid {name}",
+        )
+    checked(
+        type(limits["timeout_seconds"]) in (int, float)
+        and 0 < limits["timeout_seconds"] <= 600,
+        "invalid timeout",
+    )
+    checked(
+        type(limits["max_wall_seconds"]) in (int, float)
+        and 0 < limits["max_wall_seconds"] <= 7200,
+        "invalid window wall-time bound",
+    )
+    checked(
+        limits["max_calls"] * limits["max_response_bytes"] <= MAX_FILE_BYTES // 4,
+        "declared response budget exceeds capture bound",
+    )
+    cases = protocol["cases"]
+    checked(
+        isinstance(cases, list) and 1 <= len(cases) <= limits["max_calls"],
+        "case schedule exceeds call bound",
+    )
+    checked(
+        len(cases) * configuration["max_tokens"] <= limits["max_total_output_tokens"],
+        "case schedule exceeds token bound",
+    )
+    ids = set()
+    for case in cases:
+        exact(case, {"id", "input", "expected"}, "case")
+        checked(
+            identity_text(case["id"], 128) and case["id"] not in ids,
+            "invalid or duplicate case ID",
+        )
+        checked(
+            isinstance(case["input"], str)
+            and len(case["input"]) <= 65536
+            and isinstance(case["expected"], str)
+            and len(case["expected"]) <= 16384,
+            "cases require bounded literal text inputs and references",
+        )
+        ids.add(case["id"])
+    checked(isinstance(protocol["policy"], dict), "invalid policy")
+    comparison_policy_digest(protocol["policy"])
+    checked(
+        all(
+            metric["kind"] == "exact_match" for metric in protocol["policy"]["metrics"]
+        ),
+        "this collector requires an exact_match policy",
+    )
+    if "expected_case_set_digest" in protocol["policy"]:
+        planned = freeze_case_set([{**case, "metadata": {}} for case in cases])
+        checked(
+            case_set_digest(planned) == protocol["policy"]["expected_case_set_digest"],
+            "policy case-set pin differs from declared cases",
+        )
+    validate_export_budget(protocol)
+
+
+def load_protocol(path, expected, *, token=None):
+    check_digest(expected)
+    raw = read(path)
+    checked(digest(raw) == expected, "protocol digest mismatch")
+    secret_error = credential_error(raw, token)
+    checked(
+        secret_error is None,
+        "credential occurs in protocol"
+        if secret_error == "credential_echo"
+        else "uninspectable protocol",
+    )
+    protocol = decode(raw)
+    validate_protocol(protocol)
+    return protocol
+
+
+def timestamp():
+    return datetime.now(UTC).isoformat(timespec="microseconds").replace("+00:00", "Z")
+
+
+def request_body(protocol, role, case):
+    config = protocol["configuration"]
+    return {
+        "model": protocol["services"][role]["model"],
+        "messages": [
+            {"role": "system", "content": config["system_prompt"]},
+            {"role": "user", "content": case["input"]},
+        ],
+        "temperature": config["temperature"],
+        "max_tokens": config["max_tokens"],
+        "stream": False,
+        "n": 1,
+    }
+
+
+def service_identity(protocol, role, window):
+    from invarlock.engine import digest as object_digest
+
+    service = protocol["services"][role]
+    configuration = {
+        **protocol["configuration"],
+        "endpoint": service["endpoint"],
+        "limits": protocol["limits"],
+        "environment": protocol["environment"],
+    }
+    return {
+        "kind": "hosted_service",
+        "provider": service["provider"],
+        "service": service["service"],
+        "deployment": service["deployment"],
+        "requested_model": service["model"],
+        "observed_model": None,
+        "exposed_revision": None,
+        "configuration": configuration,
+        "configuration_digest": object_digest(configuration),
+        "harness": protocol["harness"],
+        "observation_window": window,
+    }
+
+
+def validate_export_budget(protocol):
+    """Reserve final serialized bytes before admitting any service requests."""
+    from invarlock.engine import capture_evaluator_run
+
+    pin = digest(b"")
+    window = dict.fromkeys(("started_at", "ended_at"), "9999-12-31T23:59:59.999999Z")
+    response_bytes = protocol["limits"]["max_response_bytes"]
+    # Base64 requires exactly 4*ceil(n/3) bytes. Re-encoding a decoded output
+    # string as UTF-8 JSON requires at most twice its source response bytes,
+    # including JSON received as UTF-16/32. Reserve 128 more bytes per row for
+    # error strings and elapsed-number spelling, and 8192 for observed identities.
+    response_reservation = 4 * ((response_bytes + 2) // 3) + 2 * response_bytes + 128
+    for role in ("baseline", "subject"):
+        checked(
+            sum(
+                len(encoded(request_body(protocol, role, case)))
+                for case in protocol["cases"]
+            )
+            <= MAX_FILE_BYTES,
+            "declared export byte budget exceeds file bound",
+        )
+        records = [
+            {
+                **case,
+                "output": "",
+                "error": None,
+                "context": {
+                    "http_observation": {
+                        "id": case["id"],
+                        "request": request_body(protocol, role, case),
+                        **window,
+                        "elapsed_seconds": 0,
+                        "status": None,
+                        "body_base64": "",
+                        "error": None,
+                    },
+                    "protocol_sha256": pin,
+                    "collector_source_digest": protocol["collector_source_digest"],
+                },
+            }
+            for case in protocol["cases"]
+        ]
+        run = capture_evaluator_run(
+            records,
+            source={name: protocol["harness"][name] for name in ("name", "version")},
+            run_id=f"hosted-{role}",
+            artifact_digest=None,
+            service_identity=service_identity(protocol, role, window),
+            source_digest=pin,
+        )
+        checked(
+            len(encoded(run)) + len(records) * response_reservation + 8192
+            <= MAX_FILE_BYTES,
+            "declared export byte budget exceeds file bound",
+        )
+
+
+def http_request(payload):
+    """One request, no proxy discovery, redirects, retries, or external logging."""
+    target = endpoint(payload["endpoint"])
+    kind = (
+        http.client.HTTPSConnection
+        if target.scheme == "https"
+        else http.client.HTTPConnection
+    )
+    connection = kind(target.hostname, target.port, timeout=payload["timeout_seconds"])
+    headers = {"Content-Type": "application/json", "Accept": "application/json"}
+    if payload["token"]:
+        headers["Authorization"] = "Bearer " + payload["token"]
+    try:
+        connection.request(
+            "POST", target.path, body=encoded(payload["request"]), headers=headers
+        )
+        response = connection.getresponse()
+        raw = response.read(payload["max_response_bytes"] + 1)
+        truncated = len(raw) > payload["max_response_bytes"]
+        raw = raw[: payload["max_response_bytes"]]
+        secret_error = credential_error(raw, payload["token"])
+        return {
+            "status": response.status,
+            "body_base64": None
+            if secret_error
+            else base64.b64encode(raw).decode("ascii"),
+            "error": secret_error
+            if secret_error
+            else "response_too_large"
+            if truncated
+            else None,
+        }
+    except (OSError, http.client.HTTPException):
+        return {"status": None, "body_base64": None, "error": "transport_error"}
+    finally:
+        connection.close()
+
+
+def bounded_request(payload):
+    try:
+        result = subprocess.run(
+            [sys.executable, "-I", str(Path(__file__).resolve()), "_request"],
+            input=encoded(payload),
+            env={
+                name: value
+                for name, value in os.environ.items()
+                if name in ("PATH", "HOME", "TMPDIR", "LANG", "LC_ALL", "SYSTEMROOT")
+            },
+            capture_output=True,
+            timeout=payload["timeout_seconds"],
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        return {"status": None, "body_base64": None, "error": "deadline_exceeded"}
+    if result.returncode:
+        return {"status": None, "body_base64": None, "error": "collector_worker_error"}
+    return decode(result.stdout)
+
+
+def interpret(observation, service, max_tokens=4096):
+    """Read model and optional top-level revision from successful responses.
+
+    Protocol exposed_revision is an expected value for response.revision; it
+    never supplies an observed revision when the response omits one.
+    """
+    if observation["error"] is not None:
+        return None, None, None, observation["error"]
+    if observation["status"] != 200:
+        return None, None, None, "http_status_error"
+    try:
+        response = decode(base64.b64decode(observation["body_base64"], validate=True))
+        checked(isinstance(response, dict), "invalid response")
+        model = response.get("model")
+        checked(identity_text(model), "invalid model")
+        checked(
+            service["expected_observed_model"] is None
+            or model == service["expected_observed_model"],
+            "model identity mismatch",
+        )
+        revision = response.get("revision")
+        checked(revision is None or identity_text(revision), "invalid revision")
+        checked(
+            service["exposed_revision"] is None
+            or revision == service["exposed_revision"],
+            "revision identity mismatch",
+        )
+        usage = response.get("usage")
+        checked(
+            isinstance(usage, dict)
+            and type(usage.get("completion_tokens")) is int
+            and 0 <= usage["completion_tokens"] <= max_tokens,
+            "missing or invalid completion token accounting",
+        )
+        choices = response.get("choices")
+        checked(
+            isinstance(choices, list)
+            and len(choices) == 1
+            and isinstance(choices[0], dict),
+            "invalid choices",
+        )
+        choice = choices[0]
+        checked(
+            type(choice.get("index")) is int
+            and choice["index"] == 0
+            and choice.get("finish_reason") in ("stop", "length"),
+            "invalid completion",
+        )
+        message = choice.get("message")
+        checked(
+            isinstance(message, dict)
+            and message.get("role") == "assistant"
+            and isinstance(message.get("content"), str)
+            and not message.get("tool_calls")
+            and not message.get("function_call"),
+            "invalid text completion",
+        )
+        message["content"].encode("utf-8")
+        return message["content"], model, revision, None
+    except (ValueError, TypeError, KeyError, RecursionError):
+        return None, None, None, "invalid_response"
+
+
+def token_accounting_error(observation, max_tokens):
+    if observation["status"] != 200:
+        return None
+    try:
+        result = decode(base64.b64decode(observation["body_base64"], validate=True))
+        usage = result.get("usage") if isinstance(result, dict) else None
+        count = usage.get("completion_tokens") if isinstance(usage, dict) else None
+        if type(count) is not int or count < 0:
+            return "missing_token_accounting"
+        return "output_token_limit_exceeded" if count > max_tokens else None
+    except (ValueError, TypeError, RecursionError):
+        return "missing_token_accounting"
+
+
+def check_request_duration(observation, timeout):
+    allowance = (
+        DEADLINE_CLEANUP_SECONDS if observation["error"] == "deadline_exceeded" else 0
+    )
+    checked(
+        observation["elapsed_seconds"] <= timeout + allowance,
+        "request duration exceeds budget",
+    )
+
+
+def collect(protocol_path, expected_protocol, role, output, token_env=None):
+    token = None if token_env is None else os.environ.get(token_env)
+    checked(
+        token_env is None
+        or isinstance(token, str)
+        and 1 <= len(token) <= 8192
+        and "\n" not in token
+        and "\r" not in token,
+        "missing or invalid token environment variable",
+    )
+    checked(role in ("baseline", "subject"), "invalid role")
+    protocol = load_protocol(protocol_path, expected_protocol, token=token)
+    checked(
+        digest(read(Path(__file__))) == protocol["collector_source_digest"],
+        "collector source differs from protocol",
+    )
+    deadline = time.monotonic() + protocol["limits"]["max_wall_seconds"]
+    output = create_directory(output)
+    write(output / "protocol.json", protocol)
+    started = timestamp()
+    observations = []
+    for index, case in enumerate(protocol["cases"]):
+        checked(time.monotonic() < deadline, "capture window deadline exceeded")
+        request = request_body(protocol, role, case)
+        call_started = timestamp()
+        before = time.monotonic()
+        # Persist admission before the attempt. A crash is an incomplete capture.
+        write(
+            output / f"{index:06}.attempt.json",
+            {"id": case["id"], "request": request, "started_at": call_started},
+        )
+        remaining = deadline - time.monotonic()
+        checked(remaining > 0, "capture window deadline exceeded")
+        payload = {
+            "endpoint": protocol["services"][role]["endpoint"],
+            "request": request,
+            "token": token,
+            "timeout_seconds": min(protocol["limits"]["timeout_seconds"], remaining),
+            "max_response_bytes": protocol["limits"]["max_response_bytes"],
+        }
+        result = bounded_request(payload)
+        observation = {
+            "id": case["id"],
+            "request": request,
+            "started_at": call_started,
+            "ended_at": timestamp(),
+            "elapsed_seconds": time.monotonic() - before,
+            **result,
+        }
+        accounting_error = token_accounting_error(
+            observation, protocol["configuration"]["max_tokens"]
+        )
+        if accounting_error and observation["error"] is None:
+            observation["error"] = accounting_error
+        write(output / f"{index:06}.json", observation)
+        checked(time.monotonic() < deadline, "capture window deadline exceeded")
+        check_request_duration(observation, payload["timeout_seconds"])
+        checked(accounting_error is None, "capture stopped: " + str(accounting_error))
+        observations.append(observation)
+    capture = {
+        "format": CAPTURE_FORMAT,
+        "protocol_sha256": expected_protocol,
+        "role": role,
+        "observation_window": {"started_at": started, "ended_at": timestamp()},
+        "observations": observations,
+    }
+    return write(output / "capture.json", capture)
+
+
+def export_run(protocol_path, expected_protocol, capture_path, expected_capture, role):
+    """Offline: no endpoint or signing identity is selected from imported evidence."""
+    from invarlock.engine import capture_evaluator_run
+    from invarlock.evaluation_records.identity import validate_service_identity
+
+    protocol = load_protocol(protocol_path, expected_protocol)
+    checked(
+        digest(read(Path(__file__))) == protocol["collector_source_digest"],
+        "collector source differs from protocol",
+    )
+    checked(role in ("baseline", "subject"), "invalid role")
+    check_digest(expected_capture)
+    raw = read(capture_path)
+    checked(digest(raw) == expected_capture, "capture digest mismatch")
+    capture = decode(raw)
+    exact(
+        capture,
+        {"format", "protocol_sha256", "role", "observation_window", "observations"},
+        "capture",
+    )
+    checked(
+        capture["format"] == CAPTURE_FORMAT
+        and capture["protocol_sha256"] == expected_protocol
+        and capture["role"] == role,
+        "capture binding mismatch",
+    )
+    observations = capture["observations"]
+    checked(
+        isinstance(observations, list) and len(observations) == len(protocol["cases"]),
+        "incomplete capture schedule",
+    )
+    service = protocol["services"][role]
+    records, models, revisions = [], set(), set()
+
+    def parse_time(value):
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+    window = capture["observation_window"]
+    exact(window, {"started_at", "ended_at"}, "observation window")
+    window_seconds = (
+        parse_time(window["ended_at"]) - parse_time(window["started_at"])
+    ).total_seconds()
+    checked(
+        0 <= window_seconds <= protocol["limits"]["max_wall_seconds"],
+        "capture window duration exceeds budget",
+    )
+    cumulative_seconds = 0.0
+    for observation in observations:
+        checked(isinstance(observation, dict), "invalid observation")
+        elapsed = observation.get("elapsed_seconds")
+        checked(
+            type(elapsed) in (int, float) and math.isfinite(elapsed) and elapsed >= 0,
+            "invalid duration",
+        )
+        cumulative_seconds += elapsed
+    checked(
+        cumulative_seconds <= protocol["limits"]["max_wall_seconds"],
+        "capture duration budget exceeded",
+    )
+    previous_end = capture["observation_window"]["started_at"]
+    for observation, case in zip(observations, protocol["cases"], strict=True):
+        exact(
+            observation,
+            {
+                "id",
+                "request",
+                "started_at",
+                "ended_at",
+                "elapsed_seconds",
+                "status",
+                "body_base64",
+                "error",
+            },
+            "observation",
+        )
+        checked(
+            observation["id"] == case["id"]
+            and encoded(observation["request"])
+            == encoded(request_body(protocol, role, case)),
+            "captured request or case order differs",
+        )
+        checked(
+            observation["status"] is None
+            or type(observation["status"]) is int
+            and 100 <= observation["status"] <= 599,
+            "invalid HTTP status",
+        )
+        checked(
+            observation["error"]
+            in (
+                None,
+                "credential_echo",
+                "uninspectable_response",
+                "response_too_large",
+                "transport_error",
+                "deadline_exceeded",
+                "collector_worker_error",
+                "missing_token_accounting",
+                "output_token_limit_exceeded",
+            ),
+            "invalid transport error",
+        )
+        check_request_duration(observation, protocol["limits"]["timeout_seconds"])
+        body = observation["body_base64"]
+        checked(
+            body is None
+            or isinstance(body, str)
+            and len(base64.b64decode(body, validate=True))
+            <= protocol["limits"]["max_response_bytes"],
+            "invalid response byte count",
+        )
+        checked(
+            body is not None or observation["error"] is not None,
+            "missing response without error",
+        )
+        window = {
+            "started_at": observation["started_at"],
+            "ended_at": observation["ended_at"],
+        }
+        identity = service_identity(protocol, role, window)
+        validate_service_identity(identity)
+
+        checked(
+            parse_time(previous_end)
+            <= parse_time(window["started_at"])
+            <= parse_time(window["ended_at"])
+            <= parse_time(capture["observation_window"]["ended_at"]),
+            "overlapping or out-of-window observations",
+        )
+        previous_end = window["ended_at"]
+        output, model, revision, error = interpret(
+            observation, service, protocol["configuration"]["max_tokens"]
+        )
+        if model is not None:
+            models.add(model)
+            revisions.add(revision)
+        records.append(
+            {
+                **case,
+                "output": output,
+                "error": error,
+                "context": {
+                    "http_observation": observation,
+                    "protocol_sha256": expected_protocol,
+                    "collector_source_digest": protocol["collector_source_digest"],
+                },
+            }
+        )
+    checked(len(models) <= 1, "observed model changed within capture window")
+    checked(len(revisions) <= 1, "observed revision changed within capture window")
+    identity["observed_model"] = next(iter(models), None)
+    identity["exposed_revision"] = next(iter(revisions), None)
+    identity["observation_window"] = capture["observation_window"]
+    return capture_evaluator_run(
+        records,
+        source={
+            "name": protocol["harness"]["name"],
+            "version": protocol["harness"]["version"],
+        },
+        run_id=f"hosted-{role}",
+        artifact_digest=None,
+        service_identity=identity,
+        source_digest=expected_capture,
+    )
+
+
+def main():
+    if sys.argv[1:] == ["_request"]:
+        sys.stdout.buffer.write(
+            encoded(http_request(decode(sys.stdin.buffer.read(MAX_FILE_BYTES + 1))))
+        )
+        return
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("action", choices=("collect", "export"))
+    parser.add_argument("--protocol", type=Path, required=True)
+    parser.add_argument("--expected-protocol-sha256", required=True)
+    parser.add_argument("--role", choices=("baseline", "subject"), required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--token-env")
+    parser.add_argument("--capture", type=Path)
+    parser.add_argument("--expected-capture-sha256")
+    args = parser.parse_args()
+    if args.action == "collect":
+        result = collect(
+            args.protocol,
+            args.expected_protocol_sha256,
+            args.role,
+            args.output,
+            args.token_env,
+        )
+    else:
+        checked(
+            args.capture is not None
+            and args.expected_capture_sha256 is not None
+            and args.token_env is None,
+            "export requires capture pins and no credentials",
+        )
+        result = write(
+            args.output,
+            export_run(
+                args.protocol,
+                args.expected_protocol_sha256,
+                args.capture,
+                args.expected_capture_sha256,
+                args.role,
+            ),
+        )
+    print(result)
+
+
+if __name__ == "__main__":
+    main()

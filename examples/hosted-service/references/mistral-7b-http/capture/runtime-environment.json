@@ -1,0 +1,15 @@
+{
+  "machine": "arm64",
+  "packages": {
+    "lm-eval": "0.4.12",
+    "numpy": "2.5.1",
+    "safetensors": "0.8.0",
+    "tokenizers": "0.22.2",
+    "torch": "2.13.0",
+    "transformers": "5.14.1"
+  },
+  "python": "3.12.13",
+  "release": "24.6.0",
+  "scope": "post-capture inventory with the same model interpreter and dependency search path; not an execution attestation",
+  "system": "Darwin"
+}

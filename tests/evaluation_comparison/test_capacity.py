@@ -76,7 +76,7 @@ def material(count=12000):
     return baseline, candidate, policy
 
 
-@pytest.mark.parametrize("count", [12000, 50000])
+@pytest.mark.parametrize("count", [12000, pytest.param(50000, marks=pytest.mark.slow)])
 def test_full_capacity_signed_independent_recipient(tmp_path, count):
     baseline, candidate, policy = material(count)
     key = Ed25519PrivateKey.generate()
@@ -122,8 +122,9 @@ receipt = verify_captured_receipt(
 assert receipt.ok, receipt.errors
 print((root / 'pack/reports/evaluation.report.json').read_text())
 """
-    # This is a liveness watchdog, not a latency assertion. Full-capacity replay
-    # is also traced by subprocess branch coverage while other CI suites run.
+    # This is a liveness watchdog, not a latency assertion. CI runs the 50,000-
+    # record case separately without tracing; the 12,000-record case retains
+    # subprocess branch coverage of the same signed recipient path.
     received = subprocess.run(
         [
             sys.executable,

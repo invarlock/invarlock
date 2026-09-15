@@ -492,7 +492,8 @@ def test_runtime_image_host_front_door_evaluate_verify_report_and_fail_closed(
     assert "Not performed by report" in report_text
     assert report_path.is_file()
     report_html = report_path.read_text(encoding="utf-8")
-    assert "Original decision: pass" in report_html
+    assert "Recorded policy result" in report_html
+    assert '<h1 id="decision">Policy satisfied</h1>' in report_html
     assert "Independent recipient acceptance" in report_html
     assert "Not performed by report" in report_html
 

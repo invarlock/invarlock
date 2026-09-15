@@ -16,6 +16,7 @@ from jsonschema import Draft202012Validator
 from invarlock.captured_contracts import secure_directory
 from invarlock.evaluation_record_contracts.contracts import MAX_INPUT_BYTES
 from invarlock.evaluation_records.cases import case_set_digest
+from invarlock.evaluation_records.identity import evaluated_subject_digest
 from invarlock.evaluation_records.io import run_digest
 from invarlock.evidence_pack_integrity import public_key_fingerprint
 from invarlock.evidence_pack_json import parse_json_bytes, read_regular_file_bytes
@@ -265,7 +266,7 @@ def publish_judge_evidence(
     envelope: JudgeEvidenceEnvelope = {
         "format": EVIDENCE_FORMAT,
         "decision_scope": DECISION_SCOPE,
-        "intended_subject": artifacts["subject_run.json"]["artifact_digest"],
+        "intended_subject": evaluated_subject_digest(artifacts["subject_run.json"]),
         "bindings": _bindings(artifacts),
         "signature_algorithm": "ed25519",
         "signer": None,
@@ -343,7 +344,9 @@ def replay_judge_evidence(
         raise JudgeEvidenceError(
             "judge evidence case set does not match the approved plan"
         )
-    if envelope["intended_subject"] != artifacts["subject_run.json"]["artifact_digest"]:
+    if envelope["intended_subject"] != evaluated_subject_digest(
+        artifacts["subject_run.json"]
+    ):
         raise JudgeEvidenceError(
             "judge evidence intended subject does not match the frozen run"
         )

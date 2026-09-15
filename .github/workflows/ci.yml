@@ -168,6 +168,8 @@ jobs:
           python -m pip install --require-hashes -r requirements/workflows/ci-hf-py313.txt
           python -m build --wheel --no-isolation
           python -m pip install --no-deps --force-reinstall dist/*.whl
+      - name: Check full-capacity signed verification
+        run: python -m pytest -q 'tests/evaluation_comparison/test_capacity.py::test_full_capacity_signed_independent_recipient[50000]'
       - name: Enforce coverage
         run: make coverage-enforce
 
@@ -199,6 +201,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --require-hashes -r requirements/workflows/ci-hf-py313.txt
+          python -m pip install --require-hashes -r requirements/workflows/docs-ci-py313.txt
           python -m build --wheel --no-isolation
           python -m pip install --no-deps --force-reinstall dist/*.whl
       - name: Install documentation linters

@@ -9,6 +9,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import math
 import re
 from dataclasses import dataclass, field
 from html import escape as html_escape
@@ -196,6 +197,9 @@ class IntervalView:
     threshold: float | None
     label: str
     unit: str
+    threshold_direction: str | None = None
+    neutral: float | None = None
+    method: str = ""
 
 
 @dataclass(frozen=True)
@@ -211,6 +215,10 @@ class MetricView:
     checks: tuple[CheckView, ...] = ()
     interval: IntervalView | None = None
     notes: tuple[str, ...] = ()
+    baseline_detail: str = ""
+    candidate_detail: str = ""
+    count_detail: str = ""
+    count_label: str = "Observed pairs"
 
 
 @dataclass(frozen=True)
@@ -265,56 +273,219 @@ def _status(check: CheckView) -> str:
     )
 
 
+def _interval_label(view: IntervalView, *, compact: bool = False) -> str:
+    """Name the interval without repeating its measured bounds."""
+    label = view.label
+    if compact:
+        label = label.replace("confidence interval", "CI")
+    elif view.method:
+        label += f" ({view.method})"
+    return label
+
+
+def _interval_summary(view: IntervalView, *, compact: bool = False) -> str:
+    """Format interval values for the change tile and accessible description."""
+    label = _interval_label(view, compact=compact)
+    lower = number(view.lower, signed=view.neutral == 0)
+    upper = number(view.upper, signed=view.neutral == 0)
+    return f"{label}: {lower} to {upper} {view.unit}".strip()
+
+
 def _interval(view: IntervalView) -> str:
     values = [view.lower, view.upper, view.estimate]
     if view.threshold is not None:
         values.append(view.threshold)
-    # Normalize before subtraction: finite policy bounds can span nearly the
-    # complete float range even when the observed interval is small.
+    if view.neutral is not None:
+        values.append(view.neutral)
+    # Normalize before subtraction so extreme finite bounds remain drawable.
     scale = max(1.0, *(abs(value) for value in values))
-    low, high = min(values) / scale, max(values) / scale
-    padding = (high - low) * 0.12 or max(abs(low) * 0.1, 0.01)
-    low, high = low - padding, high + padding
+    first, last = min(values) / scale, max(values) / scale
+    padding = (last - first) * 0.12 or max(abs(first) * 0.1, 0.01)
+    low, high = first - padding, last + padding
+
+    def project(normalized: float) -> float:
+        return 30 + (normalized - low) / (high - low) * 580
 
     def x(value: float) -> float:
-        return 30 + (value / scale - low) / (high - low) * 580
+        return project(value / scale)
 
-    description = f"{view.label}: {number(view.lower)} to {number(view.upper)} {view.unit}. Estimate {number(view.estimate)} {view.unit}."
-    threshold = ""
+    ticks = [first] if first == last else [first, first / 2 + last / 2, last]
+    desired_step = (last - first) * (scale / 4)
+    if desired_step > 0:
+        magnitude = 10.0 ** math.floor(math.log10(desired_step))
+        if magnitude > 0:
+            factor = desired_step / magnitude
+            step = (
+                next(value for value in (1, 2, 5, 10) if value >= factor)
+                * magnitude
+                / scale
+            )
+            first_tick, last_tick = math.floor(low / step), math.ceil(high / step)
+            axis_low, axis_high = first_tick * step, last_tick * step
+            if (
+                math.isfinite(axis_low * scale)
+                and math.isfinite(axis_high * scale)
+                and axis_low < axis_high
+                and axis_low <= first <= last <= axis_high
+            ):
+                low, high = axis_low, axis_high
+                ticks = [index * step for index in range(first_tick, last_tick + 1)]
+    description = f"{_interval_summary(view)}. Estimate {number(view.estimate, signed=view.neutral == 0)} {view.unit}."
+    graphics = []
+    legend = ""
+    allowed_legend = ""
+    neutral_legend = ""
     if view.threshold is not None:
         description += f" Policy threshold {number(view.threshold)} {view.unit}."
-        threshold = f'<line class="threshold" x1="{x(view.threshold):.2f}" x2="{x(view.threshold):.2f}" y1="12" y2="54"/>'
+        position = x(view.threshold)
+        direction = view.threshold_direction
+        if direction in {"minimum", "maximum"}:
+            left, right = (
+                (position, 610.0) if direction == "minimum" else (30.0, position)
+            )
+            graphics.append(
+                f'<rect class="allowed" x="{left:.2f}" y="18" width="{right - left:.2f}" height="42"/>'
+            )
+            allowed_legend = '<span class="chart-key"><i class="allowed-key" aria-hidden="true"></i>Allowed change region</span>'
+            description += f" Shading marks values at or {'above' if direction == 'minimum' else 'below'} the threshold."
+        legend = "Policy threshold"
+        graphics.append(
+            f'<line class="threshold" x1="{position:.2f}" x2="{position:.2f}" y1="10" y2="66"/>'
+        )
+    if view.neutral is not None:
+        position = x(view.neutral)
+        graphics.append(
+            f'<line class="neutral" x1="{position:.2f}" x2="{position:.2f}" y1="18" y2="60"/>'
+        )
+        neutral_legend = "No change"
+        description += f" No change: {number(view.neutral)} {view.unit}."
+    labels = []
+    for tick in ticks:
+        value = tick * scale
+        position = project(tick)
+        graphics.append(
+            f'<line class="tick" x1="{position:.2f}" x2="{position:.2f}" y1="60" y2="67"/>'
+        )
+        labels.append(
+            f'<span style="left:{position / 640 * 100:.2f}%">{escape(number(value))}</span>'
+        )
+
+    def annotation(value: float, text: str, kind: str) -> str:
+        percent = x(value) / 640 * 100
+        anchor = "start" if percent < 22 else "end" if percent > 78 else "middle"
+        return (
+            f'<span class="chart-label {kind} {anchor}" style="left:{percent:.2f}%">'
+            + escape(text)
+            + "</span>"
+        )
+
+    annotations = []
+    if view.threshold is not None:
+        operator = {"minimum": "≥ ", "maximum": "≤ "}.get(
+            view.threshold_direction or "", ""
+        )
+        annotations.append(
+            annotation(
+                view.threshold,
+                f"Limit {operator}{number(view.threshold)} {view.unit}".strip(),
+                "limit-label",
+            )
+        )
+    bounds = []
+    if x(view.upper) - x(view.lower) < 180:
+        midpoint = view.lower / 2 + view.upper / 2
+        bounds.append(
+            annotation(
+                midpoint, f"{number(view.lower)} to {number(view.upper)}", "bound-label"
+            )
+        )
+    else:
+        bounds.extend(
+            (
+                annotation(view.lower, number(view.lower), "bound-label"),
+                annotation(view.upper, number(view.upper), "bound-label"),
+            )
+        )
     return (
-        '<figure class="interval"><svg viewBox="0 0 640 68" role="img" aria-label="'
+        '<figure class="interval"><div class="chart-annotations" aria-hidden="true">'
+        + "".join(annotations)
+        + '</div><div class="interval-plot"><svg viewBox="0 0 640 72" role="img" aria-label="'
         + escape(description, quote=True)
-        + '"><line class="axis" x1="30" x2="610" y1="34" y2="34"/>'
-        + threshold
-        + f'<line class="range" x1="{x(view.lower):.2f}" x2="{x(view.upper):.2f}" y1="34" y2="34"/>'
-        + f'<circle class="estimate" cx="{x(view.estimate):.2f}" cy="34" r="6"/>'
-        + "</svg><figcaption>"
-        + escape(description)
+        + '">'
+        + "".join(graphics)
+        + '<line class="axis" x1="30" x2="610" y1="60" y2="60"/>'
+        + f'<line class="range" x1="{x(view.lower):.2f}" x2="{x(view.upper):.2f}" y1="38" y2="38"/>'
+        + f'<circle class="estimate" cx="{x(view.estimate):.2f}" cy="38" r="6"/>'
+        + '</svg><div class="interval-bounds" aria-hidden="true">'
+        + "".join(bounds)
+        + '</div></div><div class="axis-labels" aria-hidden="true">'
+        + "".join(labels)
+        + "</div>"
+        + '<figcaption><span class="chart-key"><i class="estimate-key" aria-hidden="true"></i>Estimate'
+        + '</span><span class="chart-key"><i class="interval-key" aria-hidden="true"></i>'
+        + escape(_interval_label(view))
+        + "</span>"
         + (
-            ' <span class="legend">Dashed line: policy threshold.</span>'
-            if threshold
+            ' <span class="chart-key"><i class="threshold-key" aria-hidden="true"></i>'
+            + escape(legend.strip())
+            + "</span>"
+            if legend
             else ""
         )
+        + (
+            '<span class="chart-key"><i class="neutral-key" aria-hidden="true"></i>'
+            + escape(neutral_legend)
+            + "</span>"
+            if neutral_legend
+            else ""
+        )
+        + allowed_legend
         + "</figcaption></figure>"
     )
 
 
 _CSS = """
-:root{color-scheme:light;--ink:#172a35;--muted:#526773;--line:#d8e3e8;--paper:#fff;--canvas:#f2f6f8;--teal:#086756;--red:#a32639;--amber:#79530b}
-*{box-sizing:border-box}body{margin:0;overflow-wrap:anywhere;background:var(--canvas);color:var(--ink);font:15px/1.6 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-a{color:#145d7b}main{max-width:1120px;margin:auto;padding:36px 28px 60px}.brand{display:flex;align-items:center;gap:10px;font-weight:750;letter-spacing:.01em}.mark{display:block;width:34px;height:34px;flex-shrink:0}.family{margin-left:auto;color:var(--muted);font-size:12px;text-align:right}
-.hero{margin:26px 0 22px;padding:30px;border:1px solid var(--line);border-radius:16px;background:var(--paper);border-top:4px solid var(--teal)}.hero.fail{border-top-color:var(--red)}.hero.insufficient{border-top-color:var(--amber)}.eyebrow{text-transform:uppercase;letter-spacing:.12em;font-size:11px;font-weight:750;color:var(--muted);margin:0 0 7px}h1{font-size:36px;line-height:1.15;letter-spacing:-.03em;margin:0 0 14px}h2{font-size:21px;letter-spacing:-.02em;line-height:1.3;margin:0}h3{font-size:16px;margin:0 0 10px}.hero>p{max-width:80ch;margin:0 0 18px}.summary-row{display:flex;flex-wrap:wrap;gap:8px}.pill{font-size:12px;font-weight:650;padding:4px 10px;border-radius:6px;background:#eef3f6;color:var(--muted)}.badge{display:inline-block;font-size:12px;font-weight:700;border:1px solid currentColor;border-radius:5px;padding:2px 8px;white-space:nowrap}.pass .badge,.badge.pass{color:var(--teal);background:#eef8f4}.fail .badge,.badge.fail{color:var(--red);background:#fff1f2}.insufficient .badge,.badge.insufficient{color:var(--amber);background:#fff8e6}
-.subjects{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:0 0 24px}.subjects div{min-width:0}.subjects dt{font-size:11px;font-weight:650;color:var(--muted)}.subjects dd{margin:3px 0 0;font-size:13px;overflow-wrap:anywhere}
-.section-heading{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin:30px 0 14px}.section-heading p{font-size:12px;margin:0;color:var(--muted)}.metric{background:var(--paper);border:1px solid var(--line);border-radius:12px;margin:0 0 16px;padding:24px;break-inside:avoid}.metric-heading>div{min-width:0}.metric-heading>.badge{flex-shrink:0;max-width:45%}.metric-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}.scope{font-size:12px;color:var(--muted);margin:4px 0}.metric-explanation{margin:12px 0 18px}.values{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--line);border-radius:8px;background:#f8fafb;overflow:hidden}.value{padding:12px 16px;border-right:1px solid var(--line)}.value:last-child{border:0}.value dt{font-size:11px;color:var(--muted)}.value dd{margin:3px 0 0;font-size:22px;font-weight:650;letter-spacing:-.02em;overflow-wrap:anywhere}.interval{margin:14px 0}.interval svg{display:block;width:100%;max-height:68px}.interval figcaption{font-size:12px;color:var(--muted)}.axis{stroke:var(--line);stroke-width:2}.range{stroke:#277b91;stroke-width:7;stroke-linecap:round}.estimate{fill:var(--ink);stroke:white;stroke-width:2}.threshold{stroke:var(--amber);stroke-width:2;stroke-dasharray:4 4}.legend{display:block}
-.scroll{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:13px;margin-top:16px}caption{text-align:left;font-weight:650;padding:0 0 8px}th{text-align:left;color:var(--muted);font-size:11px;font-weight:650}th,td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}th:first-child,td:first-child{padding-left:0}td:last-child,th:last-child{padding-right:0}tbody tr:last-child td{border-bottom:0}.check-detail{display:block;color:var(--muted);font-size:12px}.check-fail{color:var(--red);font-weight:650}.check-pass{color:var(--teal)}.check-unknown{color:var(--amber)}.notes{font-size:12px;color:var(--muted);padding-left:18px}.columns{display:grid;grid-template-columns:1fr 1fr;gap:16px}.panel{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:22px}.panel h2{font-size:16px;margin-bottom:12px}.metric h3,.metric h4{font-size:21px;line-height:1.3;margin:0}.limits h2{font-size:16px;margin-bottom:8px}.panel dl{margin:0}.panel dt{font-size:12px;font-weight:650;margin-top:12px}.panel dt:first-child{margin-top:0}.panel dd{margin:3px 0 0;color:var(--muted);font-size:13px;overflow-wrap:anywhere}.panel ol,.panel ul{padding-left:20px;font-size:13px;margin:0}.panel li+li{margin-top:9px}.limits{color:var(--muted);font-size:13px;margin:22px 0}.limits li+li{margin-top:6px}details{border:1px solid var(--line);border-radius:8px;background:var(--paper);margin:10px 0}summary{padding:14px 18px;font-size:13px;font-weight:650;cursor:pointer}summary:focus-visible{outline:3px solid #277b91;outline-offset:3px}details .detail-content{padding:0 18px 18px}pre{font:12px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere;background:#f5f8fa;border-radius:6px;padding:14px;max-height:480px;overflow:auto}code{overflow-wrap:anywhere}.footer{color:var(--muted);font-size:11px;margin-top:26px;border-top:1px solid var(--line);padding-top:16px}
-@media(max-width:650px){main{padding:20px 14px 40px}.hero{padding:22px 18px}h1{font-size:29px}.metric{padding:18px}.values{grid-template-columns:repeat(2,minmax(0,1fr))}.value:nth-child(2){border-right:0}.value:nth-child(-n+2){border-bottom:1px solid var(--line)}.value dd{font-size:20px}.columns,.subjects{grid-template-columns:1fr}.family{max-width:160px}.section-heading{display:block}.section-heading p{margin-top:5px}.metric-heading{gap:8px;flex-direction:column}.badge{white-space:normal;font-size:11px}th,td{padding:9px 7px}}
-@media print{body{background:white;font-size:10pt}main{max-width:none;padding:0}.hero{margin-top:16px;padding:20px}h1{font-size:25pt}.metric,.panel{padding:15px}.columns{display:block}.panel{margin:12px 0}details{break-inside:avoid}pre{max-height:none}.footer{font-size:9pt}.scroll{overflow:visible}a{color:inherit}}
-a:focus-visible,[tabindex]:focus-visible{outline:3px solid #277b91;outline-offset:4px}a,[tabindex]{scroll-margin-top:20px}.metric-group:target,.metric:target{border-color:#277b91}.metric-group>.section-heading h3{font-size:23px;line-height:1.3;margin:0}.metric-group>.section-heading>a{font-size:12px}.results-overview{margin:28px 0}.results-overview .section-heading{align-items:flex-start}.results-overview .section-heading p{max-width:48ch}.overview-scroll{border:1px solid var(--line);border-radius:12px;background:var(--paper);padding:4px 16px}.overview-table{margin:12px 0;min-width:840px}.overview-table a{display:block}.overview-table .scope{display:block}.overview-table .badge{white-space:normal}.overview-table tbody th{font-size:13px}.overview-table td{font-variant-numeric:tabular-nums}.overview-checks{margin:0;padding-left:16px}.overview-checks li+li{margin-top:4px}.metric-navigation{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0 26px}.metric-navigation a{display:block;padding:9px 14px;border:1px solid var(--line);border-radius:8px;background:var(--paper);font-weight:650;text-decoration:none}.metric-navigation a:hover{border-color:#277b91;background:#eaf3f7}.metric-navigation span{display:block;color:var(--muted);font-size:11px;font-weight:400}
-.metric-navigation [role="tab"][aria-selected="true"]{border-color:#145d7b;background:#e4f1f7;box-shadow:inset 0 -3px #145d7b}.metric-display-toggle{font:inherit;font-size:13px;border:1px solid var(--line);border-radius:7px;background:var(--paper);color:#145d7b;padding:7px 12px;cursor:pointer;margin:0 0 8px}.metric-display-toggle:focus-visible{outline:3px solid #277b91;outline-offset:4px}
-@media print{.metric-group[hidden]{display:block!important}.metric-navigation,.metric-display-toggle,.metric-group>.section-heading>a{display:none}.overview-table{min-width:0;font-size:8pt;table-layout:fixed}.overview-table th{font-size:8pt}.overview-scroll{padding:0;border:0}.overview-table th,.overview-table td{padding:6px 4px}.overview-table .badge{font-size:8pt}.metric-group>.section-heading{break-after:avoid}}
+.allowed-key{width:16px;height:10px;background:var(--allowed);border:1px solid var(--neutral)}
+:root{color-scheme:light;--ink:#172a35;--muted:#526773;--line:#d8e3e8;--paper:#fff;--canvas:#f6f8f9;--teal:#086756;--red:#a32639;--amber:#79530b;--range:#277b91;--allowed:#e5f3ed;--neutral:#78909c}
+*{box-sizing:border-box}
+body{margin:0;background:var(--canvas);color:var(--ink);font:15px/1.55 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+a{color:#145d7b}main{max-width:1120px;margin:auto;padding:26px 28px 48px}
+h1,h2,h3,h4,p{margin-top:0}h1{font-size:36px;line-height:1.15;letter-spacing:-.03em;margin-bottom:14px}h2{font-size:18px;line-height:1.3;letter-spacing:-.02em;margin-bottom:0}h3,h4{font-size:20px;line-height:1.3;margin-bottom:10px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:750}.mark{width:34px;height:34px;flex-shrink:0}.family{margin-left:auto;color:var(--muted);font-size:13px;text-align:right}
+.hero{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(260px,1fr);gap:30px;margin:24px 0;padding:26px 0;border-block:1px solid var(--line)}
+.hero h1::before{content:"";display:inline-block;width:12px;height:12px;border-radius:50%;background:var(--teal);margin-right:12px;vertical-align:middle}.hero.fail h1::before{background:var(--red)}.hero.insufficient h1::before{background:var(--amber)}
+.verdict{min-width:0}.decision-summary{max-width:65ch;margin-bottom:0;overflow-wrap:anywhere;font-size:16px;color:var(--muted)}.decision-summary strong{color:var(--ink);font-weight:650}.hero .eyebrow{margin-bottom:10px}
+.assurance{min-width:0}.assurance h2{font-size:13px;margin:0 0 10px;color:var(--muted)}.assurance dl{margin:0}.assurance dl>div{display:grid;grid-template-columns:minmax(90px,1fr) minmax(0,1.8fr);gap:12px;padding:8px 0;border-bottom:1px dashed var(--line);font-size:12px}.assurance dl>div:last-child{border:0}.assurance dt{color:var(--muted)}.assurance dd{margin:0;overflow-wrap:anywhere}.next-steps{margin-top:22px}
+.eyebrow{margin-bottom:10px}
+.eyebrow{text-transform:uppercase;letter-spacing:.12em;font-size:12px;font-weight:750;color:var(--muted)}
+.summary-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.pill{font-size:13px;font-weight:650;padding:4px 10px;border-radius:6px;background:#eef3f6;color:var(--muted)}
+.badge{display:inline-block;font-size:13px;font-weight:700;border:1px solid currentColor;border-radius:5px;padding:2px 8px;white-space:nowrap}
+.pass .badge,.badge.pass{color:var(--teal);background:#eef8f4}.fail .badge,.badge.fail{color:var(--red);background:#fff1f2}.insufficient .badge,.badge.insufficient{color:var(--amber);background:#fff8e6}
+.panel,.metric{background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:20px}.panel h2{font-size:16px;margin-bottom:12px}.metric{margin-bottom:16px;break-inside:avoid}
+.section-heading{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin:24px 0 12px}.section-heading p{font-size:13px;color:var(--muted);margin:0}
+.subjects{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:0}.subjects div{min-width:0}.subjects dt{font-size:13px;font-weight:650;color:var(--muted)}.subjects dd{margin:3px 0 0;overflow-wrap:anywhere}
+.comparison-table{table-layout:fixed;margin-top:0}.comparison-table th:first-child{width:23%}.comparison-table td{width:38.5%;overflow-wrap:anywhere}.comparison-table .different{background:#f0f6fa}.side-label{display:none}.different-label{display:block;font-size:12px;font-weight:400;color:#315e76}
+.shared-context{border:0;border-top:1px solid var(--line);border-radius:0;margin:12px 0 0;background:transparent}.shared-context summary{padding:12px 0}.shared-context .detail-content{padding:0}
+.context-list{display:grid;grid-template-columns:minmax(120px,1fr) 3fr;gap:8px 18px;margin:0}.context-list dt{font-weight:650;font-size:13px}.context-list dd{margin:0;overflow-wrap:anywhere;font-size:14px}
+.change-notes{font-size:13px;color:var(--muted);margin:14px 0 0;padding-left:20px}.change-notes li+li{margin-top:6px}
+.metric-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}.metric-heading>div{min-width:0}.metric h3,.metric h4{overflow-wrap:anywhere}.metric-heading>.badge{flex-shrink:0}.scope{font-size:13px;color:var(--muted);margin:4px 0}.metric-explanation{margin:10px 0 18px}
+.values{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--line);border-radius:8px;background:var(--paper);overflow:hidden;margin:0}
+.value{padding:12px;border-right:1px solid var(--line);min-width:0}.value:last-child{border:0}.value dt{font-size:13px;color:var(--muted)}.value dd{margin:4px 0 0;font-size:26px;font-weight:650;line-height:1.2;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.value small{display:block;margin-top:5px;font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--muted);letter-spacing:0}.interval{margin:22px 0}.interval svg{display:block;width:100%;height:auto}.interval figcaption{overflow-wrap:anywhere;font-size:13px;color:var(--muted);margin-top:8px}.axis{stroke:var(--line);stroke-width:2}.range{stroke:var(--range);stroke-width:7;stroke-linecap:round}.estimate{fill:var(--paper);stroke:var(--range);stroke-width:3}.threshold{stroke:var(--red);stroke-width:2}.neutral{stroke:var(--neutral);stroke-width:1.5;stroke-dasharray:3 4}.allowed{fill:var(--allowed)}.tick{stroke:var(--neutral);stroke-width:1.5}.legend{display:block;margin-top:4px}.chart-annotations{height:24px;position:relative;font-size:12px;font-variant-numeric:tabular-nums}.chart-label{position:absolute;max-width:72%;overflow-wrap:anywhere}.chart-label.middle{transform:translateX(-50%)}.chart-label.end{transform:translateX(-100%)}.limit-label{top:0;color:var(--red)}.interval-plot{position:relative}.interval-bounds{position:absolute;inset:0;pointer-events:none;font-size:12px;font-variant-numeric:tabular-nums}.bound-label{bottom:calc(47.222222% + 10px);line-height:1.2;font-weight:650}.chart-key{display:inline-block;margin-right:18px}.chart-key i,.legend i{display:inline-block;margin-right:7px;vertical-align:middle}.estimate-key{width:10px;height:10px;border:2px solid var(--range);border-radius:50%}.interval-key{width:16px;border-top:3px solid var(--range)}.neutral-key{width:16px;border-top:2px dashed var(--neutral)}.threshold-key{height:12px;border-left:2px solid var(--red)}.axis-labels{position:relative;height:22px;font-size:13px;font-variant-numeric:tabular-nums;color:var(--muted)}.axis-labels span{position:absolute;transform:translateX(-50%);white-space:nowrap}
+.scroll{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:14px;margin-top:16px}caption{text-align:left;font-weight:650;padding:0 0 8px}th{text-align:left;color:var(--muted);font-size:13px;font-weight:650}th,td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}th:first-child,td:first-child{padding-left:0}td:last-child,th:last-child{padding-right:0}tbody tr:last-child td,tbody tr:last-child th{border-bottom:0}
+.check-label{display:none}.context-heading{font-size:14px;margin:14px 0 8px}.checks-table td{white-space:nowrap}.checks-table th[scope="row"]{width:48%}.check-detail{display:block;font-size:13px;font-weight:400;margin-top:4px;color:var(--muted)}.check-fail{color:var(--red);font-weight:650}.check-pass{color:var(--teal)}.check-unknown{color:var(--amber)}.notes{font-size:13px;color:var(--muted);padding-left:20px;margin-bottom:0}.notes li+li{margin-top:6px}
+.columns{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:24px}.panel dl{margin:0}.panel dt{font-size:13px;font-weight:650;margin-top:10px}.panel dt:first-child{margin-top:0}.panel dd{margin:3px 0 0;color:var(--muted);font-size:14px;overflow-wrap:anywhere}.panel ol,.panel ul{padding-left:20px;font-size:14px;margin:0}.panel li+li{margin-top:8px}
+.limits{color:var(--muted);font-size:14px;margin:24px 0}.limits h2{font-size:18px;margin-bottom:8px}.limits li+li{margin-top:6px}
+details{border:1px solid var(--line);border-radius:8px;background:var(--paper);margin:10px 0}summary{overflow-wrap:anywhere;padding:14px 18px;font-size:14px;font-weight:650;cursor:pointer}details .detail-content{padding:0 18px 18px}pre{font:13px/1.6 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere;background:#f5f8fa;border-radius:6px;padding:14px;max-height:480px;overflow:auto}code{overflow-wrap:anywhere}.footer{color:var(--muted);font-size:13px;margin-top:26px;border-top:1px solid var(--line);padding-top:16px}
+a:focus-visible,summary:focus-visible,[tabindex]:focus-visible{outline:3px solid #277b91;outline-offset:4px}a,[tabindex]{scroll-margin-top:20px}.metric-group:target,.metric:target{border-color:#277b91}
+.metric-group>.section-heading h3{font-size:22px;margin:0}.metric-group>.section-heading>a{font-size:13px}.results-overview{margin:18px 0}.results-overview .section-heading p{max-width:48ch}.overview-scroll{border:1px solid var(--line);border-radius:8px;background:var(--paper);padding:4px 16px}.overview-table{margin:12px 0;min-width:840px}.overview-table a,.overview-table .scope{display:block}.overview-table .badge{white-space:normal}.overview-table tbody th{font-size:14px}.overview-table td{font-variant-numeric:tabular-nums}.overview-checks{margin:0;padding-left:16px}.overview-checks li+li{margin-top:4px}
+.metric-controls{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:18px 0}.metric-navigation{display:flex;flex-wrap:wrap;gap:8px}.metric-navigation a{display:block;padding:9px 14px;border:1px solid var(--line);border-radius:8px;background:var(--paper);font-weight:650;text-decoration:none}.metric-navigation a:hover{border-color:#277b91;background:#eaf3f7}.metric-navigation span{display:block;color:var(--muted);font-size:13px;font-weight:400}.metric-navigation [role="tab"][aria-selected="true"]{border-color:#145d7b;background:#e4f1f7;box-shadow:inset 0 -3px #145d7b}.metric-display-toggle{font:inherit;font-size:13px;border:1px solid var(--line);border-radius:7px;background:var(--paper);color:#145d7b;padding:9px 12px;cursor:pointer}.metric-display-toggle:focus-visible{outline:3px solid #277b91;outline-offset:4px}
+@media(max-width:650px){main{padding:20px 14px 40px}.hero{grid-template-columns:1fr;gap:22px;padding:22px 0}.assurance dl>div{grid-template-columns:1fr 1.8fr}h1{font-size:29px}.metric,.panel{padding:18px}.values{grid-template-columns:repeat(2,minmax(0,1fr))}.value:nth-child(2){border-right:0}.value:nth-child(-n+2){border-bottom:1px solid var(--line)}.value dd{font-size:20px}.columns,.subjects{grid-template-columns:1fr}.family{max-width:160px}.section-heading{display:block}.section-heading p{margin-top:5px}.metric-heading{gap:8px;flex-direction:column}th,td{padding:10px 8px}.context-list{grid-template-columns:1fr}.context-list dd{margin-bottom:6px}.comparison-table{font-size:13px}.comparison-table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}.comparison-table,.comparison-table tbody,.comparison-table tr,.comparison-table th,.comparison-table td{display:block;width:100%}.comparison-table th:first-child{width:100%}.comparison-table tbody tr{padding:10px 12px;border-bottom:1px solid var(--line)}.comparison-table tbody th,.comparison-table tbody td{padding:5px 0;border:0}.comparison-table .different-label{display:inline;margin-left:8px}.side-label{display:block;font-size:11px;color:var(--muted);font-weight:500;margin-bottom:2px}.checks-table{min-width:0}.checks-table caption{display:block;width:100%}.checks-table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}.checks-table,.checks-table tbody,.checks-table tbody tr,.checks-table tbody th,.checks-table tbody td{display:block;width:100%}.checks-table th[scope="row"]{width:100%}.checks-table tbody tr{padding:12px 0;border-bottom:1px solid var(--line)}.checks-table tbody th,.checks-table tbody td{border:0;padding:5px 0}.checks-table tbody td{display:grid;grid-template-columns:90px minmax(0,1fr);white-space:normal;overflow-wrap:anywhere}.check-label{display:block;font-weight:400;color:var(--muted)}.interval{margin-inline:0}}
+@media screen and (prefers-color-scheme:dark){
+:root{color-scheme:dark;--ink:#e2e9ed;--muted:#aebfc9;--line:#394951;--paper:#192229;--canvas:#11191e;--teal:#6fd7b8;--red:#ff99aa;--amber:#eac27a;--range:#84c9e0;--allowed:#24483c;--neutral:#a0b7c3}
+a{color:#99d4f1}.pill{background:#25333d}.pass .badge,.badge.pass{background:#183c33}.fail .badge,.badge.fail{background:#41232c}.insufficient .badge,.badge.insufficient{background:#3b301b}.comparison-table .different{background:#24343e}.different-label{color:#a9d4e7}pre{background:#11191e}.metric-navigation a:hover{background:#243844}.metric-navigation [role="tab"][aria-selected="true"]{background:#243c49;border-color:#99d4f1;box-shadow:inset 0 -3px #99d4f1}.metric-display-toggle{color:#99d4f1}.metric-group:target,.metric:target{border-color:#99d4f1}a:focus-visible,summary:focus-visible,[tabindex]:focus-visible,.metric-display-toggle:focus-visible{outline-color:#99d4f1}
+}
+@media print{body{background:white;font-size:10pt}main{max-width:none;padding:0}.hero{margin-top:16px;padding:16px 0;grid-template-columns:1fr 1fr;gap:20px}h1{font-size:25pt}.metric,.panel{padding:15px}.columns{display:block}.panel{margin:12px 0}details{break-inside:avoid}details>.detail-content{display:block!important}pre{max-height:none}.footer{font-size:9pt}.scroll{overflow:visible}a{color:inherit}.metric-group[hidden]{display:block!important}.metric-navigation,.metric-display-toggle,.metric-group>.section-heading>a{display:none}.overview-table,.checks-table{min-width:0;font-size:8pt;table-layout:fixed}.overview-table th{font-size:8pt}.overview-scroll{padding:0;border:0}.overview-table th,.overview-table td{padding:6px 4px}.overview-table .badge{font-size:8pt}.metric-group>.section-heading{break-after:avoid}.checks-table td{white-space:normal}}
 """
 
 
@@ -355,6 +526,224 @@ def _results_overview(metrics: tuple[MetricView, ...]) -> str:
     return "".join(parts)
 
 
+@dataclass(frozen=True)
+class _ComparisonContext:
+    rows: tuple[tuple[str, str, str, bool], ...]
+    matching: tuple[tuple[str, str], ...]
+    additional: tuple[tuple[str, str], ...]
+
+
+def _comparison_view(view: ReportView) -> _ComparisonContext:
+    """Align unambiguous sides and compare displayed text, not hidden full values."""
+    side_names = {"Baseline": "Baseline", "Subject": "Subject", "Candidate": "Subject"}
+    grouped: dict[str, list[tuple[str, str, str]]] = {}
+    shared = []
+    matching = []
+    for label, value in view.context:
+        side, separator, name = label.partition(" ")
+        if separator and name and side in side_names:
+            grouped.setdefault(name, []).append((label, side_names[side], value))
+        else:
+            shared.append((label, value))
+    paired = {}
+    for name, entries in grouped.items():
+        if len(entries) == 2 and {side for _, side, _ in entries} == {
+            "Baseline",
+            "Subject",
+        }:
+            paired[name] = {side: value for _, side, value in entries}
+        else:
+            # Repeated fields and competing Subject/Candidate labels cannot be
+            # resolved by choosing whichever appeared first or last.
+            shared.extend((label, value) for label, _, value in entries)
+    rows = []
+    subject_entries = []
+    for label, value in view.subjects:
+        side, _, name = label.partition(" ")
+        subject_entries.append((side_names.get(side, side), name, value))
+    unambiguous_subjects = (
+        len(subject_entries) == 2
+        and {side for side, _, _ in subject_entries} == {"Baseline", "Subject"}
+        and len({name for _, name, _ in subject_entries}) == 1
+    )
+    subjects = (
+        {side: value for side, _, value in subject_entries}
+        if unambiguous_subjects
+        else {}
+    )
+    subject_field = subject_entries[0][1] if unambiguous_subjects else ""
+    if unambiguous_subjects and not subject_field:
+        for field_name in ("Recorded model ID", "Recorded model key", "Recorded run"):
+            prefix = field_name + ": "
+            if all(
+                value.startswith(prefix) and value[len(prefix) :]
+                for value in subjects.values()
+            ):
+                subject_field = field_name
+                subjects = {
+                    side: value[len(prefix) :] for side, value in subjects.items()
+                }
+                break
+    observed = paired.get("observed model", {})
+    deployment = paired.get("deployment", {})
+    represented = (
+        unambiguous_subjects
+        and not subject_field
+        and all(
+            side in observed
+            and side in deployment
+            and subjects.get(side)
+            == f"Observed model: {observed[side]} · Deployment: {deployment[side]}"
+            for side in ("Baseline", "Subject")
+        )
+    )
+    if represented:
+        # The complete displayed subject labels are already represented by rows.
+        paired = {"observed model": paired["observed model"], **paired}
+    elif unambiguous_subjects:
+        rows.append(
+            (
+                subject_field[:1].upper() + subject_field[1:]
+                if subject_field
+                else "Subject identity",
+                subjects["Baseline"],
+                subjects["Subject"],
+                subjects["Baseline"] != subjects["Subject"],
+            )
+        )
+    else:
+        shared.extend(view.subjects)
+    for name, sides in paired.items():
+        if sides["Baseline"] == sides["Subject"]:
+            matching.append((name[:1].upper() + name[1:], sides["Baseline"]))
+        else:
+            rows.append(
+                (name[:1].upper() + name[1:], sides["Baseline"], sides["Subject"], True)
+            )
+    return _ComparisonContext(tuple(rows), tuple(matching), tuple(shared))
+
+
+_MATCHING_CONTEXT_NOTE = (
+    "Matching previews do not establish equality of the complete retained fields."
+)
+
+
+def _comparison_context(view: ReportView) -> str:
+    context = _comparison_view(view)
+    rows = context.rows
+    parts = [
+        '<section class="panel" aria-labelledby="comparison-context"><h2 id="comparison-context">What was compared</h2>'
+    ]
+    if rows:
+        parts.append(
+            '<table class="comparison-table"><thead><tr><th scope="col">Recorded field</th><th scope="col">Baseline</th><th scope="col">Subject</th></tr></thead><tbody>'
+        )
+        for label, baseline, subject, changed in rows:
+            style = ' class="different"' if changed else ""
+            annotation = (
+                '<span class="different-label">Differs</span>' if changed else ""
+            )
+            parts.append(
+                f'<tr{style}><th scope="row">{escape(label)}{annotation}</th><td data-side="Baseline"><span class="side-label" aria-hidden="true">Baseline</span>{escape(baseline)}</td><td data-side="Subject"><span class="side-label" aria-hidden="true">Subject</span>{escape(subject)}</td></tr>'
+            )
+        parts.append("</tbody></table>")
+    if context.matching or context.additional:
+        if rows:
+            parts.append(
+                f'<details class="shared-context"><summary>Additional recorded context ({len(context.matching) + len(context.additional)})</summary><div class="detail-content">'
+            )
+        for label, entries in (
+            ("Matching displayed fields", context.matching),
+            ("Additional fields", context.additional),
+        ):
+            if not entries:
+                continue
+            parts.append(f'<h3 class="context-heading">{label}</h3>')
+            if label == "Matching displayed fields":
+                parts.append('<p class="scope">' + _MATCHING_CONTEXT_NOTE + "</p>")
+            parts.append('<dl class="context-list">')
+            parts.extend(
+                f"<dt>{escape(name)}</dt><dd>{escape(value)}</dd>"
+                for name, value in entries
+            )
+            parts.append("</dl>")
+        if rows:
+            parts.append("</div></details>")
+    if view.changes:
+        parts.append(
+            '<ul class="change-notes" aria-label="Recorded changes">'
+            + "".join(f"<li>{escape(note)}</li>" for note in view.changes)
+            + "</ul>"
+        )
+    parts.append("</section>")
+    return "".join(parts)
+
+
+def _detail_content(data: Any) -> str:
+    # Preview text is intentionally not necessarily JSON: bounded walkers may
+    # insert elision markers. Escape it directly rather than parsing it.
+    if (
+        isinstance(data, dict)
+        and data.get("preview_only") is True
+        and isinstance(data.get("text"), str)
+    ):
+        note = str(
+            data.get("note", "Bounded preview; full values remain in the evidence.")
+        )
+        limits = data.get("limits", {})
+        return (
+            "<p>"
+            + escape(note)
+            + "</p><pre>"
+            + escape(data["text"])
+            + '</pre><p class="scope">Preview limits: '
+            + escape(
+                json.dumps(limits, ensure_ascii=False, sort_keys=True, allow_nan=False)
+            )
+            + "</p>"
+        )
+    return (
+        "<pre>"
+        + escape(
+            json.dumps(
+                data, ensure_ascii=False, indent=2, sort_keys=True, allow_nan=False
+            )
+        )
+        + "</pre>"
+    )
+
+
+def _summary_html(view: ReportView) -> str:
+    """Emphasize supplied display values without interpreting summary markup."""
+    if len(view.metrics) != 1:
+        return escape(view.summary)
+    metric = view.metrics[0]
+    values = {metric.name, metric.baseline, metric.candidate, metric.change}
+    if metric.interval:
+        values.update(
+            number(value)
+            for value in (
+                metric.interval.lower,
+                metric.interval.upper,
+                metric.interval.estimate,
+                metric.interval.threshold,
+            )
+            if value is not None
+        )
+    tokens = sorted((value for value in values if value), key=len, reverse=True)
+    if not tokens:
+        return escape(view.summary)
+    pattern = re.compile(
+        r"(?<![\w.+-])("
+        + "|".join(re.escape(value) for value in tokens)
+        + r")(?![\w%]|\.\d)"
+    )
+    return "".join(
+        "<strong>" + escape(part) + "</strong>" if index % 2 else escape(part)
+        for index, part in enumerate(pattern.split(view.summary))
+    )
+
+
 def render_html(view: ReportView) -> str:
     """Render escaped fields with optional hash-authorized local metric tabs."""
     e = escape
@@ -370,61 +759,48 @@ def render_html(view: ReportView) -> str:
         f"<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none';{script_policy}\">",
         f"<title>{e(view.title)}</title><style>{_CSS}</style></head><body><main>",
         f'<header class="brand">{_BRAND_MARK} InvarLock<span class="family">{e(view.family)}</span></header>',
-        f'<section class="hero {_tone(view.decision)}" aria-labelledby="decision"><p class="eyebrow">Recorded policy result</p><h1 id="decision">{e(decision_label(view.decision))}</h1><p>{e(view.summary)}</p><div class="summary-row">',
-        f'<span class="pill">{len(view.metrics)} metric / scope result{"s" if len(view.metrics) != 1 else ""}</span>',
-        f'<span class="pill">Original decision: {e(view.decision)}</span></div></section>',
+        f'<section class="hero {_tone(view.decision)}" aria-labelledby="decision"><div class="verdict"><p class="eyebrow">Recorded policy result</p><h1 id="decision">{e(decision_label(view.decision))}</h1><p class="decision-summary">{_summary_html(view)}</p>',
     ]
-    if view.subjects or view.context or view.changes:
-        parts.append(
-            '<section class="panel" aria-labelledby="comparison-context"><h2 id="comparison-context">What was compared</h2>'
-        )
-        if view.subjects:
-            parts.append(
-                '<dl class="subjects">'
-                + "".join(
-                    f"<div><dt>{e(k)}</dt><dd>{e(v)}</dd></div>"
-                    for k, v in view.subjects
-                )
-                + "</dl>"
-            )
-        if view.context:
-            parts.append(
-                '<dl class="subjects">'
-                + "".join(
-                    f"<div><dt>{e(k)}</dt><dd>{e(v)}</dd></div>"
-                    for k, v in view.context
-                )
-                + "</dl>"
-            )
-        if view.changes:
-            parts.append(
-                "<h3>Recorded changes</h3><ul>"
-                + "".join(f"<li>{e(change)}</li>" for change in view.changes)
-                + "</ul>"
-            )
-        parts.append("</section>")
-    support = [
-        '<div class="columns"><section class="panel"><h2>What was checked</h2><dl>'
-    ]
-    for name, value in view.assurance:
-        support.append(f"<dt>{e(name)}</dt><dd>{e(value)}</dd>")
-    support.append('</dl></section><section class="panel"><h2>Next steps</h2><ol>')
-    support.extend(f"<li>{e(step)}</li>" for step in view.next_steps)
-    support.append("</ol></section></div>")
     if multiple_results:
-        parts.append(_results_overview(view.metrics))
+        parts.append(
+            f'<div class="summary-row"><span class="pill">{len(view.metrics)} metric / scope results</span></div>'
+        )
+    parts.append(
+        '</div><aside class="assurance" aria-labelledby="assurance-heading"><h2 id="assurance-heading">What was checked</h2><dl>'
+    )
+    for name, value in view.assurance:
+        parts.append(f"<div><dt>{e(name)}</dt><dd>{e(value)}</dd></div>")
+    parts.append("</dl></aside></section>")
+    if view.subjects or view.context or view.changes:
+        parts.append(_comparison_context(view))
+    support = ['<section class="panel next-steps"><h2>Next steps</h2><ol>']
+    support.extend(f"<li>{e(step)}</li>" for step in view.next_steps)
+    support.append("</ol></section>")
+    if multiple_results:
+        parts.append(
+            '<details class="overview-disclosure"'
+            + (
+                " open"
+                if any(metric.decision != "pass" for metric in view.metrics)
+                else ""
+            )
+            + '><summary>Compare all metric and scope results</summary><div class="detail-content">'
+            + _results_overview(view.metrics)
+            + "</div></details>"
+        )
         if len(groups) > 1:
             parts.append(
-                '<nav class="metric-navigation" aria-label="Metric results">'
+                '<div class="metric-controls"><nav class="metric-navigation" aria-label="Metric results">'
                 + "".join(
                     f'<a href="#metric-group-{index}">{e(name)} <span>{len(group)} scope result{"s" if len(group) != 1 else ""}</span></a>'
                     for index, (name, group) in enumerate(groups.items(), 1)
                 )
-                + '</nav><button class="metric-display-toggle" type="button" hidden>Show all metrics</button>'
+                + '</nav><button class="metric-display-toggle" type="button" hidden>Show all metrics</button></div>'
             )
-    parts.append(
-        '<div class="section-heading"><h2>Results and requirements</h2><p>Observed values alongside the configured checks</p></div>'
-    )
+    if not tabs_enabled:
+        parts.append(
+            '<div class="section-heading"><h2>Results and requirements</h2></div>'
+        )
     for group_index, (metric_name, group) in enumerate(groups.items(), 1):
         if multiple_results:
             parts.append(
@@ -444,20 +820,26 @@ def render_html(view: ReportView) -> str:
             parts.append(
                 f'<section id="metric-result-{result_index}" tabindex="-1" class="metric {_tone(metric.decision)}"><div class="metric-heading"><div>{heading}<p class="scope">{context}</p></div><span class="badge">{e(decision_label(metric.decision))}</span></div><p class="metric-explanation">{e(metric.explanation)}</p><dl class="values">'
             )
-            for name, value in [
-                ("Baseline", metric.baseline),
-                ("Candidate", metric.candidate),
-                ("Change", metric.change),
-                ("Observed pairs", metric.count),
+            change_detail = (
+                _interval_summary(metric.interval, compact=True)
+                if metric.interval
+                else ""
+            )
+            for name, value, detail in [
+                ("Baseline", metric.baseline, metric.baseline_detail),
+                ("Subject", metric.candidate, metric.candidate_detail),
+                ("Change", metric.change, change_detail),
+                (metric.count_label, metric.count, metric.count_detail),
             ]:
+                sublabel = f"<small>{e(detail)}</small>" if detail else ""
                 parts.append(
-                    f'<div class="value"><dt>{name}</dt><dd>{e(value)}</dd></div>'
+                    f'<div class="value"><dt>{e(name)}</dt><dd>{e(value)}{sublabel}</dd></div>'
                 )
             parts.append("</dl>")
             if metric.interval:
                 parts.append(_interval(metric.interval))
             parts.append(
-                '<div class="scroll" tabindex="0" role="region" aria-label="Decision checks"><table><caption>Decision checks</caption><thead><tr><th scope="col">Check</th><th scope="col">Observed</th><th scope="col">Required</th><th scope="col">Result</th></tr></thead><tbody>'
+                '<div class="scroll" tabindex="0" role="region" aria-label="Decision checks"><table class="checks-table"><caption>Decision checks</caption><thead><tr><th scope="col">Check</th><th scope="col">Observed</th><th scope="col">Required</th><th scope="col">Result</th></tr></thead><tbody>'
             )
             for check in metric.checks:
                 tone = (
@@ -467,8 +849,13 @@ def render_html(view: ReportView) -> str:
                     if check.passed is False
                     else "unknown"
                 )
+                detail = (
+                    f'<span class="check-detail">{e(check.explanation)}</span>'
+                    if check.explanation
+                    else ""
+                )
                 parts.append(
-                    f'<tr><th scope="row">{e(check.name)}<span class="check-detail">{e(check.explanation)}</span></th><td>{e(check.observed)}</td><td>{e(check.required)}</td><td class="check-{tone}">{_status(check)}</td></tr>'
+                    f'<tr><th scope="row">{e(check.name)}{detail}</th><td data-label="Observed"><span class="check-label" aria-hidden="true">Observed</span>{e(check.observed)}</td><td data-label="Required"><span class="check-label" aria-hidden="true">Required</span>{e(check.required)}</td><td data-label="Result" class="check-{tone}"><span class="check-label" aria-hidden="true">Result</span>{_status(check)}</td></tr>'
                 )
             parts.append("</tbody></table></div>")
             if metric.notes:
@@ -483,9 +870,9 @@ def render_html(view: ReportView) -> str:
     parts.extend(support)
     if view.limitations:
         parts.append(
-            '<section class="limits"><h2>Scope and limitations</h2><ul>'
+            '<details class="limits"><summary>Scope and limitations</summary><div class="detail-content"><ul>'
             + "".join(f"<li>{e(n)}</li>" for n in view.limitations)
-            + "</ul></section>"
+            + "</ul></div></details>"
         )
     parts.append(
         '<div class="section-heading"><h2>Evidence details</h2><p>Identities, methods and exact recorded values</p></div>'
@@ -500,8 +887,23 @@ def render_html(view: ReportView) -> str:
         parts.append("</dl></div></details>")
     for heading, data in (*view.details, ("Exact comparison data", view.technical)):
         parts.append(
-            f'<details><summary>{e(heading)}</summary><div class="detail-content"><pre>{e(json.dumps(data, ensure_ascii=False, indent=2, sort_keys=True, allow_nan=False))}</pre></div></details>'
+            f'<details><summary>{e(heading)}</summary><div class="detail-content">{_detail_content(data)}</div></details>'
         )
+    for _, data in view.details:
+        if not isinstance(data, dict) or not isinstance(data.get("metrics"), list):
+            continue
+        for item in data["metrics"]:
+            if not isinstance(item, dict):
+                continue
+            preview = item.get("configuration")
+            if (
+                isinstance(preview, dict)
+                and preview.get("preview_only") is True
+                and isinstance(preview.get("text"), str)
+            ):
+                parts.append(
+                    f'<details><summary>{e(str(item.get("name", "Metric")))} configuration preview</summary><div class="detail-content">{_detail_content(preview)}</div></details>'
+                )
     parts.append(
         '<footer class="footer">InvarLock · Evidence report. Displayed values may be rounded; exact values are preserved in the evidence bundle. This report is not an independent acceptance receipt.</footer></main></body></html>\n'
     )
@@ -514,7 +916,7 @@ def render_html(view: ReportView) -> str:
 
 def render_markdown(view: ReportView, *, include_details: bool = False) -> str:
     def clean(value: str) -> str:
-        value = escape(value).replace("\n", " ").replace("\r", " ")
+        value = escape(value, quote=False).replace("\n", " ").replace("\r", " ")
         for ch in "|\\`*[]()":
             value = value.replace(ch, f"&#{ord(ch)};")
         return re.sub(r"(?<!\w)_|_(?!\w)", "&#95;", value)
@@ -529,9 +931,27 @@ def render_markdown(view: ReportView, *, include_details: bool = False) -> str:
     ]
     if view.subjects or view.context or view.changes:
         lines += ["## What was compared", ""]
-        lines.extend(
-            f"- **{clean(k)}:** {clean(v)}" for k, v in (*view.subjects, *view.context)
-        )
+        context = _comparison_view(view)
+        # Paired lists retain full identifiers in narrow Markdown terminals;
+        # table cells can silently ellipsize long model and artifact names.
+        for label, baseline, subject, changed in context.rows:
+            difference = "Differs" if changed else "Same displayed text"
+            lines += [
+                "",
+                f"### {clean(label)} — {difference}",
+                "",
+                f"- **Baseline:** {clean(baseline)}",
+                f"- **Subject:** {clean(subject)}",
+            ]
+        for heading, entries in (
+            ("Matching displayed fields", context.matching),
+            ("Additional fields", context.additional),
+        ):
+            if entries:
+                lines += ["", "### " + heading, ""]
+                if heading == "Matching displayed fields":
+                    lines += [_MATCHING_CONTEXT_NOTE, ""]
+                lines.extend(f"- **{clean(k)}:** {clean(v)}" for k, v in entries)
         if view.changes:
             lines += ["", "### Recorded changes", ""]
             lines.extend(f"- {clean(change)}" for change in view.changes)
@@ -544,7 +964,7 @@ def render_markdown(view: ReportView, *, include_details: bool = False) -> str:
             "",
             f"**{decision_label(metric.decision)}**. {clean(metric.explanation)}",
             "",
-            "| Baseline | Candidate | Change | Observed pairs |",
+            f"| Baseline | Subject | Change | {clean(metric.count_label)} |",
             "| --- | --- | --- | --- |",
             "| "
             + " | ".join(

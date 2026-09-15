@@ -40,7 +40,7 @@ def starter_artifacts(example: str) -> dict[str, bytes]:
     }
     readme = (
         "# InvarLock captured evaluation example\n\n"
-        "The JSON inputs are honest synthetic captured results. Replace them "
+        "The JSON inputs are synthetic captured results. Replace them "
         "with independently produced records before relying on a decision.\n"
         "Run these commands from this directory:\n\n"
         "invarlock evaluate request.yaml --unsigned --json\n"

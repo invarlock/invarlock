@@ -12,6 +12,7 @@ from invarlock.evidence_pack_contract import (
 from invarlock.evidence_reporting import (
     EvidenceReportError,
     _native_report_context,
+    _report_view,
     render_evidence,
 )
 from tests.cli.test_import_journey import (
@@ -97,6 +98,37 @@ def _request(mode):
     }
 
 
+@pytest.mark.parametrize(
+    "metric,direction,neutral",
+    [("exact_match", "minimum", 0.0), ("normalized_nll", "maximum", 1.0)],
+)
+def test_native_interval_semantics_preserve_numeric_summary(
+    tmp_path, metric, direction, neutral
+):
+    report = _metric_report(tmp_path, metric)
+    view = _report_view(report, evidence_signer="fixture", observations=[])
+    result = view.metrics[0]
+    assert result.interval.threshold_direction == direction
+    assert result.interval.neutral == neutral
+    assert result.interval.threshold == report["comparison"][direction]
+    assert result.decision == view.decision == report["verdict"]
+    if metric == "exact_match":
+        assert (result.baseline, result.candidate, result.change) == (
+            "50%",
+            "100%",
+            "+50 pp",
+        )
+        assert (
+            "This policy does not specify an absolute accuracy floor." in result.notes
+        )
+    else:
+        assert (result.baseline, result.candidate, result.change) == (
+            "1 nats / byte",
+            "1.1 nats / byte",
+            "1.1 ratio",
+        )
+
+
 def _context_pack(tmp_path, metric="exact_match", request=None):
     report = _metric_report(tmp_path, metric)
     pack, _ = _evidence(tmp_path, report_payload=report)
@@ -149,11 +181,20 @@ def test_native_context_survives_metric_and_execution_modes(tmp_path, mode, metr
 
 def test_legacy_context_is_unavailable_without_inferred_model_or_execution(tmp_path):
     pack, _ = _context_pack(tmp_path)
-    rendered = render_evidence(pack).text
+    output = tmp_path / "report.html"
+    rendered = render_evidence(pack, html_path=output).text
     assert "Unavailable in evidence" in rendered
     assert "Runtime execution" not in rendered
     assert "Imported runtime evidence" not in rendered
     assert "fixture://dataset" in rendered
+    html = output.read_text()
+    assert 'class="comparison-table"' in html
+    assert (
+        '<th scope="row">Artifact<span class="different-label">Differs</span></th>'
+        in html
+    )
+    assert "<dt>Baseline artifact</dt>" not in html
+    assert "<dt>Candidate artifact</dt>" not in html
 
 
 def test_context_tampering_is_rejected_before_html_publication(tmp_path):

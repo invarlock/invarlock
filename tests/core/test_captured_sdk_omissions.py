@@ -559,7 +559,7 @@ def test_planned_case_helpers_accept_readonly_mappings_and_do_not_mutate():
     assert engine.case_set_digest(frozen) == expected
     assert not any(
         hasattr(engine, name)
-        for name in ("digest", "validate", "example_project", "PipelineError")
+        for name in ("validate", "example_project", "PipelineError")
     )
 
 

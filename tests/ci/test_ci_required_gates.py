@@ -82,6 +82,14 @@ def test_ci_runs_the_repository_gates() -> None:
 
     coverage = jobs["coverage"]
     _assert_core_wheel_install(coverage)
+    capacity = _step(coverage, "Check full-capacity signed verification")
+    assert capacity["run"] == (
+        "python -m pytest -q 'tests/evaluation_comparison/test_capacity.py::"
+        "test_full_capacity_signed_independent_recipient[50000]'"
+    )
+    assert coverage["steps"].index(capacity) < coverage["steps"].index(
+        _step(coverage, "Enforce coverage")
+    )
     assert _step(coverage, "Enforce coverage")["run"] == "make coverage-enforce"
 
     supply_chain = jobs["supply-chain"]
@@ -98,6 +106,10 @@ def test_manual_full_ci_uses_standard_repository_and_distribution_gates() -> Non
     full = workflow["jobs"]["verify-full"]
 
     _assert_core_wheel_install(full)
+    assert (
+        "python -m pip install --require-hashes "
+        "-r requirements/workflows/docs-ci-py313.txt"
+    ) in _step(full, "Install dependencies")["run"]
     assert "workflow_dispatch" in full["if"]
     assert _step(full, "Set up uv")["with"]["version"] == "0.10.10"
     assert _step(full, "Install documentation linters")["run"] == "npm ci"

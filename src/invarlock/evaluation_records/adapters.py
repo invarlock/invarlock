@@ -270,6 +270,7 @@ def load_run(
     source: Mapping[str, str] | None = None,
     run_id: str | None = None,
     artifact_digest: str | None = None,
+    service_identity: Mapping[str, Any] | None = None,
     score_provenance: Mapping[str, Any] | None = None,
     input_projection: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
@@ -286,6 +287,7 @@ def load_run(
         source=source,
         run_id=run_id,
         artifact_digest=artifact_digest,
+        service_identity=service_identity,
         score_provenance=score_provenance,
         input_projection=input_projection,
     )
@@ -298,6 +300,7 @@ def _parse_run_bytes(
     source: Mapping[str, str] | None = None,
     run_id: str | None = None,
     artifact_digest: str | None = None,
+    service_identity: Mapping[str, Any] | None = None,
     score_provenance: Mapping[str, Any] | None = None,
     input_projection: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
@@ -330,6 +333,7 @@ def _parse_run_bytes(
                         source,
                         run_id,
                         artifact_digest,
+                        service_identity,
                         score_provenance,
                         input_projection,
                     )
@@ -339,15 +343,20 @@ def _parse_run_bytes(
                     )
                 return cast(dict[str, Any], value)
             records = _inspect(value)
-        if source is None or run_id is None or artifact_digest is None:
+        if (
+            source is None
+            or run_id is None
+            or (artifact_digest is None and service_identity is None)
+        ):
             raise EvaluationRecordsError(
-                "native import requires source name/version, run_id and artifact_digest from your pipeline"
+                "native import requires source name/version, run_id and artifact_digest or service_identity from your pipeline"
             )
         return capture_evaluator_run(
             records,
             source=dict(source),
             run_id=run_id,
             artifact_digest=artifact_digest,
+            service_identity=service_identity,
             score_provenance=dict(score_provenance)
             if score_provenance is not None
             else None,

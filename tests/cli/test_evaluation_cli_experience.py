@@ -376,7 +376,7 @@ def test_report_regenerates_without_scoring_or_inferred_verification(
             if signed
             else "Unsigned local evidence" in text
         )
-        assert "Independent acceptance" in text
+        assert "Independent recipient verification" in text
         assert "Not performed by report." in text
         assert "Scoring and replay were not performed by report." in text
     published = _inventory(tmp_path)
@@ -497,8 +497,14 @@ def test_explain_keeps_json_metadata_and_entire_evidence_unchanged(
                     assert manifest["signing_key_fingerprint"] in text
                 else:
                     assert "Unsigned local evidence; no signer authentication." in text
-                assert "Independent acceptance: Not performed by report." in text
-                assert "Replay and scoring: Not performed by report." in text
+                assert (
+                    "Independent recipient verification: Not performed by report."
+                    in text
+                )
+                assert (
+                    "Replay and scoring: Scoring and replay were not performed by report."
+                    in text
+                )
                 assert manifest["comparison_id"] in text
                 assert ("Exact comparison data" in text) is explain
             assert _inventory(root / "original") == original
@@ -557,8 +563,10 @@ def test_report_signed_manifest_presents_recorded_adverse_result_without_replay(
     if missing:
         assert "Unavailable" in text
     assert "Signed manifest verified." in text
-    assert "Independent acceptance: Not performed by report." in text
-    assert "Replay and scoring: Not performed by report." in text
+    assert "Independent recipient verification: Not performed by report." in text
+    assert (
+        "Replay and scoring: Scoring and replay were not performed by report." in text
+    )
     assert (
         "Recorded reasons: missing results"
         if missing
@@ -717,8 +725,10 @@ def test_generated_starter_directory_runs_neutral_commands(tmp_path, monkeypatch
     assert rendered.exit_code == 0, rendered.output
     text = " ".join(Text.from_ansi(rendered.stdout).plain.split())
     assert "Unsigned local evidence" in text
-    assert "Independent acceptance: Not performed by report." in text
-    assert "Replay and scoring: Not performed by report." in text
+    assert "Independent recipient verification: Not performed by report." in text
+    assert (
+        "Replay and scoring: Scoring and replay were not performed by report." in text
+    )
     assert (project / "artifacts/report.html").is_file()
     assert (project / "artifacts/summary.md").is_file()
     assert (project / "artifacts/junit.xml").is_file()

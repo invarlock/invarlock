@@ -25,6 +25,7 @@ from invarlock.report_presentation import (
     IntervalView,
     MetricView,
     ReportView,
+    number,
     render_html,
     render_markdown,
     xml_text,
@@ -243,6 +244,10 @@ def _view(
             threshold=float(threshold),
             label="Paired independent-unit effect interval",
             unit="normalized rating",
+            threshold_direction="minimum"
+            if policy["direction"] == "higher"
+            else "maximum",
+            neutral=0.0,
         )
     baseline_mean = (
         _baseline_mean(plan, artifacts["measurements"]) if subject is not None else None
@@ -253,19 +258,21 @@ def _view(
         if required
         else "Advisory metric; fixed benchmark; equal independent-unit weights",
         decision=analysis["decision"],
-        baseline=baseline_mean if baseline_mean is not None else "Unavailable",
-        candidate=subject["mean"] if subject is not None else "Unavailable",
-        change=effect["mean"] if effect is not None else "Unavailable",
-        count=(
-            f"{_count_label(counts['scheduled_cases'], 'case')}; "
-            f"{_count_label(counts['scheduled_units'], 'independent unit')}; "
-            f"{counts['completed_trials']}/{counts['expected_trials']} completed "
-            f"{'trial' if counts['expected_trials'] == 1 else 'trials'}"
-        ),
+        baseline=number(float(baseline_mean))
+        if baseline_mean is not None
+        else "Unavailable",
+        candidate=number(float(subject["mean"]))
+        if subject is not None
+        else "Unavailable",
+        change=number(float(effect["mean"])) if effect is not None else "Unavailable",
+        count=_count_label(counts["scheduled_cases"], "case"),
         explanation=explanation,
         checks=checks,
         interval=interval,
         notes=(
+            f"{_count_label(counts['scheduled_units'], 'independent unit')}; "
+            f"{counts['completed_trials']}/{counts['expected_trials']} completed "
+            f"{'trial' if counts['expected_trials'] == 1 else 'trials'}.",
             "Decision role: required."
             if required
             else "Decision role: advisory; this metric does not gate required decisions.",
@@ -503,6 +510,13 @@ def _view(
             facts["comparison"][side].update(
                 run_digest=run_digest(run), source_digest=run["source_digest"]
             )
+            if "service_identity" in run:
+                service = run["service_identity"]
+                facts["comparison"][side]["service_identity"] = {
+                    key: value
+                    for key, value in service.items()
+                    if key != "configuration"
+                }
             native_identity.append(
                 (
                     side.title() + " source digest",
@@ -614,9 +628,12 @@ def _view(
             ("Coverage", metric.count),
         ),
         identity=tuple(native_identity)
+        + tuple(
+            (side.title() + " artifact", artifacts[f"{side}_run"]["artifact_digest"])
+            for side in ("baseline", "subject")
+            if artifacts[f"{side}_run"]["artifact_digest"] is not None
+        )
         + (
-            ("Baseline artifact", artifacts["baseline_run"]["artifact_digest"]),
-            ("Subject artifact", artifacts["subject_run"]["artifact_digest"]),
             ("Plan", publication.envelope["bindings"]["plan_sha256"]),
             ("Intended subject", publication.envelope["intended_subject"]),
             (
@@ -650,6 +667,7 @@ def _view(
                 if native is not None
                 else "A retained judgment does not establish model execution or immunity to prompt injection."
             ),
+            "Verification replays retained measurements offline; it does not remeasure the evaluated service or independently establish that every judge rating is correct.",
         ),
         details=tuple(details),
         technical={

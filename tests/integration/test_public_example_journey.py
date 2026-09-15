@@ -7,6 +7,7 @@ import stat
 import subprocess
 import sys
 import tarfile
+import textwrap
 from collections.abc import Mapping
 from pathlib import Path
 
@@ -176,10 +177,56 @@ def test_hf_integration_prepares_from_committed_export(tmp_path: Path) -> None:
     workspace = tmp_path / "hf-integration"
     environment = dict(os.environ)
     environment["PYTHONPATH"] = str(exported / "src")
+    environment["HF_HUB_OFFLINE"] = "1"
+    environment["TRANSFORMERS_OFFLINE"] = "1"
+    # Keep the exported script's imports and real preparation path, replacing
+    # only remote checkpoint acquisition with a small local model fixture.
+    bootstrap = textwrap.dedent(
+        """
+        import runpy
+        import sys
+        from pathlib import Path
+
+        script = Path(sys.argv.pop(1))
+        sys.path[0] = str(script.parent)
+        import compact_model_profile
+
+        assert Path(compact_model_profile.__file__).parent == script.parent
+
+        def load_model_and_tokenizer(*, torch, transformers):
+            import tokenizers
+
+            vocabulary = {
+                "<pad>": 0, "<bos>": 1, "<eos>": 2, "<unk>": 3,
+                "alpha": 4, "beta": 5, "target": 6, "other": 7,
+            }
+            backend = tokenizers.Tokenizer(
+                tokenizers.models.WordLevel(vocabulary, unk_token="<unk>")
+            )
+            backend.pre_tokenizer = tokenizers.pre_tokenizers.Whitespace()
+            tokenizer = transformers.PreTrainedTokenizerFast(
+                tokenizer_object=backend, bos_token="<bos>", eos_token="<eos>",
+                pad_token="<pad>", unk_token="<unk>",
+            )
+            config = transformers.Qwen3Config(
+                vocab_size=8, hidden_size=64, intermediate_size=128,
+                num_hidden_layers=1, num_attention_heads=4,
+                num_key_value_heads=2, head_dim=16, max_position_embeddings=64,
+                bos_token_id=1, eos_token_id=2, pad_token_id=0,
+                use_cache=False, tie_word_embeddings=False,
+            )
+            return transformers.Qwen3ForCausalLM(config), tokenizer
+
+        compact_model_profile.load_model_and_tokenizer = load_model_and_tokenizer
+        runpy.run_path(str(script), run_name="__main__")
+        """
+    )
 
     completed = subprocess.run(
         [
             sys.executable,
+            "-c",
+            bootstrap,
             str(exported / "examples/integrations/run.py"),
             "hf-transformers",
             "--workspace",
@@ -256,6 +303,8 @@ def test_only_bounded_fixture_receipts_are_unignored() -> None:
         "examples/import/baseline/runtime-provider.receipt.json",
         "examples/import/rejected-subject/runtime-provider.receipt.json",
         "examples/import/subject/runtime-provider.receipt.json",
+        "examples/hosted-service/references/mistral-7b-http/verification.receipt.json",
+        "examples/hosted-service/references/mistral-7b-http/current/verification.receipt.json",
     }
     ignore_lines = (
         (REPO_ROOT / "examples/.gitignore").read_text(encoding="utf-8").splitlines()
@@ -281,9 +330,16 @@ def test_only_bounded_fixture_receipts_are_unignored() -> None:
         "examples/import/baseline/runtime-provider.receipt.json",
         "examples/import/rejected-subject/runtime-provider.receipt.json",
         "examples/import/subject/runtime-provider.receipt.json",
+        "examples/hosted-service/references/mistral-7b-http/verification.receipt.json",
+        "examples/hosted-service/references/mistral-7b-http/current/verification.receipt.json",
     }
     for receipt in fixture_receipts:
-        assert _git("check-ignore", "--quiet", receipt).returncode == 1
+        assert _git("check-ignore", "--no-index", "--quiet", receipt).returncode == 1
+    for receipt in (
+        "examples/hosted-service/references/another/verification.receipt.json",
+        "examples/hosted-service/references/mistral-7b-http/another/verification.receipt.json",
+    ):
+        assert _git("check-ignore", "--no-index", "--quiet", receipt).returncode == 0
 
     assert (
         _git("check-ignore", "--quiet", "examples/verification.receipt.json").returncode

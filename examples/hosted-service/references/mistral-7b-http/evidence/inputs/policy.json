@@ -1,0 +1,1 @@
+{"expected_case_set_digest":"sha256:055b7884cdda72232bc22cdf7e84f2160315258a992134c51ef08288dde2b23c","format":"invarlock/comparison-policy-v1","metrics":[{"aggregation":"mean","configuration":{},"direction":"higher","kind":"exact_match","maximum_interval_width":0.1,"maximum_regression":0.02,"minimum_count":400,"name":"final_word_accuracy","unit":"score"}],"slices":[]}

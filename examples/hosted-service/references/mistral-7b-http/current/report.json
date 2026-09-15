@@ -1,0 +1,1 @@
+{"errors":[],"failed_output":null,"format_version":"invarlock/evidence-report-v2","kind":"captured","ok":true,"pack_manifest_digest":"sha256:701aa0c705c6d024745e45f8fc1f6e1a13a54de7dff4e6fdfcb69e53744ded5a","requested_outputs":{"html":"report.html","junit":"report.xml","markdown":"report.md"},"written_outputs":{"html":"report.html","junit":"report.xml","markdown":"report.md"}}

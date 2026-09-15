@@ -22,8 +22,8 @@
 </p>
 
 Using independently supplied trust inputs, an artifact recipient can check
-whether one exact model derivative satisfies an agreed release-regression
-policy.
+whether a local model derivative or captured hosted-service observation
+satisfies an agreed release-regression policy.
 
 InvarLock is an open-source assurance engine for one paired
 baseline-versus-subject decision. It can execute both sides on the same
@@ -84,7 +84,7 @@ for itself.
 
 ## Decision boundary
 
-InvarLock answers one precise question: whether a subject artifact satisfies an
+InvarLock answers one precise question: whether a subject satisfies an
 agreed release-regression policy relative to a baseline, using authenticated
 evidence and independently supplied trust anchors. It makes that decision
 reproducible, portable, and suitable for recipient-controlled approval.
@@ -121,6 +121,20 @@ Its starter records and thresholds are illustrative. Captured verification
 authenticates inputs and arithmetic, not runtime execution; recorded judgments
 remain explicit and cannot authorize native acceptance or deployment.
 
+For a hosted endpoint or application, follow the
+[requalification workflow](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/hosted-service-requalification.md):
+approve a baseline and policy, capture fresh service executions, then evaluate,
+verify offline and report. Captured service identity records the configuration,
+harness and observation window without claiming immutable weights. Periodic and
+incident-triggered campaigns use your own harness and scheduler; replay of old
+evidence is not a fresh service measurement.
+
+The [local HTTP reference](https://github.com/invarlock/invarlock/blob/main/examples/hosted-service/references/mistral-7b-http/README.md)
+retains 400 paired cases from two distinct full 7B checkpoints, original responses,
+signed evidence and offline verification. It demonstrates that captured workflow;
+its comparative pass does not establish adequate task quality or qualify an
+external provider.
+
 ## Evaluate with a native judge scorer
 
 Select `metric: judge` alongside `exact_match` and
@@ -146,10 +160,14 @@ reference-continuation likelihoods for NLL, and frozen text plus retained rating
 for judging. See the [captured-results guide](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/captured-results.md#use-the-three-built-in-scorers).
 An evaluator's aggregate score cannot replace those facts.
 
-The [Harness likelihood reference](https://github.com/invarlock/invarlock/blob/main/examples/captured-results/references/harness-likelihood/README.md)
-retains six real same-model CPU pairs and their installed signed handoff. It
-demonstrates that external likelihood integration profile; its conformance pass
-does not establish model quality or qualify the full evaluator matrix.
+The [Mistral 7B likelihood reference](https://github.com/invarlock/invarlock/blob/main/examples/captured-results/references/mistral-7b-likelihood/README.md)
+compares distinct base and instruction-tuned checkpoints over 400 fixed public
+narrative continuations, retaining the measured likelihoods and installed signed
+handoff. The original six-pair
+[same-model control](https://github.com/invarlock/invarlock/blob/main/examples/captured-results/references/harness-likelihood/README.md)
+remains available. These references demonstrate their declared integration
+profiles; they do not qualify the full evaluator matrix or establish broad model
+quality.
 
 `evaluate` performs live collection through the optional
 `invarlock-inspect-judge[inspect]` package, with explicit call, token, cost, timeout

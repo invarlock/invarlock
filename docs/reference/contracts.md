@@ -98,8 +98,8 @@ the authenticated objects, in addition to validating their schemas.
 
 The independently selected complete-request digest can require exact declared
 settings and observation contents without introducing another model hash. It
-does not prove that a hosted service truthfully reported its revision or that an
-observation's scientific conclusion is correct. Do not obtain an expected digest
+does not independently confirm a hosted service's reported revision or an
+observation's scientific conclusion. Do not obtain an expected digest
 from incoming evidence and describe the resulting equality as independent trust.
 
 Observation payloads may use a versioned profile for method, configuration,

@@ -65,8 +65,8 @@ tags, registry credentials, a publisher cache, or the CLI's rendered manifest.
 Perform this for both baseline and subject. Repackaging is a separate operation
 from model transformation: retain the actual transformation's command, source and
 output identities, runtime, and configuration with the evaluation provenance.
-This example checks package-to-content binding; it does not certify a package author's
-claim that a transformation was executed honestly.
+This example checks package-to-content binding; it does not independently
+establish that the declared transformation was executed.
 
 ## Prepare independent recipient inputs
 

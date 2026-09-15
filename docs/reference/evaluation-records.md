@@ -60,13 +60,74 @@ substitute a raw export checksum for a complete-run pin.
 runtime provider or import execution authority. Original upstream bytes and
 their `source_digest` remain unchanged. A canonical `invarlock` run supplies its
 own metadata; external adapters require explicit source, run ID and artifact
-identity, with approved score provenance when recorded metrics are used.
+or hosted service identity, with approved score provenance when recorded metrics
+are used. External captured request sources accept `artifact_digest: null`
+with the complete `service_identity` descriptor. Canonical `adapter: invarlock`
+runs carry their own descriptor and reject source identity overrides. The
+external parser also binds the original file bytes through `source_digest`.
+
+## Hosted service identity
+
+A canonical run may include `service_identity` only with `artifact_digest: null`.
+Local artifact runs retain their existing digest contract and need no new field.
+The service descriptor is closed and requires every field below; unavailable
+observed model or exposed revision values are explicitly `null`.
+
+| Field | Accepted value and meaning |
+| --- | --- |
+| `kind` | Exactly `hosted_service` |
+| `provider`, `service`, `deployment`, `requested_model` | Nonempty strings, at most 512 characters each, describing the requested endpoint |
+| `observed_model`, `exposed_revision` | Nonempty strings of at most 512 characters, or `null`; source-reported observations |
+| `configuration` | JSON object with at most 100 properties containing relevant non-secret settings |
+| `configuration_digest` | `invarlock.engine.digest(configuration)` |
+| `harness` | Closed object with nonempty `name` and `version` (at most 512 characters each), plus SHA-256 `source_digest` |
+| `observation_window` | Closed object with `started_at` and `ended_at`, ordered UTC timestamps using `YYYY-MM-DDTHH:MM:SS[.microseconds]Z` |
+
+The complete descriptor is limited to 1 MiB. Unknown fields, an inconsistent
+configuration digest, invalid timestamps or a reversed window are rejected.
+Identity strings reject ASCII control characters and all-whitespace values. Fractional seconds, when
+present, contain one through six digits; the start may equal the end.
+`invarlock.engine.make_run` and `capture_evaluator_run` accept
+`artifact_digest=None, service_identity=identity`. The configuration digest is
+computed over the configuration object; the service identity digest is computed
+over the complete descriptor. `run_digest` additionally binds all records and
+run provenance. These are different identities and cannot substitute for one
+another. The public `invarlock.engine.validate_service_identity(identity)`
+validates the descriptor. `invarlock.engine.evaluated_subject_digest(run)` returns
+the hosted descriptor digest or, for a local run, its explicit artifact digest;
+it does not fall back from a malformed hosted identity. Neither helper
+authorizes the subject or replaces a complete-run pin.
+
+For example, given a reviewed descriptor and explicitly mapped records:
+
+```python
+from invarlock.engine import capture_evaluator_run, digest
+
+identity["configuration_digest"] = digest(identity["configuration"])
+run = capture_evaluator_run(
+    rows,
+    source={"name": "service-capture", "version": "1"},
+    run_id="subject-campaign",
+    artifact_digest=None,
+    service_identity=identity,
+)
+```
+
+The variables `identity` and `rows` must contain the complete descriptor and
+actual captured facts. Canonical source bytes and complete-run anchors authenticate
+what was supplied; a service label, revision string or digest of the descriptor
+does not identify immutable model weights or attest execution. A hosted run
+uses the captured request and verification path. It does not register a native
+runtime provider or require provider access during offline replay. See the
+[requalification guide](../user-guide/hosted-service-requalification.md) for
+campaign preparation and interpretation.
 
 ## Capture and explicit input projections
 
 `invarlock.engine.capture_evaluator_run` accepts explicitly mapped per-case rows
 from any evaluator, with its actual source name/version, run ID and supplied
-artifact digest. `evaluator_input_capabilities` reports usable counts and
+artifact digest, or `artifact_digest=None` with a hosted `service_identity`.
+`evaluator_input_capabilities` reports usable counts and
 unavailable IDs for `exact_match`, `normalized_nll_per_utf8_byte` and `judge`.
 Availability describes input facts; it grants neither qualification nor proof
 of an upstream scorer execution.
@@ -97,7 +158,8 @@ A record may additionally retain `likelihood` with these closed fields:
 | `token_count` | Positive integer count of measured reference tokens |
 | `utf8_byte_count` | Positive integer equal to the reference string's UTF-8 byte length |
 | `input_digest`, `reference_digest` | Canonical digests of the original input and reference |
-| `artifact_digest`, `source` | Exact evaluated artifact and evaluator identity from the run |
+| `artifact_digest`, `source` | Exact evaluated artifact and evaluator identity from the run; artifact is `null` for hosted runs |
+| `service_identity_digest` | Required for hosted likelihoods: canonical digest of the complete run service descriptor; absent for local artifacts |
 | `configuration_digest`, `tokenizer_digest` | Pins for the likelihood measurement configuration and tokenizer |
 
 These facts must originate from an actual likelihood measurement. Generated
@@ -107,7 +169,11 @@ projection, `input_digest` still identifies the preserved original input.
 The NLL policy metric uses `direction: lower`, `unit: nats_per_utf8_byte`,
 `aggregation: mean` and `ratio_max` in place of `maximum_regression`. Its
 configuration requires `configuration_digest`, `baseline_tokenizer_digest` and
-`subject_tokenizer_digest`. The score per record is `-logprob_sum / utf8_byte_count`;
+`subject_tokenizer_digest`. For hosted NLL, the policy has one shared
+`configuration_digest`: both service descriptors and each likelihood row must
+match it. Different service configurations are not admitted by this profile;
+separate model, observation-window and tokenizer identities may still differ.
+The score per record is `-logprob_sum / utf8_byte_count`;
 the comparison is the ratio of subject and baseline means, with the same paired
 resampling method as native NLL. Interval width is measured in ratio units.
 Reference and configuration bindings and the declared tokenizer identities are

@@ -66,8 +66,17 @@ def test_captured_judge_preflight_never_collects_or_writes(tmp_path, monkeypatch
     assert not (tmp_path / "evidence").exists()
 
 
-def test_captured_import_judgments_uses_same_offline_cli_and_report(tmp_path):
+@pytest.mark.parametrize("hosted", [False, True])
+def test_captured_import_judgments_uses_same_offline_cli_and_report(tmp_path, hosted):
     path, value, recipe, runs = _request(tmp_path)
+    if hosted:
+        from invarlock.engine import evaluated_subject_digest
+        from tests.evaluation_records.test_hosted_service_identity import identity
+
+        for side, run in zip(("baseline", "subject"), runs, strict=True):
+            run.update(artifact_digest=None, service_identity=identity())
+            run["service_identity"]["deployment"] = side
+            (tmp_path / f"{side}.json").write_text(json.dumps(run))
     plan, _ = finalize_native_plan(recipe, *runs)
     measurements = _incomplete_measurements(plan=plan)
     (tmp_path / "measurements.json").write_text(json.dumps(measurements))
@@ -76,6 +85,10 @@ def test_captured_import_judgments_uses_same_offline_cli_and_report(tmp_path):
     result = CliRunner().invoke(app, ["evaluate", str(path), "--unsigned", "--json"])
     assert result.exit_code == 0, result.output
     assert json.loads(result.output)["decision"] == "insufficient_evidence"
+    if hosted:
+        envelope = json.loads((tmp_path / "evidence/envelope.json").read_text())
+        assert envelope["intended_subject"] == evaluated_subject_digest(runs[1])
+        assert envelope["intended_subject"] != evaluated_subject_digest(runs[0])
     report = CliRunner().invoke(
         app,
         ["report", str(tmp_path / "evidence"), "--html", str(tmp_path / "report.html")],
