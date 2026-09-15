@@ -152,7 +152,6 @@ def test_docs_ci_reports_for_every_pull_request_and_scopes_pushes() -> None:
     workflow = _load(".github/workflows/docs-ci.yml")
     docs = workflow["jobs"]["docs"]
 
-    assert _step(docs, "Check documentation")["run"] == "make docs-check"
     assert _step(docs, "Exercise documented commands")["run"] == ("make docs-live-fast")
     assert workflow["on"]["pull_request"] == {
         "branches": ["main", "staging/next", "release/v*"]

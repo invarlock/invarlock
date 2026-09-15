@@ -17,13 +17,19 @@ Workflow YAML is linted with `make workflow-lint`.
   `evaluate`, `verify`, and `report` through the installed command surface.
   It also checks network isolation with positive controls, resource limits,
   interruption, exact-container cleanup, and failed evidence publication.
-- `pre-commit.yml` runs the repository pre-commit hooks.
-- `repo-hygiene.yml` rejects generated artifacts and oversized files.
+- `pre-commit.yml` runs the repository hooks for every pull request, including
+  changes to shell scripts, TOML files and dependency locks.
+- `repo-hygiene.yml` rejects generated artifacts and oversized files. Obsolete
+  runs are cancelled; only the checks that inspect a change's history fetch it.
+
+Python dependency caches use each job's installed workflow locks as their keys.
+When adding an installation step or locked environment, include its lockfile in
+that job's `cache-dependency-path`.
 
 ## Documentation
 
-- `docs-ci.yml` lints and builds the current documentation and smoke-checks the
-  documented CLI command surface.
+- `docs-ci.yml` lints and builds the current documentation once and smoke-checks
+  the documented CLI command surface through `make docs-live-fast`.
 - `docs-publish.yml` serializes MkDocs publication to `gh-pages`. `main` pushes
   update `latest`, while the production release workflow calls it from the
   exact release tag to update the immutable version path, `latest`, and
@@ -31,7 +37,8 @@ Workflow YAML is linted with `make workflow-lint`.
 
 ## Security and release
 
-- `codeql.yml` performs static analysis.
+- `codeql.yml` analyzes core code, maintained scripts and all five shipped
+  add-in source trees.
 - `supply-chain-pr.yml` audits the core and Hugging Face install surfaces and
   scans the pull-request delta for secrets.
 - `scorecards.yml` publishes OpenSSF Scorecard results.
