@@ -115,7 +115,7 @@ teams, and internal AI teams with a release-review process.
 <p align="center">
   <img
     src="https://raw.githubusercontent.com/invarlock/invarlock/main/docs/assets/evaluation-verification-flow.svg"
-    alt="A pinned paired evaluation publishes signed evidence, a separate recipient verifies it, and a report explains the result"
+    alt="Native comparisons, captured records and frozen answers feed evaluation; independent verification and reporting use the resulting evidence"
     width="100%"
   />
 </p>

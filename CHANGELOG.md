@@ -12,7 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Aligned the documentation overview, user guides, API and assurance references
   with native, captured and judge workflows. Corrected receipt-verification
   examples, scorer authorization, hosted identity and report semantics; clarified
-  required integration keys and coordinated release-package coverage.
+  required integration keys and coordinated release-package coverage. Updated
+  the workflow diagram for judge and hosted-service inputs and completed the
+  root distribution and retained-data notices.
 
 - Reorganized the root README around a runnable signed-evidence quickstart,
   the three built-in scorers, supported integration routes and retained examples.
@@ -216,6 +218,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unchanged.
 
 ### Fixed
+
+- Restored the evaluator image build inputs excluded by the root Docker context
+  allowlist and removed obsolete paths. Build-input checks cover current Harness,
+  Inspect and OpenAI Evals recipes.
 
 - Reject duplicate provider response IDs across retained Inspect judge calls and
   resumed collection, including calls split across source segments. Generic

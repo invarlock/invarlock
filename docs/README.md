@@ -139,7 +139,7 @@ A [runtime profile](reference/cli.md#reusable-runtime-profiles) supplies reusabl
 execution settings without choosing policy or signer trust. Authenticated
 provider import uses complete existing sidecars instead of rerunning answers.
 
-![Native execution binds a paired request, publishes signed evidence, and supports separate verification and reporting](assets/evaluation-verification-flow.svg)
+![Native comparisons, captured records and frozen answers feed evaluation, followed by independent verification and reporting](assets/evaluation-verification-flow.svg)
 
 **Captured evaluation** accepts supported Inspect AI, Harness and Promptfoo
 export profiles, canonical records or data prepared through the

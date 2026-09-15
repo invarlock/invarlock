@@ -15,10 +15,10 @@ invarlock verify evidence/
 invarlock report evidence/
 ```
 
-![InvarLock paired release-regression architecture](../assets/evaluation-verification-flow.svg)
+![Native, captured and judge evaluation with separate verification and reporting](../assets/evaluation-verification-flow.svg)
 
 `evaluate` executes, imports, or compares captured baseline-versus-subject
-records and publishes one atomic evidence directory. Native exact-match/NLL and
+records and publishes evidence for the selected workflow. Native exact-match/NLL and
 deterministic-extension execution/import retain pack v1, native
 artifact/schedule/runtime anchors, and receipt v1/v2. Captured built-in and
 recorded-score comparisons use pack v2, complete-run/request/policy/signer anchors,
