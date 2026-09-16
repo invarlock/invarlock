@@ -66,7 +66,7 @@ def validate_collection_environment(
             version = importlib.metadata.version(distribution)
         except importlib.metadata.PackageNotFoundError:
             raise InspectJudgeError(
-                "install invarlock-inspect-judge[inspect] for live collection"
+                'install "invarlock[judge]" for live collection'
             ) from None
         if version != expected:
             raise InspectJudgeError(

@@ -1,8 +1,10 @@
 """Package descriptions keep repository context without mutable release links."""
 
+from html.parser import HTMLParser
 from pathlib import Path
 
 import pytest
+from markdown_it import MarkdownIt
 
 from scripts.release import package_readme as readme
 
@@ -86,8 +88,29 @@ def test_cli(tmp_path, monkeypatch):
 def test_picture_cleanup_preserves_literal_examples(tmp_path):
     source = '<p>\n  <picture>\n    <source srcset="x">\n  </picture>\n</p>\n```html\n<picture><source srcset="x"></picture>\n  \n```\n'
     result = readme.render(tmp_path, project(tmp_path, source))
-    assert result.startswith("<p>\n\n\n\n</p>")
+    assert result.startswith("<p>\n\n</p>")
     assert '```html\n<picture><source srcset="x"></picture>\n  \n```' in result
+
+
+def test_package_logo_renders_as_image():
+    root = Path(__file__).resolve().parents[2]
+    rendered = MarkdownIt("commonmark").render(readme.render(root, root))
+
+    class Images(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.images = []
+
+        def handle_starttag(self, tag, attrs):
+            if tag == "img":
+                self.images.append(dict(attrs))
+
+    images = Images()
+    images.feed(rendered)
+    logos = [item for item in images.images if item.get("alt") == "InvarLock"]
+    assert len(logos) == 1
+    assert logos[0]["src"].endswith("/docs/assets/invarlock-logo.svg")
+    assert "&lt;img" not in rendered
 
 
 @pytest.mark.parametrize(

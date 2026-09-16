@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "invarlock-runtime-gguf"
-version = "0.16.0"
+version = "0.16.1"
 description = "First-party GGUF runtime provider add-in for InvarLock"
 readme = "packaging/README.md"
 requires-python = ">=3.12"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
-dependencies = ["invarlock==0.16.0"]
+dependencies = ["invarlock==0.16.1"]
 
 [project.entry-points."invarlock.runtime_providers"]
 llama_cpp = "invarlock_addins.gguf.provider:LlamaCppProvider"

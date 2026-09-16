@@ -30,12 +30,16 @@ evidence-signing key. Use core, collector and example files from the same source
 revision. The [getting-started guide](../../docs/user-guide/getting-started.md)
 explains model identities, image preparation and key separation.
 
-Install matching core and collector packages from the repository root:
+Install the core with live judge collection:
 
 ```bash
-python -m pip install .
-python -m pip install 'addins/inspect_judge[inspect]'
+python -m pip install "invarlock[judge]"
 ```
+
+Use the example files matching the installed release. For a local source build,
+install both packages from the same repository root with
+`python -m pip install '.[judge]' 'addins/inspect_judge[inspect]'`.
+Offline judge import, verification and reporting need only the core package.
 
 Installed collection requires exactly Inspect `0.3.263`, OpenAI `3.13.0` and
 `httpx==0.28.1`, supplied by the extra. It uses the official OpenAI Chat Completions

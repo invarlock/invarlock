@@ -300,7 +300,7 @@ def prepare_inspect_config(
         version = importlib.metadata.version("inspect-ai")
     except importlib.metadata.PackageNotFoundError as exc:
         raise InspectJudgeError(
-            "install the inspect extra to construct SDK configuration"
+            'install "invarlock[judge]" to construct SDK configuration'
         ) from exc
     _require(version == INSPECT_VERSION, "unsupported installed Inspect version")
     module = importlib.import_module("inspect_ai.model")
