@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Keep the package README logo as an image when generating the PyPI description,
+  rather than exposing its HTML as an indented code block.
+
 ## [0.16.0] - 2026-09-16
 
 InvarLock brings native execution, captured evaluator records and bounded judge

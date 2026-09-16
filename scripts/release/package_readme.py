@@ -78,9 +78,15 @@ def render(root: Path, project: Path) -> str:
         )
 
     def markup(part: str) -> str:
-        # PyPI removes source elements; publish the explicit fallback.
+        # Keep the fallback in the surrounding HTML block. Removing only the
+        # wrapper leaves blank lines and an indented Markdown code block.
+        part = re.sub(
+            r"<picture>(.*?)</picture>",
+            lambda match: re.sub(r"<source\b[^>]*>", "", match[1]).strip(),
+            part,
+            flags=re.S,
+        )
         part = re.sub(r"<source\b[^>]*>", "", part)
-        part = part.replace("<picture>", "").replace("</picture>", "")
         return re.sub(r"(?m)^[ \t]+$", "", LINK.sub(replace, part))
 
     # Examples are literal shell/Python input, not rendered resource references.
