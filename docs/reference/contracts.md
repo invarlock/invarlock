@@ -6,11 +6,13 @@ byte-identical package-owned copies ship in the core wheel. Verification always
 loads the package-owned copies: a working directory or environment variable
 cannot substitute a different schema.
 
-!!! info "Reference"
-
-    - **Surface:** Versioned request, evidence, provider, runtime, report, and receipt contracts
-    - **Stability:** Closed public interchange formats; incompatible shape or meaning changes require a new format identifier
-    - **Use this page when:** Authoring contract objects, validating canonical bytes, or reviewing cross-file digest and signature bindings
+> **Reference**
+>
+> **Surface:** Versioned request, evidence, provider, runtime, report, and receipt contracts
+>
+> **Stability:** Closed public interchange formats; incompatible shape or meaning changes require a new format identifier
+>
+> **Use this page when:** Authoring contract objects, validating canonical bytes, or reviewing cross-file digest and signature bindings
 
 ## Schema-backed contracts
 
@@ -279,12 +281,18 @@ without acceptance authority.
 
 ### Evaluator input boundary
 
-Import mode is the general extension boundary for measurements produced by an
-external evaluator. An evaluator's output is admissible for an acceptance
+Native provider import mode is an extension boundary for measurements produced
+by an external evaluator. Under that contract, output is admissible for an acceptance
 decision only when InvarLock can authenticate the ordered per-record inputs
 and outputs, bind them to the exact schedule, artifacts, runtime, and source,
 and deterministically recompute the decision-contract metric or authorized
 scorer.
+
+Captured evaluator integrations use the separate
+[evaluation-record contracts](evaluation-records.md). They bind supplied runs
+and scorer-specific facts without requiring native provider sidecars or asserting
+native execution. Captured judge requests use the bounded judge evidence and
+recipient-policy contracts.
 
 An adapter alone does not establish evaluator neutrality. The generic
 qualification boundary binds the profile, independent schedule, normalized

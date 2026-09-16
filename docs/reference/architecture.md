@@ -3,11 +3,13 @@
 InvarLock is an authenticated paired-evaluation engine. Its core path has three
 transactions:
 
-!!! info "Reference"
-
-    - **Surface:** Core transaction, package, data-flow, and trust boundaries
-    - **Stability:** Architectural contract for the paired evaluation engine; implementation internals may change behind documented public surfaces
-    - **Use this page when:** Locating responsibilities, selecting an integration boundary, or inspecting where evidence-signing and verifier authority separate
+> **Reference**
+>
+> **Surface:** Core transaction, package, data-flow, and trust boundaries
+>
+> **Stability:** Architectural contract for the paired evaluation engine; implementation internals may change behind documented public surfaces
+>
+> **Use this page when:** Locating responsibilities, selecting an integration boundary, or inspecting where evidence-signing and verifier authority separate
 
 ```bash
 invarlock evaluate request.yaml
@@ -87,7 +89,8 @@ are not selected by the bundle:
 - for GGUF evidence, the expected normalized-request digest.
 
 The verifier signs those anchors, the pack-manifest digest, and its verdict
-with a separate key. Keeping the verification receipt outside the bundle lets
+with a verifier-controlled key. The recipient's process enforces any required
+separation of signing keys. Keeping the receipt outside the bundle lets
 multiple authorities assess the same immutable evidence using independently
 sourced copies of the policy bytes bound into that bundle.
 
@@ -95,7 +98,7 @@ sourced copies of the policy bytes bound into that bundle.
 | --- | --- | --- |
 | Which artifacts were compared | Typed artifact identities and request bindings | Re-derive identity and compare material digests |
 | Which inputs were scored | Canonical schedule and ordered observation records | Recompute schedule digest, IDs, order, and input digests |
-| Which runtime executed each side | Runtime manifests and provider receipts | Compare both image digests to caller-owned expected values |
+| Which runtime each side declares | Runtime manifests and provider receipts | Compare both image digests to caller-owned expected values; this does not attest execution |
 | What each backend returned | Scoring observations | Validate per-record facts and observation digests |
 | What score and threshold apply | Paired records, policy, scorer binding when selected, and canonical report | Re-derive scores, means, comparison, paired interval, threshold, optional count/width and exact-match side-accuracy qualification, and verdict; require independently authorized scorer code when selected |
 | Who signed the pack | Manifest signature | Compare the public-key fingerprint to the caller anchor |
@@ -170,8 +173,10 @@ See [Runtime providers](runtime-providers.md) for the extension contract.
    statistical assumptions and conservative policy bound.
 4. Publication stages a closed inventory, signs its manifest or judge envelope,
    and renames the directory into place without replacing an existing destination.
-5. Verification treats the submitted bundle as untrusted, replays all semantic
-   bindings, and signs a receipt outside it.
+5. Verification treats the submitted bundle as untrusted and replays the
+   selected contract under independent trust inputs. Native pack-v1 verification
+   writes a signed receipt outside the bundle; judge verification returns a local
+   result and signs a separate receipt when requested.
 6. Reporting checks retained evidence and writes optional presentation outputs.
    Native and captured directory-pack reports display the recorded comparison;
    judge reports additionally replay retained measurements.

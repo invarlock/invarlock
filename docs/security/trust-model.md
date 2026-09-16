@@ -6,26 +6,26 @@ preserves the team's intended comparison when inputs and signing roles are
 controlled independently. The same organization or operator can maintain those
 roles using separately approved expectations and distinct evidence/verifier keys.
 
-!!! warning "Security guidance"
-
-    **In plain language:** A valid signature identifies a key; trust comes from
-    independently deciding that the key, policy, artifacts, schedule, runtimes,
-    and scoped result are the ones you intended to rely on.
-
-    **Objective:** Define what evidence-signer, technical-verifier, and envelope
-    signatures establish, which anchors must remain independent, and the exact
-    scope of a trusted receipt or portable acceptance envelope.
-
-    **Assets or boundary:** Canonical evidence, evidence-signer, verifier, and
-    envelope-signing identities, technical and recipient policy, artifact,
-    schedule, subject, and runtime anchors, authorized scorer code when
-    selected, receipt and acceptance statements, and the authorization sources
-    that are intentionally outside submitted evidence.
-
-    **Use this page when:** Assigning evidence signer, technical verifier,
-    envelope signer, recipient, or receipt-verifier roles; designing
-    trust-anchor distribution; or evaluating whether a signed result supports
-    a proposed reliance decision.
+> **Security guidance**
+>
+> **In plain language:** A valid signature identifies a key; trust comes from
+> independently deciding that the key, policy, artifacts, schedule, runtimes,
+> and scoped result are the ones you intended to rely on.
+>
+> **Objective:** Define what evidence-signer, technical-verifier, and envelope
+> signatures establish, which anchors must remain independent, and the exact
+> scope of a trusted receipt or portable acceptance envelope.
+>
+> **Assets or boundary:** Canonical evidence, evidence-signer, verifier, and
+> envelope-signing identities, technical and recipient policy, artifact,
+> schedule, subject, and runtime anchors, authorized scorer code when
+> selected, receipt and acceptance statements, and the authorization sources
+> that are intentionally outside submitted evidence.
+>
+> **Use this page when:** Assigning evidence signer, technical verifier,
+> envelope signer, recipient, or receipt-verifier roles; designing
+> trust-anchor distribution; or evaluating whether a signed result supports
+> a proposed reliance decision.
 
 The equations and runtime anchors below describe native pack-v1 evidence.
 Captured comparisons and bounded judge measurements have separate trust inputs;
@@ -130,7 +130,9 @@ and result. Native judge evidence additionally binds `native_capture_sha256`.
 Offline verification returns separate authentication, replay, verification,
 acceptance and decision fields. A local result can be unsigned; an optional
 judge receipt authenticates that result for handoff under its own receipt
-contract. See [judge measurements](../reference/judge-measurements.md).
+contract. `verified: true` does not imply `accepted: true`: advisory evidence
+cannot satisfy required recipient acceptance, even when its decision is `pass`.
+See [judge measurements](../reference/judge-measurements.md).
 
 An externally assigned scalar rating may be evaluated as a captured `recorded`
 metric when policy explicitly approves its provenance. That verifies retained
@@ -152,8 +154,9 @@ a mutually consistent set of provider facts and sign it.
 
 The verifier signature similarly establishes who signed the receipt and which
 manifest, anchors, and replayed verdict it covers. It does not make the source
-measurements true. It shows that the named verifier accepted those bytes under
-the recorded anchors and verifier implementation.
+measurements true. It authenticates the named verifier's recorded result under
+the stated anchors and verifier implementation, including a failure result.
+Acceptance requires checking the verdict and applicable independent policy.
 
 Trust in either statement therefore requires an external authorization binding
 between a real actor and the pinned public-key fingerprint.

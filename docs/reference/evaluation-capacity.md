@@ -1,9 +1,12 @@
 # Evaluation Capacity
 
-!!! info "Reference"
-    **Surface:** Bounded captured-evaluation workload and replay limits.
-    **Stability:** Public core operational contract.
-    **Use this page when:** Setting recipient-side replay budgets.
+> **Reference**
+>
+> **Surface:** Bounded captured-evaluation workload and replay limits.
+>
+> **Stability:** Public core operational contract.
+>
+> **Use this page when:** Setting recipient-side replay budgets.
 
 Captured evaluation enforces bounded input, record, artifact, and comparison
 sizes before doing statistical work. The verifier also charges the complete

@@ -4,14 +4,16 @@ InvarLock separates provider facts, a canonical comparison report, independent
 verification output, a signed verification receipt, and console or HTML summaries.
 They have different trust meanings.
 
-!!! info "Reference"
-
-    - **Surface:** Runtime-side reports, canonical comparison reports,
-      verification results, signed receipts, and console or HTML summaries
-    - **Stability:** Versioned machine contracts are stable by format; console
-      and HTML output are presentation surfaces
-    - **Use this page when:** Parsing a decision, validating a receipt, or
-      distinguishing signed evidence from independently accepted evidence
+> **Reference**
+>
+> **Surface:** Runtime-side reports, canonical comparison reports,
+> verification results, signed receipts, and console or HTML summaries
+>
+> **Stability:** Versioned machine contracts are stable by format; console
+> and HTML output are presentation surfaces
+>
+> **Use this page when:** Parsing a decision, validating a receipt, or
+> distinguishing signed evidence from independently accepted evidence
 
 Report formats depend on the selected scorer and evidence family. The native
 runtime sections below describe exact match, normalized NLL and deterministic
@@ -332,9 +334,11 @@ A completed `regression` or `insufficient_evidence` decision has
 Local work-budget or unsupported-scoring-environment refusal is incomplete
 verification (exit `2`) without a receipt, not evidence corruption.
 
-Do not infer acceptance from `integrity_ok` alone. Require status `0`,
-`ok: true`, the expected `assurance_status`, exact anchors, and a valid receipt
-when the result crosses a process boundary.
+Do not infer acceptance from `integrity_ok` alone. Native deterministic acceptance
+requires `assurance_status: verified`; captured acceptance requires
+`replay_status: completed`. Both require status `0`, `ok: true`,
+`integrity_ok: true`, exact anchors, and a valid receipt when the result crosses
+a process boundary.
 
 ## Signed verification receipt
 

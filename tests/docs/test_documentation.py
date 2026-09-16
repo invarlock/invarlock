@@ -9,7 +9,9 @@ import tomllib
 from pathlib import Path
 
 import jsonschema
+import markdown
 import yaml
+from markdown_it import MarkdownIt
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CORE_DOCS = (
@@ -88,11 +90,11 @@ EXPECTED_DOC_PAGES = {
 }
 DOCUMENT_TYPE_CONTRACTS = {
     "user-guide": (
-        '!!! tip "User guide"',
+        "> **User guide**",
         ("**Outcome:**", "**Audience:**", "**Prerequisites:**"),
     ),
     "assurance": (
-        '!!! abstract "Assurance note"',
+        "> **Assurance note**",
         (
             "**In plain language:**",
             "**Question:**",
@@ -101,11 +103,11 @@ DOCUMENT_TYPE_CONTRACTS = {
         ),
     ),
     "reference": (
-        '!!! info "Reference"',
+        "> **Reference**",
         ("**Surface:**", "**Stability:**", "**Use this page when:**"),
     ),
     "security": (
-        '!!! warning "Security guidance"',
+        "> **Security guidance**",
         (
             "**In plain language:**",
             "**Objective:**",
@@ -187,7 +189,7 @@ def test_readme_leads_with_a_runnable_workflow_and_scoped_capabilities() -> None
         "## What can you use it for?",
         "## One workflow: evaluate, verify, report",
         "## Choose a scorer",
-        "## Keep your evaluator—or run the comparison here",
+        "## Keep your evaluator or run the comparison here",
         "## Inspect real retained examples",
         "## What verification establishes",
         "## Documentation and contributing",
@@ -206,7 +208,7 @@ def test_readme_leads_with_a_runnable_workflow_and_scoped_capabilities() -> None
         assert f"(`{metric}`)" in scorers
     integrations = readme[positions[4] : positions[5]]
     assert "An aggregate score cannot substitute" in integrations
-    assert "verifying old evidence does not measure" in integrations
+    assert "Verifying old evidence does not measure" in integrations
     boundary = " ".join(readme[positions[6] : positions[7]].split())
     assert "does not independently rerun" in boundary
     assert "recipient's current policy" in boundary
@@ -506,6 +508,25 @@ def test_typed_docs_declare_their_reader_contract() -> None:
             for field in fields:
                 value = opener.split(field, maxsplit=1)[1].splitlines()[0].strip()
                 assert value, f"empty {field} in {page}"
+
+            # GitHub treats MkDocs-only indented callouts as code. Exercise
+            # both Markdown engines, not just the presence of source labels.
+            contract_lines = []
+            for line in text[text.index(marker) :].splitlines():
+                if not line.startswith(">"):
+                    break
+                contract_lines.append(line)
+            contract = "\n".join(contract_lines)
+            rendered = (
+                MarkdownIt("commonmark").render(contract),
+                markdown.markdown(contract, extensions=["admonition", "tables"]),
+            )
+            for html in rendered:
+                assert "<blockquote>" in html, page
+                assert "<pre>" not in html, page
+                for field in fields:
+                    assert f"<strong>{field.strip('*')}</strong>" in html, page
+                    assert field not in html, page
 
 
 def test_workflow_diagram_tracks_current_transactions() -> None:

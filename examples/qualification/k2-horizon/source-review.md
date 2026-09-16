@@ -1,13 +1,37 @@
 # K2 candidate runtime source review
 
-!!! abstract "Assurance note"
-    **In plain language:** the chosen native implementation can load the
-    declared architecture without executing code supplied by the model
-    repository, but its complete runnable image is not qualified yet.
-    **Question:** which code and configuration boundaries must be preserved?
-    **Decision use:** review a candidate build before authorizing qualification.
-    **Evidence:** pinned public source inspection and dependency resolution;
-    no GPU execution evidence.
+This note explains why the campaign selects a particular SGLang source and
+restricted dependency set. Use it when rebuilding the runtime or evaluating a
+dependency change; the [campaign guide](README.md) supplies the full execution
+sequence.
+
+> **In plain language:** The selected source provides a native path for the
+> declared architecture without executing model-repository Python. Source
+> inspection does not establish that the complete image or GPU model works.
+>
+> **Question:** Which code and configuration boundaries must a candidate build
+> preserve?
+>
+> **Decision use:** Assess build inputs before authorizing qualification.
+>
+> **Evidence:** Pinned public source inspection and dependency resolution;
+> no GPU execution evidence.
+
+## How to use this note
+
+Read the source boundaries first, then compare any proposed dependency update
+with the maintained derivation and lock. The resolution command below requires
+the authenticated `runtime-source/` directory prepared by the campaign guide,
+the matching checkout, `uv`, and network access to the listed package indexes.
+It produces a candidate lock for inspection; it does not replace the maintained
+lock, build a ready image or run a model.
+
+The expected result of this review is an exact set of source and dependency
+inputs that can proceed to the guide's image checks. If the source hashes,
+dependency closure or selected runtime behavior changes, repeat the relevant
+checks before relying on a prior result.
+
+## Selected source boundaries
 
 The candidate SGLang source commit is
 `392841f47cb7ef214601eeb528906a0abba02471`. It includes native K2 support and its

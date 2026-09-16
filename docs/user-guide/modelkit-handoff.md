@@ -1,12 +1,15 @@
 # Verify a ModelKit at the point of use
 
-!!! tip "User guide"
-    **Outcome:** Check the exact delivered package, both actual model directories,
-    signed evaluation evidence, and the recipient's current acceptance policy.
-    **Audience:** Model publishers and recipients integrating an artifact handoff.
-    **Prerequisites:** Python 3.12 or newer, the installed
-    InvarLock wheel, a separately reviewed copy of the example script, complete
-    local package blobs, and independently selected trust inputs.
+> **User guide**
+>
+> **Outcome:** Check the exact delivered package, both actual model directories,
+> signed evaluation evidence, and the recipient's current acceptance policy.
+>
+> **Audience:** Model publishers and recipients integrating an artifact handoff.
+>
+> **Prerequisites:** Python 3.12 or newer, the installed
+> InvarLock wheel, a separately reviewed copy of the example script, complete
+> local package blobs, and independently selected trust inputs.
 
 Use the [matching wheel and examples](getting-started.md#matching-wheels-and-examples).
 The example uses the public InvarLock verifier and needs no service account. Its result is a check at the time

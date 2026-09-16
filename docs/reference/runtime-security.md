@@ -5,11 +5,13 @@ observe strict execution context and to harden an embedding process. They are
 defense-in-depth tools; they do not turn a Python process or container into a
 trusted execution environment.
 
-!!! info "Reference"
-
-    - **Surface:** `invarlock.runtime_security` and `invarlock.security`
-    - **Stability:** Documented names are public; kernel, container, and socket behavior remains platform-dependent
-    - **Use this page when:** Embedding the engine, constructing runtime manifests, or applying process-local network and temporary-file controls
+> **Reference**
+>
+> **Surface:** `invarlock.runtime_security` and `invarlock.security`
+>
+> **Stability:** Documented names are public; kernel, container, and socket behavior remains platform-dependent
+>
+> **Use this page when:** Embedding the engine, constructing runtime manifests, or applying process-local network and temporary-file controls
 
 ## Runtime observation facade
 

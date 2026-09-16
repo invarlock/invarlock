@@ -4,11 +4,13 @@ An evidence set combines one captured deterministic comparison and one required
 bounded judge comparison over the same complete baseline and subject runs. Both
 component policies must pass before a recipient accepts the combined result.
 
-!!! info "Reference"
-
-    - **Surface:** Evidence-set index, recipient policy, verification and reporting
-    - **Stability:** Additive closed formats; existing component formats retain their meanings
-    - **Use this page when:** Requiring deterministic and repeated-judge checks on the same frozen answers
+> **Reference**
+>
+> **Surface:** Evidence-set index, recipient policy, verification and reporting
+>
+> **Stability:** Additive closed formats; existing component formats retain their meanings
+>
+> **Use this page when:** Requiring deterministic and repeated-judge checks on the same frozen answers
 
 ## Component boundary
 

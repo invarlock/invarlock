@@ -54,6 +54,8 @@ dev = [
   "types-jsonschema>=4.26",
   "hypothesis>=6.98",
   "pre-commit>=4.6.1",
+  "markdown>=3.10.2",
+  "markdown-it-py>=4.0.0",
   "mkdocs>=1.5",
   "mkdocs-material>=9.7.7",
   "mkdocs-mermaid2-plugin>=1.2.3",
@@ -74,6 +76,8 @@ ci = [
   "mypy==2.3.1",
   "types-jsonschema>=4.26",
   "build>=0.10.0",
+  "markdown>=3.10.2",
+  "markdown-it-py>=4.0.0",
   "wheel>=0.48.0",
   "twine>=4.0.0",
 ]

@@ -6,6 +6,12 @@ and slot extraction are `insufficient_evidence` because their 40-unit effect
 intervals have width `1.007489336443204`, above the frozen maximum of `1`.
 These are advisory policy results for the pilot schedule.
 
+Use this reference to compare two judge configurations on identical frozen
+answers and to replay an authentic but inconclusive result. Grounded QA concerns
+answers supported by supplied context; extraction concerns requested slot
+values. The 480 ratings come from only 80 cases across both workflows, so the
+rating count should not be read as the independent sample size.
+
 ## What is retained
 
 [reference.zip](reference.zip) is a deterministic archive with sorted members,
@@ -65,11 +71,15 @@ a general latency comparison.
 
 ## Replay without model calls
 
+You need Python 3.12 or newer, the core InvarLock package and the checked-in
+archive. No optional collector, API key, model or GPU is needed. The helper
+uses temporary extraction and prints JSON without changing the archive.
+
 Use the helper from this repository revision with the core InvarLock
 implementation installed from collector source
 `adb3c77d0af3e351b6dfe325959660deb5543e80` or a compatible later revision.
 Obtain the archive pin from an independently trusted copy of this repository,
-then run:
+then run from the checkout root:
 
 ```bash
 python examples/judge_measurements_pilot_reference.py \
@@ -84,6 +94,12 @@ reference validation exits zero with `verified: true`, `authenticated: true`,
 both workflows. A required recipient cannot accept the retained advisory
 evidence. The independently obtained archive pin gives authority to the included
 public-key anchors; keys copied from an untrusted submitted package would not.
+
+Both workflow entries should show successful verification and rejected
+acceptance. The helper exits zero because those are the retained expected
+outcomes. A nonzero helper exit means an archive, signature, binding or replay
+check failed. Preserve that error and recover the approved inputs rather than
+changing the retained measurements or their policy.
 
 ## Claim limits
 

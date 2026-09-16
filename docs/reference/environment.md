@@ -5,14 +5,16 @@ InvarLock keeps environment configuration narrow. Comparison intent belongs in
 supply secrets, independent verification anchors, OCI launch choices, and
 caller-owned provider resources.
 
-!!! info "Reference"
-
-    - **Surface:** Public CLI, OCI launcher, provider-resource, and security
-      environment variables
-    - **Stability:** Documented variables are public operator inputs;
-      repository-test and add-in-internal variables are excluded
-    - **Use this page when:** Supplying key paths, independent verifier anchors,
-      runtime-image identity, device selection, or caller-owned provider support
+> **Reference**
+>
+> **Surface:** Public CLI, OCI launcher, provider-resource, and security
+> environment variables
+>
+> **Stability:** Documented variables are public operator inputs;
+> repository-test and add-in-internal variables are excluded
+>
+> **Use this page when:** Supplying key paths, independent verifier anchors,
+> runtime-image identity, device selection, or caller-owned provider support
 
 An explicit command option wins over its environment alternative. Empty values
 do not satisfy required paths, digests, fingerprints, or identities.

@@ -6,11 +6,13 @@ requests, responses, sanitized error outcomes, attempts and source mappings for
 offline replay. Failed calls omit private raw error/response details; their
 admission and full budget reservation remain recorded.
 
-!!! info "Reference"
-
-    - **Surface:** Judge request, measurement, analysis and evidence contracts
-    - **Stability:** Additive versioned formats; native metric selection and separately scoped judge evidence
-    - **Use this page when:** Running a native judge scorer, importing ratings or reviewing judge evidence
+> **Reference**
+>
+> **Surface:** Judge request, measurement, analysis and evidence contracts
+>
+> **Stability:** Additive versioned formats; native metric selection and separately scoped judge evidence
+>
+> **Use this page when:** Running a native judge scorer, importing ratings or reviewing judge evidence
 
 Use the core wheel, optional collection package and example files from the same
 source revision. For released packages, use their matching release documentation;

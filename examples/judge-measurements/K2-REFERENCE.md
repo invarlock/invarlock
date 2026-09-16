@@ -11,6 +11,35 @@ development and comparison against separately recorded labels. Native judge
 evaluation uses its declared recipe directly; these study helpers are not
 additional execution or acceptance requirements.
 
+Use this guide to reproduce how the study chose its cases or to prepare a new
+grading rubric over the same frozen answers. To inspect completed measurements
+instead, go directly to the [held-out replay](references/k2-32b-luna-xhigh-heldout/README.md).
+To validate the existing answer archive, use the shorter
+[frozen-answer reference command](references/k2-32b/README.md); you do not need
+the original campaign for that check.
+
+## Prepare the study inputs
+
+Run the helpers from a source checkout with Python 3.12 or newer and the matching
+core InvarLock package installed. Building from scratch additionally requires
+the complete retained K2 campaign in `campaign/`, including its raw blocks and
+source metadata. A score summary or a directory containing only model answers
+cannot replace that input. All commands below operate on retained files and make
+no model or judge calls.
+
+The study has three stages:
+
+1. Freeze which answers will be studied, before inspecting judge outcomes.
+2. Use the small pilot subset to assess the rubric and prepare final plans.
+3. Collect ratings for the held-out subset separately, then replay the frozen
+   policy and compare against separately recorded reference labels.
+
+An independent unit is a source cluster, not a rating. Multiple ratings of the
+same answer describe grading variability and do not increase the number of
+independent source units.
+
+Build a new reference directory, package its exact bytes, and validate it:
+
 ```bash
 python examples/judge_measurements_reference.py build \
   --campaign-root campaign \
@@ -19,6 +48,16 @@ python examples/judge_measurements_reference.py build \
 python examples/judge_measurements_reference.py pack --bundle reference --output reference.zip
 python examples/judge_measurements_reference.py validate --bundle reference.zip
 ```
+
+Success prints a JSON validation result and exits zero. `reference/` contains
+the frozen runs, source mappings, plans and rating sheets; `reference.zip` is its
+portable carrier. The final command checks consistency without an external pin.
+For an authenticated handoff, also supply the independently obtained reference
+manifest SHA-256 with `--expected-sha256`. This helper expects the internal
+manifest digest, not the ZIP file digest. Neither validation nor plan creation
+is a measurement or policy pass.
+
+## Reuse or update a frozen reference
 
 Current bundles use `invarlock/k2-judge-answer-reference-v2`, with
 `reference_review` selection fields and review-sheet directories. To use the

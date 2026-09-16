@@ -2,11 +2,13 @@
 
 InvarLock ships six coordinated Python distributions:
 
-!!! info "Reference"
-
-    - **Surface:** Core and first-party add-in distributions, release checks, provenance, and installation verification
-    - **Stability:** Coordinated version and ABI compatibility rules are public; the release workflow may evolve while preserving those checks
-    - **Use this page when:** Building, publishing, installing, or independently checking an InvarLock release set
+> **Reference**
+>
+> **Surface:** Core and first-party add-in distributions, release checks, provenance, and installation verification
+>
+> **Stability:** Coordinated version and ABI compatibility rules are public; the release workflow may evolve while preserving those checks
+>
+> **Use this page when:** Building, publishing, installing, or independently checking an InvarLock release set
 
 | Distribution | Role |
 | --- | --- |
@@ -164,12 +166,14 @@ compatibility evidence, not recipient authorization to deploy. Run the
 non-publishing branch workflow after these local checks to exercise the same
 release surface on the hosted Linux runner before creating a release tag.
 
-The local preflight intentionally validates the core pair in depth while
-`make dist-check` validates every archive against its checkout source and
-`make addins-install-smoke` plus the release workflow validate the coordinated
-six-package install. Keep both kinds of gate; do not describe the core-only
-JSON result as proof that every add-in archive was independently inspected by
-preflight.
+Local preflight validates the core wheel/sdist pair and all five add-in pairs
+against the checkout, including versions, source contents and licenses. Its JSON
+result includes `first_party_addins`. The external hash manifest and isolated
+execution/replay consumer cover the core pair and core wheel respectively;
+`make dist-check` also validates the archives against the checkout. Archive
+validation alone does not exercise every add-in. Keep
+`make addins-install-smoke` and the release workflow's coordinated six-package
+installation checks alongside preflight.
 
 The captured core-wheel consumer checks the exact three-command root before
 add-ins, all three synthetic starters, signed trust-v2 handoffs and receipt-v3

@@ -1,10 +1,17 @@
 # Runnable integrations
 
-Every entry in this directory has one maintained command for the named
-upstream operation or runtime call. LM Evaluation Harness and Inspect AI also
-have retained model-running signed `evaluate → verify → report` OCI journeys.
-The remaining entries demonstrate their named model-change, runtime, or
-evaluator compatibility paths.
+Use these examples to compare an actual model change, connect a runtime, or
+bring an evaluator's per-record results into a signed InvarLock comparison.
+Start with the table below to choose the operation and hardware you need.
+The model examples download or create artifacts and execute real inference;
+SPDX checks a small metadata fixture, and ModelKit verifies an existing handoff.
+
+The launchers live in this checkout. They are not additional installed CLI
+commands. Native model examples use InvarLock runtime providers; the Harness,
+Inspect and OpenAI Evals examples execute upstream evaluators in containers and
+import their complete records through the native evidence contract. LM
+Evaluation Harness and Inspect AI also have retained signed transactions you
+can verify without running a model.
 
 The evaluator transaction contracts, native adapters, and bounded result
 transfer helper are example-owned support under
@@ -42,8 +49,24 @@ from the native signed OCI profiles listed below.
 | [ModelKit recipient handoff](modelkit-handoff/) | `python examples/integrations/modelkit_handoff.py --request recipient.json` | Offline package/content binding, evidence replay, and current recipient acceptance against actual model directories |
 | [LM Evaluation Harness](lm-evaluation-harness/) | `make example-lm-evaluation-harness` | Real upstream per-record output across compact CPU and retained CUDA profiles |
 | [Inspect AI](inspect-ai/) | `make example-inspect-ai` | Native Inspect Task/scorer execution across compact CPU and retained CUDA profiles |
-| [OpenAI Evals](openai-evals/) | `make example-openai-evals` | CPU, maintained native OpenAI Evals Match adapter; signed journey not yet retained |
+| [OpenAI Evals](openai-evals/) | `make example-openai-evals` | CPU, example-owned OpenAI Evals Match adapter; no retained signed transaction |
 | [TensorRT-LLM](tensorrt-llm/) | `make example-tensorrt-llm` | Linux, Docker, two H100 GPUs, and a Qwen3-0.6B compatibility fixture for the pinned runtime |
+
+## Before running a model example
+
+Run commands from a clean, committed repository root with Git, Make, Python 3.12
+or newer, and `uv` available. The Make targets select the repository's locked
+dependencies. You also need the container engine and hardware specified by the
+chosen page, network access for initial downloads/builds, and space for model
+snapshots and image layers. A successful package installation alone does not
+establish that the selected model fits your hardware.
+
+Paths under `/secure` in the commands are placeholders. Replace them with real
+paths to Ed25519 PEM keys and a new trust-root directory outside the workspace.
+The evidence key signs the evaluation pack; the separate verifier key signs the
+recipient's replay result. Evaluator bridges also use a builder key to sign the
+runtime image identity and its matching public key to check that signature.
+Choose a new trust root and workspace for each invocation.
 
 The maintained evaluator commands require caller-owned Ed25519 evidence,
 verifier, and builder key material plus a new trust-root directory. Keep the
@@ -78,9 +101,25 @@ not assume that independently compiled engine bytes will be identical. The
 first-party runtime packages also expose conformance and real-model
 qualification commands beside their implementations under `addins/`.
 
-The GPU-backed checkpoint examples accept an explicit device when several
-accelerators are available, for example
-`EXAMPLE_ARGS="--runtime-device cuda:1"`.
+The GPU-backed checkpoint examples accept `--runtime-device cuda:1` when several
+accelerators are available. The three evaluator bridges use `--device cuda:1`
+instead. Append optional flags to the full `EXAMPLE_ARGS` value shown on each
+page; replacing it with only a workspace or device flag drops the required key
+and trust-root arguments.
+
+## Check the result
+
+Successful model journeys print the workspace and the evidence, verification
+receipt, and HTML report paths. Keep the complete evidence directory immutable
+and retain the separate receipt and recipient trust inputs. The HTML report
+explains the measured comparison; the independent verification result tells you
+whether that evidence met the selected policy under those trust inputs.
+
+An authentic comparison can fail its policy. Where an evaluator page documents
+`--allow-policy-fail`, that flag retains the rejection for inspection; it does
+not change the verdict or permit an integrity failure. If preparation or a
+worker fails, fix the reported prerequisite and use new output paths. None of
+these small fixtures establishes quality for your deployment workload.
 
 The root `make example-evidence-handoff` command runs accepted, policy-rejected,
 and tampered evidence through separately signed verification.

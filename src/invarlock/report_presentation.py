@@ -938,7 +938,7 @@ def render_markdown(view: ReportView, *, include_details: bool = False) -> str:
             difference = "Differs" if changed else "Same displayed text"
             lines += [
                 "",
-                f"### {clean(label)} — {difference}",
+                f"### {clean(label)}: {difference}",
                 "",
                 f"- **Baseline:** {clean(baseline)}",
                 f"- **Subject:** {clean(subject)}",
@@ -960,7 +960,7 @@ def render_markdown(view: ReportView, *, include_details: bool = False) -> str:
     for metric in view.metrics:
         lines += [
             "",
-            f"## {clean(metric.name)} — {clean(metric.scope)}",
+            f"## {clean(metric.name)}: {clean(metric.scope)}",
             "",
             f"**{decision_label(metric.decision)}**. {clean(metric.explanation)}",
             "",

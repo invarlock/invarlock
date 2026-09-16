@@ -270,10 +270,29 @@ before the final gates so checks that enumerate Git's file inventory include
 them. Inspect the staged diff to keep generated artifacts, local evidence, and
 secrets out of the change.
 
+### Example guides
+
+Write examples for a developer who knows Python and a terminal but has not read
+InvarLock's contracts. Start with the task the example solves, who it is for and
+what it produces. State setup requirements before commands, distinguish offline
+fixtures from model execution or billed calls, and explain the expected result,
+including intentional rejections. Define unfamiliar terms when first needed.
+Put schema details and advanced reproduction steps after the shortest useful
+path, or link to the relevant reference. Keep hardware and key requirements
+beside the commands that need them. Historical evidence and attribution files
+retain their original facts and identities.
+
+The native-judge starter is also shipped as package data. When editing
+`examples/native-judge/`, update the matching files in
+`src/invarlock/_data/examples/native-judge/` and run
+`python -m pytest tests/cli/test_native_evaluation_setup.py`. The consistency
+check ensures `evaluate --init --example native-judge` delivers the same
+instructions and inputs as the maintained example.
+
 ### Documentation type contracts
 
 Choose the document type from the reader's task, then make that type visible
-in a short opening admonition. The fields in the admonition are a reader
+in a short opening Markdown blockquote. The fields in the blockquote are a reader
 contract, not decorative metadata: they should say why the page exists, who or
 what it applies to, and what a reader can decide or accomplish with it.
 
@@ -283,6 +302,10 @@ what it applies to, and what a reader can decide or accomplish with it.
 | Assurance note | `In plain language`, `Question`, `Decision use`, `Evidence` | State the scoped claim or question, develop the argument or derivation, identify runtime enforcement and observable evidence, and name assumptions, defeaters, and limits. |
 | Reference | `Surface`, `Stability`, `Use this page when` | Describe the exact current interface or contract. Include defaults, accepted forms, outputs, and failure behavior, with a minimal example and security notes where they affect correct use. |
 | Security guidance | `In plain language`, `Objective`, `Assets or boundary`, `Use this page when` | Identify threats and trust assumptions, connect controls to residual risks, and state operational response, non-goals, and authoritative references where applicable. |
+
+Use a standard Markdown blockquote and bold field labels so the opener renders
+on GitHub and in the MkDocs site. Separate the fields with quoted blank lines;
+do not use MkDocs-only callout syntax or indented code for prose.
 
 Use headings that fit the subject instead of reproducing a rigid outline. A
 glossary, acceptance checklist, CLI reference, and threat model should remain

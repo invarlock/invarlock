@@ -3,11 +3,13 @@
 The public command line supports one evaluation, verification and reporting
 journey for native execution, authenticated imports, and captured results:
 
-!!! info "Reference"
-
-    - **Surface:** `invarlock evaluate`, `invarlock verify`, and `invarlock report`
-    - **Stability:** Stable public CLI; command help is authoritative for installed options
-    - **Use this page when:** Automating a transaction, selecting flags or environment fallbacks, or interpreting outputs and exit status
+> **Reference**
+>
+> **Surface:** `invarlock evaluate`, `invarlock verify`, and `invarlock report`
+>
+> **Stability:** Stable public CLI; command help is authoritative for installed options
+>
+> **Use this page when:** Automating a transaction, selecting flags or environment fallbacks, or interpreting outputs and exit status
 
 ```text
 invarlock --help
@@ -299,8 +301,9 @@ The `auto` entrypoint profile selects `nvidia` for TensorRT-LLM and `python` for
 the other first-party providers. Explicit per-side profiles are available when
 an authenticated image requires one of those known launch forms.
 
-Text success output identifies the published directory. JSON success output
-contains `format_version`, `ok`, `comparison_id`, `evidence`, and the immutable
+For native pack-v1 evaluation, text success output identifies the published
+directory. JSON success output contains `format_version`, `ok`, `comparison_id`,
+`evidence`, and the immutable
 `pack_manifest_digest` calculated from the canonical manifest bytes before
 publication. JSON failures use the same format version with `ok: false` and an
 `errors` array.
@@ -407,8 +410,10 @@ invarlock verify EVIDENCE \
   [--json]
 ```
 
-`verify` treats the bundle as untrusted. It requires all acceptance anchors
-from the caller and writes a signed receipt outside the bundle.
+Native and captured directory-pack verification treats the bundle as untrusted,
+requires all acceptance anchors from the caller, and writes a signed receipt
+outside the bundle. Judge verification has an optional signed receipt, as
+described under [Frozen-answer judge evidence](#frozen-answer-judge-evidence).
 
 The following table describes native pack-v1 verification. With a trust profile,
 the profile supplies the trust fields; the explicit alternatives are not also

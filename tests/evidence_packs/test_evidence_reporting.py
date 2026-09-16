@@ -289,7 +289,7 @@ def test_render_markdown_from_complete_evidence_signed_pack(
         + hashlib.sha256((evidence / "manifest.json").read_bytes()).hexdigest()
     )
     assert result.html_path is None
-    assert "### Artifact — Differs" in result.text
+    assert "### Artifact: Differs" in result.text
     assert "**Baseline:** fixture://baseline" in result.text
     assert "**Subject:** fixture://subject" in result.text
 

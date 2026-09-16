@@ -18,17 +18,17 @@ choose a representative sample or a suitable threshold for you.
 
 ![One fixed schedule produces exactly paired baseline and subject records before metric arithmetic and policy evaluation](../assets/user-guide-pairing-contract.svg)
 
-!!! tip "User guide"
-
-    **Outcome:** Freeze a digest-pinned local JSONL source and one closed
-    comparison policy before collecting subject results.
-
-    **Audience:** Evaluation owners, dataset curators, policy authors, and
-    independent decision owners.
-
-    **Prerequisites:** A concrete release-regression claim, fixed source
-    material, stable record identities, a supported built-in metric or
-    authorized scorer binding, and an independent policy-distribution path.
+> **User guide**
+>
+> **Outcome:** Freeze a digest-pinned local JSONL source and one closed
+> comparison policy before collecting subject results.
+>
+> **Audience:** Evaluation owners, dataset curators, policy authors, and
+> independent decision owners.
+>
+> **Prerequisites:** A concrete release-regression claim, fixed source
+> material, stable record identities, a supported built-in metric or
+> authorized scorer binding, and an independent policy-distribution path.
 
 ## Design the decision first
 

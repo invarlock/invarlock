@@ -1,17 +1,27 @@
-# Capture frozen answers from your pipeline
+# Save baseline and subject answers from your pipeline
 
-## Purpose
+Use this helper if you already have a model pipeline and want to save its answers
+for an InvarLock comparison. It runs each task once against the baseline and once
+against the subject, then keeps those answers unchanged for later scoring.
+Here, **frozen** means retained without regenerating or selecting a better answer.
 
-This optional POSIX example calls a user-owned pipeline adapter once per case
-for the baseline and once for the subject. It writes the two
-`invarlock/evaluation-run-v1` files consumed by captured-result evaluation and
-bounded judge preparation. It makes no quality decision and does not score the
+This example is for developers who can supply a Python adapter or executable
+for their pipeline. The included demonstration needs Python, InvarLock and a
+POSIX system such as Linux or macOS. It runs offline without a model or account.
+Start with the offline run below; the adapter protocol and limits are reference
+material for connecting your own pipeline afterward.
+
+## What it produces
+
+The helper writes `baseline_run.json` and `subject_run.json`, two
+`invarlock/evaluation-run-v1` files that captured-result evaluation and judge
+preparation can read. It makes no quality decision and does not score the
 answers. The same frozen answers can support exact-match scoring and judge
 measurements without generating them again. This helper does not capture
 reference-continuation likelihoods, so its token usage cannot supply normalized
 NLL. That scorer requires separately retained, bound likelihood facts.
 
-The included adapter is an offline wiring fixture. Its toy answers, tokenizer,
+The included adapter returns fixed example answers to demonstrate the connection. Its toy answers, tokenizer,
 artifact digests and prices are not model qualification or useful evaluation
 results. No provider package is installed or contacted by the example itself.
 
@@ -157,7 +167,8 @@ both exact run digests, case membership, answer hashes and rendered judge
 requests, and writes a new directory. It preserves the template's rubric,
 model, repetitions, sampling basis and policy thresholds. It does not lower
 minimum sample requirements to make a small capture pass. The one-case fixture
-is intentionally too small to support its analysis policy.
+is intentionally too small to meet its policy. Preparation and preflight can
+succeed, but they do not establish a passing comparison.
 
 For actual work, review those templates and units before preparation. Then use
 the [judge collection example](../judge-measurements/README.md) with the generated
@@ -212,8 +223,7 @@ qualification.
 The example admits the complete case set only when two calls per case fit the
 call cap, and the full per-call token reservations fit the total token and cost
 caps. Costs use integer millionths of a US dollar: `1000000` means one dollar.
-Set input
-and output rates to conservative upper bounds across both deployments, including
+Set input and output rates to conservative upper bounds across both deployments, including
 any billed reasoning tokens or provider minimums. These are caller-supplied
 prices, not a pricing lookup.
 

@@ -5,15 +5,18 @@ and write boundaries. The stages below describe native exact-match/NLL and deter
 run/import evidence. Native `judge` retains its runtime capture but uses the
 [judge collection, publication and recipient contracts](judge-measurements.md),
 including a private resumable workspace.
-[Captured results](../user-guide/captured-results.md) use the same transactions
+[Captured deterministic, likelihood and recorded-score comparisons](../user-guide/captured-results.md)
+use the same transactions
 with paired runs, a captured directory pack, and independent run/request pins
 in place of native provider, schedule, and runtime bindings.
 
-!!! info "Reference"
-
-    - **Surface:** Transaction stages, write boundaries, failure classification, and outputs
-    - **Stability:** Behavioral contract for public evaluate, verify, and report transactions
-    - **Use this page when:** Diagnosing where a transaction stopped, designing retries, or determining which output may exist after failure
+> **Reference**
+>
+> **Surface:** Transaction stages, write boundaries, failure classification, and outputs
+>
+> **Stability:** Behavioral contract for public evaluate, verify, and report transactions
+>
+> **Use this page when:** Diagnosing where a transaction stopped, designing retries, or determining which output may exist after failure
 
 ```text
 request parsed

@@ -1,5 +1,10 @@
 # Retained evaluator transactions
 
+Use these saved examples to inspect or replay a complete evaluator-to-InvarLock
+handoff without downloading a model or starting a container. The example-owned
+bridges ran the upstream evaluator and imported its complete records into native
+signed evidence. They are not installed evaluator plugins.
+
 This directory retains compact, independently replayable evidence for LM
 Evaluation Harness and Inspect AI. Each transaction package contains:
 
@@ -15,12 +20,32 @@ HTML are excluded. Signed evidence binds the model and runtime identities, and
 HTML can be regenerated offline. Fixture signing keys demonstrate the format;
 production acceptance requires recipient-owned keys, policies, and anchors.
 
+## Verify the saved examples
+
+From the matching repository root, use Python 3.12 or newer with the core
+development dependencies described in [CONTRIBUTING](../../../CONTRIBUTING.md):
+
+```bash
+make evaluator-qualification
+```
+
+This offline command checks the generic qualification matrix, the 102-record
+imports and the retained signed transactions. It needs no model weights, GPU,
+container engine, upstream evaluator installation or provider credentials. A
+successful check reproduces each saved verdict, including the three policy
+rejections; it does not mean that all four comparisons pass policy.
+
+Open a package's `transaction.json` to find its expected anchors and outcome,
+then inspect the evidence report and separate receipt. Those supplied example
+anchors let you reproduce the demonstration. For an actual recipient decision,
+obtain and approve your own policy and trust inputs independently.
+
 ## Retained set
 
 | Package | Evaluator | Model comparison | Purpose | Signed outcome |
 | --- | --- | --- | --- | --- |
-| [`qwen35-lm-evaluation-harness`](qwen35-lm-evaluation-harness/) | LM Evaluation Harness | Qwen3.5 9B Base → post-trained | Current-model flagship | Integrity valid; policy rejected |
-| [`qwen35-inspect-ai`](qwen35-inspect-ai/) | Inspect AI | Qwen3.5 9B Base → post-trained | Independent flagship evaluator | Integrity valid; policy rejected |
+| [`qwen35-lm-evaluation-harness`](qwen35-lm-evaluation-harness/) | LM Evaluation Harness | Qwen3.5 9B Base → post-trained | Shared model comparison | Integrity valid; policy rejected |
+| [`qwen35-inspect-ai`](qwen35-inspect-ai/) | Inspect AI | Qwen3.5 9B Base → post-trained | Same comparison through another evaluator | Integrity valid; policy rejected |
 | [`gemma4-lm-evaluation-harness`](gemma4-lm-evaluation-harness/) | LM Evaluation Harness | Gemma 4 12B IT → official QAT-Q4 source checkpoint | Cross-family portability | Integrity valid; policy rejected |
 | [`deployment-approval-inspect-ai`](deployment-approval-inspect-ai/) | Inspect AI | Qwen3.5 0.8B Base → post-trained | Passing CI approval example | Policy passed |
 
@@ -30,7 +55,7 @@ status. Offline verification requires each package to reproduce the declared
 outcome; it rejects outcome drift, bad signatures, changed records, or changed
 trust anchors.
 
-## Proof map
+## Find the evidence behind each result
 
 The generic qualification evidence remains separate from model-running signed
 transactions. For each evaluator, it binds the maintained adapter and upstream
@@ -79,7 +104,7 @@ reports adapter support, replay authority, and retained transactions as
 independent properties. These demonstrations are scoped to the pinned
 exact-match workflows.
 
-## Current-model results
+## Read the measured results
 
 The Qwen3.5 9B flagship transactions used the same ordered 400-record schedule. LM
 Evaluation Harness and Inspect AI produced identical normalized record digests
@@ -100,12 +125,6 @@ regression rule that requires the confidence lower bound to be at least −2
 percentage points, so each authentic transaction was correctly rejected. The deployment pack uses a separate
 tokenizer-qualified 400-record LAMBADA corpus and its −20-point lower-bound
 floor, declared before execution, passed.
-
-Run complete offline verification with:
-
-```bash
-make evaluator-qualification
-```
 
 ## Operational footprint
 

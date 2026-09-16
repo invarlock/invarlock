@@ -5,13 +5,15 @@ one exact derived artifact. It is an in-toto Statement v1 inside a DSSE
 envelope. It does not represent a recipient's final approval, exception,
 quorum, governance action, or deployment decision.
 
-!!! info "Reference"
-
-    - **Surface:** `https://invarlock.dev/attestations/acceptance/v2`
-      standards-shaped in-toto/DSSE transport
-    - **Stability:** Closed v2 predicate and recipient-policy contracts
-    - **Use this page when:** Producing, transporting, or independently
-      evaluating a portable acceptance attestation
+> **Reference**
+>
+> **Surface:** `https://invarlock.dev/attestations/acceptance/v2`
+> standards-shaped in-toto/DSSE transport
+>
+> **Stability:** Closed v2 predicate and recipient-policy contracts
+>
+> **Use this page when:** Producing, transporting, or independently
+> evaluating a portable acceptance attestation
 
 The predicate format is `invarlock/acceptance-predicate-v2`; the envelope
 payload type is `application/vnd.in-toto+json`.

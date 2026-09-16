@@ -4,23 +4,23 @@ These practices preserve the trust separation described in the
 [Trust model](trust-model.md). They supplement rather than replace host,
 container, key-management, and model-safety controls.
 
-!!! warning "Security guidance"
-
-    **In plain language:** Keep signing authority, fixed inputs, and
-    acceptance expectations explicit so teams can detect incorrect handoffs,
-    unintended inputs and tampering before relying on a result.
-
-    **Objective:** Operate evidence production and verification while
-    preserving key separation, immutable inputs, independent anchors, and
-    fail-closed handling.
-
-    **Assets or boundary:** Evidence signer and verifier keys, artifact and runtime
-    identities, schedules, policies, evidence bundles, receipts, and the host
-    controls outside InvarLock's evidence contract.
-
-    **Use this page when:** Deploying or reviewing an InvarLock workflow,
-    defining custody and retention controls, or responding to suspected key,
-    runtime, or artifact compromise.
+> **Security guidance**
+>
+> **In plain language:** Keep signing authority, fixed inputs, and
+> acceptance expectations explicit so teams can detect incorrect handoffs,
+> unintended inputs and tampering before relying on a result.
+>
+> **Objective:** Operate evidence production and verification while
+> preserving key separation, immutable inputs, independent anchors, and
+> fail-closed handling.
+>
+> **Assets or boundary:** Evidence signer and verifier keys, artifact and runtime
+> identities, schedules, policies, evidence bundles, receipts, and the host
+> controls outside InvarLock's evidence contract.
+>
+> **Use this page when:** Deploying or reviewing an InvarLock workflow,
+> defining custody and retention controls, or responding to suspected key,
+> runtime, or artifact compromise.
 
 ## Operating assumptions and residual risk
 

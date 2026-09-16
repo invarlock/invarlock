@@ -4,13 +4,52 @@ This synthetic one-case fixture demonstrates offline import and report rendering
 It contains too few independent units to satisfy its policy and deliberately
 returns `insufficient_evidence`. It is not a live provider qualification result.
 
-Copy this directory to a fresh working directory, then run:
+Use this example to understand how frozen answers, a grading plan and retained
+ratings become an evidence bundle you can inspect. The first exercise needs only
+Python 3.12 or newer and the installed core InvarLock package. It needs no model,
+GPU, API key or optional collector. Use example files from the same source
+revision as your installed build.
+
+## Run the offline fixture
+
+From the repository root, copy the fixture inputs into a new workspace. The
+measured-reference archives are not needed for this exercise:
+
+```bash
+mkdir judge-demo
+cp examples/judge-measurements/*.json examples/judge-measurements/*.yaml \
+  examples/judge-measurements/import_inspect.py judge-demo/
+cd judge-demo
+```
+
+The main request connects these files:
+
+| Input | Role |
+| --- | --- |
+| `baseline_run.json`, `subject_run.json` | One paired case with its original input, reference and frozen answers |
+| `plan.json` | Rubric, judge identity, independent units and scheduled ratings |
+| `measurements.json` | Retained illustrative calls and outcomes for replay |
+| `analysis_policy.json` | Count, uncertainty and score requirements applied to those outcomes |
+
+Check the inputs, publish unsigned local evidence, then render it:
 
 ```bash
 invarlock evaluate request.yaml --preflight --json
 invarlock evaluate request.yaml --unsigned --json
-invarlock report evidence --html report.html --markdown report.md --junit report.xml --json
+invarlock report evidence --html report.html --markdown report.md \
+  --junit report.xml --json
 ```
+
+Preflight writes no evidence. Evaluation creates `evidence/` and exits zero
+because publication succeeded; the recorded decision is still
+`insufficient_evidence`. Reporting creates the three requested views. Repeated
+ratings of one answer do not create additional independent cases, so this
+fixture cannot satisfy its uncertainty requirement. Do not loosen the policy to
+make the example appear to qualify a model.
+
+Outputs are no-clobber. Repeat the exercise in a fresh workspace, or select new
+evidence and report paths. Unsigned evidence is useful for this local exercise
+but cannot establish recipient acceptance. The signed handoff is described below.
 
 ## Use existing evaluator captures
 
@@ -76,11 +115,19 @@ bindings fail before publication.
 `request-collect.yaml` selects installed collection for already frozen answers.
 The committed `example-judge` identity is synthetic and cannot make live calls.
 For real collection, freeze an approved supported hosted judge and matching
-collection settings, install matching core and collector packages, and run:
+collection settings. Install matching core and collector packages from the
+repository root:
 
 ```bash
 python -m pip install .
 python -m pip install 'addins/inspect_judge[inspect]'
+```
+
+Then return to the prepared workspace with the updated plan, policy and
+collection settings. Use a fresh evidence destination if you already ran the
+offline fixture, since both requests initially name `evidence`:
+
+```bash
 # Supply OPENAI_API_KEY through your secret manager.
 invarlock evaluate request-collect.yaml --preflight --json
 invarlock evaluate request-collect.yaml --signing-key signer-private.pem --json
@@ -101,11 +148,24 @@ For native model execution and automatic answer freezing, use
 [`metric: judge`](../native-judge/README.md) instead. Imported frozen answers do
 not claim native runtime provenance.
 
+## Publish signed evidence and verify it
+
 Add `--fail-on-policy` to evaluation for exit 7 on the inconclusive policy result.
 The unsigned evidence cannot establish recipient acceptance. To publish signed
 evidence, use a fresh output directory and `--signing-key signer-private.pem`
-instead of `--unsigned`. Verification additionally requires an independently
+instead of `--unsigned`. With your own Ed25519 signing key, publish the same
+fixture into a new directory beneath the workspace:
+
+```bash
+invarlock evaluate request.yaml --output signed-evidence \
+  --signing-key signer-private.pem --json
+```
+
+Signing authenticates the recorded result; the one-case decision remains
+insufficient evidence. Verification additionally requires an independently
 maintained judge recipient policy, not a policy copied from submitted evidence.
+Prepare `recipient-policy.json` using the [judge recipient contract](../../docs/reference/judge-measurements.md).
+It is not created by the offline commands above.
 When retaining a verification receipt, supply an independent verifier key and
 identity together:
 

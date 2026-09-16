@@ -2,31 +2,38 @@
 
 InvarLock uses Ed25519 signatures for two distinct statements:
 
-- the evidence signer signs the canonical evidence manifest;
+- the evidence signer signs the canonical manifest for pack-v1/v2 evidence or
+  the domain-separated envelope statement for judge evidence;
 - the independent verifier signs a receipt containing its decision and anchors.
 
 Use different keys for these roles. A verifier that accepts an evidence-signing key and
 then signs the result should not possess the evidence-signing private key.
 
-!!! tip "User guide"
-
-    **Outcome:** Establish separate evidence signer and verifier signing identities,
-    distribute their fingerprints independently, and retain or revoke them
-    without rewriting signed history.
-
-    **Audience:** Key custodians, evaluation operators, verifier operators, and
-    receipt verifiers responsible for signer authorization.
-
-    **Prerequisites:** Assigned evidence signer and verifier roles, protected key
-    storage, an authenticated fingerprint-distribution channel, and a recorded
-    rotation and incident-response policy.
+> **User guide**
+>
+> **Outcome:** Establish separate evidence signer and verifier signing identities,
+> distribute their fingerprints independently, and retain or revoke them
+> without rewriting signed history.
+>
+> **Audience:** Key custodians, evaluation operators, verifier operators, and
+> receipt verifiers responsible for signer authorization.
+>
+> **Prerequisites:** Assigned evidence signer and verifier roles, protected key
+> storage, an authenticated fingerprint-distribution channel, and a recorded
+> rotation and incident-response policy.
 
 ## Key roles and compromise impact
 
 | Key | Signs | If compromised |
 | --- | --- | --- |
-| Evidence signer | Canonical `manifest.json` bytes | An attacker can create new signature-authenticated bundles; independent verifier anchors and replay still apply. |
-| Verifier | Receipt statement containing manifest digest, anchors, and verdict | An attacker can issue receipts under that verifier identity; receipt verifiers must revoke the fingerprint. |
+| Evidence signer | Canonical `manifest.json` bytes for pack-v1/v2, or the domain-separated judge envelope statement | An attacker can create new signature-authenticated evidence; independent verifier anchors and replay still apply. |
+| Verifier | Receipt statement containing evidence bindings, anchors, and verdict | An attacker can issue receipts under that verifier identity; receipt verifiers must revoke the fingerprint. |
+
+The verification commands and receipt example below use native pack-v1 evidence.
+For the other families, use the [captured handoff](captured-results.md#signed-handoff)
+or [judge evidence and recipient contract](../reference/judge-measurements.md).
+Judge signing bytes include the evidence format identifier, a NUL separator,
+and the canonical envelope statement without its signature field.
 
 Neither key encrypts evidence. Public keys are embedded so signatures can be
 checked, while authorization comes from fingerprints distributed separately.

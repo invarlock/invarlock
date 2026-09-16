@@ -6,18 +6,18 @@ prepares a session from caller-owned resources, scores the ordered schedule,
 and emits typed records. InvarLock owns pairing, metric arithmetic, policy
 evaluation, bundle publication, and independent verification.
 
-!!! tip "User guide"
-
-    **Outcome:** Select, inspect, and configure a provider so both artifacts
-    emit contract-complete records for one independently verifiable comparison.
-
-    **Audience:** Runtime integration engineers and evaluation operators working
-    with Hugging Face text, Hugging Face vision-text, GGUF/`llama.cpp`,
-    TensorRT-LLM, or complete imported provider material.
-
-    **Prerequisites:** Materialized artifacts and support files, a canonical
-    schedule and caller-approved policy, a provider-compatible offline environment,
-    and caller-owned runtime-image and device configuration.
+> **User guide**
+>
+> **Outcome:** Select, inspect, and configure a provider so both artifacts
+> emit contract-complete records for one independently verifiable comparison.
+>
+> **Audience:** Runtime integration engineers and evaluation operators working
+> with Hugging Face text, Hugging Face vision-text, GGUF/`llama.cpp`,
+> TensorRT-LLM, or complete imported provider material.
+>
+> **Prerequisites:** Materialized artifacts and support files, a canonical
+> schedule and caller-approved policy, a provider-compatible offline environment,
+> and caller-owned runtime-image and device configuration.
 
 ## Choose a provider path
 

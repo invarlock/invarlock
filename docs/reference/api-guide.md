@@ -4,11 +4,13 @@ Applications embed InvarLock through `invarlock.engine`. This module is the
 stable facade for the paired evaluation engine. Modules that encode or decode
 individual bundle files remain internal unless explicitly documented.
 
-!!! info "Reference"
-
-    - **Surface:** Python facade exported by `invarlock.engine`
-    - **Stability:** Stable public API; undocumented `invarlock.*` imports remain internal
-    - **Use this page when:** Embedding evaluate, verify, report, request loading, receipt verification, or provider-ABI types in Python
+> **Reference**
+>
+> **Surface:** Python facade exported by `invarlock.engine`
+>
+> **Stability:** Stable public API; undocumented `invarlock.*` imports remain internal
+>
+> **Use this page when:** Embedding evaluate, verify, report, request loading, receipt verification, or provider-ABI types in Python
 
 ## Stable exports
 
@@ -153,8 +155,10 @@ declares signed authentication. Unsigned captured packs retain their explicit
 local assurance label. Judge rendering validates envelope structure and replays
 measurements; it does not authenticate the envelope signature. Rendering does not
 take independent artifact, schedule, policy, runtime, run, request, or signer
-anchors. Call `verify_evidence` when an independent acceptance decision is
-required.
+anchors. For independent acceptance in Python, call `verify_evidence` for native
+deterministic or captured v2 packs and `verify_judge_evidence_with_policy` for
+judge evidence. The CLI dispatches both through `invarlock verify` with the
+corresponding recipient trust inputs.
 
 ## External evaluator qualification
 

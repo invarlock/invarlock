@@ -3,8 +3,9 @@
 This reference retains the complete 4,000-pair routing comparison between two
 prompt configurations of the same K2 Horizon 32B model revision. Its signed
 captured evidence reproduces the original **regression** with no missing scores.
-It is an offline recorded-score reference, not a model checkpoint comparison or
-native runtime qualification.
+Both sides use the same model; the changed prompt is what is being tested.
+InvarLock rechecks the scores supplied by the original evaluator. It does not
+rerun that scorer or model, and this result does not qualify a native runtime.
 
 | Slice | Pairs | Baseline mean | Subject mean | Difference | Paired 95% interval |
 | --- | ---: | ---: | ---: | ---: | --- |
@@ -19,6 +20,10 @@ per slice, interval width at most 0.05 and a lower confidence bound of at least
 correct scores and the subject has 2,909.
 
 ## Replay with an installed wheel
+
+Use this section to check the existing result, not to rerun the model. You need
+Python, the installed InvarLock package and matching example files. No model,
+GPU or provider account is needed. An expected rejection is the correct outcome.
 
 Install InvarLock and obtain the matching source archive as described in
 [getting started](../../../../docs/user-guide/getting-started.md). From that source

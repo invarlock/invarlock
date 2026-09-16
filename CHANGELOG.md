@@ -133,10 +133,18 @@ while strengthening evidence verification, runtime isolation and release checks.
   coordinate the root manifest and uv lock with separately checked workflow
   locks. Pre-commit covers all pull requests and docs build once per docs job.
 - **Documentation:** the README, workflow diagram and docs landing page now lead
-  with runnable tasks and supported integration routes. Guides, API references,
+  with runnable tasks and supported integration routes. Page openers render
+  consistently on GitHub and the documentation site. Guides, API references,
   assurance notes, security guidance and third-party notices describe the current
-  contracts; receipt examples include required independent anchors and separate
-  authenticity from the signed verdict. Production release publication updates
+  contracts. Assurance guidance distinguishes native, captured and judge decision
+  rules, acceptance requirements and evidence-set limits; receipt examples include
+  required independent anchors and separate authenticity from the signed verdict.
+  Guides and API references scope pairing, signatures, observation attachments and
+  verification helpers by evidence family. Policy-engine examples state their
+  supported recipient-policy subset separately from full acceptance verification.
+  Example guides explain their audience, setup and expected outputs, distinguish
+  offline fixtures from live model runs, and clarify intentional policy failures.
+  Production release publication updates
   tagged docs, `latest` and `stable`; TestPyPI and bootstrap runs cannot do so.
 
 ### Removed

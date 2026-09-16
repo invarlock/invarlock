@@ -5,11 +5,13 @@ uses the checked-in offline example, so it exercises real signing, bundle
 integrity, policy replay, receipt signing, and report authentication without
 downloading a model.
 
-!!! tip "User guide"
-
-    **Outcome:** Reproduce an authentic report-local policy rejection plus wrong-anchor, tamper, extra-file, and receipt-authorization failures.
-    **Audience:** Verifier operators, CI authors, and maintainers validating fail-closed behavior.
-    **Prerequisites:** A source checkout, the core package installed, a shell with `mktemp`, and permission to create a disposable working directory.
+> **User guide**
+>
+> **Outcome:** Reproduce an authentic report-local policy rejection plus wrong-anchor, tamper, extra-file, and receipt-authorization failures.
+>
+> **Audience:** Verifier operators, CI authors, and maintainers validating fail-closed behavior.
+>
+> **Prerequisites:** A source checkout, the core package installed, a shell with `mktemp`, and permission to create a disposable working directory.
 
 ## Create a disposable valid transaction
 

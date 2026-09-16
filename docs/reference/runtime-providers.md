@@ -5,11 +5,13 @@ execution from the evidence transaction. Hugging Face Transformers is built
 into the core distribution. GGUF through `llama.cpp`, TensorRT-LLM, and Hugging
 Face vision-text are first-party optional add-ins.
 
-!!! info "Reference"
-
-    - **Surface:** Runtime-provider ABI `1`, typed identities, settings, resources, discovery, and conformance
-    - **Stability:** Providers must match versioned ABI `1` exactly; first-party settings and capability declarations are closed
-    - **Use this page when:** Selecting, configuring, implementing, or validating a runtime provider
+> **Reference**
+>
+> **Surface:** Runtime-provider ABI `1`, typed identities, settings, resources, discovery, and conformance
+>
+> **Stability:** Providers must match versioned ABI `1` exactly; first-party settings and capability declarations are closed
+>
+> **Use this page when:** Selecting, configuring, implementing, or validating a runtime provider
 
 ## Provider protocol
 

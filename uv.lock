@@ -869,6 +869,8 @@ dependencies = [
 ci = [
     { name = "build" },
     { name = "hypothesis" },
+    { name = "markdown" },
+    { name = "markdown-it-py" },
     { name = "mypy" },
     { name = "pillow" },
     { name = "pytest" },
@@ -883,6 +885,8 @@ ci = [
 dev = [
     { name = "build" },
     { name = "hypothesis" },
+    { name = "markdown" },
+    { name = "markdown-it-py" },
     { name = "mkdocs" },
     { name = "mkdocs-material" },
     { name = "mkdocs-mermaid2-plugin" },
@@ -977,6 +981,10 @@ requires-dist = [
     { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.98" },
     { name = "jsonschema", specifier = ">=4.0" },
     { name = "linkchecker", marker = "extra == 'docs-ci'", specifier = ">=10.6.0" },
+    { name = "markdown", marker = "extra == 'ci'", specifier = ">=3.10.2" },
+    { name = "markdown", marker = "extra == 'dev'", specifier = ">=3.10.2" },
+    { name = "markdown-it-py", marker = "extra == 'ci'", specifier = ">=4.0.0" },
+    { name = "markdown-it-py", marker = "extra == 'dev'", specifier = ">=4.0.0" },
     { name = "mkdocs", marker = "extra == 'dev'", specifier = ">=1.5" },
     { name = "mkdocs", marker = "extra == 'docs-ci'", specifier = ">=1.5" },
     { name = "mkdocs-material", marker = "extra == 'dev'", specifier = ">=9.7.7" },

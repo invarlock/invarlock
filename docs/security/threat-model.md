@@ -5,23 +5,23 @@ the portable acceptance-attestation handoff, and the public provider
 contracts. It distinguishes attacks that the evidence verifier or acceptance
 verifier can detect from claims that require controls outside InvarLock.
 
-!!! warning "Security guidance"
-
-    **In plain language:** InvarLock can detect tampering and inconsistent
-    evidence, but it cannot independently attest execution or prove that the
-    chosen test and threshold are sufficient.
-
-    **Objective:** Identify threats to one evidence transaction and distinguish
-    verifier-enforced properties from risks that require deployment controls.
-
-    **Assets or boundary:** The `evaluate`, `verify`, `report`, and portable
-    acceptance data flows, provider-contract inputs, signing identities,
-    recipient policy, independent anchors, and signed outputs; host and
-    accelerator security remain external boundaries.
-
-    **Use this page when:** Performing architecture review, assigning controls,
-    interpreting a verifier failure, or deciding whether a deployment needs
-    attestation or safeguards beyond InvarLock.
+> **Security guidance**
+>
+> **In plain language:** InvarLock can detect tampering and inconsistent
+> evidence, but it cannot independently attest execution or prove that the
+> chosen test and threshold are sufficient.
+>
+> **Objective:** Identify threats to one evidence transaction and distinguish
+> verifier-enforced properties from risks that require deployment controls.
+>
+> **Assets or boundary:** The `evaluate`, `verify`, `report`, and portable
+> acceptance data flows, provider-contract inputs, signing identities,
+> recipient policy, independent anchors, and signed outputs; host and
+> accelerator security remain external boundaries.
+>
+> **Use this page when:** Performing architecture review, assigning controls,
+> interpreting a verifier failure, or deciding whether a deployment needs
+> attestation or safeguards beyond InvarLock.
 
 ## Security objectives
 
@@ -139,8 +139,10 @@ and captured or frozen-answer requests can import retained calls. Native
 and reporting replay those measurements offline.
 
 The plan binds the original task text, frozen answers, rubric, judge configuration,
-reference mode, independent units and repetition schedule. Retained attempts and
-call, token, cost, timeout and storage limits constrain collection. They do not
+reference mode, declared unit grouping and repetition schedule. Independence
+between units is a statistical assumption; replay cannot establish it from
+recorded scores. Retained attempts and call, token, cost, timeout and storage
+limits constrain collection. They do not
 prove that a compromised operator or provider supplied truthful measurements,
 that the rubric reflects user needs, or that the judge agrees with independent
 reference labels.

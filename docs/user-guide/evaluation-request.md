@@ -10,17 +10,17 @@ The request is comparison intent, not host authorization. It does not grant
 network access, choose an OCI engine, select arbitrary executables, inject
 secrets, or authorize its own runtime digest.
 
-!!! tip "User guide"
-
-    **Outcome:** Author a closed run request for a real paired comparison, or a
-    closed import request for complete provider material produced elsewhere.
-
-    **Audience:** Evaluation operators and integration engineers preparing a
-    release-regression decision.
-
-    **Prerequisites:** Pinned model inputs, a local JSONL source for run mode or
-    a canonical schedule for import mode, a reviewed single-scorer policy,
-    provider settings, and a new request-relative evidence destination.
+> **User guide**
+>
+> **Outcome:** Author a closed run request for a real paired comparison, or a
+> closed import request for complete provider material produced elsewhere.
+>
+> **Audience:** Evaluation operators and integration engineers preparing a
+> release-regression decision.
+>
+> **Prerequisites:** Pinned model inputs, a local JSONL source for run mode or
+> a canonical schedule for import mode, a reviewed single-scorer policy,
+> provider settings, and a new request-relative evidence destination.
 
 Captured records use the separate `invarlock/evaluation-request-v2` contract
 with `execution.mode: captured` through the same `evaluate` command. Follow
@@ -382,17 +382,21 @@ observations:
 Each entry has a unique canonical ID, a canonical kind, a scope of
 `comparison`, `baseline`, or `subject`, and a request-relative path to a
 canonical JSON object. Evaluation reads the bytes without following links,
-requires canonical encoding and a maximum size of 1 MiB, and places the payload
-under `observations/<id>.json`. The signed manifest binds its digest, kind,
-scope, comparison, schedule, policy, and both artifact identities. Strict
-verification replays those bindings, and the evidence report renders the payload
+requires canonical encoding and a maximum size of 1 MiB. Native pack-v1 evidence
+places the payload under `observations/<id>.json`. Its signed manifest binds the
+digest, kind, scope, comparison, schedule, policy, and both artifact identities.
+Strict verification replays those bindings, and the evidence report renders the payload
 in a separate context section.
+
+Native judge evidence instead retains the observation payloads inside
+`native_capture.json`, authenticated by its signed judge envelope. Captured v2
+requests do not accept the root `observations` field.
 
 Observations are authenticated context. The selected paired comparison, its
 paired interval, and policy are the complete acceptance calculation. Adding,
-removing, or changing an observation changes the request-bound comparison ID
-and therefore creates a different signed transaction, but cannot alter the
-paired statistics or verdict for otherwise identical inputs. Any byte change
+removing, or changing a native pack-v1 observation changes the request-bound
+comparison ID and therefore creates a different signed transaction, but cannot
+alter the paired statistics or verdict for otherwise identical inputs. Any byte change
 after publication invalidates bundle integrity. Spectral, random-matrix, and
 variance summaries from `invarlock-diagnostics` use this path. The
 [SPDX 3.0.1 AI observation example](https://github.com/invarlock/invarlock/tree/main/examples/integrations/spdx-ai-observation)
@@ -433,9 +437,10 @@ bound and every configured count, width, and side-accuracy check pass.
 Preflight can validate the count but marks interval width and side accuracy
 pending until execution.
 
-This is a deterministic resampling interval over the authenticated finite
-schedule. It is not a population confidence interval, proof of dataset
-representativeness, or general model-quality claim.
+The normalized-NLL and deterministic-extension intervals describe deterministic
+resampling over the authenticated finite schedule. They are not population
+confidence intervals, proof of dataset representativeness, or general
+model-quality claims.
 
 ## OCI delegation for run mode
 
