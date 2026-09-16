@@ -282,6 +282,13 @@ path, or link to the relevant reference. Keep hardware and key requirements
 beside the commands that need them. Historical evidence and attribution files
 retain their original facts and identities.
 
+The native-judge starter is also shipped as package data. When editing
+`examples/native-judge/`, update the matching files in
+`src/invarlock/_data/examples/native-judge/` and run
+`python -m pytest tests/cli/test_native_evaluation_setup.py`. The consistency
+check ensures `evaluate --init --example native-judge` delivers the same
+instructions and inputs as the maintained example.
+
 ### Documentation type contracts
 
 Choose the document type from the reader's task, then make that type visible

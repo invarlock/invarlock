@@ -5,6 +5,12 @@ match and normalized NLL. It generates baseline and subject answers through the
 native runtime, freezes the complete runtime evidence, collects bounded judge
 ratings, and publishes evidence for offline `verify` and `report`.
 
+Use it when you need to generate new model answers and assess them against a
+rubric, such as whether an answer stays within supplied context. A judge rating
+is a measurement of that rubric, not a replacement for task-specific tests. To
+try the evidence workflow without models, containers or API credentials, start
+with the [offline frozen-answer example](../judge-measurements/README.md).
+
 The two invented questions demonstrate wiring. They cannot establish benchmark
 quality or satisfy the interval precision in the example policy. Replace them
 with your own reviewed regression cases and independent-unit assignments before
@@ -17,6 +23,12 @@ counts toward request limits. It is never added to the evaluated model input.
 Omitting the mode or setting it to `none` preserves the original request bytes.
 
 ## Prepare
+
+You need Python 3.12 or newer, two local model snapshots, Docker or Podman, a
+digest-pinned native runtime image, a supported judge account and an Ed25519
+evidence-signing key. Use core, collector and example files from the same source
+revision. The [getting-started guide](../../docs/user-guide/getting-started.md)
+explains model identities, image preparation and key separation.
 
 Install matching core and collector packages from the repository root:
 
@@ -45,13 +57,36 @@ not a price quote. Confirm the approved resolved model identity for your account
 Update the dataset SHA-256 in `request.yaml` whenever the exact case file changes.
 Keep the API key in `OPENAI_API_KEY`, supplied through your secret manager.
 
+Prepare these files before running the commands:
+
+| File | What you supply |
+| --- | --- |
+| `cases.jsonl` | Prompts and references; each case ID must match the policy's unit assignments |
+| `request.yaml` | Exact baseline, subject, case-file digest and output location |
+| `judge-policy.json` | Grading instructions, judge configuration, repetition plan, thresholds and collection limits |
+| `runtime-profile.json` | Your pinned native images and resources; not supplied by the starter |
+| `recipient-policy.json` | Independently approved judge evidence and signer expectations; not supplied by the starter |
+
+Create the runtime profile using the [runtime-profile reference](../../docs/reference/cli.md#reusable-runtime-profiles).
+Prepare the recipient policy using the [judge recipient contract](../../docs/reference/judge-measurements.md).
+The signing key is also supplied by you and stays outside published evidence.
+
 ## Evaluate and inspect
 
-With your normal native runtime profile and signing key configured:
+Run from your prepared workspace. Start with preflight; continue to evaluation
+only after its resource and collection checks pass:
 
 ```bash
-invarlock evaluate request.yaml --runtime-profile runtime-profile.json --signing-key signer-private.pem --preflight --json
-invarlock evaluate request.yaml --runtime-profile runtime-profile.json --signing-key signer-private.pem --json
+invarlock evaluate request.yaml --runtime-profile runtime-profile.json \
+  --signing-key signer-private.pem --preflight --json
+invarlock evaluate request.yaml --runtime-profile runtime-profile.json \
+  --signing-key signer-private.pem --json
+```
+
+After evidence is published, verify it using the independently prepared
+recipient policy and render a report:
+
+```bash
 invarlock verify evidence --trust-profile recipient-policy.json --json
 invarlock report evidence --html report.html --json
 ```
@@ -62,6 +97,15 @@ billable judge calls only within the declared limits. The recipient independentl
 chooses the trust policy, signer, subject and evidence bindings; do not derive
 trust by blindly copying the submitted envelope.
 
+Successful publication creates `evidence/`; it does not mean the comparison
+passed. With the two illustrative cases, expect insufficient evidence under the
+example precision requirement. Inspect the recorded decision and the verifier's
+separate `verified` and `accepted` fields. A report displays the evidence; it does
+not itself authorize acceptance. Use new evidence and report destinations for
+each completed transaction because existing outputs are not overwritten.
+
+## Resume or change the inputs
+
 If judging stops with pending trials, rerun the same request. `judge-work` retains
 the original answers and call admissions; the final evidence destination stays
 absent until all trial slots have an outcome. A failed answer capture is marked
@@ -69,6 +113,8 @@ and cannot silently regenerate answers. Inspect that failure before explicitly
 starting a new capture in a new workspace. Changing the model, data, rubric,
 policy or runtime identity requires a new workspace. Exhausted retained-storage
 capacity publishes terminal insufficient evidence with an explicit stop reason.
+
+## Start from answers collected elsewhere
 
 Native `execution.mode: import` can use existing complete provider side files
 instead of generating answers. Those files must bind the original judge policy
