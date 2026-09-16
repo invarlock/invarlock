@@ -193,3 +193,15 @@ secrets or signing keys when the incident analysis requires it.
   coordinated distribution gate.
 - [Threat model](threat-model.md) separates dependency compromise from evidence
   integrity and acceptance claims.
+
+## Unpublished release candidates
+
+The installed audit binds the local InvarLock candidate's name, version and
+metadata to the supplied wheel. Before publication, PyPI may have no record for
+that exact version. Only the scanner's explicit not-found result for this bound
+first-party identity is recorded as `unpublished_project`; it is not a clean
+vulnerability result. With no dependency findings, the status is
+`dependencies_clean` rather than `clean`. Source, artifact and release checks cover the candidate.
+All third-party dependencies remain in the audit inventory. Missing dependencies,
+other skip reasons, mismatched candidate versions and reported vulnerabilities
+still block release. Raw scanner output remains attached to the audit report.

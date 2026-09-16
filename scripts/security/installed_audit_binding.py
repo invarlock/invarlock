@@ -490,6 +490,27 @@ def _classify(raw: object, binding: dict, returncode: int) -> tuple[list, list]:
     observed: dict[str, str] = {}
     accepted, blocking = [], []
     for dependency in raw["dependencies"]:
+        if isinstance(dependency, dict) and "skip_reason" in dependency:
+            project = binding.get("project_identity", {})
+            name = project.get("name")
+            version = project.get("version")
+            _require(
+                name == "invarlock"
+                and isinstance(version, str)
+                and bool(binding.get("project_wheel_sha256"))
+                and dependency
+                == {
+                    "name": name,
+                    "skip_reason": (
+                        "Dependency not found on PyPI and could not be audited: "
+                        f"{name} ({version})"
+                    ),
+                },
+                "unrecognized or third-party scanner skip",
+            )
+            _require(name not in observed, "duplicate scanner dependency")
+            observed[name] = version
+            continue
         _require(
             isinstance(dependency, dict)
             and set(dependency) == {"name", "version", "vulns"}
@@ -619,6 +640,16 @@ def run_bound_audit(args: argparse.Namespace, load_allowlist) -> int:
         raw = _json(completed.stdout)
         report["raw_findings"] = raw
         accepted, blocking = _classify(raw, binding, completed.returncode)
+        report["unpublished_project"] = [
+            {
+                **binding["project_identity"],
+                "wheel_sha256": binding["project_wheel_sha256"],
+                "scanner_skip_reason": dependency["skip_reason"],
+                "scope": "Local candidate identity is bound to its wheel and installed metadata; no PyPI vulnerability result exists for this version.",
+            }
+            for dependency in raw["dependencies"]
+            if "skip_reason" in dependency
+        ]
         report[
             "remediated_findings" if binding["remediation"] else "accepted_findings"
         ] = accepted
@@ -636,6 +667,8 @@ def run_bound_audit(args: argparse.Namespace, load_allowlist) -> int:
             if blocking
             else ("remediated" if binding["remediation"] else "accepted_exception")
             if accepted
+            else "dependencies_clean"
+            if report["unpublished_project"]
             else "clean"
         )
     except (
@@ -654,7 +687,12 @@ def run_bound_audit(args: argparse.Namespace, load_allowlist) -> int:
             report["raw_stdout_base64"] = base64.b64encode(exc.stdout or b"").decode()
             report["raw_stderr_base64"] = base64.b64encode(exc.stderr or b"").decode()
     write_report(report, args.report)
-    return 0 if report["status"] in {"clean", "accepted_exception", "remediated"} else 1
+    return (
+        0
+        if report["status"]
+        in {"clean", "dependencies_clean", "accepted_exception", "remediated"}
+        else 1
+    )
 
 
 def write_report(report: dict, report_path: str | None) -> None:

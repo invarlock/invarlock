@@ -815,3 +815,75 @@ def test_inventory_normalizes_distribution_spelling_but_rejects_ambiguity(tmp_pa
     (metadata / "METADATA").write_text("Name: other\nVersion: 3.4.0\n")
     with pytest.raises(ValueError, match="installed dist-info identity mismatch"):
         binding._inventory(root)
+
+
+def _unpublished_project(surface):
+    surface.raw["dependencies"][1] = {
+        "name": "invarlock",
+        "skip_reason": "Dependency not found on PyPI and could not be audited: invarlock (0.15.0)",
+    }
+
+
+@pytest.mark.parametrize("kind", ["exception", "remediation"])
+def test_unpublished_project_retains_exact_bound_identity(request, kind):
+    surface = request.getfixturevalue(
+        "hardened_surface" if kind == "remediation" else "surface"
+    )
+    _unpublished_project(surface)
+    assert audit.main(surface.args) == 0
+    report = json.loads(surface.report.read_text())
+    assert report["raw_findings"] == surface.raw
+    assert report["unpublished_project"][0]["name"] == "invarlock"
+    assert report["unpublished_project"][0]["version"] == "0.15.0"
+    assert report["unpublished_project"][0]["wheel_sha256"] == _digest(
+        surface.project_wheel.read_bytes()
+    )
+    assert "no PyPI vulnerability result" in report["unpublished_project"][0]["scope"]
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "wrong-version",
+        "other-name",
+        "unknown-reason",
+        "extra-field",
+        "duplicate",
+        "installed-tamper",
+    ],
+)
+def test_unpublished_project_does_not_allow_arbitrary_skips(surface, mutation):
+    _unpublished_project(surface)
+    record = surface.raw["dependencies"][1]
+    if mutation == "wrong-version":
+        record["skip_reason"] = record["skip_reason"].replace("0.15.0", "0.16.0")
+    elif mutation == "other-name":
+        record["name"] = "other"
+    elif mutation == "unknown-reason":
+        record["skip_reason"] = "network error"
+    elif mutation == "extra-field":
+        record["vulns"] = []
+    elif mutation == "duplicate":
+        surface.raw["dependencies"].append(record.copy())
+    else:
+        (surface.root / "invarlock-0.15.0.dist-info/METADATA").write_text("changed")
+    assert audit.main(surface.args) == 1
+    assert json.loads(surface.report.read_text())["status"] == "blocked"
+
+
+def test_unpublished_project_without_findings_is_not_reported_clean(
+    surface, monkeypatch
+):
+    _unpublished_project(surface)
+    surface.raw["dependencies"][0]["vulns"] = []
+    monkeypatch.setattr(
+        binding.subprocess,
+        "run",
+        lambda *args, **kwargs: SimpleNamespace(
+            returncode=0, stdout=json.dumps(surface.raw).encode(), stderr=b""
+        ),
+    )
+    assert audit.main(surface.args) == 0
+    report = json.loads(surface.report.read_text())
+    assert report["status"] == "dependencies_clean"
+    assert len(report["unpublished_project"]) == 1
