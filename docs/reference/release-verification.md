@@ -17,7 +17,7 @@ InvarLock ships six coordinated Python distributions:
 | `invarlock-runtime-tensorrt-llm` | Optional TensorRT-LLM provider |
 | `invarlock-runtime-hf-vision-text` | Optional Hugging Face vision-text provider |
 | `invarlock-diagnostics` | Optional observation-only numeric diagnostics |
-| `invarlock-inspect-judge` | Optional bounded collection and import adapter; provider SDKs require its `inspect` extra |
+| `invarlock-inspect-judge` | Optional bounded collection and import adapter; install `invarlock[judge]` to include the pinned provider SDKs |
 
 Each add-in wheel and source distribution includes the repository license text;
 the coordinated distribution gate checks its contents and wheel metadata.

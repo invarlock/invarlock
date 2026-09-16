@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
+from invarlock import __version__
 from invarlock.captured_contracts import read_file
 from invarlock.evidence_pack_contract import EvidenceObservation, RuntimeSideEvidence
 from invarlock.evidence_pack_json import parse_json_bytes
@@ -41,7 +42,8 @@ def collection_api() -> Any:
         return importlib.import_module("invarlock_addins.inspect_judge")
     except ImportError:
         raise JudgeWorkflowError(
-            "Install invarlock-inspect-judge[inspect] to collect judge measurements"
+            f'Install with: python -m pip install "invarlock[judge]=={__version__}" '
+            "to collect judge measurements"
         ) from None
 
 

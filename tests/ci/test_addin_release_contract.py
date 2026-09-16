@@ -38,6 +38,17 @@ def test_first_party_distribution_versions_match_core() -> None:
         assert _module_version(path, name) == core_version
 
 
+def test_judge_extra_requires_matching_collector_without_enlarging_core() -> None:
+    core = _project(REPO_ROOT)
+    assert core["optional-dependencies"]["judge"] == [
+        f"invarlock-inspect-judge[inspect]=={core['version']}"
+    ]
+    assert not any(
+        str(dependency).startswith(("invarlock-inspect-judge", "inspect-ai", "openai"))
+        for dependency in core["dependencies"]
+    )
+
+
 def test_all_addins_ship_the_declared_license_text() -> None:
     expected = (REPO_ROOT / "LICENSE").read_bytes()
     for path in ADDINS.values():
@@ -128,7 +139,8 @@ def test_inspect_judge_keeps_the_sdk_optional_and_joins_installed_smokes() -> No
 def test_optional_judge_sdk_has_hashed_release_gate_without_source_shadowing() -> None:
     gate = (REPO_ROOT / "scripts/inspect_judge_sdk_gate.sh").read_text()
     assert '"${JUDGE_BIN}" -m pip install --no-index' in gate
-    assert '"${judge_wheels[0]}[inspect]"' in gate
+    assert '"${core_wheels[0]}[judge]"' in gate
+    assert '--find-links "${ROOT_DIR}/dist/addins"' in gate
     assert '"${JUDGE_BIN}" -m pip check' in gate
     assert "unset PYTHONPATH" in gate
     assert "INVARLOCK_REQUIRE_INSPECT_SDK=1" in gate

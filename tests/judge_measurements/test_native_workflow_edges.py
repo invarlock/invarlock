@@ -33,7 +33,7 @@ def _installed_api(monkeypatch):
 def test_missing_installed_collector_has_safe_install_diagnostic(monkeypatch):
     monkeypatch.setitem(sys.modules, "invarlock_addins.inspect_judge", None)
     with pytest.raises(
-        workflow.JudgeWorkflowError, match="Install invarlock-inspect-judge"
+        workflow.JudgeWorkflowError, match=r"pip install .*invarlock\[judge\]=="
     ):
         workflow.collection_preflight(_recipe()["collection"])
 

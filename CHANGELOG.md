@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Install live judge collection with `pip install "invarlock[judge]"`, including
+  the matching collector and pinned SDKs. Offline judging of retained
+  measurements, verification and reporting remain available in core alone.
+
 ### Changed
 
 ### Removed

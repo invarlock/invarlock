@@ -43,6 +43,9 @@ Issues = "https://github.com/invarlock/invarlock/issues"
 Changelog = "https://github.com/invarlock/invarlock/blob/v0.16.0/CHANGELOG.md"
 
 [project.optional-dependencies]
+# Live judge collection; analysis, import, verification and reporting stay in core.
+judge = ["invarlock-inspect-judge[inspect]==0.16.0"]
+
 # Development dependencies
 dev = [
   "pytest>=9.1.1",
@@ -110,7 +113,7 @@ security-ci = [
 ]
 
 # Runtime preparation is source-bound and uses the verified generated wheelhouse.
-# Public extras contain tooling only; they cannot supply this local wheel.
+# Public extras cannot supply this local runtime wheel.
 [dependency-groups]
 hf = [
   "accelerate==1.14.0+invarlock.1",
@@ -137,6 +140,10 @@ example-torchao = [
 
 [tool.uv]
 find-links = ["runtime/wheels"]
+
+# Resolve coordinated source builds without depending on a published release.
+[tool.uv.sources]
+invarlock-inspect-judge = { path = "addins/inspect_judge" }
 
 [project.entry-points."invarlock.runtime_providers"]
 hf_transformers = "invarlock.runtime_providers.hf_transformers:HFTransformersProvider"
