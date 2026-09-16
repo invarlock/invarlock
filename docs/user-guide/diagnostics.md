@@ -147,8 +147,9 @@ a signed receipt.
 
 ## Attach an authenticated observation
 
-Create the diagnostic result, write its canonical JSON, and name it in the
-evaluation request:
+Create the diagnostic result, write its canonical JSON, and name it in a native
+v1 evaluation request. Captured v2 requests do not accept this `observations`
+field:
 
 ```python
 from pathlib import Path
@@ -173,13 +174,18 @@ observations:
     path: observations/subject-spectral.json
 ```
 
-`invarlock evaluate` binds the observation to the comparison, schedule, policy,
-and both artifact identities, includes its digest in the signed manifest, and
-places it under `observations/`. Strict verification rejects malformed,
-non-canonical, unbound, or tampered observations. The verification JSON lists
-the authenticated observation ID, kind, scope, and digest. Reports place
-the payload under **Authenticated observations** and state that it is outside
+For native pack-v1 evidence, `invarlock evaluate` binds the observation to the
+comparison, schedule, policy, and both artifact identities, includes its digest
+in the signed manifest, and places it under `observations/`. Strict verification
+rejects malformed, non-canonical, unbound, or tampered observations. The
+verification JSON lists the authenticated observation ID, kind, scope, and digest.
+Reports place the payload under **Authenticated observations** and state that it is outside
 the acceptance calculation.
+
+Native judge requests retain these observation payloads inside
+`native_capture.json` under their separate signed judge envelope. Use the
+[judge evidence contract](../reference/judge-measurements.md) for that layout
+and its recipient verification.
 
 Absence is valid. Adding a JSON file after publication still violates the
 bundle's closed inventory and fails strict verification.

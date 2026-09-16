@@ -139,8 +139,10 @@ and captured or frozen-answer requests can import retained calls. Native
 and reporting replay those measurements offline.
 
 The plan binds the original task text, frozen answers, rubric, judge configuration,
-reference mode, independent units and repetition schedule. Retained attempts and
-call, token, cost, timeout and storage limits constrain collection. They do not
+reference mode, declared unit grouping and repetition schedule. Independence
+between units is a statistical assumption; replay cannot establish it from
+recorded scores. Retained attempts and call, token, cost, timeout and storage
+limits constrain collection. They do not
 prove that a compromised operator or provider supplied truthful measurements,
 that the rubric reflects user needs, or that the judge agrees with independent
 reference labels.

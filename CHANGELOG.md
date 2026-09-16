@@ -139,6 +139,9 @@ while strengthening evidence verification, runtime isolation and release checks.
   contracts. Assurance guidance distinguishes native, captured and judge decision
   rules, acceptance requirements and evidence-set limits; receipt examples include
   required independent anchors and separate authenticity from the signed verdict.
+  Guides and API references scope pairing, signatures, observation attachments and
+  verification helpers by evidence family. Policy-engine examples state their
+  supported recipient-policy subset separately from full acceptance verification.
   Production release publication updates
   tagged docs, `latest` and `stable`; TestPyPI and bootstrap runs cannot do so.
 

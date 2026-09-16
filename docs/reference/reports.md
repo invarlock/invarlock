@@ -334,9 +334,11 @@ A completed `regression` or `insufficient_evidence` decision has
 Local work-budget or unsupported-scoring-environment refusal is incomplete
 verification (exit `2`) without a receipt, not evidence corruption.
 
-Do not infer acceptance from `integrity_ok` alone. Require status `0`,
-`ok: true`, the expected `assurance_status`, exact anchors, and a valid receipt
-when the result crosses a process boundary.
+Do not infer acceptance from `integrity_ok` alone. Native deterministic acceptance
+requires `assurance_status: verified`; captured acceptance requires
+`replay_status: completed`. Both require status `0`, `ok: true`,
+`integrity_ok: true`, exact anchors, and a valid receipt when the result crosses
+a process boundary.
 
 ## Signed verification receipt
 
