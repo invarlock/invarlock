@@ -1,0 +1,154 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="1600"
+  height="760"
+  viewBox="0 0 1600 760"
+  role="img"
+  aria-labelledby="title desc"
+>
+  <title id="title">Evidence signer and verifier trust separation</title>
+  <desc id="desc">
+    The evidence signer signs a canonical bundle after evaluation. A verifier
+    reads that unchanged bundle with independently supplied artifact, schedule,
+    policy, runtime, and signer expectations, then signs a separate verification
+    receipt.
+  </desc>
+  <defs>
+    <marker
+      id="arrow"
+      viewBox="0 0 10 10"
+      refX="8.25"
+      refY="5"
+      markerWidth="6.7"
+      markerHeight="6.7"
+      orient="auto-start-reverse"
+    >
+      <path d="M 0.75 1 L 9.5 5 L 0.75 9 z" fill="#1b2b25" />
+    </marker>
+    <style>
+      .column-label {
+        font: 700 25px Sora, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      .box-title {
+        fill: #1b2b25;
+        font: 700 23px Sora, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      .box-text {
+        fill: #5a675f;
+        font: 17px Sora, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      .mono {
+        fill: #1b2b25;
+        font: 18px "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      }
+      .boundary-signer {
+        fill: #fff8ea;
+        stroke: #0f7669;
+        stroke-dasharray: 13 10;
+        stroke-width: 3;
+      }
+      .boundary-evidence {
+        fill: #fff8ea;
+        stroke: #2d7a5f;
+        stroke-dasharray: 13 10;
+        stroke-width: 3;
+      }
+      .boundary-verifier {
+        fill: #fff8ea;
+        stroke: #b56a3d;
+        stroke-dasharray: 13 10;
+        stroke-width: 3;
+      }
+      .box-signer {
+        fill: #f3ecde;
+        stroke: #0f7669;
+        stroke-width: 3;
+      }
+      .box-evidence {
+        fill: #f3ecde;
+        stroke: #2d7a5f;
+        stroke-width: 3;
+      }
+      .box-verifier {
+        fill: #f3ecde;
+        stroke: #b56a3d;
+        stroke-width: 3;
+      }
+      .arrow {
+        fill: none;
+        marker-end: url(#arrow);
+        stroke: #1b2b25;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 3;
+      }
+      .divider {
+        stroke: #b9b1a4;
+        stroke-dasharray: 7 9;
+        stroke-width: 2;
+      }
+    </style>
+  </defs>
+
+  <rect width="1600" height="760" fill="#f3ecde" />
+
+  <rect x="55" y="55" width="445" height="650" rx="22" class="boundary-signer" />
+  <text x="90" y="105" class="column-label" fill="#0f7669">Evaluate / sign</text>
+
+  <rect x="578" y="55" width="444" height="650" rx="22" class="boundary-evidence" />
+  <text x="613" y="105" class="column-label" fill="#2d7a5f">Portable evidence</text>
+
+  <rect x="1100" y="55" width="445" height="650" rx="22" class="boundary-verifier" />
+  <text x="1135" y="105" class="column-label" fill="#b56a3d">Verifier boundary</text>
+
+  <rect x="105" y="150" width="345" height="95" rx="12" class="box-signer" />
+  <text x="277" y="187" text-anchor="middle" class="box-title">Closed request</text>
+  <text x="277" y="216" text-anchor="middle" class="box-text">artifacts · dataset · runtime · policy</text>
+
+  <rect x="105" y="300" width="345" height="95" rx="12" class="box-signer" />
+  <text x="277" y="337" text-anchor="middle" class="box-title">invarlock evaluate</text>
+  <text x="277" y="366" text-anchor="middle" class="box-text">prepare · execute · pair · publish</text>
+
+  <rect x="105" y="485" width="345" height="95" rx="12" class="box-signer" />
+  <text x="277" y="522" text-anchor="middle" class="box-title">Evidence-signing key</text>
+  <text x="277" y="551" text-anchor="middle" class="box-text">authenticates bundle bytes</text>
+
+  <path d="M 277 245 L 277 300" class="arrow" />
+  <path d="M 277 485 C 277 450 277 430 277 395" class="arrow" />
+
+  <rect x="628" y="205" width="344" height="170" rx="12" class="box-evidence" />
+  <text x="800" y="246" text-anchor="middle" class="box-title">Canonical signed evidence</text>
+  <text x="800" y="285" text-anchor="middle" class="mono">invarlock/evidence-pack-v1</text>
+  <text x="800" y="322" text-anchor="middle" class="box-text">records · report · checksums</text>
+  <text x="800" y="350" text-anchor="middle" class="box-text">evidence signature</text>
+
+  <rect x="628" y="475" width="344" height="105" rx="12" class="box-evidence" />
+  <text x="800" y="514" text-anchor="middle" class="box-title">Signed verification receipt</text>
+  <text x="800" y="545" text-anchor="middle" class="box-text">anchors · decision · verifier signature</text>
+
+  <path d="M 450 347 C 510 347 550 290 628 290" class="arrow" />
+  <line x1="800" y1="392" x2="800" y2="447" class="divider" />
+
+  <rect x="1150" y="120" width="345" height="170" rx="12" class="box-verifier" />
+  <text x="1322" y="158" text-anchor="middle" class="box-title">Independent trust inputs</text>
+  <text x="1322" y="191" text-anchor="middle" class="box-text">artifact digests · schedule digest</text>
+  <text x="1322" y="221" text-anchor="middle" class="box-text">policy bytes · runtime digests</text>
+  <text x="1322" y="251" text-anchor="middle" class="box-text">evidence-signer fingerprint</text>
+
+  <rect x="1150" y="325" width="345" height="95" rx="12" class="box-verifier" />
+  <text x="1322" y="362" text-anchor="middle" class="box-title">invarlock verify</text>
+  <text x="1322" y="391" text-anchor="middle" class="box-text">replay pairs + interval · decide</text>
+
+  <rect x="1150" y="485" width="345" height="95" rx="12" class="box-verifier" />
+  <text x="1322" y="522" text-anchor="middle" class="box-title">Verifier key</text>
+  <text x="1322" y="551" text-anchor="middle" class="box-text">authenticates receipt bytes</text>
+
+  <path d="M 1322 290 L 1322 325" class="arrow" />
+  <path d="M 1322 485 C 1322 458 1322 444 1322 420" class="arrow" />
+  <path d="M 972 290 C 1040 290 1080 372 1150 372" class="arrow" />
+  <path d="M 1150 390 C 1070 420 1032 527 972 527" class="arrow" />
+
+  <text x="800" y="650" text-anchor="middle" class="box-text">
+    Evidence signature · verifier receipt · one unchanged bundle
+  </text>
+</svg>
