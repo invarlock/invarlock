@@ -1,6 +1,6 @@
 """Optional Hugging Face vision-text runtime for InvarLock."""
 
-__version__ = "0.16.0"
+__version__ = "0.16.1"
 
 from .provider import HFVisionTextProvider, processor_contract_sha256
 

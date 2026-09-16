@@ -246,15 +246,20 @@ none qualifies a different judge model, effort or rubric.
 Rubric development and reference-label review are study-design choices, not
 additional requirements of the native judge workflow.
 
-Install matching packages and use the installed command:
+Install the core with its live-collection extra and use the installed command:
 
 ```bash
-python -m pip install .
-python -m pip install 'addins/inspect_judge[inspect]'
+python -m pip install "invarlock[judge]"
 # Supply OPENAI_API_KEY through your secret manager.
 invarlock evaluate judge-request.yaml --preflight --json
 invarlock evaluate judge-request.yaml --signing-key signer-private.pem --json
 ```
+
+The `judge` extra installs the matching `invarlock-inspect-judge[inspect]`
+package and pinned SDKs. Scoring, retained-measurement import, verification and
+reporting remain in core. For local source builds, use
+`python -m pip install '.[judge]' 'addins/inspect_judge[inspect]'` from the
+repository root so both packages come from the same checkout.
 
 Review every call, token, cost and time cap first. The collector rejects custom
 provider URLs and reads credentials only from its environment. Remove both

@@ -576,7 +576,7 @@ def test_sdk_missing_fails_without_importing_provider(data, monkeypatch):
         raise importlib.metadata.PackageNotFoundError
 
     monkeypatch.setattr(importlib.metadata, "version", missing)
-    with pytest.raises(InspectJudgeError, match="inspect extra"):
+    with pytest.raises(InspectJudgeError, match=r"invarlock\[judge\]"):
         prepare_inspect_config(data[0], data[3])
 
 

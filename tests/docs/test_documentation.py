@@ -796,7 +796,7 @@ def test_operational_guides_pin_current_failure_publication_and_release_paths() 
         assert fragment in security
 
 
-def test_latest_release_changelog_is_a_product_synthesis() -> None:
+def test_v0160_release_changelog_is_a_product_synthesis() -> None:
     changelog = _read("CHANGELOG.md")
     unreleased, current = changelog.split("## [0.16.0]", maxsplit=1)
     current_release, remainder = current.split("## [0.15.0]", maxsplit=1)

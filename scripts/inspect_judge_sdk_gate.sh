@@ -26,7 +26,7 @@ if [[ ${#core_wheels[@]} -ne 1 || ${#judge_wheels[@]} -ne 1 ]]; then
 fi
 # Resolve the real extra against the installed hashed closure. --no-index makes
 # an omitted or incompatible dependency fail rather than silently fetching it.
-"${JUDGE_BIN}" -m pip install --no-index "${core_wheels[0]}" "${judge_wheels[0]}[inspect]"
+"${JUDGE_BIN}" -m pip install --no-index --find-links "${ROOT_DIR}/dist/addins" "${core_wheels[0]}[judge]"
 "${JUDGE_BIN}" -m pip check
 "${JUDGE_BIN}" -c 'from pathlib import Path; from sysconfig import get_path; import invarlock, invarlock_addins.inspect_judge as judge; root=Path(get_path("purelib")).resolve(); assert all(Path(module.__file__).resolve().is_relative_to(root) for module in (invarlock, judge))'
 mkdir "${JUDGE_ENV}/tests"

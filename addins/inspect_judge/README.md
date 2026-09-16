@@ -38,11 +38,16 @@ response cache does not disable provider prompt caching; declared cost
 reservations must include applicable cache-write charges.
 
 ```bash
-python -m pip install .
-python -m pip install 'addins/inspect_judge[inspect]'
+python -m pip install "invarlock[judge]"
 invarlock evaluate judge-request.yaml --preflight --json
 invarlock evaluate judge-request.yaml --signing-key signer-private.pem --json
 ```
+
+The core `judge` extra installs this matching collector and its pinned SDKs.
+For a source build, run
+`python -m pip install '.[judge]' 'addins/inspect_judge[inspect]'` from the
+repository root. Offline judge analysis, verification and reporting are built
+into `invarlock` and do not require the extra.
 
 Preflight checks without calling a provider. Execution uses the declared cost,
 call, token and time ceilings, the official OpenAI endpoint and a private
@@ -153,7 +158,7 @@ The pinned SDK interfaces used for configuration and event-field inspection are
 and [`ModelCall`](https://inspect.aisi.org.uk/reference/inspect_ai.model.html#modelcall).
 
 The release gate `make inspect-judge-sdk-test` installs built core and add-in
-wheels with the real `inspect` extra against the dedicated hashed dependency
+wheels through `invarlock[judge]` against the dedicated hashed dependency
 locks, runs `pip check`, and executes real SDK request/event conversion using an
 offline HTTP transport. Missing or mismatched SDK dependencies fail that gate.
 The separate evaluator-qualification runtime retains its own historical version

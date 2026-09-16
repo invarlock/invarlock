@@ -96,6 +96,11 @@ its commit and wheel digest when sharing it. A missing release archive is an
 error, never a reason to substitute another version. See
 [matching wheels and examples](docs/user-guide/getting-started.md#matching-wheels-and-examples).
 
+To collect new judge ratings, install `python -m pip install "invarlock[judge]"`.
+Judge scoring is built into the core; this extra adds the matching collector and
+its pinned provider SDKs. Offline import, verification and reporting need only
+`invarlock`. See [judge setup](docs/reference/judge-measurements.md#frozen-answer-requests-and-preflight).
+
 ## What can you use it for?
 
 | Your task | Starting point |

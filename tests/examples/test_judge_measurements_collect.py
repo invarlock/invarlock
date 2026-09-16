@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import re
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -117,16 +119,23 @@ def test_incomplete_collection_prints_a_followable_resume_action(
     assert (tmp_path / "measurements-collected.json").exists()
 
 
-def test_documented_source_install_does_not_name_an_unpublished_distribution():
-    root = SCRIPT.parents[2]
-    for path in (
-        root / "docs/reference/judge-measurements.md",
-        root / "examples/judge-measurements/README.md",
-        root / "addins/inspect_judge/README.md",
-    ):
-        text = path.read_text(encoding="utf-8")
-        assert "python -m pip install ." in text
-        assert "invarlock-inspect-judge[inspect]==0.15.0" not in text
+@pytest.mark.parametrize(
+    "relative_path",
+    (
+        "docs/reference/judge-measurements.md",
+        "examples/judge-measurements/README.md",
+        "addins/inspect_judge/README.md",
+    ),
+)
+def test_documented_source_install_uses_matching_local_packages(relative_path):
+    text = (SCRIPT.parents[2] / relative_path).read_text(encoding="utf-8")
+    install_arguments = [
+        shlex.split(arguments)
+        for arguments in re.findall(
+            r"(?:^|`)python -m pip install ([^\n`]+)", text, flags=re.MULTILINE
+        )
+    ]
+    assert [".[judge]", "addins/inspect_judge[inspect]"] in install_arguments
 
 
 @pytest.fixture

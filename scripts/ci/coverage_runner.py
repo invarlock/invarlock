@@ -41,6 +41,7 @@ SUPPORT_TESTS = (
     "tests/scripts/test_first_party_distribution_validation.py",
     "tests/scripts/test_installed_pip_audit.py",
     "tests/scripts/test_package_readme.py",
+    "tests/scripts/test_package_rendering.py",
     "tests/scripts/test_prepare_qualification_suites.py",
     "tests/scripts/test_qualification_candidate_wheels.py",
     "tests/scripts/test_qualification_receipt_check.py",

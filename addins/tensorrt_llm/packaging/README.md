@@ -139,7 +139,7 @@ later `qualify-preflight` and `qualify-evidence` call as `CANARY_EVIDENCE`,
 `CANARY_RECEIPT`, and `CANARY_TRUST_PROFILE`. A different image digest requires
 a new signed canary. Keep the original verifier private key available for
 readiness. Reuse also requires matching providers, task, acceptance binding and
-device class; see the [canary compatibility rules](https://github.com/invarlock/invarlock/blob/v0.16.0/docs/reference/runtime-providers.md).
+device class; see the [canary compatibility rules](https://github.com/invarlock/invarlock/blob/v0.16.1/docs/reference/runtime-providers.md).
 Set `QUALIFICATION_DEVICE` to an explicit GPU such as `cuda:0`, then set
 `QUALIFICATION_CPUS`, `QUALIFICATION_MEMORY_MIB`, and `QUALIFICATION_USER` for
 the bounded workers. Keep all four values unchanged through canary, preflight,
@@ -195,7 +195,7 @@ Build the request-side runtime spec from the exact engine bundle, tokenizer
 contract, and pinned runner instead of transcribing engine metadata. The
 inspection probes the vendor runner and CUDA runtime, so this Python must run
 inside the digest-pinned, network-disabled image built from
-[`runtime/Dockerfile`](https://github.com/invarlock/invarlock/blob/v0.16.0/addins/tensorrt_llm/runtime/Dockerfile), with the target GPU available:
+[`runtime/Dockerfile`](https://github.com/invarlock/invarlock/blob/v0.16.1/addins/tensorrt_llm/runtime/Dockerfile), with the target GPU available:
 
 ```python
 from pathlib import Path

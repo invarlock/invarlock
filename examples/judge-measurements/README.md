@@ -119,8 +119,7 @@ collection settings. Install matching core and collector packages from the
 repository root:
 
 ```bash
-python -m pip install .
-python -m pip install 'addins/inspect_judge[inspect]'
+python -m pip install ".[judge]" "addins/inspect_judge[inspect]"
 ```
 
 Then return to the prepared workspace with the updated plan, policy and
