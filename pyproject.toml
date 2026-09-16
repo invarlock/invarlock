@@ -66,6 +66,7 @@ dev = [
   "build>=0.10.0",
   "wheel>=0.48.0",
   "twine>=4.0.0",
+  "readme-renderer[md]==45.0",
 ]
 
 ci = [
@@ -83,6 +84,7 @@ ci = [
   "markdown-it-py>=4.0.0",
   "wheel>=0.48.0",
   "twine>=4.0.0",
+  "readme-renderer[md]==45.0",
 ]
 
 docs-ci = [
@@ -102,6 +104,7 @@ release-ci = [
   "setuptools>=83.0.0",
   "wheel==0.48.0",
   "twine>=4.0.0",
+  "readme-renderer[md]==45.0",
   "cyclonedx-bom>=4.1",
 ]
 

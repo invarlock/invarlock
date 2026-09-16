@@ -177,6 +177,7 @@ jobs:
           python -m build --wheel --no-isolation
           python -m pip install --no-deps --force-reinstall dist/*.whl
           npm ci
+          npm audit --audit-level=high
       - name: Install actionlint
         run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
       - name: Run complete repository gates
@@ -348,6 +349,8 @@ jobs:
           --expected-version "${INVARLOCK_RELEASE_TAG#v}"
           --core-dist-dir dist
           --addin-dist-dir dist/addins
+      - name: Render built package descriptions
+        run: python scripts/release/package_rendering.py
       - name: Run clean-checkout release preflight
         env:
           INVARLOCK_RELEASE_SHA: ${{ needs.resolve_release_ref.outputs.release_sha }}

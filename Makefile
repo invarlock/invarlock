@@ -247,6 +247,7 @@ coverage-release:  ## Enforce branch-aware coverage for release helpers
 		tests/scripts/test_core_wheel_consumers.py \
 		tests/scripts/test_first_party_distribution_validation.py \
 		tests/scripts/test_package_readme.py \
+		tests/scripts/test_package_rendering.py \
 		tests/scripts/test_release_distribution_validation_edges.py \
 		tests/scripts/test_release_preflight.py \
 		tests/scripts/test_release_preflight_adversarial.py \
@@ -268,6 +269,8 @@ coverage-release-report:  ## Enforce retained release coverage measurements
 		--include='scripts/release/core_wheel_consumers.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc \
 		--include='scripts/release/first_party_distribution_validation.py' --fail-under=95
+	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc \
+		--include='scripts/release/package_rendering.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc \
 		--include='scripts/release/release_distribution_validation.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc \
@@ -742,6 +745,7 @@ dist-check: package-readmes-check  ## Build and validate the core and first-part
 	$(DIST_RUN) python -m twine check dist/addins/*
 	$(DIST_RUN) python scripts/release/first_party_distribution_validation.py \
 		--repo-root . --core-dist-dir dist --addin-dist-dir dist/addins
+	$(DIST_RUN) python scripts/release/package_rendering.py
 
 .PHONY: inspect-judge-sdk-test
 inspect-judge-sdk-test: dist-check  ## Resolve the optional judge SDK extra and replay real SDK events offline
