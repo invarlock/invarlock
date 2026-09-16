@@ -687,10 +687,16 @@ librt==0.13.0 \
     --hash=sha256:fadc63331f4388c3dc90090448f682a7e9feafc11481391c1e94f2f907a3976e \
     --hash=sha256:fc67741da44c6eaa90e01eafb586bbba9b51eb5b6ed381ee6f5ae72eb3316d21
     # via mypy
+markdown==3.10.2 \
+    --hash=sha256:994d51325d25ad8aa7ce4ebaec003febcce822c3f8c911e3b17c52f7f589f950 \
+    --hash=sha256:e91464b71ae3ee7afd3017d9f358ef0baf158fd9a298db92f1d4761133824c36
+    # via invarlock (pyproject.toml)
 markdown-it-py==4.0.0 \
     --hash=sha256:87327c59b172c5011896038353a81343b6754500a08cd7a4973bb48c6d578147 \
     --hash=sha256:cb0a2b4aa34f932c007117b194e945bd74e0ec24133ceb5bac59009cda1cb9f3
-    # via rich
+    # via
+    #   invarlock (pyproject.toml)
+    #   rich
 markupsafe==3.0.3 \
     --hash=sha256:0303439a41979d9e74d18ff5e2dd8c43ed6c6001fd40e5bf2e43f7bd9bbc523f \
     --hash=sha256:068f375c472b3e7acbe2d5318dea141359e6900156b5b2ba06a30b169086b91a \
