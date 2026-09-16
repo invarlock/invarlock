@@ -9,11 +9,13 @@ including a private resumable workspace.
 with paired runs, a captured directory pack, and independent run/request pins
 in place of native provider, schedule, and runtime bindings.
 
-!!! info "Reference"
-
-    - **Surface:** Transaction stages, write boundaries, failure classification, and outputs
-    - **Stability:** Behavioral contract for public evaluate, verify, and report transactions
-    - **Use this page when:** Diagnosing where a transaction stopped, designing retries, or determining which output may exist after failure
+> **Reference**
+>
+> **Surface:** Transaction stages, write boundaries, failure classification, and outputs
+>
+> **Stability:** Behavioral contract for public evaluate, verify, and report transactions
+>
+> **Use this page when:** Diagnosing where a transaction stopped, designing retries, or determining which output may exist after failure
 
 ```text
 request parsed

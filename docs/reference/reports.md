@@ -4,14 +4,16 @@ InvarLock separates provider facts, a canonical comparison report, independent
 verification output, a signed verification receipt, and console or HTML summaries.
 They have different trust meanings.
 
-!!! info "Reference"
-
-    - **Surface:** Runtime-side reports, canonical comparison reports,
-      verification results, signed receipts, and console or HTML summaries
-    - **Stability:** Versioned machine contracts are stable by format; console
-      and HTML output are presentation surfaces
-    - **Use this page when:** Parsing a decision, validating a receipt, or
-      distinguishing signed evidence from independently accepted evidence
+> **Reference**
+>
+> **Surface:** Runtime-side reports, canonical comparison reports,
+> verification results, signed receipts, and console or HTML summaries
+>
+> **Stability:** Versioned machine contracts are stable by format; console
+> and HTML output are presentation surfaces
+>
+> **Use this page when:** Parsing a decision, validating a receipt, or
+> distinguishing signed evidence from independently accepted evidence
 
 Report formats depend on the selected scorer and evidence family. The native
 runtime sections below describe exact match, normalized NLL and deterministic

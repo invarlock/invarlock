@@ -6,20 +6,20 @@ party can verify independently. The system that trained, pruned, quantized,
 converted, or compiled the subject remains responsible for creating that
 artifact.
 
-!!! tip "User guide"
-
-    **In plain language:** Create the candidate with the tool you already use,
-    then give InvarLock the immutable before-and-after artifacts or complete
-    per-record results.
-
-    **Outcome:** A signed comparison bundle, an independently signed
-    verification receipt, and an evidence report.
-
-    **Audience:** Model adaptation, runtime, evaluation, and release teams.
-
-    **Prerequisites:** Stable record IDs, a representative paired schedule, a
-    policy, and independently managed artifact, runtime, signer, and policy
-    identities.
+> **User guide**
+>
+> **In plain language:** Create the candidate with the tool you already use,
+> then give InvarLock the immutable before-and-after artifacts or complete
+> per-record results.
+>
+> **Outcome:** A signed comparison bundle, an independently signed
+> verification receipt, and an evidence report.
+>
+> **Audience:** Model adaptation, runtime, evaluation, and release teams.
+>
+> **Prerequisites:** Stable record IDs, a representative paired schedule, a
+> policy, and independently managed artifact, runtime, signer, and policy
+> identities.
 
 ## Choose the execution boundary
 

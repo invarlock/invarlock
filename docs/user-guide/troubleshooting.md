@@ -3,17 +3,17 @@
 InvarLock fails closed: a missing binding, unverifiable input, or ambiguous
 destination stops publication or produces a rejected verification result.
 
-!!! tip "User guide"
-
-    **Outcome:** Identify the earliest failing transaction boundary and recover
-    without mutating signed evidence or weakening independent verification.
-
-    **Audience:** Evaluation operators, verifier operators, runtime integrators,
-    and decision owners investigating an evaluation, verification, or report error.
-
-    **Prerequisites:** The original command and structured error, unchanged
-    submitted artifacts, independently sourced anchors, and knowledge of which
-    output paths existed before the attempt.
+> **User guide**
+>
+> **Outcome:** Identify the earliest failing transaction boundary and recover
+> without mutating signed evidence or weakening independent verification.
+>
+> **Audience:** Evaluation operators, verifier operators, runtime integrators,
+> and decision owners investigating an evaluation, verification, or report error.
+>
+> **Prerequisites:** The original command and structured error, unchanged
+> submitted artifacts, independently sourced anchors, and knowledge of which
+> output paths existed before the attempt.
 
 ## Triage by transaction boundary
 

@@ -1,19 +1,20 @@
 # Reproducibility and provenance
 
-!!! abstract "Assurance note"
-    **In plain language:** The pack records what artifacts, inputs, settings,
-    and results were declared, so reruns can be compared. It does not by itself
-    prove that a particular machine executed them.
-
-    **Question:** Which identities and execution facts can be compared across
-    transactions, and which reproducibility claims remain external?
-
-    **Decision use:** Use this page to design or review a controlled rerun and
-    to distinguish byte identity, declared runtime identity, and attestation.
-
-    **Evidence:** Artifact, schedule, policy, provider, runtime, device, and
-    per-record bindings retained in the pack and its external verification
-    receipt.
+> **Assurance note**
+>
+> **In plain language:** The pack records what artifacts, inputs, settings,
+> and results were declared, so reruns can be compared. It does not by itself
+> prove that a particular machine executed them.
+>
+> **Question:** Which identities and execution facts can be compared across
+> transactions, and which reproducibility claims remain external?
+>
+> **Decision use:** Use this page to design or review a controlled rerun and
+> to distinguish byte identity, declared runtime identity, and attestation.
+>
+> **Evidence:** Artifact, schedule, policy, provider, runtime, device, and
+> per-record bindings retained in the pack and its external verification
+> receipt.
 
 InvarLock records enough identity and execution material to compare a rerun
 with an earlier transaction. That material narrows ambiguity; it is not remote

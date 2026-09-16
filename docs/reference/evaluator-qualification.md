@@ -5,14 +5,16 @@ boundary. `qualify_evaluator_export` consumes normalized contracts without
 dispatching to an evaluator SDK. Example-owned runners execute representative
 upstream tools and normalize their results into the same four contracts.
 
-!!! info "Reference"
-
-    - **Surface:** Four canonical JSON contracts, the
-      `invarlock-qualify-evaluator` companion CLI, and
-      `invarlock.engine.qualify_evaluator_export`
-    - **Stability:** Closed v1 qualification formats
-    - **Use this page when:** Integrating an open or proprietary evaluator, or
-      reviewing the maintained upstream-execution matrix
+> **Reference**
+>
+> **Surface:** Four canonical JSON contracts, the
+> `invarlock-qualify-evaluator` companion CLI, and
+> `invarlock.engine.qualify_evaluator_export`
+>
+> **Stability:** Closed v1 qualification formats
+>
+> **Use this page when:** Integrating an open or proprietary evaluator, or
+> reviewing the maintained upstream-execution matrix
 
 A matrix row demonstrates the named version and entry point; it does not make
 that evaluator a built-in InvarLock plugin.

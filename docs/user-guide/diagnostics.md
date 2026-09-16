@@ -6,17 +6,17 @@ engineering context. Its canonical JSON can travel inside the authenticated
 `evaluate -> verify -> report` evidence transaction while remaining outside
 the acceptance calculation.
 
-!!! tip "User guide"
-
-    **Outcome:** Produce deterministic numerical observations that support an
-    investigation without changing an InvarLock acceptance decision.
-
-    **Audience:** Engineers comparing numerical artifacts after conversion,
-    quantization, or another externally managed transformation.
-
-    **Prerequisites:** Fixed baseline and subject arrays, retained input
-    provenance, and a completed or planned paired evidence transaction whose
-    policy remains authoritative.
+> **User guide**
+>
+> **Outcome:** Produce deterministic numerical observations that support an
+> investigation without changing an InvarLock acceptance decision.
+>
+> **Audience:** Engineers comparing numerical artifacts after conversion,
+> quantization, or another externally managed transformation.
+>
+> **Prerequisites:** Fixed baseline and subject arrays, retained input
+> provenance, and a completed or planned paired evidence transaction whose
+> policy remains authoritative.
 
 ## Decide whether you need it
 

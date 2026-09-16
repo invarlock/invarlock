@@ -1,23 +1,24 @@
 # Decision semantics
 
-!!! abstract "Assurance note"
-    **In plain language:** For native exact match and NLL, InvarLock recomputes
-    scores from authenticated paired records, derives the paired interval, and
-    applies the policy to the conservative bound. When the policy qualifies sample size,
-    precision, or exact-match side accuracy, those checks must pass too. A
-    favorable point value cannot override a threshold, count, width, or side-
-    accuracy failure.
-
-    **Question:** How are a built-in metric or authorized deterministic scorer
-    converted into a reproducible policy verdict?
-
-    **Decision use:** Use these definitions to review thresholds, reproduce
-    canonical report arithmetic, and interpret a pass or fail at the boundary.
-
-    **Evidence:** Pinned local source identity, canonical schedule, provider
-    observations, verifier-derived paired scores, exact policy bytes,
-    independent artifact and schedule anchors, and the metric-specific paired
-    interval recorded in the report.
+> **Assurance note**
+>
+> **In plain language:** For native exact match and NLL, InvarLock recomputes
+> scores from authenticated paired records, derives the paired interval, and
+> applies the policy to the conservative bound. When the policy qualifies sample size,
+> precision, or exact-match side accuracy, those checks must pass too. A
+> favorable point value cannot override a threshold, count, width, or side-
+> accuracy failure.
+>
+> **Question:** How are a built-in metric or authorized deterministic scorer
+> converted into a reproducible policy verdict?
+>
+> **Decision use:** Use these definitions to review thresholds, reproduce
+> canonical report arithmetic, and interpret a pass or fail at the boundary.
+>
+> **Evidence:** Pinned local source identity, canonical schedule, provider
+> observations, verifier-derived paired scores, exact policy bytes,
+> independent artifact and schedule anchors, and the metric-specific paired
+> interval recorded in the report.
 
 The native exact-match, normalized-NLL and deterministic extension contract
 makes one decision over one authenticated, ordered, finite schedule.

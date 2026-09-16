@@ -1,9 +1,12 @@
 # Evaluation Records
 
-!!! info "Reference"
-    **Surface:** Captured evaluation records and evidence bindings.
-    **Stability:** Public core contract for captured evaluation.
-    **Use this page when:** Implementing or reviewing captured evidence.
+> **Reference**
+>
+> **Surface:** Captured evaluation records and evidence bindings.
+>
+> **Stability:** Public core contract for captured evaluation.
+>
+> **Use this page when:** Implementing or reviewing captured evidence.
 
 Captured comparisons use neutral evaluation record contracts. A record keeps
 its stable ID, input, expected value, output, score provenance, metadata, and

@@ -3,11 +3,13 @@
 The public command line supports one evaluation, verification and reporting
 journey for native execution, authenticated imports, and captured results:
 
-!!! info "Reference"
-
-    - **Surface:** `invarlock evaluate`, `invarlock verify`, and `invarlock report`
-    - **Stability:** Stable public CLI; command help is authoritative for installed options
-    - **Use this page when:** Automating a transaction, selecting flags or environment fallbacks, or interpreting outputs and exit status
+> **Reference**
+>
+> **Surface:** `invarlock evaluate`, `invarlock verify`, and `invarlock report`
+>
+> **Stability:** Stable public CLI; command help is authoritative for installed options
+>
+> **Use this page when:** Automating a transaction, selecting flags or environment fallbacks, or interpreting outputs and exit status
 
 ```text
 invarlock --help

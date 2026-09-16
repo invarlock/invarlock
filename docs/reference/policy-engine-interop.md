@@ -4,14 +4,16 @@ The maintained policy-engine example demonstrates that a recipient can
 authenticate an InvarLock acceptance envelope and apply current policy without
 an InvarLock service or policy-engine plugin.
 
-!!! info "Reference"
-
-    - **Surface:** Standalone DSSE verification followed by OPA/Rego or CUE
-      recipient-policy evaluation
-    - **Stability:** Maintained example over the acceptance v2 predicate and
-      `invarlock/acceptance-policy-input-v1`
-    - **Use this page when:** Consuming an acceptance attestation without an
-      InvarLock service or policy-engine plugin
+> **Reference**
+>
+> **Surface:** Standalone DSSE verification followed by OPA/Rego or CUE
+> recipient-policy evaluation
+>
+> **Stability:** Maintained example over the acceptance v2 predicate and
+> `invarlock/acceptance-policy-input-v1`
+>
+> **Use this page when:** Consuming an acceptance attestation without an
+> InvarLock service or policy-engine plugin
 
 ## Data flow
 

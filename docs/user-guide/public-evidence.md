@@ -8,11 +8,13 @@ vision-text, and TensorRT-LLM runtime packages. A comparison remains
 **Evidence not yet created** until its pack and receipt pass strict verification
 and disclosure review.
 
-!!! tip "User guide"
-
-    **Outcome:** Add one strictly verified evidence entry, publish it locally or as a hash-bound release asset, and keep the compact wheel index synchronized.
-    **Audience:** Evidence maintainers preparing public, independently reviewable InvarLock artifacts.
-    **Prerequisites:** An immutable signed evidence pack, a separately signed verification receipt, independently maintained anchors, permission to publish every record, and a clean repository checkout.
+> **User guide**
+>
+> **Outcome:** Add one strictly verified evidence entry, publish it locally or as a hash-bound release asset, and keep the compact wheel index synchronized.
+>
+> **Audience:** Evidence maintainers preparing public, independently reviewable InvarLock artifacts.
+>
+> **Prerequisites:** An immutable signed evidence pack, a separately signed verification receipt, independently maintained anchors, permission to publish every record, and a clean repository checkout.
 
 ## Published evidence
 

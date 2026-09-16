@@ -7,17 +7,17 @@ evidence directory governed by
 The bundle is the portable machine record; a signed verification receipt is the
 independent acceptance record.
 
-!!! tip "User guide"
-
-    **Outcome:** Verify an immutable evidence bundle against independent
-    anchors, validate its signed receipt, and render an evidence report.
-
-    **Audience:** Verifier operators, decision owners, and downstream receipt
-    verifiers deciding whether to rely on one evidence transaction.
-
-    **Prerequisites:** A complete evidence directory, independently obtained
-    policy, runtime digests and evidence-signer fingerprint, plus an independently
-    selected verifier key and identity when issuing a receipt.
+> **User guide**
+>
+> **Outcome:** Verify an immutable evidence bundle against independent
+> anchors, validate its signed receipt, and render an evidence report.
+>
+> **Audience:** Verifier operators, decision owners, and downstream receipt
+> verifiers deciding whether to rely on one evidence transaction.
+>
+> **Prerequisites:** A complete evidence directory, independently obtained
+> policy, runtime digests and evidence-signer fingerprint, plus an independently
+> selected verifier key and identity when issuing a receipt.
 
 For captured v2 packs, use the [captured-results guide](captured-results.md)
 for independent run/request pins and captured receipt scope. The native

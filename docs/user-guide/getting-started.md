@@ -18,18 +18,18 @@ invarlock verify evidence/ ... --receipt verification.receipt.json
 invarlock report evidence/
 ```
 
-!!! tip "User guide"
-
-    **Outcome:** Prepare and run a real paired Hugging Face comparison through
-    the OCI-backed `evaluate -> verify -> report` path.
-
-    **Audience:** First-time operators, release decision owners, and engineers
-    integrating a model build with an evidence gate.
-
-    **Prerequisites:** Python 3.12 or newer; Docker or Podman; a digest-addressed
-    local InvarLock runtime image; two local SafeTensors snapshots; a pinned
-    JSONL evaluation source; and separate Ed25519 evidence-signer and verifier
-    keys.
+> **User guide**
+>
+> **Outcome:** Prepare and run a real paired Hugging Face comparison through
+> the OCI-backed `evaluate -> verify -> report` path.
+>
+> **Audience:** First-time operators, release decision owners, and engineers
+> integrating a model build with an evidence gate.
+>
+> **Prerequisites:** Python 3.12 or newer; Docker or Podman; a digest-addressed
+> local InvarLock runtime image; two local SafeTensors snapshots; a pinned
+> JSONL evaluation source; and separate Ed25519 evidence-signer and verifier
+> keys.
 
 To check results from an existing evaluator without preparing an OCI runtime,
 start with [Captured results](captured-results.md). Native requests support

@@ -6,11 +6,13 @@ byte-identical package-owned copies ship in the core wheel. Verification always
 loads the package-owned copies: a working directory or environment variable
 cannot substitute a different schema.
 
-!!! info "Reference"
-
-    - **Surface:** Versioned request, evidence, provider, runtime, report, and receipt contracts
-    - **Stability:** Closed public interchange formats; incompatible shape or meaning changes require a new format identifier
-    - **Use this page when:** Authoring contract objects, validating canonical bytes, or reviewing cross-file digest and signature bindings
+> **Reference**
+>
+> **Surface:** Versioned request, evidence, provider, runtime, report, and receipt contracts
+>
+> **Stability:** Closed public interchange formats; incompatible shape or meaning changes require a new format identifier
+>
+> **Use this page when:** Authoring contract objects, validating canonical bytes, or reviewing cross-file digest and signature bindings
 
 ## Schema-backed contracts
 

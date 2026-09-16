@@ -1,19 +1,20 @@
 # Assurance glossary
 
-!!! abstract "Assurance note"
-    **In plain language:** These definitions separate what signed bytes prove,
-    what independent replay checks, and what decision owners must establish outside
-    the evidence pack.
-
-    **Question:** What do the assurance terms in the evidence contract and
-    review guidance mean precisely?
-
-    **Decision use:** Use these definitions to keep evidence-signer, verifier,
-    and decision-owner statements consistent with the recorded decision scope.
-
-    **Evidence:** The versioned public contracts, deterministic verification
-    behavior, and the assurance and security responsibilities linked from this
-    glossary.
+> **Assurance note**
+>
+> **In plain language:** These definitions separate what signed bytes prove,
+> what independent replay checks, and what decision owners must establish outside
+> the evidence pack.
+>
+> **Question:** What do the assurance terms in the evidence contract and
+> review guidance mean precisely?
+>
+> **Decision use:** Use these definitions to keep evidence-signer, verifier,
+> and decision-owner statements consistent with the recorded decision scope.
+>
+> **Evidence:** The versioned public contracts, deterministic verification
+> behavior, and the assurance and security responsibilities linked from this
+> glossary.
 
 **Acceptance policy**
 : Exact JSON bytes that define metric thresholds and applicable decision

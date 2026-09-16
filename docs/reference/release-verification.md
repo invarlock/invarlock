@@ -2,11 +2,13 @@
 
 InvarLock ships six coordinated Python distributions:
 
-!!! info "Reference"
-
-    - **Surface:** Core and first-party add-in distributions, release checks, provenance, and installation verification
-    - **Stability:** Coordinated version and ABI compatibility rules are public; the release workflow may evolve while preserving those checks
-    - **Use this page when:** Building, publishing, installing, or independently checking an InvarLock release set
+> **Reference**
+>
+> **Surface:** Core and first-party add-in distributions, release checks, provenance, and installation verification
+>
+> **Stability:** Coordinated version and ABI compatibility rules are public; the release workflow may evolve while preserving those checks
+>
+> **Use this page when:** Building, publishing, installing, or independently checking an InvarLock release set
 
 | Distribution | Role |
 | --- | --- |

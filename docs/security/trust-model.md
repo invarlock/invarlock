@@ -6,26 +6,26 @@ preserves the team's intended comparison when inputs and signing roles are
 controlled independently. The same organization or operator can maintain those
 roles using separately approved expectations and distinct evidence/verifier keys.
 
-!!! warning "Security guidance"
-
-    **In plain language:** A valid signature identifies a key; trust comes from
-    independently deciding that the key, policy, artifacts, schedule, runtimes,
-    and scoped result are the ones you intended to rely on.
-
-    **Objective:** Define what evidence-signer, technical-verifier, and envelope
-    signatures establish, which anchors must remain independent, and the exact
-    scope of a trusted receipt or portable acceptance envelope.
-
-    **Assets or boundary:** Canonical evidence, evidence-signer, verifier, and
-    envelope-signing identities, technical and recipient policy, artifact,
-    schedule, subject, and runtime anchors, authorized scorer code when
-    selected, receipt and acceptance statements, and the authorization sources
-    that are intentionally outside submitted evidence.
-
-    **Use this page when:** Assigning evidence signer, technical verifier,
-    envelope signer, recipient, or receipt-verifier roles; designing
-    trust-anchor distribution; or evaluating whether a signed result supports
-    a proposed reliance decision.
+> **Security guidance**
+>
+> **In plain language:** A valid signature identifies a key; trust comes from
+> independently deciding that the key, policy, artifacts, schedule, runtimes,
+> and scoped result are the ones you intended to rely on.
+>
+> **Objective:** Define what evidence-signer, technical-verifier, and envelope
+> signatures establish, which anchors must remain independent, and the exact
+> scope of a trusted receipt or portable acceptance envelope.
+>
+> **Assets or boundary:** Canonical evidence, evidence-signer, verifier, and
+> envelope-signing identities, technical and recipient policy, artifact,
+> schedule, subject, and runtime anchors, authorized scorer code when
+> selected, receipt and acceptance statements, and the authorization sources
+> that are intentionally outside submitted evidence.
+>
+> **Use this page when:** Assigning evidence signer, technical verifier,
+> envelope signer, recipient, or receipt-verifier roles; designing
+> trust-anchor distribution; or evaluating whether a signed result supports
+> a proposed reliance decision.
 
 The equations and runtime anchors below describe native pack-v1 evidence.
 Captured comparisons and bounded judge measurements have separate trust inputs;

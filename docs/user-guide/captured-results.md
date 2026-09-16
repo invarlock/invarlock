@@ -1,9 +1,12 @@
 # Captured Results
 
-!!! tip "User guide"
-    **Outcome:** Publish and independently verify captured evaluation evidence.
-    **Audience:** Evaluator and release-integration engineers.
-    **Prerequisites:** Paired records, a policy, and the core `invarlock` wheel.
+> **User guide**
+>
+> **Outcome:** Publish and independently verify captured evaluation evidence.
+>
+> **Audience:** Evaluator and release-integration engineers.
+>
+> **Prerequisites:** Paired records, a policy, and the core `invarlock` wheel.
 
 Use the core wheel and examples from the same source revision. For a released
 wheel, use its matching release documentation. Record the source commit and wheel

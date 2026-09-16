@@ -3,11 +3,13 @@
 InvarLock is an authenticated paired-evaluation engine. Its core path has three
 transactions:
 
-!!! info "Reference"
-
-    - **Surface:** Core transaction, package, data-flow, and trust boundaries
-    - **Stability:** Architectural contract for the paired evaluation engine; implementation internals may change behind documented public surfaces
-    - **Use this page when:** Locating responsibilities, selecting an integration boundary, or inspecting where evidence-signing and verifier authority separate
+> **Reference**
+>
+> **Surface:** Core transaction, package, data-flow, and trust boundaries
+>
+> **Stability:** Architectural contract for the paired evaluation engine; implementation internals may change behind documented public surfaces
+>
+> **Use this page when:** Locating responsibilities, selecting an integration boundary, or inspecting where evidence-signing and verifier authority separate
 
 ```bash
 invarlock evaluate request.yaml

@@ -4,11 +4,13 @@ An `invarlock/evidence-pack-v1` bundle is a closed, signed evidence directory. I
 are fixed by the manifest schema; additional files are rejected in strict
 verification.
 
-!!! info "Reference"
-
-    - **Surface:** `invarlock/evidence-pack-v1` directory, manifest, payload inventory, and external outputs
-    - **Stability:** Versioned public artifact contract; fixed paths and closed inventory are verification requirements
-    - **Use this page when:** Inspecting a bundle, implementing artifact storage, or determining which bytes carry a particular claim
+> **Reference**
+>
+> **Surface:** `invarlock/evidence-pack-v1` directory, manifest, payload inventory, and external outputs
+>
+> **Stability:** Versioned public artifact contract; fixed paths and closed inventory are verification requirements
+>
+> **Use this page when:** Inspecting a bundle, implementing artifact storage, or determining which bytes carry a particular claim
 
 This layout applies to native exact-match/NLL and deterministic-extension
 evidence. Captured comparisons use [evaluation records](evaluation-records.md)

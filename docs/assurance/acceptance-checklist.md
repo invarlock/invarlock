@@ -1,18 +1,19 @@
 # Acceptance checklist
 
-!!! abstract "Assurance note"
-    **In plain language:** A valid signature is only the start. A decision owner must
-    also confirm the independent anchors, decision scope, key authorization,
-    and known limitations before relying on the result.
-
-    **Question:** Has a decision owner established every prerequisite needed to rely
-    on one signed evidence decision?
-
-    **Decision use:** Use this for recipient-owned acceptance after strict
-    verification, before an evidence pack supports a downstream decision.
-
-    **Evidence:** Independently sourced anchors, a verified immutable pack, a
-    signed verifier receipt, and the decision-owner-maintained decision record.
+> **Assurance note**
+>
+> **In plain language:** A valid signature is only the start. A decision owner must
+> also confirm the independent anchors, decision scope, key authorization,
+> and known limitations before relying on the result.
+>
+> **Question:** Has a decision owner established every prerequisite needed to rely
+> on one signed evidence decision?
+>
+> **Decision use:** Use this for recipient-owned acceptance after strict
+> verification, before an evidence pack supports a downstream decision.
+>
+> **Evidence:** Independently sourced anchors, a verified immutable pack, a
+> signed verifier receipt, and the decision-owner-maintained decision record.
 
 Use this checklist for one native exact-match, normalized-NLL or deterministic
 extension `invarlock/evidence-pack-v1` decision. For captured comparisons and

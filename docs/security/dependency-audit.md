@@ -4,12 +4,15 @@ Dependency auditing is a release and maintenance control. An exception is a
 time-bounded, maintainer-approved statement that one known advisory does not currently
 block the repository; it is not a declaration that the dependency is safe.
 
-!!! warning "Security guidance"
-
-    **In plain language:** A vulnerability exception buys limited remediation time; it must identify an owner, public tracking issue, exact advisory, rationale, and near-term expiry.
-    **Objective:** Keep `pip-audit` exceptions narrow, accountable, and self-expiring while preserving a fail-closed dependency gate.
-    **Assets or boundary:** Core and first-party add-in Python dependency sets audited by `make security`.
-    **Use this page when:** Assessing a new advisory, authorizing a temporary exception, reviewing an existing entry, or removing a remediated exception.
+> **Security guidance**
+>
+> **In plain language:** A vulnerability exception buys limited remediation time; it must identify an owner, public tracking issue, exact advisory, rationale, and near-term expiry.
+>
+> **Objective:** Keep `pip-audit` exceptions narrow, accountable, and self-expiring while preserving a fail-closed dependency gate.
+>
+> **Assets or boundary:** Core and first-party add-in Python dependency sets audited by `make security`.
+>
+> **Use this page when:** Assessing a new advisory, authorizing a temporary exception, reviewing an existing entry, or removing a remediated exception.
 
 ## Default response
 

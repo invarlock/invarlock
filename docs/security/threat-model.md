@@ -5,23 +5,23 @@ the portable acceptance-attestation handoff, and the public provider
 contracts. It distinguishes attacks that the evidence verifier or acceptance
 verifier can detect from claims that require controls outside InvarLock.
 
-!!! warning "Security guidance"
-
-    **In plain language:** InvarLock can detect tampering and inconsistent
-    evidence, but it cannot independently attest execution or prove that the
-    chosen test and threshold are sufficient.
-
-    **Objective:** Identify threats to one evidence transaction and distinguish
-    verifier-enforced properties from risks that require deployment controls.
-
-    **Assets or boundary:** The `evaluate`, `verify`, `report`, and portable
-    acceptance data flows, provider-contract inputs, signing identities,
-    recipient policy, independent anchors, and signed outputs; host and
-    accelerator security remain external boundaries.
-
-    **Use this page when:** Performing architecture review, assigning controls,
-    interpreting a verifier failure, or deciding whether a deployment needs
-    attestation or safeguards beyond InvarLock.
+> **Security guidance**
+>
+> **In plain language:** InvarLock can detect tampering and inconsistent
+> evidence, but it cannot independently attest execution or prove that the
+> chosen test and threshold are sufficient.
+>
+> **Objective:** Identify threats to one evidence transaction and distinguish
+> verifier-enforced properties from risks that require deployment controls.
+>
+> **Assets or boundary:** The `evaluate`, `verify`, `report`, and portable
+> acceptance data flows, provider-contract inputs, signing identities,
+> recipient policy, independent anchors, and signed outputs; host and
+> accelerator security remain external boundaries.
+>
+> **Use this page when:** Performing architecture review, assigning controls,
+> interpreting a verifier failure, or deciding whether a deployment needs
+> attestation or safeguards beyond InvarLock.
 
 ## Security objectives
 

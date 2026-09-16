@@ -273,7 +273,7 @@ secrets out of the change.
 ### Documentation type contracts
 
 Choose the document type from the reader's task, then make that type visible
-in a short opening admonition. The fields in the admonition are a reader
+in a short opening Markdown blockquote. The fields in the blockquote are a reader
 contract, not decorative metadata: they should say why the page exists, who or
 what it applies to, and what a reader can decide or accomplish with it.
 
@@ -283,6 +283,10 @@ what it applies to, and what a reader can decide or accomplish with it.
 | Assurance note | `In plain language`, `Question`, `Decision use`, `Evidence` | State the scoped claim or question, develop the argument or derivation, identify runtime enforcement and observable evidence, and name assumptions, defeaters, and limits. |
 | Reference | `Surface`, `Stability`, `Use this page when` | Describe the exact current interface or contract. Include defaults, accepted forms, outputs, and failure behavior, with a minimal example and security notes where they affect correct use. |
 | Security guidance | `In plain language`, `Objective`, `Assets or boundary`, `Use this page when` | Identify threats and trust assumptions, connect controls to residual risks, and state operational response, non-goals, and authoritative references where applicable. |
+
+Use a standard Markdown blockquote and bold field labels so the opener renders
+on GitHub and in the MkDocs site. Separate the fields with quoted blank lines;
+do not use MkDocs-only callout syntax or indented code for prose.
 
 Use headings that fit the subject instead of reproducing a rigid outline. A
 glossary, acceptance checklist, CLI reference, and threat model should remain

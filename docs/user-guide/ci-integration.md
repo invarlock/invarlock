@@ -4,17 +4,17 @@ The InvarLock evidence-gate action verifies one immutable evidence pack against
 verifier-controlled anchors, writes a separately signed receipt, renders the
 authenticated report, and uploads the review material as one workflow artifact.
 
-!!! tip "User guide"
-
-    **Outcome:** Add a fail-closed GitHub Actions gate for an existing
-    `invarlock/evidence-pack-v1` directory.
-
-    **Audience:** Release engineers and verifier operators automating an
-    independent acceptance decision.
-
-    **Prerequisites:** An evidence pack, an independently managed policy and
-    trust anchors, an installed matching InvarLock version, and a verifier key
-    available to the job without being stored in the evidence artifact.
+> **User guide**
+>
+> **Outcome:** Add a fail-closed GitHub Actions gate for an existing
+> `invarlock/evidence-pack-v1` directory.
+>
+> **Audience:** Release engineers and verifier operators automating an
+> independent acceptance decision.
+>
+> **Prerequisites:** An evidence pack, an independently managed policy and
+> trust anchors, an installed matching InvarLock version, and a verifier key
+> available to the job without being stored in the evidence artifact.
 
 The action runs the same public transactions documented by the
 [CLI reference](../reference/cli.md):

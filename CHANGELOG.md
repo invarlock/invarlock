@@ -133,7 +133,8 @@ while strengthening evidence verification, runtime isolation and release checks.
   coordinate the root manifest and uv lock with separately checked workflow
   locks. Pre-commit covers all pull requests and docs build once per docs job.
 - **Documentation:** the README, workflow diagram and docs landing page now lead
-  with runnable tasks and supported integration routes. Guides, API references,
+  with runnable tasks and supported integration routes. Page openers render
+  consistently on GitHub and the documentation site. Guides, API references,
   assurance notes, security guidance and third-party notices describe the current
   contracts; receipt examples include required independent anchors and separate
   authenticity from the signed verdict. Production release publication updates

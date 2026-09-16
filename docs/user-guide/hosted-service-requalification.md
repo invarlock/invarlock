@@ -1,12 +1,15 @@
 # Requalify a hosted service
 
-!!! tip "User guide"
-    **Outcome:** Compare a fresh hosted-service capture with an approved baseline,
-    publish signed evidence, verify it offline, and record a scoped decision.
-    **Audience:** Evaluation engineers and owners of periodic or incident-triggered
-    service qualification.
-    **Prerequisites:** A capture harness with service access, a reviewed baseline
-    and case set, policy fixed before capture, the core wheel, and independent trust inputs.
+> **User guide**
+>
+> **Outcome:** Compare a fresh hosted-service capture with an approved baseline,
+> publish signed evidence, verify it offline, and record a scoped decision.
+>
+> **Audience:** Evaluation engineers and owners of periodic or incident-triggered
+> service qualification.
+>
+> **Prerequisites:** A capture harness with service access, a reviewed baseline
+> and case set, policy fixed before capture, the core wheel, and independent trust inputs.
 
 Use a wheel and example files from the same source revision. For released
 packages, use their matching documentation; see

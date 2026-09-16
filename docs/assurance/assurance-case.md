@@ -1,19 +1,20 @@
 # Assurance case
 
-!!! abstract "Assurance note"
-    **In plain language:** A pass records that one subject met one policy
-    against one baseline on the fixed schedule. Broader quality, safety, and
-    deployment decisions use complementary evidence.
-
-    **Question:** What decision does a strictly verified InvarLock transaction
-    support, and which broader questions use complementary evidence?
-
-    **Decision use:** Use this page to decide whether a signed receipt and its
-    operational assumptions are sufficient for a particular acceptance case.
-
-    **Evidence:** Authenticated inputs, paired provider records, deterministic
-    replay, the signed evidence pack, independent anchors, and the
-    verifier-signed receipt.
+> **Assurance note**
+>
+> **In plain language:** A pass records that one subject met one policy
+> against one baseline on the fixed schedule. Broader quality, safety, and
+> deployment decisions use complementary evidence.
+>
+> **Question:** What decision does a strictly verified InvarLock transaction
+> support, and which broader questions use complementary evidence?
+>
+> **Decision use:** Use this page to decide whether a signed receipt and its
+> operational assumptions are sufficient for a particular acceptance case.
+>
+> **Evidence:** Authenticated inputs, paired provider records, deterministic
+> replay, the signed evidence pack, independent anchors, and the
+> verifier-signed receipt.
 
 InvarLock supports one narrow assurance claim: a named subject satisfied a
 caller-approved acceptance policy relative to a named baseline on one authenticated,

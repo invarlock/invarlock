@@ -4,11 +4,13 @@ Applications embed InvarLock through `invarlock.engine`. This module is the
 stable facade for the paired evaluation engine. Modules that encode or decode
 individual bundle files remain internal unless explicitly documented.
 
-!!! info "Reference"
-
-    - **Surface:** Python facade exported by `invarlock.engine`
-    - **Stability:** Stable public API; undocumented `invarlock.*` imports remain internal
-    - **Use this page when:** Embedding evaluate, verify, report, request loading, receipt verification, or provider-ABI types in Python
+> **Reference**
+>
+> **Surface:** Python facade exported by `invarlock.engine`
+>
+> **Stability:** Stable public API; undocumented `invarlock.*` imports remain internal
+>
+> **Use this page when:** Embedding evaluate, verify, report, request loading, receipt verification, or provider-ABI types in Python
 
 ## Stable exports
 

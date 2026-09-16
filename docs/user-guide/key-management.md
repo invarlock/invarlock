@@ -8,18 +8,18 @@ InvarLock uses Ed25519 signatures for two distinct statements:
 Use different keys for these roles. A verifier that accepts an evidence-signing key and
 then signs the result should not possess the evidence-signing private key.
 
-!!! tip "User guide"
-
-    **Outcome:** Establish separate evidence signer and verifier signing identities,
-    distribute their fingerprints independently, and retain or revoke them
-    without rewriting signed history.
-
-    **Audience:** Key custodians, evaluation operators, verifier operators, and
-    receipt verifiers responsible for signer authorization.
-
-    **Prerequisites:** Assigned evidence signer and verifier roles, protected key
-    storage, an authenticated fingerprint-distribution channel, and a recorded
-    rotation and incident-response policy.
+> **User guide**
+>
+> **Outcome:** Establish separate evidence signer and verifier signing identities,
+> distribute their fingerprints independently, and retain or revoke them
+> without rewriting signed history.
+>
+> **Audience:** Key custodians, evaluation operators, verifier operators, and
+> receipt verifiers responsible for signer authorization.
+>
+> **Prerequisites:** Assigned evidence signer and verifier roles, protected key
+> storage, an authenticated fingerprint-distribution channel, and a recorded
+> rotation and incident-response policy.
 
 ## Key roles and compromise impact
 

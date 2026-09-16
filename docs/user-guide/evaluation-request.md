@@ -10,17 +10,17 @@ The request is comparison intent, not host authorization. It does not grant
 network access, choose an OCI engine, select arbitrary executables, inject
 secrets, or authorize its own runtime digest.
 
-!!! tip "User guide"
-
-    **Outcome:** Author a closed run request for a real paired comparison, or a
-    closed import request for complete provider material produced elsewhere.
-
-    **Audience:** Evaluation operators and integration engineers preparing a
-    release-regression decision.
-
-    **Prerequisites:** Pinned model inputs, a local JSONL source for run mode or
-    a canonical schedule for import mode, a reviewed single-scorer policy,
-    provider settings, and a new request-relative evidence destination.
+> **User guide**
+>
+> **Outcome:** Author a closed run request for a real paired comparison, or a
+> closed import request for complete provider material produced elsewhere.
+>
+> **Audience:** Evaluation operators and integration engineers preparing a
+> release-regression decision.
+>
+> **Prerequisites:** Pinned model inputs, a local JSONL source for run mode or
+> a canonical schedule for import mode, a reviewed single-scorer policy,
+> provider settings, and a new request-relative evidence destination.
 
 Captured records use the separate `invarlock/evaluation-request-v2` contract
 with `execution.mode: captured` through the same `evaluate` command. Follow

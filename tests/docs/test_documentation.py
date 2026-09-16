@@ -9,7 +9,9 @@ import tomllib
 from pathlib import Path
 
 import jsonschema
+import markdown
 import yaml
+from markdown_it import MarkdownIt
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CORE_DOCS = (
@@ -88,11 +90,11 @@ EXPECTED_DOC_PAGES = {
 }
 DOCUMENT_TYPE_CONTRACTS = {
     "user-guide": (
-        '!!! tip "User guide"',
+        "> **User guide**",
         ("**Outcome:**", "**Audience:**", "**Prerequisites:**"),
     ),
     "assurance": (
-        '!!! abstract "Assurance note"',
+        "> **Assurance note**",
         (
             "**In plain language:**",
             "**Question:**",
@@ -101,11 +103,11 @@ DOCUMENT_TYPE_CONTRACTS = {
         ),
     ),
     "reference": (
-        '!!! info "Reference"',
+        "> **Reference**",
         ("**Surface:**", "**Stability:**", "**Use this page when:**"),
     ),
     "security": (
-        '!!! warning "Security guidance"',
+        "> **Security guidance**",
         (
             "**In plain language:**",
             "**Objective:**",
@@ -506,6 +508,25 @@ def test_typed_docs_declare_their_reader_contract() -> None:
             for field in fields:
                 value = opener.split(field, maxsplit=1)[1].splitlines()[0].strip()
                 assert value, f"empty {field} in {page}"
+
+            # GitHub treats MkDocs-only indented callouts as code. Exercise
+            # both Markdown engines, not just the presence of source labels.
+            contract_lines = []
+            for line in text[text.index(marker) :].splitlines():
+                if not line.startswith(">"):
+                    break
+                contract_lines.append(line)
+            contract = "\n".join(contract_lines)
+            rendered = (
+                MarkdownIt("commonmark").render(contract),
+                markdown.markdown(contract, extensions=["admonition", "tables"]),
+            )
+            for html in rendered:
+                assert "<blockquote>" in html, page
+                assert "<pre>" not in html, page
+                for field in fields:
+                    assert f"<strong>{field.strip('*')}</strong>" in html, page
+                    assert field not in html, page
 
 
 def test_workflow_diagram_tracks_current_transactions() -> None:

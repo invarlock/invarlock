@@ -1,18 +1,19 @@
 # Pairing and replay
 
-!!! abstract "Assurance note"
-    **In plain language:** Baseline and subject results are comparable only
-    when they cover the same paired records with the same inputs.
-    Any mismatch stops verification instead of being averaged away.
-
-    **Question:** How does verification establish that baseline and subject
-    results describe the same ordered evaluation records?
-
-    **Decision use:** Use this page to diagnose pairing failures and to judge
-    whether imported or executed observations support the same replay claim.
-
-    **Evidence:** The canonical schedule, ordered provider observations,
-    record and input digests, derived paired records, and exact replay checks.
+> **Assurance note**
+>
+> **In plain language:** Baseline and subject results are comparable only
+> when they cover the same paired records with the same inputs.
+> Any mismatch stops verification instead of being averaged away.
+>
+> **Question:** How does verification establish that baseline and subject
+> results describe the same ordered evaluation records?
+>
+> **Decision use:** Use this page to diagnose pairing failures and to judge
+> whether imported or executed observations support the same replay claim.
+>
+> **Evidence:** The canonical schedule, ordered provider observations,
+> record and input digests, derived paired records, and exact replay checks.
 
 Pairing is the central comparison invariant. In native pack-v1 evidence, the
 baseline and subject must produce one successful observation for every scheduled
