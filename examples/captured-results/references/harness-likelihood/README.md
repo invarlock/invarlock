@@ -2,10 +2,22 @@
 
 > **Outcome:** Replay a real CPU likelihood capture through signed evaluation,
 > independent verification and reporting.
+>
 > **Audience:** Users integrating an existing likelihood evaluator with InvarLock.
+>
 > **Prerequisites:** An installed InvarLock package that supports captured NLL,
 > its matching example checkout and Python. Offline replay needs no model,
 > Harness, Torch, GPU or provider account.
+
+This is a small integration check: can an existing evaluator measure the
+likelihood of reference text, and can InvarLock independently verify the resulting
+comparison? The same model runs on both sides, so it should reproduce matching
+measurements. For a comparison between two different 7B models, see the
+[Mistral likelihood reference](../mistral-7b-likelihood/README.md).
+
+To inspect the existing result, go to [offline replay](#offline-recipient-replay).
+Only [reproducing the measurement](#reproduce-the-model-measurement) needs the
+model and evaluator dependencies.
 
 ## Result and scope
 

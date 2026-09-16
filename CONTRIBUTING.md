@@ -270,6 +270,18 @@ before the final gates so checks that enumerate Git's file inventory include
 them. Inspect the staged diff to keep generated artifacts, local evidence, and
 secrets out of the change.
 
+### Example guides
+
+Write examples for a developer who knows Python and a terminal but has not read
+InvarLock's contracts. Start with the task the example solves, who it is for and
+what it produces. State setup requirements before commands, distinguish offline
+fixtures from model execution or billed calls, and explain the expected result,
+including intentional rejections. Define unfamiliar terms when first needed.
+Put schema details and advanced reproduction steps after the shortest useful
+path, or link to the relevant reference. Keep hardware and key requirements
+beside the commands that need them. Historical evidence and attribution files
+retain their original facts and identities.
+
 ### Documentation type contracts
 
 Choose the document type from the reader's task, then make that type visible

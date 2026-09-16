@@ -1,75 +1,99 @@
-# Captured Results Example
+# Evaluate results from an existing pipeline
 
-The [retained routing reference](references/k2-32b-routing/README.md) contains
-4,000 paired records from real K2 Horizon 32B model captures. It provides a
-complete signed pack and offline recipient replay of the expected regression,
-with recorded-score assurance and no native runtime qualification claim.
+Use this example when your evaluator has already produced answers or likelihood
+measurements and you want InvarLock to compare them, verify the evidence and
+create a report. You can keep your existing model execution pipeline. The
+[supported capture profiles](../../docs/user-guide/captured-results.md) define
+which records each scorer needs; an aggregate score alone is not enough.
 
-This directory demonstrates the neutral captured-evaluation workflow. The
-wheel smoke invokes the installed core `invarlock` command and checks signed
-`evaluate`, independent `verify`, and non-mutating `report` before add-ins are
-installed.
+The **baseline** is the model or configuration you compare against. The
+**subject** is the proposed change. Both runs must cover the same declared cases.
 
-```bash
-python examples/captured-results/wheel_smoke.py --cli invarlock
-```
+## Start with an offline example
 
-The three-scorer rehearsal checks the public capture and retained-judge import
-helpers, then runs v2 exact-match, normalized-NLL and judge requests through
-signed evaluation, independent verification and reports:
-
-```bash
-python examples/captured-results/scorer_wheel_smoke.py --cli invarlock \
-  --fixture examples/judge-measurements
-```
-
-For an isolated recipient check, copy the script and fixture directory outside
-the checkout and run them with the candidate wheel's Python and executable.
-This requires only the core package; Inspect and provider SDKs must be absent.
-The NLL likelihood facts are authored synthetic inputs for contract testing,
-not measured model evidence. The retained one-case judge fixture stays
-insufficient evidence under its existing policy. No model or judge is called,
-and each CLI command has a 60-second timeout.
-
-The separate [Harness likelihood reference](references/harness-likelihood/README.md)
-retains real CPU measurements from unmodified `lm-eval==0.4.12`, followed by the
-installed signed journey. Its six same-model pairs establish likelihood capture
-compatibility, not model quality. `harness_likelihood_rehearsal.py` performs the
-bounded model capture; `harness_likelihood_handoff.py` independently checks and
-imports its original facts using only the core package.
-
-The [Mistral 7B comparison](references/mistral-7b-likelihood/README.md) extends
-that control with two distinct full checkpoints and 400 retained public narrative
-passages. It measures each exact reference continuation through Harness and
-preserves the model identities, original measurements, frozen policy, signed
-evidence and independent verification receipt. The capture and handoff helpers
-are `harness_model_comparison.py` and `harness_model_handoff.py`.
-
-The native rehearsal and handoff helpers produce captured records for external
-evaluators. They do not add a second CLI or SDK namespace. Runtime pipelines
-remain ordinary upstream integrations; their exported records enter through
-the `invarlock/evaluation-request-v2` request contract.
-
-The smoke covers classification, extraction and recorded-judge starters, signed
-handoffs, unsigned local reports, repeated destinations, all policy gate exits,
-and v2 report output maps. Commands default to readable text; use `--json` for
-automation. Captured report v2 has `requested_outputs`, `written_outputs`,
-`failed_output`, and `errors`, not a top-level `html` path.
+You need Python, an installed InvarLock package and this example checkout from
+the same release or source revision. No model, GPU, provider account or evaluator
+SDK is needed for this starter. Run from the checkout in a directory where
+`release-check`, `report.html`, `summary.md` and `results.xml` do not already exist:
 
 ```bash
 invarlock evaluate --init release-check --example extraction
-invarlock evaluate release-check/request.yaml --unsigned --json
+invarlock evaluate release-check/request.yaml --unsigned
 invarlock report release-check/artifacts/evidence --html report.html \
   --markdown summary.md --junit results.xml --explain
 ```
 
-The starter is illustrative, not deployment evidence. A signed handoff uses
-`evaluate --signing-key`, recipient-owned `--trust-profile` v2 run/request/policy/
-signer pins and `verify --receipt` outside the pack. A passing captured receipt
-cannot authorize native acceptance or deployment. `--fail-on-policy` gates
-evaluation at `0` (pass), `7` (adverse decision), or `2` (input/local-budget
-failure); render only newly published packs. See the
-[complete signed/local guide](../../docs/user-guide/captured-results.md).
+The first command writes sample baseline and subject records, a policy and a
+request linking them. The second evaluates those records. The third writes the
+reports and prints an explanation. These are synthetic extraction results, so a
+pass demonstrates the workflow rather than useful model quality.
+
+This starter is unsigned. For a result another team can verify, follow the
+[complete signed handoff](../../docs/user-guide/captured-results.md#signed-handoff):
+the operator signs the evidence, and the recipient supplies its own expected
+runs, request, policy and signing identity before issuing a separate receipt.
+A passing receipt does not authorize deployment.
+
+## Choose the data for your scorer
+
+| Scorer | What your pipeline must retain | Next step |
+| --- | --- | --- |
+| Exact match | Case inputs, baseline and subject answers, and references | Adapt the starter using the [captured-results guide](../../docs/user-guide/captured-results.md) |
+| Normalized NLL | The specified reference continuation, its measured log probabilities and required identity/token metadata | Use the [Harness likelihood example](references/harness-likelihood/README.md) |
+| Judge | Frozen task inputs and answers, an explicit judging plan and either new or retained judge measurements | Follow [judge captured answers](../../docs/user-guide/captured-results.md#judge-captured-answers) |
+
+Normalized NLL measures how likely the reference text was, not whether a generated
+answer matched it. Token usage alone cannot supply that score. The judge route
+can import retained ratings without calling a judge again.
+
+## Inspect real retained comparisons
+
+The [reference index](references/README.md) links to complete results you can
+replay without inference:
+
+- [K2 Horizon 32B routing](references/k2-32b-routing/README.md): 4,000 paired
+  records compare two prompts for the same model. The recorded policy rejects
+  the subject; the reference retains all scores.
+- [Harness likelihood](references/harness-likelihood/README.md): six pairs from
+  separately loaded copies of one small model check the likelihood integration.
+  They do not demonstrate task quality.
+- [Mistral 7B likelihood](references/mistral-7b-likelihood/README.md): 400 public
+  narrative passages compare two distinct full checkpoints. The subject fails
+  the declared policy, and verification reproduces that rejection.
+
+These are captured records, not native runtime qualification. Their pages explain
+what was measured, which inputs are retained and what the results can support.
+
+## Check an installed package
+
+These scripts are for integration developers and maintainers checking an
+installed core wheel. They exercise the commands in temporary directories, print
+check summaries and remove their generated outputs on completion:
+
+```bash
+python examples/captured-results/wheel_smoke.py --cli invarlock
+python examples/captured-results/scorer_wheel_smoke.py --cli invarlock \
+  --fixture examples/judge-measurements
+```
+
+The first checks sample classification, extraction and recorded-score workflows,
+signed handoffs, reports and expected failure exits. The second exercises exact
+match, normalized NLL and retained judge import. Its NLL inputs are synthetic;
+its one-case judge fixture must remain `insufficient_evidence`. Neither script
+runs a model or contacts a judge. Successful scripts exit zero after checking
+both passing and deliberately rejected examples. The three-scorer script gives
+each CLI command a 60-second timeout.
+
+Use a core-only environment with no Inspect or provider SDKs. To check a separate
+recipient installation, copy the scripts and judge fixture outside the checkout
+and run them with that installation's Python and `invarlock` executable.
+
+For automation, add `--json` to individual CLI commands. Captured report results
+use `requested_outputs`, `written_outputs`, `failed_output` and `errors`, rather
+than a top-level `html` path. Use `--fail-on-policy` with evaluation when CI should
+fail on an adverse result: exit `0` means pass, `7` means an adverse policy
+decision, and `2` means invalid inputs or a local budget failure. Render only the
+new evidence pack from a completed evaluation.
 
 ## Hosted-service campaigns
 
@@ -81,7 +105,11 @@ harness; the core evaluates retained facts and verifies them offline. Local
 fixtures establish contract behavior only and are not externally hosted
 qualification evidence.
 
-## Real native capture
+## Run a fresh comparison through an external evaluator
+
+This advanced section is for integration developers who want to exercise the
+capture itself. It runs inference and needs a separate evaluator environment
+and local model files. For an offline demonstration, use the sections above.
 
 `native_rehearsal.py` runs a small local model through Inspect, LM Evaluation
 Harness or Promptfoo and retains each framework's original sample export.

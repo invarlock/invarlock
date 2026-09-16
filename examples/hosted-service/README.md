@@ -1,4 +1,18 @@
-# Hosted-service capture and handoff
+# Compare a hosted service before and after a change
+
+Use this example when you want to collect answers from an HTTP model service,
+compare an earlier run with a later one and give a reviewer evidence they can
+verify offline. The baseline is the earlier service run; the subject is the
+later run. Verification checks the saved observations and does not call the
+service again.
+
+This guide is for developers who control the capture setup. **The collection
+commands make real HTTP requests** and may incur your endpoint's normal charges.
+You must supply a running endpoint and approve the cases and limits first. To
+inspect a result without making calls, start with the
+[retained Mistral HTTP comparison](references/mistral-7b-http/README.md).
+
+## What this example supports
 
 These helpers collect bounded text completions from an OpenAI-compatible HTTP
 endpoint, import the retained observations, and run a signed handoff between two
@@ -20,6 +34,13 @@ provider qualification.
 
 ## Prepare the environment and protocol
 
+The **protocol** is a JSON file that fixes the two services, test cases,
+acceptance policy and call limits before collection. The steps are:
+
+1. Configure and review that file, then record its hash.
+2. Collect baseline answers, followed by subject answers.
+3. Export the records and run evaluation, verification and reporting offline.
+
 Use Python 3.12 or newer with the core wheel installed. Run these commands from
 the matching checkout: for a released wheel, use its exact release tag archive;
 for a local wheel, use the source checkout that built it. Follow the
@@ -39,7 +60,7 @@ loopback test endpoint; it does not start a model server. Keep its cases and
 policy when exercising only the synthetic smoke. Replace them with an approved
 campaign design before making a qualification claim.
 
-The closed protocol requires these fields:
+The protocol accepts only its defined fields. Configure these before continuing:
 
 | Field | Meaning |
 | --- | --- |
@@ -52,7 +73,7 @@ The closed protocol requires these fields:
 | `harness` | Source name/version of at most 128 characters each, reused as the canonical run source, and physical source digest of the approved capture harness |
 | `collector_source_digest`, `journey_source_digest` | SHA-256 of the exact `capture.py` and `journey.py` file bytes |
 
-Admission validates the complete policy before making service calls. If the
+Before any requests, the helper validates the complete policy before making service calls. If the
 policy declares `expected_case_set_digest`, it must match the declared cases
 with empty metadata, derived using the public `freeze_case_set` and
 `case_set_digest` helpers. This text-only collector supports `exact_match`
@@ -90,7 +111,7 @@ or execution. The fixture reserves four calls and 32 output tokens per side, for
 across both sides. It caps each response at 4096 bytes, each request at 10 seconds
 and each side's window at 60 seconds.
 
-Admission also reserves encoded output space before calls. The protocol and
+The helper also reserves encoded output space before calls. The protocol and
 declared raw-response budget are each limited to 16 MiB. For each side, the
 helper conservatively estimates the exported canonical run, including repeated
 inputs, references, system/user requests, Base64 response expansion and normalized
@@ -124,12 +145,12 @@ PY
 )
 ```
 
-These are hashes of physical source/protocol bytes. They are distinct from the
+These hashes identify the exact bytes of each source or protocol file. They are distinct from the
 core's canonical complete-run, service-identity and normalized-request digests.
 Any source or protocol edit requires new approved pins and a new campaign;
 do not change historical inputs to make an old capture pass.
 
-## Collect baseline and subject
+## Collect baseline and subject answers
 
 For an unauthenticated loopback endpoint, run:
 

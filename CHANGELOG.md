@@ -142,6 +142,8 @@ while strengthening evidence verification, runtime isolation and release checks.
   Guides and API references scope pairing, signatures, observation attachments and
   verification helpers by evidence family. Policy-engine examples state their
   supported recipient-policy subset separately from full acceptance verification.
+  Example guides explain their audience, setup and expected outputs, distinguish
+  offline fixtures from live model runs, and clarify intentional policy failures.
   Production release publication updates
   tagged docs, `latest` and `stable`; TestPyPI and bootstrap runs cannot do so.
 

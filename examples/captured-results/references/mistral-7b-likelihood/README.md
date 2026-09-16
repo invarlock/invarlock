@@ -13,6 +13,11 @@ The subject is the official instruction-tuned version of the baseline. Both see
 identical plain text, without a chat template. The comparison measures narrative
 continuation likelihood; it does not test instruction-following quality.
 
+To check this result yourself, use [offline replay](#replay-with-the-core-package)
+with Python, an installed InvarLock package and matching example files. You do
+not need model weights, a GPU or Harness. The expected result is a verified
+**rejection**, followed by a report explaining why.
+
 ## Result and policy
 
 | Measurement | Result |
@@ -26,7 +31,8 @@ continuation likelihood; it does not test instruction-following quality.
 
 Before inference, the illustrative policy required all 400 pairs, an upper ratio
 interval bound at most 1.05 and interval width at most 0.10. It uses 2,048 paired
-bootstrap replicates. The subject's mean NLL is about 9.1% higher, exceeding the
+bootstrap replicates. Lower NLL means the model assigned greater probability to the specified
+reference text. The subject's mean NLL is about 9.1% higher, exceeding the
 5% tolerance. This policy illustrates a release gate; it is not a universal
 business threshold. No threshold or case was changed after measurement.
 
