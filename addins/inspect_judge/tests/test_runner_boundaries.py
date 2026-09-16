@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import copy
 import json
+import os
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -203,10 +204,13 @@ def test_collection_lock_rejects_shared_permissions_and_can_recover(runner_optio
         lock.touch(mode=0o644)
         lock.chmod(0o644)
         with pytest.raises(InspectJudgeError, match="safe regular file"):
-            live._acquire_collection_lock(fd)
+            with live._collection_lock(fd):
+                pytest.fail("unsafe lock was accepted")
         lock.chmod(0o600)
-        descriptor = live._acquire_collection_lock(fd)
-        live._release_collection_lock(descriptor)
+        with live._collection_lock(fd) as descriptor:
+            os.fstat(descriptor)
+        with pytest.raises(OSError):
+            os.fstat(descriptor)
 
 
 class NoCallModel:
@@ -469,3 +473,24 @@ def test_frozen_rows_reject_ungradeable_pairs(inputs, corruption, message):
         subject["records"][0]["output"] = None
     with pytest.raises(InspectJudgeError, match=message):
         live._frozen_rows(baseline, subject)
+
+
+@pytest.mark.parametrize("failure", ["body", "unlock"])
+def test_collection_lock_closes_on_body_and_unlock_failures(
+    runner_options, monkeypatch, failure
+):
+    original_flock = live.fcntl.flock
+
+    def flock(descriptor, operation):
+        if failure == "unlock" and operation == live.fcntl.LOCK_UN:
+            raise OSError("unlock failed")
+        return original_flock(descriptor, operation)
+
+    monkeypatch.setattr(live.fcntl, "flock", flock)
+    with pinned_directory(runner_options.checkpoint_directory, create=True) as fd:
+        with pytest.raises(OSError, match=failure):
+            with live._collection_lock(fd) as descriptor:
+                if failure == "body":
+                    raise OSError("body failed")
+        with pytest.raises(OSError):
+            os.fstat(descriptor)

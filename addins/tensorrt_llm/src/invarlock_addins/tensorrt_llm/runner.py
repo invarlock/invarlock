@@ -863,20 +863,22 @@ def _silence_backend_output() -> Iterator[None]:
         saved_stderr = os.dup(2)
         descriptors.callback(os.close, saved_stderr)
         sink = os.open(os.devnull, os.O_WRONLY)
-        descriptors.callback(os.close, sink)
-        with ExitStack() as restore_outputs:
-            restore_outputs.callback(os.dup2, saved_stderr, 2)
-            restore_outputs.callback(os.dup2, saved_stdout, 1)
-            try:
-                os.dup2(sink, 1)
-                os.dup2(sink, 2)
-                yield
-            finally:
-                for stream in (sys.stdout, sys.stderr):
-                    try:
-                        stream.flush()
-                    except (AttributeError, OSError):
-                        pass
+        try:
+            with ExitStack() as restore_outputs:
+                restore_outputs.callback(os.dup2, saved_stderr, 2)
+                restore_outputs.callback(os.dup2, saved_stdout, 1)
+                try:
+                    os.dup2(sink, 1)
+                    os.dup2(sink, 2)
+                    yield
+                finally:
+                    for stream in (sys.stdout, sys.stderr):
+                        try:
+                            stream.flush()
+                        except (AttributeError, OSError):
+                            pass
+        finally:
+            os.close(sink)
 
 
 def _tokenizer_from_contract(contract: _TokenizerContract, backend: _Backend) -> object:

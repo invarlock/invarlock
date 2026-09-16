@@ -43,6 +43,7 @@ condition = "AND"
 regexTarget = "line"
 paths = [
   '''^src/invarlock/captured_evidence_publication\.py$''',
+  '''^src/invarlock/pipeline/evidence\.py$''',
 ]
 regexes = [
   # Gitleaks retains the preceding newline for findings after the first line.

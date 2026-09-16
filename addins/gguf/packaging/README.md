@@ -98,7 +98,7 @@ Do not hand-copy artifact or backend digests. Derive the complete runtime spec
 from the exact GGUF file, executable, and source archive that will be used. The
 inspection itself executes native code, so this Python must run inside the
 digest-pinned, network-disabled image built from
-[`runtime/Dockerfile`](https://github.com/invarlock/invarlock/blob/v0.15.0/addins/gguf/runtime/Dockerfile), not in an ordinary host process:
+[`runtime/Dockerfile`](https://github.com/invarlock/invarlock/blob/v0.16.0/addins/gguf/runtime/Dockerfile), not in an ordinary host process:
 
 ```python
 from pathlib import Path
@@ -201,7 +201,7 @@ the same image digest, pass those paths to `qualify-preflight` and
 `qualify-evidence` as `CANARY_EVIDENCE`, `CANARY_RECEIPT`, and
 `CANARY_TRUST_PROFILE`, keeping its referenced verifier private key available.
 Reuse requires the same image, providers, task, acceptance binding and device
-class; see the [canary compatibility rules](https://github.com/invarlock/invarlock/blob/v0.15.0/docs/reference/runtime-providers.md).
+class; see the [canary compatibility rules](https://github.com/invarlock/invarlock/blob/v0.16.0/docs/reference/runtime-providers.md).
 Set `QUALIFICATION_DEVICE`, `QUALIFICATION_CPUS`,
 `QUALIFICATION_MEMORY_MIB`, and `QUALIFICATION_USER` for the bounded worker
 environment and keep them unchanged through canary, preflight, and evidence.
