@@ -9,16 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Install live judge collection with `pip install "invarlock[judge]"`, including
-  the matching collector and pinned SDKs. Offline judging of retained
-  measurements, verification and reporting remain available in core alone.
-
 ### Changed
 
 ### Removed
 
 ### Fixed
 
+## [0.16.1] - 2026-09-16
+
+### Added
+
+- Install live judge collection with `pip install "invarlock[judge]"`, including
+  the matching collector and pinned SDKs. Offline analysis of retained judge
+  measurements, verification and reporting remain available in core alone.
+
+### Changed
+
+- Refresh documentation rendering and spelling tools to KaTeX 0.18.7 and
+  CSpell 10.3.0.
+
+### Fixed
+
+- Block releases when built package descriptions fail the PyPI renderer or lose
+  the logo and workflow images.
+- Use the patched TOML parser in documentation linting.
 - Keep the package README logo as an image when generating the PyPI description,
   rather than exposing its HTML as an indented code block.
 

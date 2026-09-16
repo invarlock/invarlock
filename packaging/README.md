@@ -1,6 +1,6 @@
 <p align="center">
   <img
-      src="https://raw.githubusercontent.com/invarlock/invarlock/v0.16.0/docs/assets/invarlock-logo.svg"
+      src="https://raw.githubusercontent.com/invarlock/invarlock/v0.16.1/docs/assets/invarlock-logo.svg"
       alt="InvarLock"
       width="420"
     />
@@ -12,7 +12,7 @@
   <a href="https://github.com/invarlock/invarlock/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/invarlock/invarlock/ci.yml?branch=main&label=CI&logo=github&labelColor=18150f" /></a>
   <a href="https://pypi.org/project/invarlock/"><img alt="PyPI" src="https://img.shields.io/pypi/v/invarlock?label=PyPI&logo=pypi&labelColor=18150f&color=1f3a7a" /></a>
   <a href="https://invarlock.github.io/invarlock/"><img alt="Docs" src="https://img.shields.io/badge/docs-quickstart-1f3a7a?labelColor=18150f" /></a>
-  <a href="https://github.com/invarlock/invarlock/blob/v0.16.0/LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-1f3a7a?labelColor=18150f" /></a>
+  <a href="https://github.com/invarlock/invarlock/blob/v0.16.1/LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-1f3a7a?labelColor=18150f" /></a>
   <a href="https://www.python.org/downloads/release/python-3120/"><img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12%2B-1f3a7a?logo=python&logoColor=f4efe3&labelColor=18150f" /></a>
 </p>
 
@@ -88,22 +88,22 @@ Use documentation and examples from the same release as a published wheel.
 For local builds, use the exact source checkout that built the package; retain
 its commit and wheel digest when sharing it. A missing release archive is an
 error, never a reason to substitute another version. See
-[matching wheels and examples](https://github.com/invarlock/invarlock/blob/v0.16.0/docs/user-guide/getting-started.md#matching-wheels-and-examples).
+[matching wheels and examples](https://github.com/invarlock/invarlock/blob/v0.16.1/docs/user-guide/getting-started.md#matching-wheels-and-examples).
 
 To collect new judge ratings, install `python -m pip install "invarlock[judge]"`.
 Judge scoring is built into the core; this extra adds the matching collector and
 its pinned provider SDKs. Offline import, verification and reporting need only
-`invarlock`. See [judge setup](https://github.com/invarlock/invarlock/blob/v0.16.0/docs/reference/judge-measurements.md#frozen-answer-requests-and-preflight).
+`invarlock`. See [judge setup](https://github.com/invarlock/invarlock/blob/v0.16.1/docs/reference/judge-measurements.md#frozen-answer-requests-and-preflight).
 
 ## What can you use it for?
 
 | Your task | Starting point |
 | --- | --- |
-| Check a fine-tune, quantized model or runtime change against a baseline | [Model-change workflows](https://github.com/invarlock/invarlock/blob/v0.16.0/docs/user-guide/change-scenarios.md) |
-| Add a verifiable comparison to an existing evaluator or CI pipeline | [Captured results](https://github.com/invarlock/invarlock/blob/v0.16.0/docs/user-guide/captured-results.md) |
-| Grade frozen answers under a task-specific rubric | [Judge scoring](https://github.com/invarlock/invarlock/blob/v0.16.0/docs/reference/judge-measurements.md) |
-| Recheck a hosted service after a change or on a schedule | [Hosted-service requalification](https://github.com/invarlock/invarlock/blob/v0.16.0/docs/user-guide/hosted-service-requalification.md) |
-| Send evidence to a customer or internal release reviewer | [Evidence and verification](https://github.com/invarlock/invarlock/blob/v0.16.0/docs/user-guide/evidence-and-verification.md) |
+| Check a fine-tune, quantized model or runtime change against a baseline | [Model-change workflows](https://github.com/invarlock/invarlock/blob/v0.16.1/docs/user-guide/change-scenarios.md) |
+| Add a verifiable comparison to an existing evaluator or CI pipeline | [Captured results](https://github.com/invarlock/invarlock/blob/v0.16.1/docs/user-guide/captured-results.md) |
+| Grade frozen answers under a task-specific rubric | [Judge scoring](https://github.com/invarlock/invarlock/blob/v0.16.1/docs/reference/judge-measurements.md) |
+| Recheck a hosted service after a change or on a schedule | [Hosted-service requalification](https://github.com/invarlock/invarlock/blob/v0.16.1/docs/user-guide/hosted-service-requalification.md) |
+| Send evidence to a customer or internal release reviewer | [Evidence and verification](https://github.com/invarlock/invarlock/blob/v0.16.1/docs/user-guide/evidence-and-verification.md) |
 
 These workflows fit teams that repeatedly need to produce, check or retain
 evidence supporting a model change: model suppliers, fine-tuning and optimization
@@ -113,7 +113,7 @@ teams, and internal AI teams with a release-review process.
 
 <p align="center">
   <img
-    src="https://raw.githubusercontent.com/invarlock/invarlock/v0.16.0/docs/assets/evaluation-verification-flow.svg"
+    src="https://raw.githubusercontent.com/invarlock/invarlock/v0.16.1/docs/assets/evaluation-verification-flow.svg"
     alt="Native comparisons, captured records and frozen answers feed evaluation; independent verification and reporting use the resulting evidence"
     width="100%"
   />
@@ -131,7 +131,7 @@ invarlock report evidence/ --html report.html
 ```
 
 Use the evidence destination declared in your request. The
-[captured-results guide](https://github.com/invarlock/invarlock/blob/v0.16.0/docs/user-guide/captured-results.md)
+[captured-results guide](https://github.com/invarlock/invarlock/blob/v0.16.1/docs/user-guide/captured-results.md)
 provides complete setup instructions, keys and trust-profile preparation.
 Native runs also need runtime resources; judge receipt issuance uses its own
 verifier-key and identity options. Follow the linked guide for that workflow.
@@ -145,7 +145,7 @@ verifier-key and identity options. Follow the linked guide for that workflow.
 The HTML report supports multiple metrics and slices, with an overview and
 per-result detail. Terminal and Markdown outputs support review; JSON and JUnit
 support automation where the selected workflow provides them. See the
-[CLI reference](https://github.com/invarlock/invarlock/blob/v0.16.0/docs/reference/cli.md)
+[CLI reference](https://github.com/invarlock/invarlock/blob/v0.16.1/docs/reference/cli.md)
 for output options and policy exit codes.
 
 ## Choose a scorer
@@ -161,7 +161,7 @@ with its own required observations and statistical treatment:
 
 Policy uses the conservative uncertainty bound, with the configured sample,
 precision and quality requirements. A point estimate alone does not decide the
-result. [Schedule and policy](https://github.com/invarlock/invarlock/blob/v0.16.0/docs/user-guide/schedule-and-policy.md)
+result. [Schedule and policy](https://github.com/invarlock/invarlock/blob/v0.16.1/docs/user-guide/schedule-and-policy.md)
 explains the statistical scope and thresholds.
 
 Judge collection uses the optional `invarlock-inspect-judge[inspect]` package
@@ -169,12 +169,12 @@ with explicit call, token, cost, timeout and checkpoint limits. Importing retain
 ratings, verification and reporting work offline in the core wheel. Start with
 `invarlock evaluate --init my-judge --example native-judge` and replace the
 illustrative model pins with your actual runtime inputs. See
-[judge scoring](https://github.com/invarlock/invarlock/blob/v0.16.0/docs/reference/judge-measurements.md)
+[judge scoring](https://github.com/invarlock/invarlock/blob/v0.16.1/docs/reference/judge-measurements.md)
 for the supported rubric, reference and collection profiles.
 
 Task-specific deterministic extensions cover normalized labels, numeric
 tolerances, structured fields and token overlap.
-[Evidence sets](https://github.com/invarlock/invarlock/blob/v0.16.0/docs/reference/evidence-sets.md)
+[Evidence sets](https://github.com/invarlock/invarlock/blob/v0.16.1/docs/reference/evidence-sets.md)
 can require multiple complementary checks on the same frozen answers while
 preserving each check's meaning.
 
@@ -182,11 +182,11 @@ preserving each check's meaning.
 
 **Use existing records.** Installed parsers cover selected Inspect AI, LM
 Evaluation Harness and Promptfoo export profiles, plus canonical JSON and generic
-JSONL. The [capture SDK](https://github.com/invarlock/invarlock/blob/v0.16.0/docs/reference/api-guide.md)
+JSONL. The [capture SDK](https://github.com/invarlock/invarlock/blob/v0.16.1/docs/reference/api-guide.md)
 lets other pipelines supply the required per-case facts. Structured inputs need
 an explicit text projection for judging; normalized NLL needs actual likelihood
 measurements. An aggregate score cannot substitute for missing observations.
-The [qualification matrix](https://github.com/invarlock/invarlock/blob/v0.16.0/docs/reference/evaluator-qualification.md)
+The [qualification matrix](https://github.com/invarlock/invarlock/blob/v0.16.1/docs/reference/evaluator-qualification.md)
 distinguishes installed support, replay authority and retained runtime evidence
 for each declared profile.
 
@@ -194,12 +194,12 @@ for each declared profile.
 Optional GGUF/llama.cpp, TensorRT-LLM and Hugging Face vision-text packages provide
 additional runtime profiles. Native run mode uses a caller-authorized,
 digest-addressed Docker or Podman image. Follow the
-[getting-started guide](https://github.com/invarlock/invarlock/blob/v0.16.0/docs/user-guide/getting-started.md)
+[getting-started guide](https://github.com/invarlock/invarlock/blob/v0.16.1/docs/user-guide/getting-started.md)
 for artifact pins, runtime setup and independent verification inputs.
 Host-side model preparation uses the matching checkout's
-[HF runtime group](https://github.com/invarlock/invarlock/blob/v0.16.0/docs/user-guide/runtime-providers.md#hugging-face-transformers)
+[HF runtime group](https://github.com/invarlock/invarlock/blob/v0.16.1/docs/user-guide/runtime-providers.md#hugging-face-transformers)
 after bootstrapping its verified hardened Accelerate wheel.
-The [import request](https://github.com/invarlock/invarlock/blob/v0.16.0/examples/request.yaml)
+The [import request](https://github.com/invarlock/invarlock/blob/v0.16.1/examples/request.yaml)
 uses complete retained provider sidecars and omits `--runtime-image` and `--runtime-image-digest`.
 
 **Recheck a hosted service.** Your harness records fresh executions, service
@@ -216,11 +216,11 @@ actual model runs. Each reference establishes its declared workflow and scope:
 
 | Reference | Retained work |
 | --- | --- |
-| [Native model and runtime comparisons](https://github.com/invarlock/invarlock/tree/v0.16.0/public_evidence) | Pinned text, GGUF, vision-text and TensorRT-LLM comparisons |
-| [Evaluator handoffs](https://github.com/invarlock/invarlock/blob/v0.16.0/examples/evaluator-qualification/signed-transactions/README.md) | 400-record Qwen3.5 9B Harness and Inspect journeys; a Gemma instruction-to-QAT comparison |
-| [Hosted HTTP capture](https://github.com/invarlock/invarlock/blob/v0.16.0/examples/hosted-service/references/mistral-7b-http/README.md) | 400 paired cases from distinct Mistral 7B base and instruction checkpoints behind a local HTTP service |
-| [Likelihood comparison](https://github.com/invarlock/invarlock/blob/v0.16.0/examples/captured-results/references/mistral-7b-likelihood/README.md) | Distinct Mistral 7B checkpoints on 400 fixed narrative continuations |
-| [Bounded judge comparison](https://github.com/invarlock/invarlock/blob/v0.16.0/examples/judge-measurements/references/k2-32b-luna-xhigh-heldout/README.md) | 10,260 retained ratings across 1,710 QA and extraction cases, with offline replay |
+| [Native model and runtime comparisons](https://github.com/invarlock/invarlock/tree/v0.16.1/public_evidence) | Pinned text, GGUF, vision-text and TensorRT-LLM comparisons |
+| [Evaluator handoffs](https://github.com/invarlock/invarlock/blob/v0.16.1/examples/evaluator-qualification/signed-transactions/README.md) | 400-record Qwen3.5 9B Harness and Inspect journeys; a Gemma instruction-to-QAT comparison |
+| [Hosted HTTP capture](https://github.com/invarlock/invarlock/blob/v0.16.1/examples/hosted-service/references/mistral-7b-http/README.md) | 400 paired cases from distinct Mistral 7B base and instruction checkpoints behind a local HTTP service |
+| [Likelihood comparison](https://github.com/invarlock/invarlock/blob/v0.16.1/examples/captured-results/references/mistral-7b-likelihood/README.md) | Distinct Mistral 7B checkpoints on 400 fixed narrative continuations |
+| [Bounded judge comparison](https://github.com/invarlock/invarlock/blob/v0.16.1/examples/judge-measurements/references/k2-32b-luna-xhigh-heldout/README.md) | 10,260 retained ratings across 1,710 QA and extraction cases, with offline replay |
 
 A comparative pass is not proof of adequate task quality or representative
 production performance. The local HTTP example does not qualify an external
@@ -237,13 +237,13 @@ Verification checks retained evidence; it does not independently rerun the
 original model execution. It does not establish that the chosen benchmark covers
 production traffic, that a rubric captures every requirement, or that a passing
 comparison authorizes deployment. Read the
-[assurance case](https://github.com/invarlock/invarlock/blob/v0.16.0/docs/assurance/assurance-case.md)
-and [trust model](https://github.com/invarlock/invarlock/blob/v0.16.0/docs/security/trust-model.md)
+[assurance case](https://github.com/invarlock/invarlock/blob/v0.16.1/docs/assurance/assurance-case.md)
+and [trust model](https://github.com/invarlock/invarlock/blob/v0.16.1/docs/security/trust-model.md)
 for the precise guarantees and assumptions.
 
 For artifact-delivery automation, optional
-[acceptance attestations](https://github.com/invarlock/invarlock/blob/v0.16.0/docs/reference/acceptance-attestations.md)
-and [OPA/Rego or CUE policies](https://github.com/invarlock/invarlock/blob/v0.16.0/docs/reference/policy-engine-interop.md)
+[acceptance attestations](https://github.com/invarlock/invarlock/blob/v0.16.1/docs/reference/acceptance-attestations.md)
+and [OPA/Rego or CUE policies](https://github.com/invarlock/invarlock/blob/v0.16.1/docs/reference/policy-engine-interop.md)
 consume the authenticated result under recipient-controlled policy.
 v0.13 evidence and receipts remain verifiable and ingestible; acceptance always
 uses the recipient's current policy. InvarLock is pre-1.0, with explicit artifact
@@ -251,11 +251,11 @@ format versions and a Python API that may evolve between minor releases.
 
 ## Documentation and contributing
 
-- [Getting started](https://github.com/invarlock/invarlock/blob/v0.16.0/docs/user-guide/getting-started.md) · [Examples](https://github.com/invarlock/invarlock/tree/v0.16.0/examples) · [CLI](https://github.com/invarlock/invarlock/blob/v0.16.0/docs/reference/cli.md) · [Python API](https://github.com/invarlock/invarlock/blob/v0.16.0/docs/reference/api-guide.md)
-- [Contributing](https://github.com/invarlock/invarlock/blob/v0.16.0/CONTRIBUTING.md) for development setup and required checks.
+- [Getting started](https://github.com/invarlock/invarlock/blob/v0.16.1/docs/user-guide/getting-started.md) · [Examples](https://github.com/invarlock/invarlock/tree/v0.16.1/examples) · [CLI](https://github.com/invarlock/invarlock/blob/v0.16.1/docs/reference/cli.md) · [Python API](https://github.com/invarlock/invarlock/blob/v0.16.1/docs/reference/api-guide.md)
+- [Contributing](https://github.com/invarlock/invarlock/blob/v0.16.1/CONTRIBUTING.md) for development setup and required checks.
 - [Discussions](https://github.com/invarlock/invarlock/discussions) for questions and integration ideas; [Issues](https://github.com/invarlock/invarlock/issues) for reproducible bugs.
-- [Security policy](https://github.com/invarlock/invarlock/blob/v0.16.0/SECURITY.md) for private vulnerability reports.
+- [Security policy](https://github.com/invarlock/invarlock/blob/v0.16.1/SECURITY.md) for private vulnerability reports.
 
-Apache-2.0. See [LICENSE](https://github.com/invarlock/invarlock/blob/v0.16.0/LICENSE)
-and [third-party notices](https://github.com/invarlock/invarlock/blob/v0.16.0/THIRD_PARTY_NOTICES.md)
+Apache-2.0. See [LICENSE](https://github.com/invarlock/invarlock/blob/v0.16.1/LICENSE)
+and [third-party notices](https://github.com/invarlock/invarlock/blob/v0.16.1/THIRD_PARTY_NOTICES.md)
 for dependency and retained-data terms.

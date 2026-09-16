@@ -1431,7 +1431,7 @@ wheels = [
 
 [[package]]
 name = "invarlock"
-version = "0.16.0"
+version = "0.16.1"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
@@ -1657,7 +1657,7 @@ runtime-test = [
 
 [[package]]
 name = "invarlock-inspect-judge"
-version = "0.16.0"
+version = "0.16.1"
 source = { directory = "addins/inspect_judge" }
 dependencies = [
     { name = "invarlock" },
@@ -1674,7 +1674,7 @@ inspect = [
 requires-dist = [
     { name = "httpx", marker = "extra == 'inspect'", specifier = "==0.28.1" },
     { name = "inspect-ai", marker = "extra == 'inspect'", specifier = "==0.3.263" },
-    { name = "invarlock", specifier = "==0.16.0" },
+    { name = "invarlock", specifier = "==0.16.1" },
     { name = "openai", marker = "extra == 'inspect'", specifier = "==3.13.0" },
 ]
 provides-extras = ["inspect"]

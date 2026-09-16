@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "invarlock"
-version = "0.16.0"
+version = "0.16.1"
 description = "Paired model release-regression evaluation with independently verifiable evidence"
 authors = [{ name = "InvarLock Team", email = "oss@invarlock.dev" }]
 maintainers = [{ name = "InvarLock Maintainers", email = "support@invarlock.dev" }]
@@ -38,13 +38,13 @@ dependencies = [
 [project.urls]
 Homepage = "https://invarlock.ai"
 Repository = "https://github.com/invarlock/invarlock"
-Documentation = "https://invarlock.github.io/invarlock/0.16.0/"
+Documentation = "https://invarlock.github.io/invarlock/0.16.1/"
 Issues = "https://github.com/invarlock/invarlock/issues"
-Changelog = "https://github.com/invarlock/invarlock/blob/v0.16.0/CHANGELOG.md"
+Changelog = "https://github.com/invarlock/invarlock/blob/v0.16.1/CHANGELOG.md"
 
 [project.optional-dependencies]
 # Live judge collection; analysis, import, verification and reporting stay in core.
-judge = ["invarlock-inspect-judge[inspect]==0.16.0"]
+judge = ["invarlock-inspect-judge[inspect]==0.16.1"]
 
 # Development dependencies
 dev = [
