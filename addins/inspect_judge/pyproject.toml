@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "invarlock-inspect-judge"
-version = "0.15.0"
+version = "0.16.0"
 description = "Bounded optional Inspect judge collection planning and retained export import"
 readme = "packaging/README.md"
 requires-python = ">=3.12"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
-dependencies = ["invarlock==0.15.0"]
+dependencies = ["invarlock==0.16.0"]
 
 [project.optional-dependencies]
 inspect = ["inspect-ai==0.3.263", "openai==3.13.0", "httpx==0.28.1"]

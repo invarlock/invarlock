@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+### Changed
+
+### Removed
+
+### Fixed
+
+## [0.16.0] - 2026-09-16
+
 InvarLock brings native execution, captured evaluator records and bounded judge
 scoring into the same `evaluate`, `verify` and `report` workflow. This update also
 adds hosted-service comparisons, clearer reports and new retained references,

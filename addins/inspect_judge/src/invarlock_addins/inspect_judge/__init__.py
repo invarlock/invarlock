@@ -13,7 +13,7 @@ from .collector import (
 from .configured import collect_configured, validate_collection_environment
 from .runner import RunnerOptions, collect
 
-__version__ = "0.15.0"
+__version__ = "0.16.0"
 
 __all__ = [
     "__version__",

@@ -777,7 +777,19 @@ def test_operational_guides_pin_current_failure_publication_and_release_paths() 
 
 def test_latest_release_changelog_is_a_product_synthesis() -> None:
     changelog = _read("CHANGELOG.md")
-    unreleased, remainder = changelog.split("## [0.15.0]", maxsplit=1)
+    unreleased, current = changelog.split("## [0.16.0]", maxsplit=1)
+    current_release, remainder = current.split("## [0.15.0]", maxsplit=1)
+    for phrase in (
+        "Three built-in scorers",
+        "Bounded judging",
+        "hosted-service",
+        "evaluate",
+        "verify",
+        "report",
+    ):
+        assert phrase in current_release
+    for heading in ("### Added", "### Changed", "### Removed", "### Fixed"):
+        assert heading in current_release
     release, remainder = remainder.split("## [0.14.0]", maxsplit=1)
     previous_release = remainder.split("## [0.13.0]", maxsplit=1)[0]
     normalized = " ".join(release.split())

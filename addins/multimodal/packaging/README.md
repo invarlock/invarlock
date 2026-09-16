@@ -228,7 +228,7 @@ make -C addins/multimodal qualify-evidence \
 image. Retain its evidence, receipt, and verifier-owned trust profile; a new
 image digest requires a new signed canary. Keep its referenced verifier private
 key available. Reuse also requires matching providers, task, acceptance binding
-and device class; see the [canary compatibility rules](https://github.com/invarlock/invarlock/blob/v0.15.0/docs/reference/runtime-providers.md).
+and device class; see the [canary compatibility rules](https://github.com/invarlock/invarlock/blob/v0.16.0/docs/reference/runtime-providers.md).
 `qualify-preflight` authenticates the saved receipt, checks evidence integrity
 and compatibility, then runs execution-free checks before starting either
 target model worker.
