@@ -2309,14 +2309,18 @@ comparison. Each archive retains its own plan, source identity and outcome;
 none qualifies a different judge model, effort or rubric.
 Rubric development and reference-label review are study-design choices, not
 additional requirements of the native judge workflow.</p>
-<p>Install matching packages and use the installed command:</p>
-<div class="codehilite"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>.
-python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;addins/inspect_judge[inspect]&#39;</span>
+<p>Install the core with its live-collection extra and use the installed command:</p>
+<div class="codehilite"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;invarlock[judge]&quot;</span>
 <span class="c1"># Supply OPENAI_API_KEY through your secret manager.</span>
 invarlock<span class="w"> </span>evaluate<span class="w"> </span>judge-request.yaml<span class="w"> </span>--preflight<span class="w"> </span>--json
 invarlock<span class="w"> </span>evaluate<span class="w"> </span>judge-request.yaml<span class="w"> </span>--signing-key<span class="w"> </span>signer-private.pem<span class="w"> </span>--json
 </code></pre></div>
 
+<p>The <code>judge</code> extra installs the matching <code>invarlock-inspect-judge[inspect]</code>
+package and pinned SDKs. Scoring, retained-measurement import, verification and
+reporting remain in core. For local source builds, use
+<code>python -m pip install '.[judge]' 'addins/inspect_judge[inspect]'</code> from the
+repository root so both packages come from the same checkout.</p>
 <p>Review every call, token, cost and time cap first. The collector rejects custom
 provider URLs and reads credentials only from its environment. Remove both
 <code>OPENAI_BASE_URL</code> and <code>OPENAI_API_BASE</code>; their presence is rejected even when

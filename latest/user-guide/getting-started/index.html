@@ -2343,6 +2343,11 @@ walks through native execution and its independent receipt. For periodic or
 incident-triggered hosted evaluation, follow
 <a href="../hosted-service-requalification/">Requalify a hosted service</a>; the capture
 harness supplies fresh executions and the core verifies their retained evidence.</p>
+<p>For live judge collection, install <code>python -m pip install "invarlock[judge]"</code>.
+This includes the matching collector and pinned SDKs. Judge analysis, retained
+measurement import, verification and reporting need only the core package. See
+<a href="../../reference/judge-measurements/#frozen-answer-requests-and-preflight">judge collection</a> for
+credentials, supported endpoints and collection limits.</p>
 <h2 id="matching-wheels-and-examples">Matching wheels and examples<a class="headerlink" href="#matching-wheels-and-examples" title="Permanent link">&para;</a></h2>
 <p>For a released wheel, install <code>invarlock</code> and obtain its version with
 <code>importlib.metadata.version("invarlock")</code>. The root README and

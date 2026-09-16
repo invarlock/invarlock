@@ -2256,7 +2256,7 @@
 </tr>
 <tr>
 <td><code>invarlock-inspect-judge</code></td>
-<td>Optional bounded collection and import adapter; provider SDKs require its <code>inspect</code> extra</td>
+<td>Optional bounded collection and import adapter; install <code>invarlock[judge]</code> to include the pinned provider SDKs</td>
 </tr>
 </tbody>
 </table>
@@ -2454,8 +2454,10 @@ select the tag archive from <code>importlib.metadata.version("invarlock")</code>
 wheels require their exact build checkout's examples, with no mutable-branch
 fallback when a matching release archive is unavailable.</p>
 <h2 id="test-index-and-production-publication">Test index and production publication<a class="headerlink" href="#test-index-and-production-publication" title="Permanent link">&para;</a></h2>
-<p>TestPyPI is an optional publication and installation smoke, not the source of
-the production candidate. To use it, dispatch the release workflow from the
+<p>TestPyPI rehearses publication and installation using the production candidate.
+For changes to package descriptions, packaging, installation or publication,
+complete this rehearsal and inspect the rendered project pages before production.
+Other releases can use it as an optional additional check. Dispatch the release workflow from the
 release tag, select <code>testpypi</code>, and provide the successful tag workflow run's
 numeric ID as <code>candidate_run_id</code>. The workflow authenticates that the supplied
 run is a successful tag-push execution of the release workflow at the exact tag
@@ -2464,6 +2466,18 @@ checks the closed twelve-file set and its ledger, publishes through the six
 project-scoped TestPyPI identities, verifies all hosted archives, installs the
 six hosted wheels together, and reruns the CLI, diagnostics,
 provider-conformance, and entry-point smoke.</p>
+<p>A successful upload does not check presentation. Extract the description from
+both the wheel and source archive, confirm their parity, and render the exact
+text with the PyPI Markdown renderer before tagging. Check that the logo and
+workflow diagram are image elements, rather than escaped HTML code. Inspect the
+actual version-specific TestPyPI pages for those images, headings, tables, code
+and release links, then repeat the page check on production. Record these manual
+checks separately from CI; the workflow does not enforce the visual review.</p>
+<p>Check each distribution's trusted publisher and matching GitHub environment on
+both indexes before dispatch. A working core publisher does not establish add-in
+readiness, and TestPyPI registrations are separate from production registrations.
+Submitting a publisher registration, satisfying a deployment approval and
+successfully publishing are separate steps.</p>
 <p>Production uses the same tagged candidate directly. Once local preflight,
 tag-to-commit checks, release notes, security review, provenance, and the tag
 workflow are complete, dispatch the workflow again from the release tag,
