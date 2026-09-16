@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/invarlock-app-icon.svg">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -436,6 +436,90 @@
     
   
     Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../captured-results/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Captured results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hosted-service-requalification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosted-service requalification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modelkit-handoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ModelKit recipient handoff
   
 
     
@@ -1335,6 +1419,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../reference/evaluation-records/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation records
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/evaluation-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation capacity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../reference/compatibility/" class="md-nav__link">
         
   
@@ -1511,6 +1651,62 @@
     
   
     Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/judge-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Judge measurements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/evidence-sets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence sets
   
 
     
@@ -2074,8 +2270,8 @@ one common evidence transaction. A provider authenticates an artifact,
 prepares a session from caller-owned resources, scores the ordered schedule,
 and emits typed records. InvarLock owns pairing, metric arithmetic, policy
 evaluation, bundle publication, and independent verification.</p>
-<div class="admonition tip">
-<p class="admonition-title">User guide</p>
+<blockquote>
+<p><strong>User guide</strong></p>
 <p><strong>Outcome:</strong> Select, inspect, and configure a provider so both artifacts
 emit contract-complete records for one independently verifiable comparison.</p>
 <p><strong>Audience:</strong> Runtime integration engineers and evaluation operators working
@@ -2084,7 +2280,7 @@ TensorRT-LLM, or complete imported provider material.</p>
 <p><strong>Prerequisites:</strong> Materialized artifacts and support files, a canonical
 schedule and caller-approved policy, a provider-compatible offline environment,
 and caller-owned runtime-image and device configuration.</p>
-</div>
+</blockquote>
 <h2 id="choose-a-provider-path">Choose a provider path<a class="headerlink" href="#choose-a-provider-path" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -2099,7 +2295,7 @@ and caller-owned runtime-image and device configuration.</p>
 <tr>
 <td>Local Hugging Face safetensors checkpoint</td>
 <td><code>hf_transformers</code></td>
-<td>Built into <code>invarlock</code>; execution dependencies in <code>invarlock[hf]</code></td>
+<td>Built into <code>invarlock</code>; execution dependencies in the maintained runtime image</td>
 <td>Run mode</td>
 </tr>
 <tr>
@@ -2135,11 +2331,16 @@ built-in <code>hf_transformers</code> integration also declares
 likelihoods over the authenticated local checkpoint. When authenticated
 tokenizer contracts and paired token counts are comparable, the verifier may
 render a token-weighted perplexity ratio as interpretation only. The GGUF,
-TensorRT-LLM, and vision-text add-ins remain exact-match only.</p>
+TensorRT-LLM, and vision-text add-ins expose exact-match text collection.
+The built-in <code>judge</code> scorer and deterministic extensions use that same
+authenticated text-output surface, then score the frozen answers separately.
+They do not require the provider to advertise a <code>judge</code> metric. Native judging
+currently requires exactly one text input part, so it cannot grade the
+vision-text add-in's image schedules.</p>
 <table>
 <thead>
 <tr>
-<th>Metric</th>
+<th>Provider collection metric</th>
 <th>Hugging Face text</th>
 <th>Vision-text</th>
 <th>GGUF</th>
@@ -2166,6 +2367,9 @@ TensorRT-LLM, and vision-text add-ins remain exact-match only.</p>
 </tr>
 </tbody>
 </table>
+<p>For native judging, follow the <a href="../evaluation-request/#judge">judge request workflow</a>.
+Judge collection, evidence and recipient verification have separate contracts;
+the provider still owns the original artifact and answer-capture provenance.</p>
 <h2 id="common-provider-workflow">Common provider workflow<a class="headerlink" href="#common-provider-workflow" title="Permanent link">&para;</a></h2>
 <p>Every run-mode provider follows the same operator sequence:</p>
 <ol>
@@ -2262,11 +2466,18 @@ contract reviewable. Vision-text additionally requires <code>RESOURCE_ROOT</code
 <code>CONTENT_STORE</code>; GGUF and TensorRT-LLM use the provider resource variables
 documented in their sections below.</p>
 <h2 id="hugging-face-transformers">Hugging Face Transformers<a class="headerlink" href="#hugging-face-transformers" title="Permanent link">&para;</a></h2>
-<p><code>hf_transformers</code> is the canonical built-in provider. Install its runtime
-dependencies with:</p>
-<div class="codehilite"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;invarlock[hf]&quot;</span>
+<p><code>hf_transformers</code> is the canonical built-in provider. The public core package
+supplies the host CLI; the maintained runtime image supplies model execution
+dependencies. For host-side model preparation or development, run from the
+matching source checkout with <code>uv</code> 0.10.10:</p>
+<div class="codehilite"><pre><span></span><code>python<span class="w"> </span>scripts/security/build_hardened_accelerate_wheel.py<span class="w"> </span>bootstrap
+uv<span class="w"> </span>sync<span class="w"> </span>--locked<span class="w"> </span>--group<span class="w"> </span>hf
 </code></pre></div>
 
+<p>Bootstrap authenticates the upstream wheel and the derived
+<code>accelerate==1.14.0+invarlock.1</code> wheel before <code>uv</code> consumes it. The <code>hf</code> repository
+group uses the generated <code>runtime/wheels</code> directory. The public package has no
+full inference extra; use the maintained image or this source-bound setup.</p>
 <p>Strict run mode expects locally materialized safetensors and tokenizer files.
 It binds the immutable revision or checkpoint-tree digest, tokenizer metadata
 digest, deterministic scalar settings, backend and device facts, and the outer
@@ -2468,13 +2679,19 @@ make<span class="w"> </span>runtime-qualification-canary<span class="w"> </span>
 <span class="w">  </span><span class="nv">CANDIDATE_WHEEL_MANIFEST</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$CANDIDATE_WHEEL_MANIFEST</span><span class="s2">&quot;</span>
 </code></pre></div>
 
-<p>Retain the canary evidence, its strictly verified signed receipt, and the
-verifier-owned trust profile together. They may be reused by later readiness
-and evidence targets only while <code>IMAGE_DIGEST</code> is unchanged. A new image digest
-requires a new signed canary.</p>
-<p>Before destroying the verifier signing key, export its Ed25519 public key into
-the retained trust unit. The maintained checker can then replay the signed
-receipt after transfer without private material:</p>
+<p>Retain the canary evidence, its signed strict-pass verification receipt, and the
+verifier-owned trust profile together. Later readiness and evidence targets can
+reuse it only when the image digest, baseline and subject runtime-provider
+identities, task, acceptance binding, and device class match. The acceptance
+binding is the same built-in metric, or the same scorer ID, version, descriptor
+digest and configuration digest. Device matching distinguishes CPU from CUDA;
+CUDA indices may differ. Run a new signed canary when any required match changes.</p>
+<p>Keep the original canary trust profile and its referenced verifier private key
+available while using <code>runtime-qualification-readiness</code> or
+<code>runtime-qualification-evidence</code>. These targets read that key to authenticate the
+retained receipt and do not expose a public-key override. For standalone receipt
+checking after transfer or archival, retain an independently trusted Ed25519
+verifier public key. The checker supports that key without the private material:</p>
 <div class="codehilite"><pre><span></span><code>python<span class="w"> </span>scripts/qualification_receipt_check.py<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--receipt<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$CANARY_RECEIPT</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--evidence<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$CANARY_EVIDENCE</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
@@ -2482,10 +2699,12 @@ receipt after transfer without private material:</p>
 <span class="w">  </span>--verifier-public-key<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$PWD</span><span class="s2">/canary/verifier-public.pem&quot;</span>
 </code></pre></div>
 
-<p>The supplied public key is authenticated by the verifier fingerprint in the
-signed receipt; a substituted key, changed profile, policy, anchor, receipt, or
-evidence manifest fails closed. The trust-profile digest remains the digest of
-the profile used when the receipt was created.</p>
+<p>The checker verifies the receipt signature against the supplied public key and
+requires its fingerprint to match the receipt. Obtain that key through a trusted
+channel. Changed profile, policy, anchor, receipt or evidence-manifest bindings
+fail verification. Keep the original profile unchanged: its digest must match
+the profile used when the receipt was created. This standalone check does not
+replace the private key required by the readiness and evidence targets.</p>
 <p>Next, run readiness for each planned request with the same source binding,
 image, verifier inputs, fresh destinations, and retained canary inputs:</p>
 <div class="codehilite"><pre><span></span><code>make<span class="w"> </span>runtime-qualification-readiness<span class="w"> </span><span class="se">\</span>
@@ -2509,8 +2728,10 @@ must be distinct absent paths with existing real parent directories. They may
 not use symlinked parents or be placed inside the evidence destination. The
 source archive is limited to 512 MiB and 50,000 members; an execution-source
 file is limited to 32 MiB. Readiness starts no model worker and publishes no
-result. It also strictly reverifies the retained canary and its exact image
-binding. Use the same variables with <code>make runtime-qualification-evidence</code>
+result. Its canary prerequisite authenticates the retained signed strict-pass
+receipt, checks the evidence inventory and checksum chain, and enforces the
+image and request compatibility described above. It does not rerun full semantic
+verification of the canary. Use the same variables with <code>make runtime-qualification-evidence</code>
 plus <code>SUMMARY</code> and optional <code>REPORT</code> only after readiness succeeds. Carry the
 same <code>QUALIFICATION_DEVICE</code>, and any CPU, memory, or user controls, into that
 command.</p>
@@ -2538,8 +2759,9 @@ needed for execution-free media preflight:</p>
 </code></pre></div>
 
 <p>The heavier Torch and Transformers inference dependencies belong in the
-digest-pinned runtime image. The <code>[runtime]</code> extra is for development that
-executes the model outside that maintained image.</p>
+digest-pinned runtime image, which derives and hash-checks the hardened
+Accelerate dependency during its build. The base add-in has no full inference
+extra.</p>
 <p><code>hf_vision_text</code> evaluates <code>vision_text_generation</code> schedules containing one
 <code>prompt</code> text part and one <code>image</code> content part per record. Schedule content
 parts carry a canonical content ID, media type, positive byte length, and
@@ -2898,7 +3120,7 @@ obligations, see <a href="../../reference/runtime-providers/">Runtime providers 
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "navigation.sections", "navigation.expand", "navigation.tabs", "navigation.top", "search.highlight", "search.suggest", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
         <script src="../../assets/javascripts/mathjax.js"></script>
       

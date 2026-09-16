@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/invarlock-app-icon.svg">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -436,6 +436,90 @@
     
   
     Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../captured-results/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Captured results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hosted-service-requalification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosted-service requalification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modelkit-handoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ModelKit recipient handoff
   
 
     
@@ -1357,6 +1441,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../reference/evaluation-records/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation records
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/evaluation-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation capacity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../reference/compatibility/" class="md-nav__link">
         
   
@@ -1533,6 +1673,62 @@
     
   
     Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/judge-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Judge measurements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/evidence-sets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence sets
   
 
     
@@ -2113,20 +2309,30 @@
 
 
 <h1 id="evidence-and-verification">Evidence and verification<a class="headerlink" href="#evidence-and-verification" title="Permanent link">&para;</a></h1>
-<p><code>invarlock evaluate</code> publishes one closed evidence directory governed by
+<p>For native exact-match/NLL and deterministic-extension run/import requests,
+<code>invarlock evaluate</code> publishes one closed
+evidence directory governed by
 <a href="https://github.com/invarlock/invarlock/blob/main/contracts/evidence_pack.schema.json"><code>contracts/evidence_pack.schema.json</code></a>.
 The bundle is the portable machine record; a signed verification receipt is the
 independent acceptance record.</p>
-<div class="admonition tip">
-<p class="admonition-title">User guide</p>
+<blockquote>
+<p><strong>User guide</strong></p>
 <p><strong>Outcome:</strong> Verify an immutable evidence bundle against independent
-anchors, validate its signed receipt, and render a human-readable report.</p>
+anchors, validate its signed receipt, and render an evidence report.</p>
 <p><strong>Audience:</strong> Verifier operators, decision owners, and downstream receipt
 verifiers deciding whether to rely on one evidence transaction.</p>
 <p><strong>Prerequisites:</strong> A complete evidence directory, independently obtained
 policy, runtime digests and evidence-signer fingerprint, plus an independently
 selected verifier key and identity when issuing a receipt.</p>
-</div>
+</blockquote>
+<p>For captured v2 packs, use the <a href="../captured-results/">captured-results guide</a>
+for independent run/request pins and captured receipt scope. The native
+artifact, schedule, and runtime bindings below do not apply to that family.
+Native and captured <code>metric: judge</code> requests instead use
+<a href="../../reference/judge-measurements/">judge evidence and recipient policies</a>.
+Native judge evidence retains its original runtime capture; imported frozen
+answers retain their narrower provenance. Select the matching verifier and
+receipt contract rather than treating all evidence directories as pack v1.</p>
 <h2 id="artifact-lifecycle-at-a-glance">Artifact lifecycle at a glance<a class="headerlink" href="#artifact-lifecycle-at-a-glance" title="Permanent link">&para;</a></h2>
 <div class="codehilite"><pre><span></span><code>closed request
     |
@@ -2295,9 +2501,14 @@ verifier's policy digest does not equal the policy bound into this evidence
 version, verification rejects the bundle instead of silently reinterpreting it.
 Applying different policy bytes requires a new evidence transaction.</p>
 <h2 id="read-the-verification-result">Read the verification result<a class="headerlink" href="#read-the-verification-result" title="Permanent link">&para;</a></h2>
+<p>Text output separates evidence integrity from the policy decision. A replayed
+policy rejection includes observed and required values for failed checks and
+the signed receipt path. Evidence, receipt and HTML paths remain complete
+logical lines even on narrow terminals. A readable report or an existing
+receipt file alone does not establish acceptance.</p>
 <p>Use <code>--json</code> in automation. A successful result includes the core verifier
 fields plus the receipt path and verifier identity. Check the structured
-meaning rather than a human substring:</p>
+fields instead of matching fragments of terminal output:</p>
 <div class="codehilite"><pre><span></span><code><span class="p">{</span>
 <span class="w">  </span><span class="nt">&quot;ok&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">&quot;integrity_ok&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
@@ -2354,6 +2565,7 @@ details. Treat the example as a field guide, not a replacement schema.</p>
 <ul>
 <li>the evidence manifest digest;</li>
 <li>external policy digest;</li>
+<li>baseline and subject artifact anchors and canonical schedule anchor;</li>
 <li>baseline and subject runtime anchors;</li>
 <li>expected evidence-signer fingerprint;</li>
 <li>the normalized-request anchor when either side uses <code>llama_cpp</code>;</li>
@@ -2376,6 +2588,11 @@ bindings without adding a fourth CLI command:</p>
     <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;verification.receipt.json&quot;</span><span class="p">),</span>
     <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;evidence&quot;</span><span class="p">),</span>
     <span class="n">policy_path</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;trusted/acceptance.json&quot;</span><span class="p">),</span>
+    <span class="n">expected_artifact_digests</span><span class="o">=</span><span class="p">{</span>
+        <span class="s2">&quot;baseline&quot;</span><span class="p">:</span> <span class="s2">&quot;sha256:&quot;</span> <span class="o">+</span> <span class="s2">&quot;5&quot;</span> <span class="o">*</span> <span class="mi">64</span><span class="p">,</span>
+        <span class="s2">&quot;subject&quot;</span><span class="p">:</span> <span class="s2">&quot;sha256:&quot;</span> <span class="o">+</span> <span class="s2">&quot;6&quot;</span> <span class="o">*</span> <span class="mi">64</span><span class="p">,</span>
+    <span class="p">},</span>
+    <span class="n">expected_schedule_digest</span><span class="o">=</span><span class="s2">&quot;sha256:&quot;</span> <span class="o">+</span> <span class="s2">&quot;7&quot;</span> <span class="o">*</span> <span class="mi">64</span><span class="p">,</span>
     <span class="n">expected_runtime_digests</span><span class="o">=</span><span class="p">{</span>
         <span class="s2">&quot;baseline&quot;</span><span class="p">:</span> <span class="s2">&quot;sha256:&quot;</span> <span class="o">+</span> <span class="s2">&quot;1&quot;</span> <span class="o">*</span> <span class="mi">64</span><span class="p">,</span>
         <span class="s2">&quot;subject&quot;</span><span class="p">:</span> <span class="s2">&quot;sha256:&quot;</span> <span class="o">+</span> <span class="s2">&quot;2&quot;</span> <span class="o">*</span> <span class="mi">64</span><span class="p">,</span>
@@ -2387,11 +2604,22 @@ bindings without adding a fourth CLI command:</p>
 
 <span class="k">if</span> <span class="ow">not</span> <span class="n">verification</span><span class="o">.</span><span class="n">ok</span><span class="p">:</span>
     <span class="k">raise</span> <span class="ne">SystemExit</span><span class="p">(</span><span class="s2">&quot;; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">verification</span><span class="o">.</span><span class="n">errors</span><span class="p">))</span>
+<span class="k">assert</span> <span class="n">verification</span><span class="o">.</span><span class="n">statement</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+<span class="k">if</span> <span class="ow">not</span> <span class="n">verification</span><span class="o">.</span><span class="n">statement</span><span class="p">[</span><span class="s2">&quot;verdict&quot;</span><span class="p">][</span><span class="s2">&quot;ok&quot;</span><span class="p">]:</span>
+    <span class="k">raise</span> <span class="ne">SystemExit</span><span class="p">(</span><span class="s2">&quot;authenticated receipt records a rejection&quot;</span><span class="p">)</span>
 </code></pre></div>
 
-<p>The function binds the receipt to the supplied pack manifest, policy bytes,
-runtime digests, evidence-signer fingerprint, verifier identity, and verifier
-fingerprint. It does not discover authorization from the receipt itself.</p>
+<p>The placeholders must come from independently maintained trust configuration.
+The function binds the receipt to the supplied pack manifest, policy bytes,
+artifact and schedule digests, runtime digests, evidence-signer fingerprint,
+verifier identity, and verifier fingerprint. It does not discover authorization
+from the receipt itself. Its <code>ok</code> authenticates the statement, including an
+authentic rejection; separately require <code>statement.verdict.ok</code> for acceptance.</p>
+<p>Supply <code>expected_request_digest</code> when validating a v2 native receipt, including
+GGUF evidence. When receipt issuance used a trust profile, also supply its
+independently obtained <code>expected_trust_profile_digest</code>. Omitting that argument
+expects a receipt with no recorded profile digest, as produced with explicit
+trust options; it does not disable the profile check.</p>
 <h2 id="report-semantics">Report semantics<a class="headerlink" href="#report-semantics" title="Permanent link">&para;</a></h2>
 <div class="codehilite"><pre><span></span><code>invarlock<span class="w"> </span>report<span class="w"> </span>artifacts/evidence/
 invarlock<span class="w"> </span>report<span class="w"> </span>artifacts/evidence/<span class="w"> </span>--html<span class="w"> </span>evidence.html<span class="w"> </span>--explain
@@ -2419,9 +2647,20 @@ signature before rendering. It shows:</p>
 <li>policy digest; and</li>
 <li>evidence-signer fingerprint.</li>
 </ul>
+<p>The HTML starts with the recorded policy decision and named baseline and
+subject. Each configured check shows its own status; expandable sections hold
+exact values, identities and technical details. Display rounding does not
+change the underlying evidence. The self-contained report works offline.
+<code>report --json</code> returns rendering status. Default and HTML-only native calls
+retain the v1 JSON shape; adding <code>--markdown</code> or <code>--junit</code> selects v2 with
+requested, written, and failed output details. All destinations are no-clobber
+and must remain outside evidence. A successful render exits <code>0</code> for both
+passing and failing recorded policies. See the
+<a href="../../reference/reports/">report reference</a> for output contracts and partial-write
+recovery.</p>
 <p>The report verifies the embedded signature without pinning that signer to an
 independent allowlist, and it does not validate a verification receipt. Treat
-it as a human view of signed evidence, not as the independent acceptance result.</p>
+it as a summary of signed evidence, not as the independent acceptance result.</p>
 <p>Use the report to answer presentation questions:</p>
 <ul>
 <li>Which artifacts, built-in metric or scorer, schedule size, and evidence
@@ -2455,6 +2694,8 @@ InvarLock's internal verification.</p>
 <p>The verifier obtains elsewhere:</p>
 <ul>
 <li>the policy file;</li>
+<li>expected baseline and subject artifact-identity digests;</li>
+<li>expected canonical schedule digest;</li>
 <li>expected baseline and subject runtime digests;</li>
 <li>expected evidence-signer fingerprint;</li>
 <li>expected normalized-request digest when either side uses <code>llama_cpp</code>;</li>
@@ -2463,8 +2704,11 @@ InvarLock's internal verification.</p>
 </ul>
 <p>The receipt verifier obtains elsewhere:</p>
 <ul>
-<li>expected verifier identity and fingerprint; and</li>
-<li>the same policy, runtime, and evidence-signer anchors named by the receipt.</li>
+<li>expected verifier identity and fingerprint;</li>
+<li>the same policy, artifact, schedule, runtime, and evidence-signer anchors
+  named by the receipt; and</li>
+<li>the request anchor for a v2 native receipt and, when required, the expected
+  verifier trust-profile digest.</li>
 </ul>
 <p>After transport, rerun receipt validation against the received evidence and
 anchors. Do not rely solely on a successful check performed before transfer.</p>
@@ -2489,7 +2733,8 @@ anchors. Do not rely solely on a successful check performed before transfer.</p>
 <li>the command exited with the expected status;</li>
 <li>a signed receipt exists outside the bundle;</li>
 <li>the receipt verifier identity and fingerprint match an independent registry;</li>
-<li>policy and both runtime anchors came from the decision authority;</li>
+<li>policy, artifact, schedule, and both runtime anchors came from the decision
+  authority;</li>
 <li>the evidence-signer fingerprint was pinned independently;</li>
 <li>no verification error was waived;</li>
 <li>the metric and threshold match the intended claim; and</li>
@@ -2554,7 +2799,7 @@ anchors. Do not rely solely on a successful check performed before transfer.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "navigation.sections", "navigation.expand", "navigation.tabs", "navigation.top", "search.highlight", "search.suggest", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
         <script src="../../assets/javascripts/mathjax.js"></script>
       

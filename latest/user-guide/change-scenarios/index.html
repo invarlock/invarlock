@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://invarlock.github.io/invarlock/user-guide/change-scenarios/">
       
       
-        <link rel="prev" href="../getting-started/">
+        <link rel="prev" href="../modelkit-handoff/">
       
       
         <link rel="next" href="../key-management/">
@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/invarlock-app-icon.svg">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -436,6 +436,90 @@
     
   
     Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../captured-results/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Captured results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hosted-service-requalification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosted-service requalification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modelkit-handoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ModelKit recipient handoff
   
 
     
@@ -1262,6 +1346,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../reference/evaluation-records/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation records
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/evaluation-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation capacity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../reference/compatibility/" class="md-nav__link">
         
   
@@ -1438,6 +1578,62 @@
     
   
     Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/judge-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Judge measurements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/evidence-sets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence sets
   
 
     
@@ -1928,18 +2124,18 @@ the same paired schedule, applies a named policy, and creates evidence another
 party can verify independently. The system that trained, pruned, quantized,
 converted, or compiled the subject remains responsible for creating that
 artifact.</p>
-<div class="admonition tip">
-<p class="admonition-title">User guide</p>
+<blockquote>
+<p><strong>User guide</strong></p>
 <p><strong>In plain language:</strong> Create the candidate with the tool you already use,
 then give InvarLock the immutable before-and-after artifacts or complete
 per-record results.</p>
 <p><strong>Outcome:</strong> A signed comparison bundle, an independently signed
-verification receipt, and a human-readable report.</p>
+verification receipt, and an evidence report.</p>
 <p><strong>Audience:</strong> Model adaptation, runtime, evaluation, and release teams.</p>
 <p><strong>Prerequisites:</strong> Stable record IDs, a representative paired schedule, a
 policy, and independently managed artifact, runtime, signer, and policy
 identities.</p>
-</div>
+</blockquote>
 <h2 id="choose-the-execution-boundary">Choose the execution boundary<a class="headerlink" href="#choose-the-execution-boundary" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -1981,9 +2177,14 @@ identities.</p>
 <td>Optional <a href="https://github.com/invarlock/invarlock/tree/main/addins/tensorrt_llm"><code>invarlock-runtime-tensorrt-llm</code></a> package</td>
 </tr>
 <tr>
-<td>Complete per-record results from a harness or endpoint</td>
-<td>Import mode</td>
+<td>Complete InvarLock provider sidecars produced by a harness</td>
+<td>Native import mode</td>
 <td>Runtime-import authoring API and closed request contract; <a href="https://github.com/invarlock/invarlock/tree/main/examples/integrations/lm-evaluation-harness">runnable LM Evaluation Harness journey</a></td>
+</tr>
+<tr>
+<td>Evaluator exports or hosted endpoint captures</td>
+<td>Captured mode</td>
+<td><a href="../captured-results/">Captured results</a>, with complete-run pins and captured assurance</td>
 </tr>
 </tbody>
 </table>
@@ -2007,28 +2208,36 @@ the subject; InvarLock does not rebuild it from its source checkpoint.</p>
                 independent verify → report
 </code></pre></div>
 
-<p>Configuration, lineage, throughput, memory, sparsity, and similar facts can be
-attached as authenticated observations. They do not influence acceptance
-unless a versioned policy and replayable scorer explicitly authorize them.</p>
+<p>Native requests can attach configuration, lineage, throughput, memory, sparsity,
+and similar facts as authenticated observations. Observation payloads have no
+acceptance authority; the selected scorer and its policy use their own
+authenticated inputs.</p>
 <h2 id="select-a-metric-that-matches-the-task">Select a metric that matches the task<a class="headerlink" href="#select-a-metric-that-matches-the-task" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Use exact match for closed-answer tasks. InvarLock reports paired regressions,
-  paired improvements, effect size, an interval, and McNemar's exact test.</li>
+<li>Use exact match for closed-answer tasks. Native pack-v1 reports include paired
+  regressions, paired improvements, effect size, an interval, and McNemar's exact
+  test. Captured exact-match comparisons report the effect and interval without
+  those discordance counts or McNemar probability.</li>
 <li>Use normalized NLL for expected-continuation likelihood. It does not measure
   general model quality. When tokenizers and target-token accounting are
-  comparable, the report renders perplexity ratio as a derived interpretation,
-  not a second acceptance metric.</li>
-<li>Use a verifier-replayable scorer extension for task-specific F1, structured
-  extraction, VQA normalization, or another deterministic text score computed
-  only from authenticated record facts.</li>
-<li>Keep model-judge results as authenticated observations until the judge,
-  prompt, references, and calibration have an independently verifiable
-  acceptance contract.</li>
+  comparable, native pack-v1 reports render perplexity ratio as a derived
+  interpretation, not a second acceptance metric. Captured NLL reports retain
+  the mean ratio and its interval without that perplexity interpretation.</li>
+<li>Use a verifier-replayable native scorer extension for task-specific F1,
+  structured extraction, VQA normalization, or another deterministic text score
+  computed only from authenticated record facts.</li>
+<li>Use the built-in <code>judge</code> scorer and <a href="../evaluation-request/#judge">native judge workflow</a>
+  when fixed answers, a declared
+  rubric, a supported text judge, repeated ratings, and independent-unit
+  analysis fit the decision. Keep other model-judge results as authenticated
+  observations.</li>
 </ul>
 <h2 id="prepare-a-meaningful-paired-schedule">Prepare a meaningful paired schedule<a class="headerlink" href="#prepare-a-meaningful-paired-schedule" title="Permanent link">&para;</a></h2>
-<p>Every conclusion is limited by its schedule. Baseline and subject must use the
-same stable IDs in the same order. Select records from the real task
-distribution, record the source revision and selection method, and include
+<p>Every conclusion is limited by its schedule. Native baseline and subject
+observations must use the same stable IDs in schedule order. Captured
+deterministic comparisons require identical ID sets and matching input,
+reference and metadata facts; they pair records in sorted ID order. Select
+records from the real task distribution, record the source revision and selection method, and include
 important subgroups.</p>
 <p>A small tutorial can prove that integration code works; it cannot support a
 release conclusion. The maintained public qualification suites use 400
@@ -2055,9 +2264,10 @@ to the verifier, and provide expected identities through a separate channel:</p>
 </code></pre></div>
 
 <p>Import mode uses the same public transaction without runtime-image arguments.
-It accepts complete per-record results with stable IDs, not aggregate scores.
-The verifier recomputes the named built-in or extension score from those
-records.</p>
+It requires complete provider sidecars and paired records, not aggregate scores.
+For evaluator exports and hosted captures, use captured mode and its independent
+run/request pins. Deterministic scorers replay retained facts; judge verification
+replays admitted ratings and analysis without calling the judge again.</p>
 <h2 id="interpret-the-outcome">Interpret the outcome<a class="headerlink" href="#interpret-the-outcome" title="Permanent link">&para;</a></h2>
 <p>A passing receipt says that the named subject met the named policy relative to
 the named baseline on the authenticated paired schedule under the recorded
@@ -2148,7 +2358,7 @@ beside their implementations.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "navigation.sections", "navigation.expand", "navigation.tabs", "navigation.top", "search.highlight", "search.suggest", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
         <script src="../../assets/javascripts/mathjax.js"></script>
       

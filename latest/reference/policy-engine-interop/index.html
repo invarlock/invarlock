@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/invarlock-app-icon.svg">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -433,6 +433,90 @@
     
   
     Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/captured-results/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Captured results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/hosted-service-requalification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosted-service requalification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/modelkit-handoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ModelKit recipient handoff
   
 
     
@@ -1138,6 +1222,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../evaluation-records/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation records
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluation-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation capacity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../compatibility/" class="md-nav__link">
         
   
@@ -1258,6 +1398,17 @@
     <span class="md-ellipsis">
       
         Data flow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#convert-and-evaluate-an-envelope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Convert and evaluate an envelope
       
     </span>
   </a>
@@ -1394,6 +1545,62 @@
     
   
     Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../judge-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Judge measurements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evidence-sets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence sets
   
 
     
@@ -1793,6 +2000,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#convert-and-evaluate-an-envelope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Convert and evaluate an envelope
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#conformance-fixtures" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1835,22 +2053,21 @@
 
 
 <h1 id="policy-engine-interoperability">Policy-engine interoperability<a class="headerlink" href="#policy-engine-interoperability" title="Permanent link">&para;</a></h1>
-<p>The maintained policy-engine example demonstrates that a recipient can
-authenticate an InvarLock acceptance envelope and apply current policy without
-an InvarLock service or policy-engine plugin.</p>
-<div class="admonition info">
-<p class="admonition-title">Reference</p>
-<ul>
-<li><strong>Surface:</strong> Standalone DSSE verification followed by OPA/Rego or CUE
-  recipient-policy evaluation</li>
-<li><strong>Stability:</strong> Maintained example over the acceptance v2 predicate and
-  <code>invarlock/acceptance-policy-input-v1</code></li>
-<li><strong>Use this page when:</strong> Consuming an acceptance attestation without an
-  InvarLock service or policy-engine plugin</li>
-</ul>
-</div>
+<p>The maintained policy-engine example demonstrates signature verification and a
+bounded set of recipient-policy checks without an InvarLock service or
+policy-engine plugin. It is not the full recipient-acceptance verifier.</p>
+<blockquote>
+<p><strong>Reference</strong></p>
+<p><strong>Surface:</strong> Standalone DSSE verification followed by OPA/Rego or CUE
+evaluation of the example's recipient-policy subset</p>
+<p><strong>Stability:</strong> Maintained example over the acceptance v2 predicate and
+<code>invarlock/acceptance-policy-input-v1</code></p>
+<p><strong>Use this page when:</strong> Studying standalone acceptance-envelope authentication
+and external policy-engine integration</p>
+</blockquote>
 <h2 id="data-flow">Data flow<a class="headerlink" href="#data-flow" title="Permanent link">&para;</a></h2>
 <div class="codehilite"><pre><span></span><code>acceptance.dsse.json + envelope-signer public key
+recipient policy + expected subject name/digest + evaluation time
                   |
                   v
 standalone DSSE and receipt verification
@@ -1865,7 +2082,8 @@ invarlock/acceptance-policy-input-v1
 
 <p>The standalone verifier checks:</p>
 <ul>
-<li>canonical envelope, Statement, and embedded receipt representations;</li>
+<li>strict envelope structure and canonical Statement and embedded receipt
+  representations;</li>
 <li>the DSSE payload type, key ID, Ed25519 signature, and public-key
   fingerprint;</li>
 <li>the embedded receipt digest, public key, Ed25519 signature, verifier
@@ -1874,13 +2092,42 @@ invarlock/acceptance-policy-input-v1
   signer projections.</li>
 </ul>
 <p>OPA and CUE then enforce the expected predicate type and subject, allowed
-InvarLock release contract, active envelope signer and receipt verifier,
-attestation freshness, and required technical verdict.</p>
+InvarLock release contract, an active matching envelope signer and receipt
+verifier, envelope freshness, and required technical verdict. Only native
+receipt v1/v2 formats are supported; captured and judge receipts are not.</p>
+<h2 id="convert-and-evaluate-an-envelope">Convert and evaluate an envelope<a class="headerlink" href="#convert-and-evaluate-an-envelope" title="Permanent link">&para;</a></h2>
+<p>Run from the repository root with Python's <code>cryptography</code> package and the pinned
+OPA/CUE executables installed. Obtain recipient policy, expected subject identity
+and evaluation time independently of the submitted envelope. The subject digest
+below is lowercase SHA-256 hexadecimal without the <code>sha256:</code> prefix.</p>
+<div class="codehilite"><pre><span></span><code><span class="nb">set</span><span class="w"> </span>-e
+python<span class="w"> </span>examples/policy-engine-interop/verify_envelope.py<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--envelope<span class="w"> </span>acceptance.dsse.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--envelope-key<span class="w"> </span>envelope-signer.public.pem<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--recipient-policy<span class="w"> </span>recipient-policy.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--expected-subject-name<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">EXPECTED_SUBJECT_NAME</span><span class="p">:?Set the approved subject name</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--expected-subject-sha256<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">EXPECTED_SUBJECT_SHA256</span><span class="p">:?Set the approved subject digest</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--now<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">EVALUATION_TIME</span><span class="p">:?Set the recipient evaluation time with a timezone</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>&gt;<span class="w"> </span>policy-input.json
+
+opa<span class="w"> </span><span class="nb">eval</span><span class="w"> </span>--format<span class="w"> </span>raw<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--data<span class="w"> </span>examples/policy-engine-interop/policy/acceptance.rego<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--input<span class="w"> </span>policy-input.json<span class="w"> </span>data.invarlock.acceptance.decision
+
+cue<span class="w"> </span>vet<span class="w"> </span>examples/policy-engine-interop/policy/acceptance.cue<span class="w"> </span>policy-input.json
+</code></pre></div>
+
+<p>Continue to policy evaluation only if conversion succeeds, and protect the
+generated input from modification before consumption. OPA returns an <code>allow</code>
+boolean and reason codes; a successful <code>opa eval</code> exit alone does not mean
+<code>allow: true</code>. CUE exits successfully when the input satisfies the example's
+constraints. Neither result establishes checks outside this example's scope.</p>
 <h2 id="conformance-fixtures">Conformance fixtures<a class="headerlink" href="#conformance-fixtures" title="Permanent link">&para;</a></h2>
 <p>The committed corpus covers positive, policy-rejected, tampered-subject,
-untrusted-signer, stale-evidence, and unsupported-contract inputs. OPA returns
-an explicit allow/deny decision with reason codes. CUE treats the same positive
-input as valid and rejects all five negative inputs.</p>
+untrusted-signer, stale-envelope, and unsupported-contract inputs. The fixture
+named <code>stale-evidence</code> changes envelope age, not receipt-authenticated evidence
+age. OPA returns an explicit allow/deny decision with reason codes. CUE treats
+the same positive input as valid and rejects all five negative inputs.</p>
 <div class="codehilite"><pre><span></span><code>make<span class="w"> </span>acceptance-policy-interop
 </code></pre></div>
 
@@ -1893,9 +2140,15 @@ for pinned installation commands.</p>
 perform raw Ed25519 verification. This division is explicit in the example and
 its tests. The verifier is a local reference executable, not an InvarLock
 service or hidden plugin.</p>
-<p>The result answers whether a portable historical technical decision is
-acceptable under current recipient policy. It does not replay the complete
-evidence pack. Use <code>invarlock verify</code> for full technical replay.</p>
+<p>The example does not enforce every field of the full recipient policy. It omits
+receipt-authenticated evidence age, clock-skew allowance, the receipt trust-profile
+pin, countersigning restrictions, and duplicate-free, exactly-one signer lookup.
+Its receipt-to-predicate checks cover verdict and signer projections, not all
+artifact, schedule, policy and contract bindings checked by the full verifier.
+Passing the example therefore does not establish full recipient acceptance.</p>
+<p>Use the <a href="../acceptance-attestations/">acceptance-attestation verifier</a> for the
+complete portable recipient contract. That verifier is itself distinct from
+replaying the complete evidence pack with <code>invarlock verify</code>.</p>
 
 
 
@@ -1954,7 +2207,7 @@ evidence pack. Use <code>invarlock verify</code> for full technical replay.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "navigation.sections", "navigation.expand", "navigation.tabs", "navigation.top", "search.highlight", "search.suggest", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
         <script src="../../assets/javascripts/mathjax.js"></script>
       

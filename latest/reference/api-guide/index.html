@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/invarlock-app-icon.svg">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -433,6 +433,90 @@
     
   
     Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/captured-results/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Captured results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/hosted-service-requalification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosted-service requalification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/modelkit-handoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ModelKit recipient handoff
   
 
     
@@ -1138,6 +1222,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../evaluation-records/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation records
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluation-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation capacity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../compatibility/" class="md-nav__link">
         
   
@@ -1456,6 +1596,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Verify a signed receipt">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#judge-verification-results-and-receipts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Judge verification results and receipts
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1543,6 +1700,62 @@
     
   
     Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../judge-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Judge measurements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evidence-sets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence sets
   
 
     
@@ -2077,6 +2290,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Verify a signed receipt">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#judge-verification-results-and-receipts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Judge verification results and receipts
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2136,14 +2366,12 @@
 <p>Applications embed InvarLock through <code>invarlock.engine</code>. This module is the
 stable facade for the paired evaluation engine. Modules that encode or decode
 individual bundle files remain internal unless explicitly documented.</p>
-<div class="admonition info">
-<p class="admonition-title">Reference</p>
-<ul>
-<li><strong>Surface:</strong> Python facade exported by <code>invarlock.engine</code></li>
-<li><strong>Stability:</strong> Stable public API; undocumented <code>invarlock.*</code> imports remain internal</li>
-<li><strong>Use this page when:</strong> Embedding evaluate, verify, report, request loading, receipt verification, or provider-ABI types in Python</li>
-</ul>
-</div>
+<blockquote>
+<p><strong>Reference</strong></p>
+<p><strong>Surface:</strong> Python facade exported by <code>invarlock.engine</code></p>
+<p><strong>Stability:</strong> Stable public API; undocumented <code>invarlock.*</code> imports remain internal</p>
+<p><strong>Use this page when:</strong> Embedding evaluate, verify, report, request loading, receipt verification, or provider-ABI types in Python</p>
+</blockquote>
 <h2 id="stable-exports">Stable exports<a class="headerlink" href="#stable-exports" title="Permanent link">&para;</a></h2>
 <p>The facade deliberately groups these stable surfaces:</p>
 <table>
@@ -2156,11 +2384,23 @@ individual bundle files remain internal unless explicitly documented.</p>
 <tbody>
 <tr>
 <td>Transactions</td>
-<td><code>evaluate_request_file</code>, <code>verify_evidence</code>, <code>render_evidence</code>, <code>verify_signed_verification_receipt</code>, <code>write_acceptance_attestation</code>, <code>verify_acceptance_attestation</code></td>
+<td><code>evaluate_request_file</code>, <code>verify_evidence</code>, <code>render_evidence</code>, native/captured receipt verification, judge verification and signed judge receipts, acceptance attestations</td>
 </tr>
 <tr>
 <td>Request</td>
 <td><code>load_evaluation_request</code>, <code>EvaluationRequest</code>, <code>EvaluationRequestError</code></td>
+</tr>
+<tr>
+<td>Captured authoring</td>
+<td><code>CapturedEvaluationRequest</code>, <code>make_run</code>, <code>load_run</code>, <code>write_run</code>, <code>run_digest</code>, <code>physical_file_digest</code>, <code>freeze_case_set</code>, <code>case_set_digest</code>, <code>validate_run_case_set</code>, <code>compare_runs</code>, <code>comparison_policy_digest</code>, <code>normalize_captured_request</code>, <code>captured_request_digest</code>, <code>EvaluationRecordsError</code>, <code>DEFAULT_MAX_BOOTSTRAP_DRAWS</code></td>
+</tr>
+<tr>
+<td>Evaluator scorer inputs</td>
+<td><code>CapturedSourceRequest</code>, <code>CapturedJudgeRequest</code>, <code>capture_evaluator_run</code>, <code>evaluator_input_capabilities</code>, <code>prepare_evaluator_judge</code>, <code>import_judge_sources</code></td>
+</tr>
+<tr>
+<td>Trust profiles</td>
+<td><code>load_trust_inputs</code>, <code>TrustInputs</code>, <code>CapturedTrustInputs</code>, <code>TrustInputsError</code></td>
 </tr>
 <tr>
 <td>Results and errors</td>
@@ -2190,11 +2430,20 @@ individual bundle files remain internal unless explicitly documented.</p>
 <td>HF identity</td>
 <td><code>checkpoint_tree_sha256</code>, <code>hf_tokenizer_contract_sha256</code></td>
 </tr>
+<tr>
+<td>Captured subject identity</td>
+<td><code>digest</code>, <code>validate_service_identity</code>, <code>evaluated_subject_digest</code></td>
+</tr>
 </tbody>
 </table>
 <p>Imports from other <code>invarlock.*</code> modules are not stable merely because they are
 importable. Use the facade unless implementing the provider protocol documented
 in <a href="../runtime-providers/">Runtime providers</a>.</p>
+<p>The captured evaluation helpers are part of the documented SDK for
+captured-result comparisons. They expose normalized run construction and loading,
+multi-metric comparison, evidence publication, independent verification, and
+scoped receipt handling through the same evaluation transaction surface. Their
+evidence and recorded-score semantics are described in <a href="../evaluation-records/">evaluation records</a>.</p>
 <h2 id="transactions">Transactions<a class="headerlink" href="#transactions" title="Permanent link">&para;</a></h2>
 <div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
 
@@ -2220,6 +2469,10 @@ in <a href="../runtime-providers/">Runtime providers</a>.</p>
     <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;request.yaml&quot;</span><span class="p">),</span>
     <span class="n">signing_key_path</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;keys/evidence-signer.pem&quot;</span><span class="p">),</span>
     <span class="n">runtime_executor</span><span class="o">=</span><span class="n">OciRuntimeExecutor</span><span class="p">(</span><span class="n">launch_from_environment</span><span class="p">()),</span>
+    <span class="n">runtime_image_digests</span><span class="o">=</span><span class="p">{</span>
+        <span class="s2">&quot;baseline&quot;</span><span class="p">:</span> <span class="s2">&quot;sha256:&quot;</span> <span class="o">+</span> <span class="s2">&quot;1&quot;</span> <span class="o">*</span> <span class="mi">64</span><span class="p">,</span>
+        <span class="s2">&quot;subject&quot;</span><span class="p">:</span> <span class="s2">&quot;sha256:&quot;</span> <span class="o">+</span> <span class="s2">&quot;2&quot;</span> <span class="o">*</span> <span class="mi">64</span><span class="p">,</span>
+    <span class="p">},</span>
 <span class="p">)</span>
 
 <span class="n">verification</span> <span class="o">=</span> <span class="n">verify_evidence</span><span class="p">(</span>
@@ -2259,6 +2512,10 @@ in <a href="../runtime-providers/">Runtime providers</a>.</p>
 <span class="k">assert</span> <span class="n">receipt_check</span><span class="o">.</span><span class="n">ok</span>
 </code></pre></div>
 
+<p>Replace the illustrative anchors with independently approved values. Before a
+run, inspect both selected images with Docker or Podman and supply those exact
+local identities in <code>runtime_image_digests</code>; the executor cannot provide its own
+trust inputs. This example is for native deterministic evidence.</p>
 <p>The result types are:</p>
 <table>
 <thead>
@@ -2274,7 +2531,7 @@ in <a href="../runtime-providers/">Runtime providers</a>.</p>
 </tr>
 <tr>
 <td><code>EvaluationTransactionResult</code></td>
-<td><code>evidence_path</code>, <code>comparison_id</code>, <code>pack_manifest_digest</code>, <code>as_json()</code></td>
+<td><code>evidence_path</code>, <code>comparison_id</code>, <code>pack_manifest_digest</code>, optional <code>policy_verdict</code>, <code>as_json()</code></td>
 </tr>
 <tr>
 <td><code>EvidenceVerification</code></td>
@@ -2282,14 +2539,40 @@ in <a href="../runtime-providers/">Runtime providers</a>.</p>
 </tr>
 <tr>
 <td><code>EvidenceReport</code></td>
-<td><code>text</code>, <code>html_path</code>, <code>evidence_signer</code></td>
+<td><code>text</code>, <code>html_path</code>, <code>evidence_signer</code>, <code>pack_manifest_digest</code>, <code>observations</code></td>
+</tr>
+<tr>
+<td><code>EvidenceReportV2</code></td>
+<td><code>text</code>, <code>kind</code>, <code>pack_manifest_digest</code>, <code>requested_outputs</code>, <code>written_outputs</code>, <code>failed_output</code>, <code>errors</code>, <code>as_json()</code></td>
+</tr>
+<tr>
+<td><code>CapturedEvaluationPreflightResult</code></td>
+<td><code>requested_authentication</code>, run/policy/request digests, record/scope counts, required/allowed draws, <code>output</code>, <code>checks</code>, <code>as_json()</code></td>
+</tr>
+<tr>
+<td><code>CapturedEvaluationTransactionResult</code></td>
+<td><code>evidence_path</code>, <code>comparison_id</code>, run/policy/request/manifest digests, <code>authentication</code>, <code>policy_verdict</code>, <code>as_json()</code></td>
 </tr>
 <tr>
 <td><code>ReceiptVerification</code></td>
 <td><code>ok</code>, <code>signed</code>, <code>statement</code>, <code>verifier_fingerprint</code>, <code>errors</code></td>
 </tr>
+<tr>
+<td><code>JudgeVerificationResult</code></td>
+<td><code>authenticated</code>, <code>replayed</code>, <code>verified</code>, <code>accepted</code>, decision, policy/evidence bindings, errors</td>
+</tr>
+<tr>
+<td><code>JudgeReceiptVerification</code></td>
+<td><code>ok</code>, <code>signed</code>, authenticated <code>statement</code>, embedded local <code>result</code>, verifier fingerprint, errors</td>
+</tr>
 </tbody>
 </table>
+<p><code>EvaluationTransactionResult.policy_verdict</code> is optional presentation metadata
+from publication. It is not added to <code>as_json()</code> and does not establish
+recipient acceptance. Use independent verification for that decision.
+<code>EvidenceReport.text</code> is Markdown presentation content; console and HTML
+layouts are not stable parsing interfaces. Use canonical evidence and verifier
+payloads for automation.</p>
 <p><code>EvaluationPreflightError</code>, <code>EvaluationTransactionError</code>,
 <code>EvidenceVerificationError</code>, and <code>EvidenceReportError</code> carry CLI-compatible
 <code>exit_code</code> values. The first three also expose machine-readable JSON behavior.
@@ -2298,15 +2581,21 @@ Applications should treat every exception or verification payload with
 <p><code>EvidenceReceiptError</code> is also exported for failures that prevent safe receipt
 processing. Ordinary receipt authenticity or anchor mismatches are reported in
 <code>ReceiptVerification.errors</code> with <code>ok</code> set to false.</p>
-<p><code>render_evidence</code> authenticates the bundle's internal evidence signature but
-does not take independent artifact, schedule, policy, runtime, or signer
-anchors. Call <code>verify_evidence</code> when an independent acceptance decision is
-required.</p>
+<p>For native and captured directory packs, <code>render_evidence</code> checks the closed
+bundle and authenticates its internal evidence signature when the manifest
+declares signed authentication. Unsigned captured packs retain their explicit
+local assurance label. Judge rendering validates envelope structure and replays
+measurements; it does not authenticate the envelope signature. Rendering does not
+take independent artifact, schedule, policy, runtime, run, request, or signer
+anchors. For independent acceptance in Python, call <code>verify_evidence</code> for native
+deterministic or captured v2 packs and <code>verify_judge_evidence_with_policy</code> for
+judge evidence. The CLI dispatches both through <code>invarlock verify</code> with the
+corresponding recipient trust inputs.</p>
 <h2 id="external-evaluator-qualification">External evaluator qualification<a class="headerlink" href="#external-evaluator-qualification" title="Permanent link">&para;</a></h2>
 <p>The stable SDK accepts a normalized export from any open or proprietary
 evaluator. The caller owns evaluator execution and native-output parsing;
 InvarLock owns closed-contract validation, digest binding, schedule matching,
-and deterministic exact-match replay.</p>
+and replay of the supported deterministic metric declared by the profile.</p>
 <div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.engine</span><span class="w"> </span><span class="kn">import</span> <span class="n">qualify_evaluator_export</span>
@@ -2324,7 +2613,7 @@ and deterministic exact-match replay.</p>
     <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">runtime_records</span><span class="p">()</span> <span class="o">==</span> <span class="p">()</span>
 </code></pre></div>
 
-<p><code>runtime_records()</code> never exposes records for aggregate-only, human-review,
+<p><code>runtime_records()</code> never exposes records for aggregate-only, externally rated,
 nondeterministic-judge, or unsupported-replay profiles. See <a href="../evaluator-qualification/">Evaluator
 qualification</a> for the contracts, private
 evaluator path, and maintained matrix.</p>
@@ -2344,29 +2633,37 @@ the TypeURI, canonical serialization, signer relationship, and reference
 policy.</p>
 <h2 id="function-signatures">Function signatures<a class="headerlink" href="#function-signatures" title="Permanent link">&para;</a></h2>
 <div class="codehilite"><pre><span></span><code><span class="n">evaluate_request_file</span><span class="p">(</span>
-    <span class="n">request_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="n">request_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="n">EvaluationRequest</span> <span class="o">|</span> <span class="n">CapturedEvaluationRequest</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
     <span class="n">signing_key_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">resource_resolver</span><span class="p">:</span> <span class="n">RuntimeResourceResolver</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">runtime_executor</span><span class="p">:</span> <span class="n">OciRuntimeExecutor</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">runtime_image_digests</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">scorer_registry</span><span class="p">:</span> <span class="n">ScorerExtensionRegistry</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">EvaluationTransactionResult</span>
+    <span class="n">unsigned</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">max_bootstrap_draws</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="n">DEFAULT_MAX_BOOTSTRAP_DRAWS</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">EvaluationTransactionResult</span> <span class="o">|</span> <span class="n">CapturedEvaluationTransactionResult</span> <span class="o">|</span> <span class="n">JudgeWorkflowResult</span>
 
 <span class="n">preflight_evaluation_request</span><span class="p">(</span>
-    <span class="n">request_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="n">request_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="n">EvaluationRequest</span> <span class="o">|</span> <span class="n">CapturedEvaluationRequest</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
     <span class="n">signing_key_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">scorer_registry</span><span class="p">:</span> <span class="n">ScorerExtensionRegistry</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">runtime_image_digests</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">resource_resolver</span><span class="p">:</span> <span class="n">RuntimeResourceResolver</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">EvaluationPreflightResult</span>
+    <span class="n">unsigned</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">max_bootstrap_draws</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="n">DEFAULT_MAX_BOOTSTRAP_DRAWS</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">EvaluationPreflightResult</span> <span class="o">|</span> <span class="n">CapturedEvaluationPreflightResult</span> <span class="o">|</span> <span class="n">JudgeWorkflowResult</span>
 
 <span class="n">load_evaluation_request</span><span class="p">(</span>
     <span class="n">path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
     <span class="n">provider_resolver</span><span class="p">:</span> <span class="n">ProviderResolver</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">EvaluationRequest</span>
+    <span class="n">request_root</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">baseline_run</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">subject_run</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">output</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">EvaluationRequest</span> <span class="o">|</span> <span class="n">CapturedEvaluationRequest</span>
 
 <span class="n">verify_evidence</span><span class="p">(</span>
     <span class="n">evidence_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
@@ -2393,9 +2690,46 @@ policy.</p>
     <span class="o">*</span><span class="p">,</span>
     <span class="n">html_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">explain</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">EvidenceReport</span>
+    <span class="n">markdown_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">junit_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">case_ids</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">(),</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">EvidenceReport</span> <span class="o">|</span> <span class="n">EvidenceReportV2</span>
 </code></pre></div>
 
+<p>Native deterministic requests return native results. Native judge evaluation
+returns <code>JudgeWorkflowResult</code>, while its preflight returns
+<code>EvaluationPreflightResult</code>. Captured judge preflight and evaluation both return
+<code>JudgeWorkflowResult</code>; other captured requests return captured results. A path
+is dispatched after loading and returns the corresponding union.</p>
+<p>For captured calls, omit native runtime/executor/registry/scorer keywords entirely,
+including explicit <code>None</code>. Frozen-answer v3 requests use the CLI judge workflow;
+these request-loader annotations do not include v3. <code>render_evidence</code> additionally
+accepts judge evidence and evidence sets; <code>case_ids</code> selects up to 50 retained
+judge cases and is rejected for native or captured deterministic packs.
+Omission and explicit null preserve their distinct
+native validation semantics; do not forward a bag of unrelated keyword defaults.</p>
+<p>Captured <code>verify_evidence</code> uses <code>policy_path</code>, <code>expected_baseline_run</code>,
+<code>expected_subject_run</code>, <code>expected_request_digest</code>, <code>expected_signer</code>,
+<code>receipt_path</code>, <code>verifier_signing_key_path</code>, and <code>verifier_identity</code>, plus optional
+<code>trust_profile_digest</code>, immutable <code>policy_bytes</code>/<code>verifier_signing_key_bytes</code>, and
+the recipient's <code>max_bootstrap_draws</code>. It does not accept native artifact,
+schedule, runtime, or scorer anchors. <code>load_trust_inputs</code> returns
+<code>CapturedTrustInputs</code> for a v2 captured profile and <code>TrustInputs</code> for native v1;
+the CLI's <code>--trust-profile</code> resolves those inputs through the same facade.</p>
+<p>For captured receipt authentication, <code>verify_signed_verification_receipt</code> takes
+<code>expected_run_digests={"baseline": ..., "subject": ...}</code> and
+<code>expected_request_digest</code> instead of native artifact/schedule/runtime digests.
+It still requires independent policy, evidence-signer fingerprint, verifier
+identity/fingerprint, and the expected profile digest when used. Its <code>ok</code> means
+the receipt authenticates, not that the embedded technical verdict passes.
+Native-only acceptance and deployment APIs reject captured scope.</p>
+<p><code>compare_runs</code> takes baseline, subject, policy and a local work budget; it does
+not publish or gate. <code>EvaluationRecordsError</code> is the canonical record validation,
+adapter, capacity, and safe-I/O exception. <code>normalize_captured_request</code>,
+<code>captured_request_digest</code>, <code>run_digest</code>, and <code>comparison_policy_digest</code> derive
+portable pins without signing keys, scoring, or publication. A local SDK budget
+of <code>None</code> explicitly removes the work allowance, not byte/record limits. The CLI
+accepts only integer allowances and never infers an unlimited value from evidence.</p>
 <p>The optional annotations on <code>verify_evidence</code> support a uniform Python
 signature; the public evidence-pack v1 transaction requires every artifact,
 schedule, policy, runtime, signer, receipt, verifier-key, and verifier-identity
@@ -2433,13 +2767,20 @@ or may explicitly enable installed <code>invarlock.scorers</code> entry-point di
 Neither an installed package nor a binding inside the submitted evidence
 authorizes scorer code by itself. Strict verification resolves the policy-
 pinned scorer through this registry and replays it deterministically.</p>
+<p>The registry includes five built-in deterministic scorers:
+<code>invarlock.normalized_match</code>, <code>invarlock.numeric_tolerance</code>,
+<code>invarlock.json_fields</code>, <code>invarlock.json_exact</code> and <code>invarlock.token_f1</code>. Pass
+<code>ScorerExtensionRegistry(allow_installed=False)</code> to use these through the SDK
+without enabling third-party discovery. The core CLI supplies this registry
+automatically. Bindings still pin the scorer's version and configuration schema.</p>
 <h2 id="request-loading">Request loading<a class="headerlink" href="#request-loading" title="Permanent link">&para;</a></h2>
 <div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.engine</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_evaluation_request</span>
 
 <span class="n">request</span> <span class="o">=</span> <span class="n">load_evaluation_request</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;request.yaml&quot;</span><span class="p">))</span>
 </code></pre></div>
 
-<p>The loader returns an immutable <code>EvaluationRequest</code> whose paths are resolved
+<p>The loader returns an immutable native <code>EvaluationRequest</code> or
+<code>CapturedEvaluationRequest</code> whose paths are resolved
 beneath the request root. Its default provider resolver exposes only the
 built-in Hugging Face provider. <code>evaluate_request_file</code> uses the core registry,
 which also discovers installed first-party add-ins.</p>
@@ -2711,8 +3052,8 @@ generic results importer:</p>
 <p>The timestamp is explicit so identical inputs produce identical files. The
 writer records strict container execution, offline operation, disabled remote
 code, and disabled third-party discovery. Those fields describe facts the
-caller is responsible for measuring; serialization does not attest that an
-untrusted host reported them honestly. Independent verification must still pin
+caller is responsible for measuring; serialization does not independently
+establish their accuracy or attest execution. Independent verification must still pin
 the artifact, schedule, policy, runtime-image, and signer identities.</p>
 <p><code>RuntimeImportAuthoringError</code> is raised before publication when record pairing,
 output digests, provider identities, provenance, side files, or manifest replay
@@ -2750,10 +3091,8 @@ accepted during the profile read:</p>
     <span class="n">verifier_signing_key_bytes</span><span class="o">=</span><span class="n">trust</span><span class="o">.</span><span class="n">verifier_signing_key_bytes</span><span class="p">,</span>
     <span class="n">verifier_identity</span><span class="o">=</span><span class="n">trust</span><span class="o">.</span><span class="n">verifier_identity</span><span class="p">,</span>
     <span class="n">trust_profile_digest</span><span class="o">=</span><span class="n">trust</span><span class="o">.</span><span class="n">profile_digest</span><span class="p">,</span>
-    <span class="n">scorer_registry</span><span class="o">=</span><span class="p">(</span>
-        <span class="n">ScorerExtensionRegistry</span><span class="p">(</span><span class="n">allow_installed</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">trust</span><span class="o">.</span><span class="n">allow_installed_scorers</span>
-        <span class="k">else</span> <span class="kc">None</span>
+    <span class="n">scorer_registry</span><span class="o">=</span><span class="n">ScorerExtensionRegistry</span><span class="p">(</span>
+        <span class="n">allow_installed</span><span class="o">=</span><span class="n">trust</span><span class="o">.</span><span class="n">allow_installed_scorers</span>
     <span class="p">),</span>
 <span class="p">)</span>
 </code></pre></div>
@@ -2790,6 +3129,75 @@ for evidence-pack v1 acceptance.</p>
 <p>There is no separate receipt-verification CLI command. Applications and
 automation use this Python facade when consuming a receipt issued by another
 verifier.</p>
+<h3 id="judge-verification-results-and-receipts">Judge verification results and receipts<a class="headerlink" href="#judge-verification-results-and-receipts" title="Permanent link">&para;</a></h3>
+<p>Native <code>evaluate_request_file</code> also accepts <code>metric: judge</code> in a run/import
+request. It retains the normal native resource and signing-key requirements and
+returns <code>JudgeWorkflowResult</code>, whose JSON has <code>kind: judge</code>, the evidence path,
+analysis decision and collection stop state. Native preflight retains
+<code>EvaluationPreflightResult</code> and adds judge model, unit, trial and budget metadata.
+The installed optional collector reads credentials from its process environment;
+callers do not pass keys in the request or plan. Recipient replay requires only
+the core package. Native judge evidence includes a bound runtime capture, whereas
+ordinary frozen-answer import makes no runtime-provenance claim.</p>
+<p>Captured v2 requests also select <code>metric: judge</code>; both preflight and evaluation
+return <code>JudgeWorkflowResult</code>. <code>CapturedJudgeRequest</code> supplies the private
+workspace, signer identity and optional retained measurements path.
+<code>prepare_evaluator_judge(recipe, baseline, subject)</code> freezes a plan and analysis
+policy without calls. <code>import_judge_sources(sources, plan=plan,
+baseline_run=baseline, subject_run=subject)</code> accepts a mapping of source IDs to
+unchanged canonical retained-call JSON bytes, validates all trial bindings and
+returns the measurements object. Import does not invoke a provider or Inspect.</p>
+<p><code>verify_judge_evidence</code> and <code>verify_judge_evidence_with_policy</code> replay bounded
+judge evidence under an external judge recipient policy and return an unsigned
+<code>JudgeVerificationResult</code>. <code>write_signed_judge_verification_receipt</code> signs that
+complete validated result, its recipient-policy digest, the verifier identity
+and verifier key fingerprint under the judge receipt domain. The destination and
+signing key must remain outside the submitted evidence.</p>
+<p><code>verify_signed_judge_verification_receipt</code> authenticates a received receipt
+against caller-owned verifier identity, fingerprint and recipient-policy digest.
+It does not reopen evidence. <code>replay_signed_judge_verification_receipt</code> adds exact
+fresh evidence replay under the external recipient policy. Use
+<code>verify_stored_judge_result</code> for the same fresh comparison when the stored object
+is an unsigned local result rather than a signed receipt.</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.engine</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">replay_signed_judge_verification_receipt</span><span class="p">,</span>
+    <span class="n">verify_judge_evidence_with_policy</span><span class="p">,</span>
+    <span class="n">verify_signed_judge_verification_receipt</span><span class="p">,</span>
+    <span class="n">write_signed_judge_verification_receipt</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">policy</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;recipient/judge-policy.json&quot;</span><span class="p">)</span>
+<span class="n">evidence</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;judge-evidence&quot;</span><span class="p">)</span>
+<span class="n">receipt</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;recipient/judge.receipt.json&quot;</span><span class="p">)</span>
+<span class="n">local</span> <span class="o">=</span> <span class="n">verify_judge_evidence_with_policy</span><span class="p">(</span><span class="n">evidence</span><span class="p">,</span> <span class="n">policy</span><span class="p">)</span>
+<span class="n">fingerprint</span> <span class="o">=</span> <span class="n">write_signed_judge_verification_receipt</span><span class="p">(</span>
+    <span class="n">evidence</span><span class="p">,</span>
+    <span class="n">local</span><span class="p">,</span>
+    <span class="n">receipt</span><span class="p">,</span>
+    <span class="n">recipient_policy_path</span><span class="o">=</span><span class="n">policy</span><span class="p">,</span>
+    <span class="n">verifier_identity</span><span class="o">=</span><span class="s2">&quot;release-verifier&quot;</span><span class="p">,</span>
+    <span class="n">verifier_signing_key_path</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;recipient/verifier.pem&quot;</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="n">authenticated</span> <span class="o">=</span> <span class="n">verify_signed_judge_verification_receipt</span><span class="p">(</span>
+    <span class="n">receipt</span><span class="p">,</span>
+    <span class="n">expected_verifier_identity</span><span class="o">=</span><span class="s2">&quot;release-verifier&quot;</span><span class="p">,</span>
+    <span class="n">expected_verifier_fingerprint</span><span class="o">=</span><span class="n">fingerprint</span><span class="p">,</span>
+    <span class="n">expected_recipient_policy_sha256</span><span class="o">=</span><span class="n">local</span><span class="o">.</span><span class="n">recipient_policy_sha256</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">assert</span> <span class="n">authenticated</span><span class="o">.</span><span class="n">ok</span>
+<span class="k">assert</span> <span class="n">replay_signed_judge_verification_receipt</span><span class="p">(</span>
+    <span class="n">receipt</span><span class="p">,</span>
+    <span class="n">evidence_path</span><span class="o">=</span><span class="n">evidence</span><span class="p">,</span>
+    <span class="n">recipient_policy_path</span><span class="o">=</span><span class="n">policy</span><span class="p">,</span>
+    <span class="n">expected_verifier_identity</span><span class="o">=</span><span class="s2">&quot;release-verifier&quot;</span><span class="p">,</span>
+    <span class="n">expected_verifier_fingerprint</span><span class="o">=</span><span class="n">fingerprint</span><span class="p">,</span>
+<span class="p">)</span><span class="o">.</span><span class="n">accepted</span>
+</code></pre></div>
+
+<p>These APIs preserve <code>bounded-judge-fixed-benchmark-v1</code>. Receipt authentication
+does not establish that the benchmark represents deployment traffic or that the
+judge is correct outside the retained rubric and cases.</p>
 <h2 id="evidence-pack-result-types">Evidence pack result types<a class="headerlink" href="#evidence-pack-result-types" title="Permanent link">&para;</a></h2>
 <p><code>EvidencePackResult</code>, <code>EvidencePackStatus</code>, and <code>EvidenceObservation</code> are
 exported for applications that inspect verifier results or attach typed
@@ -2977,7 +3385,7 @@ replay completed; inspect the exception payload for <code>signed_receipt</code>.
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "navigation.sections", "navigation.expand", "navigation.tabs", "navigation.top", "search.highlight", "search.suggest", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
         <script src="../../assets/javascripts/mathjax.js"></script>
       

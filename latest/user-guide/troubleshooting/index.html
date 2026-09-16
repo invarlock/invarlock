@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/invarlock-app-icon.svg">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -436,6 +436,90 @@
     
   
     Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../captured-results/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Captured results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hosted-service-requalification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosted-service requalification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modelkit-handoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ModelKit recipient handoff
   
 
     
@@ -917,6 +1001,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#worker-output-cleanup-fails" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Worker output cleanup fails
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#policy-digest-mismatch" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -965,6 +1060,17 @@
     <span class="md-ellipsis">
       
         Exact match is unexpectedly zero
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#judge-collection-or-replay-fails" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Judge collection or replay fails
       
     </span>
   </a>
@@ -1427,6 +1533,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../reference/evaluation-records/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation records
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/evaluation-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation capacity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../reference/compatibility/" class="md-nav__link">
         
   
@@ -1603,6 +1765,62 @@
     
   
     Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/judge-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Judge measurements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/evidence-sets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence sets
   
 
     
@@ -2112,6 +2330,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#worker-output-cleanup-fails" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Worker output cleanup fails
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#policy-digest-mismatch" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2160,6 +2389,17 @@
     <span class="md-ellipsis">
       
         Exact match is unexpectedly zero
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#judge-collection-or-replay-fails" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Judge collection or replay fails
       
     </span>
   </a>
@@ -2255,8 +2495,8 @@
 <h1 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h1>
 <p>InvarLock fails closed: a missing binding, unverifiable input, or ambiguous
 destination stops publication or produces a rejected verification result.</p>
-<div class="admonition tip">
-<p class="admonition-title">User guide</p>
+<blockquote>
+<p><strong>User guide</strong></p>
 <p><strong>Outcome:</strong> Identify the earliest failing transaction boundary and recover
 without mutating signed evidence or weakening independent verification.</p>
 <p><strong>Audience:</strong> Evaluation operators, verifier operators, runtime integrators,
@@ -2264,7 +2504,7 @@ and decision owners investigating an evaluation, verification, or report error.<
 <p><strong>Prerequisites:</strong> The original command and structured error, unchanged
 submitted artifacts, independently sourced anchors, and knowledge of which
 output paths existed before the attempt.</p>
-</div>
+</blockquote>
 <h2 id="triage-by-transaction-boundary">Triage by transaction boundary<a class="headerlink" href="#triage-by-transaction-boundary" title="Permanent link">&para;</a></h2>
 <p>Start with the first boundary that failed. Later artifacts may not exist and
 should not be synthesized.</p>
@@ -2304,12 +2544,14 @@ should not be synthesized.</p>
 </tr>
 <tr>
 <td>Reporting</td>
-<td>Invalid bundle or existing HTML destination</td>
-<td>Bundle unchanged; no new HTML</td>
+<td>Invalid evidence, output collision, or failed output write</td>
+<td>Evidence unchanged; earlier completed outputs may remain after a later write fails</td>
 </tr>
 </tbody>
 </table>
-<p>Use machine-readable output for the first two core transactions:</p>
+<p>Use machine-readable output for evaluation and verification. The example below
+uses native pack-v1 trust anchors; captured and judge evidence need their own
+<a href="../evidence-and-verification/">trust contracts</a>.</p>
 <div class="codehilite"><pre><span></span><code>invarlock<span class="w"> </span>evaluate<span class="w"> </span>request.yaml<span class="w"> </span>--signing-key<span class="w"> </span>evidence-signer.pem<span class="w"> </span>--json
 invarlock<span class="w"> </span>verify<span class="w"> </span>evidence/<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--policy<span class="w"> </span>trusted/acceptance.json<span class="w"> </span><span class="se">\</span>
@@ -2352,7 +2594,8 @@ invarlock<span class="w"> </span>evaluate<span class="w"> </span>request.yaml<sp
 new destination in the request or verify command. For a disposable tutorial,
 start from a fresh copy of <code>examples/</code>. Do not remove or mutate an artifact that
 has already been distributed.</p>
-<p>HTML rendering is also no-clobber. Choose a new <code>--html</code> path.</p>
+<p>HTML, Markdown and JUnit rendering are also no-clobber. Choose fresh output
+paths and inspect <code>written_outputs</code> if a multi-output render failed.</p>
 <h2 id="request-path-is-rejected">Request path is rejected<a class="headerlink" href="#request-path-is-rejected" title="Permanent link">&para;</a></h2>
 <p>Request file references must be nonempty, relative, root-confined paths. They
 cannot contain absolute prefixes, URLs, backslashes, <code>.</code> or <code>..</code> segments,
@@ -2426,8 +2669,10 @@ expected digest with the value copied from a failed evidence bundle.</p>
 authority. They may be equal when both sides intentionally used one runtime.</p>
 <h2 id="provider-is-unavailable">Provider is unavailable<a class="headerlink" href="#provider-is-unavailable" title="Permanent link">&para;</a></h2>
 <p>The base package includes the HF text provider and can authenticate its local
-snapshot identity for import mode without Torch or Transformers. Install
-<code>invarlock[hf]</code> before run-mode execution. GGUF, TensorRT-LLM, and Hugging Face
+snapshot identity for import mode without Torch or Transformers. Run-mode
+execution requires the maintained HF runtime image; host-side model preparation
+uses the <a href="../runtime-providers/#hugging-face-transformers">source runtime setup</a>.
+GGUF, TensorRT-LLM, and Hugging Face
 vision-text providers are separate first-party add-ins and must be installed
 and qualified in their required runtimes. A
 request naming an undiscoverable provider fails before evidence publication.</p>
@@ -2468,6 +2713,20 @@ digest agreement, signing-key placement, and device syntax. If a child starts
 but rejects the boundary, inspect its image entrypoint, container markers,
 offline flags, and runtime-integration resources. See
 <a href="../runtime-providers/">Runtime providers</a> for provider-specific setup.</p>
+<h2 id="worker-output-cleanup-fails">Worker output cleanup fails<a class="headerlink" href="#worker-output-cleanup-fails" title="Permanent link">&para;</a></h2>
+<p>A failed or interrupted worker can leave temporary files owned by its numeric
+user. InvarLock first attempts bounded host cleanup. If those permissions block
+removal, it runs a cleanup helper with the same non-root user and pinned image,
+disabled networking, and only that side's temporary output mounted writable.
+The helper has a 30-second deadline, 128 MiB of memory, and limits of 4,096
+entries and 64 nested directory levels. It does not follow symbolic links or
+change regular-file permissions.</p>
+<p>If cleanup still fails, the diagnostic names the retained private temporary
+directory. An existing evaluation error remains the primary error; cleanup
+failure is also reported. Check the local engine and exact image availability,
+then have the machine operator inspect and remove only the reported temporary
+directory using its file ownership. A cleanup failure does not publish a
+completed evidence bundle.</p>
 <h2 id="policy-digest-mismatch">Policy digest mismatch<a class="headerlink" href="#policy-digest-mismatch" title="Permanent link">&para;</a></h2>
 <p>Verification uses the exact bytes at <code>--policy</code>; it never trusts a policy found
 only inside submitted evidence. Obtain the approved policy file from the
@@ -2488,9 +2747,14 @@ new verification attempt.</p>
 <p>Never treat the existence of a receipt as a passing result. Check its signed
 verdict and independently pin the verifier fingerprint.</p>
 <h2 id="a-received-receipt-does-not-validate">A received receipt does not validate<a class="headerlink" href="#a-received-receipt-does-not-validate" title="Permanent link">&para;</a></h2>
-<p>The stable receipt reader checks six independent relationships: verifier
-signature, verifier identity and fingerprint, pack manifest digest, policy
-digest, both runtime digests, and evidence-signer fingerprint.</p>
+<p>The native receipt reader checks the verifier signature, independently pinned
+verifier identity and fingerprint, pack manifest digest, policy bytes, both
+artifact and runtime anchors, canonical schedule, and evidence-signer anchor.
+A v2 native receipt also requires its independent request anchor; GGUF evidence
+requires this form. An optional expected trust-profile digest can constrain the
+verifier configuration. Captured receipts instead require complete-run and
+request pins. Missing native artifact or schedule arguments raise <code>TypeError</code>;
+follow the <a href="../evidence-and-verification/#validate-a-received-receipt">complete receipt example</a>.</p>
 <p>Classify the error before retrying:</p>
 <table>
 <thead>
@@ -2513,7 +2777,7 @@ digest, both runtime digests, and evidence-signer fingerprint.</p>
 <td>Receipt belongs to another pack or pack bytes changed.</td>
 </tr>
 <tr>
-<td>Policy/runtime/evidence-signer anchor mismatch</td>
+<td>Policy/artifact/schedule/runtime/request/signer anchor mismatch</td>
 <td>Caller and verifier did not use the same independently maintained trust inputs.</td>
 </tr>
 <tr>
@@ -2530,6 +2794,18 @@ authorization record.</p>
 and line endings are significant. If normalization is part of the desired
 metric, define and authenticate it before provider observation; do not normalize
 only one side after execution.</p>
+<h2 id="judge-collection-or-replay-fails">Judge collection or replay fails<a class="headerlink" href="#judge-collection-or-replay-fails" title="Permanent link">&para;</a></h2>
+<p>Confirm the request family first: native v1 <code>metric: judge</code> collects model
+answers before judging, captured v2 <code>metric: judge</code> uses evaluator records, and
+frozen-answer v3 selects <code>judge_import</code> or <code>judge_collect</code>. Their evidence uses
+the separate judge recipient policy rather than native pack-v1 trust flags.</p>
+<p>Preflight must pass before collection. Check the complete recipe reservations,
+installed collector and supported configuration. For interrupted collection,
+resume the same private workspace with unchanged identities; do not regenerate
+answers or replace failed attempts. A changed model, input, rubric or policy
+requires a new workspace. Offline imports need retained calls and source
+bindings; scalar ratings alone cannot supply them. See the
+<a href="../evaluation-request/#judge">judge workflow and recovery rules</a>.</p>
 <h2 id="normalized-nll-fails-closed">Normalized NLL fails closed<a class="headerlink" href="#normalized-nll-fails-closed" title="Permanent link">&para;</a></h2>
 <p>Each successful record needs finite <code>logprob_sum</code>, positive <code>token_count</code>, and
 positive <code>utf8_byte_count</code>. InvarLock derives <code>-logprob_sum / utf8_byte_count</code>.
@@ -2560,13 +2836,35 @@ or an invalid evidence signature are fatal. Keep receipts and HTML outside the
 evidence directory. Recover from an immutable trusted copy; do not repair files
 inside a signed bundle.</p>
 <h2 id="machine-readable-diagnostics">Machine-readable diagnostics<a class="headerlink" href="#machine-readable-diagnostics" title="Permanent link">&para;</a></h2>
-<p>Use <code>--json</code> for evaluation and verification automation:</p>
+<p>Use <code>--json</code> for core evaluation, verification and rendering automation:</p>
 <div class="codehilite"><pre><span></span><code>invarlock<span class="w"> </span>evaluate<span class="w"> </span>request.yaml<span class="w"> </span>--signing-key<span class="w"> </span>evidence-signer.pem<span class="w"> </span>--json
 invarlock<span class="w"> </span>verify<span class="w"> </span>evidence/<span class="w"> </span>...<span class="w"> </span>--receipt<span class="w"> </span>receipt.json<span class="w"> </span>--json
+invarlock<span class="w"> </span>report<span class="w"> </span>evidence/<span class="w"> </span>--html<span class="w"> </span>report.html<span class="w"> </span>--json
 </code></pre></div>
 
-<p>The report command intentionally renders human-facing console or HTML output.
-The canonical JSON report remains inside the authenticated bundle.</p>
+<p>The report result describes rendering success or failure and includes the HTML
+path when requested. It is not the canonical comparison JSON or an acceptance
+receipt. The canonical report remains inside the authenticated bundle.
+Application errors use structured output; invalid CLI options and path arguments
+rejected before a command runs still produce usage diagnostics on stderr.</p>
+<p>Captured results also use <code>evaluate</code>, <code>verify</code>, and <code>report</code>, with text by default
+and <code>--json</code> for automation. Use <code>report --explain</code> to inspect checks interactively.
+Console text and HTML are presentation formats and should
+not be parsed as stable machine interfaces. See the
+<a href="../../reference/cli/#text-and-json-output">CLI output contract</a>.</p>
+<p>For captured handoffs, use <code>--trust-profile</code> with a recipient-owned
+<code>invarlock/trust-inputs-v2</code> profile, not native artifact/runtime anchors. Unsigned
+local packs cannot yield positive verification; a signed rejection receipt may
+record the refusal (exit <code>6</code>). A local work-budget refusal
+exits <code>2</code> without a receipt; retry with an explicitly reviewed
+<code>--max-bootstrap-draws</code> allowance. An authenticated policy rejection exits <code>7</code>
+and can still carry a valid rejection receipt. Do not treat receipt authenticity
+as a passing technical verdict.</p>
+<p>Captured reports and native reports requesting Markdown or JUnit emit
+<code>invarlock/evidence-report-v2</code>. Inspect <code>requested_outputs</code>, <code>written_outputs</code>,
+<code>failed_output</code>, and <code>errors</code> after a write failure; earlier completed outputs
+may remain. Default and HTML-only native report calls retain v1 JSON. Never
+render stale evidence after a failed evaluation publication.</p>
 <h2 id="before-escalating-a-bug">Before escalating a bug<a class="headerlink" href="#before-escalating-a-bug" title="Permanent link">&para;</a></h2>
 <p>Collect the smallest non-sensitive reproduction that preserves the failing
 contract:</p>
@@ -2643,7 +2941,7 @@ For trust implications, see the <a href="../../security/threat-model/">Threat mo
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "navigation.sections", "navigation.expand", "navigation.tabs", "navigation.top", "search.highlight", "search.suggest", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
         <script src="../../assets/javascripts/mathjax.js"></script>
       

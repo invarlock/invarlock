@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/invarlock-app-icon.svg">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -433,6 +433,90 @@
     
   
     Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/captured-results/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Captured results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/hosted-service-requalification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosted-service requalification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/modelkit-handoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ModelKit recipient handoff
   
 
     
@@ -885,6 +969,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#evidence-family-scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evidence-family scope
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#top-level-claim" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1284,6 +1379,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../reference/evaluation-records/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation records
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/evaluation-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation capacity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../reference/compatibility/" class="md-nav__link">
         
   
@@ -1460,6 +1611,62 @@
     
   
     Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/judge-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Judge measurements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/evidence-sets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence sets
   
 
     
@@ -1848,6 +2055,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#evidence-family-scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evidence-family scope
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#top-level-claim" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1967,8 +2185,8 @@
 
 
 <h1 id="assurance-case">Assurance case<a class="headerlink" href="#assurance-case" title="Permanent link">&para;</a></h1>
-<div class="admonition abstract">
-<p class="admonition-title">Assurance note</p>
+<blockquote>
+<p><strong>Assurance note</strong></p>
 <p><strong>In plain language:</strong> A pass records that one subject met one policy
 against one baseline on the fixed schedule. Broader quality, safety, and
 deployment decisions use complementary evidence.</p>
@@ -1979,14 +2197,62 @@ operational assumptions are sufficient for a particular acceptance case.</p>
 <p><strong>Evidence:</strong> Authenticated inputs, paired provider records, deterministic
 replay, the signed evidence pack, independent anchors, and the
 verifier-signed receipt.</p>
-</div>
-<p>InvarLock supports one narrow assurance claim: a named subject satisfied a
-caller-approved acceptance policy relative to a named baseline on one authenticated,
-ordered evaluation schedule, under the runtime identities recorded for that
-transaction.</p>
+</blockquote>
+<p>InvarLock supports a scoped acceptance claim: the recorded comparison met
+independently supplied requirements under its declared inputs, measurement
+provenance and decision contract. The evidence family determines which facts
+are replayed and what the result means.</p>
 <p>The claim covers the submitted records. Questions about other inputs, model
 safety, model intent, and deployment fitness remain explicit complementary
 review domains.</p>
+<p>The formal argument below concerns native exact-match/NLL and deterministic
+extension pack-v1 evidence. <a href="../../user-guide/captured-results/">Captured comparisons</a>
+authenticate supplied case facts and replay, with independent run/request pins.
+<a href="../../reference/judge-measurements/">Judge evidence</a> adds a bounded measurement
+plan, retained ratings and its own recipient policy; native judge evidence also
+retains runtime provenance. Judge accuracy and broader model quality require
+separate validation when those claims matter to the decision; such studies are
+not prerequisites for running or verifying the bounded judge workflow.</p>
+<p>Trusted teams can use these checks to catch ordinary handoff mistakes: the wrong
+model, stale policy, incomplete capture or mismatched report. Independent anchors
+mean separately controlled expectations, not a requirement for separate people
+or organizations.</p>
+<h2 id="evidence-family-scope">Evidence-family scope<a class="headerlink" href="#evidence-family-scope" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Evidence family</th>
+<th>What independent verification checks</th>
+<th>Main boundary</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Native exact match, NLL and deterministic extensions</td>
+<td>Artifact, runtime, schedule, provider observations, paired arithmetic and policy bindings</td>
+<td>Recorded runtime facts are not execution attestation</td>
+</tr>
+<tr>
+<td>Signed captured comparisons, including hosted runs</td>
+<td>Complete normalized runs, declared source identities, request, policy, scorer-specific facts and every metric/slice result</td>
+<td>Imported facts are supplied observations; a hosted descriptor does not identify hidden weights</td>
+</tr>
+<tr>
+<td>Signed bounded judge evidence, including native judge</td>
+<td>Authorized signer and subject, frozen runs, case set, plan, retained trials, analysis and recipient policy; native evidence also binds provider capture</td>
+<td>Replay establishes the retained decision, not judge accuracy or independence of the declared units</td>
+</tr>
+<tr>
+<td>Deterministic and judge evidence set</td>
+<td>Both independently verified components and identical complete runs, case set and subject identity</td>
+<td>The local conjunction is not a new signed attestation or joint confidence guarantee</td>
+</tr>
+</tbody>
+</table>
+<p>Unsigned local evaluations remain useful for development, but do not establish
+independent recipient acceptance. A report presents the recorded result; it does
+not replace verification under independently controlled inputs.</p>
+<p>The native formal argument below is one instance of this common structure.</p>
 <h2 id="top-level-claim">Top-level claim<a class="headerlink" href="#top-level-claim" title="Permanent link">&para;</a></h2>
 <p>Let:</p>
 <table>
@@ -2152,7 +2418,7 @@ and
 <tr>
 <td>Selected scorer code was reviewed and independently authorized.</td>
 <td>A scorer extension executes code that determines per-record values, although the core retains aggregation and policy arithmetic.</td>
-<td>Scorer authorization copied from the request, substituted installed package, malicious scorer code, or an extension that uses a network, external model, human judgment, or LLM judge.</td>
+<td>Scorer authorization copied from the request, substituted installed package, malicious scorer code, or an extension that uses a network, external model, externally assigned ratings, or LLM judge.</td>
 </tr>
 <tr>
 <td>The baseline is an appropriate reference.</td>
@@ -2206,7 +2472,8 @@ contract does not re-evaluate one existing pack under different policy bytes.</p
 that statement. It does not silently upgrade the statement beyond those
 facts.</p>
 <h2 id="result-states">Result states<a class="headerlink" href="#result-states" title="Permanent link">&para;</a></h2>
-<p>Use three review states rather than collapsing every outcome into pass/fail:</p>
+<p>For native pack-v1 evidence, use three review states rather than collapsing
+every outcome into pass/fail:</p>
 <table>
 <thead>
 <tr>
@@ -2218,13 +2485,13 @@ facts.</p>
 <tbody>
 <tr>
 <td>Verified pass</td>
-<td>Integrity and replay succeeded; policy verdict is <code>pass</code>; required operational assumptions were explicitly approved.</td>
-<td>May support the scoped decision recorded by the decision owner.</td>
+<td>Integrity and replay succeeded; policy verdict is <code>pass</code>.</td>
+<td>May support the scoped decision after the decision owner assesses applicable operational assumptions.</td>
 </tr>
 <tr>
 <td>Verified policy fail</td>
 <td>Integrity and replay succeeded; policy verdict is <code>fail</code>.</td>
-<td>Preserve the signed failure receipt; do not publish or describe as accepted.</td>
+<td>Preserve the signed failure receipt and share it as a rejection, not an accepted change.</td>
 </tr>
 <tr>
 <td>Not verified</td>
@@ -2233,6 +2500,12 @@ facts.</p>
 </tr>
 </tbody>
 </table>
+<p>Captured and judge decisions separately distinguish <code>regression</code> and
+<code>insufficient_evidence</code>. Either can be an authentic, replayed result without
+recipient acceptance. An advisory judge pass is also not a required accepted
+result. Their <code>regression</code> labels have different statistical meanings; use the
+<a href="../decision-semantics/#choose-the-decision-contract">decision contract</a> and the
+<a href="../acceptance-checklist/#captured-and-judge-evidence">recipient checklist</a>.</p>
 <p>An incompatible or not-yet-evaluated lane belongs in the third category. It is
 not a negative model result and must not be converted to one.</p>
 <h2 id="decision-scope-and-complementary-evidence">Decision scope and complementary evidence<a class="headerlink" href="#decision-scope-and-complementary-evidence" title="Permanent link">&para;</a></h2>
@@ -2371,7 +2644,7 @@ assurance claim beyond the implemented checks and documented assumptions.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "navigation.sections", "navigation.expand", "navigation.tabs", "navigation.top", "search.highlight", "search.suggest", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
         <script src="../../assets/javascripts/mathjax.js"></script>
       

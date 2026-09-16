@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/invarlock-app-icon.svg">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -433,6 +433,90 @@
     
   
     Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/captured-results/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Captured results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/hosted-service-requalification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosted-service requalification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/modelkit-handoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ModelKit recipient handoff
   
 
     
@@ -1138,6 +1222,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../evaluation-records/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation records
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluation-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation capacity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../compatibility/" class="md-nav__link">
         
   
@@ -1449,6 +1589,62 @@
     
   
     Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../judge-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Judge measurements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evidence-sets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence sets
   
 
     
@@ -1948,14 +2144,18 @@
 <p>An <code>invarlock/evidence-pack-v1</code> bundle is a closed, signed evidence directory. Its paths
 are fixed by the manifest schema; additional files are rejected in strict
 verification.</p>
-<div class="admonition info">
-<p class="admonition-title">Reference</p>
-<ul>
-<li><strong>Surface:</strong> <code>invarlock/evidence-pack-v1</code> directory, manifest, payload inventory, and external outputs</li>
-<li><strong>Stability:</strong> Versioned public artifact contract; fixed paths and closed inventory are verification requirements</li>
-<li><strong>Use this page when:</strong> Inspecting a bundle, implementing artifact storage, or determining which bytes carry a particular claim</li>
-</ul>
-</div>
+<blockquote>
+<p><strong>Reference</strong></p>
+<p><strong>Surface:</strong> <code>invarlock/evidence-pack-v1</code> directory, manifest, payload inventory, and external outputs</p>
+<p><strong>Stability:</strong> Versioned public artifact contract; fixed paths and closed inventory are verification requirements</p>
+<p><strong>Use this page when:</strong> Inspecting a bundle, implementing artifact storage, or determining which bytes carry a particular claim</p>
+</blockquote>
+<p>This layout applies to native exact-match/NLL and deterministic-extension
+evidence. Captured comparisons use <a href="../evaluation-records/">evaluation records</a>
+and pack v2. Native and captured judge requests use the
+<a href="../judge-measurements/">judge evidence envelope</a>; native judge evidence also
+retains its bound runtime capture. A shared CLI does not make these inventories
+or receipt contracts interchangeable.</p>
 <p><img alt="Evidence dependency map" src="../../assets/reference-evidence-dependency.svg" /></p>
 <h2 id="directory-layout">Directory layout<a class="headerlink" href="#directory-layout" title="Permanent link">&para;</a></h2>
 <div class="codehilite"><pre><span></span><code>evidence/
@@ -2260,8 +2460,17 @@ atomically renames the directory into place. It never replaces an existing
 destination. Published files are read-only and directories are non-writable.</p>
 <p>Filesystem permissions are a local hardening measure, not the integrity model.
 Any later byte change, missing file, or extra file is detected by strict
-verification. Verification receipts and rendered HTML must remain outside the
+verification. Verification receipts and rendered report files must remain outside the
 bundle so the bundle can stay byte-identical.</p>
+<p>Output writers pin directory descriptors and check pathname bindings around
+publication. They reject changes observed at those checks; they cannot prevent
+later changes by a process with the same filesystem permissions. On an ambiguous
+publication failure, a completed or competing file, or private staging directory,
+can remain. Inspect and authenticate any retained evidence before using it.
+Cleanup never recursively follows an old staging pathname.</p>
+<p>Runtime-provider sidecars are published individually. If a later sidecar fails,
+earlier completed files remain. Callers that need an all-or-nothing set must use
+a private directory and publish that directory only after all checks succeed.</p>
 <h2 id="external-outputs">External outputs<a class="headerlink" href="#external-outputs" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -2283,13 +2492,25 @@ bundle so the bundle can stay byte-identical.</p>
 <td>Console report</td>
 <td><code>invarlock report</code></td>
 <td>Not a file</td>
-<td>Human rendering of signature-authenticated canonical content</td>
+<td>Summary of canonical content after integrity and embedded-signature checks</td>
 </tr>
 <tr>
 <td>Self-contained HTML</td>
 <td><code>invarlock report --html</code></td>
 <td>No</td>
 <td>Unsigned presentation; not independent acceptance</td>
+</tr>
+<tr>
+<td>Markdown report</td>
+<td><code>invarlock report --markdown</code></td>
+<td>No</td>
+<td>Unsigned presentation; not independent acceptance</td>
+</tr>
+<tr>
+<td>JUnit report</td>
+<td><code>invarlock report --junit</code></td>
+<td>No</td>
+<td>CI test results reflecting the recorded comparison; not independent acceptance</td>
 </tr>
 </tbody>
 </table>
@@ -2368,7 +2589,7 @@ different policy requires a newly evaluated evidence bundle.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "navigation.sections", "navigation.expand", "navigation.tabs", "navigation.top", "search.highlight", "search.suggest", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
         <script src="../../assets/javascripts/mathjax.js"></script>
       

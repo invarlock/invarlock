@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/invarlock-app-icon.svg">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -436,6 +436,90 @@
     
   
     Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../captured-results/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Captured results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hosted-service-requalification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosted-service requalification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modelkit-handoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ModelKit recipient handoff
   
 
     
@@ -1306,6 +1390,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../reference/evaluation-records/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation records
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/evaluation-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation capacity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../reference/compatibility/" class="md-nav__link">
         
   
@@ -1482,6 +1622,62 @@
     
   
     Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/judge-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Judge measurements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/evidence-sets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence sets
   
 
     
@@ -2026,8 +2222,8 @@ into the evidence.</p>
 <p>InvarLock authenticates, executes, and replays this specification. It does not
 choose a representative sample or a suitable threshold for you.</p>
 <p><img alt="One fixed schedule produces exactly paired baseline and subject records before metric arithmetic and policy evaluation" src="../../assets/user-guide-pairing-contract.svg" /></p>
-<div class="admonition tip">
-<p class="admonition-title">User guide</p>
+<blockquote>
+<p><strong>User guide</strong></p>
 <p><strong>Outcome:</strong> Freeze a digest-pinned local JSONL source and one closed
 comparison policy before collecting subject results.</p>
 <p><strong>Audience:</strong> Evaluation owners, dataset curators, policy authors, and
@@ -2035,7 +2231,7 @@ independent decision owners.</p>
 <p><strong>Prerequisites:</strong> A concrete release-regression claim, fixed source
 material, stable record identities, a supported built-in metric or
 authorized scorer binding, and an independent policy-distribution path.</p>
-</div>
+</blockquote>
 <h2 id="design-the-decision-first">Design the decision first<a class="headerlink" href="#design-the-decision-first" title="Permanent link">&para;</a></h2>
 <ol>
 <li>State the concrete release-regression claim in one sentence.</li>
@@ -2043,12 +2239,19 @@ authorized scorer binding, and an independent policy-distribution path.</p>
 <li>Select prompts and expected outputs without inspecting subject outcomes.</li>
 <li>Choose <code>exact_match</code> for literal closed answers or
    <code>normalized_nll_per_utf8_byte</code> for teacher-forced expected-continuation
-   likelihood regression, or bind an explicitly authorized deterministic text
-   scorer for a task-specific unit-interval result.</li>
+   likelihood regression. Select <code>judge</code> for bounded rubric-based ratings of
+   frozen answers, or bind an explicitly authorized deterministic text scorer
+   for a task-specific unit-interval result.</li>
 <li>Select the threshold, unit, conservative interval bound, and failure action.</li>
 <li>Freeze the JSONL bytes, field mapping, optional exact prefix, and SHA-256.</li>
 <li>Freeze the policy bytes and distribute an independent copy to verifiers.</li>
 </ol>
+<p>The JSONL and policy shapes below describe native exact match, normalized NLL
+and deterministic extensions. Judge requests also freeze a rubric, independent
+unit mapping, repetitions, reference mode and collection budgets. Follow the
+<a href="../../reference/judge-measurements/">judge policy contract</a> for that scorer's
+uncertainty and recipient acceptance rules; captured evaluator records follow
+the <a href="../captured-results/">captured-results guide</a>.</p>
 <p>A reviewable claim is:</p>
 <blockquote>
 <p>Compare the fixed subject with the fixed baseline on these 400 ordered
@@ -2063,7 +2266,7 @@ old model.”</p>
 <p>Run requests identify source bytes and field mapping directly:</p>
 <div class="codehilite"><pre><span></span><code><span class="nt">dataset</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">inputs/release-regression.jsonl</span>
-<span class="w">  </span><span class="nt">sha256</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">4444444444444444444444444444444444444444444444444444444444444444</span>
+<span class="w">  </span><span class="nt">sha256</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;4444444444444444444444444444444444444444444444444444444444444444&quot;</span>
 <span class="w">  </span><span class="nt">format</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">jsonl</span>
 <span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">release-regression</span>
 <span class="w">  </span><span class="nt">split</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">validation</span>
@@ -2085,8 +2288,10 @@ file with fewer selected lines fails.</p>
 <p>If <code>id_field</code> is absent, deterministic position IDs are generated as
 <code>record/00000000</code>, <code>record/00000001</code>, and so on. Prefer durable source IDs when
 they exist; they make a failed record identifiable outside one array position.</p>
-<p>The source may contain additional metadata fields, but only the declared ID,
-input, and expected-output fields enter the schedule. Preserve any separate
+<p>The source may contain additional metadata fields. The declared ID, input,
+expected-output and optional content mappings enter the schedule; unmapped
+metadata does not. See the <a href="../evaluation-request/#run-mode-dataset-object">dataset mapping contract</a>
+for authenticated media inputs. Preserve any separate
 provenance, licenses, or adjudication records needed to justify the selection.</p>
 <h2 id="canonical-prepared-schedule">Canonical prepared schedule<a class="headerlink" href="#canonical-prepared-schedule" title="Permanent link">&para;</a></h2>
 <p>The prepared contract is
@@ -2225,7 +2430,7 @@ execution is rejected.</p>
 <p>These are governance and sampling controls outside the schema. A valid but
 biased schedule remains biased.</p>
 <h2 id="metric-specific-paired-intervals">Metric-specific paired intervals<a class="headerlink" href="#metric-specific-paired-intervals" title="Permanent link">&para;</a></h2>
-<p>New <code>invarlock/comparison-report-v3</code> reports use the continuity-corrected
+<p>New exact-match <code>invarlock/comparison-report-v3</code> reports use the continuity-corrected
 paired Newcombe hybrid-score 95% interval over the subject-minus-baseline
 binary effect. The report also records baseline-pass to
 subject-fail regressions, baseline-fail to subject-pass improvements, both-pass
@@ -2415,8 +2620,10 @@ optional but coupled and use the same ranges.</p>
 <p>Separately installed scorer packages may implement deterministic token F1,
 structured-field extraction, and VQA answer normalization and require explicit
 authorization. Executable SQL/code tests, model-based semantic similarity,
-network or human scoring, external-model calls, and LLM judges require separate
-authenticated contracts. Judge results remain observations.</p>
+network services or externally assigned ratings, and external-model calls are outside this extension
+contract. The built-in <code>metric: judge</code> has its own bounded collection, retained
+measurement, analysis-policy and recipient contracts. Other judge summaries may
+be attached as observations, which have no acceptance authority.</p>
 <h2 id="derived-perplexity-interpretation">Derived perplexity interpretation<a class="headerlink" href="#derived-perplexity-interpretation" title="Permanent link">&para;</a></h2>
 <p>For normalized NLL, the verifier also renders a token-weighted perplexity ratio
 when both artifacts bind the same authenticated tokenizer and every pair has
@@ -2541,7 +2748,7 @@ for record-level enforcement.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "navigation.sections", "navigation.expand", "navigation.tabs", "navigation.top", "search.highlight", "search.suggest", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
         <script src="../../assets/javascripts/mathjax.js"></script>
       

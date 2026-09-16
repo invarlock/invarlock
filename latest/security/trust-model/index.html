@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/invarlock-app-icon.svg">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -433,6 +433,90 @@
     
   
     Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/captured-results/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Captured results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/hosted-service-requalification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosted-service requalification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/modelkit-handoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ModelKit recipient handoff
   
 
     
@@ -1135,6 +1219,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../reference/evaluation-records/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation records
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/evaluation-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation capacity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../reference/compatibility/" class="md-nav__link">
         
   
@@ -1311,6 +1451,62 @@
     
   
     Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/judge-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Judge measurements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/evidence-sets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence sets
   
 
     
@@ -1656,6 +1852,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#captured-hosted-and-judge-trust-inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Captured, hosted and judge trust inputs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#signed-bytes-are-not-truthful-measurements" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1970,6 +2177,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#captured-hosted-and-judge-trust-inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Captured, hosted and judge trust inputs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#signed-bytes-are-not-truthful-measurements" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2147,9 +2365,11 @@
 <h1 id="trust-model">Trust model<a class="headerlink" href="#trust-model" title="Permanent link">&para;</a></h1>
 <p>InvarLock separates evidence creation, technical verification, portable
 recipient acceptance, and presentation into four transactions. The separation
-matters only when their inputs and keys are controlled independently.</p>
-<div class="admonition warning">
-<p class="admonition-title">Security guidance</p>
+preserves the team's intended comparison when inputs and signing roles are
+controlled independently. The same organization or operator can maintain those
+roles using separately approved expectations and distinct evidence/verifier keys.</p>
+<blockquote>
+<p><strong>Security guidance</strong></p>
 <p><strong>In plain language:</strong> A valid signature identifies a key; trust comes from
 independently deciding that the key, policy, artifacts, schedule, runtimes,
 and scoped result are the ones you intended to rely on.</p>
@@ -2165,7 +2385,10 @@ that are intentionally outside submitted evidence.</p>
 envelope signer, recipient, or receipt-verifier roles; designing
 trust-anchor distribution; or evaluating whether a signed result supports
 a proposed reliance decision.</p>
-</div>
+</blockquote>
+<p>The equations and runtime anchors below describe native pack-v1 evidence.
+Captured comparisons and bounded judge measurements have separate trust inputs;
+their boundaries are summarized after the anchor matrix.</p>
 <h2 id="trust-statement">Trust statement<a class="headerlink" href="#trust-statement" title="Permanent link">&para;</a></h2>
 <p>Let <span class="arithmatex">\(M\)</span> be the canonical pack manifest, <span class="arithmatex">\(\sigma_E\)</span> its evidence signature,
 <span class="arithmatex">\(\pi_V\)</span> the independently supplied policy, <span class="arithmatex">\(A_B\)</span> and <span class="arithmatex">\(A_S\)</span> the expected
@@ -2334,6 +2557,30 @@ request digest from the submitted bundle makes the check circular.</p>
 <p>An anchor source must be protected from the evidence submitter for the threat
 it addresses. Merely storing the same value in two files does not create
 independence.</p>
+<h2 id="captured-hosted-and-judge-trust-inputs">Captured, hosted and judge trust inputs<a class="headerlink" href="#captured-hosted-and-judge-trust-inputs" title="Permanent link">&para;</a></h2>
+<p>Captured comparison uses <code>invarlock/trust-inputs-v2</code>: independent complete-run
+pins, normalized-request pin, policy bytes, signer fingerprint and verifier
+identity/key. Its v3 receipt states <code>captured_comparison</code> scope and each metric's
+recorded or recomputed scoring assurance. These anchors do not substitute for
+native artifact, schedule and runtime anchors.</p>
+<p>A captured hosted run uses a declared <code>service_identity</code> and
+<code>artifact_digest: null</code>. The complete-run pin covers the descriptor's
+configuration and observation window. It does not authenticate hidden weights,
+provider-internal execution or subsequent service behavior.</p>
+<p>Bounded judge evidence uses its own recipient policy to pin the signer,
+intended subject, frozen runs, case set, plan, measurements, analysis policy
+and result. Native judge evidence additionally binds <code>native_capture_sha256</code>.
+Offline verification returns separate authentication, replay, verification,
+acceptance and decision fields. A local result can be unsigned; an optional
+judge receipt authenticates that result for handoff under its own receipt
+contract. <code>verified: true</code> does not imply <code>accepted: true</code>: advisory evidence
+cannot satisfy required recipient acceptance, even when its decision is <code>pass</code>.
+See <a href="../../reference/judge-measurements/">judge measurements</a>.</p>
+<p>An externally assigned scalar rating may be evaluated as a captured <code>recorded</code>
+metric when policy explicitly approves its provenance. That verifies retained
+scores and their aggregation, not the original judgment or the bounded judge
+trial contract. Judge accuracy studies are complementary evidence selected by
+the decision owner, not a prerequisite for runtime verification.</p>
 <h2 id="signed-bytes-are-not-truthful-measurements">Signed bytes are not truthful measurements<a class="headerlink" href="#signed-bytes-are-not-truthful-measurements" title="Permanent link">&para;</a></h2>
 <p>The Ed25519 evidence signature establishes that:</p>
 <ul>
@@ -2346,8 +2593,9 @@ measurement is correct. An authorized but compromised evidence signer can fabric
 a mutually consistent set of provider facts and sign it.</p>
 <p>The verifier signature similarly establishes who signed the receipt and which
 manifest, anchors, and replayed verdict it covers. It does not make the source
-measurements true. It shows that the named verifier accepted those bytes under
-the recorded anchors and verifier implementation.</p>
+measurements true. It authenticates the named verifier's recorded result under
+the stated anchors and verifier implementation, including a failure result.
+Acceptance requires checking the verdict and applicable independent policy.</p>
 <p>Trust in either statement therefore requires an external authorization binding
 between a real actor and the pinned public-key fingerprint.</p>
 <p>InvarLock's fingerprint is:</p>
@@ -2400,10 +2648,15 @@ policy pins the scorer ID, version, descriptor digest, and configuration
 digest. The registry must resolve that exact binding, and replay must produce
 the same canonical result twice. Scorer code is part of the verifier's trusted
 computing base: review and distribute it with the same discipline as verifier
-code. An acceptance scorer must not use a network, external model, human
-judgment, or LLM judge. InvarLock checks the authenticated scorer identity and
+code. A deterministic extension scorer must not use a network, external model, externally assigned
+ratings, or LLM judge. InvarLock checks the authenticated scorer identity and
 deterministic replay; it does not sandbox extension code or prove those
-operational restrictions.</p>
+operational restrictions. The native <code>judge</code> scorer collects or imports bounded
+ratings under a separate evidence and recipient-policy contract. Only live
+collection requires the installed collector and provider credentials; verification
+replays retained measurements offline. Native judge evidence binds its runtime
+capture, while imported answers retain their supplied-source provenance. Judging
+does not execute through the deterministic scorer-extension trust boundary.</p>
 <h3 id="authorization-lifecycle">Authorization lifecycle<a class="headerlink" href="#authorization-lifecycle" title="Permanent link">&para;</a></h3>
 <p>For each evidence signer, technical verifier, and envelope-signer identity, the
 deployment should maintain:</p>
@@ -2419,8 +2672,8 @@ deployment should maintain:</p>
 lifecycle. A receipt verifier or recipient must check that the relevant keys
 were authorized for their distinct roles at the decision time.</p>
 <h3 id="runtime-and-provider">Runtime and provider<a class="headerlink" href="#runtime-and-provider" title="Permanent link">&para;</a></h3>
-<p>Runtime receipts bind an integration implementation, artifact identity, scoring
-observation, execution settings, device facts, and outer image digest. The host
+<p>For native model execution, runtime receipts bind an integration implementation,
+artifact identity, scoring observation, execution settings, device facts, and outer image digest. The host
 prepares the canonical schedule, then launches a separately digest-pinned
 Docker or Podman worker for each side. Each worker runs with network disabled,
 a read-only container root, reduced privileges, read-only job, artifact, and
@@ -2484,9 +2737,13 @@ the other.</p>
 <li>retains the exact supplied receipt bytes in <code>receipt.raw_base64</code>, with a
   digest over those decoded bytes and parsed-content equality.</li>
 </ul>
-<p>A v0.13 receipt has no authenticated issuance time. Wrapping it cannot invent
-one, so it cannot satisfy a recipient policy that requires bounded evidence
-age. Creating a fresh envelope changes transport metadata only.</p>
+<p>The native v1/v2 receipt formats retained from v0.13 have no authenticated
+issuance time, including receipts created by the current implementation.
+Wrapping them cannot invent one: <code>receipt_issued_at</code> remains null, so they cannot
+satisfy a recipient policy that requires bounded evidence age. Creating a fresh
+envelope changes transport metadata only. This portable acceptance path supports
+native pack-v1 receipts; captured and judge receipts retain separate handoff
+contracts.</p>
 <p>This boundary authenticates and policy-evaluates the portable projection; it
 does not replace full evidence replay with <code>invarlock verify</code>. The envelope is
 standards-shaped in-toto/DSSE transport, but interoperability with an external
@@ -2583,7 +2840,7 @@ in <a href="../../reference/acceptance-attestations/">Acceptance attestations</a
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "navigation.sections", "navigation.expand", "navigation.tabs", "navigation.top", "search.highlight", "search.suggest", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
         <script src="../../assets/javascripts/mathjax.js"></script>
       

@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/invarlock-app-icon.svg">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -436,6 +436,90 @@
     
   
     Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../captured-results/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Captured results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hosted-service-requalification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosted-service requalification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modelkit-handoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ModelKit recipient handoff
   
 
     
@@ -1284,6 +1368,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../reference/evaluation-records/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation records
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/evaluation-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation capacity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../reference/compatibility/" class="md-nav__link">
         
   
@@ -1460,6 +1600,62 @@
     
   
     Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/judge-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Judge measurements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/evidence-sets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence sets
   
 
     
@@ -1969,13 +2165,14 @@
 <h1 id="key-management">Key management<a class="headerlink" href="#key-management" title="Permanent link">&para;</a></h1>
 <p>InvarLock uses Ed25519 signatures for two distinct statements:</p>
 <ul>
-<li>the evidence signer signs the canonical evidence manifest;</li>
+<li>the evidence signer signs the canonical manifest for pack-v1/v2 evidence or
+  the domain-separated envelope statement for judge evidence;</li>
 <li>the independent verifier signs a receipt containing its decision and anchors.</li>
 </ul>
 <p>Use different keys for these roles. A verifier that accepts an evidence-signing key and
 then signs the result should not possess the evidence-signing private key.</p>
-<div class="admonition tip">
-<p class="admonition-title">User guide</p>
+<blockquote>
+<p><strong>User guide</strong></p>
 <p><strong>Outcome:</strong> Establish separate evidence signer and verifier signing identities,
 distribute their fingerprints independently, and retain or revoke them
 without rewriting signed history.</p>
@@ -1984,7 +2181,7 @@ receipt verifiers responsible for signer authorization.</p>
 <p><strong>Prerequisites:</strong> Assigned evidence signer and verifier roles, protected key
 storage, an authenticated fingerprint-distribution channel, and a recorded
 rotation and incident-response policy.</p>
-</div>
+</blockquote>
 <h2 id="key-roles-and-compromise-impact">Key roles and compromise impact<a class="headerlink" href="#key-roles-and-compromise-impact" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -1997,16 +2194,21 @@ rotation and incident-response policy.</p>
 <tbody>
 <tr>
 <td>Evidence signer</td>
-<td>Canonical <code>manifest.json</code> bytes</td>
-<td>An attacker can create new signature-authenticated bundles; independent verifier anchors and replay still apply.</td>
+<td>Canonical <code>manifest.json</code> bytes for pack-v1/v2, or the domain-separated judge envelope statement</td>
+<td>An attacker can create new signature-authenticated evidence; independent verifier anchors and replay still apply.</td>
 </tr>
 <tr>
 <td>Verifier</td>
-<td>Receipt statement containing manifest digest, anchors, and verdict</td>
+<td>Receipt statement containing evidence bindings, anchors, and verdict</td>
 <td>An attacker can issue receipts under that verifier identity; receipt verifiers must revoke the fingerprint.</td>
 </tr>
 </tbody>
 </table>
+<p>The verification commands and receipt example below use native pack-v1 evidence.
+For the other families, use the <a href="../captured-results/#signed-handoff">captured handoff</a>
+or <a href="../../reference/judge-measurements/">judge evidence and recipient contract</a>.
+Judge signing bytes include the evidence format identifier, a NUL separator,
+and the canonical envelope statement without its signature field.</p>
 <p>Neither key encrypts evidence. Public keys are embedded so signatures can be
 checked, while authorization comes from fingerprints distributed separately.
 The Ed25519 algorithm is specified in
@@ -2057,7 +2259,7 @@ in its <a href="https://cryptography.io/en/stable/hazmat/primitives/asymmetric/s
 script computes the InvarLock form directly. Evidence-signer fingerprints must reach
 verifiers through an authenticated channel separate from the submitted evidence.
 Verifier fingerprints must likewise reach receipt verifiers independently.</p>
-<p>Compute a fingerprint from a public or private PEM without printing private
+<p>Compute a fingerprint from a private PEM without printing private
 material:</p>
 <div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">hashlib</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
@@ -2138,6 +2340,11 @@ fingerprint from the receipt into the receipt reader has the same circularity.</
     <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;verification.receipt.json&quot;</span><span class="p">),</span>
     <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;evidence&quot;</span><span class="p">),</span>
     <span class="n">policy_path</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;trusted/acceptance.json&quot;</span><span class="p">),</span>
+    <span class="n">expected_artifact_digests</span><span class="o">=</span><span class="p">{</span>
+        <span class="s2">&quot;baseline&quot;</span><span class="p">:</span> <span class="s2">&quot;sha256:&quot;</span> <span class="o">+</span> <span class="s2">&quot;5&quot;</span> <span class="o">*</span> <span class="mi">64</span><span class="p">,</span>
+        <span class="s2">&quot;subject&quot;</span><span class="p">:</span> <span class="s2">&quot;sha256:&quot;</span> <span class="o">+</span> <span class="s2">&quot;6&quot;</span> <span class="o">*</span> <span class="mi">64</span><span class="p">,</span>
+    <span class="p">},</span>
+    <span class="n">expected_schedule_digest</span><span class="o">=</span><span class="s2">&quot;sha256:&quot;</span> <span class="o">+</span> <span class="s2">&quot;7&quot;</span> <span class="o">*</span> <span class="mi">64</span><span class="p">,</span>
     <span class="n">expected_runtime_digests</span><span class="o">=</span><span class="p">{</span>
         <span class="s2">&quot;baseline&quot;</span><span class="p">:</span> <span class="s2">&quot;sha256:&quot;</span> <span class="o">+</span> <span class="s2">&quot;1&quot;</span> <span class="o">*</span> <span class="mi">64</span><span class="p">,</span>
         <span class="s2">&quot;subject&quot;</span><span class="p">:</span> <span class="s2">&quot;sha256:&quot;</span> <span class="o">+</span> <span class="s2">&quot;2&quot;</span> <span class="o">*</span> <span class="mi">64</span><span class="p">,</span>
@@ -2148,10 +2355,20 @@ fingerprint from the receipt into the receipt reader has the same circularity.</
 <span class="p">)</span>
 <span class="k">if</span> <span class="ow">not</span> <span class="n">result</span><span class="o">.</span><span class="n">ok</span><span class="p">:</span>
     <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">errors</span><span class="p">)</span>
+<span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">statement</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+<span class="k">if</span> <span class="ow">not</span> <span class="n">result</span><span class="o">.</span><span class="n">statement</span><span class="p">[</span><span class="s2">&quot;verdict&quot;</span><span class="p">][</span><span class="s2">&quot;ok&quot;</span><span class="p">]:</span>
+    <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;authenticated receipt records a rejection&quot;</span><span class="p">)</span>
 </code></pre></div>
 
 <p>Every expected value in that example must come from caller-owned trust
-configuration. Do not fill it from <code>result.statement</code>.</p>
+configuration. Do not fill it from <code>result.statement</code>. Receipt authentication
+and a passing signed verdict are separate checks. For a v2 native receipt,
+also supply the independent <code>expected_request_digest</code>; GGUF requires that
+anchor. See <a href="../evidence-and-verification/#validate-a-received-receipt">receipt validation</a>
+for trust-profile binding and the complete handoff rules. A receipt issued
+using a trust profile requires its independently obtained
+<code>expected_trust_profile_digest</code>; omission expects a receipt with no recorded
+profile digest.</p>
 <h2 id="validate-the-key-setup">Validate the key setup<a class="headerlink" href="#validate-the-key-setup" title="Permanent link">&para;</a></h2>
 <p>Before relying on a production transaction, confirm that:</p>
 <ul>
@@ -2265,7 +2482,7 @@ receipt retention.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "navigation.sections", "navigation.expand", "navigation.tabs", "navigation.top", "search.highlight", "search.suggest", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
         <script src="../../assets/javascripts/mathjax.js"></script>
       

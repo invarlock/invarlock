@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/invarlock-app-icon.svg">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -433,6 +433,90 @@
     
   
     Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/captured-results/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Captured results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/hosted-service-requalification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosted-service requalification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/modelkit-handoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ModelKit recipient handoff
   
 
     
@@ -1046,6 +1130,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#captured-hosted-and-judge-reruns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Captured, hosted and judge reruns
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#worked-classification" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1306,6 +1401,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../reference/evaluation-records/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation records
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/evaluation-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation capacity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../reference/compatibility/" class="md-nav__link">
         
   
@@ -1482,6 +1633,62 @@
     
   
     Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/judge-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Judge measurements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/evidence-sets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence sets
   
 
     
@@ -1947,6 +2154,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#captured-hosted-and-judge-reruns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Captured, hosted and judge reruns
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#worked-classification" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2011,8 +2229,8 @@
 
 
 <h1 id="reproducibility-and-provenance">Reproducibility and provenance<a class="headerlink" href="#reproducibility-and-provenance" title="Permanent link">&para;</a></h1>
-<div class="admonition abstract">
-<p class="admonition-title">Assurance note</p>
+<blockquote>
+<p><strong>Assurance note</strong></p>
 <p><strong>In plain language:</strong> The pack records what artifacts, inputs, settings,
 and results were declared, so reruns can be compared. It does not by itself
 prove that a particular machine executed them.</p>
@@ -2023,11 +2241,16 @@ to distinguish byte identity, declared runtime identity, and attestation.</p>
 <p><strong>Evidence:</strong> Artifact, schedule, policy, provider, runtime, device, and
 per-record bindings retained in the pack and its external verification
 receipt.</p>
-</div>
+</blockquote>
 <p>InvarLock records enough identity and execution material to compare a rerun
 with an earlier transaction. That material narrows ambiguity; it is not remote
 execution attestation and does not promise bit-for-bit numerical reproduction
 on every machine.</p>
+<p>The runtime identity vector below describes native pack-v1 provider evidence.
+Captured comparisons retain complete canonical evaluation runs and source
+provenance; bounded judge evidence retains its own plan, measurements and
+analysis, with native runtime capture only when produced through the native
+workflow.</p>
 <h2 id="reproducibility-vocabulary">Reproducibility vocabulary<a class="headerlink" href="#reproducibility-vocabulary" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -2113,9 +2336,10 @@ I_C=(I_B,I_S,d_{\mathcal S},d_{\pi},m,c),
 \]</div>
 <p>with schedule digest <span class="arithmatex">\(d_{\mathcal S}\)</span>, policy digest <span class="arithmatex">\(d_{\pi}\)</span>, metric <span class="arithmatex">\(m\)</span>,
 and comparison identifier <span class="arithmatex">\(c\)</span>.</p>
-<p>Equality of recorded vectors is a necessary condition for a strict same-input,
-same-configuration comparison of two packs. It is not sufficient to prove that
-either declared execution occurred.</p>
+<p>Compare the input and configuration components when assessing a same-input,
+same-configuration rerun; the observation component may differ because it
+contains the result being compared. Agreement on recorded identities does not
+prove that either declared execution occurred.</p>
 <h2 id="bound-material">Bound material<a class="headerlink" href="#bound-material" title="Permanent link">&para;</a></h2>
 <p>An <code>invarlock/evidence-pack-v1</code> binds:</p>
 <table>
@@ -2192,7 +2416,7 @@ cannot rewrite with the evidence.</p>
 <li>request/evidence cross-bindings.</li>
 </ul>
 <p>Every digest anchor is exact. A different artifact identity, schedule, or image
-digest fails verification even when a human-readable locator or source file
+digest fails verification even when a displayed locator or source file
 appears equivalent.</p>
 <h2 id="rerun-control-matrix">Rerun control matrix<a class="headerlink" href="#rerun-control-matrix" title="Permanent link">&para;</a></h2>
 <p>A meaningful rerun should preserve or deliberately vary these controls:</p>
@@ -2287,6 +2511,31 @@ character. Teacher-forced normalized NLL can change near a policy boundary.</p>
 <li>record every material environment difference; and</li>
 <li>investigate disagreement instead of selecting the favorable run.</li>
 </ol>
+<h2 id="captured-hosted-and-judge-reruns">Captured, hosted and judge reruns<a class="headerlink" href="#captured-hosted-and-judge-reruns" title="Permanent link">&para;</a></h2>
+<p>For captured evidence, preserve the complete source exports, explicit field or
+text projection, canonical run digests, policy and normalized request. Keep
+original evaluator exports beside the evidence when needed for provenance
+review; the captured pack retains normalized runs and source bindings. Offline
+verification repeats the declared score derivation or recorded-score aggregation
+without calling the original evaluator. Replaying retained likelihood facts
+checks their arithmetic and bindings; tokenizer and execution facts remain
+assertions of the capture source.</p>
+<p>A hosted run declares <code>artifact_digest: null</code> and a <code>service_identity</code> containing
+configuration and an observation window. Its descriptor digest identifies those
+declarations, not hidden weights or later service behavior. A fresh service
+capture is a new observation even if the endpoint name is unchanged. Callers
+schedule and collect those observations; InvarLock does not provide a hosted
+runtime or continuous monitoring service. See
+<a href="../../user-guide/hosted-service-requalification/">hosted requalification</a>.</p>
+<p>Judge verification replays retained requests, responses, attempts, parsing and
+fixed-benchmark analysis offline. A fresh collection can produce different
+ratings under the same model name and configuration. Preserve the plan, frozen
+answers, independent-unit mapping, repetitions, budgets and source provenance
+when comparing collections. Additional repetitions do not create additional
+independent units. Independence across declared units and fixing the benchmark
+and policy before judging are assumptions, not properties established by replay.
+Optional reference-label studies can test judge agreement; they do not change the
+replay claim or become runtime prerequisites.</p>
 <h2 id="worked-classification">Worked classification<a class="headerlink" href="#worked-classification" title="Permanent link">&para;</a></h2>
 <p>Suppose a rerun uses identical artifact, schedule, policy, provider, and image
 digests but moves from one GPU model to another. The pack can establish
@@ -2397,7 +2646,7 @@ describes adversarial selection and fabricated-execution scenarios.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "navigation.sections", "navigation.expand", "navigation.tabs", "navigation.top", "search.highlight", "search.suggest", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
         <script src="../../assets/javascripts/mathjax.js"></script>
       

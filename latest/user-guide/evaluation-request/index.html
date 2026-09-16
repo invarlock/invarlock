@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/invarlock-app-icon.svg">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -456,6 +456,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../captured-results/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Captured results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hosted-service-requalification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosted-service requalification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modelkit-handoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ModelKit recipient handoff
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../change-scenarios/" class="md-nav__link">
         
   
@@ -705,6 +789,17 @@
     <span class="md-ellipsis">
       
         normalized_nll_per_utf8_byte
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#judge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        judge
       
     </span>
   </a>
@@ -1379,6 +1474,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../reference/evaluation-records/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation records
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/evaluation-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation capacity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../reference/compatibility/" class="md-nav__link">
         
   
@@ -1555,6 +1706,62 @@
     
   
     Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/judge-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Judge measurements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/evidence-sets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence sets
   
 
     
@@ -2055,6 +2262,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#judge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        judge
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#derived-perplexity-interpretation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2157,7 +2375,7 @@
 
 
 <h1 id="evaluation-request">Evaluation request<a class="headerlink" href="#evaluation-request" title="Permanent link">&para;</a></h1>
-<p>An evaluation request closes one baseline-versus-subject release-regression
+<p>A native evaluation request closes one baseline-versus-subject release-regression
 transaction over exact artifacts, a pinned evaluation source, one task,
 runtime settings, one built-in metric or bound scorer extension, one policy,
 optional authenticated observations, and a fresh evidence destination. The schema is
@@ -2165,8 +2383,8 @@ optional authenticated observations, and a fresh evidence destination. The schem
 <p>The request is comparison intent, not host authorization. It does not grant
 network access, choose an OCI engine, select arbitrary executables, inject
 secrets, or authorize its own runtime digest.</p>
-<div class="admonition tip">
-<p class="admonition-title">User guide</p>
+<blockquote>
+<p><strong>User guide</strong></p>
 <p><strong>Outcome:</strong> Author a closed run request for a real paired comparison, or a
 closed import request for complete provider material produced elsewhere.</p>
 <p><strong>Audience:</strong> Evaluation operators and integration engineers preparing a
@@ -2174,7 +2392,14 @@ release-regression decision.</p>
 <p><strong>Prerequisites:</strong> Pinned model inputs, a local JSONL source for run mode or
 a canonical schedule for import mode, a reviewed single-scorer policy,
 provider settings, and a new request-relative evidence destination.</p>
-</div>
+</blockquote>
+<p>Captured records use the separate <code>invarlock/evaluation-request-v2</code> contract
+with <code>execution.mode: captured</code> through the same <code>evaluate</code> command. Follow
+<a href="../captured-results/">Captured results</a> for that request, run pins, and independent
+verification. Frozen-answer <code>invarlock/evaluation-request-v3</code> requests select
+<code>judge_import</code> or <code>judge_collect</code> when the runs and judge plan are already
+prepared; see the <a href="../../reference/judge-measurements/">judge request contract</a>.
+The native v1 shapes below support all three built-in scorers.</p>
 <h2 id="choose-the-execution-mode">Choose the execution mode<a class="headerlink" href="#choose-the-execution-mode" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -2469,6 +2694,41 @@ UTF-8 bytes are the normalization unit. It is not perplexity and is not a pooled
 byte-weighted loss. It measures expected-continuation likelihood regression
 under the authenticated prompt, target, provider, and runtime; it is not a
 general model-quality measure.</p>
+<h3 id="judge"><code>judge</code><a class="headerlink" href="#judge" title="Permanent link">&para;</a></h3>
+<p>Select this built-in scorer when generated text needs bounded rubric-based
+ratings. Keep the native baseline, subject, dataset and execution fields, and
+add this comparison fragment:</p>
+<div class="codehilite"><pre><span></span><code><span class="nt">comparison</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">metric</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">judge</span>
+<span class="w">  </span><span class="nt">policy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">judge-policy.json</span>
+<span class="w">  </span><span class="nt">judge</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">workspace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">judge-work</span>
+<span class="w">    </span><span class="nt">signer_identity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">evaluation-signer</span>
+</code></pre></div>
+
+<p>The policy uses <code>invarlock/native-judge-policy-v1</code> and binds the rubric,
+judge identity and configuration, rating scale, independent-unit assignments,
+repetitions, analysis thresholds and collection budgets. Create a complete
+starting workspace with <code>invarlock evaluate --init demo --example native-judge</code>.
+Its illustrative model digests and two cases must be replaced before use.</p>
+<p>Native judging requires exactly one text input part per record; image/content
+inputs are rejected. Run mode first collects authenticated answers through the
+provider's text-output surface and freezes the runtime capture. Import mode
+authenticates complete provider sidecars bound to the same judge policy. Both then collect ratings
+through the separately installed collector. Preflight validates prerequisites
+and complete reservations without model or judge calls. The model workers remain
+network-disabled; judge collection has its own explicit authorization and limits.</p>
+<p>The private judge workspace supports resuming admitted trials against the same
+frozen answers. Changed models, data, rubric, policy or runtime identities need
+a new workspace. Repeated ratings do not create more independent tasks. Unless
+<code>plan.prompt.reference_mode: per_case</code> is selected, authenticated expected
+outputs are not sent to the judge.</p>
+<p>Judge evidence has a separate envelope, analysis and recipient-policy contract;
+it does not use the comparison-report-v3 interval or native pack-v1 receipt
+shown for exact match and NLL. Follow the
+<a href="https://github.com/invarlock/invarlock/blob/main/examples/native-judge/README.md">native judge starter</a>
+through collection, independent verification, reporting and recovery, and use the
+<a href="../../reference/judge-measurements/">judge reference</a> for exact contracts.</p>
 <h3 id="derived-perplexity-interpretation">Derived perplexity interpretation<a class="headerlink" href="#derived-perplexity-interpretation" title="Permanent link">&para;</a></h3>
 <p>For a normalized-NLL report, InvarLock derives token-normalized NLL when both
 artifacts bind the same authenticated tokenizer and each pair has the same
@@ -2483,12 +2743,13 @@ unavailable reason.</p>
 <p>The perplexity ratio is verifier-derived interpretation only. It is not a
 selectable metric and has no policy threshold, confidence interval, or verdict
 authority.</p>
-<p>The built-in HF provider supports both built-in metrics for <code>text_causal</code>. The
+<p>The built-in HF provider supports exact-match and normalized-NLL collection for <code>text_causal</code>. The
 first-party GGUF, TensorRT-LLM, and Hugging Face vision-text add-ins currently
 support exact match for their declared tasks. Import execution support remains
 provider-specific: both imported provider receipts must declare the selected
-task and collection metric. A scorer extension collects authenticated text
-outputs through the exact-match provider surface before verifier replay.</p>
+task and collection metric. Judge and deterministic scorer extensions collect authenticated text outputs
+through the exact-match provider surface. Judge then performs separately bounded
+collection against those frozen outputs; deterministic extensions replay locally.</p>
 <h2 id="deterministic-scorer-extension">Deterministic scorer extension<a class="headerlink" href="#deterministic-scorer-extension" title="Permanent link">&para;</a></h2>
 <p><code>comparison</code> selects exactly one built-in <code>metric</code> or one complete
 <code>scorer_extension</code> binding. It cannot contain both. A binding has this closed
@@ -2506,9 +2767,10 @@ shape:</p>
 
 <p>The digests are illustrative. The descriptor binds supported tasks, text
 output, configuration schema, replay mode, unit-interval value semantics,
-arithmetic-mean aggregation, higher-is-better direction, and disabled network,
-external-model, and human judgment. The configuration digest covers canonical
-JSON configuration bytes.</p>
+arithmetic-mean aggregation and higher-is-better direction. Network access,
+external models and externally assigned ratings are excluded from deterministic
+extension replay. The configuration digest covers canonical JSON configuration
+bytes.</p>
 <p>Providers collect ordinary authenticated text outputs. The scorer receives
 exactly <code>expected_output</code>, <code>output_text</code>, and <code>output_sha256</code> for each ordered
 record, even when the underlying schedule also contains authenticated content.
@@ -2525,9 +2787,10 @@ kinds, output kind, pairing, source facts, and replay result must all agree.
 Replay runs twice and must produce byte-identical canonical results.</p>
 <p>Separately installed and explicitly authorized scorer packages may implement
 deterministic token F1, structured extraction, or VQA answer normalization. SQL
-or code execution, model-based semantic similarity, network and human scoring,
-external models, and LLM judges are excluded until separate authenticated
-contracts exist. Judge outputs remain optional authenticated observations.</p>
+or code execution, model-based semantic similarity, network services and externally assigned ratings,
+external models, and LLM judges are excluded from the scorer-extension contract.
+Use the built-in <a href="#judge"><code>judge</code> scorer</a> for bounded rubric-based text grading
+with its separate collection and replay contract.</p>
 <h2 id="authenticated-optional-observations">Authenticated optional observations<a class="headerlink" href="#authenticated-optional-observations" title="Permanent link">&para;</a></h2>
 <p>The optional root <code>observations</code> array attaches canonical JSON context to the
 same signed evidence transaction:</p>
@@ -2541,16 +2804,19 @@ same signed evidence transaction:</p>
 <p>Each entry has a unique canonical ID, a canonical kind, a scope of
 <code>comparison</code>, <code>baseline</code>, or <code>subject</code>, and a request-relative path to a
 canonical JSON object. Evaluation reads the bytes without following links,
-requires canonical encoding and a maximum size of 1 MiB, and places the payload
-under <code>observations/&lt;id&gt;.json</code>. The signed manifest binds its digest, kind,
-scope, comparison, schedule, policy, and both artifact identities. Strict
-verification replays those bindings, and the human report renders the payload
+requires canonical encoding and a maximum size of 1 MiB. Native pack-v1 evidence
+places the payload under <code>observations/&lt;id&gt;.json</code>. Its signed manifest binds the
+digest, kind, scope, comparison, schedule, policy, and both artifact identities.
+Strict verification replays those bindings, and the evidence report renders the payload
 in a separate context section.</p>
+<p>Native judge evidence instead retains the observation payloads inside
+<code>native_capture.json</code>, authenticated by its signed judge envelope. Captured v2
+requests do not accept the root <code>observations</code> field.</p>
 <p>Observations are authenticated context. The selected paired comparison, its
 paired interval, and policy are the complete acceptance calculation. Adding,
-removing, or changing an observation changes the request-bound comparison ID
-and therefore creates a different signed transaction, but cannot alter the
-paired statistics or verdict for otherwise identical inputs. Any byte change
+removing, or changing a native pack-v1 observation changes the request-bound
+comparison ID and therefore creates a different signed transaction, but cannot
+alter the paired statistics or verdict for otherwise identical inputs. Any byte change
 after publication invalidates bundle integrity. Spectral, random-matrix, and
 variance summaries from <code>invarlock-diagnostics</code> use this path. The
 <a href="https://github.com/invarlock/invarlock/tree/main/examples/integrations/spdx-ai-observation">SPDX 3.0.1 AI observation example</a>
@@ -2576,7 +2842,8 @@ Strict verification continues to reconstruct
 for one scheduled record remain coupled. The upper bound controls the
 normalized-NLL policy. A favorable point estimate cannot override an interval
 that crosses the policy limit.</p>
-<p>Each metric policy may optionally add a coupled record-count and interval-width
+<p>For exact match, normalized NLL and deterministic extensions, a metric policy
+may optionally add a coupled record-count and interval-width
 requirement. Exact match and scorer extensions pair <code>minimum_record_count</code> with
 <code>maximum_interval_width_pp</code>; normalized NLL pairs it with
 <code>maximum_interval_width_ratio</code>. Exact match may independently add
@@ -2585,9 +2852,10 @@ and subject means must meet. The final v3 report passes only when the metric
 bound and every configured count, width, and side-accuracy check pass.
 Preflight can validate the count but marks interval width and side accuracy
 pending until execution.</p>
-<p>This is a deterministic resampling interval over the authenticated finite
-schedule. It is not a population confidence interval, proof of dataset
-representativeness, or general model-quality claim.</p>
+<p>The normalized-NLL and deterministic-extension intervals describe deterministic
+resampling over the authenticated finite schedule. They are not population
+confidence intervals, proof of dataset representativeness, or general
+model-quality claims.</p>
 <h2 id="oci-delegation-for-run-mode">OCI delegation for run mode<a class="headerlink" href="#oci-delegation-for-run-mode" title="Permanent link">&para;</a></h2>
 <p>When the host CLI sees <code>execution.mode: run</code> and is not already inside a strict
 container boundary, it launches the request in Docker or Podman. Caller-owned
@@ -2659,8 +2927,9 @@ key is never mounted into either worker.</p>
 allow different digest-pinned images or devices. Workers that share a generic
 or identical CUDA selector run sequentially; workers assigned explicitly
 different CUDA indexes can run in parallel.</p>
-<p>The request cannot enable network or remote code. Runtime-image identity,
-device selection, resource ceilings, and worker identity remain
+<p>The request cannot enable network or remote code in model workers. Native judge
+collection uses the separately authorized collector described above. Runtime-image
+identity, device selection, resource ceilings, and worker identity remain
 caller-controlled so submitted YAML cannot grant itself host capabilities.</p>
 <h2 id="import-mode">Import mode<a class="headerlink" href="#import-mode" title="Permanent link">&para;</a></h2>
 <p>Import mode uses a canonical schedule path under <code>comparison.dataset</code> and
@@ -2779,7 +3048,7 @@ recovery.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "navigation.sections", "navigation.expand", "navigation.tabs", "navigation.top", "search.highlight", "search.suggest", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
         <script src="../../assets/javascripts/mathjax.js"></script>
       

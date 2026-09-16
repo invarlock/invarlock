@@ -16,14 +16,14 @@
         <link rel="prev" href="../architecture/">
       
       
-        <link rel="next" href="../compatibility/">
+        <link rel="next" href="../evaluation-records/">
       
       
         
       
       
       <link rel="icon" href="../../assets/invarlock-app-icon.svg">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -433,6 +433,90 @@
     
   
     Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/captured-results/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Captured results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/hosted-service-requalification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosted-service requalification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/modelkit-handoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ModelKit recipient handoff
   
 
     
@@ -1181,6 +1265,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#identity-and-evaluation-context-boundaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Identity and evaluation-context boundaries
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#provider-contracts" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1355,6 +1450,62 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluation-records/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation records
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluation-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation capacity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -1543,6 +1694,62 @@
     
   
     Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../judge-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Judge measurements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evidence-sets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence sets
   
 
     
@@ -1942,6 +2149,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#identity-and-evaluation-context-boundaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Identity and evaluation-context boundaries
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#provider-contracts" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2138,14 +2356,12 @@
 byte-identical package-owned copies ship in the core wheel. Verification always
 loads the package-owned copies: a working directory or environment variable
 cannot substitute a different schema.</p>
-<div class="admonition info">
-<p class="admonition-title">Reference</p>
-<ul>
-<li><strong>Surface:</strong> Versioned request, evidence, provider, runtime, report, and receipt contracts</li>
-<li><strong>Stability:</strong> Closed public interchange formats; incompatible shape or meaning changes require a new format identifier</li>
-<li><strong>Use this page when:</strong> Authoring contract objects, validating canonical bytes, or reviewing cross-file digest and signature bindings</li>
-</ul>
-</div>
+<blockquote>
+<p><strong>Reference</strong></p>
+<p><strong>Surface:</strong> Versioned request, evidence, provider, runtime, report, and receipt contracts</p>
+<p><strong>Stability:</strong> Closed public interchange formats; incompatible shape or meaning changes require a new format identifier</p>
+<p><strong>Use this page when:</strong> Authoring contract objects, validating canonical bytes, or reviewing cross-file digest and signature bindings</p>
+</blockquote>
 <h2 id="schema-backed-contracts">Schema-backed contracts<a class="headerlink" href="#schema-backed-contracts" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -2162,9 +2378,124 @@ cannot substitute a different schema.</p>
 <td>One closed run-or-import request</td>
 </tr>
 <tr>
+<td><code>evaluation_request_v2.schema.json</code></td>
+<td><code>invarlock/evaluation-request-v2</code></td>
+<td>Captured-only request with paired source specifications and complete-run pins</td>
+</tr>
+<tr>
+<td><code>evaluation_request_v3.schema.json</code></td>
+<td><code>invarlock/evaluation-request-v3</code></td>
+<td>Bounded judge import or collection request over frozen runs</td>
+</tr>
+<tr>
+<td><code>evaluation_setup_result.schema.json</code></td>
+<td><code>invarlock/evaluation-setup-v1</code></td>
+<td>CLI example, key generation, or case-set preparation result; no evaluation assurance</td>
+</tr>
+<tr>
+<td><code>evaluation_case_set.schema.json</code></td>
+<td><code>invarlock/evaluation-case-set-v1</code></td>
+<td>Immutable case membership and inputs shared by captured runs</td>
+</tr>
+<tr>
+<td><code>evaluation_run.schema.json</code></td>
+<td><code>invarlock/evaluation-run-v1</code></td>
+<td>Complete attributed answers and optional recorded scores for one side</td>
+</tr>
+<tr>
+<td><code>normalized_captured_request.schema.json</code></td>
+<td><code>invarlock/evaluation-request-v2</code></td>
+<td>Canonical captured-request projection retained in evidence</td>
+</tr>
+<tr>
+<td><code>comparison_policy.schema.json</code></td>
+<td><code>invarlock/comparison-policy-v1</code></td>
+<td>Deterministic metric, slice, count, precision, and regression requirements</td>
+</tr>
+<tr>
+<td><code>multi_metric_comparison.schema.json</code></td>
+<td><code>invarlock/multi-metric-comparison-v1</code></td>
+<td>Recomputed deterministic results across declared metrics and slices</td>
+</tr>
+<tr>
+<td><code>scorer_extension_descriptor.schema.json</code></td>
+<td><code>invarlock/scorer-extension-descriptor-v1</code></td>
+<td>Installed deterministic scorer identity and declared capabilities</td>
+</tr>
+<tr>
+<td><code>scorer_extension_binding.schema.json</code></td>
+<td><code>invarlock/scorer-extension-binding-v1</code></td>
+<td>Request binding to an exact scorer descriptor and configuration</td>
+</tr>
+<tr>
+<td><code>scorer_extension_result.schema.json</code></td>
+<td><code>invarlock/scorer-extension-result-v1</code></td>
+<td>Per-side deterministic scorer replay facts</td>
+</tr>
+<tr>
 <td><code>evidence_pack.schema.json</code></td>
 <td><code>invarlock/evidence-pack-v1</code></td>
 <td>Canonical bundle manifest and fixed payload paths</td>
+</tr>
+<tr>
+<td><code>evidence_pack_v2.schema.json</code></td>
+<td><code>invarlock/evidence-pack-v2</code></td>
+<td>Captured-only closed directory inventory and explicit signed/unsigned authentication</td>
+</tr>
+<tr>
+<td><code>evidence_verification_receipt_v3.schema.json</code></td>
+<td><code>invarlock/evidence-verification-receipt-v3</code></td>
+<td>Captured-only external verifier statement with run/request anchors and per-metric/slice scoring assurance</td>
+</tr>
+<tr>
+<td><code>judge_measurement_plan.schema.json</code></td>
+<td><code>invarlock/judge-measurement-plan-v1</code></td>
+<td>Frozen judge identity, prompt, rubric, scale, answer bindings, units, and schedule</td>
+</tr>
+<tr>
+<td><code>judge_measurements.schema.json</code></td>
+<td><code>invarlock/judge-measurements-v1</code></td>
+<td>Retained per-trial attempts, responses, parsed ratings, and completeness</td>
+</tr>
+<tr>
+<td><code>judge_analysis_policy.schema.json</code></td>
+<td><code>invarlock/judge-analysis-policy-v1</code></td>
+<td>Independent judge metric, interval, precision, and degradation requirements</td>
+</tr>
+<tr>
+<td><code>judge_measurement_evidence.schema.json</code></td>
+<td><code>invarlock/judge-measurement-evidence-v1</code></td>
+<td>Signed or unsigned judge evidence envelope and artifact digests</td>
+</tr>
+<tr>
+<td><code>judge_measurement_recipient_policy.schema.json</code></td>
+<td><code>invarlock/judge-measurement-recipient-policy-v1</code></td>
+<td>Recipient signer, subject, metric, result, and exact-artifact pins</td>
+</tr>
+<tr>
+<td><code>judge_verification_result.schema.json</code></td>
+<td><code>invarlock/judge-verification-result-v1</code></td>
+<td>Unsigned local judge authentication, replay, policy decision, and acceptance result</td>
+</tr>
+<tr>
+<td><code>judge_measurement_verification_receipt.schema.json</code></td>
+<td><code>invarlock/judge-measurement-verification-receipt-v1</code></td>
+<td>Scoped Ed25519 verifier statement binding the complete local judge result and recipient policy</td>
+</tr>
+<tr>
+<td><code>evidence_set.schema.json</code></td>
+<td><code>invarlock/evidence-set-v1</code></td>
+<td>Unsigned index of one deterministic captured pack and one bounded judge pack</td>
+</tr>
+<tr>
+<td><code>evidence_set_recipient_policy.schema.json</code></td>
+<td><code>invarlock/evidence-set-recipient-policy-v1</code></td>
+<td>Independent shared-run and component-policy pins for required conjunction</td>
+</tr>
+<tr>
+<td><code>evidence_set_verification.schema.json</code></td>
+<td><code>invarlock/evidence-set-verification-v1</code></td>
+<td>Fresh local conjunction result retaining distinct component receipts</td>
 </tr>
 <tr>
 <td><code>evidence_observation.schema.json</code></td>
@@ -2175,6 +2506,11 @@ cannot substitute a different schema.</p>
 <td><code>trust_inputs.schema.json</code></td>
 <td><code>invarlock/trust-inputs-v1</code></td>
 <td>Independent policy, anchors, verifier identity/key path, and scorer authorization</td>
+</tr>
+<tr>
+<td><code>trust_inputs_v2.schema.json</code></td>
+<td><code>invarlock/trust-inputs-v2</code></td>
+<td>Captured independent policy, complete-run/request/signer anchors and verifier identity/key path</td>
 </tr>
 <tr>
 <td><code>acceptance_predicate.schema.json</code></td>
@@ -2210,7 +2546,18 @@ cannot substitute a different schema.</p>
 </table>
 <p>The acceptance predicate and recipient policy are described in
 <a href="../acceptance-attestations/">Acceptance attestations</a>. The detailed InvarLock
-receipt remains the authoritative replayable result.</p>
+receipt remains the authoritative replayable result.
+Native pack v1 and receipt v1/v2 retain their published meanings. Captured pack
+v2 and receipt v3 are the deterministic captured evidence family; captured
+<code>metric: judge</code> uses the separate judge envelope and receipt. Legacy monolithic
+comparison evidence is not accepted. A captured receipt's
+<code>verification_scope: captured_comparison</code> does not qualify native execution,
+acceptance attestations, ModelKit acceptance, or deployment approval. See
+<a href="../evaluation-records/">Captured records</a> for run, case-set, policy and request
+normalization contracts; these schema identifiers are not product-release pins.</p>
+<p><a href="../evidence-sets/">Evidence sets</a> compose existing deterministic and judge
+components over the same original runs. Their combined decision does not add a
+joint confidence guarantee or change either component's acceptance scope.</p>
 <p>Evaluator qualification has two stable wire classifications:</p>
 <table>
 <thead>
@@ -2233,6 +2580,93 @@ receipt remains the authoritative replayable result.</p>
 <p>These fields do not express adapter maintenance or signed-journey maturity.
 Those independent axes belong to the examples-layer qualification catalog, so
 an export cannot promote itself by claiming support or demonstration status.</p>
+<h2 id="identity-and-evaluation-context-boundaries">Identity and evaluation-context boundaries<a class="headerlink" href="#identity-and-evaluation-context-boundaries" title="Permanent link">&para;</a></h2>
+<p>A model name is a display label. It does not select the evaluated artifact,
+package, runtime, scorer or complete execution context. Independent verification
+requires recipient-selected expectations and checks the relationships between
+the authenticated objects, in addition to validating their schemas.</p>
+<table>
+<thead>
+<tr>
+<th>Requirement</th>
+<th>Existing binding and recipient check</th>
+<th>Authority and limit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Exact artifact</td>
+<td>Typed HF snapshot, GGUF or TensorRT-LLM identity; independent artifact-identity digest and actual content checks where supplied</td>
+<td>Content identity is separate from a model name or declared ancestry</td>
+</tr>
+<tr>
+<td>Tokenizer and template</td>
+<td>Artifact tokenizer-metadata digest; supported providers measure relevant files, including HF chat-template metadata</td>
+<td>Additional processor or execution settings must be checked through the applicable provider/request binding</td>
+</tr>
+<tr>
+<td>Evaluated task and schedule</td>
+<td>Normalized request, canonical schedule, and both authenticated provider capability declarations must agree</td>
+<td>A valid signature cannot make conflicting task declarations consistent</td>
+</tr>
+<tr>
+<td>Generation, runtime and security settings</td>
+<td>Provider-specific request/receipt checks and independent runtime digests; a full normalized-request digest can additionally pin the exact declared context</td>
+<td>Authenticated settings and local enforcement tests do not establish independent hardware attestation</td>
+</tr>
+<tr>
+<td>Scorer and evaluation data</td>
+<td>Scorer identifier/version/descriptor/configuration bindings, policy bytes, and independently selected schedule identity</td>
+<td>A qualified scoring domain does not imply support for every behavior of the external evaluator</td>
+</tr>
+<tr>
+<td>Complete transaction request</td>
+<td>Optional independent <code>request_digest</code> in the trust-input profile, or <code>--expected-request-digest</code>; required for the llama.cpp path</td>
+<td>Receipt v2 records this expectation; receipt v1 does not acquire it retroactively</td>
+</tr>
+<tr>
+<td>Package-to-model mapping</td>
+<td>The <a href="../../user-guide/modelkit-handoff/">ModelKit example</a> verifies recipient-selected package blobs, both model directories and their relation to replayed evidence</td>
+<td>This is an example-owned point-of-use check; the generic acceptance envelope alone does not verify a ModelKit</td>
+</tr>
+<tr>
+<td>Transformation or contextual observations</td>
+<td>Canonical payload digest in the normalized request, comparison-bound observation envelope, and signed manifest inventory</td>
+<td>Authenticates the payload and its association; arbitrary payload claims are not independently validated</td>
+</tr>
+<tr>
+<td>Current recipient acceptance</td>
+<td>Trusted envelope and receipt signers, exact transported identity consistency, independent subject digest or actual-content binding, contract versions, freshness and current policy</td>
+<td>Current acceptance is separate from the original technical result</td>
+</tr>
+</tbody>
+</table>
+<p>The independently selected complete-request digest can require exact declared
+settings and observation contents without introducing another model hash. It
+does not independently confirm a hosted service's reported revision or an
+observation's scientific conclusion. Do not obtain an expected digest
+from incoming evidence and describe the resulting equality as independent trust.</p>
+<p>Observation payloads may use a versioned profile for method, configuration,
+probe-set identity, assumptions, result and uncertainty. A consumer must implement
+that profile's semantic checks before claiming to understand or validate it.
+The current recipient policy does not implement a generic required lineage or
+context-profile result. Its optional receipt trust-profile digest identifies the
+selected verifier configuration; it does not create missing validation logic.
+Unknown policy fields reject, while opaque observation payloads retain only
+observation authority.</p>
+<p>Declared transformation history, empirical similarity and exact artifact
+identity remain separate. No supported behavioral fingerprint proves ancestry
+merely because its payload is signed. A future profile must avoid including the
+complete normalized-request digest inside a payload already hashed by that
+request; bind component identities first and let the envelope add comparison
+bindings after normalization.</p>
+<p>The <a href="../evaluation-records/">evaluation-record contracts</a> bind complete captured
+runs and policy bytes, including source versions and per-record context. Their
+independent run digests include outputs, so they are not pre-execution context
+identities. Replaying signed captured evidence verifies the comparison;
+it does not prove that an untrusted capture worker executed the declared model.
+The <a href="../../user-guide/captured-results/">captured rehearsal</a> independently pins
+the protocol and capture before reconstructing those runs.</p>
 <h2 id="provider-contracts">Provider contracts<a class="headerlink" href="#provider-contracts" title="Permanent link">&para;</a></h2>
 <p>The provider ABI uses these schema-backed documents:</p>
 <table>
@@ -2369,7 +2803,7 @@ digest in its signed receipt. The profile never contains private-key bytes.</p>
 <td><code>artifact.model_id</code></td>
 <td>String</td>
 <td>Yes</td>
-<td>Human-stable artifact name; URL syntax is rejected</td>
+<td>Display name for the artifact; URL syntax is rejected</td>
 </tr>
 <tr>
 <td><code>artifact.locator</code></td>
@@ -2397,6 +2831,10 @@ digest in its signed receipt. The profile never contains private-key bytes.</p>
 </tr>
 </tbody>
 </table>
+<p>For <code>metric: judge</code>, <code>comparison.judge</code> additionally requires a private
+<code>workspace</code> and <code>signer_identity</code>, and <code>comparison.policy</code> names the closed
+<code>invarlock/native-judge-policy-v1</code> recipe. Its code-enforced plan and analysis
+bindings are described in <a href="../judge-measurements/#native-scorer">judge measurements</a>.</p>
 <p><code>comparison.policy</code> is always a safe relative path. <code>comparison.dataset</code> is
 mode-specific:</p>
 <ul>
@@ -2412,12 +2850,13 @@ capabilities, evaluation batches, and provider receipts. Built-in identifiers
 are <code>text_causal</code>, <code>masked_language</code>, <code>text_seq2seq</code>, and
 <code>vision_text_generation</code>; a provider must explicitly declare execution
 support. The request selects exactly one built-in <code>metric</code> or one complete
-<code>scorer_extension</code> binding. Built-in metrics are <code>exact_match</code> and
-<code>normalized_nll_per_utf8_byte</code>; request loading requires both selected
-providers to declare the chosen built-in metric. A scorer extension instead
-uses <code>exact_match</code> as its provider collection metric so that expected and
+<code>scorer_extension</code> binding. Built-in scorers are <code>exact_match</code>,
+<code>normalized_nll_per_utf8_byte</code> and <code>judge</code>. Providers declare the required
+collection metric: judge and deterministic scorer extensions use <code>exact_match</code>
+to retain complete text outputs; normalized NLL requires its own likelihood
+facts. A scorer extension uses that authenticated collection so that expected and
 observed text are authenticated for verifier replay. The built-in
-<code>hf_transformers</code> provider declares both built-in metrics. The
+<code>hf_transformers</code> provider declares exact-match and normalized-NLL collection. The
 first-party <code>llama_cpp</code>, <code>tensorrt_llm</code>, and <code>hf_vision_text</code> add-ins currently
 declare exact match for their tasks.</p>
 <h3 id="deterministic-scorer-extension">Deterministic scorer extension<a class="headerlink" href="#deterministic-scorer-extension" title="Permanent link">&para;</a></h3>
@@ -2432,8 +2871,8 @@ input/output kinds, the configuration-schema digest, and these v1 semantics:</p>
 <li>each result is a finite higher-is-better value in <code>[0, 1]</code>;</li>
 <li>the core computes the arithmetic mean, subject-minus-baseline percentage-
   point delta, and fixed 2,048-replicate paired interval; and</li>
-<li>network access, an external model, and human judgment are forbidden in an
-  acceptance scorer.</li>
+<li>network access, external models and externally assigned ratings are forbidden
+  in a deterministic extension scorer.</li>
 </ul>
 <p>The independently supplied policy must contain
 <code>resolved_policy.metrics.scorer_extension</code> with the same <code>scorer_id</code>,
@@ -2443,28 +2882,38 @@ input/output kinds, the configuration-schema digest, and these v1 semantics:</p>
 code. The verifier runs the scorer twice, requires identical canonical
 results, then independently reconstructs the core-owned aggregate, paired
 interval, threshold comparison, and verdict.</p>
-<p>This boundary can support deterministic text scorers such as token F1,
-structured-field extraction, or VQA answer normalization when separately
-implemented and authorized. Those scorer packages are separately installed and
-require explicit authorization. SQL or code execution, model-based semantic
-similarity, network services,
-human review, and LLM judges require different trust contracts; judge outputs
-can be attached as authenticated observations without acceptance authority.</p>
+<p>Core ships <code>invarlock.normalized_match</code>, <code>invarlock.numeric_tolerance</code>,
+<code>invarlock.json_fields</code>, <code>invarlock.json_exact</code> and <code>invarlock.token_f1</code> through
+this boundary. The CLI enables them without <code>--allow-installed-scorers</code>; SDK
+callers supply <code>ScorerExtensionRegistry(allow_installed=False)</code>. Their exact
+version, descriptor and configuration bindings remain mandatory. Additional
+implementations, such as a VQA normalization scorer, require separate
+installation or caller injection and explicit authorization. SQL or code
+execution, model-based semantic similarity, network services, externally
+supplied ratings, and LLM judges require different trust contracts. The bounded
+frozen-answer judge formats provide one such contract for their declared text
+profile; other judge outputs can be attached as authenticated observations
+without acceptance authority.</p>
 <h3 id="evaluator-input-boundary">Evaluator input boundary<a class="headerlink" href="#evaluator-input-boundary" title="Permanent link">&para;</a></h3>
-<p>Import mode is the general extension boundary for measurements produced by an
-external evaluator. An evaluator's output is admissible for an acceptance
+<p>Native provider import mode is an extension boundary for measurements produced
+by an external evaluator. Under that contract, output is admissible for an acceptance
 decision only when InvarLock can authenticate the ordered per-record inputs
 and outputs, bind them to the exact schedule, artifacts, runtime, and source,
 and deterministically recompute the decision-contract metric or authorized
 scorer.</p>
+<p>Captured evaluator integrations use the separate
+<a href="../evaluation-records/">evaluation-record contracts</a>. They bind supplied runs
+and scorer-specific facts without requiring native provider sidecars or asserting
+native execution. Captured judge requests use the bounded judge evidence and
+recipient-policy contracts.</p>
 <p>An adapter alone does not establish evaluator neutrality. The generic
 qualification boundary binds the profile, independent schedule, normalized
 export, retained upstream output, runner bundle, and dependency declaration.
 For a deterministic exact-match profile, every ordered input and output must be
 present and InvarLock independently recomputes every score. Aggregate-only
-results, missing or reordered record facts, and external-judge outputs whose
-scores cannot be deterministically replayed remain observation-only and expose
-no runtime-import records.</p>
+results, missing or reordered record facts, and external-judge outputs outside
+the bounded judge-measurement profile remain observation-only and expose no
+runtime-import records.</p>
 <p>The maintained <a href="../evaluator-qualification/">evaluator qualification
 matrix</a> executes representative upstream tools
 through example-owned runners. Every deterministic profile also scores and
@@ -2605,6 +3054,9 @@ for both <code>baseline</code> and <code>subject</code>:</p>
 artifact identities and paired records; supplying a valid-looking aggregate is
 not sufficient.</p>
 <h2 id="parser-and-path-limits">Parser and path limits<a class="headerlink" href="#parser-and-path-limits" title="Permanent link">&para;</a></h2>
+<p>These are native v1 request limits. Captured comparisons use the separate
+<a href="../evaluation-capacity/">capacity limits</a>; judge recipes and measurements use
+<a href="../judge-measurements/#operational-bounds-and-measured-reference-workload">judge operational bounds</a>.</p>
 <table>
 <thead>
 <tr>
@@ -2640,8 +3092,9 @@ anchors, tags, directives, merge keys, duplicate keys, include-like keys,
 unsafe scalar types, and non-canonical scalar spellings. File reads repeat
 component-by-component no-follow checks at use time, so a path that passed the
 first parse cannot be replaced with a symbolic link unnoticed.</p>
-<p>The built-in comparison metrics are <code>exact_match</code> and
-<code>normalized_nll_per_utf8_byte</code>. Exact-match reports include paired outcome
+<p>The built-in deterministic native metrics are <code>exact_match</code> and
+<code>normalized_nll_per_utf8_byte</code>; native <code>judge</code> uses the separately described
+<a href="../judge-measurements/">judge analysis policy</a>. Exact-match reports include paired outcome
 counts, an exact two-sided McNemar probability, and a versioned paired Newcombe
 95% interval whose lower bound controls policy. Current v3 reports and
 historical v2 reports use the continuity-corrected method; strict verification
@@ -2767,18 +3220,6 @@ separate JSON Schema file:</p>
 <tr>
 <td><code>invarlock/runtime-side-report-v1</code></td>
 <td>Minimal link from one side to its provider observation</td>
-</tr>
-<tr>
-<td><code>invarlock/scorer-extension-descriptor-v1</code></td>
-<td>One scorer's capabilities, input facts, result semantics, and trust constraints</td>
-</tr>
-<tr>
-<td><code>invarlock/scorer-extension-binding-v1</code></td>
-<td>Exact scorer identity and canonical configuration selected by the request</td>
-</tr>
-<tr>
-<td><code>invarlock/scorer-extension-result-v1</code></td>
-<td>Ordered unit-interval record results and core-owned arithmetic mean from replay</td>
 </tr>
 <tr>
 <td><code>invarlock/comparison-report-v3</code></td>
@@ -2953,7 +3394,7 @@ the runtime compatibility gate. See <a href="../release-verification/">Release v
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "navigation.sections", "navigation.expand", "navigation.tabs", "navigation.top", "search.highlight", "search.suggest", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
         <script src="../../assets/javascripts/mathjax.js"></script>
       

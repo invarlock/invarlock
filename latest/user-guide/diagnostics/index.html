@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/invarlock-app-icon.svg">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -436,6 +436,90 @@
     
   
     Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../captured-results/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Captured results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hosted-service-requalification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosted-service requalification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modelkit-handoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ModelKit recipient handoff
   
 
     
@@ -1279,6 +1363,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../reference/evaluation-records/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation records
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/evaluation-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation capacity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../reference/compatibility/" class="md-nav__link">
         
   
@@ -1455,6 +1595,62 @@
     
   
     Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/judge-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Judge measurements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/evidence-sets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence sets
   
 
     
@@ -1962,8 +2158,8 @@ numeric observations. It is useful when a paired decision needs supporting
 engineering context. Its canonical JSON can travel inside the authenticated
 <code>evaluate -&gt; verify -&gt; report</code> evidence transaction while remaining outside
 the acceptance calculation.</p>
-<div class="admonition tip">
-<p class="admonition-title">User guide</p>
+<blockquote>
+<p><strong>User guide</strong></p>
 <p><strong>Outcome:</strong> Produce deterministic numerical observations that support an
 investigation without changing an InvarLock acceptance decision.</p>
 <p><strong>Audience:</strong> Engineers comparing numerical artifacts after conversion,
@@ -1971,7 +2167,7 @@ quantization, or another externally managed transformation.</p>
 <p><strong>Prerequisites:</strong> Fixed baseline and subject arrays, retained input
 provenance, and a completed or planned paired evidence transaction whose
 policy remains authoritative.</p>
-</div>
+</blockquote>
 <h2 id="decide-whether-you-need-it">Decide whether you need it<a class="headerlink" href="#decide-whether-you-need-it" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -2033,7 +2229,7 @@ limit will be operationally cheap.</p>
 <tr>
 <td><code>rmt_observation</code></td>
 <td>Exactly two dimensions</td>
-<td>At least two rows and one column; every standardized column must have nonzero sample deviation</td>
+<td>At least two rows and one varying column; constant columns are reported and excluded</td>
 <td><code>RmtObservation</code></td>
 </tr>
 <tr>
@@ -2073,8 +2269,9 @@ one finite matrix:</p>
 can be expensive for large matrices; take a fixed slice or projection when
 the full calculation is not operationally justified, and record that choice.</p>
 <h3 id="covariance-and-marchenko-pastur-reference">Covariance and Marchenko--Pastur reference<a class="headerlink" href="#covariance-and-marchenko-pastur-reference" title="Permanent link">&para;</a></h3>
-<p><code>rmt_observation</code> standardizes columns, computes covariance eigenvalues, and
-reports theoretical Marchenko--Pastur reference edges:</p>
+<p><code>rmt_observation</code> excludes constant columns, standardizes the remaining columns
+by population deviation, computes covariance eigenvalues, and reports theoretical
+Marchenko--Pastur reference edges:</p>
 <div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">invarlock_addins.diagnostics</span><span class="w"> </span><span class="kn">import</span> <span class="n">rmt_observation</span>
 
@@ -2120,12 +2317,18 @@ policy failure.</p>
 recompute the observation. Do not compensate by changing evidence, policy, or
 a signed receipt.</p>
 <h2 id="attach-an-authenticated-observation">Attach an authenticated observation<a class="headerlink" href="#attach-an-authenticated-observation" title="Permanent link">&para;</a></h2>
-<p>Create the diagnostic result, write its canonical JSON, and name it in the
-evaluation request:</p>
+<p>Create the diagnostic result, write its canonical JSON, and name it in a native
+v1 evaluation request. Captured v2 requests do not accept this <code>observations</code>
+field:</p>
 <div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">invarlock_addins.diagnostics</span><span class="w"> </span><span class="kn">import</span> <span class="n">canonical_observation_bytes</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">invarlock_addins.diagnostics</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">canonical_observation_bytes</span><span class="p">,</span>
+    <span class="n">spectral_observation</span><span class="p">,</span>
+<span class="p">)</span>
 
+<span class="n">observation</span> <span class="o">=</span> <span class="n">spectral_observation</span><span class="p">([[</span><span class="mf">3.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">]])</span>
+<span class="n">Path</span><span class="p">(</span><span class="s2">&quot;observations&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;observations/subject-spectral.json&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">write_bytes</span><span class="p">(</span>
     <span class="n">canonical_observation_bytes</span><span class="p">(</span><span class="n">observation</span><span class="p">)</span>
 <span class="p">)</span>
@@ -2138,13 +2341,17 @@ evaluation request:</p>
 <span class="w">    </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">observations/subject-spectral.json</span>
 </code></pre></div>
 
-<p><code>invarlock evaluate</code> binds the observation to the comparison, schedule, policy,
-and both artifact identities, includes its digest in the signed manifest, and
-places it under <code>observations/</code>. Strict verification rejects malformed,
-non-canonical, unbound, or tampered observations. The verification JSON lists
-the authenticated observation ID, kind, scope, and digest. Human reports place
-the payload under <strong>Authenticated observations</strong> and state that it is outside
+<p>For native pack-v1 evidence, <code>invarlock evaluate</code> binds the observation to the
+comparison, schedule, policy, and both artifact identities, includes its digest
+in the signed manifest, and places it under <code>observations/</code>. Strict verification
+rejects malformed, non-canonical, unbound, or tampered observations. The
+verification JSON lists the authenticated observation ID, kind, scope, and digest.
+Reports place the payload under <strong>Authenticated observations</strong> and state that it is outside
 the acceptance calculation.</p>
+<p>Native judge requests retain these observation payloads inside
+<code>native_capture.json</code> under their separate signed judge envelope. Use the
+<a href="../../reference/judge-measurements/">judge evidence contract</a> for that layout
+and its recipient verification.</p>
 <p>Absence is valid. Adding a JSON file after publication still violates the
 bundle's closed inventory and fails strict verification.</p>
 <p>For each observation, retain the following provenance with the surrounding
@@ -2154,7 +2361,7 @@ investigation record:</p>
 <li>how the array was selected, reshaped, standardized, or projected;</li>
 <li>package and NumPy versions;</li>
 <li>the observation JSON; and</li>
-<li>the human interpretation, clearly separated from the verified decision.</li>
+<li>the interpretation, clearly separated from the verified decision.</li>
 </ul>
 <p>When diagnostic work leads to a new acceptance rule, define and calibrate that
 rule outside the current bundle, review it, then create a new versioned policy
@@ -2228,7 +2435,7 @@ handling.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "navigation.sections", "navigation.expand", "navigation.tabs", "navigation.top", "search.highlight", "search.suggest", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
         <script src="../../assets/javascripts/mathjax.js"></script>
       

@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/invarlock-app-icon.svg">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -433,6 +433,90 @@
     
   
     Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/captured-results/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Captured results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/hosted-service-requalification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosted-service requalification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/modelkit-handoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ModelKit recipient handoff
   
 
     
@@ -1138,6 +1222,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../evaluation-records/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation records
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluation-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation capacity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../compatibility/" class="md-nav__link">
         
   
@@ -1314,6 +1454,62 @@
     
   
     Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../judge-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Judge measurements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evidence-sets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence sets
   
 
     
@@ -2024,15 +2220,20 @@
 
 <h1 id="evaluation-lifecycle-and-failure-boundaries">Evaluation lifecycle and failure boundaries<a class="headerlink" href="#evaluation-lifecycle-and-failure-boundaries" title="Permanent link">&para;</a></h1>
 <p>The evaluate, verify, and report transactions have deliberately separate read
-and write boundaries.</p>
-<div class="admonition info">
-<p class="admonition-title">Reference</p>
-<ul>
-<li><strong>Surface:</strong> Transaction stages, write boundaries, failure classification, and outputs</li>
-<li><strong>Stability:</strong> Behavioral contract for public evaluate, verify, and report transactions</li>
-<li><strong>Use this page when:</strong> Diagnosing where a transaction stopped, designing retries, or determining which output may exist after failure</li>
-</ul>
-</div>
+and write boundaries. The stages below describe native exact-match/NLL and deterministic-extension
+run/import evidence. Native <code>judge</code> retains its runtime capture but uses the
+<a href="../judge-measurements/">judge collection, publication and recipient contracts</a>,
+including a private resumable workspace.
+<a href="../../user-guide/captured-results/">Captured deterministic, likelihood and recorded-score comparisons</a>
+use the same transactions
+with paired runs, a captured directory pack, and independent run/request pins
+in place of native provider, schedule, and runtime bindings.</p>
+<blockquote>
+<p><strong>Reference</strong></p>
+<p><strong>Surface:</strong> Transaction stages, write boundaries, failure classification, and outputs</p>
+<p><strong>Stability:</strong> Behavioral contract for public evaluate, verify, and report transactions</p>
+<p><strong>Use this page when:</strong> Diagnosing where a transaction stopped, designing retries, or determining which output may exist after failure</p>
+</blockquote>
 <div class="codehilite"><pre><span></span><code>request parsed
   -&gt; inputs authenticated
   -&gt; JSONL prepared or canonical schedule imported
@@ -2147,8 +2348,10 @@ schedule, policy, runtime digests, and paired records.</p>
 <p>Publication validates the complete candidate in a private staging directory,
 writes canonical payloads and checksums, signs the manifest, and atomically
 renames the directory into place. The destination and a sibling publication
-lock are no-clobber. A failed publication removes staging and leaves no partial
-evidence directory.</p>
+lock are no-clobber. Only a completed staged tree is renamed into place. If a
+publication check observes a changed path, the operation fails; completed or
+competing output, or private staging, may remain for inspection. Cleanup does not
+recursively remove a replacement at an old staging name.</p>
 <p>Published permissions are read-only, and all later outputs remain external.
 See <a href="../artifacts/">Evidence artifacts</a> for the exact inventory.</p>
 <p>The atomic rename protects visibility, while checksums, the signed manifest,
@@ -2166,14 +2369,23 @@ rejected and under which anchors.</p>
 <p>Structural failure that prevents the verification transaction from reaching a
 completed result may prevent receipt creation. Automation must check both exit
 status and expected receipt presence.</p>
+<p>Receipt and report files are written in private staging, synchronized, and
+published without replacing an existing destination. A synchronization or path
+check failure after publication can leave a completed or competing file even
+though the command failed. Inspect and authenticate any retained evidence, and
+choose a new destination for a retry; file presence alone does not establish
+successful verification.</p>
 <p>Verification snapshots the submitted pack before replay so subsequent reads
 refer to the same regular-file inventory. It validates syntax and signatures
 before depending on semantic content, then reconstructs identities, pairings,
 scores, interval, report, and policy decision under the independent anchors.</p>
 <h2 id="6-render-the-authenticated-report">6. Render the authenticated report<a class="headerlink" href="#6-render-the-authenticated-report" title="Permanent link">&para;</a></h2>
 <p>Reporting authenticates signed evidence bundle integrity and renders its closed
-canonical report. It can write one new HTML file outside the pack. Independent
-verification and its signed receipt remain the acceptance record.</p>
+canonical report. It can write new HTML, Markdown, and JUnit files outside the
+pack. Independent verification and its signed receipt remain the acceptance
+record. Output destinations are checked together before writing. A later write
+failure can leave earlier completed outputs; the v2 rendering result lists them
+in <code>written_outputs</code>.</p>
 <h2 id="failure-classification">Failure classification<a class="headerlink" href="#failure-classification" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -2216,8 +2428,8 @@ verification and its signed receipt remain the acceptance record.</p>
 </tr>
 <tr>
 <td>Reporting</td>
-<td>Unauthenticated or malformed bundle, existing HTML destination</td>
-<td>No rendered output and no bundle mutation</td>
+<td>Unauthenticated or malformed bundle, existing destination, later write failure</td>
+<td>No bundle mutation; earlier completed outputs may remain after a later write failure</td>
 </tr>
 </tbody>
 </table>
@@ -2230,17 +2442,17 @@ input. InvarLock never treats overwriting an earlier result as a retry.</p>
 <th>Transaction result</th>
 <th>Evidence directory</th>
 <th>Receipt</th>
-<th>HTML</th>
+<th>Rendered files</th>
 <th>Exit</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Evaluation succeeds</td>
+<td>Evaluation publishes</td>
 <td>New immutable directory</td>
 <td>None</td>
 <td>None</td>
-<td><code>0</code></td>
+<td><code>0</code>; <code>--fail-on-policy</code> returns <code>7</code> for adverse policy or <code>2</code> for an unavailable decision</td>
 </tr>
 <tr>
 <td>Evaluation fails</td>
@@ -2274,14 +2486,14 @@ input. InvarLock never treats overwriting an earlier result as a retry.</p>
 <td>Reporting succeeds</td>
 <td>Unchanged</td>
 <td>None</td>
-<td>Optional new file</td>
+<td>Optional new files</td>
 <td><code>0</code></td>
 </tr>
 <tr>
 <td>Reporting fails</td>
 <td>Unchanged</td>
 <td>None</td>
-<td>Absent or no replacement</td>
+<td>Earlier completed files may remain; no replacement</td>
 <td>Nonzero</td>
 </tr>
 </tbody>
@@ -2357,7 +2569,7 @@ as separate records that identify their target by manifest or receipt digest.</p
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "navigation.sections", "navigation.expand", "navigation.tabs", "navigation.top", "search.highlight", "search.suggest", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
         <script src="../../assets/javascripts/mathjax.js"></script>
       

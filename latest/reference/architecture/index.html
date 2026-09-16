@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/invarlock-app-icon.svg">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -433,6 +433,90 @@
     
   
     Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/captured-results/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Captured results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/hosted-service-requalification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosted-service requalification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/modelkit-handoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ModelKit recipient handoff
   
 
     
@@ -1186,10 +1270,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#data-flow" class="md-nav__link">
+  <a href="#native-data-flow" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Data flow
+        Native data flow
       
     </span>
   </a>
@@ -1242,6 +1326,62 @@
     
   
     Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluation-records/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation records
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluation-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation capacity
   
 
     
@@ -1438,6 +1578,62 @@
     
   
     Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../judge-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Judge measurements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evidence-sets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence sets
   
 
     
@@ -1870,10 +2066,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#data-flow" class="md-nav__link">
+  <a href="#native-data-flow" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Data flow
+        Native data flow
       
     </span>
   </a>
@@ -1925,27 +2121,33 @@
 <h1 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">&para;</a></h1>
 <p>InvarLock is an authenticated paired-evaluation engine. Its core path has three
 transactions:</p>
-<div class="admonition info">
-<p class="admonition-title">Reference</p>
-<ul>
-<li><strong>Surface:</strong> Core transaction, package, data-flow, and trust boundaries</li>
-<li><strong>Stability:</strong> Architectural contract for the paired evaluation engine; implementation internals may change behind documented public surfaces</li>
-<li><strong>Use this page when:</strong> Locating responsibilities, selecting an integration boundary, or inspecting where evidence-signing and verifier authority separate</li>
-</ul>
-</div>
+<blockquote>
+<p><strong>Reference</strong></p>
+<p><strong>Surface:</strong> Core transaction, package, data-flow, and trust boundaries</p>
+<p><strong>Stability:</strong> Architectural contract for the paired evaluation engine; implementation internals may change behind documented public surfaces</p>
+<p><strong>Use this page when:</strong> Locating responsibilities, selecting an integration boundary, or inspecting where evidence-signing and verifier authority separate</p>
+</blockquote>
 <div class="codehilite"><pre><span></span><code>invarlock<span class="w"> </span>evaluate<span class="w"> </span>request.yaml
 invarlock<span class="w"> </span>verify<span class="w"> </span>evidence/
 invarlock<span class="w"> </span>report<span class="w"> </span>evidence/
 </code></pre></div>
 
-<p><img alt="InvarLock paired release-regression architecture" src="../../assets/evaluation-verification-flow.svg" /></p>
-<p><code>evaluate</code> executes or imports one baseline-versus-subject comparison and
-publishes one signed evidence bundle. <code>verify</code> replays that bundle against
-independent artifact, schedule, policy, runtime, and signer anchors and writes
-a separately signed receipt. <code>report</code> authenticates the bundle's closed inventory and embedded
-evidence signature, then renders the canonical comparison report without changing the
-bundle.</p>
+<p><img alt="Native, captured and judge evaluation with separate verification and reporting" src="../../assets/evaluation-verification-flow.svg" /></p>
+<p><code>evaluate</code> executes, imports, or compares captured baseline-versus-subject
+records and publishes evidence for the selected workflow. Native exact-match/NLL and
+deterministic-extension execution/import retain pack v1, native
+artifact/schedule/runtime anchors, and receipt v1/v2. Captured built-in and
+recorded-score comparisons use pack v2, complete-run/request/policy/signer anchors,
+trust profile v2, and receipt v3 scoped to <code>captured_comparison</code>.
+The bounded judge workflow collects or imports frozen-answer measurements, validates their
+complete planned schedule, and emits a judge evidence envelope with its own
+recipient policy and verification receipt. It preserves fixed-benchmark judge
+uncertainty separately from deterministic comparison statistics. All three use
+the same CLI; the native and captured SDK facade is <code>invarlock.engine</code>. Native-only acceptance APIs reject
+captured scope. <code>report</code> renders the stored result without changing the pack or
+discovering an adjacent receipt; unsigned captured packs remain local reports.</p>
 <h2 id="transaction-boundaries">Transaction boundaries<a class="headerlink" href="#transaction-boundaries" title="Permanent link">&para;</a></h2>
+<p>For native exact-match/NLL and deterministic-extension execution/import:</p>
 <table>
 <thead>
 <tr>
@@ -1974,7 +2176,7 @@ bundle.</p>
 <tr>
 <td><code>report</code></td>
 <td>Signature-authenticated evidence directory</td>
-<td>Console and optional HTML outside the pack</td>
+<td>Console, HTML, Markdown, or JUnit outside the pack</td>
 <td>None beyond embedded evidence signature</td>
 <td>Presents the canonical report; the verification receipt carries acceptance authority</td>
 </tr>
@@ -1982,7 +2184,20 @@ bundle.</p>
 </table>
 <p>The same pack can be rendered many times and verified by many independent
 authorities without changing a byte in the evidence directory.</p>
+<p>Captured exact-match/NLL comparisons score supplied case facts; other declared
+metrics can use explicitly attributed recorded scores. They do not authenticate
+native model execution. Evaluator profiles qualified as observation-only retain
+that limit. Signed captured verification
+replays the complete comparison under independent pins and a recipient-owned
+work budget. Captured judge requests instead collect or import bounded ratings
+and use the judge envelope and recipient policy. They preserve supplied-answer
+provenance; native judge evidence additionally retains the runtime capture.
+An unsigned pack is not independently authenticated, though an
+attempt to verify it can produce an external signed rejection. A valid receipt
+signature does not mean the technical verdict passes. The
+<a href="../../user-guide/captured-results/">captured-results guide</a> defines both paths.</p>
 <h2 id="core-layers">Core layers<a class="headerlink" href="#core-layers" title="Permanent link">&para;</a></h2>
+<p>The native runtime layers are:</p>
 <table>
 <thead>
 <tr>
@@ -2012,12 +2227,14 @@ authorities without changing a byte in the evidence directory.</p>
 <td>Recompute integrity, identities, pairs, scores, report, and policy verdict under caller-owned trust anchors</td>
 </tr>
 <tr>
-<td>Human renderer</td>
-<td>Produce a console view and optional self-contained HTML from the authenticated canonical report</td>
+<td>Report renderer</td>
+<td>Produce console, HTML, Markdown, and JUnit views from the authenticated canonical report</td>
 </tr>
 </tbody>
 </table>
 <h2 id="trust-boundaries">Trust boundaries<a class="headerlink" href="#trust-boundaries" title="Permanent link">&para;</a></h2>
+<p>The following native pack-v1 anchors are not substitutes for captured run/request
+pins or the <a href="../judge-measurements/#replay-authentication-and-acceptance">judge recipient policy</a>.</p>
 <p>The evidence-signing key authenticates the bundle bytes and identifies the
 signer. It does not make the submitted assertions true. Verification therefore requires inputs that
 are not selected by the bundle:</p>
@@ -2025,12 +2242,13 @@ are not selected by the bundle:</p>
 <li>the exact policy file;</li>
 <li>the expected baseline and subject artifact-identity digests;</li>
 <li>the expected canonical schedule digest;</li>
-<li>expected baseline and subject runtime image digests; and</li>
+<li>expected baseline and subject runtime image digests;</li>
 <li>the expected evidence-signer fingerprint; and</li>
 <li>for GGUF evidence, the expected normalized-request digest.</li>
 </ul>
 <p>The verifier signs those anchors, the pack-manifest digest, and its verdict
-with a separate key. Keeping the verification receipt outside the bundle lets
+with a verifier-controlled key. The recipient's process enforces any required
+separation of signing keys. Keeping the receipt outside the bundle lets
 multiple authorities assess the same immutable evidence using independently
 sourced copies of the policy bytes bound into that bundle.</p>
 <table>
@@ -2053,9 +2271,9 @@ sourced copies of the policy bytes bound into that bundle.</p>
 <td>Recompute schedule digest, IDs, order, and input digests</td>
 </tr>
 <tr>
-<td>Which runtime executed each side</td>
+<td>Which runtime each side declares</td>
 <td>Runtime manifests and provider receipts</td>
-<td>Compare both image digests to caller-owned expected values</td>
+<td>Compare both image digests to caller-owned expected values; this does not attest execution</td>
 </tr>
 <tr>
 <td>What each backend returned</td>
@@ -2095,12 +2313,19 @@ property of the host or accelerator.</p>
 <li>the request and evidence contracts;</li>
 <li>the runtime-provider ABI;</li>
 <li>the Hugging Face Transformers provider; and</li>
-<li>the independent verifier and human renderer.</li>
+<li>the independent verifier and report renderer.</li>
 </ul>
 <p>The GGUF, TensorRT-LLM, and Hugging Face vision-text providers are first-party
 optional distributions. They implement the same ABI and register through the
 <code>invarlock.runtime_providers</code> entry-point group. Numeric diagnostics are a
-separate observation-only package and have no acceptance authority.</p>
+separate observation-only package and have no acceptance authority.
+The fifth optional distribution, <code>invarlock-inspect-judge</code>, adapts bounded
+collection logs to core judge measurements. Its <code>inspect</code> extra supplies the
+provider SDK collection path. Offline import, schedule replay, analysis, signing,
+independent verification, and reporting live in core and do not import or require
+Inspect or OpenAI SDKs. <code>evaluate</code> invokes the installed collector when a judge
+request requires new ratings, under its explicit budgets. Preflight, retained-call
+import, verification and reporting make no provider calls.</p>
 <div class="codehilite"><pre><span></span><code>invarlock
 ├── request + evidence contracts
 ├── evaluate / verify / report transactions
@@ -2112,11 +2337,12 @@ first-party optional distributions
 ├── invarlock-runtime-gguf
 ├── invarlock-runtime-tensorrt-llm
 ├── invarlock-runtime-hf-vision-text
-└── invarlock-diagnostics (observation only)
+├── invarlock-diagnostics (observation only)
+└── invarlock-inspect-judge (bounded collection adapter)
 </code></pre></div>
 
 <p>See <a href="../runtime-providers/">Runtime providers</a> for the extension contract.</p>
-<h2 id="data-flow">Data flow<a class="headerlink" href="#data-flow" title="Permanent link">&para;</a></h2>
+<h2 id="native-data-flow">Native data flow<a class="headerlink" href="#native-data-flow" title="Permanent link">&para;</a></h2>
 <ol>
 <li>The request loader resolves all file references beneath the request root,
    without following symbolic links, and authenticates the exact source bytes.</li>
@@ -2125,24 +2351,24 @@ first-party optional distributions
    Docker or Podman worker per side. Both workers score the same schedule, and
    the host validates their complete side results. Import mode authenticates a
    supplied canonical schedule and complete runtime sidecars.</li>
-<li>The engine computes a deterministic comparison ID and either derives one of
-   two built-in paired metrics or replays one explicitly authorized
-   deterministic text scorer. Exact match replays paired outcome counts, an
-   exact McNemar probability, and the versioned Newcombe 95% interval.
-   Normalized NLL and
-   scorer-extension deltas use the fixed 2,048-replicate schedule-resampling
-   interval. The scorer owns only per-record values in <code>[0, 1]</code>; the core owns
-   means, subject-minus-baseline percentage-point delta, interval, and policy
-   arithmetic. Policy reads the conservative bound of the selected interval.
-   When the policy includes coupled sample controls, core also checks the
-   authenticated record count and observed interval width. All three
-   conditions must pass.</li>
-<li>Publication stages a closed inventory, signs the canonical manifest, and
-   renames the directory into place without replacing an existing destination.</li>
-<li>Verification treats the submitted bundle as untrusted, replays all semantic
-   bindings, and signs a receipt outside it.</li>
-<li>Reporting reads only the signature-authenticated bundle and writes only the
-   optional presentation output.</li>
+<li>The engine selects exact match, normalized NLL, native judge, or an explicitly
+   authorized deterministic text scorer. Exact match replays paired outcome
+   counts, the exact McNemar probability and Newcombe 95% interval. Normalized
+   NLL and scorer-extension deltas use the fixed 2,048-replicate schedule interval.
+   Native judge freezes the exact native capture, derives answer-dependent plan
+   bindings, collects bounded ratings through the installed optional integration,
+   and applies its fixed-benchmark analysis. Each scorer preserves its own
+   statistical assumptions and conservative policy bound.</li>
+<li>Publication stages a closed inventory, signs its manifest or judge envelope,
+   and renames the directory into place without replacing an existing destination.</li>
+<li>Verification treats the submitted bundle as untrusted and replays the
+   selected contract under independent trust inputs. Native pack-v1 verification
+   writes a signed receipt outside the bundle; judge verification returns a local
+   result and signs a separate receipt when requested.</li>
+<li>Reporting checks retained evidence and writes optional presentation outputs.
+   Native and captured directory-pack reports display the recorded comparison;
+   judge reports additionally replay retained measurements.
+   It reports authentication and policy state separately from recipient acceptance.</li>
 </ol>
 <p>Run mode and import mode differ only before bundle assembly. Run mode asks each
 isolated worker to emit the sidecars. Import mode authenticates supplied
@@ -2153,6 +2379,10 @@ index, and CPU/CUDA pairs run sequentially. In every case, the authenticated
 schedule and record IDs establish the pairing invariant.</p>
 <p>The exact inventory is documented in <a href="../artifacts/">Evidence artifacts</a>; the
 decision and receipt shapes are documented in <a href="../reports/">Reports and receipts</a>.</p>
+<p>The <a href="../judge-measurements/">judge measurement reference</a> defines the separate
+frozen-answer collection and replay flow, missing-measurement handling, fixed
+benchmark statistical scope, and recipient-owned plan, result, and signer pins.
+A report does not authorize acceptance or establish judge accuracy.</p>
 <h2 id="stable-and-internal-surfaces">Stable and internal surfaces<a class="headerlink" href="#stable-and-internal-surfaces" title="Permanent link">&para;</a></h2>
 <p>Embedding applications should use <code>invarlock.engine</code>. Provider implementations
 use the runtime-provider ABI in <code>invarlock.core.runtime_provider</code>. An embedding
@@ -2232,7 +2462,7 @@ JSON Schema alone.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "navigation.sections", "navigation.expand", "navigation.tabs", "navigation.top", "search.highlight", "search.suggest", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
         <script src="../../assets/javascripts/mathjax.js"></script>
       

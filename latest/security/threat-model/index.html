@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/invarlock-app-icon.svg">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -433,6 +433,90 @@
     
   
     Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/captured-results/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Captured results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/hosted-service-requalification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosted-service requalification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/modelkit-handoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ModelKit recipient handoff
   
 
     
@@ -1135,6 +1219,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../reference/evaluation-records/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation records
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/evaluation-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation capacity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../reference/compatibility/" class="md-nav__link">
         
   
@@ -1311,6 +1451,62 @@
     
   
     Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/judge-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Judge measurements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/evidence-sets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence sets
   
 
     
@@ -1706,6 +1902,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#captured-and-hosted-evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Captured and hosted evidence
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bounded-judge-collection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bounded judge collection
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#trust-boundary-data-flow" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2047,6 +2265,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#captured-and-hosted-evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Captured and hosted evidence
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bounded-judge-collection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bounded judge collection
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#trust-boundary-data-flow" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2259,10 +2499,10 @@
 the portable acceptance-attestation handoff, and the public provider
 contracts. It distinguishes attacks that the evidence verifier or acceptance
 verifier can detect from claims that require controls outside InvarLock.</p>
-<div class="admonition warning">
-<p class="admonition-title">Security guidance</p>
+<blockquote>
+<p><strong>Security guidance</strong></p>
 <p><strong>In plain language:</strong> InvarLock can detect tampering and inconsistent
-evidence, but it cannot prove that an honest runtime executed or that the
+evidence, but it cannot independently attest execution or prove that the
 chosen test and threshold are sufficient.</p>
 <p><strong>Objective:</strong> Identify threats to one evidence transaction and distinguish
 verifier-enforced properties from risks that require deployment controls.</p>
@@ -2273,7 +2513,7 @@ accelerator security remain external boundaries.</p>
 <p><strong>Use this page when:</strong> Performing architecture review, assigning controls,
 interpreting a verifier failure, or deciding whether a deployment needs
 attestation or safeguards beyond InvarLock.</p>
-</div>
+</blockquote>
 <h2 id="security-objectives">Security objectives<a class="headerlink" href="#security-objectives" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -2336,6 +2576,10 @@ deployment controls must protect sensitive model, dataset, and key material.</p>
 <li>the authorization mapping from actor identities to public-key fingerprints.</li>
 </ul>
 <h2 id="adversaries-and-failure-sources">Adversaries and failure sources<a class="headerlink" href="#adversaries-and-failure-sources" title="Permanent link">&para;</a></h2>
+<p>Trusted participants exchanging intended results are the normal workflow.
+Independent expectations catch stale configuration, wrong captures and transport
+mistakes as well as intentional substitution. They can be maintained within one
+team; independence does not require different organizations.</p>
 <p>The model considers accidental corruption, unsafe input, a malicious evidence
 submitter, compromised evidence signer or verifier environments, compromised provider
 add-ins, key theft, and a decision owner who obtains trust anchors from the submitted
@@ -2401,6 +2645,8 @@ can only reason about the facts in that bundle.</p>
 </tbody>
 </table>
 <h2 id="threats-controls-and-residual-risk">Threats, controls, and residual risk<a class="headerlink" href="#threats-controls-and-residual-risk" title="Permanent link">&para;</a></h2>
+<p>The artifact, ordered-schedule and runtime controls in this table describe native
+pack-v1. Captured and judge evidence use the distinct bindings described below.</p>
 <table>
 <thead>
 <tr>
@@ -2477,11 +2723,11 @@ can only reason about the facts in that bundle.</p>
 </tr>
 <tr>
 <td>Malicious model or provider code executes during evaluation</td>
-<td>Built-in strict HF path uses local safetensors, disables remote code and network access, and authenticates checkpoint/tokenizer material</td>
+<td>Built-in strict HF path authenticates checkpoint/tokenizer material, validates canonical safetensors shard references and regular files before native weight loading, and disables remote code and network access</td>
 <td>Native libraries, container runtime, kernel, driver, add-ins, and optional backends can contain vulnerabilities. InvarLock is not a sandbox.</td>
 </tr>
 <tr>
-<td>Human report differs from machine evidence</td>
+<td>Report differs from machine evidence</td>
 <td>Renderer authenticates the bundle and reads the canonical bound report</td>
 <td>Screenshots, copied text, or externally modified HTML are not acceptance records. Verify the bundle and receipt.</td>
 </tr>
@@ -2498,7 +2744,7 @@ can only reason about the facts in that bundle.</p>
 <tr>
 <td>Old evidence is placed in a newly issued envelope</td>
 <td>Envelope age and receipt-authenticated evidence age are evaluated separately; missing authoritative evidence time rejects when an evidence-age limit is configured</td>
-<td>v0.13 receipts have no authenticated issuance time and cannot satisfy a recipient policy that requires bounded evidence age.</td>
+<td>Native v1/v2 receipts retain the v0.13 no-timestamp contract, including newly created receipts; they cannot satisfy a recipient policy requiring bounded evidence age.</td>
 </tr>
 <tr>
 <td>Recipient policy contains contradictory duplicate trust records</td>
@@ -2512,8 +2758,47 @@ can only reason about the facts in that bundle.</p>
 </tr>
 </tbody>
 </table>
+<h2 id="captured-and-hosted-evidence">Captured and hosted evidence<a class="headerlink" href="#captured-and-hosted-evidence" title="Permanent link">&para;</a></h2>
+<p>Captured verification authenticates complete baseline and subject runs, normalized
+request, policy and signer against caller-owned pins. It pairs unique IDs and
+checks retained case facts, then recomputes deterministic metrics or aggregates
+recorded scores. Approved externally assigned scores remain source judgments;
+they are not replayable bounded judge trials merely because their provenance is
+pinned. Missing metric facts produce insufficient evidence rather than a
+favorable subset result.</p>
+<p>For hosted captures, the service descriptor binds declared configuration and an
+observation window. Its digest is not a weight digest, execution attestation or
+guarantee about later requests. Collection, scheduling, credential custody and
+provider data-handling controls belong to the caller's capture environment.
+Verification operates offline without service credentials.</p>
+<h2 id="bounded-judge-collection">Bounded judge collection<a class="headerlink" href="#bounded-judge-collection" title="Permanent link">&para;</a></h2>
+<p>Selecting <code>judge</code> adds a measurement source to the evaluation transaction.
+Native requests freeze authenticated runtime answers; captured requests retain
+the evaluator's supplied-answer provenance. Both can collect bounded ratings,
+and captured or frozen-answer requests can import retained calls. Native
+<code>execution.mode: import</code> imports provider answer evidence before judge collection. Verification
+and reporting replay those measurements offline.</p>
+<p>The plan binds the original task text, frozen answers, rubric, judge configuration,
+reference mode, declared unit grouping and repetition schedule. Independence
+between units is a statistical assumption; replay cannot establish it from
+recorded scores. Retained attempts and call, token, cost, timeout and storage
+limits constrain collection. They do not
+prove that a compromised operator or provider supplied truthful measurements,
+that the rubric reflects user needs, or that the judge agrees with independent
+reference labels.</p>
+<p>Task text and answers remain untrusted content inside the judge prompt. Explicit
+rendering and digest checks expose changed inputs; they do not eliminate prompt
+injection or semantic bias in a judge model. Optional per-case references are
+sent to the judge only under the declared mode and never added to the evaluated
+model's input. Protect sensitive task, answer and reference content before
+authorizing external collection, and keep provider credentials out of plans,
+evidence and reports. The collector executes within the caller's trust boundary.</p>
+<p>The <a href="../../reference/judge-measurements/">judge contract</a> specifies its independent
+recipient policy, receipt and analysis checks. A generic external scalar rating
+does not supply the retained requests, responses and trial identities needed
+by that contract.</p>
 <h2 id="trust-boundary-data-flow">Trust-boundary data flow<a class="headerlink" href="#trust-boundary-data-flow" title="Permanent link">&para;</a></h2>
-<p>The critical transitions are:</p>
+<p>For native pack-v1 evidence, the critical transitions are:</p>
 <div class="codehilite"><pre><span></span><code>host CLI -&gt; separately pinned per-side OCI workers -&gt; paired records -&gt; host-signed pack
 signed pack + independent anchors -&gt; verifier replay -&gt; signed receipt
 signed receipt + bound evidence -&gt; DSSE envelope -&gt; recipient verifier + exact subject + current policy
@@ -2674,8 +2959,8 @@ failed the metric.</p>
 <li>authorize deployment or replace domain-specific review;</li>
 <li>secure a host, container engine, kernel, accelerator, or multi-tenant system;</li>
 <li>issue or revoke identities and keys;</li>
-<li>demonstrate external CUE, Open Policy Agent, or other policy-engine
-  authentication or evaluation of the acceptance envelope; or</li>
+<li>guarantee that arbitrary external CUE, Open Policy Agent, or other policy-engine
+  integrations authenticate or evaluate the acceptance envelope correctly; or</li>
 <li>establish the baseline as correct or trustworthy.</li>
 </ul>
 <p>See <a href="../best-practices/">Security practices</a> for operating guidance and the
@@ -2755,7 +3040,7 @@ decision. Portable recipient verification is specified in
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "navigation.sections", "navigation.expand", "navigation.tabs", "navigation.top", "search.highlight", "search.suggest", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
         <script src="../../assets/javascripts/mathjax.js"></script>
       

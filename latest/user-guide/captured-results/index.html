@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://invarlock.github.io/invarlock/user-guide/ci-integration/">
+        <link rel="canonical" href="https://invarlock.github.io/invarlock/user-guide/captured-results/">
       
       
-        <link rel="prev" href="../diagnostics/">
+        <link rel="prev" href="../getting-started/">
       
       
-        <link rel="next" href="../public-evidence/">
+        <link rel="next" href="../hosted-service-requalification/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>CI integration - InvarLock Documentation</title>
+        <title>Captured results - InvarLock Documentation</title>
       
     
     
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#ci-integration" class="md-skip">
+        <a href="#captured-results" class="md-skip">
           Skip to content
         </a>
       
@@ -111,7 +111,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              CI integration
+              Captured results
             
           </span>
         </div>
@@ -453,10 +453,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../captured-results/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Captured results
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -472,6 +499,92 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#prepare-the-request" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prepare the request
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#use-the-three-built-in-scorers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Use the three built-in scorers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#judge-captured-answers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Judge captured answers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#signed-handoff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Signed handoff
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#preflight-and-local-ci" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Preflight and local CI
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#outputs-and-assurance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outputs and assurance
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -761,37 +874,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    CI integration
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../ci-integration/" class="md-nav__link">
         
   
   
@@ -807,81 +893,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#inputs" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Inputs
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#complete-workflow" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Complete workflow
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#protected-deployment-approval" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Protected deployment approval
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#outputs-and-status" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Outputs and status
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#trust-and-secret-handling" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Trust and secret handling
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -2000,10 +2011,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#inputs" class="md-nav__link">
+  <a href="#prepare-the-request" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Inputs
+        Prepare the request
       
     </span>
   </a>
@@ -2011,10 +2022,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#complete-workflow" class="md-nav__link">
+  <a href="#use-the-three-built-in-scorers" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Complete workflow
+        Use the three built-in scorers
       
     </span>
   </a>
@@ -2022,10 +2033,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#protected-deployment-approval" class="md-nav__link">
+  <a href="#judge-captured-answers" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Protected deployment approval
+        Judge captured answers
       
     </span>
   </a>
@@ -2033,10 +2044,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#outputs-and-status" class="md-nav__link">
+  <a href="#signed-handoff" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Outputs and status
+        Signed handoff
       
     </span>
   </a>
@@ -2044,10 +2055,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#trust-and-secret-handling" class="md-nav__link">
+  <a href="#preflight-and-local-ci" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Trust and secret handling
+        Preflight and local CI
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#outputs-and-assurance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outputs and assurance
       
     </span>
   </a>
@@ -2074,327 +2096,275 @@
   
 
 
-<h1 id="ci-integration">CI integration<a class="headerlink" href="#ci-integration" title="Permanent link">&para;</a></h1>
-<p>The InvarLock evidence-gate action verifies one immutable evidence pack against
-verifier-controlled anchors, writes a separately signed receipt, renders the
-authenticated report, and uploads the review material as one workflow artifact.</p>
+<h1 id="captured-results">Captured Results<a class="headerlink" href="#captured-results" title="Permanent link">&para;</a></h1>
 <blockquote>
 <p><strong>User guide</strong></p>
-<p><strong>Outcome:</strong> Add a fail-closed GitHub Actions gate for an existing
-<code>invarlock/evidence-pack-v1</code> directory.</p>
-<p><strong>Audience:</strong> Release engineers and verifier operators automating an
-independent acceptance decision.</p>
-<p><strong>Prerequisites:</strong> An evidence pack, an independently managed policy and
-trust anchors, an installed matching InvarLock version, and a verifier key
-available to the job without being stored in the evidence artifact.</p>
+<p><strong>Outcome:</strong> Publish and independently verify captured evaluation evidence.</p>
+<p><strong>Audience:</strong> Evaluator and release-integration engineers.</p>
+<p><strong>Prerequisites:</strong> Paired records, a policy, and the core <code>invarlock</code> wheel.</p>
 </blockquote>
-<p>The action runs the same public transactions documented by the
-<a href="../../reference/cli/">CLI reference</a>:</p>
-<ol>
-<li><code>invarlock verify EVIDENCE</code> authenticates and replays the bundle using the
-   supplied artifact identities, schedule, policy, runtime digests, and
-   evidence-signer fingerprint plus the normalized-request digest required for
-   GGUF evidence, then writes a verifier-signed receipt.</li>
-<li><code>invarlock report EVIDENCE --html PATH --explain</code> authenticates the bundle
-   and writes a report without changing the evidence.</li>
-<li>The action uploads the evidence directory, verification JSON, signed
-   receipt, and HTML report. It never uploads the verifier private key.</li>
-</ol>
-<p>This action and its deployment consumer are native pack-v1 integrations.
-Captured packs and judge evidence use different trust and receipt contracts;
-use the <a href="../captured-results/#preflight-and-local-ci">captured CI workflow</a> or
-<a href="../../reference/judge-measurements/">judge recipient workflow</a> for those families.</p>
-<h2 id="inputs">Inputs<a class="headerlink" href="#inputs" title="Permanent link">&para;</a></h2>
-<p>Every trust input must come from verifier-controlled configuration rather than
-from the submitted evidence directory.</p>
+<p>Use the core wheel and examples from the same source revision. For a released
+wheel, use its matching release documentation. Record the source commit and wheel
+SHA-256 when sharing a local build; see
+<a href="../getting-started/#matching-wheels-and-examples">matching wheels and examples</a>.</p>
+<p>Use the core <code>evaluate</code>, <code>verify</code>, and <code>report</code> commands when an evaluator has
+already produced paired records. The request binds the baseline, subject,
+policy, and output location without introducing a separate command namespace.</p>
+<p>Hosted captures can declare a service identity and observation window with
+<code>artifact_digest: null</code>. The <a href="../hosted-service-requalification/">hosted requalification guide</a>
+walks through baseline approval, fresh capture, evaluation, offline verification
+and the resulting decision. This is captured assurance: replay does not attest
+execution or freshly measure a service.</p>
+<h2 id="prepare-the-request">Prepare the request<a class="headerlink" href="#prepare-the-request" title="Permanent link">&para;</a></h2>
+<p><code>invarlock evaluate --init demo --example classification</code> creates synthetic
+paired runs, policy, and <code>demo/request.yaml</code>. <code>extraction</code> demonstrates structured
+extraction; <code>judge</code> demonstrates comparison of recorded scalar ratings and does
+not collect bounded judge measurements. Use <code>--example native-judge</code> for native
+answer generation followed by bounded judging. Replace illustrative inputs and
+thresholds before drawing conclusions about a model.</p>
+<div class="codehilite"><pre><span></span><code><span class="nt">format_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">invarlock/evaluation-request-v2</span>
+<span class="nt">execution</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">captured</span>
+<span class="nt">comparison</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">baseline</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">baseline.json</span>
+<span class="w">    </span><span class="nt">adapter</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">invarlock</span>
+<span class="w">  </span><span class="nt">subject</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">subject.json</span>
+<span class="w">    </span><span class="nt">adapter</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">invarlock</span>
+<span class="w">  </span><span class="nt">policy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">policy.json</span>
+<span class="nt">output</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">evidence</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">evidence</span>
+</code></pre></div>
+
+<p>Request paths resolve beneath the request's parent directory. CLI
+<code>--baseline-run</code>, <code>--subject-run</code>, and <code>--output</code> overrides resolve from the
+caller's working directory and must remain inside that request root. They change
+locations, not adapters or identity pins. A source's <code>expected_run_digest</code> still
+has to match after an override. Native runtime/container controls do not apply to captured requests. Judge
+collection uses the installed collector and explicit budgets described below.</p>
+<h2 id="use-the-three-built-in-scorers">Use the three built-in scorers<a class="headerlink" href="#use-the-three-built-in-scorers" title="Permanent link">&para;</a></h2>
+<p>An existing evaluator can supply records to all three scorers. Each scorer needs
+different facts; naming an evaluator or retaining its aggregate score cannot
+supply missing facts.</p>
 <table>
 <thead>
 <tr>
-<th>Input</th>
-<th>Required</th>
-<th>Purpose</th>
+<th>Scorer</th>
+<th>Required per-case facts</th>
+<th>Comparison</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>evidence</code></td>
-<td>Yes</td>
-<td>Immutable <code>invarlock/evidence-pack-v1</code> directory to review</td>
+<td><code>exact_match</code></td>
+<td>Output and reference strings</td>
+<td>Paired correctness change</td>
 </tr>
 <tr>
-<td><code>policy</code></td>
-<td>Yes</td>
-<td>Independently approved acceptance-policy JSON</td>
+<td><code>normalized_nll_per_utf8_byte</code></td>
+<td>Reference-continuation log probabilities, byte/token counts and identity bindings</td>
+<td>Ratio of mean normalized NLL, using the native paired interval</td>
 </tr>
 <tr>
-<td><code>expected-baseline-artifact</code></td>
-<td>Yes</td>
-<td>Approved baseline artifact-identity digest</td>
-</tr>
-<tr>
-<td><code>expected-subject-artifact</code></td>
-<td>Yes</td>
-<td>Approved subject artifact-identity digest</td>
-</tr>
-<tr>
-<td><code>expected-schedule</code></td>
-<td>Yes</td>
-<td>Approved canonical schedule digest</td>
-</tr>
-<tr>
-<td><code>expected-baseline-runtime</code></td>
-<td>Yes</td>
-<td>Approved baseline outer-image digest</td>
-</tr>
-<tr>
-<td><code>expected-subject-runtime</code></td>
-<td>Yes</td>
-<td>Approved subject outer-image digest</td>
-</tr>
-<tr>
-<td><code>expected-signer</code></td>
-<td>Yes</td>
-<td>Authorized Ed25519 evidence-signer fingerprint</td>
-</tr>
-<tr>
-<td><code>expected-request-digest</code></td>
-<td>For GGUF</td>
-<td>Approved normalized-request digest; required when either side uses <code>llama_cpp</code></td>
-</tr>
-<tr>
-<td><code>verifier-signing-key</code></td>
-<td>Yes</td>
-<td>Path to the verifier-owned private-key file</td>
-</tr>
-<tr>
-<td><code>verifier-identity</code></td>
-<td>Yes</td>
-<td>Stable identity recorded in the signed receipt</td>
-</tr>
-<tr>
-<td><code>python</code></td>
-<td>No</td>
-<td>Python executable; defaults to <code>python</code></td>
-</tr>
-<tr>
-<td><code>receipt-output</code></td>
-<td>No</td>
-<td>Signed receipt path outside evidence</td>
-</tr>
-<tr>
-<td><code>verify-output</code></td>
-<td>No</td>
-<td>Machine-readable verification-result path</td>
-</tr>
-<tr>
-<td><code>html-output</code></td>
-<td>No</td>
-<td>Self-contained HTML report path outside evidence</td>
-</tr>
-<tr>
-<td><code>artifact-name</code></td>
-<td>No</td>
-<td>Name of the uploaded workflow artifact</td>
-</tr>
-<tr>
-<td><code>fail-on-verify</code></td>
-<td>No</td>
-<td>Whether a nonzero verifier result fails the job; defaults to <code>true</code></td>
+<td><code>judge</code></td>
+<td>Task text and frozen answer text, plus a declared rubric and retained judge calls</td>
+<td>Repeated ratings aggregated over declared independent units</td>
 </tr>
 </tbody>
 </table>
-<p>Output paths are no-clobber. Use new names for every review attempt and keep
-all three outside the signed evidence directory. The policy and verifier key
-must also resolve outside evidence; the action refuses an unsafe layout before
-it renders or uploads any review artifact. Path inputs must be plain paths:
-control characters, leading or trailing whitespace, and upload-pattern
-characters (<code>*</code>, <code>?</code>, <code>[</code>, <code>]</code>, <code>{</code>, <code>}</code>, <code>!</code>, <code>~</code>, <code>\</code>, and <code>#</code>) are
-rejected so the artifact uploader cannot expand one approved path into
-additional files.
-The submitted evidence must also be a real directory with no symbolic links;
-this is checked before any failed-review material becomes uploadable.</p>
-<h2 id="complete-workflow">Complete workflow<a class="headerlink" href="#complete-workflow" title="Permanent link">&para;</a></h2>
-<p>This example assumes an earlier evaluation job or a controlled checkout placed
-the submitted pack at <code>incoming/evidence</code>. Store the verifier private key as a
-GitHub Actions secret. Store the expected artifact, schedule, runtime, and
-evidence-signer anchors as protected environment variables or retrieve them
-from an independently managed approval system.</p>
-<p>Pin the action to a pinned InvarLock commit rather than a mutable branch.
-Replace <code>PINNED_INVARLOCK_COMMIT</code> with its full commit SHA.</p>
-<div class="codehilite"><pre><span></span><code><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Verify InvarLock evidence</span>
-
-<span class="nt">on</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">workflow_dispatch</span><span class="p">:</span>
-
-<span class="nt">permissions</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">contents</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">read</span>
-
-<span class="nt">jobs</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">verify-evidence</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ubuntu-latest</span>
-<span class="w">    </span><span class="nt">environment</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">release-review</span>
-<span class="w">    </span><span class="nt">steps</span><span class="p">:</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Check out review inputs</span>
-<span class="w">        </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0</span>
-
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Set up Python</span>
-<span class="w">        </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1</span>
-<span class="w">        </span><span class="nt">with</span><span class="p">:</span>
-<span class="w">          </span><span class="nt">python-version</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;3.13&quot;</span>
-
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Install the pinned verifier environment</span>
-<span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
-<span class="w">          </span><span class="no">python -m pip install --require-hashes \</span>
-<span class="w">            </span><span class="no">-r review/requirements/invarlock-verifier.txt</span>
-
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Materialize the verifier key</span>
-<span class="w">        </span><span class="nt">env</span><span class="p">:</span>
-<span class="w">          </span><span class="nt">VERIFIER_KEY_PEM</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ secrets.INVARLOCK_VERIFIER_KEY_PEM }}</span>
-<span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
-<span class="w">          </span><span class="no">umask 077</span>
-<span class="w">          </span><span class="no">printf &#39;%s\n&#39; &quot;$VERIFIER_KEY_PEM&quot; &gt; &quot;$RUNNER_TEMP/invarlock-verifier.pem&quot;</span>
-
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Authenticate the acceptance policy</span>
-<span class="w">        </span><span class="nt">env</span><span class="p">:</span>
-<span class="w">          </span><span class="nt">EXPECTED_POLICY_SHA256</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ vars.INVARLOCK_POLICY_SHA256 }}</span>
-<span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
-<span class="w">          </span><span class="no">python - &lt;&lt;&#39;PY&#39;</span>
-<span class="w">          </span><span class="no">import hashlib</span>
-<span class="w">          </span><span class="no">import os</span>
-<span class="w">          </span><span class="no">from pathlib import Path</span>
-
-<span class="w">          </span><span class="no">policy = Path(&quot;policy/acceptance.json&quot;).read_bytes()</span>
-<span class="w">          </span><span class="no">observed = &quot;sha256:&quot; + hashlib.sha256(policy).hexdigest()</span>
-<span class="w">          </span><span class="no">if observed != os.environ[&quot;EXPECTED_POLICY_SHA256&quot;]:</span>
-<span class="w">              </span><span class="no">raise SystemExit(&quot;acceptance policy digest mismatch&quot;)</span>
-<span class="w">          </span><span class="no">PY</span>
-
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Verify and render evidence</span>
-<span class="w">        </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">invarlock/invarlock/.github/actions/invarlock-report-gate@PINNED_INVARLOCK_COMMIT</span>
-<span class="w">        </span><span class="nt">with</span><span class="p">:</span>
-<span class="w">          </span><span class="nt">evidence</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">incoming/evidence</span>
-<span class="w">          </span><span class="nt">policy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">policy/acceptance.json</span>
-<span class="w">          </span><span class="nt">expected-baseline-artifact</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ vars.INVARLOCK_BASELINE_ARTIFACT_DIGEST }}</span>
-<span class="w">          </span><span class="nt">expected-subject-artifact</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ vars.INVARLOCK_SUBJECT_ARTIFACT_DIGEST }}</span>
-<span class="w">          </span><span class="nt">expected-schedule</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ vars.INVARLOCK_SCHEDULE_DIGEST }}</span>
-<span class="w">          </span><span class="nt">expected-baseline-runtime</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ vars.INVARLOCK_BASELINE_RUNTIME_DIGEST }}</span>
-<span class="w">          </span><span class="nt">expected-subject-runtime</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ vars.INVARLOCK_SUBJECT_RUNTIME_DIGEST }}</span>
-<span class="w">          </span><span class="nt">expected-signer</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ vars.INVARLOCK_EVIDENCE_SIGNER_FINGERPRINT }}</span>
-<span class="w">          </span><span class="nt">expected-request-digest</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ vars.INVARLOCK_REQUEST_DIGEST }}</span>
-<span class="w">          </span><span class="nt">verifier-signing-key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ runner.temp }}/invarlock-verifier.pem</span>
-<span class="w">          </span><span class="nt">verifier-identity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">release-verifier</span>
-<span class="w">          </span><span class="nt">receipt-output</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">reports/invarlock/verification.receipt.json</span>
-<span class="w">          </span><span class="nt">verify-output</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">reports/invarlock/verification.result.json</span>
-<span class="w">          </span><span class="nt">html-output</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">reports/invarlock/evidence.html</span>
-<span class="w">          </span><span class="nt">artifact-name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">candidate-invarlock-evidence</span>
+<p>Set <code>comparison.metric</code> explicitly to select one scorer. For exact match or NLL,
+it must agree with the single metric in <code>comparison.policy</code>. Omitting it retains
+the existing multi-metric comparison-policy behavior. Missing likelihood facts
+produce insufficient evidence; InvarLock does not estimate them from generated
+answers, token counts alone or an evaluator's summary score.</p>
+<p>Use <code>invarlock.engine.capture_evaluator_run</code> to preserve canonical per-case
+records and <code>evaluator_input_capabilities</code> to inspect available facts before
+selecting a scorer. The <a href="https://github.com/invarlock/invarlock/blob/main/examples/evaluator-qualification/maintained/CAPTURE.md">maintained capture example</a>
+covers the evaluator shortlist and distinguishes tested capture paths from
+upstream qualification. Keep using your evaluator's environment; InvarLock can
+consume its retained exports in a separate environment.</p>
+<p>For a measured NLL comparison between distinct checkpoints, replay the
+<a href="https://github.com/invarlock/invarlock/blob/main/examples/captured-results/references/mistral-7b-likelihood/README.md">Mistral 7B reference</a>.
+It retains 400 paired narrative continuations, both model identities and the
+complete signed handoff. The smaller
+<a href="https://github.com/invarlock/invarlock/blob/main/examples/captured-results/references/harness-likelihood/README.md">Harness likelihood control</a>
+preserves the original six-pair same-model CPU check. Both references retain exact
+continuation and tokenizer bindings, signed evaluation and independent recipient
+verification; their scope is the declared integration profile.</p>
+<p>For structured task inputs, a source may declare an explicit text projection:</p>
+<div class="codehilite"><pre><span></span><code><span class="nt">comparison</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">baseline</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">baseline.jsonl</span>
+<span class="w">    </span><span class="nt">adapter</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">jsonl</span>
+<span class="w">    </span><span class="nt">input_projection</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">json-pointer</span>
+<span class="w">      </span><span class="nt">pointer</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/input/question</span>
 </code></pre></div>
 
-<p>The verifier-owned requirements file must pin the complete verifier dependency
-closure and carry hashes verified against the intended release artifacts; a
-version constraint alone is not a supply-chain identity. For a released action,
-use that release's pinned immutable commit SHA. A tag is easier to read but a
-full commit pin makes action-source substitution visible in review.
-<code>INVARLOCK_POLICY_SHA256</code> must likewise be a protected verifier-owned digest,
-not a value read from the submitted checkout.
-<code>INVARLOCK_REQUEST_DIGEST</code> is required when either evidence side uses
-<code>llama_cpp</code>; omit <code>expected-request-digest</code> for a non-GGUF workflow that does
-not maintain this additional anchor.</p>
-<h2 id="protected-deployment-approval">Protected deployment approval<a class="headerlink" href="#protected-deployment-approval" title="Permanent link">&para;</a></h2>
-<p>A successful verification job is necessary but is not, by itself, a portable
-deployment authorization. The deployment job must consume the uploaded signed
-receipt, reauthenticate it against production-owned verifier and policy
-anchors, and deploy only the exact candidate bound by that receipt.</p>
-<p>The maintained
-<a href="https://github.com/invarlock/invarlock/blob/main/examples/ci/standalone-consumer/.github/workflows/deployment-approval.yml"><code>deployment-approval.yml</code></a>
-example implements that separation:</p>
-<ol>
-<li><code>verify-evidence</code> runs in the protected <code>release-review</code> environment and
-   uploads the evidence plus its signed verifier receipt.</li>
-<li><code>deploy-candidate</code> depends on that successful job and enters a separate
-   protected <code>production</code> environment.</li>
-<li>The deployment job downloads the artifact and runs
-   <code>review/verify_deployment_receipt.py</code> against production-owned approval
-   inputs. The helper authenticates the receipt signature, verifier identity
-   and fingerprint, evidence signer, artifact identities, schedule, runtimes,
-   and policy digest.</li>
-<li>The production-owned deployment adapter resolves or recomputes the candidate
-   identity and requires it to equal <code>artifact_digests.subject</code> in the emitted
-   <code>invarlock/deployment-approval-v1</code> record. Only then does the workflow invoke
-   the deployment command with that same record.</li>
-</ol>
-<p>The complete approval-input JSON is materialized from protected production
-configuration. It must not be generated from the downloaded evidence, receipt,
-or verification job outputs. The checked-in test exercises the accepted path
-and rejects changed verifier and policy anchors. A mutable candidate path or
-tag is not enough: the deployment adapter must enforce the approved InvarLock
-artifact identity to close the time-of-check/time-of-use boundary.</p>
-<h2 id="outputs-and-status">Outputs and status<a class="headerlink" href="#outputs-and-status" title="Permanent link">&para;</a></h2>
-<p>The default action outputs are:</p>
-<div class="codehilite"><pre><span></span><code>reports/invarlock/
-├── evidence.html
-├── verification.receipt.json
-└── verification.result.json
+<p>Apply the same projection to the subject. The pointer must select an existing
+string beneath <code>/input/</code> or <code>/context/</code>. InvarLock retains and verifies the
+original input, context and projection configuration; it never invents a prompt
+by converting a structured object to text. Canonical <code>invarlock</code> runs already contain
+their bindings and reject a projection override.</p>
+<h2 id="judge-captured-answers">Judge captured answers<a class="headerlink" href="#judge-captured-answers" title="Permanent link">&para;</a></h2>
+<p>Keep the captured request's baseline and subject source definitions and replace
+its comparison policy selection with:</p>
+<div class="codehilite"><pre><span></span><code><span class="nt">comparison</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">metric</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">judge</span>
+<span class="w">  </span><span class="nt">policy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">judge-policy.json</span>
+<span class="w">  </span><span class="nt">judge</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">workspace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">judge-work</span>
+<span class="w">    </span><span class="nt">signer_identity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">evaluation-signer</span>
 </code></pre></div>
 
-<p>The uploaded artifact contains those files plus the submitted evidence
-directory. Their roles remain distinct:</p>
-<table>
-<thead>
-<tr>
-<th>Output</th>
-<th>Authority</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Evidence directory</td>
-<td>Signed canonical evidence and comparison report</td>
-</tr>
-<tr>
-<td><code>verification.result.json</code></td>
-<td>Machine-readable result for this verifier run</td>
-</tr>
-<tr>
-<td><code>verification.receipt.json</code></td>
-<td>Verifier-signed decision and independent anchors</td>
-</tr>
-<tr>
-<td><code>evidence.html</code></td>
-<td>Reproducible HTML report; not an acceptance record</td>
-</tr>
-</tbody>
-</table>
-<p>Verification JSON is written even when the verifier returns nonzero. The action
-then attempts the authenticated renderer and uploads available review material.
-With the default <code>fail-on-verify: true</code>, any nonzero verification result fails
-the job after artifact collection. Automation must require job success and
-validate the signed receipt; it must not infer acceptance from HTML or artifact
-upload success.</p>
-<p>The verification action writes the signed receipt and selected review
-artifacts. Downstream systems consume the verified JSON and validate the signed
-receipt through the
-<a href="../../reference/api-guide/#verify-a-signed-receipt">Python API</a>.</p>
-<h2 id="trust-and-secret-handling">Trust and secret handling<a class="headerlink" href="#trust-and-secret-handling" title="Permanent link">&para;</a></h2>
-<ul>
-<li>Never derive <code>expected-signer</code> from <code>manifest.signature.json</code> in the pack.</li>
-<li>For GGUF evidence, never derive <code>expected-request-digest</code> from the submitted
-  normalized request.</li>
-<li>Never copy either expected runtime digest from the submitted runtime
-  manifests.</li>
-<li>Do not upload or cache the verifier private key.</li>
-<li>Protect the policy, anchor variables, environment approvals, and workflow
-  revision from the evidence-signing role.</li>
-<li>Retain failed attempts according to the review policy; use fresh receipt and
-  report paths for a retry.</li>
-<li>Validate a received receipt against the expected verifier identity and
-  fingerprint before another system relies on it.</li>
-<li>Reauthenticate the signed receipt in the deployment environment; do not
-  treat job dependency, artifact presence, HTML, or unsigned verification JSON
-  as deployment authority.</li>
-</ul>
-<p>Continue with <a href="../evidence-and-verification/">Evidence and verification</a> for the
-handoff and receipt verifier rules and <a href="../key-management/">Key management</a> for
-rotation and incident response.</p>
+<p>This is a fragment of the complete request, not a replacement for the baseline
+and subject fields. <code>judge-policy.json</code> uses the same
+<code>invarlock/native-judge-policy-v1</code> recipe as native judging. InvarLock derives the
+plan from the captured records, checks the full call reservation and collects
+ratings through the installed collector. Preflight makes no calls. Resuming
+uses the frozen identities and admitted trials in the private workspace.</p>
+<p>Alternatively, set <code>comparison.judge.measurements: measurements.json</code> to import
+retained ratings entirely offline. <code>prepare_evaluator_judge(recipe, baseline,
+subject)</code> returns the frozen plan and analysis policy for your own collector.
+<code>import_judge_sources</code> assembles canonical retained-call shards and validates
+their requests, responses, attempts and source positions against that plan.
+Existing scalar ratings without these facts cannot be imported as judge evidence.
+Captured judging limits each run to 128 MiB, the recipe to 4 MiB and retained
+measurements to 384 MiB, with a shared 384 MiB input allowance. Each file is read
+once under the remaining allowance before parsing.
+The <a href="../../reference/judge-measurements/">judge reference</a> describes the retained
+format, optional per-case references and recipient-owned judge trust profile.</p>
+<p>Captured judging produces judge evidence and uses that judge trust profile,
+rather than the deterministic captured trust profile below. It authenticates
+captured inputs and scoring replay; it does not assert that InvarLock executed
+the original model. Reports identify the evaluator and retained model context.</p>
+<h2 id="signed-handoff">Signed handoff<a class="headerlink" href="#signed-handoff" title="Permanent link">&para;</a></h2>
+<p>The evaluation operator supplies its Ed25519 key through <code>--signing-key</code> or
+<code>INVARLOCK_SIGNING_KEY</code>. A recipient independently reviews the complete runs and
+policy, derives their pins through <code>invarlock.engine.run_digest</code>,
+<code>normalize_captured_request</code>, and <code>captured_request_digest</code>, and obtains the
+evidence-signer fingerprint through an authorized channel. Do not copy anchors out of
+the submitted pack or treat the operator's preflight output as recipient approval.</p>
+<p>Use a recipient-owned <code>trust/trust-inputs.json</code> outside the pack. Replace all
+digest placeholders with the independently approved values:</p>
+<div class="codehilite"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;format&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;invarlock/trust-inputs-v2&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;kind&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;captured&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;policy&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;policy.json&quot;</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;anchors&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;baseline_run_digest&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sha256:...&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;subject_run_digest&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sha256:...&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;request_digest&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sha256:...&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;evidence_signer_fingerprint&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sha256:...&quot;</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;verifier&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;identity&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;recipient-verifier&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;signing_key_path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;verifier.pem&quot;</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>The policy and verifier key resolve relative to the profile. The recipient owns
+that key separately from the evaluation operator. <code>evaluate --keygen keys</code> creates an
+Ed25519 demonstration key pair; do not share the private key between roles.
+Profile paths reject traversal and symlinks. Explicit trust flags cannot be
+combined with <code>--trust-profile</code>, and environment anchors cannot override it.</p>
+<div class="codehilite"><pre><span></span><code>invarlock<span class="w"> </span>evaluate<span class="w"> </span>request.yaml<span class="w"> </span>--signing-key<span class="w"> </span>evidence-signer.pem<span class="w"> </span>--json
+invarlock<span class="w"> </span>verify<span class="w"> </span>evidence/<span class="w"> </span>--trust-profile<span class="w"> </span>trust/trust-inputs.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--receipt<span class="w"> </span>verification.receipt.json<span class="w"> </span>--json
+invarlock<span class="w"> </span>report<span class="w"> </span>evidence/<span class="w"> </span>--html<span class="w"> </span>report.html<span class="w"> </span>--markdown<span class="w"> </span>report.md<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--junit<span class="w"> </span>results.xml<span class="w"> </span>--json
+</code></pre></div>
+
+<p>The equivalent explicit verification options are <code>--policy</code>,
+<code>--expected-baseline-run</code>, <code>--expected-subject-run</code>, <code>--expected-request-digest</code>,
+<code>--expected-signer</code>, <code>--verifier-identity</code>, <code>--verifier-signing-key</code>, and
+<code>--receipt</code>. All are required. Native artifact/schedule/runtime anchors are not
+substitutes. The profile's canonical digest is bound into the external signed
+receipt. Receipt authentication uses
+<code>invarlock.engine.verify_signed_verification_receipt</code> with the same independent
+run/request/policy/signer pins and expected verifier identity/fingerprint.
+Its <code>ok</code> authenticates the receipt, including an authentic rejection; separately
+require <code>statement.verdict.ok</code> for a passing technical result.</p>
+<h2 id="preflight-and-local-ci">Preflight and local CI<a class="headerlink" href="#preflight-and-local-ci" title="Permanent link">&para;</a></h2>
+<p>Before publication, <code>evaluate --preflight --json</code> checks paired inputs, reviewed case
+membership, and the planned work allowance without scoring or writing evidence.
+Both evaluation and recipient verification accept <code>--max-bootstrap-draws</code>; each
+caller owns its allowance, and increasing the evaluation allowance does not raise
+the recipient's allowance. The default is 102,400,000 draws across the complete
+policy, including overlapping slices.
+Preflight emits <code>invarlock/evaluation-preflight-v3</code>, with <code>kind: captured</code>,
+<code>requested_authentication</code>, run/policy/request digests, record/scope counts, and
+required versus allowed bootstrap draws. It emits no decision, assurance, or
+receipt fields. For key-free pin derivation, use the pure SDK normalization and
+digest helpers; signed preflight validates the supplied signing key.</p>
+<p><code>evaluate --unsigned</code> publishes an explicitly unsigned local pack. It conflicts
+with an explicit signing key and never falls back to signing implicitly.
+<code>verify</code> rejects unsigned packs with exit <code>6</code>. If the manifest was safely examined,
+it may issue a signed rejection receipt, never a positive verification receipt.
+Local rendering
+preserves the unsigned assurance label rather than presenting a verified result.</p>
+<p>Successful evaluation exits <code>0</code> when it publishes evidence, even for an adverse
+policy decision. For local CI, add <code>--fail-on-policy</code> to return <code>7</code> after publishing
+a regression or insufficient-evidence result. Reports still describe the recorded
+decision; they do not independently verify unsigned results. Preserve the gate
+status while generating JUnit output:</p>
+<div class="codehilite"><pre><span></span><code><span class="nv">evaluation_status</span><span class="o">=</span><span class="m">0</span>
+invarlock<span class="w"> </span>evaluate<span class="w"> </span>request.yaml<span class="w"> </span>--unsigned<span class="w"> </span>--fail-on-policy<span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nv">evaluation_status</span><span class="o">=</span><span class="nv">$?</span>
+<span class="k">case</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$evaluation_status</span><span class="s2">&quot;</span><span class="w"> </span><span class="k">in</span>
+<span class="w">  </span><span class="m">0</span><span class="p">|</span><span class="m">7</span><span class="o">)</span><span class="w"> </span><span class="p">;;</span>
+<span class="w">  </span>*<span class="o">)</span><span class="w"> </span><span class="nb">exit</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$evaluation_status</span><span class="s2">&quot;</span><span class="w"> </span><span class="p">;;</span>
+<span class="k">esac</span>
+invarlock<span class="w"> </span>report<span class="w"> </span>evidence/<span class="w"> </span>--junit<span class="w"> </span>results.xml<span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nb">exit</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$?</span><span class="s2">&quot;</span>
+<span class="nb">exit</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$evaluation_status</span><span class="s2">&quot;</span>
+</code></pre></div>
+
+<p>Preflight cannot be combined with <code>--fail-on-policy</code>, because it does not compute
+a policy decision. A failed publication must not trigger reporting of an older
+evidence directory.</p>
+<p><code>--fail-on-policy</code> is CLI-only: <code>pass</code> exits <code>0</code>, <code>regression</code>,
+<code>insufficient_evidence</code>, or native <code>fail</code> exits <code>7</code>, and an unknown/unavailable
+decision exits <code>2</code>. The successful publication JSON is retained on gate exits;
+SDK evaluation continues to return its publication result. Input or local budget
+refusal exits <code>2</code> without a new pack or receipt. A signed captured verification
+that completes with an adverse policy decision exits <code>7</code> with its rejection
+receipt. Structural/contract rejection exits <code>4</code>; authenticated binding or source
+integrity rejection exits <code>6</code>. Every nonzero verification
+status rejects. Retry budget refusal only after approving an adequate local
+allowance, not by weakening policy.</p>
+<h2 id="outputs-and-assurance">Outputs and assurance<a class="headerlink" href="#outputs-and-assurance" title="Permanent link">&para;</a></h2>
+<p>Captured evaluation emits <code>invarlock/evaluation-result-v2</code>, with <code>kind</code>, <code>ok</code>,
+<code>evidence</code>, <code>comparison_id</code>, baseline/subject run digests, <code>policy_digest</code>,
+<code>request_digest</code>, <code>pack_manifest_digest</code>, <code>authentication</code>, <code>decision</code>, and
+<code>policy_verdict</code>. Publication <code>ok: true</code> is not a claim of independent verification.
+Captured verification emits <code>invarlock/evidence-pack-verify-v2</code>; its signed
+<code>invarlock/evidence-verification-receipt-v3</code> has
+<code>verification_scope: captured_comparison</code>, replay status and scoring assurance.
+Only <code>invarlock/evidence-pack-v2</code> directories are captured evidence packs.</p>
+<p><code>report --json</code> emits <code>invarlock/evidence-report-v2</code> with <code>kind: captured</code>, <code>ok</code>,
+<code>pack_manifest_digest</code>, <code>requested_outputs</code>, <code>written_outputs</code>, <code>failed_output</code>,
+and <code>errors</code>. Output maps use <code>html</code>, <code>markdown</code>, and <code>junit</code> keys; an omitted
+destination is not written. Destinations are checked together for collisions
+before writing. If a later write fails, earlier outputs remain and are listed in
+<code>written_outputs</code>. JUnit represents regression as failure and insufficient
+evidence as error. See <a href="../../reference/reports/">reports</a> and
+<a href="../../reference/evaluation-capacity/">capacity</a>.</p>
+<p>The readable views show both run IDs, complete-run digests, attributed artifact
+digests and evaluator name and version. When the records provide model, workflow,
+dataset or prompt metadata, the comparison context makes those changes visible.
+This is enough to tell which inputs produced the recorded decision; use <code>verify</code>
+when a recipient also needs authenticated bindings and replay assurance.</p>
+<p>The captured record format is intentionally separate from native runtime
+receipts. It authenticates the bytes and policy decision supplied by the
+submission; it does not establish model quality, representativeness, or runtime
+truth beyond those inputs. Receipt <code>scoring_assurance</code> is an ordered array of
+<code>name</code>, <code>slice</code>, <code>kind</code>, and <code>scoring_assurance</code> entries, each <code>recomputed</code> or
+<code>recorded</code>, according to policy, or <code>null</code> after integrity rejection. A comparison
+may contain both kinds of assurance. Recorded judgments and measurements are
+attributed inputs, not rerun inference. Captured packs and receipts, even when
+signed and passing, are rejected by native-only acceptance attestations, ModelKit
+acceptance, and deployment-approval consumers.</p>
 
 
 

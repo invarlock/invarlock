@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://invarlock.github.io/invarlock/reference/runtime-providers/">
       
       
-        <link rel="prev" href="../reports/">
+        <link rel="prev" href="../evidence-sets/">
       
       
         <link rel="next" href="../runtime-security/">
@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/invarlock-app-icon.svg">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -433,6 +433,90 @@
     
   
     Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/captured-results/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Captured results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/hosted-service-requalification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosted-service requalification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/modelkit-handoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ModelKit recipient handoff
   
 
     
@@ -1138,6 +1222,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../evaluation-records/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation records
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluation-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation capacity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../compatibility/" class="md-nav__link">
         
   
@@ -1314,6 +1454,62 @@
     
   
     Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../judge-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Judge measurements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evidence-sets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence sets
   
 
     
@@ -2171,14 +2367,12 @@
 execution from the evidence transaction. Hugging Face Transformers is built
 into the core distribution. GGUF through <code>llama.cpp</code>, TensorRT-LLM, and Hugging
 Face vision-text are first-party optional add-ins.</p>
-<div class="admonition info">
-<p class="admonition-title">Reference</p>
-<ul>
-<li><strong>Surface:</strong> Runtime-provider ABI <code>1</code>, typed identities, settings, resources, discovery, and conformance</li>
-<li><strong>Stability:</strong> Providers must match versioned ABI <code>1</code> exactly; first-party settings and capability declarations are closed</li>
-<li><strong>Use this page when:</strong> Selecting, configuring, implementing, or validating a runtime provider</li>
-</ul>
-</div>
+<blockquote>
+<p><strong>Reference</strong></p>
+<p><strong>Surface:</strong> Runtime-provider ABI <code>1</code>, typed identities, settings, resources, discovery, and conformance</p>
+<p><strong>Stability:</strong> Providers must match versioned ABI <code>1</code> exactly; first-party settings and capability declarations are closed</p>
+<p><strong>Use this page when:</strong> Selecting, configuring, implementing, or validating a runtime provider</p>
+</blockquote>
 <h2 id="provider-protocol">Provider protocol<a class="headerlink" href="#provider-protocol" title="Permanent link">&para;</a></h2>
 <p>A provider implements <code>RuntimeProvider</code> with an exact <code>name</code> and
 <code>abi_version</code>, then supplies:</p>
@@ -2261,14 +2455,17 @@ inspection remain usable without loading a model runtime.</p>
 <li>artifact formats: <code>hf_snapshot</code>, <code>gguf</code>, <code>tensorrt_llm_engine</code>;</li>
 <li>canonical tasks declared by each provider, currently <code>text_causal</code> and
   <code>vision_text_generation</code> across shipped integrations;</li>
-<li>metrics: <code>exact_match</code> and <code>normalized_nll_per_utf8_byte</code>; and</li>
+<li>collection metrics: <code>exact_match</code> and <code>normalized_nll_per_utf8_byte</code>; and</li>
 <li>execution modes: <code>in_process</code>, <code>local_process</code>, <code>container</code>.</li>
 </ul>
-<p>The request loader rejects a built-in metric the selected provider does not
-declare. A scorer extension is not a provider metric: the provider collects
-authenticated output text through its declared exact-match path, and an
-explicitly authorized verifier-replay scorer derives unit-interval values from
-those text facts after collection.
+<p>The request loader checks the selected scorer's required collection metric
+against the provider declaration. Native <code>judge</code> and deterministic extensions
+collect authenticated output text through the existing <code>exact_match</code> path;
+they do not require a new provider metric. The bounded text judge profile also
+requires text task inputs and answers, so a vision-text capability alone
+does not establish judge compatibility. An explicitly authorized deterministic
+extension derives unit-interval values from those authenticated text facts
+after collection.
 Strict evidence execution further requires a real offline container and
 <code>batch_size=1</code>, regardless of a provider's broader capability declaration.</p>
 <table>
@@ -2330,7 +2527,8 @@ authority. The GGUF add-in
 does not declare normalized NLL: its authenticated execution surface is
 the raw <code>llama-completion</code> executable, which emits generated bytes but no
 deterministic per-target-token log probabilities. TensorRT-LLM and Hugging Face
-vision-text likewise remain exact-match only. A provider may not emit a metric it did not advertise, and
+vision-text likewise expose only exact-match collection; authenticated text
+outputs can also support a compatible scorer extension or native judge profile. A provider may not emit a metric it did not advertise, and
 request loading rejects that mismatch before execution.</p>
 <h2 id="artifact-identity">Artifact identity<a class="headerlink" href="#artifact-identity" title="Permanent link">&para;</a></h2>
 <p>Providers return one typed identity:</p>
@@ -2349,7 +2547,7 @@ provider derivation.</p>
 <thead>
 <tr>
 <th>Artifact format</th>
-<th>Identity fields beyond <code>format</code> and <code>artifact_format</code></th>
+<th>Identity fields beyond <code>format_version</code> and <code>artifact_format</code></th>
 </tr>
 </thead>
 <tbody>
@@ -2549,7 +2747,7 @@ error code and no measured output facts; canonical evidence rejects them.</p>
 </tr>
 <tr>
 <td>Output text and output digest</td>
-<td>Required for <code>exact_match</code> and scorer-extension collection</td>
+<td>Required for <code>exact_match</code>, native judge and scorer-extension collection</td>
 <td>Forbidden</td>
 </tr>
 <tr>
@@ -2734,15 +2932,21 @@ engine bundle, exact runner protocol, selected GPU, image digest, and one
 representative request. Run each qualification only inside its intended
 digest-pinned runtime. None of these commands supplies or qualifies a
 production model fixture.</p>
-<p>Maintained qualification adds a signed image prerequisite around those
+<p>Maintained qualification adds a signed canary prerequisite around those
 provider checks. Run <code>runtime-qualification-canary</code> at the repository root, or
-the provider's <code>qualify-canary</code> target, once for a small representative request
-through one exact image digest. Retain its evidence, signed verification
-receipt, and verifier-owned trust profile. Subsequent readiness and evidence
-targets require those paths as <code>CANARY_EVIDENCE</code>, <code>CANARY_RECEIPT</code>, and
-<code>CANARY_TRUST_PROFILE</code>; they strictly reverify the canary and require its
-runtime-image digest to equal the image being qualified. The retained canary
-may be reused while that exact digest remains unchanged.</p>
+the provider's <code>qualify-canary</code> target, for a small representative request
+through one exact image digest. Retain its evidence, signed strict-pass receipt,
+original verifier-owned trust profile, and referenced verifier private key.
+Subsequent readiness and evidence targets require <code>CANARY_EVIDENCE</code>,
+<code>CANARY_RECEIPT</code>, and <code>CANARY_TRUST_PROFILE</code>. They authenticate the saved receipt,
+check the evidence inventory and checksum chain, and require matching image
+digest, per-side runtime-provider identities, task, acceptance binding, and
+CPU/CUDA device class. Acceptance matching requires the same built-in metric or
+the same scorer ID, version, descriptor digest and configuration digest; CUDA
+indices may differ. A change to any required match needs a new signed canary.
+This prerequisite does not rerun full semantic verification. These targets still
+require the original verifier private key; standalone receipt checking can use
+an independently trusted public key.</p>
 <p>This signed canary is a real end-to-end transaction. By contrast, readiness is
 execution-free and starts no model worker. The sequence prevents many jobs
 from being launched through an image that cannot complete one representative
@@ -2919,7 +3123,7 @@ authorization boundary; environment opt-in is deliberately insufficient.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "navigation.sections", "navigation.expand", "navigation.tabs", "navigation.top", "search.highlight", "search.suggest", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
         <script src="../../assets/javascripts/mathjax.js"></script>
       

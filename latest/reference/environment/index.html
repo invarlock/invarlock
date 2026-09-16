@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/invarlock-app-icon.svg">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -433,6 +433,90 @@
     
   
     Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/captured-results/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Captured results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/hosted-service-requalification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosted-service requalification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/modelkit-handoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ModelKit recipient handoff
   
 
     
@@ -1138,6 +1222,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../evaluation-records/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation records
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluation-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation capacity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../compatibility/" class="md-nav__link">
         
   
@@ -1334,6 +1474,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../judge-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Judge measurements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evidence-sets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence sets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../runtime-providers/" class="md-nav__link">
         
   
@@ -1498,6 +1694,17 @@
     <span class="md-ellipsis">
       
         Optional provider resources
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#optional-judge-collection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optional judge collection
       
     </span>
   </a>
@@ -1903,6 +2110,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#optional-judge-collection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optional judge collection
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#security-switches" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1971,19 +2189,24 @@
 <code>request.yaml</code>. Environment variables are alternatives for command options that
 supply secrets, independent verification anchors, OCI launch choices, and
 caller-owned provider resources.</p>
-<div class="admonition info">
-<p class="admonition-title">Reference</p>
-<ul>
-<li><strong>Surface:</strong> Public CLI, OCI launcher, provider-resource, and security
-  environment variables</li>
-<li><strong>Stability:</strong> Documented variables are public operator inputs;
-  repository-test and add-in-internal variables are excluded</li>
-<li><strong>Use this page when:</strong> Supplying key paths, independent verifier anchors,
-  runtime-image identity, device selection, or caller-owned provider support</li>
-</ul>
-</div>
+<blockquote>
+<p><strong>Reference</strong></p>
+<p><strong>Surface:</strong> Public CLI, OCI launcher, provider-resource, and security
+environment variables</p>
+<p><strong>Stability:</strong> Documented variables are public operator inputs;
+repository-test and add-in-internal variables are excluded</p>
+<p><strong>Use this page when:</strong> Supplying key paths, independent verifier anchors,
+runtime-image identity, device selection, or caller-owned provider support</p>
+</blockquote>
 <p>An explicit command option wins over its environment alternative. Empty values
 do not satisfy required paths, digests, fingerprints, or identities.</p>
+<p>Run-mode <code>evaluate --runtime-profile FILE</code> also accepts explicit host resource
+settings. In profile mode, explicit CLI values take precedence over profile
+values, then environment values and defaults. Per-side resolution is detailed
+in <a href="../cli/#reusable-runtime-profiles">Runtime profiles</a>. There is no profile
+environment variable or automatic discovery. Use <code>--preflight</code> to inspect the
+effective settings and their origins. Profiles cannot supply signing keys,
+verification anchors or scorer authorization; import requests reject them.</p>
 <h2 id="transaction-inputs">Transaction inputs<a class="headerlink" href="#transaction-inputs" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -2030,6 +2253,16 @@ do not satisfy required paths, digests, fingerprints, or identities.</p>
 <td>Expected subject <code>sha256:...</code> runtime-image digest</td>
 </tr>
 <tr>
+<td><code>INVARLOCK_EXPECTED_BASELINE_RUN</code></td>
+<td><code>verify</code></td>
+<td>Approved complete baseline run digest for captured evidence</td>
+</tr>
+<tr>
+<td><code>INVARLOCK_EXPECTED_SUBJECT_RUN</code></td>
+<td><code>verify</code></td>
+<td>Approved complete subject run digest for captured evidence</td>
+</tr>
+<tr>
 <td><code>INVARLOCK_EXPECTED_SIGNER</code></td>
 <td><code>verify</code></td>
 <td>Expected Ed25519 evidence-signer fingerprint</td>
@@ -2037,7 +2270,7 @@ do not satisfy required paths, digests, fingerprints, or identities.</p>
 <tr>
 <td><code>INVARLOCK_EXPECTED_REQUEST_DIGEST</code></td>
 <td><code>verify</code></td>
-<td>Approved normalized-request digest; required when either evidence side uses <code>llama_cpp</code></td>
+<td>Approved normalized-request digest; required for captured evidence and when either native evidence side uses <code>llama_cpp</code></td>
 </tr>
 <tr>
 <td><code>INVARLOCK_VERIFIER_SIGNING_KEY</code></td>
@@ -2051,6 +2284,11 @@ do not satisfy required paths, digests, fingerprints, or identities.</p>
 </tr>
 </tbody>
 </table>
+<p>Captured <code>evaluate --unsigned</code> ignores the signing-key environment alternative
+and rejects an explicit signing key. Captured verification uses run/request pins;
+native artifact, schedule, and runtime anchors cannot be mixed with them.
+<code>verify --trust-profile</code> uses only its own policy, anchors, and verifier inputs;
+environment values do not override the profile.</p>
 <p>The receipt destination intentionally has no environment alternative. It must
 be an explicit new path outside the immutable evidence pack.</p>
 <p>Variables contain key paths, not private-key bytes. Keep the evidence-signing
@@ -2225,8 +2463,8 @@ invarlock<span class="w"> </span>evaluate<span class="w"> </span>release-check/r
 </code></pre></div>
 
 <p>Replace the illustrative digest with the exact local CUDA image identity. Keep
-the signing-key path in a caller-controlled location; the host reads it only
-when signing the validated evidence bundle.</p>
+the signing-key path in a caller-controlled location; the host validates it
+during preflight and uses it to sign the validated evidence bundle.</p>
 <p>Equivalent explicit options are often clearer for one-off runs:</p>
 <div class="codehilite"><pre><span></span><code>invarlock<span class="w"> </span>evaluate<span class="w"> </span>release-check/request.yaml<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--signing-key<span class="w"> </span>keys/evidence-signer.pem<span class="w"> </span><span class="se">\</span>
@@ -2307,6 +2545,37 @@ configuration, path escape, and symbolic-link transitions fail closed.</p>
 tokenizer-support resources remain caller-controlled when they are provider
 inputs. The TensorRT-LLM runner is instead installed in and authenticated from
 the selected runtime image; a submitted request cannot replace it.</p>
+<h2 id="optional-judge-collection">Optional judge collection<a class="headerlink" href="#optional-judge-collection" title="Permanent link">&para;</a></h2>
+<p>The installed Inspect judge collector has a separate, explicitly budgeted hosted
+collection boundary. Native model workers remain offline. These environment
+inputs apply only when new judge ratings are collected:</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OPENAI_API_KEY</code></td>
+<td>Required nonempty credential for the configured collector; never retain it in a request or evidence</td>
+</tr>
+<tr>
+<td><code>OPENAI_BASE_URL</code>, <code>OPENAI_API_BASE</code></td>
+<td>Presence is rejected, including an empty value; custom endpoints are unsupported</td>
+</tr>
+<tr>
+<td><code>OPENAI_SAFETY_IDENTIFIER</code></td>
+<td>Presence is rejected; inherited identifier controls are unsupported</td>
+</tr>
+</tbody>
+</table>
+<p>Collection preflight checks this environment and the pinned optional
+dependencies without making calls. Offline retained-measurement import,
+verification and reporting need neither credentials nor these SDKs. See
+<a href="../judge-measurements/#frozen-answer-requests-and-preflight">judge measurements</a>
+for the configuration and reservation limits.</p>
 <h2 id="security-switches">Security switches<a class="headerlink" href="#security-switches" title="Permanent link">&para;</a></h2>
 <p>These variables are false unless set to <code>1</code>, <code>true</code>, <code>yes</code>, or <code>on</code>:</p>
 <table>
@@ -2471,7 +2740,7 @@ internals are not part of this public inventory. Treat this page and
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "navigation.sections", "navigation.expand", "navigation.tabs", "navigation.top", "search.highlight", "search.suggest", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
         <script src="../../assets/javascripts/mathjax.js"></script>
       

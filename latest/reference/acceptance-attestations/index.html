@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/invarlock-app-icon.svg">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -433,6 +433,90 @@
     
   
     Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/captured-results/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Captured results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/hosted-service-requalification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosted-service requalification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/modelkit-handoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ModelKit recipient handoff
   
 
     
@@ -1138,6 +1222,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../evaluation-records/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation records
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluation-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation capacity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../compatibility/" class="md-nav__link">
         
   
@@ -1427,6 +1567,62 @@
     
   
     Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../judge-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Judge measurements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evidence-sets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence sets
   
 
     
@@ -1905,16 +2101,14 @@
 one exact derived artifact. It is an in-toto Statement v1 inside a DSSE
 envelope. It does not represent a recipient's final approval, exception,
 quorum, governance action, or deployment decision.</p>
-<div class="admonition info">
-<p class="admonition-title">Reference</p>
-<ul>
-<li><strong>Surface:</strong> <code>https://invarlock.dev/attestations/acceptance/v2</code>
-  standards-shaped in-toto/DSSE transport</li>
-<li><strong>Stability:</strong> Closed v2 predicate and recipient-policy contracts</li>
-<li><strong>Use this page when:</strong> Producing, transporting, or independently
-  evaluating a portable acceptance attestation</li>
-</ul>
-</div>
+<blockquote>
+<p><strong>Reference</strong></p>
+<p><strong>Surface:</strong> <code>https://invarlock.dev/attestations/acceptance/v2</code>
+standards-shaped in-toto/DSSE transport</p>
+<p><strong>Stability:</strong> Closed v2 predicate and recipient-policy contracts</p>
+<p><strong>Use this page when:</strong> Producing, transporting, or independently
+evaluating a portable acceptance attestation</p>
+</blockquote>
 <p>The predicate format is <code>invarlock/acceptance-predicate-v2</code>; the envelope
 payload type is <code>application/vnd.in-toto+json</code>.</p>
 <h2 id="handoff-model">Handoff model<a class="headerlink" href="#handoff-model" title="Permanent link">&para;</a></h2>
@@ -1965,8 +2159,9 @@ InvarLock receipt is the authoritative replayable technical result.
 <code>receipt.raw_base64</code> preserves the exact supplied receipt-file bytes, and
 <code>receipt.digest</code> is SHA-256 over those decoded bytes. <code>receipt.content</code> is the
 parsed policy projection and must decode to the same JSON value. The
-surrounding predicate duplicates selected fields, all of which must agree with
-the authenticated receipt.</p>
+surrounding predicate duplicates receipt-carried anchors, verdict and signer
+fields, which must agree with the authenticated receipt. Other selected fields
+are authenticated by the envelope signer and retain that distinct authority.</p>
 <p>Existing v0.13 receipt formats are wrapped without modification or relabeling.
 Their original bytes are recoverable byte-for-byte from <code>receipt.raw_base64</code>,
 and their original format remains in <code>contracts.receipt</code> and the parsed
@@ -1982,6 +2177,16 @@ wrapper-supplied context, not an authoritative freshness input.
 technical verdict, artifact anchors, schedule digest, policy digest, contract
 version, and signer against the outer predicate. Any contradiction rejects the
 attestation, even if the modified envelope has a valid outer signature.</p>
+<p>The evaluation-source identity object must agree with its canonical digest.
+This is an internal consistency check: the receipt binds the schedule digest,
+but does not contain the complete schedule or independently recover its dataset
+metadata. Source labels and metric descriptions are envelope-signer context
+unless a recipient also replays the complete evidence and checks those fields.
+An envelope signer can supply a different self-consistent source description
+without changing the original receipt-bound schedule or technical result;
+envelope-only verification does not establish that description's relationship
+to the schedule bytes. Do not present those fields as independently replayed
+merely because both signatures authenticate.</p>
 <h2 id="signer-relationship">Signer relationship<a class="headerlink" href="#signer-relationship" title="Permanent link">&para;</a></h2>
 <p>The receipt signer is the technical verifier. The envelope signer is the party
 transporting that verified result.</p>
@@ -2115,7 +2320,7 @@ surface is <code>invarlock.engine.verify_evidence</code>.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "navigation.sections", "navigation.expand", "navigation.tabs", "navigation.top", "search.highlight", "search.suggest", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
         <script src="../../assets/javascripts/mathjax.js"></script>
       

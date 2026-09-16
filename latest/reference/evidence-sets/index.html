@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://invarlock.github.io/invarlock/assurance/pairing-and-replay/">
+        <link rel="canonical" href="https://invarlock.github.io/invarlock/reference/evidence-sets/">
       
       
-        <link rel="prev" href="../decision-semantics/">
+        <link rel="prev" href="../judge-measurements/">
       
       
-        <link rel="next" href="../reproducibility/">
+        <link rel="next" href="../runtime-providers/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>Pairing and replay - InvarLock Documentation</title>
+        <title>Evidence sets - InvarLock Documentation</title>
       
     
     
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#pairing-and-replay" class="md-skip">
+        <a href="#deterministic-and-judge-evidence-sets" class="md-skip">
           Skip to content
         </a>
       
@@ -111,7 +111,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Pairing and replay
+              Evidence sets
             
           </span>
         </div>
@@ -235,13 +235,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../assurance-case/" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../assurance/assurance-case/" class="md-tabs__link">
           
   
   
@@ -257,11 +255,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../reference/cli/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../cli/" class="md-tabs__link">
           
   
   
@@ -849,31 +849,28 @@
       
   
   
-    
   
   
-  
     
     
     
     
-      
-        
-        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
         
           
-          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
             
   
   
@@ -891,7 +888,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -909,7 +906,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../assurance-case/" class="md-nav__link">
+      <a href="../../assurance/assurance-case/" class="md-nav__link">
         
   
   
@@ -937,7 +934,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../decision-semantics/" class="md-nav__link">
+      <a href="../../assurance/decision-semantics/" class="md-nav__link">
         
   
   
@@ -945,6 +942,546 @@
     
   
     Decision semantics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/pairing-and-replay/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pairing and replay
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/acceptance-checklist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Acceptance checklist
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluation-records/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation records
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluation-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation capacity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../compatibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compatibility covenant
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../acceptance-attestations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Acceptance attestations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../policy-engine-interop/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Policy-engine interoperability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluator-qualification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluator qualification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../artifacts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifacts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../judge-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Judge measurements
   
 
     
@@ -981,7 +1518,7 @@
   <span class="md-ellipsis">
     
   
-    Pairing and replay
+    Evidence sets
   
 
     
@@ -999,7 +1536,7 @@
   <span class="md-ellipsis">
     
   
-    Pairing and replay
+    Evidence sets
   
 
     
@@ -1025,10 +1562,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#notation" class="md-nav__link">
+  <a href="#component-boundary" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Notation
+        Component boundary
       
     </span>
   </a>
@@ -1036,10 +1573,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#canonical-schedule-contract" class="md-nav__link">
+  <a href="#independent-recipient-policy" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Canonical schedule contract
+        Independent recipient policy
       
     </span>
   </a>
@@ -1047,10 +1584,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#provider-observation-contract" class="md-nav__link">
+  <a href="#verification-and-report-commands" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Provider-observation contract
+        Verification and report commands
       
     </span>
   </a>
@@ -1058,76 +1595,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#pair-derivation" class="md-nav__link">
+  <a href="#statistical-scope" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Pair derivation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#worked-mismatch-examples" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Worked mismatch examples
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#native-run-and-import-equivalence" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Native run and import equivalence
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#captured-records-and-judge-trials" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Captured records and judge trials
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#replay-guarantees-and-limits" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Replay guarantees and limits
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#selection-assumptions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Selection assumptions
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#references" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        References
+        Statistical scope
       
     </span>
   </a>
@@ -1150,544 +1621,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reproducibility/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Reproducibility
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../acceptance-checklist/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Acceptance checklist
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../glossary/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Glossary
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    
-    
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
-        
-          
-          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Reference
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Reference
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../reference/cli/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    CLI
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../reference/architecture/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Architecture
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../reference/contracts/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Contracts
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../reference/evaluation-records/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Evaluation records
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../reference/evaluation-capacity/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Evaluation capacity
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../reference/compatibility/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Compatibility covenant
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../reference/acceptance-attestations/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Acceptance attestations
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../reference/policy-engine-interop/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Policy-engine interoperability
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../reference/evaluator-qualification/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Evaluator qualification
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../reference/api-guide/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Python API
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../reference/artifacts/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Artifacts
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../reference/reports/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Reports
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../reference/judge-measurements/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Judge measurements
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../reference/evidence-sets/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Evidence sets
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../reference/runtime-providers/" class="md-nav__link">
+      <a href="../runtime-providers/" class="md-nav__link">
         
   
   
@@ -1715,7 +1649,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/runtime-security/" class="md-nav__link">
+      <a href="../runtime-security/" class="md-nav__link">
         
   
   
@@ -1743,7 +1677,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/environment/" class="md-nav__link">
+      <a href="../environment/" class="md-nav__link">
         
   
   
@@ -1771,7 +1705,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/lifecycle/" class="md-nav__link">
+      <a href="../lifecycle/" class="md-nav__link">
         
   
   
@@ -1799,7 +1733,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/release-verification/" class="md-nav__link">
+      <a href="../release-verification/" class="md-nav__link">
         
   
   
@@ -1827,7 +1761,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/documentation/" class="md-nav__link">
+      <a href="../documentation/" class="md-nav__link">
         
   
   
@@ -2055,10 +1989,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#notation" class="md-nav__link">
+  <a href="#component-boundary" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Notation
+        Component boundary
       
     </span>
   </a>
@@ -2066,10 +2000,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#canonical-schedule-contract" class="md-nav__link">
+  <a href="#independent-recipient-policy" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Canonical schedule contract
+        Independent recipient policy
       
     </span>
   </a>
@@ -2077,10 +2011,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#provider-observation-contract" class="md-nav__link">
+  <a href="#verification-and-report-commands" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Provider-observation contract
+        Verification and report commands
       
     </span>
   </a>
@@ -2088,76 +2022,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#pair-derivation" class="md-nav__link">
+  <a href="#statistical-scope" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Pair derivation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#worked-mismatch-examples" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Worked mismatch examples
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#native-run-and-import-equivalence" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Native run and import equivalence
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#captured-records-and-judge-trials" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Captured records and judge trials
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#replay-guarantees-and-limits" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Replay guarantees and limits
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#selection-assumptions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Selection assumptions
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#references" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        References
+        Statistical scope
       
     </span>
   </a>
@@ -2184,289 +2052,165 @@
   
 
 
-<h1 id="pairing-and-replay">Pairing and replay<a class="headerlink" href="#pairing-and-replay" title="Permanent link">&para;</a></h1>
+<h1 id="deterministic-and-judge-evidence-sets">Deterministic and judge evidence sets<a class="headerlink" href="#deterministic-and-judge-evidence-sets" title="Permanent link">&para;</a></h1>
+<p>An evidence set combines one captured deterministic comparison and one required
+bounded judge comparison over the same complete baseline and subject runs. Both
+component policies must pass before a recipient accepts the combined result.</p>
 <blockquote>
-<p><strong>Assurance note</strong></p>
-<p><strong>In plain language:</strong> Baseline and subject must refer to the same declared
-cases under the selected pairing contract. Missing required measurements
-prevent acceptance; they are not silently discarded to improve the result.</p>
-<p><strong>Question:</strong> How does verification establish matching cases and handle
-ordering, changed inputs and missing measurements in each workflow?</p>
-<p><strong>Decision use:</strong> Use this page to diagnose pairing failures and to judge
-whether imported or executed observations support the same replay claim.</p>
-<p><strong>Evidence:</strong> The canonical schedule, ordered provider observations,
-record and input digests, derived paired records, and exact replay checks.</p>
+<p><strong>Reference</strong></p>
+<p><strong>Surface:</strong> Evidence-set index, recipient policy, verification and reporting</p>
+<p><strong>Stability:</strong> Additive closed formats; existing component formats retain their meanings</p>
+<p><strong>Use this page when:</strong> Requiring deterministic and repeated-judge checks on the same frozen answers</p>
 </blockquote>
-<p>Pairing is the central comparison invariant. In native pack-v1 evidence, the
-baseline and subject must produce one successful observation for every scheduled
-record, in exactly the same order, with the same record identity and input digest.
-The derivation below describes that native contract. Captured comparisons pair
-by unique record ID, while judge replay additionally binds each scheduled trial;
-their rules are described below.</p>
-<h2 id="notation">Notation<a class="headerlink" href="#notation" title="Permanent link">&para;</a></h2>
-<p>Let the canonical schedule be the ordered sequence:</p>
-<div class="arithmatex">\[
-\mathcal{S}=\left((r_i, q_i, h_i, y_i)\right)_{i=1}^{n},
-\]</div>
-<p>where:</p>
-<table>
-<thead>
-<tr>
-<th>Symbol</th>
-<th>Meaning</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><span class="arithmatex">\(r_i\)</span></td>
-<td>Unique logical record ID</td>
-</tr>
-<tr>
-<td><span class="arithmatex">\(q_i\)</span></td>
-<td>Exact ordered input-part array</td>
-</tr>
-<tr>
-<td><span class="arithmatex">\(h_i\)</span></td>
-<td>Lowercase SHA-256 of the canonical JSON bytes of <span class="arithmatex">\(q_i\)</span></td>
-</tr>
-<tr>
-<td><span class="arithmatex">\(y_i\)</span></td>
-<td>Expected output</td>
-</tr>
-<tr>
-<td><span class="arithmatex">\(\mathcal{O}_B\)</span>, <span class="arithmatex">\(\mathcal{O}_S\)</span></td>
-<td>Ordered baseline and subject observations</td>
-</tr>
-<tr>
-<td><span class="arithmatex">\(C_0(z)\)</span></td>
-<td>InvarLock's contract-defined canonical JSON bytes for <span class="arithmatex">\(z\)</span>, without a final line feed</td>
-</tr>
-<tr>
-<td><span class="arithmatex">\(H(z)\)</span></td>
-<td>SHA-256 of bytes <span class="arithmatex">\(z\)</span></td>
-</tr>
-<tr>
-<td><span class="arithmatex">\(d_{\mathcal S}\)</span></td>
-<td>Canonical schedule digest, <span class="arithmatex">\(H(C_0(\mathcal S))\)</span></td>
-</tr>
-</tbody>
-</table>
-<p>The notation <span class="arithmatex">\(C_0\)</span> is the no-final-line-feed form used for canonical schedules
-and scoring-record arrays: UTF-8, sorted keys, compact separators, finite
-numbers, and preserved array order. Other public documents use the same JSON
-profile with the newline behavior defined by their individual contract. This
-profile is deterministic but is not a claim of conformance to the separate
-JSON Canonicalization Scheme in RFC 8785.</p>
-<h2 id="canonical-schedule-contract">Canonical schedule contract<a class="headerlink" href="#canonical-schedule-contract" title="Permanent link">&para;</a></h2>
-<p>The <code>invarlock/runtime-behavioral-schedule-v1</code> document contains:</p>
-<ul>
-<li>dataset provider, name, configuration, immutable revision when required,
-  and split;</li>
-<li>an ordered, nonempty array of at most 10,000 records;</li>
-<li>a unique, safe logical <code>record_id</code> for each record;</li>
-<li>an ordered array of authenticated text or content input parts and its
-  lowercase SHA-256 digest; and</li>
-<li>nonempty <code>expected_output</code> retained with each scheduled record. Exact match
-  compares against it and NLL scores its continuation. Native judging includes
-  it in judge prompts only when the plan selects per-case reference mode.</li>
-</ul>
-<p>The loader rejects unknown fields, unsafe logical names, duplicate record IDs,
-empty material, hosted-dataset revisions that are not canonical, and an input
-digest that does not match the canonical ordered input parts. Text parts carry
-inline text and its digest; content parts carry a path-free content ID, media
-type, byte length, and digest. It serializes the validated schedule and
-recomputes <code>schedule_sha256</code>.</p>
-<p>The schedule digest serves as the dataset material identity in
-<code>invarlock/evidence-pack-v1</code>. Dataset coordinates explain the declared source; the
-digest identifies the exact ordered schedule evaluated. Coordinates alone are
-not a material identity.</p>
-<h2 id="provider-observation-contract">Provider-observation contract<a class="headerlink" href="#provider-observation-contract" title="Permanent link">&para;</a></h2>
-<p>Each side emits an <code>invarlock/runtime-scoring-observation-v1</code> document binding:</p>
-<ul>
-<li>provider name and artifact-identity digest;</li>
-<li>the canonical schedule digest;</li>
-<li>ordered records with <code>record_id</code> and <code>input_sha256</code>;</li>
-<li>successful output or scoring facts; and</li>
-<li><code>aggregate_source_sha256</code>, the digest of the complete canonical record
-  array.</li>
-</ul>
-<p>For side <span class="arithmatex">\(X \in \{B,S\}\)</span>, the verifier requires:</p>
-<div class="arithmatex">\[
-\operatorname{IDs}(\mathcal O_X)
-= (r_1,\ldots,r_n),
-\]</div>
-<p>and:</p>
-<div class="arithmatex">\[
-\forall i,\quad
-\operatorname{inputDigest}(\mathcal O_{X,i}) = h_i
-\quad\land\quad
-\operatorname{status}(\mathcal O_{X,i})=\texttt{ok}.
-\]</div>
-<p>It also recomputes:</p>
-<div class="arithmatex">\[
-d_{\mathcal O_X}=H\!\left(C_0(\operatorname{records}(\mathcal O_X))\right)
-\]</div>
-<p>and requires equality with the observation's <code>aggregate_source_sha256</code>.</p>
-<p>Provider receipts and runtime manifests cross-bind artifact identity,
-observation, provider implementation, execution settings, runtime image, and
-device facts. The runtime-side report binds the observation digest, schedule,
-provider, artifact, and record count. These links prevent a record or sidecar
-from being transplanted without invalidating another authenticated binding.</p>
-<h2 id="pair-derivation">Pair derivation<a class="headerlink" href="#pair-derivation" title="Permanent link">&para;</a></h2>
-<p>For schedule position <span class="arithmatex">\(i\)</span>, the accepted pairing relation is:</p>
-<div class="arithmatex">\[
-r_i=r_{B,i}=r_{S,i}
-\quad\land\quad
-h_i=h_{B,i}=h_{S,i}
-\quad\land\quad
-z_{B,i}=z_{S,i}=\texttt{ok}.
-\]</div>
-<p>Equality is positional and sequence-wide. Matching sets or matching counts are
-insufficient. Reordering, omission, duplication, an input-part change, an
-error record, or a schedule-digest change fails the transaction.</p>
-<p>The resulting <code>invarlock/paired-records-v1</code> file stores, for each schedule
-record:</p>
-<ul>
-<li><code>record_id</code> and <code>input_sha256</code>;</li>
-<li>verifier-derived baseline and subject scores; and</li>
-<li>a digest of each complete source observation record.</li>
-</ul>
-<p>Normalized-NLL pairs may also bind a verifier-derived perplexity interpretation
-when authenticated tokenizer digests and equal positive per-pair token counts
-make the token-weighted value comparable. That interpretation has no acceptance
-authority.</p>
-<p>Verification derives the entire document again and requires exact equality
-with the stored canonical file. It then rebuilds the comparison report from
-those derived pairs, including the selected paired interval and optional
-record-count, interval-width, and exact-match side-accuracy qualification.</p>
-<h2 id="worked-mismatch-examples">Worked mismatch examples<a class="headerlink" href="#worked-mismatch-examples" title="Permanent link">&para;</a></h2>
-<p>Given schedule IDs:</p>
-<div class="codehilite"><pre><span></span><code>[sample-001, sample-002, sample-003]
+<h2 id="component-boundary">Component boundary<a class="headerlink" href="#component-boundary" title="Permanent link">&para;</a></h2>
+<p>Produce each component with its existing <code>evaluate</code> request. Captured metrics
+must be recomputed by <code>exact_match</code>, <code>normalized_match</code>, <code>numeric_tolerance</code>,
+<code>json_fields</code>, <code>json_exact</code> or <code>token_f1</code>; recorded scores are not accepted as
+the deterministic component. The judge policy must declare <code>required</code>.</p>
+<p>Both components must bind identical complete run digests, original case-set
+digest and evaluated subject identity. Matching case IDs alone is insufficient. Inputs,
+references, metadata and answers must match through those complete bindings.
+Judge repetitions do not create additional deterministic records.</p>
+<p>An index contains exactly the two named members. For existing child directories:</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.evidence_sets.contracts</span><span class="w"> </span><span class="kn">import</span> <span class="n">write_evidence_set_index</span>
+
+<span class="n">write_evidence_set_index</span><span class="p">(</span>
+    <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;evidence&quot;</span><span class="p">),</span> <span class="n">deterministic</span><span class="o">=</span><span class="s2">&quot;deterministic&quot;</span><span class="p">,</span> <span class="n">judge</span><span class="o">=</span><span class="s2">&quot;judge&quot;</span>
+<span class="p">)</span>
 </code></pre></div>
 
-<p>these observations all fail closed:</p>
-<table>
-<thead>
-<tr>
-<th>Observation IDs or facts</th>
-<th>Reason</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>[sample-001, sample-003, sample-002]</code></td>
-<td>Same set, wrong order</td>
-</tr>
-<tr>
-<td><code>[sample-001, sample-002]</code></td>
-<td>Missing scheduled record</td>
-</tr>
-<tr>
-<td><code>[sample-001, sample-002, sample-003, sample-003]</code></td>
-<td>Duplicate and extra record</td>
-</tr>
-<tr>
-<td>Correct IDs, changed digest for <code>sample-002</code></td>
-<td>Input bytes do not match schedule</td>
-</tr>
-<tr>
-<td>Correct IDs, <code>sample-002</code> has <code>status: error</code></td>
-<td>Partial evidence is not scored</td>
-</tr>
-<tr>
-<td>Correct records, wrong <code>schedule_sha256</code></td>
-<td>Observation is bound to another schedule</td>
-</tr>
-</tbody>
-</table>
-<p>The native pack-v1 verifier never sorts, intersects, truncates, or drops records to manufacture
-a paired subset.</p>
-<h2 id="native-run-and-import-equivalence">Native run and import equivalence<a class="headerlink" href="#native-run-and-import-equivalence" title="Permanent link">&para;</a></h2>
-<p>For native exact match, NLL and deterministic extensions, run mode asks
-installed providers to authenticate and score both artifacts.
-Import mode accepts complete provider evidence created elsewhere. Both modes
-converge on the same pair derivation, canonical report, and
-<code>invarlock/evidence-pack-v1</code> publication path.</p>
-<p>Import mode is not a relaxed path. Imported paired records must equal the pairs
-derived from the imported schedule and provider observations. All provider,
-artifact, runtime, order, digest, and score checks still apply.</p>
-<p>Native judge run/import modes reuse authenticated provider capture but publish
-the separate judge evidence format. They additionally bind frozen answers,
-planned judge trials and retained measurements; they do not publish a native
-pack-v1 judge comparison report.</p>
-<p>See the <a href="../../user-guide/evaluation-request/">evaluation request guide</a> for the
-two request shapes and the
-<a href="../../reference/contracts/#provider-contracts">provider contracts</a> for their
-versioned documents.</p>
-<h2 id="captured-records-and-judge-trials">Captured records and judge trials<a class="headerlink" href="#captured-records-and-judge-trials" title="Permanent link">&para;</a></h2>
-<p>Captured comparison requires equal sets of unique record IDs and canonical
-equality of each pair's input, expected value and metadata. It sorts pairs by
-record ID, so differing export order alone is not a pairing failure. Explicit
-text projection also retains and verifies the original input/context binding.
-The complete run digests still identify the exact submitted runs, including
-original record order. Missing IDs or changed paired facts reject comparison;
-missing metric facts or errored results yield <code>insufficient_evidence</code> for the
-applicable metric instead of silently dropping cases.</p>
-<p>Bounded judge replay binds frozen runs, the case set, declared case-to-unit
-mapping and every case/side/repetition slot. It retains attempts, parses and
-source locations; a failed or incomplete scheduled trial cannot be replaced
-by a favorable extra sample. Repetitions are averaged within each case and cases
-within each unit. The independently declared units determine the inference
-sample size. Native judge evidence additionally retains and replays its provider
-capture; captured or frozen-answer imports retain supplied-source provenance.</p>
-<p>See <a href="../../reference/evaluation-records/">captured records</a> and
-<a href="../../reference/judge-measurements/">judge measurements</a> for these contracts.</p>
-<h2 id="replay-guarantees-and-limits">Replay guarantees and limits<a class="headerlink" href="#replay-guarantees-and-limits" title="Permanent link">&para;</a></h2>
-<p>For native pack-v1 evidence, replay detects:</p>
-<ul>
-<li>baseline or subject artifact identity different from the caller-owned
-  expected digest;</li>
-<li>a canonical schedule different from the caller-owned expected digest;</li>
-<li>schedule or input changes;</li>
-<li>baseline/subject order drift;</li>
-<li>provider aggregate values unsupported by record facts;</li>
-<li>artifact, provider, runtime, observation, or report substitution;</li>
-<li>changes to paired scores, decision arithmetic, or the policy-relevant paired
-  interval bound; and</li>
-<li>use of policy bytes different from the independently supplied policy.</li>
-</ul>
-<p>Captured verification uses complete-run and request pins instead of native
-runtime anchors. Judge verification additionally checks its plan, measurement
-and analysis bindings. Reordering captured exports can preserve paired results
-while changing the complete-run identity; an independently pinned run still
-rejects that substitution.</p>
-<p>Replay does not prove that provider facts came from genuine model execution. An
-evidence signer able to fabricate a complete, mutually consistent set of measurements can
-sign that set. External measured-execution attestation or an independently
-controlled rerun is needed for a stronger claim.</p>
-<h2 id="selection-assumptions">Selection assumptions<a class="headerlink" href="#selection-assumptions" title="Permanent link">&para;</a></h2>
-<p>Perfect pairing does not make a schedule representative. The assurance
-argument assumes that an accountable decision owner:</p>
-<ol>
-<li>defines the target behavior and sampling frame;</li>
-<li>fixes the dataset revision, split, records, expected outputs, and policy
-   before subject results are visible;</li>
-<li>records or reviews the schedule digest before evaluation;</li>
-<li>does not remove difficult records after observing failures; and</li>
-<li>creates a new evidence pack for any schedule or policy change.</li>
-</ol>
-<p>Violation of an assumption need not produce a verifier error. It is a defeater
-for broader interpretation of the otherwise valid finite-schedule result.</p>
-<p>The canonical loader and replay are implemented in
-<a href="https://github.com/invarlock/invarlock/blob/main/src/invarlock/core/runtime_provider/behavioral_schedule.py">behavioral schedule</a>
-and
-<a href="https://github.com/invarlock/invarlock/blob/main/src/invarlock/evidence_pack_contract.py">evidence pack contract</a>.</p>
-<h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
-<ul>
-<li><a href="https://www.rfc-editor.org/rfc/rfc8259">RFC 8259: The JavaScript Object Notation Data Interchange
-  Format</a>, Internet Standard, 2017.</li>
-<li><a href="https://www.rfc-editor.org/rfc/rfc8785">RFC 8785: JSON Canonicalization Scheme</a>,</li>
-<li>InvarLock uses its own versioned canonical profile and does not claim
-  RFC 8785 conformance.</li>
-<li>National Institute of Standards and Technology,
-  <a href="https://doi.org/10.6028/NIST.FIPS.180-4">Secure Hash Standard</a>,
-  2015.</li>
-</ul>
+<p>This writes an unsigned <code>evidence-set.json</code> transport index with the following
+shape. Digest placeholders must be replaced by the helper's actual values:</p>
+<div class="codehilite"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;format&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;invarlock/evidence-set-v1&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;members&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;deterministic&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;kind&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;captured&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;deterministic&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;statement_sha256&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sha256:...&quot;</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;judge&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;kind&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;judge&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;judge&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;statement_sha256&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sha256:...&quot;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>The statement pins hash exact child manifest/envelope bytes. The index supplies
+no signer authority or acceptance policy. Nested sets, overlapping member paths,
+traversal, symlinks and conflicting format markers are rejected.</p>
+<h2 id="independent-recipient-policy">Independent recipient policy<a class="headerlink" href="#independent-recipient-policy" title="Permanent link">&para;</a></h2>
+<p>The recipient retains its composition policy and both component trust profiles
+outside the entire evidence set. Relative profile paths resolve under the
+composition policy's parent. The captured profile keeps its existing independent
+policy, anchors, verifier identity and signing key. The judge profile keeps its
+existing signer, plan, measurement, result and intended-subject pins.</p>
+<div class="codehilite"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;format&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;invarlock/evidence-set-recipient-policy-v1&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;scope&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;same-answer-component-conjunction-v1&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;index_sha256&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sha256:...&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;shared_inputs&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;baseline_run_sha256&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sha256:...&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;subject_run_sha256&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sha256:...&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;case_set_sha256&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sha256:...&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;subject_artifact_sha256&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sha256:...&quot;</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;members&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;deterministic&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;kind&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;captured&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;trust_profile&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;captured.json&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;trust_profile_sha256&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sha256:...&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;role&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;required&quot;</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;judge&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;kind&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;judge&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;trust_profile&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;judge.json&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;trust_profile_sha256&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sha256:...&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;role&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;required&quot;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;decision_rule&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;all-required-components-pass&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;statistical_scope&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;component-methods-no-joint-confidence&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>The example above is for a local artifact. For a hosted subject,
+<code>shared_inputs.subject_artifact_sha256</code> must be <code>null</code> and
+<code>shared_inputs.subject_service_identity_sha256</code> must contain
+<code>invarlock.engine.evaluated_subject_digest(subject_run)</code>. The latter hashes the
+complete service descriptor; it does not identify immutable weights. Local
+artifact policies omit the service field. The judge recipient policy must pin
+the same evaluated subject in <code>intended_subject</code>, and both components still
+require the exact complete-run digests.</p>
+<p>All composition digests use the <code>sha256:</code> prefix. Index and trust-profile pins
+hash exact file bytes; original-run and case-set pins use their canonical public
+contract functions. Approve component policies and shared input identities
+independently before approving the transport index. Copying a submitted
+index's identities does not establish that approval.</p>
+<p>The runnable source example at <code>examples/judge-with-deterministic/demo.py</code>
+constructs independent input expectations before publishing its synthetic
+components. Its generated recipient policy shows every required field.</p>
+<h2 id="verification-and-report-commands">Verification and report commands<a class="headerlink" href="#verification-and-report-commands" title="Permanent link">&para;</a></h2>
+<div class="codehilite"><pre><span></span><code>invarlock<span class="w"> </span>verify<span class="w"> </span>evidence<span class="w"> </span>--trust-profile<span class="w"> </span>recipient/composition.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--receipt<span class="w"> </span>verification.json<span class="w"> </span>--json
+invarlock<span class="w"> </span>report<span class="w"> </span>evidence<span class="w"> </span>--html<span class="w"> </span>report.html<span class="w"> </span>--markdown<span class="w"> </span>report.md<span class="w"> </span>--junit<span class="w"> </span>report.xml
+</code></pre></div>
+
+<p><code>verify</code> freshly authenticates and replays each component with its own recipient
+profile, checks common input identity, then requires both accepted results.
+Explicit component signer or policy flags cannot be combined with composition;
+place these controls in the corresponding independent profiles.
+<code>--max-bootstrap-draws</code> remains the recipient's captured replay work allowance.
+No provider calls or scorer extensions execute.</p>
+<p>Exit 0 means both required components passed and were accepted. Exit 7 means
+both components verified but a required result was adverse or inconclusive.
+Exit 4 means composition could not establish authentication, replay or required
+input identity. Missing CLI trust inputs or invalid output destinations exit 2.</p>
+<p>An optional result retains the complete captured signed receipt and a scoped
+signed judge receipt as bounded JSON text inside the member results. Both member
+receipts use the captured trust profile's independently loaded verifier identity
+and key. The composite result remains local and unsigned; it cannot authorize
+itself. All output destinations must be new and outside the evidence set. Reports
+preserve both methods and show the shared original cases, component outcomes and
+distinct assurance levels; reporting does not perform recipient acceptance.</p>
+<p>The corresponding APIs are:</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.evidence_sets.verification</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">verify_evidence_set</span><span class="p">,</span>
+    <span class="n">verify_stored_evidence_set_result</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">result</span> <span class="o">=</span> <span class="n">verify_evidence_set</span><span class="p">(</span>
+    <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;evidence&quot;</span><span class="p">),</span>
+    <span class="n">recipient_policy</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;recipient/composition.json&quot;</span><span class="p">),</span>
+    <span class="n">receipt</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;verification.json&quot;</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="n">accepted</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">accepted</span>
+
+<span class="n">rechecked</span> <span class="o">=</span> <span class="n">verify_stored_evidence_set_result</span><span class="p">(</span>
+    <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;verification.json&quot;</span><span class="p">),</span>
+    <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;evidence&quot;</span><span class="p">),</span>
+    <span class="n">recipient_policy</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;recipient/composition.json&quot;</span><span class="p">),</span>
+<span class="p">)</span>
+</code></pre></div>
+
+<p>Rechecking recomputes the result and requires exact equality. Stored flags or
+component receipts are never substituted for current verification.</p>
+<h2 id="statistical-scope">Statistical scope<a class="headerlink" href="#statistical-scope" title="Permanent link">&para;</a></h2>
+<p>The combined policy is a conjunction of component decisions. It provides <strong>no
+joint confidence guarantee</strong>. Captured v1 retains its marginal case-based
+intervals. Judge evidence retains its declared independent-unit weighting and
+family-adjusted bounds. Neither method's confidence level is promoted to a
+confidence claim about the entire set.</p>
+<p>No metric can rescue a failed required component. An advisory judge result
+cannot be promoted into required acceptance. A common confidence family,
+arbitrary member graphs and additional evidence families are outside this
+profile. All existing standalone requests, evidence and receipts remain valid.</p>
+<p>For the individual contracts, see <a href="../../user-guide/captured-results/">captured results</a>
+and <a href="../judge-measurements/">bounded judge measurements</a>.</p>
 
 
 
