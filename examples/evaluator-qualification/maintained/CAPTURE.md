@@ -2,7 +2,9 @@
 
 > **Outcome:** Preserve cases from an existing evaluator workflow and make their
 > available facts usable by InvarLock's exact-match, normalized-NLL or judge scorer.
+>
 > **Audience:** Evaluator users who already retain model inputs and outputs.
+>
 > **Prerequisites:** An installed InvarLock wheel, its matching example checkout,
 > original per-case data and the evaluated model's artifact digest.
 
@@ -12,6 +14,18 @@ existing case facts; InvarLock owns subsequent scoring. Naming an evaluator does
 not execute that package or transfer its scoring authority. Capability output
 reports which records have the required facts, rather than claiming a completed
 judge execution or model-likelihood measurement.
+
+Use `qualification` when you have the original cases plus a complete retained
+qualification package. Use `records` when you can map your own workflow's cases
+directly. Both write one canonical run JSON file and print input-capability
+counts. Neither command publishes an evidence pack or makes an acceptance
+decision. Capture a baseline and a subject, then pass both to the
+[captured comparison workflow](../../captured-results/README.md).
+
+The helper is a script in this checkout, not an installed CLI. Run it from the
+repository root with the Python interpreter that has the matching InvarLock
+wheel installed. No evaluator SDK, container, model execution or provider call
+is needed to capture facts already on disk.
 
 ## Shortlist coverage
 
@@ -98,6 +112,11 @@ These retained runs executed upstream exact-match scorers on supplied cases.
 Capturing them does not establish a fresh upstream run or a native judge/NLL
 execution. Fresh maintained qualification outputs can use the same command with
 their own cases, schedule, profile, export and raw-output paths.
+The paths above select the small two-case conformance fixture. To capture the
+real 102-record model corpus, use the matching cases, schedule and evaluator
+artifacts under `examples/evaluator-qualification/authoritative/` together;
+do not mix files from the two corpora. The supplied artifact digest attributes
+the run and must come from the source evaluation, not from hashing this export.
 
 ## Capture cases inside an existing workflow
 
@@ -171,6 +190,12 @@ for the available facts, then evaluate and independently verify the published
 evidence. The capture command refuses an existing output destination; choose a
 new filename when correcting source data.
 
+Check the printed capability counts before writing the comparison request. An
+unavailable ID means its retained facts cannot support that scorer. Fix the
+source capture or choose a scorer supported by those facts; do not drop the
+case to make the counts look complete. A successful capture still needs the
+policy, publication and recipient verification steps below.
+
 See the [captured-results guide](../../../docs/user-guide/captured-results.md)
 for policy, request, evaluation and verification steps. The production tests in
 `tests/examples/test_evaluator_scorer_capture.py` exercise the retained joins,
@@ -188,10 +213,10 @@ Keep three conclusions separate:
 | Real-workflow qualification | Retained inputs come from the actual evaluator/model measurement and preserve its exact task and settings |
 | Supported quality claim | The qualified result and its reviewed scope support the specific published claim |
 
-A capability refusal does not complete a promised combination. Distinguish
-missing capture facts, an import that has not been implemented, and a task or
-runtime that cannot supply the required measurement. When the facts are
-available for a promised profile, implement and test its positive path.
+When capture fails, distinguish missing per-case facts from an unsupported
+native export layout or a runtime that cannot supply the requested measurement.
+For an unsupported layout, explicitly map the original records with the SDK;
+mapping cannot recover outputs or likelihoods absent from the source data.
 
 The canonical NLL contract tests use synthetic likelihood facts. The separate
 [Harness likelihood reference](../../captured-results/references/harness-likelihood/README.md)

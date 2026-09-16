@@ -5,6 +5,11 @@ over two pinned checkpoints, imports every output, and completes `invarlock
 evaluate`, `invarlock verify`, and `invarlock report`. InvarLock recomputes the
 paired exact-match result instead of trusting the Harness aggregate.
 
+This launcher is an example-owned container bridge, not an installed Harness
+provider. It runs real inference and imports complete records into native
+InvarLock evidence. If you already have model outputs, the captured workflow
+below avoids rerunning them.
+
 Four profiles serve different purposes:
 
 | Profile | Models | Records | Runtime | Purpose |
@@ -48,29 +53,51 @@ separate derived exact-match image used by the OCI profiles below.
 
 ## Run a profile
 
-From a clean committed checkout with Docker or Podman available, the quick
-profile is:
+Complete the [shared setup](../README.md#before-running-a-model-example), including
+Git, Make, Python, `uv`, Docker or Podman, external evidence/verifier/builder keys,
+and a new trust root. The first run downloads models and image dependencies.
+From the clean committed repository root, run the CPU quick profile:
 
 ```bash
-make example-lm-evaluation-harness EXAMPLE_ARGS="--evidence-signing-key /secure/keys/evidence.pem --verifier-signing-key /secure/keys/verifier.pem --builder-signing-key /secure/keys/builder.pem --builder-public-key /secure/keys/builder-public.pem --trust-root /secure/trust/lm-evaluation-harness"
+make example-lm-evaluation-harness EXAMPLE_ARGS="\
+  --evidence-signing-key /secure/keys/evidence.pem \
+  --verifier-signing-key /secure/keys/verifier.pem \
+  --builder-signing-key /secure/keys/builder.pem \
+  --builder-public-key /secure/keys/builder-public.pem \
+  --trust-root /secure/trust/lm-evaluation-harness"
 ```
 
-Select the Qwen3.5 flagship with:
+Run the Qwen3.5 flagship and retain an authenticated policy rejection if one occurs:
 
 ```bash
-make example-lm-evaluation-harness EXAMPLE_ARGS="--corpus-profile flagship --evidence-signing-key /secure/keys/evidence.pem --verifier-signing-key /secure/keys/verifier.pem --builder-signing-key /secure/keys/builder.pem --builder-public-key /secure/keys/builder-public.pem --trust-root /secure/trust/lm-evaluation-harness"
+make example-lm-evaluation-harness EXAMPLE_ARGS="--corpus-profile flagship --allow-policy-fail \
+  --evidence-signing-key /secure/keys/evidence.pem \
+  --verifier-signing-key /secure/keys/verifier.pem \
+  --builder-signing-key /secure/keys/builder.pem \
+  --builder-public-key /secure/keys/builder-public.pem \
+  --trust-root /secure/trust/lm-evaluation-harness-flagship"
 ```
 
 Select the compact deployment profile with:
 
 ```bash
-make example-lm-evaluation-harness EXAMPLE_ARGS="--corpus-profile deployment --evidence-signing-key /secure/keys/evidence.pem --verifier-signing-key /secure/keys/verifier.pem --builder-signing-key /secure/keys/builder.pem --builder-public-key /secure/keys/builder-public.pem --trust-root /secure/trust/lm-evaluation-harness"
+make example-lm-evaluation-harness EXAMPLE_ARGS="--corpus-profile deployment \
+  --evidence-signing-key /secure/keys/evidence.pem \
+  --verifier-signing-key /secure/keys/verifier.pem \
+  --builder-signing-key /secure/keys/builder.pem \
+  --builder-public-key /secure/keys/builder-public.pem \
+  --trust-root /secure/trust/lm-evaluation-harness-deployment"
 ```
 
 Select the Gemma 4 portability profile with:
 
 ```bash
-make example-lm-evaluation-harness EXAMPLE_ARGS="--corpus-profile portability --evidence-signing-key /secure/keys/evidence.pem --verifier-signing-key /secure/keys/verifier.pem --builder-signing-key /secure/keys/builder.pem --builder-public-key /secure/keys/builder-public.pem --trust-root /secure/trust/lm-evaluation-harness"
+make example-lm-evaluation-harness EXAMPLE_ARGS="--corpus-profile portability --allow-policy-fail \
+  --evidence-signing-key /secure/keys/evidence.pem \
+  --verifier-signing-key /secure/keys/verifier.pem \
+  --builder-signing-key /secure/keys/builder.pem \
+  --builder-public-key /secure/keys/builder-public.pem \
+  --trust-root /secure/trust/lm-evaluation-harness-portability"
 ```
 
 The GPU profiles require an NVIDIA CUDA runtime and enough memory for one model
@@ -82,6 +109,12 @@ Pass `--workspace PATH` to retain the complete transaction at a new path. The
 launcher otherwise creates a temporary workspace and prints it at completion.
 It removes the exact temporary base and evaluator image tags it creates,
 including when the workspace is retained.
+
+Completion prints the evidence, separately signed verification receipt and HTML
+report paths. The flagship and portability commands above allow a verified
+policy rejection to remain a completed example, matching the retained outcomes.
+Inspect the receipt's `policy_verdict`; successful execution of the example is
+not itself a passing model decision.
 
 ## Frozen 400-record suite
 

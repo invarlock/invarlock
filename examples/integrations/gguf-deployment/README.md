@@ -1,5 +1,12 @@
 # BF16-to-GGUF deployment comparison
 
+Use this example to check a deployment change that alters both the model format
+and inference runtime. It executes real baseline and subject artifacts through
+native InvarLock providers and produces signed evidence, a separate verification
+receipt and an HTML report. It is substantially larger than the
+[compact GGUF example](../gguf-llama-cpp/README.md); check the compute and storage
+requirements before starting.
+
 This journey selects one closed, revision- and byte-pinned deployment profile.
 It executes the source checkpoint in BF16 through the built-in Hugging Face
 Transformers provider, converts the same checkpoint with a pinned llama.cpp
@@ -79,7 +86,8 @@ does not require network access.
 ## Run the signed journey
 
 Use distinct caller-owned evidence and verifier Ed25519 keys plus a new
-trust-root directory:
+trust-root directory. Follow the [shared setup](../README.md#before-running-a-model-example)
+and run from the repository root:
 
 ```bash
 make example-gguf-deployment EXAMPLE_ARGS="\
@@ -115,6 +123,9 @@ the report, and removes the temporary image tags it created. The workspace
 retains the large source and subject artifacts so its evidence can be audited;
 remove that workspace after preserving the signed evidence and receipt you
 need.
+Read the report's per-side accuracy and interval checks before interpreting a
+pass. The result covers this frozen 400-record schedule and policy. It does not
+mean the two runtime formats return identical text for arbitrary prompts.
 
 Already inspected local images can be supplied by immutable config ID:
 

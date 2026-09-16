@@ -1,5 +1,9 @@
 # llama.cpp Qwen3.5 GGUF quantization comparison
 
+Use this example to compare two quantized GGUF versions in the same CPU
+runtime. It uses the optional InvarLock GGUF provider and executes both model
+files; it does not estimate behavior from their sizes or quantization labels.
+
 This one-command example downloads the official revision-pinned
 `ggml-org/Qwen3.5-0.8B-GGUF` Q8 artifact and verifies its published byte length and
 SHA-256 digest. It builds the maintained, source-pinned llama.cpp runtime,
@@ -10,7 +14,9 @@ quantizer, and compares the two artifacts through:
 invarlock evaluate -> invarlock verify -> invarlock report
 ```
 
-Run it from the repository root:
+Follow the [shared setup](../README.md#before-running-a-model-example), including
+caller-owned evidence/verifier keys and a new trust root. Run from a clean,
+committed repository root with `uv` available:
 
 ```bash
 make example-gguf-llama-cpp \
@@ -31,7 +37,7 @@ report.
 
 The 50-record schedule uses losslessly decoded, single-token Qwen3.5 targets. Its
 illustrative policy requires at least 50 records, a paired interval no wider
-than 20 percentage points, and a lower confidence bound above -15 percentage
+than 20 percentage points, and a lower confidence bound of at least -15 percentage
 points. The command also requires both models to solve at least 40% of those
 records before reporting success. A passing result supports only that bounded
 comparison; it is not a general model-quality or quantization-quality result.

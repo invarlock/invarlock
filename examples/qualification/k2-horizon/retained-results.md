@@ -1,9 +1,17 @@
 # Retained K2 prompt comparisons
 
-!!! tip "User guide"
-    **Outcome:** Inspect retained decisions, their artifact identities and their limits.
-    **Audience:** Maintainers reviewing historical captured evaluations.
-    **Prerequisites:** The original companion artifacts and independently approved trust inputs for replay.
+Use this page to understand what the completed K2 prompt studies measured, why
+some results were rejected, and which artifacts are available for replay. It
+does not launch model inference or qualify a new checkpoint.
+
+> **Outcome:** Inspect retained decisions, their artifact identities and limits,
+> then select the appropriate replay route.
+>
+> **Audience:** ML engineers reviewing historical captured evaluations.
+>
+> **Prerequisites:** None for reading the public metadata. Historical replay
+> requires the original companion artifacts and independently approved trust
+> inputs; current-format replay follows the linked reference's instructions.
 
 The [result metadata](retained-results.json) records ten completed K2 Horizon
 32B and MoVA prompt comparisons and the earlier ten-report 0.9B/3.7B capsule.
@@ -17,6 +25,19 @@ Original historical signed reports and recipient receipts remain in the campaign
 archive. The selected [32B routing reference](../../captured-results/references/k2-32b-routing/README.md)
 publishes the complete comparison as a separately signed current captured pack.
 Other workflows remain represented here by metadata and source references.
+
+## Choose what to inspect or replay
+
+| Your task | Start here | What is available |
+| --- | --- | --- |
+| Understand the recorded outcomes | [Recorded decisions](#recorded-decisions) and `retained-results.json` | Public decisions, counts and artifact identities; metadata alone cannot reproduce responses. |
+| Replay a complete public comparison | [32B routing reference](../../captured-results/references/k2-32b-routing/README.md) | A separately signed current captured pack with its recipient instructions. |
+| Replay an original historical capsule | [CPU replay](#cpu-replay-and-the-current-interface) | Requires the companion capsule and its exact recorded wheel and environment. |
+| Learn the current commands with small fixtures | [Captured-results example](../../captured-results/README.md) | Synthetic CPU-only evaluation, verification and reporting. |
+
+For a retained regression or insufficient-evidence decision, successful replay
+means reproducing that adverse outcome. It does not turn it into an accepted
+model comparison.
 
 ## Recorded decisions
 

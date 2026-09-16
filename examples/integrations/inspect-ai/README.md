@@ -6,6 +6,11 @@ its exact-match scorer over two pinned model evaluations, then completes
 recomputes the paired result from every imported record instead of trusting the
 evaluator aggregate.
 
+This is a source-checkout example that runs Inspect and imports its records into
+native InvarLock evidence. It is not an installed Inspect provider or a model
+judge. For answers you already collected, use the captured route below instead
+of rerunning inference.
+
 The default `quick` profile compares Qwen3.5 0.8B Base with its post-trained
 checkpoint over 102 local records on CPU. The retained `deployment` profile
 uses the same checkpoints with a tokenizer-qualified 400-record LAMBADA
@@ -44,22 +49,40 @@ behavior; they do not establish a new hosted judge result.
 
 ## Run the integration
 
-From a clean committed checkout with Docker or Podman available:
+Complete the [shared setup](../README.md#before-running-a-model-example): a clean
+committed checkout, Git, Make, Python, `uv`, Docker or Podman, and external
+evidence/verifier/builder keys. Initial model and image preparation needs network
+access. The default profile runs on CPU; the larger profiles need CUDA.
 
 ```bash
-make example-inspect-ai EXAMPLE_ARGS="--evidence-signing-key /secure/keys/evidence.pem --verifier-signing-key /secure/keys/verifier.pem --builder-signing-key /secure/keys/builder.pem --builder-public-key /secure/keys/builder-public.pem --trust-root /secure/trust/inspect-ai"
+make example-inspect-ai EXAMPLE_ARGS="\
+  --evidence-signing-key /secure/keys/evidence.pem \
+  --verifier-signing-key /secure/keys/verifier.pem \
+  --builder-signing-key /secure/keys/builder.pem \
+  --builder-public-key /secure/keys/builder-public.pem \
+  --trust-root /secure/trust/inspect-ai"
 ```
 
-Select the current-model flagship with:
+Run the flagship profile and retain its result even if the policy rejects it:
 
 ```bash
-make example-inspect-ai EXAMPLE_ARGS="--corpus-profile flagship --evidence-signing-key /secure/keys/evidence.pem --verifier-signing-key /secure/keys/verifier.pem --builder-signing-key /secure/keys/builder.pem --builder-public-key /secure/keys/builder-public.pem --trust-root /secure/trust/inspect-ai"
+make example-inspect-ai EXAMPLE_ARGS="--corpus-profile flagship --allow-policy-fail \
+  --evidence-signing-key /secure/keys/evidence.pem \
+  --verifier-signing-key /secure/keys/verifier.pem \
+  --builder-signing-key /secure/keys/builder.pem \
+  --builder-public-key /secure/keys/builder-public.pem \
+  --trust-root /secure/trust/inspect-ai-flagship"
 ```
 
 Run the compact deployment-approval profile with:
 
 ```bash
-make example-inspect-ai EXAMPLE_ARGS="--corpus-profile deployment --evidence-signing-key /secure/keys/evidence.pem --verifier-signing-key /secure/keys/verifier.pem --builder-signing-key /secure/keys/builder.pem --builder-public-key /secure/keys/builder-public.pem --trust-root /secure/trust/inspect-ai"
+make example-inspect-ai EXAMPLE_ARGS="--corpus-profile deployment \
+  --evidence-signing-key /secure/keys/evidence.pem \
+  --verifier-signing-key /secure/keys/verifier.pem \
+  --builder-signing-key /secure/keys/builder.pem \
+  --builder-public-key /secure/keys/builder-public.pem \
+  --trust-root /secure/trust/inspect-ai-deployment"
 ```
 
 The shared `portability` profile can also run the Gemma 4 12B instruction and
@@ -70,9 +93,15 @@ from cross-family portability.
 
 The GPU profiles require an NVIDIA CUDA runtime and enough memory for one model
 at a time. A 32 GB GPU is a practical minimum for the BF16 singleton runs.
-Pass `EXAMPLE_ARGS="--workspace PATH"` to retain the complete transaction at a
-new path. Signing keys and the trust root remain caller-owned and outside the
+Append `--workspace PATH` to the full command's `EXAMPLE_ARGS` to retain the
+complete transaction at a new path. Signing keys and the trust root remain caller-owned and outside the
 transaction.
+
+The command prints paths for the evidence pack, separate verification receipt
+and HTML report. Check the receipt's policy verdict as well as integrity: the
+retained flagship result is an authentic rejection, while the separate retained
+deployment profile passes its different policy. `--allow-policy-fail` preserves
+that distinction and never accepts malformed evidence.
 
 ## Frozen 400-record suite
 

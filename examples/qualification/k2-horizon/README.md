@@ -1,11 +1,17 @@
 # K2 Horizon candidate campaign
 
-!!! tip "User guide"
-    **Outcome:** prepare frozen comparisons, capture native responses, and verify
-    signed captured results independently.
-    **Audience:** maintainers qualifying the declared K2 configurations.
-    **Prerequisites:** a candidate InvarLock wheel for CPU preparation; a reviewed,
-    immutable runtime image and an approved compute budget before GPU execution.
+This guide prepares a specific before-and-after checkpoint comparison for K2
+Horizon models. It separates work you can do on a CPU from runtime preparation
+and paid GPU capture, then shows how a recipient checks the captured results.
+
+> **Outcome:** Prepare frozen comparisons, capture native responses, and verify
+> signed captured results independently.
+>
+> **Audience:** ML engineers qualifying the declared K2 configurations.
+>
+> **Prerequisites:** The matching source checkout and candidate InvarLock wheel
+> for CPU preparation; a reviewed, immutable runtime image and an approved
+> compute budget before GPU execution.
 
 All five configurations are **candidates, not qualified**. Separate historical
 [prompt comparisons](retained-results.md) retain completed captured studies,
@@ -22,6 +28,32 @@ authenticates the captured inputs, attributed measurements, and deterministic
 scoring. It is not native InvarLock isolated-transaction evidence, proof of GPU
 execution, or a general endorsement of a model's quality. The core provider's
 remote-code restrictions remain unchanged.
+
+## Choose your starting point
+
+If you only want to learn captured evaluation, start with the CPU-only
+[captured-results example](../../captured-results/README.md). Use this guide
+when you intend to prepare or run the exact K2 checkpoint-pair protocol. To
+inspect already completed prompt comparisons, use
+[retained results](retained-results.md); those compare prompt variants on the
+same checkpoint and are a different study.
+
+Follow the stages in order. A file named `runtime-build.json` or a successful
+command exit does not by itself mean the runtime is ready; inspect the recorded
+status and the scope described at each stage.
+
+| Stage | What you do | Output and meaning |
+| --- | --- | --- |
+| [CPU preparation](#cpu-preparation) | Generate a draft and run synthetic tests. | `draft-0.9b.json`; no model download or inference. |
+| [Build the runtime](#build-the-candidate-runtime) | Authenticate build inputs, build an image and check native CPU imports. | An exact local image ID and probe results; no GPU qualification. |
+| [Finalize the image](#finalize-the-exact-image) | Bind dependency findings and an attributed security decision to that image. | `runtime-build.json`; only `ready` permits the bounded GPU preflight. |
+| [Materialize and freeze](#materialize-and-freeze-before-evaluation) | Download the pinned checkpoints, measure their bytes and freeze budgets. | Measured snapshots and `plan.json`; send the approved plan digest to the recipient. |
+| [Capture](#native-preflight-and-decision-capture) | Run each role's preflight, then its decision cases. | Raw native responses and `capture.json`, including failures. |
+| [Publish and verify](#publish-and-independently-verify) | Sign three cohort packs and replay them against independent inputs. | Evidence, reports, verification JSON and signed receipts; inspect each cohort decision. |
+
+Commands use paths relative to the repository root. Use fresh output paths
+throughout so a failed attempt remains available for inspection. The sections
+below identify which steps download material, build containers or use GPUs.
 
 ## Frozen model pairs
 
@@ -94,9 +126,12 @@ after observing a decision result.
 
 ## CPU preparation
 
-Use the matching source checkout to prepare the verified Hugging Face
-dependency group for later downloads, then install the candidate wheel into
-that environment:
+Start with the matching source checkout and one built candidate wheel in
+`dist/`. Follow the repository's
+[development setup](../../../CONTRIBUTING.md#development-setup) for its build
+environment. The commands below prepare the verified Hugging Face dependency
+group for later downloads, then install that candidate wheel. Ensure the
+`dist/invarlock-*.whl` pattern selects only the intended wheel:
 
 ```bash
 python scripts/security/build_hardened_accelerate_wheel.py bootstrap
@@ -118,9 +153,16 @@ python -m pytest tests/examples/test_k2_campaign.py \
 
 The model selectors are `0.9b`, `3.7b`, `7b`, `mova-36b-a4b`, and `32b`.
 The plan command neither downloads weights nor starts a container. Every
-output path must be new.
+output path must be new. Inspect the draft's model revisions, cases, metric
+settings and limits before continuing. A passing CPU test suite confirms the
+planning and capture code's synthetic cases, not that any K2 model fits or runs.
 
 ## Build the candidate runtime
+
+This stage needs Linux x86_64 container support, Docker, `curl`, GPG tools and
+network access to acquire the pinned sources and dependency artifacts. It does
+not run model inference. Keep all downloaded artifacts and the prepared context
+for later image finalization.
 
 The source helper authenticates the complete SGLang archive before extraction.
 It changes only the optional Outlines dependency and its two backend modules;
@@ -157,6 +199,12 @@ helper uses `gpgv` and the public Ubuntu keyring pinned from that base, fetches
 exact compressed indexes by their signed hashes, and retains them for replay.
 Context preparation rechecks the signature-to-index-to-package chain for every
 selected package; it rejects changed metadata or an unmatched artifact.
+
+Before the build command, set `CORE_WHEEL` to the candidate wheel path,
+`EXPECTED_CORE_WHEEL` to its independently approved SHA-256, and
+`EXPECTED_OS_MANIFEST` to the reviewed package manifest's SHA-256. Both expected
+hashes are lowercase hexadecimal without a `sha256:` prefix. The OS-resolution
+steps below produce inputs for review, not an automatically approved hash.
 
 ```bash
 mkdir runtime-apt

@@ -1,6 +1,13 @@
 # Hugging Face vision-text
 
-Run a complete image-and-text comparison with one command:
+Use this example to learn how an image's exact bytes stay bound to a comparison
+between two vision-language checkpoints. It uses the optional native
+`hf_vision_text` provider, generates a four-color test image, and evaluates four
+questions about that image. It does not import scores from a vision benchmark.
+
+Check the [requirements](#requirements) and
+[shared key setup](../README.md#before-running-a-model-example) before running
+from the repository root:
 
 ```console
 make example-hf-vision-text \
@@ -40,7 +47,7 @@ an explicit new workspace with `EXAMPLE_ARGS`:
 
 ```console
 make example-hf-vision-text \
-  EXAMPLE_ARGS="--runtime-device cuda:1 --workspace /tmp/invarlock-vision \
+  EXAMPLE_ARGS="--runtime-device cuda:1 --workspace /new/path/invarlock-vision \
   --evidence-signing-key /secure/keys/evidence.pem \
   --verifier-signing-key /secure/keys/verifier.pem \
   --trust-root /secure/trust/hf-vision-text"
@@ -48,6 +55,10 @@ make example-hf-vision-text \
 
 The command prints the workspace, evidence pack, signed verification receipt,
 and HTML report paths when it completes.
+Replace `/new/path` with a real parent without symlink components and choose a
+new workspace and trust root. Inspect the retained per-record outcomes and read
+the report alongside the signed verification result; a rendered report alone is
+not recipient acceptance.
 
 ## Inspect the transaction without GPU work
 
@@ -57,7 +68,7 @@ checkpoints, build an image, initialize CUDA, or execute either model:
 
 ```console
 make example-hf-vision-text \
-  EXAMPLE_ARGS="--prepare-only --workspace /tmp/invarlock-vision-inputs \
+  EXAMPLE_ARGS="--prepare-only --workspace /new/path/invarlock-vision-inputs \
   --evidence-signing-key /secure/keys/evidence.pem \
   --verifier-signing-key /secure/keys/verifier.pem \
   --trust-root /secure/trust/hf-vision-text"
