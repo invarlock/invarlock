@@ -1,7 +1,21 @@
 # Standalone policy-engine interoperability
 
-This example feeds authenticated acceptance facts from the committed in-toto
-Statement and DSSE envelope into two external policy engines:
+Use this example when you want an existing policy engine to consume a signed
+model-evaluation handoff. A small Python program checks the signatures and
+produces JSON; OPA or CUE then decides whether that JSON satisfies the example's
+policy rules. No model execution or InvarLock service is needed.
+
+> **Outcome:** Run six fixtures through OPA and CUE and see one allowed input
+> alongside five rejected inputs under the example policy.
+>
+> **Audience:** Developers integrating evaluation evidence into policy tooling.
+>
+> **Prerequisites:** The matching checkout, Python with `cryptography` installed,
+> Make, and the pinned OPA/CUE executables below. Building those executables also
+> requires a compatible Go installation and network access.
+
+The example feeds authenticated facts from the committed in-toto Statement and
+DSSE envelope into two external policy engines:
 
 - Open Policy Agent v1.17.0 with Rego; and
 - CUE v0.16.1.
@@ -17,7 +31,10 @@ contract-version, and technical-verdict rules. This is a bounded integration
 example, not the full recipient-acceptance verifier. It supports native receipt
 v1/v2 formats, not captured or judge receipts.
 
-Run the pinned conformance matrix:
+## Run the fixtures
+
+From the repository root, install the pinned tools if they are not already
+available, then run the fixture checks:
 
 ```bash
 gopath="$(go env GOPATH)"
@@ -27,6 +44,12 @@ make acceptance-policy-interop \
   OPA="${gopath}/bin/opa" \
   CUE="${gopath}/bin/cue"
 ```
+
+The Make target first checks that the JSON fixtures match their signed source,
+then runs both engines. Expect one line per fixture, including
+`positive: opa=true cue=true`. All five negative fixtures print `false` for
+both engines; that is the expected successful result. The fixture run is
+offline once its tools and Python dependency are installed.
 
 The six fixtures are:
 
@@ -38,6 +61,15 @@ The six fixtures are:
 | Untrusted envelope signer | Deny | Invalid |
 | Stale envelope (`stale-evidence` fixture) | Deny | Invalid |
 | Unsupported InvarLock contract | Deny | Invalid |
+
+## Understand the files and scope
+
+`verify_envelope.py` produces the authenticated JSON input. The files under
+`policy/` implement the OPA and CUE rules, `fixtures/` contains their inputs,
+and `run.py` compares both engines' results with `fixtures/expectations.json`.
+To check your own envelope, follow the conversion commands in the
+[interoperability reference](../../docs/reference/policy-engine-interop.md#convert-and-evaluate-an-envelope)
+and supply your own independently approved policy, subject identity and time.
 
 Regenerate fixtures only with `python
 examples/policy-engine-interop/build_fixtures.py`. The maintained target first

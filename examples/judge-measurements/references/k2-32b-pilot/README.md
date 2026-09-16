@@ -6,6 +6,12 @@ Both grounded QA and slot extraction remain **`insufficient_evidence`**. Their
 40-unit effect intervals have width `1.007489336443204`, exceeding the unchanged
 maximum of `1`. Complete collection did not make either policy pass.
 
+Use this reference to exercise successful authentication of an inconclusive
+measurement result. Grounded QA asks whether answers are supported by the task's
+context; slot extraction grades the requested extracted values. Three ratings
+per answer measure grading variability, while the 40 source units per workflow
+determine the statistical precision. More ratings are not more independent cases.
+
 The original attempt is retained separately: all 480 recorded trials remain,
 with 203 complete QA trials and 227 complete extraction trials, or 430 complete
 in total. No original responses, incomplete attempts or old evidence bytes were
@@ -48,6 +54,10 @@ historical `v0.15.0` release; do not infer compatibility from the package versio
 alone. No Inspect package, provider SDK, model, GPU, credential or signing key
 is needed for replay.
 
+Use Python 3.12 or newer. Replay reads the checked-in archive, validates it in a
+temporary directory and prints JSON; it does not modify the archive or start a
+new collection. Run from the repository root so the paths below resolve.
+
 Obtain the archive pin from an independently trusted copy of this repository,
 then run from the source checkout with its core package installed:
 
@@ -63,6 +73,12 @@ Successful reference validation exits zero while returning `verified: true`,
 `accepted: false` and `decision: insufficient_evidence` for each workflow.
 The public `invarlock verify` command returns exit **7** for those retained
 negative policy results. It must not be interpreted as failed signature replay.
+
+Check both workflow entries in the JSON. `verified: true` means authentication
+and replay succeeded; `accepted: false` means the recipient's requirements were
+not met. A nonzero exit from this reference helper means validation failed,
+rather than the expected inconclusive policy result. Recover the approved bytes
+or correct the trusted input configuration; do not edit the signed evidence.
 
 The included recipient policies and verifier identities demonstrate reproducible
 trust checks. They gain authority for this reference only through the

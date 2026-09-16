@@ -6,6 +6,16 @@ three ratings per answer. Both comparisons meet their policies declared in advan
 Neither establishes that the subject is better or that the judge is generally
 accurate.
 
+Use this reference to replay a complete measured judge campaign and inspect why
+its two comparison policies pass. The answers were already frozen before
+judging. Grounded QA rates answers against supplied context; extraction rates
+the requested slot values. The source cases were kept separate from the pilot
+used to develop the rubric, which is what “held-out” means here.
+
+For the commands, go to [retained files and replay](#retained-files-and-replay).
+For interpretation, read each effect interval together with its allowed
+degradation and the absolute subject-score requirement below.
+
 ## Results and interpretation
 
 | Measure | Grounded QA | Extraction |
@@ -54,6 +64,11 @@ bytes did not change. Pilot review and the held-out comparison remain separate.
 
 ## Retained files and replay
 
+You need Python 3.12 or newer, the core InvarLock package, the matching helper and
+the checked-in archive. No collector package, API key, model or GPU is needed.
+Run from the repository root. Replay uses temporary extraction and reads a larger
+archive than the pilot examples, so allow space for the expanded files below.
+
 The archive contains the original signed evidence, recipient policies and signed
 receipts for both workflows; reports; collection settings; complete usage and
 agreement summaries; frozen runtime source pins; split checks; and dataset
@@ -77,6 +92,11 @@ member inventory, signed receipts and replayed decisions without model calls.
 It returns `verified: true`, `authenticated: true`, `replayed: true`,
 `accepted: true` and `decision: pass` for both workflows. Included keys have
 reference authority only through the independently trusted archive pin.
+
+Successful reference validation exits zero and prints those results as JSON.
+A nonzero exit indicates a validation failure, not a request to recollect ratings.
+Preserve the error and check the archive pin, installed implementation and size
+allowance. Do not regenerate or edit historical evidence to make replay pass.
 
 Replay checks retained evidence, not fresh provider execution or hidden weights.
 The archive includes no private keys, credentials, execution authorization,
