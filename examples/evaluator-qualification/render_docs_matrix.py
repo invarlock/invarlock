@@ -53,7 +53,7 @@ def escape_cell(value: str) -> str:
 
 def retained_transactions(value: object) -> str:
     if value == []:
-        return "—"
+        return "None retained"
     if not isinstance(value, list) or not value:
         raise ValueError("retained signed transaction status is invalid")
     counts: set[int] = set()

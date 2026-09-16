@@ -66,7 +66,7 @@ and cannot safely substitute for one another.
 | --- | --- | --- |
 | Adapter support | `maintained_adapter` or an external adapter | Whether this repository maintains the source-specific runner, dependency lock, and upstream entry point; support grants no replay authority |
 | Replay authority | `deterministic_per_record` or `observation_only` | Whether complete ordered facts can be independently recomputed and imported, or only retained as authenticated context |
-| Signed-journey maturity | Retained with a named corpus and record count, or `—` | Whether a model-running, signed `evaluate` → `verify` → `report` OCI transaction has completed and been retained as release evidence |
+| Signed-journey maturity | Retained with a named corpus and record count, or `None retained` | Whether a model-running, signed `evaluate` → `verify` → `report` OCI transaction has completed and been retained as release evidence |
 
 The stable qualification-result contract continues to emit
 `outcome: qualified_for_import` with `authority: verdict_authority` for an
@@ -329,13 +329,13 @@ new signed transactions.
 
 | Upstream evaluator | Pinned version | Executed upstream entry point | Adapter support | Replay authority | Retained signed transactions |
 | --- | --- | --- | --- | --- | --- |
-| Promptfoo | `promptfoo@0.121.19` | `promptfoo eval` | Maintained | Independently replayable (102 shared outputs) | — |
-| DeepEval | `deepeval==4.1.3` | `deepeval.metrics.ExactMatchMetric.measure` | Maintained | Independently replayable (102 shared outputs) | — |
-| Ragas | `ragas==0.4.3` | `ragas.metrics.collections.ExactMatch.ascore` | Maintained | Independently replayable (102 shared outputs) | — |
-| Pydantic Evals | `pydantic-evals==2.18.0` | `pydantic_evals.Dataset.evaluate_sync/EqualsExpected` | Maintained | Independently replayable (102 shared outputs) | — |
-| Braintrust AutoEvals | `autoevals==0.3.0` | `autoevals.ExactMatch.__call__` | Maintained | Independently replayable (102 shared outputs) | — |
-| OpenEvals | `openevals==0.2.0` | `openevals.exact.exact_match` | Maintained | Independently replayable (102 shared outputs) | — |
-| Azure AI Evaluation | `azure-ai-evaluation==1.18.1` | `azure.ai.evaluation.evaluate` | Maintained | Independently replayable (102 shared outputs) | — |
+| Promptfoo | `promptfoo@0.121.19` | `promptfoo eval` | Maintained | Independently replayable (102 shared outputs) | None retained |
+| DeepEval | `deepeval==4.1.3` | `deepeval.metrics.ExactMatchMetric.measure` | Maintained | Independently replayable (102 shared outputs) | None retained |
+| Ragas | `ragas==0.4.3` | `ragas.metrics.collections.ExactMatch.ascore` | Maintained | Independently replayable (102 shared outputs) | None retained |
+| Pydantic Evals | `pydantic-evals==2.18.0` | `pydantic_evals.Dataset.evaluate_sync/EqualsExpected` | Maintained | Independently replayable (102 shared outputs) | None retained |
+| Braintrust AutoEvals | `autoevals==0.3.0` | `autoevals.ExactMatch.__call__` | Maintained | Independently replayable (102 shared outputs) | None retained |
+| OpenEvals | `openevals==0.2.0` | `openevals.exact.exact_match` | Maintained | Independently replayable (102 shared outputs) | None retained |
+| Azure AI Evaluation | `azure-ai-evaluation==1.18.1` | `azure.ai.evaluation.evaluate` | Maintained | Independently replayable (102 shared outputs) | None retained |
 
 ### Benchmark harnesses
 
@@ -343,31 +343,31 @@ new signed transactions.
 | --- | --- | --- | --- | --- | --- |
 | LM Evaluation Harness | `lm-eval==0.4.12` | `lm_eval.api.metrics.exact_match_hf_evaluate` | Maintained | Independently replayable (102 shared outputs) | Retained (2 signed transactions, 400 records each) |
 | Inspect AI | `inspect-ai==0.3.254` | `inspect_ai.scorer.match` | Maintained | Independently replayable (102 shared outputs) | Retained (2 signed transactions, 400 records each) |
-| LightEval | `lighteval==0.13.0` | `lighteval.metrics.metrics_sample.ExactMatches.compute` | Maintained | Independently replayable (102 shared outputs) | — |
-| OpenAI Evals | source revision `8eac7a7` (`3.0.1.post1`) | `evals.elsuite.modelgraded.classify_utils.MATCH_FNS['exact']` | Maintained | Independently replayable (102 shared outputs) | — |
+| LightEval | `lighteval==0.13.0` | `lighteval.metrics.metrics_sample.ExactMatches.compute` | Maintained | Independently replayable (102 shared outputs) | None retained |
+| OpenAI Evals | source revision `8eac7a7` (`3.0.1.post1`) | `evals.elsuite.modelgraded.classify_utils.MATCH_FNS['exact']` | Maintained | Independently replayable (102 shared outputs) | None retained |
 
 ### Evaluation and observability platforms
 
 | Upstream evaluator | Pinned version | Executed upstream entry point | Adapter support | Replay authority | Retained signed transactions |
 | --- | --- | --- | --- | --- | --- |
-| MLflow Model Evaluation | `mlflow==3.14.0` | `mlflow.models.evaluate` | Maintained | Observation-only: aggregate only | — |
-| Arize Phoenix Evals | `arize-phoenix-evals==3.3.0` | `phoenix.evals.metrics.exact_match` | Maintained | Independently replayable (102 shared outputs) | — |
-| Langfuse | `langfuse==4.14.1` | `langfuse.Langfuse.run_experiment` | Maintained | Independently replayable (102 shared outputs) | — |
-| Opik | `opik==2.2.7` | `opik.evaluation.metrics.Equals.score` | Maintained | Independently replayable (102 shared outputs) | — |
-| Evidently | `evidently==0.7.21` | `evidently.Dataset.from_pandas/Evidently ExactMatch` | Maintained | Independently replayable (102 shared outputs) | — |
-| TruLens | `trulens==2.9.0` | `trulens.core.Metric.__call__` | Maintained | Independently replayable (102 shared outputs) | — |
+| MLflow Model Evaluation | `mlflow==3.14.0` | `mlflow.models.evaluate` | Maintained | Observation-only: aggregate only | None retained |
+| Arize Phoenix Evals | `arize-phoenix-evals==3.3.0` | `phoenix.evals.metrics.exact_match` | Maintained | Independently replayable (102 shared outputs) | None retained |
+| Langfuse | `langfuse==4.14.1` | `langfuse.Langfuse.run_experiment` | Maintained | Independently replayable (102 shared outputs) | None retained |
+| Opik | `opik==2.2.7` | `opik.evaluation.metrics.Equals.score` | Maintained | Independently replayable (102 shared outputs) | None retained |
+| Evidently | `evidently==0.7.21` | `evidently.Dataset.from_pandas/Evidently ExactMatch` | Maintained | Independently replayable (102 shared outputs) | None retained |
+| TruLens | `trulens==2.9.0` | `trulens.core.Metric.__call__` | Maintained | Independently replayable (102 shared outputs) | None retained |
 
 ### General metric libraries
 
 | Upstream evaluator | Pinned version | Executed upstream entry point | Adapter support | Replay authority | Retained signed transactions |
 | --- | --- | --- | --- | --- | --- |
-| Hugging Face Evaluate | `evaluate==0.4.6` | `evaluate.load('exact_match').compute` | Maintained | Independently replayable (102 shared outputs) | — |
+| Hugging Face Evaluate | `evaluate==0.4.6` | `evaluate.load('exact_match').compute` | Maintained | Independently replayable (102 shared outputs) | None retained |
 
 ### Security and red-team evaluators
 
 | Upstream evaluator | Pinned version | Executed upstream entry point | Adapter support | Replay authority | Retained signed transactions |
 | --- | --- | --- | --- | --- | --- |
-| Garak | `garak==0.15.1` | `python -m garak` | Maintained | Observation-only: unsupported replay semantics | — |
+| Garak | `garak==0.15.1` | `python -m garak` | Maintained | Observation-only: unsupported replay semantics | None retained |
 <!-- evaluator-matrix:end -->
 
 Each row under

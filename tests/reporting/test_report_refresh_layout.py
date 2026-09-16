@@ -407,7 +407,7 @@ def test_grouped_comparison_is_shared_by_html_and_markdown_without_loss():
         assert "Differs" in rendered
         assert rendered.count("Baseline revision") == 2
         assert "same displayed text" not in rendered
-    assert "### Artifact — Differs" in render_markdown(report)
+    assert "### Artifact: Differs" in render_markdown(report)
     assert "- **Baseline:** first\n- **Subject:** second" in render_markdown(report)
 
 

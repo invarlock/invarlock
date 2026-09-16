@@ -187,7 +187,7 @@ def test_readme_leads_with_a_runnable_workflow_and_scoped_capabilities() -> None
         "## What can you use it for?",
         "## One workflow: evaluate, verify, report",
         "## Choose a scorer",
-        "## Keep your evaluator—or run the comparison here",
+        "## Keep your evaluator or run the comparison here",
         "## Inspect real retained examples",
         "## What verification establishes",
         "## Documentation and contributing",
@@ -206,7 +206,7 @@ def test_readme_leads_with_a_runnable_workflow_and_scoped_capabilities() -> None
         assert f"(`{metric}`)" in scorers
     integrations = readme[positions[4] : positions[5]]
     assert "An aggregate score cannot substitute" in integrations
-    assert "verifying old evidence does not measure" in integrations
+    assert "Verifying old evidence does not measure" in integrations
     boundary = " ".join(readme[positions[6] : positions[7]].split())
     assert "does not independently rerun" in boundary
     assert "recipient's current policy" in boundary

@@ -20,7 +20,7 @@
 </p>
 
 **InvarLock evaluates model changes and produces evidence that another team can
-verify independently.** Compare a candidate—the *subject*—with an approved
+verify independently.** Compare a candidate (the *subject*) with an approved
 baseline, using tests and acceptance thresholds you choose. Run a supported
 comparison through InvarLock, or bring per-case records from your existing
 evaluation workflow.
@@ -176,7 +176,7 @@ tolerances, structured fields and token overlap.
 can require multiple complementary checks on the same frozen answers while
 preserving each check's meaning.
 
-## Keep your evaluator—or run the comparison here
+## Keep your evaluator or run the comparison here
 
 **Use existing records.** Installed parsers cover selected Inspect AI, LM
 Evaluation Harness and Promptfoo export profiles, plus canonical JSON and generic
@@ -204,7 +204,7 @@ uses complete retained provider sidecars and omits `--runtime-image` and `--runt
 configuration and observation windows. InvarLock compares those captured facts
 and verifies the resulting evidence offline. Hosted identity describes the
 observed service; it does not claim access to hidden model weights. Your scheduler
-initiates periodic comparisons—verifying old evidence does not measure the
+initiates periodic comparisons. Verifying old evidence does not measure the
 service again.
 
 ## Inspect real retained examples
