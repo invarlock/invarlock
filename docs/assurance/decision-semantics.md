@@ -9,8 +9,8 @@
 > favorable point value cannot override a threshold, count, width, or side-
 > accuracy failure.
 >
-> **Question:** How are a built-in metric or authorized deterministic scorer
-> converted into a reproducible policy verdict?
+> **Question:** How does each scoring contract turn its measurements and
+> uncertainty into a replayable policy decision?
 >
 > **Decision use:** Use these definitions to review thresholds, reproduce
 > canonical report arithmetic, and interpret a pass or fail at the boundary.
@@ -20,12 +20,33 @@
 > independent artifact and schedule anchors, and the metric-specific paired
 > interval recorded in the report.
 
+## Choose the decision contract
+
+The selected evidence family determines the arithmetic and the meaning of its
+result labels. Native `judge` selection uses the bounded judge contract, even
+though it shares the main commands with native exact match and NLL.
+
+| Evidence family | Decision basis | Meaning when the result does not pass |
+| --- | --- | --- |
+| Native exact match, NLL or deterministic extension | Authenticated provider records, the metric-specific paired interval and configured qualification checks | `fail` means the policy was not met; it does not by itself establish degradation |
+| Captured deterministic, likelihood or recorded scores | Every declared metric and slice, with conservative comparison bounds and optional subject-mean bounds | `regression` means a bound check failed; missing facts, too few records or excessive width alone yield `insufficient_evidence` |
+| Bounded judge, including native judge | Complete planned trials, declared units, bounded-score intervals and the judge analysis policy | `regression` requires an entirely adverse interval after count and precision checks; a boundary-straddling interval is inconclusive |
+
+A [combined evidence set](../reference/evidence-sets.md) requires both component
+acceptances and preserves their statistical scopes. It does not create a new
+joint confidence guarantee. The detailed native derivation follows; captured
+and judge rules appear under [Captured comparison and bounded judge decisions](#captured-comparison-and-bounded-judge-decisions).
+
 The native exact-match, normalized-NLL and deterministic extension contract
 makes one decision over one authenticated, ordered, finite schedule.
 It reports a point comparison and a verifier-replayed paired interval. Exact
 match uses a paired Newcombe 95% effect-size interval. Normalized NLL and an
 authorized scorer extension use deterministic paired resampling over the
 authenticated schedule.
+
+The notation, preconditions and equations through the deterministic-extension
+section apply to that native contract, including its 10,000-record limit.
+Captured comparison capacity and judge plan limits are separate.
 
 New evaluations under that contract emit `invarlock/comparison-report-v3`.
 Strict verification continues to replay v2 reports without side-accuracy qualification and v1
@@ -416,12 +437,21 @@ or other externally assigned ratings with explicit approved provenance and rubri
 recomputes aggregation and decision arithmetic, not the upstream judgment.
 Missing facts or insufficient count produce `insufficient_evidence`; a violated
 regression or subject bound produces `regression`; an otherwise acceptable but
-overly wide interval produces `insufficient_evidence`. All metric/slice rows
-must pass for the comparison to pass. See the
+overly wide interval produces `insufficient_evidence`. The captured
+`regression` label is a policy-gate result: its conservative bound can fail even
+when the interval straddles the allowed-degradation boundary. It does not claim
+that the entire interval demonstrates adverse change. Absolute subject bounds
+apply to the observed subject mean, not a confidence bound on that mean.
+A bound violation takes precedence over excessive width; missing measurements
+or an unmet minimum count are checked before either. Across metric/slice rows,
+any `regression` takes precedence over `insufficient_evidence`. All rows must
+pass for the comparison to pass. See the
 [captured policy contract](../reference/evaluation-records.md).
 
 Selecting `judge` instead uses `fixed-benchmark-hoeffding-v1` over bounded,
-independent units. Replay averages repetitions within cases and cases within
+declared units under an assumption of independence across those units. Replay
+checks grouping and arithmetic; it cannot establish that independence. Replay
+averages repetitions within cases and cases within
 units before calculating equal-unit means. Repetitions and additional cases in
 one unit do not increase the inference sample size. The Hoeffding bound targets
 the fixed benchmark's average expected score under the declared independence
@@ -431,10 +461,15 @@ published advisory intervals. Constant observed ratings still have positive
 interval width unless the declared support itself is constant.
 
 Judge gates distinguish `pass`, `regression` and `insufficient_evidence`.
-Bounds entirely beyond tolerated degradation establish regression; bounds that
-still straddle the decision boundary remain inconclusive. Minimum-unit and
-precision checks also apply, and incomplete scheduled trials prevent complete-
-case inference. `decision_role: required` controls the conjunction of metrics;
+Within each judge gate, minimum-unit and maximum-width checks take precedence:
+a failure yields `insufficient_evidence`. Once those checks pass, an interval
+entirely beyond tolerated degradation establishes regression; an interval that
+straddles the decision boundary remains inconclusive. An optional absolute
+subject bound uses the subject interval with the same decision rules, unlike
+the captured subject-mean check above. Incomplete scheduled trials yield
+`insufficient_evidence` without complete-case inference. Across required judge
+gates, regression takes precedence over insufficient evidence.
+`decision_role: required` controls the conjunction of metrics;
 advisory metrics cannot independently authorize recipient acceptance.
 Optional reference-label studies assess the judge's usefulness but are not
 inputs required by runtime replay.
@@ -466,7 +501,8 @@ and independent replay is in
 
 ## Finite-schedule interpretation
 
-A pass means that the policy's conservative bound cleared its threshold and
+For the native comparisons derived above, a pass means that the policy's
+conservative bound cleared its threshold and
 any configured count, width, and exact-match side-accuracy requirements passed
 for the authenticated records and runtime configuration. It does not establish:
 

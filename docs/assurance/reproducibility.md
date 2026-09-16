@@ -22,9 +22,10 @@ execution attestation and does not promise bit-for-bit numerical reproduction
 on every machine.
 
 The runtime identity vector below describes native pack-v1 provider evidence.
-Captured comparisons retain complete evaluator runs and source provenance;
-bounded judge evidence retains its own plan, measurements and analysis, with
-native runtime capture only when produced through the native workflow.
+Captured comparisons retain complete canonical evaluation runs and source
+provenance; bounded judge evidence retains its own plan, measurements and
+analysis, with native runtime capture only when produced through the native
+workflow.
 
 ## Reproducibility vocabulary
 
@@ -189,7 +190,9 @@ For boundary decisions:
 ## Captured, hosted and judge reruns
 
 For captured evidence, preserve the complete source exports, explicit field or
-text projection, canonical run digests, policy and normalized request. Offline
+text projection, canonical run digests, policy and normalized request. Keep
+original evaluator exports beside the evidence when needed for provenance
+review; the captured pack retains normalized runs and source bindings. Offline
 verification repeats the declared score derivation or recorded-score aggregation
 without calling the original evaluator. Replaying retained likelihood facts
 checks their arithmetic and bindings; tokenizer and execution facts remain
@@ -208,8 +211,10 @@ fixed-benchmark analysis offline. A fresh collection can produce different
 ratings under the same model name and configuration. Preserve the plan, frozen
 answers, independent-unit mapping, repetitions, budgets and source provenance
 when comparing collections. Additional repetitions do not create additional
-independent units. Optional reference-label studies can test judge agreement;
-they do not change the replay claim or become runtime prerequisites.
+independent units. Independence across declared units and fixing the benchmark
+and policy before judging are assumptions, not properties established by replay.
+Optional reference-label studies can test judge agreement; they do not change the
+replay claim or become runtime prerequisites.
 
 ## Worked classification
 
