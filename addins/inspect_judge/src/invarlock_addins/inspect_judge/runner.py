@@ -10,7 +10,8 @@ import os
 import stat
 import time
 from collections import deque
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any, cast
@@ -243,7 +244,8 @@ def _checkpoint_path(
     return runner.checkpoint_directory / f"{prefix}{trial_id}-{attempt:02d}.json"
 
 
-def _acquire_collection_lock(directory_fd: int) -> int:
+@contextmanager
+def _collection_lock(directory_fd: int) -> Iterator[int]:
     flags = os.O_RDWR | os.O_CREAT | os.O_CLOEXEC
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
@@ -262,15 +264,10 @@ def _acquire_collection_lock(directory_fd: int) -> int:
             raise InspectJudgeError(
                 "another collector is already using this checkpoint"
             ) from exc
-        return descriptor
-    except BaseException:
-        os.close(descriptor)
-        raise
-
-
-def _release_collection_lock(descriptor: int) -> None:
-    try:
-        fcntl.flock(descriptor, fcntl.LOCK_UN)
+        try:
+            yield descriptor
+        finally:
+            fcntl.flock(descriptor, fcntl.LOCK_UN)
     finally:
         os.close(descriptor)
 
@@ -670,8 +667,7 @@ async def _collect_pinned(
     check_directory()
     _initialize_checkpoint(plan, options, runner, directory_fd)
     check_directory()
-    lock_descriptor = _acquire_collection_lock(directory_fd)
-    try:
+    with _collection_lock(directory_fd):
         config = prepare_inspect_config(plan, options)
         rows = _frozen_rows(
             baseline_run,
@@ -842,8 +838,6 @@ async def _collect_pinned(
             except BaseException:
                 await drain()
                 raise
-    finally:
-        _release_collection_lock(lock_descriptor)
 
 
 async def collect(
