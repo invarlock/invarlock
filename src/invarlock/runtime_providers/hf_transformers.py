@@ -646,7 +646,16 @@ def load_hf_model_with_strict_loading_info(
     loader: Callable[..., object],
     checkpoint: Path,
 ) -> object:
-    """Load one local HF model and reject incomplete or ambiguous loader state."""
+    """Validate local weight paths before loading, then require complete loader state."""
+
+    # Reject unsafe index references before a native loader can interpret them.
+    # The checkpoint must remain immutable through loading and subsequent binding.
+    try:
+        safetensors_storage_keys(checkpoint)
+    except HFSafetensorsIdentityError as exc:
+        raise RuntimeError(
+            "strict HF checkpoint must use a canonical safetensors layout"
+        ) from exc
 
     loaded = loader(
         str(checkpoint),

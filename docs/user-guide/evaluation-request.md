@@ -1,6 +1,6 @@
 # Evaluation request
 
-An evaluation request closes one baseline-versus-subject release-regression
+A native evaluation request closes one baseline-versus-subject release-regression
 transaction over exact artifacts, a pinned evaluation source, one task,
 runtime settings, one built-in metric or bound scorer extension, one policy,
 optional authenticated observations, and a fresh evidence destination. The schema is
@@ -10,17 +10,25 @@ The request is comparison intent, not host authorization. It does not grant
 network access, choose an OCI engine, select arbitrary executables, inject
 secrets, or authorize its own runtime digest.
 
-!!! tip "User guide"
+> **User guide**
+>
+> **Outcome:** Author a closed run request for a real paired comparison, or a
+> closed import request for complete provider material produced elsewhere.
+>
+> **Audience:** Evaluation operators and integration engineers preparing a
+> release-regression decision.
+>
+> **Prerequisites:** Pinned model inputs, a local JSONL source for run mode or
+> a canonical schedule for import mode, a reviewed single-scorer policy,
+> provider settings, and a new request-relative evidence destination.
 
-    **Outcome:** Author a closed run request for a real paired comparison, or a
-    closed import request for complete provider material produced elsewhere.
-
-    **Audience:** Evaluation operators and integration engineers preparing a
-    release-regression decision.
-
-    **Prerequisites:** Pinned model inputs, a local JSONL source for run mode or
-    a canonical schedule for import mode, a reviewed single-scorer policy,
-    provider settings, and a new request-relative evidence destination.
+Captured records use the separate `invarlock/evaluation-request-v2` contract
+with `execution.mode: captured` through the same `evaluate` command. Follow
+[Captured results](captured-results.md) for that request, run pins, and independent
+verification. Frozen-answer `invarlock/evaluation-request-v3` requests select
+`judge_import` or `judge_collect` when the runs and judge plan are already
+prepared; see the [judge request contract](../reference/judge-measurements.md).
+The native v1 shapes below support all three built-in scorers.
 
 ## Choose the execution mode
 
@@ -241,6 +249,48 @@ byte-weighted loss. It measures expected-continuation likelihood regression
 under the authenticated prompt, target, provider, and runtime; it is not a
 general model-quality measure.
 
+### `judge`
+
+Select this built-in scorer when generated text needs bounded rubric-based
+ratings. Keep the native baseline, subject, dataset and execution fields, and
+add this comparison fragment:
+
+```yaml
+comparison:
+  metric: judge
+  policy: judge-policy.json
+  judge:
+    workspace: judge-work
+    signer_identity: evaluation-signer
+```
+
+The policy uses `invarlock/native-judge-policy-v1` and binds the rubric,
+judge identity and configuration, rating scale, independent-unit assignments,
+repetitions, analysis thresholds and collection budgets. Create a complete
+starting workspace with `invarlock evaluate --init demo --example native-judge`.
+Its illustrative model digests and two cases must be replaced before use.
+
+Native judging requires exactly one text input part per record; image/content
+inputs are rejected. Run mode first collects authenticated answers through the
+provider's text-output surface and freezes the runtime capture. Import mode
+authenticates complete provider sidecars bound to the same judge policy. Both then collect ratings
+through the separately installed collector. Preflight validates prerequisites
+and complete reservations without model or judge calls. The model workers remain
+network-disabled; judge collection has its own explicit authorization and limits.
+
+The private judge workspace supports resuming admitted trials against the same
+frozen answers. Changed models, data, rubric, policy or runtime identities need
+a new workspace. Repeated ratings do not create more independent tasks. Unless
+`plan.prompt.reference_mode: per_case` is selected, authenticated expected
+outputs are not sent to the judge.
+
+Judge evidence has a separate envelope, analysis and recipient-policy contract;
+it does not use the comparison-report-v3 interval or native pack-v1 receipt
+shown for exact match and NLL. Follow the
+[native judge starter](https://github.com/invarlock/invarlock/blob/main/examples/native-judge/README.md)
+through collection, independent verification, reporting and recovery, and use the
+[judge reference](../reference/judge-measurements.md) for exact contracts.
+
 ### Derived perplexity interpretation
 
 For a normalized-NLL report, InvarLock derives token-normalized NLL when both
@@ -260,12 +310,13 @@ The perplexity ratio is verifier-derived interpretation only. It is not a
 selectable metric and has no policy threshold, confidence interval, or verdict
 authority.
 
-The built-in HF provider supports both built-in metrics for `text_causal`. The
+The built-in HF provider supports exact-match and normalized-NLL collection for `text_causal`. The
 first-party GGUF, TensorRT-LLM, and Hugging Face vision-text add-ins currently
 support exact match for their declared tasks. Import execution support remains
 provider-specific: both imported provider receipts must declare the selected
-task and collection metric. A scorer extension collects authenticated text
-outputs through the exact-match provider surface before verifier replay.
+task and collection metric. Judge and deterministic scorer extensions collect authenticated text outputs
+through the exact-match provider surface. Judge then performs separately bounded
+collection against those frozen outputs; deterministic extensions replay locally.
 
 ## Deterministic scorer extension
 
@@ -287,9 +338,10 @@ scorer_extension:
 
 The digests are illustrative. The descriptor binds supported tasks, text
 output, configuration schema, replay mode, unit-interval value semantics,
-arithmetic-mean aggregation, higher-is-better direction, and disabled network,
-external-model, and human judgment. The configuration digest covers canonical
-JSON configuration bytes.
+arithmetic-mean aggregation and higher-is-better direction. Network access,
+external models and externally assigned ratings are excluded from deterministic
+extension replay. The configuration digest covers canonical JSON configuration
+bytes.
 
 Providers collect ordinary authenticated text outputs. The scorer receives
 exactly `expected_output`, `output_text`, and `output_sha256` for each ordered
@@ -309,9 +361,10 @@ Replay runs twice and must produce byte-identical canonical results.
 
 Separately installed and explicitly authorized scorer packages may implement
 deterministic token F1, structured extraction, or VQA answer normalization. SQL
-or code execution, model-based semantic similarity, network and human scoring,
-external models, and LLM judges are excluded until separate authenticated
-contracts exist. Judge outputs remain optional authenticated observations.
+or code execution, model-based semantic similarity, network services and externally assigned ratings,
+external models, and LLM judges are excluded from the scorer-extension contract.
+Use the built-in [`judge` scorer](#judge) for bounded rubric-based text grading
+with its separate collection and replay contract.
 
 ## Authenticated optional observations
 
@@ -329,17 +382,21 @@ observations:
 Each entry has a unique canonical ID, a canonical kind, a scope of
 `comparison`, `baseline`, or `subject`, and a request-relative path to a
 canonical JSON object. Evaluation reads the bytes without following links,
-requires canonical encoding and a maximum size of 1 MiB, and places the payload
-under `observations/<id>.json`. The signed manifest binds its digest, kind,
-scope, comparison, schedule, policy, and both artifact identities. Strict
-verification replays those bindings, and the human report renders the payload
+requires canonical encoding and a maximum size of 1 MiB. Native pack-v1 evidence
+places the payload under `observations/<id>.json`. Its signed manifest binds the
+digest, kind, scope, comparison, schedule, policy, and both artifact identities.
+Strict verification replays those bindings, and the evidence report renders the payload
 in a separate context section.
+
+Native judge evidence instead retains the observation payloads inside
+`native_capture.json`, authenticated by its signed judge envelope. Captured v2
+requests do not accept the root `observations` field.
 
 Observations are authenticated context. The selected paired comparison, its
 paired interval, and policy are the complete acceptance calculation. Adding,
-removing, or changing an observation changes the request-bound comparison ID
-and therefore creates a different signed transaction, but cannot alter the
-paired statistics or verdict for otherwise identical inputs. Any byte change
+removing, or changing a native pack-v1 observation changes the request-bound
+comparison ID and therefore creates a different signed transaction, but cannot
+alter the paired statistics or verdict for otherwise identical inputs. Any byte change
 after publication invalidates bundle integrity. Spectral, random-matrix, and
 variance summaries from `invarlock-diagnostics` use this path. The
 [SPDX 3.0.1 AI observation example](https://github.com/invarlock/invarlock/tree/main/examples/integrations/spdx-ai-observation)
@@ -369,7 +426,8 @@ for one scheduled record remain coupled. The upper bound controls the
 normalized-NLL policy. A favorable point estimate cannot override an interval
 that crosses the policy limit.
 
-Each metric policy may optionally add a coupled record-count and interval-width
+For exact match, normalized NLL and deterministic extensions, a metric policy
+may optionally add a coupled record-count and interval-width
 requirement. Exact match and scorer extensions pair `minimum_record_count` with
 `maximum_interval_width_pp`; normalized NLL pairs it with
 `maximum_interval_width_ratio`. Exact match may independently add
@@ -379,9 +437,10 @@ bound and every configured count, width, and side-accuracy check pass.
 Preflight can validate the count but marks interval width and side accuracy
 pending until execution.
 
-This is a deterministic resampling interval over the authenticated finite
-schedule. It is not a population confidence interval, proof of dataset
-representativeness, or general model-quality claim.
+The normalized-NLL and deterministic-extension intervals describe deterministic
+resampling over the authenticated finite schedule. They are not population
+confidence intervals, proof of dataset representativeness, or general
+model-quality claims.
 
 ## OCI delegation for run mode
 
@@ -418,8 +477,9 @@ allow different digest-pinned images or devices. Workers that share a generic
 or identical CUDA selector run sequentially; workers assigned explicitly
 different CUDA indexes can run in parallel.
 
-The request cannot enable network or remote code. Runtime-image identity,
-device selection, resource ceilings, and worker identity remain
+The request cannot enable network or remote code in model workers. Native judge
+collection uses the separately authorized collector described above. Runtime-image
+identity, device selection, resource ceilings, and worker identity remain
 caller-controlled so submitted YAML cannot grant itself host capabilities.
 
 ## Import mode

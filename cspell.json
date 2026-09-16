@@ -30,6 +30,8 @@
     "*.egg-info/**"
   ],
   "words": [
+    "NFKC",
+    "multiset",
     "invarlock",
     "venv",
     "pytest",
@@ -63,12 +65,14 @@
     "logloss",
     "lognll",
     "Bonferroni",
+    "Hoeffding",
     "Equalisation",
     "behaviour",
     "logits",
     "overweights",
     "logspace",
     "numpy",
+    "NLTK",
     "wikitext",
     "bitwidth",
     "pipx",
@@ -197,6 +201,7 @@
     "Opik",
     "Rego",
     "requalify",
+    "requalification",
     "sentencepiece",
     "Textualize",
     "tiktoken",
@@ -221,6 +226,17 @@
     "subsampling",
     "thresholded",
     "underprovisioned",
-    "unwritable"
+    "unwritable",
+    "Abhinav",
+    "Rastogi",
+    "Xiaoxue",
+    "Zang",
+    "Srinivas",
+    "Sunkara",
+    "Raghav",
+    "Pranav",
+    "Rajpurkar",
+    "Liang",
+    "Khaitan"
   ]
 }

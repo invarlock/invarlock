@@ -34,6 +34,7 @@ jobs:
 
       - name: Audit maintained dependency locks
         run: |
+          python scripts/security/build_hardened_accelerate_wheel.py bootstrap
           python scripts/security/cve_audit.py \
             --out-json artifacts/supply-chain/cve-audit.json \
             --out-md artifacts/supply-chain/cve-audit.md
@@ -77,13 +78,136 @@ jobs:
           digest="9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
           printf '{"tokenizer_metadata_sha256":"%s","api_key":"%s"}\n' \
             "${digest}" "${digest}" > "${probe_root}/${probe_path}/request.json"
+          python - "${probe_root}" "${digest}" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          source = Path(sys.argv[1]) / "src/invarlock/captured_evidence_publication.py"
+          source.parent.mkdir(parents=True)
+          name = "_".join(("signing", "key"))
+          annotation = "Ed25519" + "PrivateKey"
+          canary = sys.argv[2]
+          source.write_text(
+              "# Synthetic scanner boundary probe.\n"
+              f"    {name}: {annotation} | None = None,\n"
+              f'{name} = "{canary}"\n'
+              f'    {name}: {annotation} | None = "{canary}",\n',
+              encoding="utf-8",
+          )
+          historical = Path(sys.argv[1]) / "src/invarlock/pipeline/evidence.py"
+          historical.parent.mkdir(parents=True)
+          historical.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+          metadata = Path(sys.argv[1]) / "examples/qualification/k2-horizon/model-card-observations.json"
+          metadata.parent.mkdir(parents=True)
+          metadata.write_text(
+              f'      "api_response_sha256": "{canary}",\n'
+              f'      "api_key": "{canary}"\n',
+              encoding="utf-8",
+          )
+          metadata.with_name("unrelated.json").write_text(
+              f'      "api_response_sha256": "{canary}",\n',
+              encoding="utf-8",
+          )
+          expat = Path(sys.argv[1]) / "examples/qualification/k2_runtime_expat.py"
+          expat.parent.mkdir(parents=True, exist_ok=True)
+          label = "_".join(("SIGNING", "KEY"))
+          fingerprint = "CB8DE70A90CFBF6C3BF5CC5696262ACFFBD3AEC6"
+          public_line = f'{label} = "{fingerprint}"\n'
+          expat.write_text(
+              "# Synthetic scanner boundary probe.\n"
+              + public_line
+              + f'api_key = "{canary}"\n'
+              + f'{label} = "{fingerprint[:-1]}0"\n'
+              + public_line.rstrip("\n") + f'; api_key = "{canary}"\n',
+              encoding="utf-8",
+          )
+          expat.with_name("unrelated.py").write_text(public_line, encoding="utf-8")
+
+          root = Path(sys.argv[1])
+          extra_expected = []
+
+          def write_cases(relative, cases):
+              path = root / relative
+              path.parent.mkdir(parents=True, exist_ok=True)
+              path.write_text("\n".join(line for line, _ in cases) + "\n", encoding="utf-8")
+              for number, (_, count) in enumerate(cases, 1):
+                  extra_expected.extend([[relative, number]] * count)
+
+          public_digests = [
+              "4b98863889c17ffa7a7d391e83264fde0aa76f6883ef2e863065728b126508f8",
+              "7292215bb68b9cf650023939b2c0e0a9a6f48c77b39600a4069c796c33384b94",
+              "c0b3c279b6ecdb71996a86ffb4d4ab94dfdb5df95f00bac9515688faef2ff5dd",
+              "5e04eb606e3a1583530a42e36c2a6b6615c86f34fe77e44d9ddeb43ff940931f",
+          ]
+          harness_pins = list(zip(("lm_eval.api.model", "lm_eval.api.metrics"), public_digests[:2]))
+          tokenizer_pins = list(zip(("special_tokens_map.json", "tokenizer_config.json"), public_digests[2:]))
+          source_paths = [
+              "examples/captured-results/harness_model_comparison.py",
+              "examples/captured-results/harness_likelihood_rehearsal.py",
+              "examples/captured-results/references/mistral-7b-likelihood/capture/baseline/protocol.json",
+              "examples/captured-results/references/mistral-7b-likelihood/capture/subject/protocol.json",
+              "examples/hosted-service/references/mistral-7b-http/capture/checkpoint-loader-source.txt",
+              "examples/hosted-service/references/mistral-7b-http/capture/checkpoint-loading-protocol.json",
+          ]
+          for relative in source_paths:
+              filename = Path(relative).name
+              pins = harness_pins + (tokenizer_pins if filename == "harness_likelihood_rehearsal.py" else [])
+              cases = []
+              for field, digest in pins:
+                  line = f'    "{field}": "{digest}",'
+                  other_digest = next(value for _, value in pins if value != digest)
+                  cases.extend([
+                      (line, 0),
+                      (line.replace(digest, digest[:-1] + ("0" if digest[-1] != "0" else "1")), 1),
+                      (line.replace(digest, other_digest), 1),
+                      (line.replace(field, "api_key"), 1),
+                      (line + f' api_key = "{canary}"', 1),
+                      (f'api_key = "{canary}"', 1),
+                  ])
+              if filename != "harness_likelihood_rehearsal.py":
+                  cases.extend((f'    "{field}": "{digest}",', 1) for field, digest in tokenizer_pins)
+              if "/references/" in relative:
+                  for field, digest in pins:
+                      line = json.dumps({field: digest}, separators=(",", ":"))
+                      cases.extend([
+                          (line, 0),
+                          (line[:-1] + f',"api_key":"{canary}"' + "}", 1),
+                      ])
+              write_cases(relative, cases)
+              for other in ("prefix/" + relative, relative + ".bak", relative.replace(filename, "unrelated_" + filename)):
+                  write_cases(other, [(f'    "{field}": "{digest}",', 1) for field, digest in pins])
+
+          for filename, label, arguments in (
+              ("acceptance.py", "trusted signer key", (" " * 12 + "value", " " * 16 + "path")),
+              ("evidence.py", "judge evidence signing key", (" " * 12 + "path", " " * 12 + "Path(value)")),
+          ):
+              relative = "src/invarlock/judge_measurements/" + filename
+              cases = []
+              public_lines = []
+              for argument in arguments:
+                  line = f'{argument}, label="{label}", max_bytes=65536'
+                  public_lines.append(line)
+                  cases.extend([
+                      (line, 0),
+                      (line.replace("65536", "65535"), 1),
+                      (line.replace(label, "other " + label), 1),
+                      (line + f'; api_key = "{canary}"', 2),
+                      (f'api_key = "{canary}"', 1),
+                  ])
+              write_cases(relative, cases)
+              for other in ("prefix/" + relative, relative + ".bak", relative.replace(filename, "unrelated_" + filename)):
+                  write_cases(other, [(line, 1) for line in public_lines])
+          (root / "expected-extra.json").write_text(json.dumps(extra_expected), encoding="utf-8")
+          PY
           git -C "${probe_root}" add .
           git -C "${probe_root}" commit --quiet -m "Add scanner boundary probe"
           set +e
           (
             cd "${probe_root}"
             gitleaks git . --config "${GITHUB_WORKSPACE}/.gitleaks.toml" \
-              --redact --no-banner
+              --redact --no-banner --report-format json \
+              --report-path "${probe_root}/gitleaks.json"
           )
           exit_code=$?
           set -e
@@ -91,6 +215,34 @@ jobs:
             echo "gitleaks allowlist suppressed an unrelated credential or failed" >&2
             exit 1
           fi
+          python - "${probe_root}/gitleaks.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          from collections import Counter
+
+          findings = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          expected = Counter([
+              ("public_evidence/evidence/example/evidence/request.json", 1),
+              ("src/invarlock/captured_evidence_publication.py", 3),
+              ("src/invarlock/captured_evidence_publication.py", 4),
+              ("src/invarlock/pipeline/evidence.py", 3),
+              ("src/invarlock/pipeline/evidence.py", 4),
+              ("examples/qualification/k2-horizon/model-card-observations.json", 2),
+              ("examples/qualification/k2-horizon/unrelated.json", 1),
+              ("examples/qualification/k2_runtime_expat.py", 3),
+              ("examples/qualification/k2_runtime_expat.py", 4),
+              ("examples/qualification/k2_runtime_expat.py", 5),
+              ("examples/qualification/k2_runtime_expat.py", 5),
+              ("examples/qualification/unrelated.py", 1),
+          ])
+          extra = Path(sys.argv[1]).with_name("expected-extra.json")
+          expected.update(tuple(item) for item in json.loads(extra.read_text(encoding="utf-8")))
+          observed = Counter((item["File"], item["StartLine"]) for item in findings)
+          if observed != expected:
+              raise SystemExit("gitleaks boundary probe findings changed")
+          PY
 
       - name: Run gitleaks PR git delta scan
         id: gitleaks_scan
@@ -212,8 +364,9 @@ jobs:
           python -m venv .hf-venv
           . .hf-venv/bin/activate
           python -m pip install --upgrade --require-hashes -r requirements/workflows/pip-bootstrap.txt
-          python -m pip install dist/*.whl --no-deps
-          python -m pip install --require-hashes -r requirements/workflows/hf-py313.txt
+          python -m pip install dist/*.whl --no-deps --no-compile
+          python scripts/security/build_hardened_accelerate_wheel.py bootstrap
+          python -m pip install --no-compile --require-hashes --find-links runtime/wheels -r requirements/workflows/hf-py313.txt
           site_packages="$(python - <<'PY'
           import site
           paths = site.getsitepackages()
@@ -223,7 +376,25 @@ jobs:
           echo "site_packages=${site_packages}" >> "$GITHUB_OUTPUT"
 
       - name: Run HF surface pip-audit
-        run: python scripts/security/run_pip_audit.py --path "${{ steps.hf_surface.outputs.site_packages }}"
+        run: |
+          python scripts/security/run_pip_audit.py \
+            --path "${{ steps.hf_surface.outputs.site_packages }}" \
+            --installed-lock requirements/workflows/hf-py313.txt \
+            --installed-lock-sha256 034d95f20a71249b0321ac33d50f6b1eb9b16773ae891a2a43d3efe4fca64ec9 \
+            --installed-bootstrap-lock requirements/workflows/pip-bootstrap.txt \
+            --installed-bootstrap-lock-sha256 8639968bea3cd8bc234d2a6d38f2c54e5d1b09c3474ac954278c99c2fa44e944 \
+            --installed-project-wheel dist/*.whl \
+            --installed-wheel runtime/wheels/accelerate-1.14.0+invarlock.1-py3-none-any.whl \
+            --report artifacts/supply-chain/hf-pip-audit.json
+
+      - name: Upload HF installed audit
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: hf-installed-audit
+          path: artifacts/supply-chain/hf-pip-audit.json
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Remove HF surface venv
-        run: rm -rf .hf-venv
+        run: rm -rf .hf-venv .hf-audit-wheels

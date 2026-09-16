@@ -10,8 +10,9 @@
 
 version: 2
 updates:
-  # Python dependencies (pip)
-  - package-ecosystem: "pip"
+  # Keep pyproject.toml and uv.lock together. Hashed workflow locks and tool
+  # hooks still require the coordinated checks described in WORKFLOWS.md.
+  - package-ecosystem: "uv"
     directory: "/"
     target-branch: "staging/next"
     schedule:
@@ -20,8 +21,6 @@ updates:
       time: "09:00"
       timezone: "America/Toronto"
     open-pull-requests-limit: 5
-    reviewers:
-      - "invarlock/invarlock-maintainers"
     labels:
       - "dependencies"
       - "python"
@@ -58,8 +57,6 @@ updates:
       time: "09:00"
       timezone: "America/Toronto"
     open-pull-requests-limit: 5
-    reviewers:
-      - "invarlock/invarlock-maintainers"
     labels:
       - "dependencies"
       - "github-actions"
@@ -80,8 +77,6 @@ updates:
     schedule:
       interval: "monthly"
     open-pull-requests-limit: 3
-    reviewers:
-      - "invarlock/invarlock-maintainers"
     labels:
       - "dependencies"
       - "npm"

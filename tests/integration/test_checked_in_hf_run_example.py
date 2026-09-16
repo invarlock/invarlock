@@ -329,4 +329,4 @@ def test_checked_in_hf_run_example_is_distinct_anchored_and_meaningful(
     )
     assert rendered.exit_code == 0, rendered.stdout
     assert html.is_file()
-    assert "PASS" in html.read_text(encoding="utf-8")
+    assert '<h1 id="decision">Policy satisfied</h1>' in html.read_text(encoding="utf-8")

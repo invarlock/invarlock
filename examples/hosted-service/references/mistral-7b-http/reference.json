@@ -1,0 +1,256 @@
+{
+  "anchors": {
+    "baseline_run_digest": "sha256:4bb9fc6111f6448a9af2d57b512c7ec47dade8676a8e49319eccc3a02680a1ef",
+    "request_digest": "sha256:d0a89d52db1e72c45e294d7530f9ce0a5e72ebfe59ea0890aa55331d95b791ac",
+    "subject_run_digest": "sha256:bab9cb53705840bd91ee67c4fbdbe9d599967ac9dca9d09c18a6820660ef7679"
+  },
+  "case_count": 400,
+  "current_validation": {
+    "new_model_calls": 0,
+    "report_path_normalization": {
+      "original_report_result_sha256": "sha256:60a857852aed009e7a4ebf24d6e4199db554a396fc3adeb10561f20c50eafdc7",
+      "scope": "Only unsigned CLI output paths were made relative for portability. Signed evidence, receipts and rendered report bytes are unchanged; the original CLI output is identified by its recorded digest."
+    },
+    "source_commit": "a473d9c4ad44906b79588bbab78273994ac959e4",
+    "verification": {
+      "decision": "pass",
+      "format_version": "invarlock/evidence-pack-verify-v2",
+      "integrity_ok": true,
+      "kind": "captured",
+      "metric_summaries": [
+        {
+          "decision": "pass",
+          "missing_count": 0,
+          "name": "final_word_accuracy",
+          "reasons": [],
+          "slice": "overall",
+          "usable_count": 400
+        }
+      ],
+      "ok": true,
+      "pack_manifest_digest": "sha256:701aa0c705c6d024745e45f8fc1f6e1a13a54de7dff4e6fdfcb69e53744ded5a",
+      "policy_verdict": "pass",
+      "replay_status": "completed",
+      "signed_receipt": "verification.receipt.json"
+    },
+    "wheel_sha256": "sha256:0b073c85c76d2b65a80d79ff96adc7f75e20984b9b49bdddc3f6c2be59318d65"
+  },
+  "earlier_attempt": {
+    "baseline_capture_sha256": "sha256:978378eb3cf9208b06e80eb44cfa36769dc6d6177028c56422cc18e3fddb643e",
+    "call_count": 400,
+    "case_policy_and_model_settings_changed": false,
+    "protocol_sha256": "sha256:25c0e9362d583bd7d8316134177e3b9497194c6969ad160bd3cdaf4cf81853f0",
+    "reason": "Collector admission, secret handling, timing replay and source-reported revision handling corrected before subject collection.",
+    "status": "retained_without_comparison"
+  },
+  "evaluation": {
+    "authentication": "signed",
+    "baseline_run_digest": "sha256:4bb9fc6111f6448a9af2d57b512c7ec47dade8676a8e49319eccc3a02680a1ef",
+    "comparison_id": "sha256:6ee0438185d0ca7cd61d18c064e8937ca806d4956f6680bd373cfb42e5cac7f2",
+    "decision": "pass",
+    "evidence": "evidence",
+    "format_version": "invarlock/evaluation-result-v2",
+    "kind": "captured",
+    "ok": true,
+    "pack_manifest_digest": "sha256:701aa0c705c6d024745e45f8fc1f6e1a13a54de7dff4e6fdfcb69e53744ded5a",
+    "policy_digest": "sha256:846b13fd7f4b30774819a7d8db8860d1b68de29859de967afa63dae3ac1d1616",
+    "policy_verdict": "pass",
+    "request_digest": "sha256:d0a89d52db1e72c45e294d7530f9ce0a5e72ebfe59ea0890aa55331d95b791ac",
+    "subject_run_digest": "sha256:bab9cb53705840bd91ee67c4fbdbe9d599967ac9dca9d09c18a6820660ef7679"
+  },
+  "external_provider_qualification": false,
+  "files": {
+    "README.md": {
+      "byte_size": 6979,
+      "sha256": "sha256:ac688d8eb383d1ad852c8547b4ddca870a9c5894832a1754c54288a9b30d70bb"
+    },
+    "capture/baseline.json": {
+      "byte_size": 560537,
+      "sha256": "sha256:d4abe34b9f86d855d690a641d170d4c7c7c7c846282d14da4948994a1ffdd301"
+    },
+    "capture/checkpoint-loader-source.txt": {
+      "byte_size": 24327,
+      "sha256": "sha256:4cc9ef6047ade6b6c7f0ba326700e82c804e29d7b14d6f79d144a11d02964e9c"
+    },
+    "capture/checkpoint-loading-protocol.json": {
+      "byte_size": 279175,
+      "sha256": "sha256:245ac509709ed5741c97078a7e6a660cf3dcb7d429de0501a2082202f332d324"
+    },
+    "capture/collector-source.txt": {
+      "byte_size": 31581,
+      "sha256": "sha256:c411e2eb3997a9bea1fb0e085a54078e94396e76af8df32f070e9595b2ff2b9a"
+    },
+    "capture/journey-source.txt": {
+      "byte_size": 9863,
+      "sha256": "sha256:50358e1155716f3eeccb9af92d2776331d75691daa454cbb9ad1fdb8c4ad7815"
+    },
+    "capture/protocol.json": {
+      "byte_size": 169694,
+      "sha256": "sha256:841a80eee5981052a486c879783e34ce99386651d5f1c6b9a9f9ad31d0ec7e90"
+    },
+    "capture/runtime-environment.json": {
+      "byte_size": 395,
+      "sha256": "sha256:480affb6ed53ca64f25e5b81485ce7e74c190610f2d871408c23c28451f3d7fe"
+    },
+    "capture/service-source.txt": {
+      "byte_size": 6590,
+      "sha256": "sha256:78be7440a77769dbbe3e1044b2e0a7535fb9f91cef2796813f7073abf7177515"
+    },
+    "capture/subject.json": {
+      "byte_size": 565374,
+      "sha256": "sha256:602b6509c0746f8f9728999ca2252376e9173ec3a1f4f8875cbfbed0ac4c2300"
+    },
+    "current/report.html": {
+      "byte_size": 28168,
+      "sha256": "sha256:eb26eb6461556297a5646307e3dc48fa1271d7283dfbae9a0302fae67cbd1f6c"
+    },
+    "current/report.json": {
+      "byte_size": 380,
+      "sha256": "sha256:e5036bb83db9f73e8de486998f3befd2a5b385795717f5a9ce06951c7a74d9a7"
+    },
+    "current/report.md": {
+      "byte_size": 4643,
+      "sha256": "sha256:c388d6b14687d9c9103940c27d1dbc7c68dfe04f92c3352baa2ac06879676442"
+    },
+    "current/report.xml": {
+      "byte_size": 195,
+      "sha256": "sha256:f9579f7ad54069b00111b04e9ad4691b7e0bad89973558891d6d2569329ecd69"
+    },
+    "current/verification.json": {
+      "byte_size": 453,
+      "sha256": "sha256:cf4618f306c352eea3b81c64cf1f706910fda7ef48bc0f6609e61bf0365fb271"
+    },
+    "current/verification.receipt.json": {
+      "byte_size": 1738,
+      "sha256": "sha256:9170760bf7f1a971f0bb48d9eac8cb71a91e060aed234c79ebb496407877b3d5"
+    },
+    "earlier-attempt/baseline.json": {
+      "byte_size": 560517,
+      "sha256": "sha256:978378eb3cf9208b06e80eb44cfa36769dc6d6177028c56422cc18e3fddb643e"
+    },
+    "earlier-attempt/collector-source.txt": {
+      "byte_size": 25149,
+      "sha256": "sha256:848e1484203445b10f61d52aefd45a9d4882a15400123828e376ab4fe72d129c"
+    },
+    "earlier-attempt/journey-source.txt": {
+      "byte_size": 9863,
+      "sha256": "sha256:50358e1155716f3eeccb9af92d2776331d75691daa454cbb9ad1fdb8c4ad7815"
+    },
+    "earlier-attempt/protocol.json": {
+      "byte_size": 169305,
+      "sha256": "sha256:25c0e9362d583bd7d8316134177e3b9497194c6969ad160bd3cdaf4cf81853f0"
+    },
+    "evidence/checksums.sha256": {
+      "byte_size": 436,
+      "sha256": "sha256:a945b24390e3a3ad95d64bb6c456def7e0faff0826851090e4446a038a6ef95a"
+    },
+    "evidence/inputs/policy.json": {
+      "byte_size": 372,
+      "sha256": "sha256:846b13fd7f4b30774819a7d8db8860d1b68de29859de967afa63dae3ac1d1616"
+    },
+    "evidence/manifest.json": {
+      "byte_size": 1162,
+      "sha256": "sha256:701aa0c705c6d024745e45f8fc1f6e1a13a54de7dff4e6fdfcb69e53744ded5a"
+    },
+    "evidence/manifest.signature.json": {
+      "byte_size": 464,
+      "sha256": "sha256:25bcb18390a99e1a033ff02b816f620cb9128d8ea3a8df984b8a87369fb1f079"
+    },
+    "evidence/records/baseline.json": {
+      "byte_size": 841656,
+      "sha256": "sha256:4bb9fc6111f6448a9af2d57b512c7ec47dade8676a8e49319eccc3a02680a1ef"
+    },
+    "evidence/records/subject.json": {
+      "byte_size": 846538,
+      "sha256": "sha256:bab9cb53705840bd91ee67c4fbdbe9d599967ac9dca9d09c18a6820660ef7679"
+    },
+    "evidence/reports/evaluation.report.json": {
+      "byte_size": 1386,
+      "sha256": "sha256:9b6371613fa7ea0177cbf83a9f11fa3bc3291ec670155427af540ca043866ba0"
+    },
+    "evidence/request.json": {
+      "byte_size": 617,
+      "sha256": "sha256:d0a89d52db1e72c45e294d7530f9ce0a5e72ebfe59ea0890aa55331d95b791ac"
+    },
+    "report.html": {
+      "byte_size": 28959,
+      "sha256": "sha256:76654141ba437b7a561b3e07cbc59a624442af8915c64d16ab121d86fdb8bafd"
+    },
+    "report.md": {
+      "byte_size": 5234,
+      "sha256": "sha256:36d156e49ba957927fb5c56ef1f640f328c249503ae14c51100d1c527d09ea7d"
+    },
+    "report.xml": {
+      "byte_size": 195,
+      "sha256": "sha256:f9579f7ad54069b00111b04e9ad4691b7e0bad89973558891d6d2569329ecd69"
+    },
+    "signer.public.pem": {
+      "byte_size": 113,
+      "sha256": "sha256:4506ef8c1aea48d4d64acadea10c91d5faf2c3f0d9dc921742a5e4d3f7f4ae9b"
+    },
+    "verification.receipt.json": {
+      "byte_size": 1738,
+      "sha256": "sha256:9170760bf7f1a971f0bb48d9eac8cb71a91e060aed234c79ebb496407877b3d5"
+    },
+    "verifier.public.pem": {
+      "byte_size": 113,
+      "sha256": "sha256:3ddbc2391dfbf31b30351ae1b8ad59bf3ce7d38ab0bfbdb55b5794b96c86da44"
+    }
+  },
+  "format": "invarlock/local-http-reference-v1",
+  "scope": "two-distinct-local-7b-deployments-through-real-http",
+  "signer_fingerprint": "sha256:624a7b6a0589618bb7884f741f8841c3214097a8456519f1653bab63d1adb50c",
+  "source_commit": "7b3019ada2c8c2ab16c881faecdb218ee97daea2",
+  "startup_attempts": [
+    {
+      "admitted_calls": 0,
+      "failure": "MPS unavailable inside restricted execution",
+      "log": {
+        "byte_size": 514,
+        "sha256": "sha256:f6a5b699970cd49cd9c2834d48b042d8ccea36f68fa98fd89bdfe3326d460846"
+      }
+    },
+    {
+      "admitted_calls": 0,
+      "failure": "20.16 GiB allocation cap exceeded during loading",
+      "log": {
+        "byte_size": 5378,
+        "sha256": "sha256:49ab8f42ab97bf3f4ee009772c0959951f042adfa8bd7e7c890e2a4dc31b9d53"
+      }
+    },
+    {
+      "admitted_calls": 0,
+      "failure": "20.16 GiB allocation cap exceeded during fresh loading",
+      "log": {
+        "byte_size": 5021,
+        "sha256": "sha256:ba1f18a53e6e1d4f6f968eee4a717e2df6fc20d12d83d2b9886a7b189292d1be"
+      }
+    }
+  ],
+  "verification": {
+    "decision": "pass",
+    "format_version": "invarlock/evidence-pack-verify-v2",
+    "integrity_ok": true,
+    "kind": "captured",
+    "metric_summaries": [
+      {
+        "decision": "pass",
+        "missing_count": 0,
+        "name": "final_word_accuracy",
+        "reasons": [],
+        "slice": "overall",
+        "usable_count": 400
+      }
+    ],
+    "ok": true,
+    "pack_manifest_digest": "sha256:701aa0c705c6d024745e45f8fc1f6e1a13a54de7dff4e6fdfcb69e53744ded5a",
+    "policy_verdict": "pass",
+    "replay_status": "completed",
+    "signed_receipt": "verification.receipt.json"
+  },
+  "verifier_fingerprint": "sha256:063f1d6794585c38a609dc916a2d6995a681f60093b1257d903b943e77dd84ba",
+  "wheel": {
+    "byte_size": 489400,
+    "sha256": "sha256:92d51ccf11ba47e0fd71706731e389f50ebe1d48c5855f97774b6db2a4c76808"
+  }
+}

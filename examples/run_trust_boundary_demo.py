@@ -328,7 +328,7 @@ def run_demo(example_root: Path, workspace: Path) -> None:
     )
 
     print(f"PASS accepted evidence and receipt: {accepted_receipt}")
-    print(f"PASS human-readable report: {accepted_report}")
+    print(f"PASS evidence report: {accepted_report}")
     print(f"PASS authentic policy rejection: {rejected_receipt}")
     print(f"PASS byte-tamper rejection: {tampered_receipt}")
     print(f"Inspect the isolated workspaces under {workspace}")

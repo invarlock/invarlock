@@ -1,22 +1,19 @@
-"""The InvarLock command line.
-
-The public workflow intentionally has three transactions: evaluate one closed
-request, independently verify its evidence, and render that verified evidence.
-Provider qualification and repository maintenance are separate tools rather than
-alternate user journeys hidden behind this CLI.
-"""
+"""The InvarLock command line."""
 
 from __future__ import annotations
 
 import json
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
+from typing import Any, Literal
 
 import click
 import typer
 from rich.console import Console
+from rich.markdown import Markdown
 from typer.core import TyperGroup
 
+from invarlock.evaluation_comparison.capacity import DEFAULT_MAX_BOOTSTRAP_DRAWS
 from invarlock.security import enforce_default_security
 
 
@@ -34,15 +31,156 @@ app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
     help=(
-        "InvarLock authenticates a paired model evaluation, produces one portable "
-        "evidence pack, independently verifies it, and renders one human report.\n"
+        "Evaluate, independently verify, and report on release evidence.\n"
         "\n"
-        "  invarlock evaluate request.yaml\n"
+        "  Evaluate: invarlock evaluate request.yaml\n"
         "  invarlock verify evidence/\n"
         "  invarlock report evidence/"
     ),
 )
-console = Console()
+console = Console(markup=False, highlight=False)
+
+
+def _setup_result(
+    action: str | None,
+    *,
+    details: dict[str, Any] | None = None,
+    errors: list[str] | None = None,
+) -> dict[str, Any]:
+    from jsonschema import Draft202012Validator
+
+    from invarlock.public_contracts import load_evaluation_setup_result_schema
+
+    result = {
+        "format_version": "invarlock/evaluation-setup-v1",
+        "action": action,
+        "ok": not errors,
+        "details": details,
+        "errors": [error[:1024] for error in (errors or [])[:16]],
+    }
+    Draft202012Validator(load_evaluation_setup_result_schema()).validate(result)
+    return result
+
+
+def _write_setup_file(path: Path, payload: bytes) -> None:
+    from invarlock.captured_contracts import atomic_write
+
+    try:
+        atomic_write(path, payload)
+    except FileExistsError as exc:
+        raise ValueError(f"setup file already exists: {path.name}") from exc
+
+
+def _publish_setup_directory(directory: Path, artifacts: dict[str, bytes]) -> None:
+    from invarlock.filesystem import publish_directory_no_replace
+    from invarlock.filesystem.staged_directory import staged_directory
+
+    directory = directory.absolute()
+    if directory.exists() or directory.is_symlink():
+        raise ValueError("setup directory must not already exist")
+    with staged_directory(
+        directory, prefix=".evaluation-setup-", create_parents=True
+    ) as stage:
+        for relative, raw in artifacts.items():
+            _write_setup_file(stage.path / relative, raw)
+        stage.require_exact_files(artifacts)
+        stage.publish(publish_directory_no_replace)
+
+
+def _run_setup_action(
+    action: str,
+    *,
+    directory: Path | None,
+    example: str,
+    case_file: Path | None,
+    case_set_output: Path | None,
+    json_out: bool,
+) -> None:
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    from invarlock.captured_contracts import read_file
+    from invarlock.cli.evaluation_setup import starter_artifacts
+    from invarlock.evaluation_record_contracts.contracts import (
+        MAX_INPUT_BYTES,
+        EvaluationRecordsError,
+    )
+    from invarlock.evaluation_records.cases import canonical_case_set, case_set_digest
+    from invarlock.evidence_pack_contract import canonical_json_bytes
+    from invarlock.evidence_pack_integrity import public_key_fingerprint
+    from invarlock.evidence_pack_json import parse_json_bytes
+
+    details: dict[str, object]
+    try:
+        if action == "init":
+            assert directory is not None
+            if directory.exists():
+                raise EvaluationRecordsError("init directory must not already exist")
+            _publish_setup_directory(directory, starter_artifacts(example))
+            details = {
+                "directory": str(directory),
+                "request": str(directory / "request.yaml"),
+                "example": example,
+            }
+        elif action == "keygen":
+            assert directory is not None
+            if directory.exists():
+                raise EvaluationRecordsError("keygen directory must not already exist")
+            key = Ed25519PrivateKey.generate()
+            private = key.private_bytes(
+                serialization.Encoding.PEM,
+                serialization.PrivateFormat.PKCS8,
+                serialization.NoEncryption(),
+            )
+            public = key.public_key().public_bytes(
+                serialization.Encoding.PEM,
+                serialization.PublicFormat.SubjectPublicKeyInfo,
+            )
+            _publish_setup_directory(
+                directory, {"private.pem": private, "public.pem": public}
+            )
+            details = {
+                "private_key": str(directory / "private.pem"),
+                "public_key": str(directory / "public.pem"),
+                "public_key_fingerprint": public_key_fingerprint(key.public_key()),
+            }
+        else:
+            assert case_file is not None
+            document = parse_json_bytes(
+                read_file(case_file, MAX_INPUT_BYTES), label="case set"
+            )
+            if not isinstance(document, dict):
+                raise EvaluationRecordsError("planned case set must be an object")
+            cases = canonical_case_set(document)
+            output = None
+            if case_set_output is not None:
+                _write_setup_file(case_set_output, canonical_json_bytes(cases))
+                output = str(case_set_output)
+            details = {
+                "case_count": len(cases["cases"]),
+                "case_set_digest": case_set_digest(cases),
+                "output": output,
+            }
+        setup_result = _setup_result(action, details=details)
+    except (
+        EvaluationRecordsError,
+        OSError,
+        TypeError,
+        ValueError,
+        RuntimeError,
+    ) as exc:
+        setup_result = _setup_result(action, errors=[str(exc)])
+    if json_out:
+        _echo_json(canonical_json_bytes(setup_result).decode("utf-8"))
+    elif setup_result["ok"]:
+        assert setup_result["details"] is not None
+        for key, value in setup_result["details"].items():
+            console.print(f"{_terminal_text(key)}: {_terminal_text(value)}")
+    else:
+        for error in setup_result["errors"]:
+            console.print(f"FAIL {_terminal_text(error)}")
+    if not setup_result["ok"]:
+        raise typer.Exit(2)
 
 
 def _emit_version() -> None:
@@ -53,13 +191,53 @@ def _emit_version() -> None:
             from invarlock import __version__ as resolved
         except (ImportError, ModuleNotFoundError):
             resolved = "unknown"
-    console.print(f"InvarLock {resolved}")
+    console.print(f"InvarLock {_terminal_text(resolved)}")
 
 
 def _version_callback(value: bool) -> None:
     if value:
         _emit_version()
         raise typer.Exit()
+
+
+def _finish_policy_gate(verdict: str | None) -> None:
+    if verdict == "pass":
+        return
+    if verdict in {"fail", "regression", "insufficient_evidence"}:
+        raise typer.Exit(7)
+    typer.echo(
+        "Evidence was published, but its policy outcome is unavailable for gating.",
+        err=True,
+    )
+    raise typer.Exit(2)
+
+
+def _terminal_text(value: object) -> str:
+    """Render untrusted dynamic text without active terminal controls."""
+    from invarlock.report_presentation import terminal_text
+
+    return terminal_text(str(value))
+
+
+def _echo_json(value: str) -> None:
+    """Escape terminal controls while preserving parsed JSON string values."""
+    body = value.rstrip("\r\n")
+    typer.echo(_terminal_text(body) + value[len(body) :])
+
+
+def _print_captured_metrics(metrics: tuple[dict[str, Any], ...]) -> None:
+    for metric in metrics:
+        name = _terminal_text(metric["name"])
+        scope = _terminal_text(metric["slice"])
+        decision = _terminal_text(metric["decision"])
+        console.print(
+            f"{name} / {scope}: {decision}; "
+            f"{metric['usable_count']} usable pairs; "
+            f"{metric['missing_count']} missing results"
+        )
+        if metric["reasons"]:
+            reasons = "; ".join(_terminal_text(v) for v in metric["reasons"])
+            console.print(f"Recorded reasons: {reasons}")
 
 
 @app.callback()
@@ -80,17 +258,23 @@ def _root(
 
 @app.command(
     name="evaluate",
-    help="Execute or import one closed request and atomically publish one evidence pack.",
+    help=(
+        "Evaluate one closed request using native execution, authenticated imports, "
+        "captured results, or retained judge measurements.\n\n"
+        "Signed handoff: evaluate REQUEST -> verify EVIDENCE -> report EVIDENCE.\n\n"
+        "Unsigned local use: evaluate REQUEST --unsigned -> report EVIDENCE."
+    ),
 )
-def evaluate(
-    request: Path = typer.Argument(
-        ...,
+def evaluate(  # noqa: C901
+    ctx: typer.Context,
+    request: Path | None = typer.Argument(
+        None,
         metavar="REQUEST",
-        exists=True,
+        exists=False,
         file_okay=True,
         dir_okay=False,
         readable=True,
-        resolve_path=True,
+        resolve_path=False,
         help="Closed evaluation request YAML.",
     ),
     signing_key: Path | None = typer.Option(
@@ -98,6 +282,7 @@ def evaluate(
         "--signing-key",
         envvar="INVARLOCK_SIGNING_KEY",
         help="Ed25519 evidence-signing key; may also be supplied by INVARLOCK_SIGNING_KEY.",
+        rich_help_panel="Signing and execution authorization",
     ),
     allow_installed_scorers: bool = typer.Option(
         False,
@@ -107,11 +292,13 @@ def evaluate(
             "Authorize loading the exact installed scorer extension bound by the "
             "request and policy. Installed scorer code executes in this process."
         ),
+        rich_help_panel="Signing and execution authorization",
     ),
     json_out: bool = typer.Option(
         False,
         "--json",
         help="Emit one machine-readable result object.",
+        rich_help_panel="Output and workflow",
     ),
     preflight: bool = typer.Option(
         False,
@@ -120,193 +307,411 @@ def evaluate(
             "Validate request, authenticated inputs, provider resources, local "
             "runtime images, key, and destination without workers or publication."
         ),
+        rich_help_panel="Output and workflow",
+    ),
+    fail_on_policy: bool = typer.Option(
+        False,
+        "--fail-on-policy",
+        help="Exit 7 after publication when the recorded policy does not pass.",
+        rich_help_panel="Output and workflow",
+    ),
+    unsigned: bool = typer.Option(
+        False,
+        "--unsigned",
+        help="Publish captured or judge evaluation as unsigned local evidence.",
+        rich_help_panel="Signing and execution authorization",
+    ),
+    max_bootstrap_draws: int = typer.Option(
+        DEFAULT_MAX_BOOTSTRAP_DRAWS,
+        "--max-bootstrap-draws",
+        min=0,
+        help="Caller-owned work allowance for the complete captured comparison.",
+        rich_help_panel="Signing and execution authorization",
     ),
     request_root: Path | None = typer.Option(
         None,
         "--request-root",
         hidden=True,
         help="Resolve request-relative inputs against this authenticated directory.",
+        rich_help_panel="Output and workflow",
+    ),
+    baseline_run: Path | None = typer.Option(
+        None,
+        "--baseline-run",
+        help="Captured or judge baseline run override, caller-relative and confined to request root.",
+        rich_help_panel="Output and workflow",
+    ),
+    subject_run: Path | None = typer.Option(
+        None,
+        "--subject-run",
+        help="Captured or judge subject run override, caller-relative and confined to request root.",
+        rich_help_panel="Output and workflow",
+    ),
+    output: Path | None = typer.Option(
+        None,
+        "--output",
+        help="Evidence destination override, caller-relative and confined to request root.",
+        rich_help_panel="Output and workflow",
+    ),
+    init_directory: Path | None = typer.Option(
+        None,
+        "--init",
+        metavar="DIRECTORY",
+        help="Create a captured example or native judge starter without a request.",
+        rich_help_panel="Evaluation setup",
+    ),
+    example: str = typer.Option(
+        "classification",
+        "--example",
+        help="Starter for --init: classification, extraction, judge (recorded ratings), or native-judge (model generation and judging).",
+        rich_help_panel="Evaluation setup",
+    ),
+    keygen_directory: Path | None = typer.Option(
+        None,
+        "--keygen",
+        metavar="DIRECTORY",
+        help="Create generic Ed25519 private/public key material.",
+        rich_help_panel="Evaluation setup",
+    ),
+    freeze_cases: Path | None = typer.Option(
+        None,
+        "--freeze-cases",
+        metavar="FILE",
+        help="Validate and optionally canonicalize an evaluation case set.",
+        rich_help_panel="Evaluation setup",
+    ),
+    case_set_output: Path | None = typer.Option(
+        None,
+        "--case-set-output",
+        metavar="FILE",
+        help="No-replace output for --freeze-cases.",
+        rich_help_panel="Evaluation setup",
+    ),
+    runtime_profile: Path | None = typer.Option(
+        None,
+        "--runtime-profile",
+        help="Explicit runtime resource JSON; CLI overrides profile, then environment/defaults. Run mode only.",
+        rich_help_panel="Runtime resources (advanced)",
     ),
     runtime_image: str | None = typer.Option(
         None,
         "--runtime-image",
         envvar="INVARLOCK_RUNTIME_IMAGE",
         help="Local OCI image reference; must be digest-bearing or paired with --runtime-image-digest.",
+        rich_help_panel="Runtime resources (advanced)",
     ),
     runtime_image_digest: str | None = typer.Option(
         None,
         "--runtime-image-digest",
         envvar="INVARLOCK_RUNTIME_IMAGE_DIGEST",
         help="Pinned lowercase OCI sha256 digest for delegated run execution.",
+        rich_help_panel="Runtime resources (advanced)",
     ),
     baseline_runtime_image: str | None = typer.Option(
         None,
         "--baseline-runtime-image",
         envvar="INVARLOCK_BASELINE_RUNTIME_IMAGE",
         help="Optional digest-pinned baseline image override.",
+        rich_help_panel="Runtime resources (advanced)",
     ),
     baseline_runtime_image_digest: str | None = typer.Option(
         None,
         "--baseline-runtime-image-digest",
         envvar="INVARLOCK_BASELINE_RUNTIME_IMAGE_DIGEST",
         help="Pinned baseline image digest; defaults to --runtime-image-digest.",
+        rich_help_panel="Runtime resources (advanced)",
     ),
     subject_runtime_image: str | None = typer.Option(
         None,
         "--subject-runtime-image",
         envvar="INVARLOCK_SUBJECT_RUNTIME_IMAGE",
         help="Optional digest-pinned subject image override.",
+        rich_help_panel="Runtime resources (advanced)",
     ),
     subject_runtime_image_digest: str | None = typer.Option(
         None,
         "--subject-runtime-image-digest",
         envvar="INVARLOCK_SUBJECT_RUNTIME_IMAGE_DIGEST",
         help="Pinned subject image digest; defaults to --runtime-image-digest.",
+        rich_help_panel="Runtime resources (advanced)",
     ),
     container_engine: str | None = typer.Option(
         None,
         "--container-engine",
         envvar="INVARLOCK_CONTAINER_ENGINE",
         help="Closed OCI engine selection: docker or podman.",
+        rich_help_panel="Runtime resources (advanced)",
     ),
     runtime_device: str | None = typer.Option(
         None,
         "--runtime-device",
         envvar="INVARLOCK_RUNTIME_DEVICE",
         help="Default container device: cpu, cuda, or cuda:<index>.",
+        rich_help_panel="Runtime resources (advanced)",
     ),
     baseline_runtime_device: str | None = typer.Option(
         None,
         "--baseline-runtime-device",
         envvar="INVARLOCK_BASELINE_RUNTIME_DEVICE",
         help="Optional baseline device override.",
+        rich_help_panel="Runtime resources (advanced)",
     ),
     subject_runtime_device: str | None = typer.Option(
         None,
         "--subject-runtime-device",
         envvar="INVARLOCK_SUBJECT_RUNTIME_DEVICE",
         help="Optional subject device override.",
+        rich_help_panel="Runtime resources (advanced)",
     ),
     runtime_entrypoint: str | None = typer.Option(
         None,
         "--runtime-entrypoint",
         envvar="INVARLOCK_RUNTIME_ENTRYPOINT",
         help="Worker entrypoint profile: auto, python, or nvidia.",
+        rich_help_panel="Runtime resources (advanced)",
     ),
     baseline_runtime_entrypoint: str | None = typer.Option(
         None,
         "--baseline-runtime-entrypoint",
         envvar="INVARLOCK_BASELINE_RUNTIME_ENTRYPOINT",
         help="Optional baseline worker entrypoint profile override.",
+        rich_help_panel="Runtime resources (advanced)",
     ),
     subject_runtime_entrypoint: str | None = typer.Option(
         None,
         "--subject-runtime-entrypoint",
         envvar="INVARLOCK_SUBJECT_RUNTIME_ENTRYPOINT",
         help="Optional subject worker entrypoint profile override.",
+        rich_help_panel="Runtime resources (advanced)",
     ),
     runtime_cpus: str | None = typer.Option(
         None,
         "--runtime-cpus",
         envvar="INVARLOCK_RUNTIME_CPUS",
         help="Hard CPU limit applied independently to each OCI worker.",
+        rich_help_panel="Runtime resources (advanced)",
     ),
     runtime_memory_mib: str | None = typer.Option(
         None,
         "--runtime-memory-mib",
         envvar="INVARLOCK_RUNTIME_MEMORY_MIB",
         help="Hard memory limit in MiB applied independently to each OCI worker.",
+        rich_help_panel="Runtime resources (advanced)",
     ),
     runtime_user: str | None = typer.Option(
         None,
         "--runtime-user",
         envvar="INVARLOCK_RUNTIME_USER",
         help="Non-root numeric UID:GID used by both OCI workers.",
+        rich_help_panel="Runtime resources (advanced)",
     ),
 ) -> None:
     """Produce the canonical evidence pack described by REQUEST."""
 
+    setup_values = (init_directory, keygen_directory, freeze_cases)
+    selected = [value is not None for value in setup_values]
+    action = (
+        "init"
+        if init_directory is not None
+        else "keygen"
+        if keygen_directory is not None
+        else "freeze_cases"
+        if freeze_cases is not None
+        else None
+    )
+    setup_option_names = {
+        "baseline_run",
+        "subject_run",
+        "output",
+        "signing_key",
+        "allow_installed_scorers",
+        "preflight",
+        "fail_on_policy",
+        "unsigned",
+        "max_bootstrap_draws",
+        "request_root",
+        "runtime_profile",
+        "runtime_image",
+        "runtime_image_digest",
+        "baseline_runtime_image",
+        "baseline_runtime_image_digest",
+        "subject_runtime_image",
+        "subject_runtime_image_digest",
+        "container_engine",
+        "runtime_device",
+        "baseline_runtime_device",
+        "subject_runtime_device",
+        "runtime_entrypoint",
+        "baseline_runtime_entrypoint",
+        "subject_runtime_entrypoint",
+        "runtime_cpus",
+        "runtime_memory_mib",
+        "runtime_user",
+    }
+    explicit_setup_controls = [
+        name
+        for name in setup_option_names
+        if getattr(ctx.get_parameter_source(name), "name", None) == "COMMANDLINE"
+    ]
+    setup_error: str | None = None
+    if sum(selected) > 1:
+        setup_error = "setup actions are mutually exclusive"
+    elif action is not None:
+        if request is not None:
+            setup_error = "setup actions do not accept a positional request"
+        elif explicit_setup_controls:
+            setup_error = (
+                "setup actions cannot be combined with evaluation options: "
+                + ", ".join(sorted(explicit_setup_controls))
+            )
+        elif action == "init" and (
+            case_set_output is not None
+            or freeze_cases is not None
+            or keygen_directory is not None
+        ):
+            setup_error = "--init cannot be combined with other setup actions"
+        elif action == "keygen" and (
+            getattr(ctx.get_parameter_source("example"), "name", None) == "COMMANDLINE"
+            or case_set_output is not None
+        ):
+            setup_error = "--keygen accepts no setup options"
+        elif (
+            action == "freeze_cases"
+            and getattr(ctx.get_parameter_source("example"), "name", None)
+            == "COMMANDLINE"
+        ):
+            setup_error = "--freeze-cases cannot use --example"
+    elif request is None:
+        setup_error = "a request or exactly one setup action is required"
+    elif (
+        case_set_output is not None
+        or getattr(ctx.get_parameter_source("example"), "name", None) == "COMMANDLINE"
+    ):
+        setup_error = "--example and --case-set-output require a setup action"
+    if setup_error is not None:
+        result = _setup_result(None, errors=[setup_error]) if json_out else None
+        if json_out:
+            from invarlock.evidence_pack_contract import canonical_json_bytes
+
+            _echo_json(canonical_json_bytes(result).decode("utf-8"))
+        else:
+            console.print(f"FAIL {_terminal_text(setup_error)}")
+        raise typer.Exit(2)
+    if preflight and fail_on_policy:
+        raise typer.BadParameter("--fail-on-policy cannot be used with --preflight")
+    if action is not None:
+        _run_setup_action(
+            action,
+            directory=init_directory or keygen_directory,
+            example=example,
+            case_file=freeze_cases,
+            case_set_output=case_set_output,
+            json_out=json_out,
+        )
+        return
+
+    from invarlock.captured_evaluation import (
+        CapturedEvaluationError,
+        CapturedEvaluationPreflightResult,
+        CapturedEvaluationTransactionResult,
+    )
+    from invarlock.cli.evaluation_workflow import (
+        EvaluationOptions,
+        execute_evaluation,
+    )
     from invarlock.core.evaluation_request import (
         EvaluationRequestError,
-        load_evaluation_request,
+        evaluation_request_mode,
     )
-    from invarlock.core.registry import CoreRegistry
-    from invarlock.core.scorer_extension import ScorerExtensionRegistry
     from invarlock.evaluation_oci import (
         OciEvaluationError,
-        OciRuntimeExecutor,
-        launch_from_environment,
-        preflight_oci_launch,
     )
     from invarlock.evaluation_transaction import (
         EvaluationPreflightError,
         EvaluationPreflightResult,
         EvaluationTransactionError,
         EvaluationTransactionResult,
-        evaluate_request_file,
-        preflight_evaluation_request,
+    )
+    from invarlock.evidence_pack_json import StrictJsonError
+    from invarlock.judge_measurements.workflow import (
+        JudgeWorkflowError,
+        JudgeWorkflowResult,
     )
 
-    result: EvaluationPreflightResult | EvaluationTransactionResult
+    evaluation_result: (
+        JudgeWorkflowResult
+        | CapturedEvaluationPreflightResult
+        | CapturedEvaluationTransactionResult
+        | EvaluationPreflightResult
+        | EvaluationTransactionResult
+    )
+    assert request is not None
+    request_mode: Literal[
+        "captured", "runtime", "run", "import", "judge_import", "judge_collect"
+    ] = "runtime"
+    command_line = frozenset(
+        name
+        for name in ctx.params
+        if getattr(ctx.get_parameter_source(name), "name", None) == "COMMANDLINE"
+    )
+    initial_mode: (
+        Literal["captured", "runtime", "run", "import", "judge_import", "judge_collect"]
+        | None
+    ) = None
     try:
-        scorer_registry = (
-            ScorerExtensionRegistry(allow_installed=True)
-            if allow_installed_scorers
-            else None
-        )
-        registry = CoreRegistry()
-        loaded_request = load_evaluation_request(
-            request,
-            provider_resolver=registry.get_runtime_provider,
-            request_root=request_root,
-        )
-        runtime_executor = None
-        launch = None
-        if loaded_request.execution.mode == "run":
-            launch = launch_from_environment(
-                engine=container_engine,
-                image_ref=runtime_image,
-                image_digest=runtime_image_digest,
-                baseline_image_ref=baseline_runtime_image,
-                baseline_image_digest=baseline_runtime_image_digest,
-                subject_image_ref=subject_runtime_image,
-                subject_image_digest=subject_runtime_image_digest,
-                default_device=runtime_device,
-                baseline_device=baseline_runtime_device,
-                subject_device=subject_runtime_device,
+        try:
+            request_mode = evaluation_request_mode(request)
+            initial_mode = request_mode
+        except EvaluationRequestError:
+            pass
+        outcome = execute_evaluation(
+            EvaluationOptions(
+                request=request,
+                signing_key=signing_key,
+                allow_installed_scorers=allow_installed_scorers,
+                preflight=preflight,
+                unsigned=unsigned,
+                max_bootstrap_draws=max_bootstrap_draws,
+                request_root=request_root,
+                baseline_run=baseline_run,
+                subject_run=subject_run,
+                output=output,
+                runtime_profile=runtime_profile,
+                runtime_image=runtime_image,
+                runtime_image_digest=runtime_image_digest,
+                baseline_runtime_image=baseline_runtime_image,
+                baseline_runtime_image_digest=baseline_runtime_image_digest,
+                subject_runtime_image=subject_runtime_image,
+                subject_runtime_image_digest=subject_runtime_image_digest,
+                container_engine=container_engine,
+                runtime_device=runtime_device,
+                baseline_runtime_device=baseline_runtime_device,
+                subject_runtime_device=subject_runtime_device,
                 runtime_entrypoint=runtime_entrypoint,
-                baseline_entrypoint=baseline_runtime_entrypoint,
-                subject_entrypoint=subject_runtime_entrypoint,
+                baseline_runtime_entrypoint=baseline_runtime_entrypoint,
+                subject_runtime_entrypoint=subject_runtime_entrypoint,
                 runtime_cpus=runtime_cpus,
                 runtime_memory_mib=runtime_memory_mib,
                 runtime_user=runtime_user,
-            )
-            runtime_executor = OciRuntimeExecutor(launch)
-        if preflight:
-            runtime_digests = preflight_oci_launch(launch) if launch else None
-            result = preflight_evaluation_request(
-                loaded_request,
-                signing_key_path=signing_key,
-                scorer_registry=scorer_registry,
-                runtime_image_digests=runtime_digests,
-                resource_resolver=runtime_executor,
-                registry=registry,
-            )
+            ),
+            command_line=command_line,
+            initial_mode=initial_mode,
+        )
+        evaluation_result = outcome.result
+        request_mode = outcome.request_mode
+    except JudgeWorkflowError as exc:
+        if json_out:
+            _echo_json(exc.as_json())
         else:
-            runtime_digests = preflight_oci_launch(launch) if launch else None
-            result = evaluate_request_file(
-                loaded_request,
-                signing_key_path=signing_key,
-                runtime_executor=runtime_executor,
-                runtime_image_digests=runtime_digests,
-                scorer_registry=scorer_registry,
-                registry=registry,
-            )
+            console.print(f"FAIL {_terminal_text(exc)}", markup=False)
+        raise typer.Exit(exc.exit_code) from exc
     except (
         EvaluationPreflightError,
         EvaluationRequestError,
         EvaluationTransactionError,
+        CapturedEvaluationError,
         OciEvaluationError,
+        StrictJsonError,
     ) as exc:
         failure: EvaluationPreflightError | EvaluationTransactionError
         if preflight:
@@ -321,25 +726,170 @@ def evaluate(
                 if isinstance(exc, EvaluationTransactionError)
                 else EvaluationTransactionError(str(exc))
             )
+        if request_mode == "captured" or isinstance(exc, CapturedEvaluationError):
+            failure.captured = True
+            if isinstance(failure, EvaluationPreflightError):
+                failure.unsigned = unsigned
         if json_out:
-            typer.echo(failure.as_json())
+            _echo_json(failure.as_json())
         else:
-            console.print(f"FAIL {failure}")
+            console.print(f"FAIL {_terminal_text(failure)}", markup=False)
         raise typer.Exit(failure.exit_code) from exc
+    if isinstance(evaluation_result, JudgeWorkflowResult):
+        payload = evaluation_result.payload
+        if json_out:
+            _echo_json(evaluation_result.as_json())
+        elif preflight:
+            console.print(
+                "Judge preflight complete"
+                if payload["ready"]
+                else "Judge preflight needs inputs"
+            )
+            console.print(
+                f"Cases: {payload['cases']}; independent units: {payload['independent_units']}; planned trials: {payload['planned_trials']}; maximum attempts: {payload['maximum_attempts']}"
+            )
+            judge = payload.get("judge")
+            if isinstance(judge, dict):
+                console.print(
+                    f"Judge: {_terminal_text(judge['requested_model'])}", markup=False
+                )
+            if payload.get("budgets") is not None:
+                console.print(
+                    f"Collection budgets: {_terminal_text(str(payload['budgets']))}",
+                    markup=False,
+                )
+            capacity = payload.get("budget_capacity")
+            if isinstance(capacity, dict):
+                console.print(
+                    f"Maximum admitted calls: {capacity['maximum_admitted_calls']}; "
+                    f"full plan reserved: {'yes' if capacity['full_plan_reserved'] else 'no'}"
+                )
+            for error in payload["errors"]:
+                console.print(_terminal_text(error), markup=False)
+            console.print("No model calls, signing, or publication were performed.")
+            if payload.get("next_action"):
+                console.print(
+                    f"Next: {_terminal_text(payload['next_action'])}", markup=False
+                )
+        else:
+            console.print("Bounded judge evidence created")
+            console.print(f"Recorded policy result: {payload['decision']}")
+            console.print(f"Authentication: {payload['authentication']}")
+            console.print("Independent verification: not performed")
+            console.print(
+                f"Evidence: {_terminal_text(payload['evidence'])}", markup=False
+            )
+        if preflight and not payload["ready"]:
+            raise typer.Exit(2)
+        if fail_on_policy:
+            _finish_policy_gate(evaluation_result.policy_verdict)
+        return
+    if request_mode == "captured":
+        if json_out:
+            _echo_json(evaluation_result.as_json())
+        elif preflight:
+            assert isinstance(evaluation_result, CapturedEvaluationPreflightResult)
+            console.print("Preflight complete")
+            console.print(
+                f"Mode: {evaluation_result.execution_mode}; paired records: "
+                f"{evaluation_result.record_count}"
+            )
+            console.print(
+                "Requested authentication: "
+                f"{evaluation_result.requested_authentication}"
+            )
+            console.print(
+                "No execution, signing, scoring, or publication was performed"
+            )
+        else:
+            assert isinstance(evaluation_result, CapturedEvaluationTransactionResult)
+            console.print("Captured evidence created")
+            console.print(f"Recorded policy result: {evaluation_result.policy_verdict}")
+            console.print(
+                "Signing: Signed evidence"
+                if evaluation_result.authentication == "signed"
+                else "Signing: Unsigned local evidence"
+            )
+            console.print("Independent verification: not performed")
+            _print_captured_metrics(evaluation_result.metric_summaries)
+            console.print(
+                f"Evidence: {_terminal_text(evaluation_result.evidence_path)}"
+            )
+        if fail_on_policy:
+            assert isinstance(evaluation_result, CapturedEvaluationTransactionResult)
+            _finish_policy_gate(evaluation_result.policy_verdict)
+        return
     if json_out:
-        typer.echo(result.as_json())
+        _echo_json(evaluation_result.as_json())
     elif preflight:
-        console.print("PASS Preflight complete")
+        console.print("Preflight complete")
+        assert isinstance(evaluation_result, EvaluationPreflightResult)
+        console.print(
+            f"Mode: {evaluation_result.execution_mode}; paired records: {evaluation_result.record_count}"
+        )
+        console.print(
+            f"Evidence destination: {_terminal_text(evaluation_result.output)}",
+            soft_wrap=True,
+        )
+        console.print(f"Validated checks: {len(evaluation_result.checks)}")
+        if evaluation_result.judge is not None:
+            judge = evaluation_result.judge
+            console.print(
+                f"Judge: {_terminal_text(judge['judge']['requested_model'])}",
+                markup=False,
+            )
+            console.print(
+                f"Independent units: {judge['independent_units']}; planned judge trials: {judge['planned_trials']}"
+            )
+            console.print(
+                f"Collection budgets: {_terminal_text(str(judge['budgets']))}",
+                markup=False,
+            )
+        if (
+            outcome.profile is not None
+            and outcome.profile_context is not None
+            and outcome.launch is not None
+        ):
+            console.print(f"Runtime profile: {_terminal_text(outcome.profile.digest)}")
+            console.print(f"Container engine: {_terminal_text(outcome.launch.engine)}")
+            for side in ("baseline", "subject"):
+                resolved_side = getattr(outcome.launch, side)
+                console.print(
+                    f"{side.capitalize()}: {_terminal_text(resolved_side.image_ref)}; "
+                    f"device {_terminal_text(resolved_side.device)}; "
+                    f"entrypoint {_terminal_text(resolved_side.entrypoint)}"
+                )
+            limits = outcome.launch.worker_limits
+            console.print(
+                f"Each worker: {limits.cpus} CPUs; {limits.memory_mib} MiB; "
+                f"user {_terminal_text(limits.user)}"
+            )
+            for field, source in outcome.profile_context.sources.items():
+                console.print(f"  {_terminal_text(field)}: {_terminal_text(source)}")
         console.print("No execution or publication was performed")
+        console.print("Next: run the same evaluate command without --preflight.")
     else:
-        assert isinstance(result, EvaluationTransactionResult)
-        console.print("PASS Evidence pack published")
-        console.print(str(result.evidence_path))
+        assert isinstance(evaluation_result, EvaluationTransactionResult)
+        console.print("Evidence created")
+        console.print(
+            f"Recorded policy result: {evaluation_result.policy_verdict or 'unavailable'}"
+        )
+        console.print("Recipient verification: not performed")
+        console.print(
+            f"Evidence: {_terminal_text(evaluation_result.evidence_path)}",
+            soft_wrap=True,
+        )
+        console.print(
+            "Next: verify with independently approved trust inputs; use report to inspect the recorded checks."
+        )
+    if fail_on_policy:
+        assert isinstance(evaluation_result, EvaluationTransactionResult)
+        _finish_policy_gate(evaluation_result.policy_verdict)
 
 
 @app.command(
     name="verify",
-    help="Independently verify one evidence pack against caller-supplied trust anchors.",
+    help="Independently verify retained evidence offline against caller-supplied trust anchors. This does not collect new model outputs or remeasure a service.",
 )
 def verify(
     ctx: typer.Context,
@@ -350,58 +900,86 @@ def verify(
         file_okay=False,
         dir_okay=True,
         readable=True,
-        resolve_path=True,
+        resolve_path=False,
         help="Canonical evidence-pack directory.",
     ),
     trust_profile: Path | None = typer.Option(
         None,
         "--trust-profile",
         help=(
-            "Closed invarlock/trust-inputs-v1 profile. Explicit trust-anchor "
+            "Closed native, captured, or judge recipient trust profile. Explicit trust-anchor "
             "options cannot be mixed with this profile."
         ),
+        rich_help_panel="Recipient verification",
     ),
     policy: Path | None = typer.Option(
         None,
         "--policy",
         envvar="INVARLOCK_POLICY",
         help="Independent policy input; never taken from the submitted pack.",
+        rich_help_panel="Independent trust anchors",
     ),
     expected_baseline_artifact: str | None = typer.Option(
         None,
         "--expected-baseline-artifact",
         envvar="INVARLOCK_EXPECTED_BASELINE_ARTIFACT",
         help="Independent expected baseline artifact-identity digest.",
+        rich_help_panel="Independent trust anchors",
     ),
     expected_subject_artifact: str | None = typer.Option(
         None,
         "--expected-subject-artifact",
         envvar="INVARLOCK_EXPECTED_SUBJECT_ARTIFACT",
         help="Independent expected subject artifact-identity digest.",
+        rich_help_panel="Independent trust anchors",
     ),
     expected_schedule: str | None = typer.Option(
         None,
         "--expected-schedule",
         envvar="INVARLOCK_EXPECTED_SCHEDULE",
         help="Independent expected canonical schedule digest.",
+        rich_help_panel="Independent trust anchors",
     ),
     expected_baseline_runtime: str | None = typer.Option(
         None,
         "--expected-baseline-runtime",
         envvar="INVARLOCK_EXPECTED_BASELINE_RUNTIME",
         help="Independent expected baseline runtime digest.",
+        rich_help_panel="Independent trust anchors",
     ),
     expected_subject_runtime: str | None = typer.Option(
         None,
         "--expected-subject-runtime",
         envvar="INVARLOCK_EXPECTED_SUBJECT_RUNTIME",
         help="Independent expected subject runtime digest.",
+        rich_help_panel="Independent trust anchors",
     ),
     expected_signer: str | None = typer.Option(
         None,
         "--expected-signer",
         envvar="INVARLOCK_EXPECTED_SIGNER",
         help="Independent expected evidence-signing fingerprint.",
+        rich_help_panel="Independent trust anchors",
+    ),
+    expected_baseline_run: str | None = typer.Option(
+        None,
+        "--expected-baseline-run",
+        envvar="INVARLOCK_EXPECTED_BASELINE_RUN",
+        help="Independent expected complete captured baseline run digest.",
+        rich_help_panel="Independent trust anchors",
+    ),
+    expected_subject_run: str | None = typer.Option(
+        None,
+        "--expected-subject-run",
+        envvar="INVARLOCK_EXPECTED_SUBJECT_RUN",
+        help="Independent expected complete captured subject run digest.",
+        rich_help_panel="Independent trust anchors",
+    ),
+    max_bootstrap_draws: int | None = typer.Option(
+        DEFAULT_MAX_BOOTSTRAP_DRAWS,
+        "--max-bootstrap-draws",
+        help="Recipient-owned captured replay work budget.",
+        rich_help_panel="Signing and execution authorization",
     ),
     expected_request_digest: str | None = typer.Option(
         None,
@@ -411,23 +989,27 @@ def verify(
             "Independent expected normalized request digest; required when either "
             "side uses llama_cpp."
         ),
+        rich_help_panel="Independent trust anchors",
     ),
     receipt: Path | None = typer.Option(
         None,
         "--receipt",
-        help="Write the signed verification receipt outside the pack.",
+        help="Write verification results outside evidence; receipt scope depends on the evidence format.",
+        rich_help_panel="Recipient verification",
     ),
     verifier_signing_key: Path | None = typer.Option(
         None,
         "--verifier-signing-key",
         envvar="INVARLOCK_VERIFIER_SIGNING_KEY",
         help="Independent Ed25519 verifier key used only for the receipt.",
+        rich_help_panel="Recipient verification",
     ),
     verifier_identity: str | None = typer.Option(
         None,
         "--verifier-identity",
         envvar="INVARLOCK_VERIFIER_IDENTITY",
         help="Stable identity asserted by the independent verifier.",
+        rich_help_panel="Recipient verification",
     ),
     allow_installed_scorers: bool = typer.Option(
         False,
@@ -438,130 +1020,157 @@ def verify(
             "evidence, policy, and request. Installed scorer code executes in this "
             "process."
         ),
+        rich_help_panel="Signing and execution authorization",
     ),
     json_out: bool = typer.Option(
         False,
         "--json",
         help="Emit one machine-readable verification result.",
+        rich_help_panel="Output and workflow",
     ),
 ) -> None:
     """Verify EVIDENCE without trusting its own policy or runtime declarations."""
 
-    from invarlock.core.scorer_extension import ScorerExtensionRegistry
-    from invarlock.evidence_verification import (
-        EvidenceVerificationError,
-        _require_outside_evidence,
-        verify_evidence,
+    from invarlock.captured_reporting import CapturedReportError, is_captured_manifest
+    from invarlock.cli.verification_workflow import (
+        VerificationOptions,
+        execute_verification,
     )
-    from invarlock.trust_inputs import TrustInputsError, load_trust_inputs
+    from invarlock.evidence_sets.contracts import is_evidence_set
+    from invarlock.evidence_verification import EvidenceVerificationError
+    from invarlock.judge_measurements.reporting import is_judge_evidence
 
+    captured = False
     try:
-        trust_profile_digest: str | None = None
-        policy_bytes: bytes | None = None
-        verifier_signing_key_bytes: bytes | None = None
-        if trust_profile is not None:
-            explicit_names = (
-                "policy",
-                "expected_baseline_artifact",
-                "expected_subject_artifact",
-                "expected_schedule",
-                "expected_baseline_runtime",
-                "expected_subject_runtime",
-                "expected_signer",
-                "expected_request_digest",
-                "verifier_signing_key",
-                "verifier_identity",
-                "allow_installed_scorers",
+        if not evidence.is_dir() or evidence.is_symlink():
+            raise EvidenceVerificationError("evidence must be a real directory")
+        try:
+            captured = (
+                False
+                if is_evidence_set(evidence) or is_judge_evidence(evidence)
+                else is_captured_manifest(evidence)
             )
-            conflicts = [
-                name.replace("_", "-")
-                for name in explicit_names
-                if getattr(
-                    ctx.get_parameter_source(name),
-                    "name",
-                    None,
-                )
-                == "COMMANDLINE"
-            ]
-            if conflicts:
-                rendered = ", ".join(f"--{name}" for name in conflicts)
-                raise EvidenceVerificationError(
-                    f"--trust-profile cannot be mixed with {rendered}"
-                )
-            _require_outside_evidence(
-                evidence,
-                trust_profile,
-                label="independent trust profile",
-            )
-            try:
-                loaded = load_trust_inputs(trust_profile)
-            except TrustInputsError as exc:
-                raise EvidenceVerificationError(str(exc)) from exc
-            _require_outside_evidence(
-                evidence,
-                loaded.policy_path,
-                label="independent policy",
-            )
-            _require_outside_evidence(
-                evidence,
-                loaded.verifier_signing_key_path,
-                label="verifier Ed25519 signing key",
-            )
-            policy = loaded.policy_path
-            policy_bytes = loaded.policy_bytes
-            expected_baseline_artifact = loaded.expected_artifact_digests["baseline"]
-            expected_subject_artifact = loaded.expected_artifact_digests["subject"]
-            expected_schedule = loaded.expected_schedule_digest
-            expected_baseline_runtime = loaded.expected_runtime_digests["baseline"]
-            expected_subject_runtime = loaded.expected_runtime_digests["subject"]
-            expected_signer = loaded.expected_signer_fingerprint
-            expected_request_digest = loaded.expected_request_digest
-            verifier_signing_key = loaded.verifier_signing_key_path
-            verifier_signing_key_bytes = loaded.verifier_signing_key_bytes
-            verifier_identity = loaded.verifier_identity
-            allow_installed_scorers = loaded.allow_installed_scorers
-            trust_profile_digest = loaded.profile_digest
-        result = verify_evidence(
-            evidence,
-            policy_path=policy,
-            expected_baseline_artifact=expected_baseline_artifact,
-            expected_subject_artifact=expected_subject_artifact,
-            expected_schedule=expected_schedule,
-            expected_baseline_runtime=expected_baseline_runtime,
-            expected_subject_runtime=expected_subject_runtime,
-            expected_signer=expected_signer,
-            expected_request_digest=expected_request_digest,
-            receipt_path=receipt,
-            verifier_signing_key_path=verifier_signing_key,
-            verifier_identity=verifier_identity,
-            trust_profile_digest=trust_profile_digest,
-            scorer_registry=(
-                ScorerExtensionRegistry(allow_installed=True)
-                if allow_installed_scorers
-                else None
+        except CapturedReportError as exc:
+            raise EvidenceVerificationError(str(exc), exit_code=4) from exc
+        command_line = frozenset(
+            name
+            for name in ctx.params
+            if getattr(ctx.get_parameter_source(name), "name", None) == "COMMANDLINE"
+        )
+        result = execute_verification(
+            VerificationOptions(
+                evidence=evidence,
+                trust_profile=trust_profile,
+                policy=policy,
+                expected_baseline_artifact=expected_baseline_artifact,
+                expected_subject_artifact=expected_subject_artifact,
+                expected_schedule=expected_schedule,
+                expected_baseline_runtime=expected_baseline_runtime,
+                expected_subject_runtime=expected_subject_runtime,
+                expected_signer=expected_signer,
+                expected_baseline_run=expected_baseline_run,
+                expected_subject_run=expected_subject_run,
+                max_bootstrap_draws=max_bootstrap_draws,
+                expected_request_digest=expected_request_digest,
+                receipt=receipt,
+                verifier_signing_key=verifier_signing_key,
+                verifier_identity=verifier_identity,
+                allow_installed_scorers=allow_installed_scorers,
             ),
-            policy_bytes=policy_bytes,
-            verifier_signing_key_bytes=verifier_signing_key_bytes,
+            captured=captured,
+            command_line=command_line,
         )
     except EvidenceVerificationError as exc:
+        if exc.payload.get("kind") in {"judge", "evidence_set"}:
+            if json_out:
+                _echo_json(exc.as_json())
+            else:
+                console.print(
+                    "Evidence set verification did not establish acceptance"
+                    if exc.payload.get("kind") == "evidence_set"
+                    else "Judge verification did not establish acceptance"
+                )
+                console.print(
+                    f"Authenticated: {exc.payload.get('authenticated', False)}; replayed: {exc.payload.get('replayed', False)}; accepted: {exc.payload.get('accepted', False)}"
+                )
+                if exc.payload.get("decision") is not None:
+                    console.print(f"Policy result: {exc.payload['decision']}")
+                for error in exc.payload.get("errors", []):
+                    console.print(_terminal_text(error), markup=False)
+            raise typer.Exit(exc.exit_code) from exc
+        if (
+            captured
+            and exc.payload.get("format_version")
+            == "invarlock/evidence-verification-error-v1"
+        ):
+            exc = EvidenceVerificationError(
+                str(exc), exit_code=exc.exit_code, captured=True
+            )
         if json_out:
-            typer.echo(exc.as_json())
+            _echo_json(exc.as_json())
         else:
-            console.print(f"FAIL {exc}")
+            console.print(f"FAIL {_terminal_text(exc)}")
+            if exc.payload.get("integrity_ok") is True:
+                console.print("Evidence integrity: verified")
+                verdict = exc.payload.get("policy_verdict")
+                if verdict in {"pass", "fail"}:
+                    console.print(f"Policy result: {verdict}")
+                if exc.payload.get("kind") == "captured":
+                    console.print("Independent captured replay complete")
+                    console.print(f"Recorded decision: {exc.payload['decision']}")
+                    _print_captured_metrics(exc.payload["metric_summaries"])
+            elif "integrity_ok" in exc.payload:
+                console.print(
+                    "Evidence integrity: not verified; no acceptance established"
+                )
+            else:
+                console.print(
+                    "Verification could not complete; check the required inputs and receipt destination."
+                )
+            for detail in exc.details:
+                console.print(_terminal_text(detail))
             signed_receipt = exc.payload.get("signed_receipt")
             if isinstance(signed_receipt, str):
-                console.print(f"Receipt {signed_receipt}")
+                console.print(
+                    f"Receipt {_terminal_text(exc.receipt_path or signed_receipt)}",
+                    soft_wrap=True,
+                )
         raise typer.Exit(exc.exit_code) from exc
+    if result.payload.get("kind") in {"judge", "evidence_set"}:
+        if json_out:
+            _echo_json(result.as_json())
+        else:
+            console.print(
+                "PASS Evidence set recipient verification complete"
+                if result.payload.get("kind") == "evidence_set"
+                else "PASS Bounded judge recipient verification complete"
+            )
+            console.print(
+                f"Authenticated: {result.payload['authenticated']}; replayed: {result.payload['replayed']}; accepted: {result.payload['accepted']}"
+            )
+            console.print(f"Policy result: {result.payload['decision']}")
+            console.print(result.summary, markup=False)
+        return
     if json_out:
-        typer.echo(result.as_json())
+        _echo_json(result.as_json())
     else:
-        console.print("PASS Evidence verified")
-        console.print(result.summary)
+        console.print(
+            "PASS Independent captured verification complete"
+            if result.payload.get("kind") == "captured"
+            else "PASS Independent verification complete"
+        )
+        console.print("Evidence integrity: verified")
+        if result.payload.get("policy_verdict") in {"pass", "fail"}:
+            console.print(f"Policy result: {result.payload['policy_verdict']}")
+        console.print(result.summary, soft_wrap=True)
+        if result.payload.get("kind") == "captured":
+            console.print(f"Recorded decision: {result.payload['decision']}")
+            _print_captured_metrics(result.payload["metric_summaries"])
 
 
 @app.command(
     name="report",
-    help="Render one human-readable report from the canonical report in an evidence pack.",
+    help="Summarize an evidence pack in the terminal and optionally write an HTML report.",
 )
 def report(
     evidence: Path = typer.Argument(
@@ -571,36 +1180,104 @@ def report(
         file_okay=False,
         dir_okay=True,
         readable=True,
-        resolve_path=True,
+        resolve_path=False,
         help="Canonical evidence-pack directory.",
     ),
     html: Path | None = typer.Option(
         None,
         "--html",
         help="Write a self-contained HTML report outside the evidence pack.",
+        rich_help_panel="Output and workflow",
+    ),
+    markdown: Path | None = typer.Option(
+        None, "--markdown", help="Write the report as Markdown outside evidence."
+    ),
+    junit: Path | None = typer.Option(
+        None,
+        "--junit",
+        help="Write recorded policy checks as JUnit XML outside evidence.",
     ),
     explain: bool = typer.Option(
         False,
         "--explain",
         help="Include a concise explanation of the decision and evidence bindings.",
+        rich_help_panel="Output and workflow",
+    ),
+    case_id: list[str] | None = typer.Option(
+        None,
+        "--case-id",
+        help=(
+            "Include one retained judge case in report details; repeat to select up "
+            "to 50 cases. Applies to judge evidence and evidence sets."
+        ),
+        rich_help_panel="Output and workflow",
     ),
     json_out: bool = typer.Option(
         False,
         "--json",
         help="Emit one machine-readable rendering result object.",
+        rich_help_panel="Output and workflow",
     ),
 ) -> None:
     """Render EVIDENCE without changing any evidence-pack byte."""
 
-    from invarlock.evidence_reporting import EvidenceReportError, render_evidence
+    from invarlock.evidence_reporting import (
+        EvidenceReportError,
+        EvidenceReportV2,
+        render_evidence,
+    )
 
     try:
-        result = render_evidence(evidence, html_path=html, explain=explain)
+        destinations = {
+            name: value
+            for name, value in (("markdown_path", markdown), ("junit_path", junit))
+            if value is not None
+        }
+        result = render_evidence(
+            evidence,
+            html_path=html,
+            explain=explain,
+            case_ids=tuple(case_id or ()),
+            **destinations,
+        )
     except EvidenceReportError as exc:
-        console.print(f"FAIL {exc}")
+        if json_out:
+            _echo_json(
+                json.dumps(
+                    exc.payload
+                    or {
+                        "format_version": "invarlock/evidence-report-v1",
+                        "ok": False,
+                        "errors": [str(exc)],
+                    },
+                    allow_nan=False,
+                    separators=(",", ":"),
+                    sort_keys=True,
+                )
+            )
+        else:
+            console.print(f"FAIL {_terminal_text(exc)}")
+            for name, destination in exc.written_outputs.items():
+                console.print(
+                    f"Written {_terminal_text(name)}: {_terminal_text(destination)}",
+                    soft_wrap=True,
+                )
+            if exc.failed_output is not None:
+                console.print(f"Failed output: {_terminal_text(exc.failed_output)}")
         raise typer.Exit(exc.exit_code) from exc
+    if isinstance(result, EvidenceReportV2):
+        if json_out:
+            _echo_json(result.as_json())
+        else:
+            console.print(Markdown(result.text))
+            for name, destination in result.written_outputs.items():
+                console.print(
+                    f"{_terminal_text(name.upper())} {_terminal_text(destination)}",
+                    soft_wrap=True,
+                )
+        return
     if json_out:
-        typer.echo(
+        _echo_json(
             json.dumps(
                 {
                     "format_version": "invarlock/evidence-report-v1",
@@ -616,9 +1293,9 @@ def report(
             )
         )
     else:
-        console.print(result.text)
+        console.print(Markdown(result.text))
         if result.html_path is not None:
-            console.print(f"HTML {result.html_path}")
+            console.print(f"HTML {_terminal_text(result.html_path)}", soft_wrap=True)
 
 
 def main() -> None:

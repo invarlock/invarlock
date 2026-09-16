@@ -17,7 +17,10 @@ from invarlock.evidence_pack_json import (
     StrictJsonError,
     parse_json_bytes,
 )
-from invarlock.public_contracts import load_trust_inputs_schema
+from invarlock.public_contracts import (
+    load_trust_inputs_schema,
+    load_trust_inputs_v2_schema,
+)
 
 MAX_TRUST_INPUTS_BYTES = 256 * 1024
 _MAX_POLICY_BYTES = 4 * 1024 * 1024
@@ -44,6 +47,21 @@ class TrustInputs:
     verifier_signing_key_path: Path
     verifier_signing_key_bytes: bytes = field(repr=False)
     allow_installed_scorers: bool
+    profile_digest: str
+
+
+@dataclass(frozen=True)
+class CapturedTrustInputs:
+    """Independent captured anchors, with immutable policy and verifier key bytes."""
+
+    policy_path: Path
+    policy_bytes: bytes = field(repr=False)
+    expected_run_digests: Mapping[str, str]
+    expected_request_digest: str
+    expected_signer_fingerprint: str
+    verifier_identity: str
+    verifier_signing_key_path: Path
+    verifier_signing_key_bytes: bytes = field(repr=False)
     profile_digest: str
 
 
@@ -76,7 +94,7 @@ def _file_open_flags() -> int:
         raise TrustInputsError(
             "secure descriptor-relative trust-input loading is unavailable"
         )
-    return os.O_RDONLY | nofollow | _CLOSE_ON_EXEC
+    return os.O_RDONLY | nofollow | _CLOSE_ON_EXEC | getattr(os, "O_NONBLOCK", 0)
 
 
 def _absolute_profile(path: Path) -> Path:
@@ -105,8 +123,9 @@ def _open_directory_without_links(path: Path, *, label: str) -> int:
                 raise TrustInputsError(
                     f"{label} parent must be an existing non-symlink directory"
                 ) from exc
-            os.close(descriptor)
+            previous_descriptor = descriptor
             descriptor = child
+            os.close(previous_descriptor)
         if not stat.S_ISDIR(os.fstat(descriptor).st_mode):
             raise TrustInputsError(
                 f"{label} parent must be an existing non-symlink directory"
@@ -146,8 +165,9 @@ def _read_relative_regular_file(
                 raise TrustInputsError(
                     f"{label} could not be opened without following symlinks"
                 ) from exc
-            os.close(current_fd)
+            previous_descriptor = current_fd
             current_fd = child_fd
+            os.close(previous_descriptor)
         opened = os.fstat(current_fd)
         if not stat.S_ISREG(opened.st_mode):
             raise TrustInputsError(f"{label} must be a real regular file")
@@ -183,7 +203,7 @@ def load_trust_inputs(
     path: Path,
     *,
     verifier_key_bytes_override: bytes | None = None,
-) -> TrustInputs:
+) -> TrustInputs | CapturedTrustInputs:
     """Load a closed profile without following profile or referenced-file symlinks.
 
     ``verifier_key_bytes_override`` is reserved for replaying a completed signed
@@ -207,8 +227,12 @@ def load_trust_inputs(
         payload = parse_json_bytes(raw, label="trust-input profile")
         if not isinstance(payload, dict):
             raise TrustInputsError("trust-input profile must decode to a JSON object")
+        captured = payload.get("format") == "invarlock/trust-inputs-v2"
+        schema = (
+            load_trust_inputs_v2_schema() if captured else load_trust_inputs_schema()
+        )
         errors = sorted(
-            Draft202012Validator(load_trust_inputs_schema()).iter_errors(payload),
+            Draft202012Validator(schema).iter_errors(payload),
             key=lambda error: tuple(str(part) for part in error.absolute_path),
         )
         if errors:
@@ -233,7 +257,7 @@ def load_trust_inputs(
             parent_fd,
             policy_parts,
             label="policy",
-            max_bytes=_MAX_POLICY_BYTES,
+            max_bytes=128 * 1024 * 1024 if captured else _MAX_POLICY_BYTES,
         )
         if verifier_key_bytes_override is None:
             signing_key_bytes = _read_relative_regular_file(
@@ -251,6 +275,32 @@ def load_trust_inputs(
                 )
             signing_key_bytes = verifier_key_bytes_override
         canonical = _canonical_json_bytes(payload)
+        if captured:
+            from invarlock.captured_normalization import comparison_policy_digest
+
+            parsed_policy = parse_json_bytes(policy_bytes, label="captured policy")
+            if not isinstance(parsed_policy, dict):
+                raise TrustInputsError("captured policy must be a JSON object")
+            try:
+                comparison_policy_digest(parsed_policy)
+            except ValueError as exc:
+                raise TrustInputsError(str(exc)) from exc
+            return CapturedTrustInputs(
+                policy_path=profile.parent.joinpath(*policy_parts),
+                policy_bytes=policy_bytes,
+                expected_run_digests=MappingProxyType(
+                    {
+                        "baseline": str(anchors["baseline_run_digest"]),
+                        "subject": str(anchors["subject_run_digest"]),
+                    }
+                ),
+                expected_request_digest=str(anchors["request_digest"]),
+                expected_signer_fingerprint=str(anchors["evidence_signer_fingerprint"]),
+                verifier_identity=str(verifier["identity"]),
+                verifier_signing_key_path=profile.parent.joinpath(*signing_key_parts),
+                verifier_signing_key_bytes=signing_key_bytes,
+                profile_digest=f"sha256:{hashlib.sha256(canonical).hexdigest()}",
+            )
         return TrustInputs(
             policy_path=profile.parent.joinpath(*policy_parts),
             policy_bytes=policy_bytes,
@@ -286,6 +336,7 @@ def load_trust_inputs(
 __all__ = [
     "MAX_TRUST_INPUTS_BYTES",
     "TrustInputs",
+    "CapturedTrustInputs",
     "TrustInputsError",
     "load_trust_inputs",
 ]

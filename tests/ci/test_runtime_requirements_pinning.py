@@ -127,29 +127,43 @@ def test_ruff_version_is_identical_in_local_ci_and_precommit_surfaces() -> None:
 
 
 @pytest.mark.parametrize(
-    ("lock_name", "extra_names"),
+    ("lock_name", "extra_names", "group_names"),
     (
-        ("core-py312.txt", ()),
-        ("hf-py313.txt", ("hf",)),
-        ("ci-hf-py312.txt", ("hf", "ci")),
-        ("ci-hf-py313.txt", ("hf", "ci")),
-        ("docs-ci-py313.txt", ("docs-ci",)),
-        ("precommit-ci-py313.txt", ("precommit-ci",)),
-        ("release-security-py313.txt", ("release-ci", "security-ci")),
-        ("security-ci-py313.txt", ("security-ci",)),
+        ("core-py312.txt", (), ()),
+        ("hf-py313.txt", (), ("hf",)),
+        ("ci-hf-py312.txt", ("ci",), ("runtime-test",)),
+        ("ci-hf-py313.txt", ("ci",), ("runtime-test",)),
+        ("docs-ci-py313.txt", ("docs-ci",), ()),
+        ("precommit-ci-py313.txt", ("precommit-ci",), ()),
+        ("release-security-py313.txt", ("release-ci", "security-ci"), ()),
+        ("security-ci-py313.txt", ("security-ci",), ()),
     ),
 )
 def test_workflow_locks_satisfy_every_declared_direct_requirement(
     lock_name: str,
     extra_names: tuple[str, ...],
+    group_names: tuple[str, ...],
 ) -> None:
-    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))[
-        "project"
-    ]
+    metadata = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    project = metadata["project"]
     requirements = list(project["dependencies"])
     optional = project["optional-dependencies"]
     for extra_name in extra_names:
         requirements.extend(optional[extra_name])
+
+    pending_groups = list(group_names)
+    resolved_groups: set[str] = set()
+    while pending_groups:
+        name = pending_groups.pop()
+        if name in resolved_groups:
+            continue
+        resolved_groups.add(name)
+        for item in metadata["dependency-groups"][name]:
+            if isinstance(item, str):
+                requirements.append(item)
+            else:
+                assert set(item) == {"include-group"}
+                pending_groups.append(item["include-group"])
 
     lock_path = WORKFLOW_REQUIREMENTS / lock_name
     for raw_requirement in requirements:

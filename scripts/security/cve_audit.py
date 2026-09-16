@@ -21,8 +21,10 @@ from pathlib import Path
 from typing import Any
 
 try:
+    from scripts.security import hardened_accelerate_audit as hardened
     from scripts.security.run_pip_audit import load_pip_audit_allowlist
 except ImportError:  # pragma: no cover - direct script execution path
+    import hardened_accelerate_audit as hardened
     from run_pip_audit import load_pip_audit_allowlist
 
 OSV_BATCH_URL = "https://api.osv.dev/v1/querybatch"
@@ -50,6 +52,11 @@ class Component:
     version: str
     sources: set[str] = field(default_factory=set)
     used_by_src: bool = False
+    remediation: dict[str, Any] | None = None
+
+    @property
+    def scan_version(self) -> str:
+        return hardened.UPSTREAM_VERSION if self.remediation else self.version
 
     @property
     def key(self) -> tuple[str, str, str]:
@@ -91,6 +98,14 @@ def parse_requirement_lock(path: Path, repo_root: Path) -> list[Component]:
     for line in path.read_text(encoding="utf-8").splitlines():
         match = _REQ_PIN_RE.match(line)
         if not match:
+            name_match = _REQ_NAME_RE.match(line)
+            if (
+                name_match
+                and normalize_package_name(name_match.group("name")) == hardened.PACKAGE
+            ):
+                raise ValueError(
+                    "Accelerate requirement must use an exact authenticated pin"
+                )
             continue
         components.append(
             Component(
@@ -100,6 +115,9 @@ def parse_requirement_lock(path: Path, repo_root: Path) -> list[Component]:
                 sources={rel},
             )
         )
+    for component in components:
+        if normalize_package_name(component.name) == hardened.PACKAGE:
+            component.remediation = hardened.lock_remediation(path, repo_root)
     return components
 
 
@@ -114,12 +132,33 @@ def parse_uv_lock(path: Path, repo_root: Path) -> list[Component]:
             continue
         name = str(package.get("name", "")).strip()
         version = str(package.get("version", "")).strip()
+        if normalize_package_name(name) == hardened.PACKAGE:
+            if not version or any(
+                normalize_package_name(c.name) == hardened.PACKAGE for c in components
+            ):
+                raise ValueError("missing or duplicate Accelerate uv identity")
         if not name or not version:
+            continue
+        if normalize_package_name(name) == hardened.PACKAGE and (
+            "+" in version
+            or package.get("source") == {"registry": hardened.WHEEL_DIRECTORY}
+        ):
+            components.append(
+                Component(
+                    ecosystem="PyPI",
+                    name=name,
+                    version=version,
+                    sources={rel},
+                    remediation=hardened.uv_remediation(package, repo_root),
+                )
+            )
             continue
         source = package.get("source", {})
         if isinstance(source, dict):
             registry = str(source.get("registry", ""))
             if source and (not registry or "pypi.org" not in registry):
+                if normalize_package_name(name) == hardened.PACKAGE:
+                    raise ValueError("unsupported Accelerate lock source")
                 continue
         components.append(
             Component(ecosystem="PyPI", name=name, version=version, sources={rel})
@@ -193,9 +232,12 @@ def merge_components(components: list[Component]) -> list[Component]:
                 version=component.version,
                 sources=set(component.sources),
                 used_by_src=component.used_by_src,
+                remediation=component.remediation,
             )
         else:
             current.sources.update(component.sources)
+            if current.remediation != component.remediation:
+                current.remediation = None
             current.used_by_src = current.used_by_src or component.used_by_src
     return sorted(merged.values(), key=lambda c: (c.ecosystem, c.name, c.version))
 
@@ -267,7 +309,7 @@ def query_osv_batch(
                         "ecosystem": component.ecosystem,
                         "name": component.name,
                     },
-                    "version": component.version,
+                    "version": component.scan_version,
                 }
                 for component in batch
             ]
@@ -289,8 +331,17 @@ def query_osv_batch(
                 f"{len(raw_results)} results for {len(batch)} components at offset {offset}."
             )
         for component, raw_result in zip(batch, raw_results, strict=True):
-            vulns = raw_result.get("vulns", []) if isinstance(raw_result, dict) else []
-            results[component.key] = [v for v in vulns if isinstance(v, dict)]
+            if not isinstance(raw_result, dict):
+                raise RuntimeError("OSV returned an invalid component result")
+            vulns = raw_result.get("vulns", [])
+            if not isinstance(vulns, list) or any(
+                not isinstance(v, dict)
+                or not isinstance(v.get("id"), str)
+                or not v["id"]
+                for v in vulns
+            ):
+                raise RuntimeError("OSV returned invalid vulnerabilities")
+            results[component.key] = vulns
     if enrich:
         return enrich_osv_results(results)
     return results
@@ -318,6 +369,10 @@ def enrich_osv_results(
                     cache[advisory_id] = fetch_osv_vuln(advisory_id)
                 except urllib.error.URLError:
                     cache[advisory_id] = vuln
+                if cache[advisory_id].get("id") != advisory_id:
+                    raise RuntimeError(
+                        "OSV enrichment changed the matched advisory identity"
+                    )
             enriched_vulns.append(cache[advisory_id])
         enriched[key] = enriched_vulns
     return enriched
@@ -418,11 +473,24 @@ def build_findings(
             status, allowlist_entry = classify_status(
                 ids, allowlist, today, component=component
             )
+            if (
+                component.remediation
+                and vuln.get("id") in hardened.REMEDIATED_ADVISORIES
+            ):
+                status = (
+                    "remediated_build_input"
+                    if component.remediation["source_only"]
+                    else "remediated"
+                )
+                allowlist_entry = None
             findings.append(
                 {
                     "component": component.name,
                     "version": component.version,
                     "ecosystem": component.ecosystem,
+                    "scan_version": component.scan_version,
+                    "remediation": component.remediation,
+                    "raw_finding": vuln,
                     "sources": sorted(component.sources),
                     "used_by_src": component.used_by_src,
                     "advisory": vuln.get("id"),
@@ -454,7 +522,10 @@ def build_findings(
 
 def finding_blocks_release(finding: dict[str, Any]) -> bool:
     status = str(finding.get("status", ""))
-    return not status.startswith("accepted_until_")
+    return status not in {
+        "remediated",
+        "remediated_build_input",
+    } and not status.startswith("accepted_until_")
 
 
 def blocking_findings(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -508,7 +579,9 @@ def write_markdown_report(report: dict[str, Any], path: Path) -> None:
             "",
             "## Scope",
             "",
-            "This report matches exact locked package versions against OSV. It does not",
+            "This report matches locked identities against OSV. Authenticated derived",
+            "Accelerate wheels retain the upstream scan version and raw findings; only",
+            "the explicitly patched advisories are classified as remediated. It does not",
             "claim that arbitrary first-party source code has or lacks a CVE; source code",
             "review and SAST remain separate audit lanes.",
             "",
@@ -522,12 +595,23 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     repo_root = Path(args.repo_root).resolve()
     components = collect_inventory(repo_root)
     allowlist = load_allowlist(repo_root / args.allowlist)
+    anchors = {
+        source: hardened._read(repo_root / source)
+        for component in components
+        for source in component.sources
+    }
     if args.no_network:
         osv_results = {component.key: [] for component in components}
     else:
         osv_results = query_osv_batch(
             components, batch_size=args.batch_size, enrich=not args.no_enrich
         )
+    for source, data in anchors.items():
+        if hardened._read(repo_root / source) != data:
+            raise ValueError("lock changed during CVE audit")
+    if any(component.remediation for component in components):
+        if collect_inventory(repo_root) != components:
+            raise ValueError("remediation binding changed during CVE audit")
     findings = build_findings(
         components,
         osv_results,
@@ -543,6 +627,9 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             "advisory": ["OSV"],
             "inventory_files": source_files,
             "allowlist": args.allowlist,
+            "inventory_sha256": {
+                source: hardened._sha(data) for source, data in anchors.items()
+            },
         },
         "inventory": {
             "component_count": len(components),
@@ -552,6 +639,16 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             "source_file_count": len(source_files),
         },
         "findings": findings,
+        "raw_osv_results": [
+            {
+                "ecosystem": c.ecosystem,
+                "name": c.name,
+                "version": c.scan_version,
+                "locked_version": c.version,
+                "vulns": osv_results.get(c.key, []),
+            }
+            for c in components
+        ],
     }
 
 

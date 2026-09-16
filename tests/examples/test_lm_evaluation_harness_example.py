@@ -1084,7 +1084,7 @@ def test_launcher_runs_workers_in_restricted_inspected_image(
             "org.invarlock.example.source-bundle-sha256": "sha256:"
             + hashlib.sha256(b"test-source").hexdigest(),
             "org.invarlock.example.evaluator": "lm-evaluation-harness",
-            "org.invarlock.example.evaluator-version": "0.4.12+invarlock.nocache.1",
+            "org.invarlock.example.evaluator-version": "0.4.12+invarlock.exactmatch.1",
             "org.invarlock.example.evaluator-lock-sha256": "sha256:"
             + hashlib.sha256(
                 (

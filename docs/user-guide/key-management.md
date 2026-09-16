@@ -2,31 +2,38 @@
 
 InvarLock uses Ed25519 signatures for two distinct statements:
 
-- the evidence signer signs the canonical evidence manifest;
+- the evidence signer signs the canonical manifest for pack-v1/v2 evidence or
+  the domain-separated envelope statement for judge evidence;
 - the independent verifier signs a receipt containing its decision and anchors.
 
 Use different keys for these roles. A verifier that accepts an evidence-signing key and
 then signs the result should not possess the evidence-signing private key.
 
-!!! tip "User guide"
-
-    **Outcome:** Establish separate evidence signer and verifier signing identities,
-    distribute their fingerprints independently, and retain or revoke them
-    without rewriting signed history.
-
-    **Audience:** Key custodians, evaluation operators, verifier operators, and
-    receipt verifiers responsible for signer authorization.
-
-    **Prerequisites:** Assigned evidence signer and verifier roles, protected key
-    storage, an authenticated fingerprint-distribution channel, and a recorded
-    rotation and incident-response policy.
+> **User guide**
+>
+> **Outcome:** Establish separate evidence signer and verifier signing identities,
+> distribute their fingerprints independently, and retain or revoke them
+> without rewriting signed history.
+>
+> **Audience:** Key custodians, evaluation operators, verifier operators, and
+> receipt verifiers responsible for signer authorization.
+>
+> **Prerequisites:** Assigned evidence signer and verifier roles, protected key
+> storage, an authenticated fingerprint-distribution channel, and a recorded
+> rotation and incident-response policy.
 
 ## Key roles and compromise impact
 
 | Key | Signs | If compromised |
 | --- | --- | --- |
-| Evidence signer | Canonical `manifest.json` bytes | An attacker can create new signature-authenticated bundles; independent verifier anchors and replay still apply. |
-| Verifier | Receipt statement containing manifest digest, anchors, and verdict | An attacker can issue receipts under that verifier identity; receipt verifiers must revoke the fingerprint. |
+| Evidence signer | Canonical `manifest.json` bytes for pack-v1/v2, or the domain-separated judge envelope statement | An attacker can create new signature-authenticated evidence; independent verifier anchors and replay still apply. |
+| Verifier | Receipt statement containing evidence bindings, anchors, and verdict | An attacker can issue receipts under that verifier identity; receipt verifiers must revoke the fingerprint. |
+
+The verification commands and receipt example below use native pack-v1 evidence.
+For the other families, use the [captured handoff](captured-results.md#signed-handoff)
+or [judge evidence and recipient contract](../reference/judge-measurements.md).
+Judge signing bytes include the evidence format identifier, a NUL separator,
+and the canonical envelope statement without its signature field.
 
 Neither key encrypts evidence. Public keys are embedded so signatures can be
 checked, while authorization comes from fingerprints distributed separately.
@@ -92,7 +99,7 @@ script computes the InvarLock form directly. Evidence-signer fingerprints must r
 verifiers through an authenticated channel separate from the submitted evidence.
 Verifier fingerprints must likewise reach receipt verifiers independently.
 
-Compute a fingerprint from a public or private PEM without printing private
+Compute a fingerprint from a private PEM without printing private
 material:
 
 ```python
@@ -191,6 +198,11 @@ result = verify_signed_verification_receipt(
     Path("verification.receipt.json"),
     Path("evidence"),
     policy_path=Path("trusted/acceptance.json"),
+    expected_artifact_digests={
+        "baseline": "sha256:" + "5" * 64,
+        "subject": "sha256:" + "6" * 64,
+    },
+    expected_schedule_digest="sha256:" + "7" * 64,
     expected_runtime_digests={
         "baseline": "sha256:" + "1" * 64,
         "subject": "sha256:" + "2" * 64,
@@ -201,10 +213,20 @@ result = verify_signed_verification_receipt(
 )
 if not result.ok:
     raise RuntimeError(result.errors)
+assert result.statement is not None
+if not result.statement["verdict"]["ok"]:
+    raise RuntimeError("authenticated receipt records a rejection")
 ```
 
 Every expected value in that example must come from caller-owned trust
-configuration. Do not fill it from `result.statement`.
+configuration. Do not fill it from `result.statement`. Receipt authentication
+and a passing signed verdict are separate checks. For a v2 native receipt,
+also supply the independent `expected_request_digest`; GGUF requires that
+anchor. See [receipt validation](evidence-and-verification.md#validate-a-received-receipt)
+for trust-profile binding and the complete handoff rules. A receipt issued
+using a trust profile requires its independently obtained
+`expected_trust_profile_digest`; omission expects a receipt with no recorded
+profile digest.
 
 ## Validate the key setup
 

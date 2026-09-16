@@ -120,7 +120,9 @@ def _canonical_input_root(value: str) -> Path:
                     follow_symlinks=False,
                 )
                 next_descriptor = os.open(component, flags, dir_fd=descriptor)
-                opened = os.fstat(next_descriptor)
+                previous_descriptor, descriptor = descriptor, next_descriptor
+                os.close(previous_descriptor)
+                opened = os.fstat(descriptor)
             except OSError as exc:
                 if isinstance(exc, FileNotFoundError):
                     raise CanaryPreflightError(
@@ -134,12 +136,9 @@ def _canonical_input_root(value: str) -> Path:
                 or not stat.S_ISDIR(opened.st_mode)
                 or (before.st_dev, before.st_ino) != (opened.st_dev, opened.st_ino)
             ):
-                os.close(next_descriptor)
                 raise CanaryPreflightError(
                     "INPUT_ROOT directory changed while being authenticated"
                 )
-            os.close(descriptor)
-            descriptor = next_descriptor
     finally:
         os.close(descriptor)
     return canonical
@@ -169,8 +168,11 @@ def _read_tokenizer_contract(
                 _directory_flags(),
                 dir_fd=directory_descriptor,
             )
-            os.close(directory_descriptor)
-            directory_descriptor = next_descriptor
+            previous_descriptor, directory_descriptor = (
+                directory_descriptor,
+                next_descriptor,
+            )
+            os.close(previous_descriptor)
         try:
             named = os.stat(
                 parts[-1],

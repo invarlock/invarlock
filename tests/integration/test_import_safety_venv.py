@@ -4,7 +4,9 @@ import os
 import shutil
 import subprocess
 import sys
+import tarfile
 import venv
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -58,9 +60,14 @@ def _create_venv(tmp_path: Path) -> tuple[Path, Path]:
 
 def _run(python: Path, args: list[str]) -> subprocess.CompletedProcess[str]:
     cmd = [str(python), *args]
-    # Use text mode for easier assertions.
+    environment = os.environ.copy()
+    environment.pop("PYTHONPATH", None)
+    environment["PYTHONSAFEPATH"] = "1"
+    environment["PYTHONNOUSERSITE"] = "1"
     return subprocess.run(
         cmd,
+        cwd=python.parent.parent,
+        env=environment,
         text=True,
         capture_output=True,
         check=False,
@@ -76,19 +83,13 @@ def test_import_and_cli_help_without_torch(tmp_path: Path):
         project_root,
         source_root,
         ignore=shutil.ignore_patterns(
-            ".git",
-            ".mypy_cache",
-            ".ruff_cache",
-            ".venv",
-            ".worktrees",
-            ".coverage",
-            ".coverage.*",
-            ".pytest_cache",
+            ".*",
+            "*.egg-info",
             "__pycache__",
-            ".hf",
             "artifacts",
             "build",
             "custom-runs",
+            "logs",
             "dist",
             "evidence_pack_runs",
             "reports",
@@ -101,7 +102,45 @@ def test_import_and_cli_help_without_torch(tmp_path: Path):
         ),
     )
 
-    install = _run(python_exe, ["-m", "pip", "install", str(source_root)])
+    distribution_root = tmp_path / "dist"
+    build = _run(
+        Path(sys.executable),
+        [
+            "-m",
+            "build",
+            "--no-isolation",
+            "--outdir",
+            str(distribution_root),
+            str(source_root),
+        ],
+    )
+    assert build.returncode == 0, build.stdout + build.stderr
+    wheel = next(distribution_root.glob("*.whl"))
+    with zipfile.ZipFile(wheel) as archive:
+        names = archive.namelist()
+        assert not any(
+            "invarlock/pipeline/" in name or "pipeline_" in name for name in names
+        )
+        entry_points = archive.read(
+            next(name for name in names if name.endswith("/entry_points.txt"))
+        ).decode()
+        assert "invarlock = invarlock.cli.app:app" in entry_points
+        assert "invarlock-qualify-evaluator =" in entry_points
+        assert "invarlock-pipeline" not in entry_points
+        for schema in (
+            "evidence_pack_v2",
+            "evidence_verification_receipt_v3",
+            "trust_inputs_v2",
+            "evaluation_request_v2",
+        ):
+            assert f"invarlock/_data/contracts/{schema}.schema.json" in names
+    with tarfile.open(next(distribution_root.glob("*.tar.gz"))) as archive:
+        assert not any(
+            "/src/invarlock/pipeline/" in name or "/pipeline_" in name
+            for name in archive.getnames()
+        )
+
+    install = _run(python_exe, ["-m", "pip", "install", str(wheel)])
     if install.returncode != 0:
         combined = f"{install.stdout}{install.stderr}"
         if "requires a different Python" in combined or "not in '>=3.12'" in combined:
@@ -141,3 +180,51 @@ def test_import_and_cli_help_without_torch(tmp_path: Path):
     res_version = _run(python_exe, ["-m", "invarlock", "--version"])
     assert res_version.returncode == 0, res_version.stderr
     assert "InvarLock" in res_version.stdout
+
+    consumer = tmp_path / "consumer"
+    consumer.mkdir()
+    environment = os.environ.copy()
+    environment.pop("PYTHONPATH", None)
+    environment["PYTHONSAFEPATH"] = "1"
+    environment["PYTHONNOUSERSITE"] = "1"
+    probe = subprocess.run(
+        [
+            str(python_exe),
+            "-I",
+            "-c",
+            "from importlib.metadata import distribution, distributions; "
+            "from pathlib import Path; import invarlock, sysconfig; "
+            "assert Path(invarlock.__file__).is_relative_to(sysconfig.get_path('purelib')); "
+            "assert not any(d.metadata['Name'].startswith('invarlock-') for d in distributions()); "
+            "from invarlock.cli.app import app; "
+            "assert {c.name for c in app.registered_commands} == {'evaluate', 'verify', 'report'}; "
+            "assert {e.name for e in distribution('invarlock').entry_points if e.group == 'console_scripts'} == {'invarlock', 'invarlock-qualify-evaluator'}",
+        ],
+        cwd=consumer,
+        env=environment,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert probe.returncode == 0, probe.stdout + probe.stderr
+    shutil.copytree(
+        project_root / "examples/acceptance-handoff/golden", consumer / "golden"
+    )
+    for relative, arguments in (
+        ("examples/quickstart/run.py", ["--fixture", "golden"]),
+        (
+            "examples/captured-results/wheel_smoke.py",
+            ["--cli", str(env_dir / "bin/invarlock")],
+        ),
+    ):
+        script = shutil.copy2(project_root / relative, consumer / Path(relative).name)
+        result = subprocess.run(
+            [str(python_exe), str(script), *arguments],
+            cwd=consumer,
+            env=environment,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=180,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr

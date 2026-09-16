@@ -15,6 +15,7 @@ from invarlock.core.runtime_provider import (
     evaluation_input_parts_sha256,
 )
 from invarlock.runtime_providers import hf_transformers as provider
+from tests.runtime_providers._hf_transformers_helpers import _save_safetensors
 
 
 def _settings(
@@ -183,6 +184,7 @@ def test_tensor_storage_identity_and_alias_helpers_fail_closed() -> None:
 
 
 def test_strict_loader_requires_complete_loading_information(tmp_path: Path) -> None:
+    _save_safetensors(tmp_path / "model.safetensors", "weight")
     with pytest.raises(RuntimeError, match="did not return loading information"):
         provider.load_hf_model_with_strict_loading_info(
             lambda *_args, **_kwargs: object(), tmp_path

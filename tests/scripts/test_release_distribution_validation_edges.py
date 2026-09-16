@@ -206,6 +206,160 @@ def test_package_metadata_rejects_parser_defects(
         )
 
 
+@pytest.mark.parametrize("archive_kind", ["wheel", "sdist"])
+@pytest.mark.parametrize(
+    ("content_type", "body", "error"),
+    [
+        ("text/markdown", "# Café — 验证\n\nRead more.  \n", None),
+        ("text/markdown", "# Café — 验证\r\n\r\nRead more.  \r\n", None),
+        ("text/plain", "# Café — 验证\n\nRead more.  \n", "Description-Content-Type"),
+        (None, "# Café — 验证\n\nRead more.  \n", "Description-Content-Type"),
+        (
+            "text/markdown\nDescription-Content-Type: text/markdown",
+            "# Café — 验证\n\nRead more.  \n",
+            "Description-Content-Type",
+        ),
+        ("text/markdown", "# Stale README\n", "README body"),
+        ("text/markdown", "", "README body"),
+        ("text/markdown", "# Café — 验证\n\nRead more.\n", "README body"),
+        ("text/markdown", b"invalid UTF-8: \xff\n", "README body is malformed"),
+    ],
+)
+def test_archives_validate_readme_metadata(
+    tmp_path: Path,
+    archive_kind: str,
+    content_type: str | None,
+    body: str | bytes,
+    error: str | None,
+) -> None:
+    pyproject = (
+        b'[project]\nname = "example"\nversion = "1.0"\n'
+        b'readme = "packaging/README.md"\n'
+    )
+    (tmp_path / "pyproject.toml").write_bytes(pyproject)
+    (tmp_path / "packaging").mkdir()
+    (tmp_path / "packaging/README.md").write_text(
+        "# Café — 验证\n\nRead more.  \n", encoding="utf-8"
+    )
+    # A root README must not substitute for the declared package description.
+    (tmp_path / "README.md").write_text("# Repository README\n", encoding="utf-8")
+    expected = validation._expected_package_metadata(tmp_path)
+    headers = "Metadata-Version: 2.1\nName: example\nVersion: 1.0\n"
+    if content_type is not None:
+        headers += f"Description-Content-Type: {content_type}\n"
+    raw = (headers + "\n").encode() + (
+        body.encode("utf-8") if isinstance(body, str) else body
+    )
+    package = b"VALUE = 1\n"
+    sources = {
+        "__init__.py": validation.CheckoutSource(
+            size=len(package), sha256=hashlib.sha256(package).hexdigest()
+        )
+    }
+    if archive_kind == "wheel":
+        artifact = tmp_path / "example-1.0-py3-none-any.whl"
+        _write_wheel(artifact, extra_files={"example-1.0.dist-info/METADATA": raw})
+        validate = validation._validate_wheel_distribution
+    else:
+        artifact = tmp_path / "example-1.0.tar.gz"
+        entries = [
+            entry
+            for entry in _minimal_sdist_entries(package_payload=package)
+            if entry[0].name
+            not in {"example-1.0/PKG-INFO", "example-1.0/pyproject.toml"}
+        ]
+        entries.extend(
+            [
+                _tar_info("example-1.0/PKG-INFO", raw),
+                _tar_info("example-1.0/pyproject.toml", pyproject),
+                _tar_info("example-1.0/packaging"),
+                _tar_info(
+                    "example-1.0/packaging/README.md",
+                    (tmp_path / "packaging/README.md").read_bytes(),
+                ),
+            ]
+        )
+        _write_sdist(artifact, entries)
+        validate = validation._validate_sdist_distribution
+    if error is not None:
+        with pytest.raises(validation.ReleasePreflightError, match=error):
+            validate(
+                _spec(tmp_path),
+                artifact,
+                sources,
+                expected_metadata=expected,
+                expected_entry_points={},
+            )
+    else:
+        validate(
+            _spec(tmp_path),
+            artifact,
+            sources,
+            expected_metadata=expected,
+            expected_entry_points={},
+        )
+
+
+@pytest.mark.parametrize(
+    ("declaration", "expected_type"),
+    [
+        ('"README.MD"', "text/markdown"),
+        ('"README.rst"', "text/x-rst"),
+        ('{file = "README.txt", content-type = "text/plain"}', "text/plain"),
+        ('{text = "Café", content-type = "text/markdown"}', "text/markdown"),
+    ],
+)
+def test_readme_metadata_is_derived_from_pyproject(
+    tmp_path: Path, declaration: str, expected_type: str
+) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        f'[project]\nname="example"\nversion="1.0"\nreadme = {declaration}\n',
+        encoding="utf-8",
+    )
+    for filename in ("README.MD", "README.rst", "README.txt"):
+        (tmp_path / filename).write_text("Café", encoding="utf-8")
+    expected = validation._expected_package_metadata(tmp_path)
+    assert expected.description_content_type == expected_type
+    assert expected.description_body == "Café"
+    validation._parse_package_metadata(
+        f"Name: example\nVersion: 1.0\nDescription-Content-Type: {expected_type}\n\nCafé\n".encode(),
+        label="wheel",
+        expected=expected,
+    )
+
+
+@pytest.mark.parametrize(
+    "declaration",
+    [
+        "[]",
+        '"README.unknown"',
+        '{file = "README.md"}',
+        '{file = "README.md", text = "conflicting", content-type = "text/markdown"}',
+        '{file = "../README.md", content-type = "text/markdown"}',
+        '{text = 42, content-type = "text/markdown"}',
+    ],
+)
+def test_readme_metadata_rejects_invalid_declarations(
+    tmp_path: Path, declaration: str
+) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        f'[project]\nname="example"\nversion="1.0"\nreadme = {declaration}\n',
+        encoding="utf-8",
+    )
+    with pytest.raises(validation.ReleasePreflightError, match="readme"):
+        validation._expected_package_metadata(tmp_path)
+
+
+def test_readme_metadata_rejects_invalid_utf8(tmp_path: Path) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname="example"\nversion="1.0"\nreadme="README.md"\n',
+        encoding="utf-8",
+    )
+    (tmp_path / "README.md").write_bytes(b"\xff")
+    with pytest.raises(validation.ReleasePreflightError, match="readme is unreadable"):
+        validation._expected_package_metadata(tmp_path)
+
+
 @pytest.mark.parametrize(
     ("function", "value"),
     [
@@ -734,3 +888,61 @@ def test_validate_distributions_rejects_hash_mismatch(
     )
     with pytest.raises(validation.ReleasePreflightError, match="does not match"):
         validation.validate_distributions(config)
+
+
+@pytest.mark.parametrize("name", [".DS_Store", "._payload", "Thumbs.db", "desktop.ini"])
+@pytest.mark.parametrize("parent", ["", "example/", "example-1.0.dist-info/"])
+def test_wheel_rejects_operating_system_metadata(
+    tmp_path: Path, name: str, parent: str
+) -> None:
+    wheel = tmp_path / "candidate.whl"
+    _write_wheel(wheel, extra_files={parent + name: b"desktop metadata"})
+    with pytest.raises(
+        validation.ReleasePreflightError, match="operating-system metadata"
+    ):
+        _validate_wheel(wheel, tmp_path)
+
+
+@pytest.mark.parametrize("name", [".DS_Store", "._payload", "Thumbs.db", "desktop.ini"])
+@pytest.mark.parametrize("parent", ["", "src/example/", "src/example.egg-info/"])
+def test_sdist_rejects_operating_system_metadata(
+    tmp_path: Path, name: str, parent: str
+) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "example"\nversion = "1.0"\n', encoding="utf-8"
+    )
+    checkout_metadata = tmp_path / parent / name
+    checkout_metadata.parent.mkdir(parents=True, exist_ok=True)
+    checkout_metadata.write_bytes(b"desktop metadata")
+    sdist = tmp_path / "candidate.tar.gz"
+    _write_sdist(
+        sdist,
+        [
+            *_minimal_sdist_entries(),
+            _tar_info(f"example-1.0/{parent}{name}", b"desktop metadata"),
+        ],
+    )
+    with pytest.raises(
+        validation.ReleasePreflightError, match="operating-system metadata"
+    ):
+        validation._validate_sdist_distribution(
+            _spec(tmp_path),
+            sdist,
+            {},
+            expected_metadata=_metadata(),
+            expected_entry_points={},
+        )
+
+
+def test_checkout_metadata_is_ignored_without_deleting_it(tmp_path: Path) -> None:
+    source = tmp_path / "src/example"
+    source.mkdir(parents=True)
+    (source / "__init__.py").write_bytes(b"VALUE = 1\n")
+    metadata = [
+        source / name
+        for name in (".DS_Store", "._module.py", "Thumbs.db", "desktop.ini")
+    ]
+    for path in metadata:
+        path.write_bytes(b"desktop metadata")
+    assert set(validation._checkout_package_files(_spec(tmp_path))) == {"__init__.py"}
+    assert all(path.read_bytes() == b"desktop metadata" for path in metadata)

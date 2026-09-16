@@ -528,6 +528,42 @@ def test_report_result_is_closed() -> None:
         )
 
 
+@pytest.mark.parametrize(
+    "changed",
+    [None, "format_version", "kind", "written_outputs", "failed_output", "html"],
+)
+def test_release_report_requires_complete_native_v2_output_maps(changed) -> None:
+    outputs = {"html": "report.html", "markdown": "report.md"}
+    result = {
+        "format_version": "invarlock/evidence-report-v2",
+        "kind": "runtime",
+        "ok": True,
+        "pack_manifest_digest": "sha256:" + "0" * 64,
+        "requested_outputs": outputs,
+        "written_outputs": outputs.copy(),
+        "failed_output": None,
+        "errors": [],
+    }
+    if changed is not None:
+        result[changed] = {
+            "format_version": "invarlock/evidence-report-v1",
+            "kind": "captured",
+            "written_outputs": {"html": "report.html"},
+            "failed_output": "markdown",
+            "html": "report.html",
+        }[changed]
+        with pytest.raises(journey.ReleaseReferenceJourneyError, match="inconsistent"):
+            journey._validate_report_result(
+                result,
+                html_path=Path("report.html"),
+                manifest_digest="sha256:" + "0" * 64,
+            )
+    else:
+        journey._validate_report_result(
+            result, html_path=Path("report.html"), manifest_digest="sha256:" + "0" * 64
+        )
+
+
 def test_candidate_result_must_match_every_pinned_field(
     repo_root: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

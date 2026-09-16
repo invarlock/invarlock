@@ -204,7 +204,7 @@ def _run_cli(arguments: list[str], *, cwd: Path) -> dict[str, Any]:
 
 
 def run_quickstart(*, fixture: Path, output: Path) -> dict[str, Path]:
-    """Verify the fixture, issue a receipt, and render a human report."""
+    """Verify the fixture, issue a receipt, and render an evidence report."""
 
     fixture_root = _real_fixture(fixture)
     anchors = _anchors(fixture_root / "technical-anchors.json")

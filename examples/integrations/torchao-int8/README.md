@@ -2,8 +2,13 @@
 
 This example measures the behavioral effect of a real TorchAO INT8 weight-only
 transformation with InvarLock's standard Hugging Face runtime.
+It saves the transformed values into a dense checkpoint so the normal HF
+provider can evaluate them. This is a model-change comparison, not an INT8
+serving-speed or memory benchmark.
 
-From the repository root:
+Start from a clean committed checkout with `uv`, Docker or Podman, and the
+[shared signing-key setup](../README.md#before-running-a-model-example).
+CPU execution is supported and CUDA is optional. From the repository root:
 
 ```bash
 make example-torchao-int8 \
@@ -49,13 +54,17 @@ engine:
 
 ```bash
 make example-torchao-int8 \
-  EXAMPLE_ARGS="--workspace /tmp/torchao-evidence --container-engine podman \
+  EXAMPLE_ARGS="--workspace /new/path/torchao-evidence --container-engine podman \
   --evidence-signing-key /secure/keys/evidence.pem \
   --verifier-signing-key /secure/keys/verifier.pem \
   --trust-root /secure/trust/torchao-int8"
 ```
 
-The workspace and trust root must not already exist. The signing keys remain
+Replace `/new/path` with a real parent without symlink components. The workspace
+and trust root must not already exist. The signing keys remain
 under caller control outside the disposable workspace.
 CUDA is selected when available and CPU remains supported. The first run needs
 several gigabytes of download, cache, and workspace capacity.
+On completion, use the printed paths to inspect the signed evidence, separate
+verification receipt and HTML report. The quantization observation explains
+what changed; the normalized-NLL policy determines the acceptance result.

@@ -8,11 +8,13 @@ vision-text, and TensorRT-LLM runtime packages. A comparison remains
 **Evidence not yet created** until its pack and receipt pass strict verification
 and disclosure review.
 
-!!! tip "User guide"
-
-    **Outcome:** Add one strictly verified evidence entry, publish it locally or as a hash-bound release asset, and keep the compact wheel index synchronized.
-    **Audience:** Evidence maintainers preparing public, independently reviewable InvarLock artifacts.
-    **Prerequisites:** An immutable signed evidence pack, a separately signed verification receipt, independently maintained anchors, permission to publish every record, and a clean repository checkout.
+> **User guide**
+>
+> **Outcome:** Add one strictly verified evidence entry, publish it locally or as a hash-bound release asset, and keep the compact wheel index synchronized.
+>
+> **Audience:** Evidence maintainers preparing public, independently reviewable InvarLock artifacts.
+>
+> **Prerequisites:** An immutable signed evidence pack, a separately signed verification receipt, independently maintained anchors, permission to publish every record, and a clean repository checkout.
 
 ## Published evidence
 
@@ -62,17 +64,15 @@ Ministral entry is an independent-family canary outside the evaluator
 qualification matrix. Broader model-quality conclusions require broader,
 task-specific evidence.
 
-## Evidence not yet created
+## Captured comparison reference
 
-The following comparisons have no pack in the current index. They may be added
-when a 400-record evaluation completes the same strict verification,
-independent-receipt, and disclosure-review path.
-
-| Comparison | Intended runtime | Publication state |
-| --- | --- | --- |
-| Gemma 4 12B vision-text checkpoint and authenticated derivative | Hugging Face vision-text add-in | Evidence not yet created |
-| Qwen 3.5 27B and Qwen 3.6 27B vision-text checkpoints | Hugging Face vision-text add-in | Evidence not yet created |
-| Qwen2.5 0.5B Q8_0 and Q4_K_M artifacts | GGUF/llama.cpp add-in | Evidence not yet created |
+The separate [captured reference index](https://github.com/invarlock/invarlock/tree/main/examples/captured-results/references)
+contains a complete 4,000-pair K2 Horizon 32B routing prompt comparison. Its
+signed captured pack reproduces the original regression through the current
+installed CLI, with independent anchors and an authenticated rejection receipt.
+It recomputes aggregates of recorded scores and does not add a native runtime qualification.
+The reference includes an offline recipient helper, source attribution and the
+full signed payload.
 
 ## Publication boundary
 

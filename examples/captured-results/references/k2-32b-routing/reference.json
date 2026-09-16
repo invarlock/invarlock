@@ -1,0 +1,157 @@
+{
+  "anchors": {
+    "baseline_run_digest": "sha256:fa136eb04e78ba830da222dc868285c68c20cd215b726191f6dd01def3c3fb29",
+    "policy_digest": "sha256:1f8cf18b004a1f582c607fc1a13df07dc46691c3dbbab17891d0216f82d9c1f1",
+    "request_digest": "sha256:3bb3d5dca3c60c1ec7a592675c44c59e28aed637f16d52dd7642660b31b758fa",
+    "signer_fingerprint": "sha256:c6d1a4790bf44cdfdf5adc2ba2c980105ff4c8c93fb413cf0708ede36181e2d9",
+    "subject_run_digest": "sha256:b1ab8f9af095c560e845d3e244d6a17ca1d33c353dfef83e7f2f0d8659d69e51"
+  },
+  "archive": {
+    "files": {
+      "checksums.sha256": {
+        "sha256": "8a52d8cdb4d7f8ef65d8a39806d6c392e6080cce4cfa4f18c755bd5f7ba67c4a",
+        "size_bytes": 436
+      },
+      "inputs/policy.json": {
+        "sha256": "1f8cf18b004a1f582c607fc1a13df07dc46691c3dbbab17891d0216f82d9c1f1",
+        "size_bytes": 825
+      },
+      "manifest.json": {
+        "sha256": "d49e5ace016488b3039364a480ba9fd7096cbc4737a63593594f40f675f8c56d",
+        "size_bytes": 1162
+      },
+      "manifest.signature.json": {
+        "sha256": "aa9285e0a614b81ba10ac611ebfacfeda5f0cf778993fcab6f13c5168e5d780f",
+        "size_bytes": 464
+      },
+      "records/baseline.json": {
+        "sha256": "fa136eb04e78ba830da222dc868285c68c20cd215b726191f6dd01def3c3fb29",
+        "size_bytes": 22640086
+      },
+      "records/subject.json": {
+        "sha256": "b1ab8f9af095c560e845d3e244d6a17ca1d33c353dfef83e7f2f0d8659d69e51",
+        "size_bytes": 23402957
+      },
+      "reports/evaluation.report.json": {
+        "sha256": "29e9063790cc2d352d630d76826aa146979ad347fefad637edb64f5f58517a6e",
+        "size_bytes": 2218
+      },
+      "request.json": {
+        "sha256": "3bb3d5dca3c60c1ec7a592675c44c59e28aed637f16d52dd7642660b31b758fa",
+        "size_bytes": 617
+      }
+    },
+    "path": "evidence.zip",
+    "sha256": "177b5b1e9dde4d622db6f0168691a002301513e4f339c84436adfd69f50f03e0",
+    "size_bytes": 5069610
+  },
+  "companions": {
+    "SGD-LICENSE.txt": "71a43a169b52bb1b39510b65ec5b43b4bbb59196d449a835fe58b50af6a72742",
+    "policy.json": "1f8cf18b004a1f582c607fc1a13df07dc46691c3dbbab17891d0216f82d9c1f1",
+    "verification.receipt.json": "b74bd6be0da384e82bac50ef2998f8896073d7283828878a4bf30706eb1a5561",
+    "verifier.public.pem": "4923583743aa0a7d447b99fd979bfd48eed74c885ce83764a3de5559bc73e789"
+  },
+  "comparison": "K2 Horizon 32B routing prompt A versus prompt B",
+  "derivation": {
+    "derived_case_set_digest": "sha256:8c2e364c5bcd583ca5b6196712ef8615251581b1be5c964355f6fa731767ee93",
+    "independent_reconstruction": "Separate process and mapping implementation, shared installed library and operator",
+    "new_model_calls": 0,
+    "original_case_set_digest": "sha256:dbdf659ec820cc2047b39c627a3274635c71e7f66e02cd9d1945889bf8e69c44",
+    "original_input_plan_sha256": "3bfcd143a37816bbb6a1a4b538ba0c8e72ad6aad871c52c5f2fb12b89334bdc4",
+    "original_metrics_preserved": true
+  },
+  "expected_metrics": [
+    {
+      "aggregation": "mean",
+      "baseline_mean": 0.7705,
+      "count": 4000,
+      "decision": "regression",
+      "delta": -0.04325000000000001,
+      "direction": "higher",
+      "interval": {
+        "lower": -0.05125,
+        "mass": 0.95,
+        "method": "paired_mean_shake256_percentile_v1",
+        "replicates": 2048,
+        "upper": -0.03625
+      },
+      "kind": "recorded",
+      "missing_ids": [],
+      "name": "native_quality",
+      "reasons": [
+        "lower interval bound exceeds allowed regression",
+        "subject mean fails absolute bounds"
+      ],
+      "scoring_assurance": "recorded",
+      "slice": "overall",
+      "subject_mean": 0.72725,
+      "unit": "score"
+    },
+    {
+      "aggregation": "mean",
+      "baseline_mean": 0.801,
+      "count": 2000,
+      "decision": "regression",
+      "delta": -0.031000000000000028,
+      "direction": "higher",
+      "interval": {
+        "lower": -0.04,
+        "mass": 0.95,
+        "method": "paired_mean_shake256_percentile_v1",
+        "replicates": 2048,
+        "upper": -0.022
+      },
+      "kind": "recorded",
+      "missing_ids": [],
+      "name": "native_quality",
+      "reasons": [
+        "subject mean fails absolute bounds"
+      ],
+      "scoring_assurance": "recorded",
+      "slice": "early_history",
+      "subject_mean": 0.77,
+      "unit": "score"
+    },
+    {
+      "aggregation": "mean",
+      "baseline_mean": 0.74,
+      "count": 2000,
+      "decision": "regression",
+      "delta": -0.055499999999999994,
+      "direction": "higher",
+      "interval": {
+        "lower": -0.067,
+        "mass": 0.95,
+        "method": "paired_mean_shake256_percentile_v1",
+        "replicates": 2048,
+        "upper": -0.044
+      },
+      "kind": "recorded",
+      "missing_ids": [],
+      "name": "native_quality",
+      "reasons": [
+        "lower interval bound exceeds allowed regression",
+        "subject mean fails absolute bounds"
+      ],
+      "scoring_assurance": "recorded",
+      "slice": "later_history",
+      "subject_mean": 0.6845,
+      "unit": "score"
+    }
+  ],
+  "expected_verdict": {
+    "decision": "regression",
+    "integrity_ok": true,
+    "ok": false,
+    "policy_verdict": "fail",
+    "verification_status": 7
+  },
+  "format": "invarlock/captured-reference-v1",
+  "kind": "captured",
+  "record_count": 4000,
+  "retained_verifier": {
+    "identity": "retained-routing-recipient",
+    "signing_key_fingerprint": "sha256:b7b1c0a0d4774d26bbf5a5f93502aad09661857689227ccd83561e5aa079aa1d",
+    "trust_profile_digest": "sha256:dfc2d2884d6bb5a27e2d99251a1084ed920a1ca3d136ce1f3dd95b7d9485e813"
+  }
+}

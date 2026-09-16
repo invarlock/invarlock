@@ -340,3 +340,64 @@ def test_tokenizer_contract_rejects_a_missing_nested_directory(tmp_path: Path) -
         match="must exist beneath INPUT_ROOT",
     ):
         preflight._read_tokenizer_contract(root, "missing/tokenizer.json")
+
+
+@pytest.mark.parametrize("failure", ["root-stat", "root-close", "tokenizer-close"])
+def test_directory_failures_release_newly_opened_children(
+    tmp_path, monkeypatch, failure
+):
+    import errno
+    import os
+
+    target = tmp_path / "child"
+    target.mkdir()
+    (target / "tokenizer.json").write_text("{}")
+    opened = []
+    real_open, real_close, real_fstat = os.open, os.close, os.fstat
+    child = None
+    injected = False
+
+    def track_open(path, flags, *args, **kwargs):
+        nonlocal child
+        fd = real_open(path, flags, *args, **kwargs)
+        opened.append(fd)
+        if path == "child":
+            child = fd
+        return fd
+
+    def fail_fstat(fd):
+        if failure == "root-stat" and fd == child:
+            raise OSError(errno.EIO, "stat failed")
+        return real_fstat(fd)
+
+    def fail_close(fd):
+        nonlocal injected
+        real_close(fd)
+        if (
+            failure.endswith("close")
+            and child is not None
+            and fd != child
+            and not injected
+        ):
+            injected = True
+            raise OSError(errno.EIO, "close failed")
+
+    monkeypatch.setattr(preflight.os, "open", track_open)
+    monkeypatch.setattr(preflight.os, "close", fail_close)
+    monkeypatch.setattr(preflight.os, "fstat", fail_fstat)
+    with pytest.raises((preflight.CanaryPreflightError, OSError)):
+        if failure == "tokenizer-close":
+            preflight._read_tokenizer_contract(tmp_path, "child/tokenizer.json")
+        else:
+            preflight._canonical_input_root(str(target))
+    assert child is not None
+    leaked = []
+    for fd in set(opened):
+        try:
+            real_fstat(fd)
+        except OSError as exc:
+            assert exc.errno == errno.EBADF
+        else:
+            leaked.append(fd)
+            real_close(fd)
+    assert not leaked, "new child descriptors must remain owned on failures"

@@ -4,11 +4,20 @@ An `invarlock/evidence-pack-v1` bundle is a closed, signed evidence directory. I
 are fixed by the manifest schema; additional files are rejected in strict
 verification.
 
-!!! info "Reference"
+> **Reference**
+>
+> **Surface:** `invarlock/evidence-pack-v1` directory, manifest, payload inventory, and external outputs
+>
+> **Stability:** Versioned public artifact contract; fixed paths and closed inventory are verification requirements
+>
+> **Use this page when:** Inspecting a bundle, implementing artifact storage, or determining which bytes carry a particular claim
 
-    - **Surface:** `invarlock/evidence-pack-v1` directory, manifest, payload inventory, and external outputs
-    - **Stability:** Versioned public artifact contract; fixed paths and closed inventory are verification requirements
-    - **Use this page when:** Inspecting a bundle, implementing artifact storage, or determining which bytes carry a particular claim
+This layout applies to native exact-match/NLL and deterministic-extension
+evidence. Captured comparisons use [evaluation records](evaluation-records.md)
+and pack v2. Native and captured judge requests use the
+[judge evidence envelope](judge-measurements.md); native judge evidence also
+retains its bound runtime capture. A shared CLI does not make these inventories
+or receipt contracts interchangeable.
 
 ![Evidence dependency map](../assets/reference-evidence-dependency.svg)
 
@@ -247,16 +256,29 @@ destination. Published files are read-only and directories are non-writable.
 
 Filesystem permissions are a local hardening measure, not the integrity model.
 Any later byte change, missing file, or extra file is detected by strict
-verification. Verification receipts and rendered HTML must remain outside the
+verification. Verification receipts and rendered report files must remain outside the
 bundle so the bundle can stay byte-identical.
+
+Output writers pin directory descriptors and check pathname bindings around
+publication. They reject changes observed at those checks; they cannot prevent
+later changes by a process with the same filesystem permissions. On an ambiguous
+publication failure, a completed or competing file, or private staging directory,
+can remain. Inspect and authenticate any retained evidence before using it.
+Cleanup never recursively follows an old staging pathname.
+
+Runtime-provider sidecars are published individually. If a later sidecar fails,
+earlier completed files remain. Callers that need an all-or-nothing set must use
+a private directory and publish that directory only after all checks succeed.
 
 ## External outputs
 
 | Output | Produced by | May be written inside pack? | Trust meaning |
 | --- | --- | --- | --- |
 | Signed verification receipt | `invarlock verify` | No | Independent verifier assertion over manifest, anchors, and verdict |
-| Console report | `invarlock report` | Not a file | Human rendering of signature-authenticated canonical content |
+| Console report | `invarlock report` | Not a file | Summary of canonical content after integrity and embedded-signature checks |
 | Self-contained HTML | `invarlock report --html` | No | Unsigned presentation; not independent acceptance |
+| Markdown report | `invarlock report --markdown` | No | Unsigned presentation; not independent acceptance |
+| JUnit report | `invarlock report --junit` | No | CI test results reflecting the recorded comparison; not independent acceptance |
 
 Multiple verifiers can issue separate receipts for the same immutable manifest.
 They can use distinct verifier identities and keys. Each must independently

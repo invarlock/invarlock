@@ -1,0 +1,6 @@
+# Build the authenticated SGLang source without implicit build isolation.
+pip==26.2
+setuptools>=83.0.0
+setuptools-rust>=1.11
+setuptools-scm>=8.0
+wheel==0.48.0

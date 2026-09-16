@@ -39,6 +39,8 @@ def _source_wheel(path: Path, *, metadata: bytes | None = None) -> bytes:
     record_name = f"{root}/RECORD"
     files = {
         "lm_eval/__init__.py": b"",
+        "lm_eval/api/metrics.py": b"def exact_match_hf_evaluate(): pass\n",
+        "lm_eval/models/huggingface.py": b"class HFLM: pass\n",
         "lm_eval/api/model.py": (
             b"from typing import TYPE_CHECKING, Any\n\n"
             b"if TYPE_CHECKING:\n"
@@ -69,6 +71,7 @@ def _source_wheel(path: Path, *, metadata: bytes | None = None) -> bytes:
             b"Name: lm_eval\n"
             b"Version: 0.4.12\n"
             b"Requires-Dist: datasets>=2.16.0\n"
+            b"Requires-Dist: rouge-score>=0.0.4\n"
             b"Requires-Dist: sqlitedict\n"
             b'Requires-Dist: torch>=1.8; extra == "hf"\n\n'
         ),
@@ -109,15 +112,20 @@ def test_builds_deterministic_cache_free_wheel(tmp_path: Path, monkeypatch) -> N
     first = module.build_wheel(source, tmp_path / "one")
     second = module.build_wheel(source, tmp_path / "two")
 
-    assert first.name == "lm_eval-0.4.12+invarlock.nocache.1-py3-none-any.whl"
+    assert first.name == "lm_eval-0.4.12+invarlock.exactmatch.1-py3-none-any.whl"
     assert first.read_bytes() == second.read_bytes()
     with zipfile.ZipFile(first) as archive:
         names = archive.namelist()
-        metadata = archive.read("lm_eval-0.4.12+invarlock.nocache.1.dist-info/METADATA")
+        metadata = archive.read(
+            "lm_eval-0.4.12+invarlock.exactmatch.1.dist-info/METADATA"
+        )
         model = archive.read("lm_eval/api/model.py")
         module.validate_wheel_record(archive)
+        with zipfile.ZipFile(source) as upstream:
+            for name in ("lm_eval/api/metrics.py", "lm_eval/models/huggingface.py"):
+                assert archive.read(name) == upstream.read(name)
     assert names[-1].endswith(".dist-info/RECORD")
-    assert b"Version: 0.4.12+invarlock.nocache.1\n" in metadata
+    assert b"Version: 0.4.12+invarlock.exactmatch.1\n" in metadata
     assert b"sqlitedict" not in metadata
     assert b"sqlitedict" not in model.lower()
     assert b"response caching is unavailable" in model
@@ -275,7 +283,9 @@ def test_filter_lock_removes_only_upstream_and_sqlitedict(tmp_path: Path) -> Non
         encoding="utf-8",
     )
 
-    module.filter_lock(source, output)
+    module.filter_lock(
+        source, output, removed_requirements=frozenset(("lm-eval", "sqlitedict"))
+    )
 
     assert output.read_text(encoding="utf-8") == (
         "# generated\n"
@@ -303,7 +313,11 @@ def test_filter_lock_requires_exact_expected_packages(
     source.write_text(content, encoding="utf-8")
 
     with pytest.raises(module.DerivationError, match=message):
-        module.filter_lock(source, tmp_path / "filtered.txt")
+        module.filter_lock(
+            source,
+            tmp_path / "filtered.txt",
+            removed_requirements=frozenset(("lm-eval", "sqlitedict")),
+        )
 
 
 def test_filter_lock_rejects_residual_and_unsafe_outputs(tmp_path: Path) -> None:
@@ -314,7 +328,11 @@ def test_filter_lock_rejects_residual_and_unsafe_outputs(tmp_path: Path) -> None
         encoding="utf-8",
     )
     with pytest.raises(module.DerivationError, match="remained"):
-        module.filter_lock(source, tmp_path / "residual.txt")
+        module.filter_lock(
+            source,
+            tmp_path / "residual.txt",
+            removed_requirements=frozenset(("lm-eval", "sqlitedict")),
+        )
 
     source.write_text(
         "lm-eval==0.4.12\nsqlitedict==2.1.0\nalpha==1\n", encoding="utf-8"
@@ -322,12 +340,20 @@ def test_filter_lock_rejects_residual_and_unsafe_outputs(tmp_path: Path) -> None
     directory_output = tmp_path / "directory-output"
     directory_output.mkdir()
     with pytest.raises(module.DerivationError, match="regular file"):
-        module.filter_lock(source, directory_output)
+        module.filter_lock(
+            source,
+            directory_output,
+            removed_requirements=frozenset(("lm-eval", "sqlitedict")),
+        )
 
     temporary_output = tmp_path / "filtered.txt"
     temporary_output.with_name(".filtered.txt.tmp").write_text("occupied")
     with pytest.raises(module.DerivationError, match="temporary output"):
-        module.filter_lock(source, temporary_output)
+        module.filter_lock(
+            source,
+            temporary_output,
+            removed_requirements=frozenset(("lm-eval", "sqlitedict")),
+        )
 
 
 def test_main_dispatches_both_commands_and_reports_failures(
@@ -391,3 +417,21 @@ def test_main_dispatches_both_commands_and_reports_failures(
         == 2
     )
     assert "ERROR: rejected" in capsys.readouterr().err
+
+
+def test_restricted_profile_removes_unused_rouge_nltk_closure(tmp_path: Path) -> None:
+    module = _load_module()
+    metadata = (
+        b"Version: 0.4.12\nRequires-Dist: sqlitedict\n"
+        b"Requires-Dist: rouge-score>=0.0.4\nRequires-Dist: torch>=1.8\n"
+    )
+    patched = module._patch_metadata(metadata)
+    assert b"rouge-score" not in patched
+    assert b"Requires-Dist: torch>=1.8\n" in patched
+    source = tmp_path / "full.txt"
+    source.write_text(
+        "lm-eval==0.4.12\nsqlitedict==2.1.0\nrouge-score==0.1.2\nnltk==3.10.3\ntorch==2.13.0\n"
+    )
+    output = tmp_path / "restricted.txt"
+    module.filter_lock(source, output)
+    assert output.read_text() == "torch==2.13.0\n"

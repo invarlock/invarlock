@@ -1,0 +1,426 @@
+{
+  "format": "invarlock/batch-differential-corpus-v1",
+  "cases": [
+    {
+      "record_id": "plain_equal",
+      "input": "Repeated prompt; identity comes from the record ID.",
+      "output": "answer",
+      "reference": "answer",
+      "supported_for": [
+        "promptfoo",
+        "evidently",
+        "langfuse",
+        "azure-ai-evaluation",
+        "pydantic-evals"
+      ]
+    },
+    {
+      "record_id": "case",
+      "input": "Repeated prompt; identity comes from the record ID.",
+      "output": "Answer",
+      "reference": "answer",
+      "supported_for": [
+        "promptfoo",
+        "evidently",
+        "langfuse",
+        "azure-ai-evaluation",
+        "pydantic-evals"
+      ]
+    },
+    {
+      "record_id": "distinct",
+      "input": "Repeated prompt; identity comes from the record ID.",
+      "output": "answer",
+      "reference": "different",
+      "supported_for": [
+        "promptfoo",
+        "evidently",
+        "langfuse",
+        "azure-ai-evaluation",
+        "pydantic-evals"
+      ]
+    },
+    {
+      "record_id": "equal_leading_space",
+      "input": "Repeated prompt; identity comes from the record ID.",
+      "output": " answer",
+      "reference": " answer",
+      "supported_for": [
+        "promptfoo",
+        "evidently",
+        "langfuse",
+        "azure-ai-evaluation",
+        "pydantic-evals"
+      ]
+    },
+    {
+      "record_id": "output_leading_space",
+      "input": "Repeated prompt; identity comes from the record ID.",
+      "output": " answer",
+      "reference": "answer",
+      "supported_for": [
+        "promptfoo",
+        "evidently",
+        "langfuse",
+        "azure-ai-evaluation",
+        "pydantic-evals"
+      ]
+    },
+    {
+      "record_id": "reference_leading_space",
+      "input": "Repeated prompt; identity comes from the record ID.",
+      "output": "answer",
+      "reference": " answer",
+      "supported_for": [
+        "promptfoo",
+        "evidently",
+        "langfuse",
+        "azure-ai-evaluation",
+        "pydantic-evals"
+      ]
+    },
+    {
+      "record_id": "equal_trailing_newline",
+      "input": "Repeated prompt; identity comes from the record ID.",
+      "output": "answer\n",
+      "reference": "answer\n",
+      "supported_for": [
+        "evidently",
+        "langfuse",
+        "azure-ai-evaluation",
+        "pydantic-evals"
+      ]
+    },
+    {
+      "record_id": "trailing_newline",
+      "input": "Repeated prompt; identity comes from the record ID.",
+      "output": "answer\n",
+      "reference": "answer",
+      "supported_for": [
+        "evidently",
+        "langfuse",
+        "azure-ai-evaluation",
+        "pydantic-evals"
+      ]
+    },
+    {
+      "record_id": "equal_boundary_punctuation",
+      "input": "Repeated prompt; identity comes from the record ID.",
+      "output": "!answer!",
+      "reference": "!answer!",
+      "supported_for": [
+        "promptfoo",
+        "evidently",
+        "langfuse",
+        "azure-ai-evaluation",
+        "pydantic-evals"
+      ]
+    },
+    {
+      "record_id": "boundary_punctuation",
+      "input": "Repeated prompt; identity comes from the record ID.",
+      "output": "answer!",
+      "reference": "answer",
+      "supported_for": [
+        "promptfoo",
+        "evidently",
+        "langfuse",
+        "azure-ai-evaluation",
+        "pydantic-evals"
+      ]
+    },
+    {
+      "record_id": "internal_whitespace",
+      "input": "Repeated prompt; identity comes from the record ID.",
+      "output": "a b",
+      "reference": "a  b",
+      "supported_for": [
+        "promptfoo",
+        "evidently",
+        "langfuse",
+        "azure-ai-evaluation",
+        "pydantic-evals"
+      ]
+    },
+    {
+      "record_id": "internal_punctuation",
+      "input": "Repeated prompt; identity comes from the record ID.",
+      "output": "a,b",
+      "reference": "ab",
+      "supported_for": [
+        "promptfoo",
+        "evidently",
+        "langfuse",
+        "azure-ai-evaluation",
+        "pydantic-evals"
+      ]
+    },
+    {
+      "record_id": "unicode_equal",
+      "input": "Repeated prompt; identity comes from the record ID.",
+      "output": "é",
+      "reference": "é",
+      "supported_for": [
+        "promptfoo",
+        "evidently",
+        "langfuse",
+        "azure-ai-evaluation",
+        "pydantic-evals"
+      ]
+    },
+    {
+      "record_id": "unicode_case",
+      "input": "Repeated prompt; identity comes from the record ID.",
+      "output": "É",
+      "reference": "é",
+      "supported_for": [
+        "promptfoo",
+        "evidently",
+        "langfuse",
+        "azure-ai-evaluation",
+        "pydantic-evals"
+      ]
+    },
+    {
+      "record_id": "unicode_composition",
+      "input": "Repeated prompt; identity comes from the record ID.",
+      "output": "é",
+      "reference": "é",
+      "supported_for": [
+        "promptfoo",
+        "evidently",
+        "langfuse",
+        "azure-ai-evaluation",
+        "pydantic-evals"
+      ]
+    },
+    {
+      "record_id": "unicode_punctuation",
+      "input": "Repeated prompt; identity comes from the record ID.",
+      "output": "“yes”",
+      "reference": "yes",
+      "supported_for": [
+        "promptfoo",
+        "evidently",
+        "langfuse",
+        "azure-ai-evaluation",
+        "pydantic-evals"
+      ]
+    },
+    {
+      "record_id": "unicode_boundary_space",
+      "input": "Repeated prompt; identity comes from the record ID.",
+      "output": " answer",
+      "reference": "answer",
+      "supported_for": [
+        "promptfoo",
+        "evidently",
+        "langfuse",
+        "azure-ai-evaluation",
+        "pydantic-evals"
+      ]
+    },
+    {
+      "record_id": "equal_unicode_boundary_space",
+      "input": "Repeated prompt; identity comes from the record ID.",
+      "output": " answer",
+      "reference": " answer",
+      "supported_for": [
+        "promptfoo",
+        "evidently",
+        "langfuse",
+        "azure-ai-evaluation",
+        "pydantic-evals"
+      ]
+    },
+    {
+      "record_id": "zero_width_space",
+      "input": "Repeated prompt; identity comes from the record ID.",
+      "output": "​answer",
+      "reference": "answer",
+      "supported_for": [
+        "promptfoo",
+        "evidently",
+        "langfuse",
+        "azure-ai-evaluation",
+        "pydantic-evals"
+      ]
+    },
+    {
+      "record_id": "empty_equal",
+      "input": "Repeated prompt; identity comes from the record ID.",
+      "output": "",
+      "reference": "",
+      "supported_for": [
+        "promptfoo",
+        "evidently",
+        "langfuse",
+        "azure-ai-evaluation",
+        "pydantic-evals"
+      ]
+    },
+    {
+      "record_id": "empty_mismatch",
+      "input": "Repeated prompt; identity comes from the record ID.",
+      "output": "",
+      "reference": "no",
+      "supported_for": [
+        "promptfoo",
+        "evidently",
+        "langfuse",
+        "azure-ai-evaluation",
+        "pydantic-evals"
+      ]
+    },
+    {
+      "record_id": "empty_whitespace",
+      "input": "Repeated prompt; identity comes from the record ID.",
+      "output": "",
+      "reference": "  ",
+      "supported_for": [
+        "promptfoo",
+        "evidently",
+        "langfuse",
+        "azure-ai-evaluation",
+        "pydantic-evals"
+      ]
+    },
+    {
+      "record_id": "empty_punctuation",
+      "input": "Repeated prompt; identity comes from the record ID.",
+      "output": "!",
+      "reference": "",
+      "supported_for": [
+        "promptfoo",
+        "evidently",
+        "langfuse",
+        "azure-ai-evaluation",
+        "pydantic-evals"
+      ]
+    },
+    {
+      "record_id": "multiple_targets_match",
+      "input": "Repeated prompt; identity comes from the record ID.",
+      "output": "answer",
+      "reference": [
+        "answer",
+        "other"
+      ],
+      "supported_for": []
+    },
+    {
+      "record_id": "multiple_targets_miss",
+      "input": "Repeated prompt; identity comes from the record ID.",
+      "output": "answer",
+      "reference": [
+        "first",
+        "second"
+      ],
+      "supported_for": []
+    },
+    {
+      "record_id": "single_target_array",
+      "input": "Repeated prompt; identity comes from the record ID.",
+      "output": "answer",
+      "reference": [
+        "answer"
+      ],
+      "supported_for": []
+    },
+    {
+      "record_id": "numeric_disabled_internal",
+      "input": "Repeated prompt; identity comes from the record ID.",
+      "output": "1,000",
+      "reference": "1000",
+      "supported_for": [
+        "promptfoo",
+        "evidently",
+        "langfuse",
+        "azure-ai-evaluation",
+        "pydantic-evals"
+      ]
+    },
+    {
+      "record_id": "numeric_disabled_boundary",
+      "input": "Repeated prompt; identity comes from the record ID.",
+      "output": "$42",
+      "reference": "42",
+      "supported_for": [
+        "promptfoo",
+        "evidently",
+        "langfuse",
+        "azure-ai-evaluation",
+        "pydantic-evals"
+      ]
+    },
+    {
+      "record_id": "template",
+      "input": "Repeated prompt; identity comes from the record ID.",
+      "output": "{{output}}",
+      "reference": "{{output}}",
+      "supported_for": [
+        "evidently",
+        "langfuse",
+        "azure-ai-evaluation",
+        "pydantic-evals"
+      ]
+    },
+    {
+      "record_id": "statement",
+      "input": "Repeated prompt; identity comes from the record ID.",
+      "output": "{% print 'x' %}",
+      "reference": "{% print 'x' %}",
+      "supported_for": [
+        "evidently",
+        "langfuse",
+        "azure-ai-evaluation",
+        "pydantic-evals"
+      ]
+    },
+    {
+      "record_id": "comment",
+      "input": "Repeated prompt; identity comes from the record ID.",
+      "output": "{# comment #}",
+      "reference": "{# comment #}",
+      "supported_for": [
+        "evidently",
+        "langfuse",
+        "azure-ai-evaluation",
+        "pydantic-evals"
+      ]
+    },
+    {
+      "record_id": "file_reference",
+      "input": "Repeated prompt; identity comes from the record ID.",
+      "output": "file://reference.txt",
+      "reference": "file://reference.txt",
+      "supported_for": [
+        "evidently",
+        "langfuse",
+        "azure-ai-evaluation",
+        "pydantic-evals"
+      ]
+    },
+    {
+      "record_id": "array_output",
+      "input": "Repeated prompt; identity comes from the record ID.",
+      "output": [
+        "answer"
+      ],
+      "reference": "answer",
+      "supported_for": []
+    },
+    {
+      "record_id": "package_reference",
+      "input": "Repeated prompt; identity comes from the record ID.",
+      "output": "package:module:function",
+      "reference": "package:module:function",
+      "supported_for": [
+        "evidently",
+        "langfuse",
+        "azure-ai-evaluation",
+        "pydantic-evals"
+      ]
+    }
+  ]
+}

@@ -5,11 +5,23 @@ authenticated InvarLock observation. It demonstrates a narrow interoperability
 boundary; it does not add an SPDX artifact type, policy input, verdict rule, or
 core contract.
 
+Use it when you need to attach model-package metadata to evidence without making
+that metadata part of the acceptance rule. This is an example-owned mapper and
+fixture check, not a model evaluation or a new installed SPDX command. It needs
+Python with the repository's core dependencies, but no model, GPU, container,
+network access or signing key.
+
 Run the deterministic fixture check from the repository root:
 
 ```bash
 make example-spdx-ai-observation
 ```
+
+Successful completion means the mapper reproduces the committed observation
+payload from the supplied fixture and identity. The `--check` path does not
+publish signed evidence or rewrite the fixture. A mismatch must be investigated
+before using the wrapper in a transaction; it is not repaired by changing the
+policy threshold.
 
 The example-owned mapper:
 

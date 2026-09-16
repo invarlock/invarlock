@@ -12,6 +12,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 PROJECT_FILES = (
     REPO_ROOT / "pyproject.toml",
     REPO_ROOT / "addins/diagnostics/pyproject.toml",
+    REPO_ROOT / "addins/inspect_judge/pyproject.toml",
     REPO_ROOT / "addins/gguf/pyproject.toml",
     REPO_ROOT / "addins/multimodal/pyproject.toml",
     REPO_ROOT / "addins/tensorrt_llm/pyproject.toml",

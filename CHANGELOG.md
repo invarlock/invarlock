@@ -15,10 +15,208 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Connected successful production publication to serialized, tagged
-  documentation publishing that atomically updates the immutable version path,
-  `latest`, and `stable`, without allowing TestPyPI or bootstrap runs to update
-  GitHub Pages.
+## [0.16.0] - 2026-09-16
+
+InvarLock brings native execution, captured evaluator records and bounded judge
+scoring into the same `evaluate`, `verify` and `report` workflow. This update also
+adds hosted-service comparisons, clearer reports and new retained references,
+while strengthening evidence verification, runtime isolation and release checks.
+
+### Added
+
+#### Evaluation and integrations
+
+- **Three built-in scorers:** exact match, normalized NLL and `judge` work through
+  native run/import and supported captured-evaluator profiles. Captured SDK
+  helpers preserve source identities, explicit task-text projections, typed
+  likelihood facts, multiple metrics, slices and recorded-score provenance.
+  Deterministic extensions cover normalized matching, numeric tolerance,
+  structured fields, whole-document `json_exact` and token F1.
+- **Bounded judging:** native judging retains authenticated runtime answers;
+  frozen-answer workflows collect bounded new ratings through the optional
+  `invarlock-inspect-judge[inspect]` package or import retained calls offline.
+  Plans bind rubrics, independent units, reasoning settings, optional per-case
+  references and collection budgets. References are not exposed to the evaluated
+  model. Interrupted collection resumes the original answers and admitted trials;
+  exhausted storage produces an explicit insufficient-evidence result.
+- **Judge handoff:** offline preflight, replay, recipient-policy verification and
+  a separate Ed25519 verification receipt bind the result, policy and verifier
+  identity. A packaged `--init --example native-judge` starter and bounded
+  answer-capture example cover setup and retained-call import. Verification and
+  reporting require no provider calls.
+- **Evidence sets:** recipients can require deterministic and judge checks over
+  the same frozen answers, with independent component verification and a shared
+  report. Composition preserves each component's statistical meaning and provides
+  no joint confidence guarantee.
+- **Captured evidence:** optional signing, independent run/request/policy/signer
+  pins and arithmetic replay accompany explicit unsigned local evaluation.
+  Complete-run and planned-case pins reject changed inputs, shared omissions
+  and changed references. Native runtime provenance and supplied observations
+  retain different assurance claims.
+- **Integration examples:** classification, extraction and recorded-score
+  onboarding; real local-model Inspect, Harness and Promptfoo rehearsals; and
+  a ModelKit handoff with package/content identity checks, independent replay
+  and optional complete-request binding. Repackaging cannot override recipient
+  expectations.
+
+#### Hosted services and retained references
+
+- **Service requalification:** captured service identities bind observed
+  configuration, harness and observation windows without asserting hidden model
+  weights. Bounded HTTP capture and an installed-wheel handoff support declared
+  text-completion profiles. Fresh collection is required for each recheck;
+  verifying historical evidence does not measure the current service.
+- **Task outcomes:** a fixed example retains resulting files and executable check
+  results for review alongside the completion message. It demonstrates outcome
+  capture without qualifying arbitrary coding agents.
+- **Real comparison references:** two distinct Mistral 7B checkpoints provide
+  400-pair likelihood and local HTTP comparisons with signed evidence and
+  independent replay. The likelihood policy rejects; the HTTP policy passes
+  without an absolute quality floor. A six-case Harness likelihood reference
+  establishes same-model integration conformance. None establishes broad model
+  quality or external-provider qualification.
+- **K2 references:** a complete 4,000-pair routing reference preserves its recorded
+  regression. Corrected 480-trial judge pilots and the original incomplete pilot
+  remain retained with their insufficient-evidence outcomes. The held-out
+  reference retains all 10,260 Luna xHigh ratings, offline verification and a
+  reference-label comparison with disagreements and provenance. Both frozen
+  held-out policies pass; label agreement does not establish general judge
+  accuracy. Reference replay accepts explicit archive byte limits.
+  Current reference bundles and review records use v2 formats with neutral
+  reference-label fields. An offline upgrade preserves frozen study inputs and
+  original archive verification; replay summaries retain recorded label sources.
+- **Qualification tooling:** a five-model K2 campaign harness binds immutable
+  pairs, workflow cases and bounded capture. Image preparation and CPU probes
+  retain dependency and security findings. Candidate configurations remain
+  unqualified until their actual runtime and GPU gates pass; these captured
+  references add no native K2 runtime qualification claim.
+
+### Changed
+
+- Repository README links follow the selected branch or tag; package descriptions
+  pin documentation, examples and images to the package release version.
+
+#### Reports, commands and capacity
+
+- **Reports:** policy decisions, model/service identities, baseline/subject
+  changes, uncertainty and numeric requirements lead the presentation. HTML
+  includes a complete result overview, accessible metric/scope tabs, direct links,
+  a Show all view, mobile layouts, dark mode and complete print output. HTML,
+  Markdown and terminal reports share comparison grouping; exact-match counts,
+  missing results, absolute floors and judge completeness/precision checks remain
+  visible. The logo and report assets work offline.
+- **Command experience:** output distinguishes publication, recorded policy
+  results and independent verification while preserving exit codes. Grouped help
+  and reusable run-mode runtime profiles expose effective settings during
+  preflight; profiles do not select policy or authorize signers. Reporting
+  preserves evidence bytes and does not replace recipient verification.
+- **Captured capacity:** comparisons support up to 50,000 planned cases, with
+  separate 128 MiB input and 384 MiB complete-evidence limits. A caller-owned
+  default budget of 102,400,000 bootstrap draws bounds combined metric/slice
+  work and can be explicitly overridden without changing signed policy. Early
+  admission checks and bounded diagnostics reject oversized work; incremental
+  canonical encoding reduces allocations without changing digests. Native
+  runtime schedules retain their separate limits.
+
+#### CI, packaging and documentation
+
+- **CI execution:** four disjoint Python 3.13 coverage groups run concurrently,
+  with duplicate behavior runs removed and all existing coverage thresholds
+  preserved. Python 3.12 remains a separate gate. The 50,000-record recipient
+  check runs without tracing; the 12,000-record case remains under coverage.
+  Bounded local parallelism, retained test timings, lock-aware caches and
+  cancellation of obsolete runs support faster feedback.
+- **Release checks:** local, candidate and published-wheel gates share isolated
+  core consumers for exact match, NLL and judge before optional packages are
+  installed. All six distributions participate in coordinated validation;
+  security analysis includes all five add-in source trees. Dependency updates
+  coordinate the root manifest and uv lock with separately checked workflow
+  locks. Pre-commit covers all pull requests and docs build once per docs job.
+- **Documentation:** the README, workflow diagram and docs landing page now lead
+  with runnable tasks and supported integration routes. Page openers render
+  consistently on GitHub and the documentation site. Guides, API references,
+  assurance notes, security guidance and third-party notices describe the current
+  contracts. Assurance guidance distinguishes native, captured and judge decision
+  rules, acceptance requirements and evidence-set limits; receipt examples include
+  required independent anchors and separate authenticity from the signed verdict.
+  Guides and API references scope pairing, signatures, observation attachments and
+  verification helpers by evidence family. Policy-engine examples state their
+  supported recipient-policy subset separately from full acceptance verification.
+  Example guides explain their audience, setup and expected outputs, distinguish
+  offline fixtures from live model runs, and clarify intentional policy failures.
+  Production release publication updates
+  tagged docs, `latest` and `stable`; TestPyPI and bootstrap runs cannot do so.
+
+### Removed
+
+- **Public inference extras:** the core `hf` and vision-text `runtime` extras
+  are replaced by maintained runtime images and source-checkout dependency
+  groups. Bootstrap the verified runtime wheelhouse before `uv sync --group hf`;
+  development and CI tooling extras no longer install PEFT or TorchAO. The
+  lightweight core install remains unchanged.
+- **Separate captured command and contracts:** use captured v2 requests through
+  `evaluate`, directory packs through `verify` and `report`, and the
+  `invarlock.engine` SDK in place of the separate captured-comparison namespace
+  and monolithic project/evidence contracts. Recreate affected captured evidence
+  from reviewed source records and independently approve its new run/request
+  pins; there is no automatic legacy conversion. Native v1 packs, native v1/v2
+  receipts and the v0.13 compatibility covenant remain unchanged.
+
+### Fixed
+
+#### Verification and publication
+
+- **Identity and input checks:** reject contradictory request tasks, schedules,
+  provider capabilities and evaluation-source identities; changed modes during
+  loading; and run-only options on import. Captured imports, artifact attestation
+  and reference replay reject oversized, replaced or non-regular inputs.
+- **Judge preflight:** keep text and JSON output consistent for captured and
+  hosted inputs, including the maximum planned attempt count.
+- **Judge integrity:** reject reused Inspect provider response IDs across retained
+  segments and resumed collection, rating text contradicted by a provider refusal,
+  tool call or non-assistant role, overlapping workspaces, changed runtime or
+  artifact identities, underfunded plans and missing native capture. Configured
+  hosted calls explicitly select and validate standard processing and reject
+  inherited safety identifiers. Historical requests and signed evidence retain
+  their original replay semantics.
+- **Safe output and cleanup:** publish receipts, reports, qualification results
+  and runtime sidecars through private staging and retained descriptors, rejecting
+  source/parent substitution without overwriting competing files. Close owned
+  files, streams and runtime resources even after setup or cleanup errors. Escape
+  hostile dynamic labels and control characters across terminal and XML output;
+  preserve JSON error mode, literal error details and scorer-specific units.
+- **Evaluator semantics:** preserve valid Promptfoo responses after quality-check
+  failures while rejecting conflicting execution status. Current Inspect, five
+  batch and eleven scalar qualification profiles bind literal input domains,
+  native settings and complete environments, covering normalization boundaries
+  without rewriting historical qualification authority or evidence.
+
+#### Runtime and dependency safeguards
+
+- **Release packaging:** include and validate the license text in every add-in
+  wheel and source distribution. Offline review bundles inventory nested add-ins,
+  require adjacent Sigstore sidecars, reject unlisted or linked files, and use
+  the independently supplied signing-certificate identity. Runtime qualification
+  guides state the canary key lifecycle and all enforced reuse conditions.
+- **Runtime safety:** validate safetensors shard paths and storage before native
+  loading. Real-container checks cover network isolation, read-only inputs, key
+  separation, limits, interruption and cleanup, including outputs owned by a
+  different numeric user. Failed execution cannot publish completed evidence.
+- **Build readiness:** restore current evaluator Docker build inputs and remove
+  obsolete allowlist paths; reject OS metadata in distributions. K2 preparation
+  authenticates bootstrap wheels and core metadata, verifies bounded JIT loading
+  and complete Expat package identities, and removes unused GLib and obsolete
+  bootstrap packages. Candidate checks include full H100 devices alongside H200,
+  reject root execution and enforce host limits. Unresolved security findings
+  still block readiness.
+- **Dependency auditing:** update affected tooling and remove unused NLTK/ROUGE
+  exposure from restricted evaluator images while retaining authenticated upstream
+  audit inputs. Maintained HF environments use an authenticated, deterministic
+  `accelerate==1.14.0+invarlock.1` wheel that hardens checkpoint loading and
+  replaces the temporary Accelerate exception. Audits bind the derived wheel,
+  exact locks and installed payload, retain raw upstream findings and reject
+  new advisories or changed artifacts. Pinned policy-engine installation retries
+  preserve artifact checksum validation.
 
 ## [0.15.0] - 2026-08-16
 
@@ -492,7 +690,7 @@ from the same canonical JSON.
 
 ### Added
 
-- Added restrained InvarLock branding and version metadata to human-readable
+- Added restrained InvarLock branding and version metadata to
   Markdown/HTML reports and evidence-pack verdict summaries while keeping JSON
   reports, manifests, and signed metadata machine-stable.
 - Added first-class baseline-relative guard warnings in reports and verification,
@@ -609,7 +807,7 @@ from the same canonical JSON.
   acceptance ranges, and render accuracy deltas consistently in percentage
   points.
 - Shared report-outline facts with Markdown reports and `report explain` so
-  the human Markdown, HTML, and CLI explain surfaces expose the same high-level
+  the Markdown, HTML, and CLI explain surfaces expose the same high-level
   decision, policy, and guard-signal facts before their detailed sections.
 - Made `report explain --evaluation-report` explain the supplied
   `evaluation.report.json` directly so portable reviewer bundles no longer need
@@ -975,7 +1173,7 @@ from the same canonical JSON.
   support, implemented coverage, usage-only checkpoints, and
   promotion-candidate inventories, while keeping tracked `public_evidence`
   limited to shipped published-basis fixtures.
-- Standardized the shared human-readable CLI output layer across `verify`,
+- Standardized the shared CLI text output layer across `verify`,
   `report html`, `advanced policy`, `advanced evidence-pack`,
   `advanced runtime-verify`, and the top-level `doctor` findings and health
   summaries so status lines, warnings, and detail rows render consistently.
@@ -1430,7 +1628,7 @@ from the same canonical JSON.
 - Refreshed shipped model lanes and presets around evidence-backed support,
   including `hf_text` causal-eval defaults, updated supported-model coverage,
   and removal of the legacy ONNX adapter surface.
-- Simplified the human-readable Markdown evaluation report by folding the
+- Simplified the Markdown evaluation report by folding the
   dashboard into a single Executive Summary section and removing the
   hand-maintained contents block.
 

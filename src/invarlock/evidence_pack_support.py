@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import IntEnum
 from typing import Any
 
@@ -27,6 +27,9 @@ class EvidencePackResult:
     payload: dict[str, Any]
     status: EvidencePackStatus
     manifest_digest: str | None = None
+    verified_report: dict[str, Any] | None = field(
+        default=None, compare=False, repr=False
+    )
 
 
 __all__ = ["EvidencePackResult", "EvidencePackStatus"]

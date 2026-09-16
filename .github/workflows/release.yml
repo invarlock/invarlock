@@ -157,13 +157,21 @@ jobs:
         with:
           python-version: '3.13'
           cache: pip
+          cache-dependency-path: |
+            requirements/workflows/ci-hf-py313.txt
+            requirements/workflows/docs-ci-py313.txt
+            requirements/workflows/inspect-judge-tests-py313.txt
+            requirements/workflows/pip-bootstrap.txt
+            requirements/workflows/release-install-py313.txt
+            requirements/workflows/release-security-py313.txt
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: '22'
           cache: npm
       - name: Install build tooling
         run: |
-          python -m pip install --require-hashes -r requirements/workflows/ci-hf-py313.txt
+          python scripts/security/build_hardened_accelerate_wheel.py bootstrap
+          python -m pip install --require-hashes --find-links runtime/wheels -r requirements/workflows/ci-hf-py313.txt
           python -m pip install --require-hashes -r requirements/workflows/docs-ci-py313.txt
           python -m pip install --require-hashes -r requirements/workflows/release-security-py313.txt
           python -m build --wheel --no-isolation
@@ -176,6 +184,7 @@ jobs:
       - name: Audit maintained dependency locks
         id: dependency_audit
         run: |
+          python scripts/security/build_hardened_accelerate_wheel.py bootstrap
           python scripts/security/cve_audit.py \
             --out-json artifacts/supply-chain/cve-audit.json \
             --out-md artifacts/supply-chain/cve-audit.md
@@ -287,12 +296,14 @@ jobs:
           fi
       - name: Build first-party distributions
         run: |
+          python scripts/release/package_readme.py --check
           rm -rf build dist
           python -m build --no-isolation
           python -m build --no-isolation --outdir dist/addins addins/diagnostics
           python -m build --no-isolation --outdir dist/addins addins/gguf
           python -m build --no-isolation --outdir dist/addins addins/multimodal
           python -m build --no-isolation --outdir dist/addins addins/tensorrt_llm
+          python -m build --no-isolation --outdir dist/addins addins/inspect_judge
       - name: Record distribution digests
         id: dist_digests
         run: |
@@ -311,9 +322,9 @@ jobs:
           source_archives = [
               path for path in distributions if path.name.endswith(".tar.gz")
           ]
-          if len(wheels) != 5 or len(source_archives) != 5:
+          if len(wheels) != 6 or len(source_archives) != 6:
               raise SystemExit(
-                  "expected five wheels and five source distributions, found "
+                  "expected six wheels and six source distributions, found "
                   f"{len(wheels)} wheels and {len(source_archives)} source archives"
               )
           lines = [
@@ -378,32 +389,7 @@ jobs:
           python -m pip install --require-hashes -r requirements/workflows/release-install-py313.txt
           python -m pip install --no-deps --force-reinstall dist/*.whl
           python -m pip check
-          quickstart_root="$(mktemp -d)"
-          approval_root="$(mktemp -d)"
-          trap 'rm -rf "${quickstart_root}" "${approval_root}"' EXIT
-          cp examples/quickstart/run.py "${quickstart_root}/run.py"
-          cp -R examples/acceptance-handoff/golden "${quickstart_root}/golden"
-          (
-            cd "${quickstart_root}"
-            python run.py --fixture golden
-          )
-          cp -R examples/ci/standalone-consumer/. "${approval_root}/"
-          mkdir "${approval_root}/incoming"
-          cp -R examples/evaluator-qualification/signed-transactions/deployment-approval-inspect-ai/evidence \
-            "${approval_root}/incoming/evidence"
-          cp examples/evaluator-qualification/signed-transactions/deployment-approval-inspect-ai/verification.receipt.json \
-            "${approval_root}/incoming/verification.receipt.json"
-          (
-            cd "${approval_root}"
-            python review/verify_deployment_receipt.py \
-              --approval-inputs review/inspect-ai-deployment-approval-inputs.json \
-              --evidence incoming/evidence \
-              --policy review/policy/acceptance.json \
-              --receipt incoming/verification.receipt.json \
-              --output deployment-approval.json
-          )
-          rm -rf "${quickstart_root}" "${approval_root}"
-          trap - EXIT
+          python scripts/release/core_wheel_consumers.py --cli "$(command -v invarlock)"
           python -m pip install --no-deps --force-reinstall dist/addins/*.whl
           python -m pip check
           invarlock --help
@@ -412,6 +398,7 @@ jobs:
           invarlock-hf-vision-text-conformance
           invarlock-tensorrt-llm-conformance
           python -c "from invarlock_addins.diagnostics import spectral_observation; assert spectral_observation([[1.0]])['status'] == 'observation'"
+          python -c "from importlib.metadata import version; from pathlib import Path; from sysconfig import get_path; import sys; import invarlock; import invarlock_addins.inspect_judge as judge; assert version('invarlock-inspect-judge') == judge.__version__ == invarlock.__version__; assert Path(judge.__file__).resolve().is_relative_to(Path(get_path('purelib')).resolve()); assert callable(judge.import_export) and callable(judge.prepare_collection); assert 'inspect_ai' not in sys.modules"
           python -c "from importlib import import_module; from pathlib import Path; from sysconfig import get_path; from invarlock import __version__; from invarlock.core.registry import CoreRegistry; from invarlock.core.runtime_provider import INVARLOCK_RUNTIME_PROVIDER_ABI; registry = CoreRegistry(); expected = {'hf_vision_text': 'invarlock-runtime-hf-vision-text', 'llama_cpp': 'invarlock-runtime-gguf', 'tensorrt_llm': 'invarlock-runtime-tensorrt-llm'}; providers = {name: registry.get_runtime_provider(name) for name in expected}; assert all(provider.name == name and provider.abi_version == INVARLOCK_RUNTIME_PROVIDER_ABI for name, provider in providers.items()); assert all(registry.get_plugin_info(name, 'runtime_providers')['package'] == package and registry.get_plugin_info(name, 'runtime_providers')['version'] == __version__ and registry.get_plugin_info(name, 'runtime_providers')['entry_point'] == name for name, package in expected.items()); site = Path(get_path('purelib')).resolve(); assert all(Path(import_module(provider.__class__.__module__).__file__).resolve().is_relative_to(site) for provider in providers.values())"
           python - <<'PY'
           import os
@@ -420,6 +407,7 @@ jobs:
           projects = (
               "invarlock",
               "invarlock-diagnostics",
+              "invarlock-inspect-judge",
               "invarlock-runtime-gguf",
               "invarlock-runtime-hf-vision-text",
               "invarlock-runtime-tensorrt-llm",
@@ -434,6 +422,8 @@ jobs:
                   f"release tag/version mismatch: tag={release_version}, packages={observed}"
               )
           PY
+      - name: Resolve and qualify the optional judge SDK extra
+        run: PYTHON=python bash scripts/inspect_judge_sdk_gate.sh
       - name: Create release install-surface venv
         id: install_surface
         shell: bash
@@ -622,6 +612,7 @@ jobs:
             --version "${INVARLOCK_RELEASE_VERSION}" \
             --project invarlock \
             --project invarlock-diagnostics \
+            --project invarlock-inspect-judge \
             --project invarlock-runtime-gguf \
             --project invarlock-runtime-hf-vision-text
 
@@ -664,10 +655,10 @@ jobs:
 
           case "${INVARLOCK_PUBLICATION_PHASE}" in
             complete)
-              matrix='{"include":[{"package":"core","environment_suffix":""},{"package":"diagnostics","environment_suffix":"-diagnostics"},{"package":"runtime-gguf","environment_suffix":"-runtime-gguf"},{"package":"runtime-hf-vision-text","environment_suffix":"-runtime-hf-vision-text"},{"package":"runtime-tensorrt-llm","environment_suffix":"-runtime-tensorrt-llm"}]}'
+              matrix='{"include":[{"package":"core","environment_suffix":""},{"package":"diagnostics","environment_suffix":"-diagnostics"},{"package":"inspect-judge","environment_suffix":"-inspect-judge"},{"package":"runtime-gguf","environment_suffix":"-runtime-gguf"},{"package":"runtime-hf-vision-text","environment_suffix":"-runtime-hf-vision-text"},{"package":"runtime-tensorrt-llm","environment_suffix":"-runtime-tensorrt-llm"}]}'
               ;;
             bootstrap)
-              matrix='{"include":[{"package":"core","environment_suffix":""},{"package":"diagnostics","environment_suffix":"-diagnostics"},{"package":"runtime-gguf","environment_suffix":"-runtime-gguf"},{"package":"runtime-hf-vision-text","environment_suffix":"-runtime-hf-vision-text"}]}'
+              matrix='{"include":[{"package":"core","environment_suffix":""},{"package":"diagnostics","environment_suffix":"-diagnostics"},{"package":"inspect-judge","environment_suffix":"-inspect-judge"},{"package":"runtime-gguf","environment_suffix":"-runtime-gguf"},{"package":"runtime-hf-vision-text","environment_suffix":"-runtime-hf-vision-text"}]}'
               ;;
             finish)
               matrix='{"include":[{"package":"runtime-tensorrt-llm","environment_suffix":"-runtime-tensorrt-llm"}]}'
@@ -726,6 +717,10 @@ jobs:
             diagnostics)
               distribution_root="_release_dist/addins"
               distribution_prefix="invarlock_diagnostics"
+              ;;
+            inspect-judge)
+              distribution_root="_release_dist/addins"
+              distribution_prefix="invarlock_inspect_judge"
               ;;
             runtime-gguf)
               distribution_root="_release_dist/addins"
@@ -826,6 +821,7 @@ jobs:
           case "${INVARLOCK_PACKAGE}" in
             core) project="invarlock" ;;
             diagnostics) project="invarlock-diagnostics" ;;
+            inspect-judge) project="invarlock-inspect-judge" ;;
             runtime-gguf) project="invarlock-runtime-gguf" ;;
             runtime-hf-vision-text) project="invarlock-runtime-hf-vision-text" ;;
             runtime-tensorrt-llm) project="invarlock-runtime-tensorrt-llm" ;;
@@ -924,9 +920,9 @@ jobs:
         inputs.publication_phase != 'bootstrap'
       }}
     runs-on: ubuntu-latest
-    # Hosted verification can consume about 92 minutes at its documented
-    # 12 attempts, 15 serial requests per attempt, and 30-second request timeout.
-    timeout-minutes: 120
+    # Hosted verification can consume about 110 minutes at its documented
+    # 12 attempts, 18 serial requests per attempt, and 30-second request timeout.
+    timeout-minutes: 130
     permissions:
       actions: read
       contents: read
@@ -967,7 +963,7 @@ jobs:
       }}
     runs-on: ubuntu-latest
     # Leave the same bounded verification budget plus installation headroom.
-    timeout-minutes: 120
+    timeout-minutes: 130
     permissions:
       actions: read
       contents: read
@@ -1012,32 +1008,7 @@ jobs:
           python -m pip install --require-hashes -r requirements/workflows/release-install-py313.txt
           python -m pip install --no-deps --force-reinstall wheelhouse/invarlock-*.whl
           python -m pip check
-          quickstart_root="$(mktemp -d)"
-          approval_root="$(mktemp -d)"
-          trap 'rm -rf "${quickstart_root}" "${approval_root}"' EXIT
-          cp examples/quickstart/run.py "${quickstart_root}/run.py"
-          cp -R examples/acceptance-handoff/golden "${quickstart_root}/golden"
-          (
-            cd "${quickstart_root}"
-            python run.py --fixture golden
-          )
-          cp -R examples/ci/standalone-consumer/. "${approval_root}/"
-          mkdir "${approval_root}/incoming"
-          cp -R examples/evaluator-qualification/signed-transactions/deployment-approval-inspect-ai/evidence \
-            "${approval_root}/incoming/evidence"
-          cp examples/evaluator-qualification/signed-transactions/deployment-approval-inspect-ai/verification.receipt.json \
-            "${approval_root}/incoming/verification.receipt.json"
-          (
-            cd "${approval_root}"
-            python review/verify_deployment_receipt.py \
-              --approval-inputs review/inspect-ai-deployment-approval-inputs.json \
-              --evidence incoming/evidence \
-              --policy review/policy/acceptance.json \
-              --receipt incoming/verification.receipt.json \
-              --output deployment-approval.json
-          )
-          rm -rf "${quickstart_root}" "${approval_root}"
-          trap - EXIT
+          python scripts/release/core_wheel_consumers.py --cli "$(command -v invarlock)"
           python -m pip install --no-deps --force-reinstall wheelhouse/invarlock_*.whl
           python -m pip check
           invarlock --help
@@ -1046,6 +1017,7 @@ jobs:
           invarlock-hf-vision-text-conformance
           invarlock-tensorrt-llm-conformance
           python -c "from invarlock_addins.diagnostics import spectral_observation; assert spectral_observation([[1.0]])['status'] == 'observation'"
+          python -c "from importlib.metadata import version; from pathlib import Path; from sysconfig import get_path; import sys; import invarlock; import invarlock_addins.inspect_judge as judge; assert version('invarlock-inspect-judge') == judge.__version__ == invarlock.__version__; assert Path(judge.__file__).resolve().is_relative_to(Path(get_path('purelib')).resolve()); assert callable(judge.import_export) and callable(judge.prepare_collection); assert 'inspect_ai' not in sys.modules"
           python -c "from importlib import import_module; from pathlib import Path; from sysconfig import get_path; from invarlock import __version__; from invarlock.core.registry import CoreRegistry; from invarlock.core.runtime_provider import INVARLOCK_RUNTIME_PROVIDER_ABI; registry = CoreRegistry(); expected = {'hf_vision_text': 'invarlock-runtime-hf-vision-text', 'llama_cpp': 'invarlock-runtime-gguf', 'tensorrt_llm': 'invarlock-runtime-tensorrt-llm'}; providers = {name: registry.get_runtime_provider(name) for name in expected}; assert all(provider.name == name and provider.abi_version == INVARLOCK_RUNTIME_PROVIDER_ABI for name, provider in providers.items()); assert all(registry.get_plugin_info(name, 'runtime_providers')['package'] == package and registry.get_plugin_info(name, 'runtime_providers')['version'] == __version__ and registry.get_plugin_info(name, 'runtime_providers')['entry_point'] == name for name, package in expected.items()); site = Path(get_path('purelib')).resolve(); assert all(Path(import_module(provider.__class__.__module__).__file__).resolve().is_relative_to(site) for provider in providers.values())"
           python - <<'PY'
           from importlib.metadata import version
@@ -1053,6 +1025,7 @@ jobs:
           projects = (
               "invarlock",
               "invarlock-diagnostics",
+              "invarlock-inspect-judge",
               "invarlock-runtime-gguf",
               "invarlock-runtime-hf-vision-text",
               "invarlock-runtime-tensorrt-llm",

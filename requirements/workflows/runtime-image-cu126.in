@@ -4,7 +4,7 @@ cryptography==50.0.0
 rich==14.3.3
 pyyaml==6.0.3
 jsonschema==4.26.0
-accelerate==1.14.0
+accelerate==1.14.0+invarlock.1
 # CUDA 12.6 retains compatibility with the qualified H100/H200 fleet while
 # using the same patched Torch release as the CPU and aarch64 runtimes.
 torch==2.13.0

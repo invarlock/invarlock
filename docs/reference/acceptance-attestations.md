@@ -5,13 +5,15 @@ one exact derived artifact. It is an in-toto Statement v1 inside a DSSE
 envelope. It does not represent a recipient's final approval, exception,
 quorum, governance action, or deployment decision.
 
-!!! info "Reference"
-
-    - **Surface:** `https://invarlock.dev/attestations/acceptance/v2`
-      standards-shaped in-toto/DSSE transport
-    - **Stability:** Closed v2 predicate and recipient-policy contracts
-    - **Use this page when:** Producing, transporting, or independently
-      evaluating a portable acceptance attestation
+> **Reference**
+>
+> **Surface:** `https://invarlock.dev/attestations/acceptance/v2`
+> standards-shaped in-toto/DSSE transport
+>
+> **Stability:** Closed v2 predicate and recipient-policy contracts
+>
+> **Use this page when:** Producing, transporting, or independently
+> evaluating a portable acceptance attestation
 
 The predicate format is `invarlock/acceptance-predicate-v2`; the envelope
 payload type is `application/vnd.in-toto+json`.
@@ -70,8 +72,9 @@ InvarLock receipt is the authoritative replayable technical result.
 `receipt.raw_base64` preserves the exact supplied receipt-file bytes, and
 `receipt.digest` is SHA-256 over those decoded bytes. `receipt.content` is the
 parsed policy projection and must decode to the same JSON value. The
-surrounding predicate duplicates selected fields, all of which must agree with
-the authenticated receipt.
+surrounding predicate duplicates receipt-carried anchors, verdict and signer
+fields, which must agree with the authenticated receipt. Other selected fields
+are authenticated by the envelope signer and retain that distinct authority.
 
 Existing v0.13 receipt formats are wrapped without modification or relabeling.
 Their original bytes are recoverable byte-for-byte from `receipt.raw_base64`,
@@ -89,6 +92,17 @@ The verifier authenticates the inner receipt independently and checks its
 technical verdict, artifact anchors, schedule digest, policy digest, contract
 version, and signer against the outer predicate. Any contradiction rejects the
 attestation, even if the modified envelope has a valid outer signature.
+
+The evaluation-source identity object must agree with its canonical digest.
+This is an internal consistency check: the receipt binds the schedule digest,
+but does not contain the complete schedule or independently recover its dataset
+metadata. Source labels and metric descriptions are envelope-signer context
+unless a recipient also replays the complete evidence and checks those fields.
+An envelope signer can supply a different self-consistent source description
+without changing the original receipt-bound schedule or technical result;
+envelope-only verification does not establish that description's relationship
+to the schedule bytes. Do not present those fields as independently replayed
+merely because both signatures authenticate.
 
 ## Signer relationship
 

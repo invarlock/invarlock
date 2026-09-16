@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.metadata
 import json
 import re
 import subprocess
@@ -160,8 +161,72 @@ def main(argv: list[str] | None = None) -> int:
             "May be supplied multiple times."
         ),
     )
+    for option in (
+        "installed-lock",
+        "installed-lock-sha256",
+        "installed-wheel",
+        "installed-bootstrap-lock",
+        "installed-bootstrap-lock-sha256",
+        "installed-project-wheel",
+        "report",
+    ):
+        parser.add_argument("--" + option)
     args = parser.parse_args(argv)
+    bound_options = (
+        "installed_lock",
+        "installed_lock_sha256",
+        "installed_wheel",
+        "installed_bootstrap_lock",
+        "installed_bootstrap_lock_sha256",
+        "installed_project_wheel",
+    )
+    remediated_requirements = any(
+        any(
+            re.match(r"^\s*accelerate\s*(?:==[^\s;]*\+|@)", line, re.IGNORECASE)
+            for line in Path(requirement).read_text(encoding="utf-8").splitlines()
+        )
+        or Path(requirement).as_posix()
+        == "requirements/workflows/accelerate-upstream-wheel.txt"
+        for requirement in args.requirement
+    )
+    if remediated_requirements and not any(
+        getattr(args, option) for option in bound_options
+    ):
+        if __package__:
+            from .hardened_accelerate_audit import run_requirement_audit
+        else:
+            from hardened_accelerate_audit import run_requirement_audit
+        return run_requirement_audit(args)
+    if any(
+        getattr(args, option)
+        for option in (
+            "installed_lock",
+            "installed_lock_sha256",
+            "installed_wheel",
+            "installed_bootstrap_lock",
+            "installed_bootstrap_lock_sha256",
+            "installed_project_wheel",
+            "report",
+        )
+    ):
+        if __package__:
+            from .installed_audit_binding import run_bound_audit
+        else:
+            from installed_audit_binding import run_bound_audit
+        return run_bound_audit(args, load_pip_audit_allowlist)
 
+    distributions = importlib.metadata.distributions(
+        **({"path": args.path} if args.path else {})
+    )
+    if not args.requirement or args.path:
+        for distribution in distributions:
+            if (
+                distribution.metadata["Name"].lower() == "accelerate"
+                and "+" in distribution.version
+            ):
+                raise SystemExit(
+                    "A local Accelerate installation requires all installed binding options; its upstream identity must be audited."
+                )
     owner, entries = load_pip_audit_allowlist(Path(args.allowlist))
     print(f"Using pip-audit allowlist owned by {owner}", file=sys.stderr)
     for entry in entries:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import errno
 import json
 from pathlib import Path
 
@@ -9,6 +10,7 @@ import pytest
 from invarlock import evidence_reporting as reporting
 from invarlock.evidence_pack_contract import build_comparison_report
 from invarlock.evidence_reporting import EvidenceReportError, render_evidence
+from invarlock.filesystem import atomic_file
 from tests.evidence_packs.test_evidence_reporting import _evidence, _report
 
 
@@ -67,11 +69,20 @@ def test_closed_report_renderer_covers_normalized_nll_and_html_escaping() -> Non
         observations=(),
     )
 
-    assert "Normalized NLL ratio" in markdown
-    assert "Maximum allowed ratio" in markdown
+    assert "Normalized negative log-likelihood" in markdown
+    assert "| 1 nats / byte | 1.05 nats / byte | 1.05 ratio | 2 |" in markdown
+    assert (
+        "| Finite-schedule upper ratio bound | 1.05 | &lt;= 1.1 | Passed |" in markdown
+    )
     assert "&lt;comparison&gt;" in html
     assert "&lt;unsafe-signer&gt;" in html
-    assert "manifest, checksums" in html
+    assert "Inventory, checksums and embedded evidence signature verified" in html
+    assert "Not performed by report" in html
+    assert (
+        "Perplexity interpretation unavailable: target token counts unavailable"
+        in markdown
+    )
+    assert "Acceptance uses normalized NLL per expected UTF-8 byte" in markdown
 
 
 def test_closed_report_renderer_explains_side_accuracy_qualification() -> None:
@@ -109,9 +120,9 @@ def test_closed_report_renderer_explains_side_accuracy_qualification() -> None:
         observations=(),
     )
 
-    assert "Side accuracy qualification" in markdown
-    assert "| Baseline | 1 | ≥ 0.5 | pass |" in markdown
-    assert "| Subject | 0 | ≥ 0.5 | fail |" in markdown
+    assert "| Baseline accuracy | 100% | &gt;= 50% | Passed |" in markdown
+    assert "| Candidate accuracy | 0% | &gt;= 50% | Not met |" in markdown
+    assert "Checks not met: Candidate accuracy" in markdown
 
 
 @pytest.mark.parametrize(
@@ -424,8 +435,17 @@ def test_renderer_includes_available_perplexity_and_sample_qualification() -> No
         observations=[],
     )
 
+    for renderer in (reporting._render_markdown, reporting._render_html):
+        rendered = renderer(
+            closed, explain=False, evidence_signer="sha256:" + "a" * 64, observations=[]
+        )
+        assert "Baseline perplexity: 2." in rendered
+        assert "Candidate perplexity: 2.1." in rendered
+        assert "Perplexity ratio: 1.05." in rendered
+        assert "These derived values do not affect acceptance" in rendered
+
     qualified = reporting._closed_comparison_report(_qualified_exact_report())
-    assert "Sample qualification" in reporting._render_markdown(
+    assert "| Record count | 2 | &gt;= 2 | Passed |" in reporting._render_markdown(
         qualified,
         explain=False,
         evidence_signer="sha256:" + "a" * 64,
@@ -437,6 +457,149 @@ def _manifest(evidence: Path) -> dict[str, object]:
     payload = json.loads((evidence / "manifest.json").read_bytes())
     assert isinstance(payload, dict)
     return payload
+
+
+def test_html_writer_cleans_up_when_stream_construction_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    destination = tmp_path / "report.html"
+    opened: list[int] = []
+
+    def fail(descriptor: int, *_args: object, **_kwargs: object):
+        opened.append(descriptor)
+        raise RuntimeError("injected stream construction failure")
+
+    monkeypatch.setattr(reporting.os, "fdopen", fail)
+    with pytest.raises(RuntimeError, match="stream construction"):
+        reporting._write_html_no_clobber(destination, "<p>report</p>")
+    assert not destination.exists()
+    assert len(opened) == 1
+    with pytest.raises(OSError):
+        reporting.os.fstat(opened[0])
+
+
+def test_html_writer_never_removes_a_concurrent_destination(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    destination = tmp_path / "report.html"
+
+    def replace_and_fail(_descriptor: int, *_args: object, **_kwargs: object) -> object:
+        destination.write_text("independent output", encoding="utf-8")
+        raise OSError(errno.EIO, "injected stream construction failure")
+
+    monkeypatch.setattr(reporting.os, "fdopen", replace_and_fail)
+    with pytest.raises(EvidenceReportError, match="could not write HTML report"):
+        reporting._write_html_no_clobber(destination, "<p>report</p>")
+    assert destination.read_text(encoding="utf-8") == "independent output"
+    assert list(tmp_path.iterdir()) == [destination]
+
+
+def test_html_writer_preserves_complete_output_on_postpublication_sync_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    destination = tmp_path / "report.html"
+    published = False
+    real_fsync = reporting.os.fsync
+    real_rename = atomic_file._rename_no_replace
+
+    def track_rename(**kwargs: object) -> int:
+        nonlocal published
+        result = real_rename(**kwargs)
+        published = True
+        return result
+
+    def fail_after_publication(descriptor: int) -> None:
+        if published:
+            raise OSError(errno.EIO, "injected post-publication failure")
+        real_fsync(descriptor)
+
+    monkeypatch.setattr(atomic_file, "_rename_no_replace", track_rename)
+    monkeypatch.setattr(reporting.os, "fsync", fail_after_publication)
+    with pytest.raises(EvidenceReportError, match="post-publication failure"):
+        reporting._write_html_no_clobber(destination, "<p>report</p>")
+    assert destination.read_text(encoding="utf-8") == "<p>report</p>"
+    assert list(tmp_path.iterdir()) == [destination]
+
+
+def test_html_writer_retries_a_private_name_collision(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    occupied = tmp_path / ".invarlock-write-occupied"
+    occupied.write_text("independent output", encoding="utf-8")
+    names = iter(("occupied", "available"))
+    monkeypatch.setattr(atomic_file.secrets, "token_hex", lambda _length: next(names))
+
+    destination = tmp_path / "report.html"
+    reporting._write_html_no_clobber(destination, "<p>report</p>")
+
+    assert occupied.read_text(encoding="utf-8") == "independent output"
+    assert destination.read_text(encoding="utf-8") == "<p>report</p>"
+    assert not (tmp_path / ".invarlock-write-available").exists()
+
+
+def test_html_writer_rejects_exhausted_private_names(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    occupied = tmp_path / ".invarlock-write-occupied"
+    occupied.write_text("independent output", encoding="utf-8")
+    monkeypatch.setattr(atomic_file.secrets, "token_hex", lambda _length: "occupied")
+
+    with pytest.raises(
+        EvidenceReportError, match="allocate a private staging directory"
+    ):
+        reporting._write_html_no_clobber(tmp_path / "report.html", "<p>report</p>")
+
+    assert occupied.read_text(encoding="utf-8") == "independent output"
+    assert list(tmp_path.iterdir()) == [occupied]
+
+
+def test_html_writer_does_not_unlink_an_unopened_candidate(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    occupied = tmp_path / ".invarlock-write-occupied"
+    occupied.write_text("independent output", encoding="utf-8")
+    real_open = reporting.os.open
+
+    monkeypatch.setattr(atomic_file.secrets, "token_hex", lambda _length: "occupied")
+
+    def fail_candidate_open(
+        path: object, flags: int, *args: object, **kwargs: object
+    ) -> int:
+        if path == occupied.name and flags & reporting.os.O_WRONLY:
+            raise OSError(errno.EMFILE, "injected open failure")
+        return real_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(reporting.os, "open", fail_candidate_open)
+    with pytest.raises(EvidenceReportError, match="could not write HTML report"):
+        reporting._write_html_no_clobber(tmp_path / "report.html", "<p>report</p>")
+
+    assert occupied.read_text(encoding="utf-8") == "independent output"
+    assert list(tmp_path.iterdir()) == [occupied]
+
+
+def test_html_writer_preserves_a_rename_time_destination(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    destination = tmp_path / "report.html"
+    real_rename = atomic_file._rename_no_replace
+
+    def occupy_then_rename(**kwargs: object) -> int:
+        destination.write_text("independent output", encoding="utf-8")
+        return real_rename(**kwargs)
+
+    monkeypatch.setattr(atomic_file, "_rename_no_replace", occupy_then_rename)
+    with pytest.raises(EvidenceReportError, match="destination already exists"):
+        reporting._write_html_no_clobber(destination, "<p>report</p>")
+
+    assert destination.read_text(encoding="utf-8") == "independent output"
+    assert list(tmp_path.iterdir()) == [destination]
 
 
 def test_report_json_loader_and_manifest_path_inventory_fail_closed(

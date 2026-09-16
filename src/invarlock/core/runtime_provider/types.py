@@ -675,7 +675,10 @@ def _validate_resource_path(root: Path, relative_path: str, *, label: str) -> Pa
         | getattr(os, "O_NOFOLLOW", 0)
     )
     leaf_flags = (
-        os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_NONBLOCK", 0)
     )
     root_descriptor: int | None = None
     current_descriptor: int | None = None
@@ -687,9 +690,10 @@ def _validate_resource_path(root: Path, relative_path: str, *, label: str) -> Pa
             child_descriptor = os.open(
                 component, directory_flags, dir_fd=current_descriptor
             )
-            if current_descriptor != root_descriptor:
-                os.close(current_descriptor)
+            previous_descriptor = current_descriptor
             current_descriptor = child_descriptor
+            if previous_descriptor != root_descriptor:
+                os.close(previous_descriptor)
         leaf_descriptor = os.open(parts[-1], leaf_flags, dir_fd=current_descriptor)
         mode = os.fstat(leaf_descriptor).st_mode
         if not (stat.S_ISREG(mode) or stat.S_ISDIR(mode)):
@@ -699,12 +703,19 @@ def _validate_resource_path(root: Path, relative_path: str, *, label: str) -> Pa
             f"{label} must exist beneath root without symbolic links"
         ) from exc
     finally:
-        if leaf_descriptor is not None:
-            os.close(leaf_descriptor)
-        if current_descriptor is not None and current_descriptor != root_descriptor:
-            os.close(current_descriptor)
-        if root_descriptor is not None:
-            os.close(root_descriptor)
+        try:
+            try:
+                if leaf_descriptor is not None:
+                    os.close(leaf_descriptor)
+            finally:
+                if (
+                    current_descriptor is not None
+                    and current_descriptor != root_descriptor
+                ):
+                    os.close(current_descriptor)
+        finally:
+            if root_descriptor is not None:
+                os.close(root_descriptor)
     return root.joinpath(*parts)
 
 

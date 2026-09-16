@@ -431,6 +431,8 @@ def dataset_preparation_binding_errors(
     execution = request.get("execution")
     if not isinstance(comparison, Mapping) or not isinstance(execution, Mapping):
         return ["normalized request dataset binding is invalid"]
+    if comparison.get("task") != schedule.task:
+        return ["request task does not match the canonical schedule"]
     mode = execution.get("mode")
     dataset = comparison.get("dataset")
     if mode == "import":
@@ -668,6 +670,11 @@ def derive_paired_records(
             raise EvidencePackError(
                 f"{side} runtime provider evidence does not declare metric "
                 f"{collection_metric!r}"
+            )
+        if schedule.task not in receipt.capabilities.tasks:
+            raise EvidencePackError(
+                f"{side} runtime provider evidence does not declare task "
+                f"{schedule.task!r}"
             )
         if sha256_digest(values.artifact_identity) != expected_artifacts[side]:
             raise EvidencePackError(

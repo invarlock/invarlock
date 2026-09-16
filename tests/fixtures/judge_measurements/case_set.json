@@ -1,0 +1,11 @@
+{
+  "cases": [
+    {
+      "expected": "Paris",
+      "id": "case-1",
+      "input": "Capital of France?",
+      "metadata": {}
+    }
+  ],
+  "format": "invarlock/evaluation-case-set-v1"
+}

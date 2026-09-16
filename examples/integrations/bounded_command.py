@@ -131,12 +131,16 @@ def run_bounded_command(
     except OSError as exc:
         raise RuntimeError(f"could not start command: {' '.join(argv)}") from exc
     finally:
-        if source is not None:
-            source.close()
-        if destination is not None:
-            destination.close()
-        if not completed and stdout_path is not None:
-            stdout_path.unlink(missing_ok=True)
+        try:
+            if source is not None:
+                source.close()
+        finally:
+            try:
+                if destination is not None:
+                    destination.close()
+            finally:
+                if not completed and stdout_path is not None:
+                    stdout_path.unlink(missing_ok=True)
 
     stdout_text = stdout.decode("utf-8", errors="replace")
     stderr_text = stderr.decode("utf-8", errors="replace")

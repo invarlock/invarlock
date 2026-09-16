@@ -26,7 +26,7 @@ REFERENCE_FORMAT = "invarlock/release-reference-journey-v1"
 SUMMARY_FORMAT = "invarlock/release-reference-result-v1"
 TRUST_FORMAT = "invarlock/trust-inputs-v1"
 VERIFY_FORMAT = "invarlock/evidence-pack-verify-v1"
-REPORT_FORMAT = "invarlock/evidence-report-v1"
+REPORT_FORMAT = "invarlock/evidence-report-v2"
 RECEIPT_FORMAT = "invarlock/evidence-verification-receipt-v2"
 RECEIPT_SIGNATURE_FORMAT = "invarlock/evidence-verification-receipt-signature-v1"
 REFERENCE_CONFIG = Path("scripts/release/reference_evidence/qwen38-27b-anchors.json")
@@ -497,11 +497,16 @@ def _validate_receipt(
 def _validate_report_result(
     result: dict[str, Any], *, html_path: Path, manifest_digest: str
 ) -> None:
+    outputs = {"html": str(html_path), "markdown": str(html_path.with_suffix(".md"))}
     if result != {
         "format_version": REPORT_FORMAT,
-        "html": str(html_path),
+        "kind": "runtime",
         "ok": True,
         "pack_manifest_digest": manifest_digest,
+        "requested_outputs": outputs,
+        "written_outputs": outputs,
+        "failed_output": None,
+        "errors": [],
     }:
         raise ReleaseReferenceJourneyError(
             "release reference report result is inconsistent"
@@ -651,6 +656,8 @@ def run_release_reference_journey(
                 str(evidence),
                 "--html",
                 str(report_path),
+                "--markdown",
+                str(report_path.with_suffix(".md")),
                 "--explain",
                 "--json",
             ),
@@ -909,6 +916,7 @@ def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
     try:
         repo_root = args.repo_root.resolve(strict=True)
+        command: tuple[str, ...]
         if args.invarlock_cli is None:
             command = (sys.executable, "-m", "invarlock.cli.app")
             allow_checkout_source = True

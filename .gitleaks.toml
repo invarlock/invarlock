@@ -37,6 +37,20 @@ regexes = [
 ]
 
 [[allowlists]]
+description = "The captured-evaluation signing-key parameter defaults to None and contains no key material."
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "line"
+paths = [
+  '''^src/invarlock/captured_evidence_publication\.py$''',
+  '''^src/invarlock/pipeline/evidence\.py$''',
+]
+regexes = [
+  # Gitleaks retains the preceding newline for findings after the first line.
+  '''^\n?    signing_key: Ed25519PrivateKey \| None = None,$''',
+]
+
+[[allowlists]]
 description = "Acceptance key-file size bounds are public limits, not credentials."
 condition = "AND"
 regexTarget = "match"
@@ -45,4 +59,95 @@ paths = [
 ]
 regexes = [
   '''key",\s*max_bytes=64\s''',
+]
+
+[[allowlists]]
+description = "Retained public model-card responses have SHA-256 content digests, not API credentials."
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "line"
+paths = [
+  '''^examples/qualification/k2-horizon/model-card-observations\.json$''',
+]
+regexes = [
+  '''^\n?      "api_response_sha256": "[0-9a-f]{64}",$''',
+]
+
+[[allowlists]]
+description = "The verified Expat release signing fingerprint identifies a public key."
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "line"
+paths = [
+  '''^examples/qualification/k2_runtime_expat\.py$''',
+]
+regexes = [
+  '''^\n?SIGNING_KEY = "CB8DE70A90CFBF6C3BF5CC5696262ACFFBD3AEC6"$''',
+]
+
+[[allowlists]]
+description = "Captured harness source pins identify verified public files."
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "match"
+paths = [
+  '''^examples/captured-results/harness_model_comparison\.py$''',
+  '''^examples/captured-results/harness_likelihood_rehearsal\.py$''',
+]
+regexes = [
+  '''^lm_eval\.api\.model":[ \t]*"4b98863889c17ffa7a7d391e83264fde0aa76f6883ef2e863065728b126508f8"$''',
+  '''^lm_eval\.api\.metrics":[ \t]*"7292215bb68b9cf650023939b2c0e0a9a6f48c77b39600a4069c796c33384b94"$''',
+]
+
+[[allowlists]]
+description = "Retained Mistral harness source pins identify verified public files."
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "match"
+paths = [
+  '''^examples/captured-results/references/mistral-7b-likelihood/capture/baseline/protocol\.json$''',
+  '''^examples/captured-results/references/mistral-7b-likelihood/capture/subject/protocol\.json$''',
+  '''^examples/hosted-service/references/mistral-7b-http/capture/checkpoint-loader-source\.txt$''',
+  '''^examples/hosted-service/references/mistral-7b-http/capture/checkpoint-loading-protocol\.json$''',
+]
+regexes = [
+  '''^lm_eval\.api\.model":[ \t]*"4b98863889c17ffa7a7d391e83264fde0aa76f6883ef2e863065728b126508f8"$''',
+  '''^lm_eval\.api\.metrics":[ \t]*"7292215bb68b9cf650023939b2c0e0a9a6f48c77b39600a4069c796c33384b94"$''',
+]
+
+[[allowlists]]
+description = "Captured likelihood tokenizer source pins identify verified public files."
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "match"
+paths = [
+  '''^examples/captured-results/harness_likelihood_rehearsal\.py$''',
+]
+regexes = [
+  '''^special_tokens_map\.json":[ \t]*"c0b3c279b6ecdb71996a86ffb4d4ab94dfdb5df95f00bac9515688faef2ff5dd"$''',
+  '''^tokenizer_config\.json":[ \t]*"5e04eb606e3a1583530a42e36c2a6b6615c86f34fe77e44d9ddeb43ff940931f"$''',
+]
+
+[[allowlists]]
+description = "Judge acceptance signer key-file size bounds are public limits."
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "line"
+paths = [
+  '''^src/invarlock/judge_measurements/acceptance\.py$''',
+]
+regexes = [
+  '''^\n?(?: {12}value| {16}path), label="trusted signer key", max_bytes=65536$''',
+]
+
+[[allowlists]]
+description = "Judge evidence signing key-file size bounds are public limits."
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "line"
+paths = [
+  '''^src/invarlock/judge_measurements/evidence\.py$''',
+]
+regexes = [
+  '''^\n? {12}(?:path|Path\(value\)), label="judge evidence signing key", max_bytes=65536$''',
 ]

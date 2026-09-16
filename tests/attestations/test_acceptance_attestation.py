@@ -764,3 +764,36 @@ def test_countersigned_receipt_relationship_is_current_policy_control(
     assert decision.receipt_authenticated is True
     assert decision.accepted is False
     assert "countersigned receipts are not allowed" in " ".join(decision.errors)
+
+
+@pytest.mark.parametrize("mutation", ["digest", "identity"])
+def test_resigned_evaluation_source_must_match_its_canonical_identity_digest(
+    tmp_path: Path, mutation: str
+) -> None:
+    envelope, public, fingerprint = _envelope(tmp_path)
+
+    def verify():
+        return verify_acceptance_attestation(
+            envelope,
+            trusted_public_keys={fingerprint: public},
+            recipient_policy=_policy(fingerprint),
+            expected_subject_digest=SUBJECT_DIGEST,
+            now=ISSUED_AT,
+        )
+
+    control = verify()
+    assert control.accepted is True
+    assert control.errors == ()
+    statement = _payload(envelope)
+    source = statement["predicate"]["evaluation_source"]
+    if mutation == "digest":
+        source["identity_digest"] = "sha256:" + "0" * 64
+    else:
+        source["identity"]["dataset_id"] = "different-source"
+    _resign(envelope, tmp_path / "envelope-signer.private.pem", statement)
+
+    decision = verify()
+    assert decision.envelope_authenticated is True
+    assert decision.receipt_authenticated is True
+    assert decision.accepted is False
+    assert "evaluation source identity digest" in " ".join(decision.errors)

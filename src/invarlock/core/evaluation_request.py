@@ -30,9 +30,13 @@ from invarlock.core.scorer_extension import (
 )
 from invarlock.evidence_pack_json import StrictJsonError, read_regular_file_bytes
 from invarlock.public_contracts import (
+    CAPTURED_EVALUATION_REQUEST_FORMAT_VERSION,
+    load_captured_evaluation_request_schema,
+    load_evaluation_request_schema,
+)
+from invarlock.public_contracts import (
     EVALUATION_REQUEST_FORMAT_VERSION as EVALUATION_REQUEST_FORMAT,
 )
-from invarlock.public_contracts import load_evaluation_request_schema
 
 from .schedule_preparation import LocalDatasetRequest
 
@@ -58,7 +62,10 @@ _DIRECTORY_OPEN_FLAGS = (
     | getattr(os, "O_NOFOLLOW", 0)
 )
 _FILE_OPEN_FLAGS = (
-    os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    os.O_RDONLY
+    | getattr(os, "O_CLOEXEC", 0)
+    | getattr(os, "O_NOFOLLOW", 0)
+    | getattr(os, "O_NONBLOCK", 0)
 )
 
 
@@ -154,14 +161,21 @@ class ComparisonSideRequest:
 
 
 @dataclass(frozen=True)
+class JudgeRequest:
+    workspace: Path
+    signer_identity: str
+
+
+@dataclass(frozen=True)
 class ComparisonRequest:
     baseline: ComparisonSideRequest
     subject: ComparisonSideRequest
     dataset: Path | LocalDatasetRequest
     policy: Path
     task: RuntimeTask
-    metric: Literal["exact_match", "normalized_nll_per_utf8_byte"] | None
+    metric: Literal["exact_match", "normalized_nll_per_utf8_byte", "judge"] | None
     scorer_extension: ScorerExtensionBinding | None = None
+    judge: JudgeRequest | None = None
 
     @property
     def collection_metric(
@@ -169,7 +183,7 @@ class ComparisonRequest:
     ) -> Literal["exact_match", "normalized_nll_per_utf8_byte"]:
         """Provider-owned facts to collect before verifier replay."""
 
-        if self.scorer_extension is not None:
+        if self.scorer_extension is not None or self.metric == "judge":
             return "exact_match"
         if self.metric is None:  # pragma: no cover - loader enforces exclusivity
             raise EvaluationRequestError("comparison metric selection is invalid")
@@ -218,6 +232,41 @@ class EvaluationRequest:
     execution: ExecutionRequest
     output: OutputRequest
     observations: tuple[ObservationRequest, ...] = ()
+
+
+@dataclass(frozen=True)
+class CapturedSourceRequest:
+    path: Path
+    adapter: str
+    source: Mapping[str, str] | None = None
+    run_id: str | None = None
+    artifact_digest: str | None = None
+    score_provenance: Mapping[str, Mapping[str, str | None]] | None = None
+    expected_run_digest: str | None = None
+    input_projection: Mapping[str, str] | None = None
+    service_identity: Mapping[str, Any] | None = None
+
+
+@dataclass(frozen=True)
+class CapturedJudgeRequest:
+    workspace: Path
+    signer_identity: str
+    measurements: Path | None = None
+
+
+@dataclass(frozen=True)
+class CapturedEvaluationRequest:
+    format_version: str
+    root: Path
+    baseline: CapturedSourceRequest
+    subject: CapturedSourceRequest
+    policy: Path
+    evidence: Path
+    execution_mode: Literal["captured"] = "captured"
+    metric: Literal["exact_match", "normalized_nll_per_utf8_byte", "judge"] | None = (
+        None
+    )
+    judge: CapturedJudgeRequest | None = None
 
 
 def _scan_yaml_limits_and_features(text: str) -> None:
@@ -282,18 +331,28 @@ def _load_yaml(payload: bytes) -> Any:
 
 
 def _reject_include_directives(value: Any) -> None:
-    pending = [value]
+    captured = isinstance(value, dict) and (
+        value.get("format_version") == CAPTURED_EVALUATION_REQUEST_FORMAT_VERSION
+    )
+    pending: list[tuple[tuple[str, ...], Any]] = [((), value)]
     while pending:
-        current = pending.pop()
+        path, current = pending.pop()
+        # Hosted configuration is retained declaration data. These fields never
+        # resolve files or extend the surrounding request.
+        if captured and path in {
+            ("comparison", "baseline", "service_identity", "configuration"),
+            ("comparison", "subject", "service_identity", "configuration"),
+        }:
+            continue
         if isinstance(current, dict):
             for key, child in current.items():
                 if isinstance(key, str) and key.lower() in _FORBIDDEN_INCLUDE_KEYS:
                     raise EvaluationRequestError(
                         "request YAML include directives are not allowed"
                     )
-                pending.append(child)
+                pending.append(((*path, key), child))
         elif isinstance(current, list):
-            pending.extend(current)
+            pending.extend((path, child) for child in current)
 
 
 def _schema_error_message(error: jsonschema.ValidationError) -> str:
@@ -323,6 +382,22 @@ def _validate_schema(value: Any) -> dict[str, Any]:
     return cast(dict[str, Any], value)
 
 
+def _validate_captured_schema(value: Any) -> dict[str, Any]:
+    validator = jsonschema.Draft202012Validator(
+        load_captured_evaluation_request_schema()
+    )
+    errors = sorted(
+        validator.iter_errors(value),
+        key=lambda error: tuple(str(component) for component in error.absolute_path),
+    )
+    if errors:
+        raise EvaluationRequestError(
+            "request does not match evaluation_request_v2.schema.json: "
+            + _schema_error_message(errors[0])
+        )
+    return cast(dict[str, Any], value)
+
+
 def _reference_parts(reference: str, *, label: str) -> tuple[str, ...]:
     if (
         not reference
@@ -330,6 +405,7 @@ def _reference_parts(reference: str, *, label: str) -> tuple[str, ...]:
         or _WINDOWS_DRIVE_RE.match(reference) is not None
         or "://" in reference
         or "\\" in reference
+        or any(ord(character) < 32 or ord(character) == 127 for character in reference)
     ):
         raise EvaluationRequestError(f"{label} must be a safe relative reference")
     parts = PurePosixPath(reference).parts
@@ -383,9 +459,10 @@ def _resolve_existing_reference(
                     component=component,
                     exc=exc,
                 ) from exc
-            if current_fd != root_fd:
-                os.close(current_fd)
+            previous_descriptor = current_fd
             current_fd = child_fd
+            if previous_descriptor != root_fd:
+                os.close(previous_descriptor)
         mode = os.fstat(current_fd).st_mode
         if expected == "file" and not stat.S_ISREG(mode):
             raise EvaluationRequestError(f"{label} must reference a regular file")
@@ -394,9 +471,11 @@ def _resolve_existing_reference(
                 f"{label} must reference a regular file or directory"
             )
     finally:
-        if current_fd != root_fd:
-            os.close(current_fd)
-        os.close(root_fd)
+        try:
+            if current_fd != root_fd:
+                os.close(current_fd)
+        finally:
+            os.close(root_fd)
     return root.joinpath(*parts)
 
 
@@ -417,9 +496,10 @@ def _resolve_output_reference(root: Path, reference: str, *, label: str) -> Path
                     component=component,
                     exc=exc,
                 ) from exc
-            if current_fd != root_fd:
-                os.close(current_fd)
+            previous_descriptor = current_fd
             current_fd = child_fd
+            if previous_descriptor != root_fd:
+                os.close(previous_descriptor)
         destination = parts[-1]
         try:
             os.stat(destination, dir_fd=current_fd, follow_symlinks=False)
@@ -429,9 +509,11 @@ def _resolve_output_reference(root: Path, reference: str, *, label: str) -> Path
             raise EvaluationRequestError(f"{label} cannot be inspected: {exc}") from exc
         raise EvaluationRequestError(f"{label} already exists")
     finally:
-        if current_fd != root_fd:
-            os.close(current_fd)
-        os.close(root_fd)
+        try:
+            if current_fd != root_fd:
+                os.close(current_fd)
+        finally:
+            os.close(root_fd)
 
 
 def _default_provider_resolver(provider_name: str) -> RuntimeProvider:
@@ -442,6 +524,31 @@ def _default_provider_resolver(provider_name: str) -> RuntimeProvider:
     from invarlock.runtime_providers.hf_transformers import HFTransformersProvider
 
     return HFTransformersProvider()
+
+
+def _build_judge_request(
+    value: dict[str, Any], *, root: Path, evidence_reference: str
+) -> JudgeRequest:
+    label = "comparison.judge.workspace"
+    reference = cast(str, value["workspace"])
+    parts = _reference_parts(reference, label=label)
+    workspace = root.joinpath(*parts)
+    if os.path.lexists(workspace):
+        workspace = _resolve_existing_reference(
+            root, reference, label=label, expected="artifact"
+        )
+        if not workspace.is_dir():
+            raise EvaluationRequestError(f"{label} must reference a directory")
+    else:
+        workspace = _resolve_output_reference(root, reference, label=label)
+    evidence = root.joinpath(
+        *_reference_parts(evidence_reference, label="output.evidence")
+    )
+    if workspace.is_relative_to(evidence) or evidence.is_relative_to(workspace):
+        raise EvaluationRequestError(
+            "judge workspace and output.evidence must not overlap"
+        )
+    return JudgeRequest(workspace=workspace, signer_identity=value["signer_identity"])
 
 
 def _resolve_provider(
@@ -700,7 +807,7 @@ def _build_request(
         provider_resolver=provider_resolver,
     )
     metric = cast(
-        Literal["exact_match", "normalized_nll_per_utf8_byte"] | None,
+        Literal["exact_match", "normalized_nll_per_utf8_byte", "judge"] | None,
         comparison.get("metric"),
     )
     try:
@@ -715,7 +822,9 @@ def _build_request(
         raise EvaluationRequestError(
             "comparison must select exactly one built-in metric or scorer_extension"
         )
-    collection_metric = "exact_match" if scorer_extension is not None else metric
+    collection_metric = (
+        "exact_match" if scorer_extension is not None or metric == "judge" else metric
+    )
     assert collection_metric is not None
     try:
         task = require_runtime_task(comparison["task"], field_name="comparison.task")
@@ -788,6 +897,15 @@ def _build_request(
             task=task,
             metric=metric,
             scorer_extension=scorer_extension,
+            judge=(
+                _build_judge_request(
+                    comparison["judge"],
+                    root=root,
+                    evidence_reference=output["evidence"],
+                )
+                if metric == "judge"
+                else None
+            ),
         ),
         execution=execution_request,
         observations=tuple(observation_requests),
@@ -801,12 +919,145 @@ def _build_request(
     )
 
 
+def _validate_judge_workspace_inputs(
+    request: EvaluationRequest, request_path: Path | None = None
+) -> None:
+    judge = request.comparison.judge
+    if judge is None:
+        return
+    workspace = judge.workspace
+    try:
+        reference = workspace.relative_to(request.root).as_posix()
+        evidence_reference = request.output.evidence.relative_to(
+            request.root
+        ).as_posix()
+    except ValueError as exc:
+        raise EvaluationRequestError(
+            "judge workspace and output must remain inside the request root"
+        ) from exc
+    definition = load_evaluation_request_schema()
+    judge_value = {"workspace": reference, "signer_identity": judge.signer_identity}
+    errors = list(
+        jsonschema.Draft202012Validator(
+            {"$ref": "#/$defs/judgeCollection", "$defs": definition["$defs"]}
+        ).iter_errors(judge_value)
+    )
+    if errors:
+        raise EvaluationRequestError("native judge configuration is invalid")
+    _build_judge_request(
+        judge_value, root=request.root, evidence_reference=evidence_reference
+    )
+    for side in (request.comparison.baseline, request.comparison.subject):
+        artifact = side.artifact.path
+        if artifact is not None and (
+            workspace.is_relative_to(artifact) or artifact.is_relative_to(workspace)
+        ):
+            raise EvaluationRequestError(
+                "judge workspace must not overlap a model artifact directory"
+            )
+    dataset = request.comparison.dataset
+    inputs = [
+        *([request_path.absolute()] if request_path is not None else []),
+        request.comparison.policy,
+        dataset if isinstance(dataset, Path) else dataset.path,
+        *[item.path for item in request.observations],
+    ]
+    inputs.extend(
+        path
+        for path in (request.execution.records, request.execution.schedule)
+        if path is not None
+    )
+    for imported in (request.execution.baseline, request.execution.subject):
+        if imported is not None:
+            inputs.extend(vars(imported).values())
+    if any(path.is_relative_to(workspace) for path in inputs):
+        raise EvaluationRequestError("judge workspace must not contain request inputs")
+
+
+def _build_captured_request(
+    value: dict[str, Any], *, root: Path
+) -> CapturedEvaluationRequest:
+    comparison = cast(dict[str, Any], value["comparison"])
+    output = cast(dict[str, Any], value["output"])
+
+    def source_request(name: Literal["baseline", "subject"]) -> CapturedSourceRequest:
+        source = cast(dict[str, Any], comparison[name])
+        provenance = source.get("score_provenance")
+        return CapturedSourceRequest(
+            path=_resolve_existing_reference(
+                root,
+                cast(str, source["path"]),
+                label=f"comparison.{name}.path",
+                expected="file",
+            ),
+            adapter=cast(str, source["adapter"]),
+            source=cast(Mapping[str, str] | None, source.get("source")),
+            run_id=cast(str | None, source.get("run_id")),
+            artifact_digest=cast(str | None, source.get("artifact_digest")),
+            service_identity=cast(
+                Mapping[str, Any] | None, source.get("service_identity")
+            ),
+            score_provenance=cast(
+                Mapping[str, Mapping[str, str | None]] | None, provenance
+            ),
+            expected_run_digest=cast(str | None, source.get("expected_run_digest")),
+            input_projection=cast(
+                Mapping[str, str] | None, source.get("input_projection")
+            ),
+        )
+
+    judge = comparison.get("judge")
+    return CapturedEvaluationRequest(
+        format_version=cast(str, value["format_version"]),
+        root=root,
+        baseline=source_request("baseline"),
+        subject=source_request("subject"),
+        policy=_resolve_existing_reference(
+            root,
+            cast(str, comparison["policy"]),
+            label="comparison.policy",
+            expected="file",
+        ),
+        evidence=_resolve_output_reference(
+            root,
+            cast(str, output["evidence"]),
+            label="output.evidence",
+        ),
+        metric=comparison.get("metric"),
+        judge=(
+            CapturedJudgeRequest(
+                workspace=root.joinpath(
+                    *_reference_parts(
+                        judge["workspace"], label="comparison.judge.workspace"
+                    )
+                ),
+                signer_identity=judge["signer_identity"],
+                measurements=(
+                    _resolve_existing_reference(
+                        root,
+                        judge["measurements"],
+                        label="comparison.judge.measurements",
+                        expected="file",
+                    )
+                    if "measurements" in judge
+                    else None
+                ),
+            )
+            if judge is not None
+            else None
+        ),
+    )
+
+
 def load_evaluation_request(
     path: str | Path,
     *,
     provider_resolver: ProviderResolver | None = None,
     request_root: Path | None = None,
-) -> EvaluationRequest:
+    baseline_run: str | Path | None = None,
+    subject_run: str | Path | None = None,
+    output: str | Path | None = None,
+) -> EvaluationRequest | CapturedEvaluationRequest:
     """Load one strict request anchored to its file's real parent directory.
 
     The built-in resolver intentionally exposes only the canonical Hugging Face
@@ -827,12 +1078,106 @@ def load_evaluation_request(
         raise EvaluationRequestError(str(exc)) from exc
     value = _load_yaml(payload)
     _reject_include_directives(value)
-    validated = _validate_schema(value)
-    return _build_request(
-        validated,
+    if not isinstance(value, dict):
+        raise EvaluationRequestError("request must be a YAML object")
+    format_version = value.get("format_version")
+    if format_version == CAPTURED_EVALUATION_REQUEST_FORMAT_VERSION:
+        validated = _validate_captured_schema(value)
+    elif format_version == EVALUATION_REQUEST_FORMAT:
+        validated = _validate_schema(value)
+        if baseline_run is not None or subject_run is not None:
+            raise EvaluationRequestError("run overrides require a captured request")
+    else:
+        raise EvaluationRequestError(
+            f"unsupported evaluation request format {format_version!r}"
+        )
+    # Shape and authored path syntax are checked before superseded references are
+    # replaced. Overrides are caller-relative, never request-relative.
+    _reference_parts(validated["output"]["evidence"], label="output.evidence")
+    if format_version == CAPTURED_EVALUATION_REQUEST_FORMAT_VERSION:
+        for side in ("baseline", "subject"):
+            _reference_parts(
+                validated["comparison"][side]["path"], label=f"comparison.{side}.path"
+            )
+        _reference_parts(validated["comparison"]["policy"], label="comparison.policy")
+    for override, target, key in (
+        (baseline_run, validated["comparison"].get("baseline"), "path"),
+        (subject_run, validated["comparison"].get("subject"), "path"),
+        (output, validated["output"], "evidence"),
+    ):
+        if override is None:
+            continue
+        candidate = Path(override).absolute()
+        try:
+            reference = candidate.relative_to(root).as_posix()
+        except ValueError as exc:
+            raise EvaluationRequestError(
+                "override must remain within request root"
+            ) from exc
+        _reference_parts(reference, label="override")
+        target[key] = reference
+    if format_version == CAPTURED_EVALUATION_REQUEST_FORMAT_VERSION:
+        captured = _build_captured_request(
+            _validate_captured_schema(validated), root=root
+        )
+        if captured.judge is not None and request_path.absolute().is_relative_to(
+            captured.judge.workspace
+        ):
+            raise EvaluationRequestError(
+                "Judge workspace must remain separate from request file"
+            )
+        return captured
+    request = _build_request(
+        _validate_schema(validated),
         root=root,
         provider_resolver=provider_resolver or _default_provider_resolver,
     )
+    _validate_judge_workspace_inputs(request, request_path)
+    return request
+
+
+def evaluation_request_mode(
+    path: str | Path,
+) -> Literal["captured", "run", "import", "judge_import", "judge_collect"]:
+    """Read only the closed request discriminator before provider discovery."""
+    try:
+        payload = read_regular_file_bytes(
+            Path(path),
+            label="evaluation request",
+            max_bytes=MAX_EVALUATION_REQUEST_BYTES,
+        )
+    except (OSError, StrictJsonError) as exc:
+        raise EvaluationRequestError(
+            f"evaluation request is unavailable: {exc}"
+        ) from exc
+    value = _load_yaml(payload)
+    if not isinstance(value, dict):
+        raise EvaluationRequestError("request must be a YAML object")
+    format_version = value.get("format_version")
+    if format_version == "invarlock/evaluation-request-v3":
+        execution = value.get("execution")
+        if not isinstance(execution, dict) or execution.get("mode") not in {
+            "judge_import",
+            "judge_collect",
+        }:
+            raise EvaluationRequestError("judge request execution mode is invalid")
+        return cast(Literal["judge_import", "judge_collect"], execution["mode"])
+    if format_version == CAPTURED_EVALUATION_REQUEST_FORMAT_VERSION:
+        execution = value.get("execution")
+        if not isinstance(execution, dict) or execution.get("mode") != "captured":
+            raise EvaluationRequestError("captured request execution mode is invalid")
+        return "captured"
+    if format_version != EVALUATION_REQUEST_FORMAT:
+        raise EvaluationRequestError(
+            f"unsupported evaluation request format {format_version!r}"
+        )
+    execution = value.get("execution")
+    if not isinstance(execution, dict) or execution.get("mode") not in {
+        "run",
+        "import",
+    }:
+        raise EvaluationRequestError("runtime request execution mode is invalid")
+    return cast(Literal["run", "import"], execution["mode"])
 
 
 __all__ = [
@@ -841,8 +1186,13 @@ __all__ = [
     "MAX_EVALUATION_REQUEST_DEPTH",
     "MAX_EVALUATION_REQUEST_NODES",
     "ArtifactRequest",
+    "CAPTURED_EVALUATION_REQUEST_FORMAT_VERSION",
+    "CapturedEvaluationRequest",
+    "CapturedJudgeRequest",
+    "CapturedSourceRequest",
     "ComparisonRequest",
     "ComparisonSideRequest",
+    "evaluation_request_mode",
     "EvaluationRequest",
     "EvaluationRequestError",
     "ExecutionRequest",

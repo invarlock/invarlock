@@ -8,7 +8,7 @@ COPY requirements/workflows/core-py312.txt /requirements/workflows/core-py312.tx
 COPY requirements/workflows/runtime-wheel-build-py312.txt /requirements/workflows/runtime-wheel-build-py312.txt
 COPY pyproject.toml README.md LICENSE MANIFEST.in /project/
 COPY src /project/src
-COPY addins/gguf/pyproject.toml addins/gguf/README.md /addin/
+COPY addins/gguf/pyproject.toml addins/gguf/README.md addins/gguf/LICENSE /addin/
 COPY addins/gguf/src /addin/src
 COPY addins/gguf/runtime/llama-completion-user-output.patch /runtime/
 

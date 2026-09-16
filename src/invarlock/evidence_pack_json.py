@@ -86,7 +86,12 @@ def read_regular_file_bytes(
     before = _regular_file_stat(path, label=label)
     if max_bytes is not None and before.st_size > max_bytes:
         raise StrictJsonError(f"{label} exceeds the {max_bytes}-byte size limit")
-    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_NONBLOCK", 0)
+    )
     try:
         descriptor = os.open(path, flags)
     except OSError as exc:
@@ -135,7 +140,12 @@ def copy_regular_file_snapshot(
     before = _regular_file_stat(source, label=label)
     if max_bytes is not None and before.st_size > max_bytes:
         raise StrictJsonError(f"{label} exceeds the {max_bytes}-byte size limit")
-    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_NONBLOCK", 0)
+    )
     try:
         descriptor = os.open(source, flags)
     except OSError as exc:

@@ -7,12 +7,14 @@ verification boundary:
 - **Dossier ingestion support: permanent.**
 - **Acceptance outcome: current recipient policy.**
 
-!!! info "Reference"
-
-    - **Surface:** v0.13 evidence packs and signed verification receipts
-    - **Stability:** Original parsing, binding, replay, and decision semantics
-    - **Use this page when:** Retaining historical receipts or deciding whether
-      an older result is acceptable now
+> **Reference**
+>
+> **Surface:** v0.13 evidence packs and signed verification receipts
+>
+> **Stability:** Original parsing, binding, replay, and decision semantics
+>
+> **Use this page when:** Retaining historical receipts or deciding whether
+> an older result is acceptable now
 
 ## What remains stable
 

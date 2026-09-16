@@ -208,3 +208,132 @@ def test_mutable_side_image_is_rejected_before_transaction(
 
     assert result.exit_code == 2
     assert "digest" in json.loads(result.stdout)["errors"][0]
+
+
+def _runtime_profile(path: Path) -> Path:
+    path.write_text(
+        json.dumps(
+            {
+                "format": "invarlock/runtime-profile-v1",
+                "runtime": {
+                    "image": f"registry.example/hf@{_BASELINE_DIGEST}",
+                    "device": "cpu",
+                    "cpus": "2",
+                    "memory_mib": 4096,
+                },
+                "subject": {"device": "cuda:1"},
+            }
+        )
+    )
+    return path
+
+
+def test_profile_preflight_uses_pinned_oci_launch_and_keeps_json_contract(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    request = _request(tmp_path / "request.yaml")
+    profile = _runtime_profile(tmp_path / "runtime.json")
+    monkeypatch.setattr(evaluation_oci.shutil, "which", lambda name: f"/bin/{name}")
+    _mock_image_inspection(monkeypatch)
+    # These lower-priority environment values must neither win nor invalidate
+    # the fully resolved profile launch.
+    monkeypatch.setenv("INVARLOCK_RUNTIME_DEVICE", "invalid-unused-device")
+    monkeypatch.setenv("INVARLOCK_SUBJECT_RUNTIME_DEVICE", "cuda:7")
+    observed: list[OciRuntimeExecutor] = []
+    expected = evaluation_transaction.EvaluationPreflightResult(
+        execution_mode="run",
+        output="artifacts/evidence",
+        schedule_digest="a" * 64,
+        policy_digest="b" * 64,
+        artifact_digests={},
+        evidence_signer_fingerprint="c" * 64,
+        request_digest="d" * 64,
+        record_count=1,
+        providers={},
+        checks=("runtime",),
+    )
+
+    def preflight(*_args: object, **kwargs: object):
+        executor = kwargs["resource_resolver"]
+        assert isinstance(executor, OciRuntimeExecutor)
+        observed.append(executor)
+        return expected
+
+    monkeypatch.setattr(
+        evaluation_transaction, "preflight_evaluation_request", preflight
+    )
+    args = [
+        "evaluate",
+        str(request),
+        "--runtime-profile",
+        str(profile),
+        "--runtime-device",
+        "cuda:2",
+        "--baseline-runtime-device",
+        "cpu",
+        "--preflight",
+    ]
+    result = CliRunner().invoke(app, args)
+    assert result.exit_code == 0, result.stdout
+    assert observed[0].launch.baseline.device == "cpu"
+    assert observed[0].launch.subject.device == "cuda:2"
+    assert observed[0].launch.subject.image_digest == _BASELINE_DIGEST
+    assert observed[0].launch.worker_limits.memory_mib == 4096
+    assert "profile.runtime.memory_mib" in result.stdout
+    assert "--runtime-device" in result.stdout
+    assert not (tmp_path / "artifacts").exists()
+    result = CliRunner().invoke(app, [*args, "--json"])
+    assert result.exit_code == 0, result.stdout
+    assert json.loads(result.stdout) == json.loads(expected.as_json())
+
+
+@pytest.mark.parametrize("mutation", ["digest_conflict", "root_user", "mutable_image"])
+def test_profile_oci_failures_do_not_reach_transaction(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mutation: str
+) -> None:
+    request = _request(tmp_path / "request.yaml")
+    profile = _runtime_profile(tmp_path / "runtime.json")
+    payload = json.loads(profile.read_text())
+    args = []
+    if mutation == "digest_conflict":
+        payload["subject"]["image_digest"] = _BASELINE_DIGEST
+        args = ["--subject-runtime-image", f"registry.example/trt@{_SUBJECT_DIGEST}"]
+    elif mutation == "root_user":
+        payload["runtime"]["user"] = "0:0"
+    else:
+        payload["runtime"]["image"] = "registry.example/mutable:latest"
+    profile.write_text(json.dumps(payload))
+    monkeypatch.setattr(evaluation_oci.shutil, "which", lambda name: f"/bin/{name}")
+    _mock_image_inspection(monkeypatch)
+
+    def forbidden(*_args: object, **_kwargs: object):
+        pytest.fail("invalid runtime profile reached execution")
+
+    monkeypatch.setattr(evaluation_transaction, "evaluate_request_file", forbidden)
+    result = CliRunner().invoke(
+        app,
+        ["evaluate", str(request), "--runtime-profile", str(profile), *args, "--json"],
+    )
+    assert result.exit_code == 2, result.stdout
+    assert json.loads(result.stdout)["ok"] is False
+    assert not (tmp_path / "artifacts").exists()
+
+
+def test_profile_file_error_is_a_json_preflight_failure(tmp_path: Path) -> None:
+    request = _request(tmp_path / "request.yaml")
+    result = CliRunner().invoke(
+        app,
+        [
+            "evaluate",
+            str(request),
+            "--runtime-profile",
+            str(tmp_path / "missing.json"),
+            "--preflight",
+            "--json",
+        ],
+    )
+    assert result.exit_code == 2
+    payload = json.loads(result.stdout)
+    assert payload["format_version"] == "invarlock/evaluation-preflight-v2"
+    assert payload["ok"] is False
+    assert "runtime profile" in payload["errors"][0]

@@ -142,6 +142,17 @@ def verify_receipt(statement: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("embedded receipt representation is inconsistent")
     signature = content["signature"]
     receipt_statement = content["statement"]
+    if (
+        receipt_statement.get("format")
+        not in {
+            "invarlock/evidence-verification-receipt-v1",
+            "invarlock/evidence-verification-receipt-v2",
+        }
+        or "verification_scope" in receipt_statement
+    ):
+        raise ValueError(
+            "acceptance requires a native receipt; captured scope is unsupported"
+        )
     public_block = signature["public_key"]
     if public_block.get("encoding") != "pem":
         raise ValueError("receipt public key encoding is unsupported")

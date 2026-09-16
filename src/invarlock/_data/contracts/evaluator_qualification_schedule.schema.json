@@ -18,6 +18,10 @@
           },
           "reference_output_sha256": {
             "$ref": "#/$defs/sha256"
+          },
+          "reference_output": {
+            "type": "string",
+            "maxLength": 1048576
           }
         },
         "required": [

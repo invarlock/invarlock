@@ -176,8 +176,9 @@ def _open_regular_without_symlinks(path: str | os.PathLike[str]) -> _OpenArtifac
                 raise GGUFIdentityError(
                     "GGUF artifact path contains a symlink or inaccessible directory"
                 ) from exc
-            os.close(directory_descriptor)
+            previous_descriptor = directory_descriptor
             directory_descriptor = next_descriptor
+            os.close(previous_descriptor)
 
         try:
             before = os.stat(
@@ -192,7 +193,12 @@ def _open_regular_without_symlinks(path: str | os.PathLike[str]) -> _OpenArtifac
         if not stat.S_ISREG(before.st_mode):
             raise GGUFIdentityError("GGUF artifact must be a stable regular file")
 
-        file_flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | os.O_NOFOLLOW
+        file_flags = (
+            os.O_RDONLY
+            | getattr(os, "O_CLOEXEC", 0)
+            | os.O_NOFOLLOW
+            | getattr(os, "O_NONBLOCK", 0)
+        )
         try:
             descriptor = os.open(
                 absolute.name,
@@ -202,23 +208,27 @@ def _open_regular_without_symlinks(path: str | os.PathLike[str]) -> _OpenArtifac
         except OSError as exc:
             raise GGUFIdentityError("GGUF artifact cannot be opened safely") from exc
         try:
-            opened = os.fstat(descriptor)
-        except OSError as exc:
+            try:
+                opened = os.fstat(descriptor)
+            except OSError as exc:
+                raise GGUFIdentityError(
+                    "GGUF artifact cannot be inspected safely"
+                ) from exc
+            if not stat.S_ISREG(opened.st_mode) or _stat_identity(
+                before
+            ) != _stat_identity(opened):
+                raise GGUFIdentityError("GGUF artifact changed while being opened")
+            return _OpenArtifact(
+                absolute_path=absolute,
+                descriptor=descriptor,
+                parent_descriptor=directory_descriptor,
+                basename=absolute.name,
+                initial_stat=opened,
+            )
+        except BaseException:
             os.close(descriptor)
-            raise GGUFIdentityError("GGUF artifact cannot be inspected safely") from exc
-        if not stat.S_ISREG(opened.st_mode) or _stat_identity(before) != _stat_identity(
-            opened
-        ):
-            os.close(descriptor)
-            raise GGUFIdentityError("GGUF artifact changed while being opened")
-        return _OpenArtifact(
-            absolute_path=absolute,
-            descriptor=descriptor,
-            parent_descriptor=directory_descriptor,
-            basename=absolute.name,
-            initial_stat=opened,
-        )
-    except Exception:
+            raise
+    except BaseException:
         os.close(directory_descriptor)
         raise
 
@@ -540,8 +550,10 @@ def read_gguf_artifact_identity(
             tokenizer_metadata_sha256=tokenizer_sha256,
         )
     finally:
-        os.close(artifact.descriptor)
-        os.close(artifact.parent_descriptor)
+        try:
+            os.close(artifact.descriptor)
+        finally:
+            os.close(artifact.parent_descriptor)
 
 
 __all__ = [

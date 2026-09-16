@@ -1,5 +1,11 @@
 # TensorRT-LLM engine comparison
 
+Use this example when you want to compare two TensorRT-LLM engine artifacts,
+including their actual runtime outputs. The optional native `tensorrt_llm`
+provider authenticates and executes the engines. Choose the full showcase to
+build the artifacts, or the [prepared-engine route](#prepared-engine-transaction)
+if you already have compatible engines and a pinned runtime image.
+
 This one-command example downloads a revision-pinned Qwen3-0.6B checkpoint,
 builds a source-authenticated TensorRT-LLM 1.2.1 runtime image, and converts it
 into BF16 and ModelOpt-calibrated FP8 single-rank H100 engines. It then
@@ -19,7 +25,9 @@ network access for the pinned model downloads and runtime-image build, and
 roughly 20 GB of temporary disk space. Both engines originate from the same
 public Apache-2.0 checkpoint and therefore share one authenticated tokenizer
 contract. The maintained 102-record schedule is also the FP8 calibration
-input. Run it from a committed checkout:
+input. You also need Git, Make, `uv`, and the
+[shared evidence/verifier key setup](../README.md#before-running-a-model-example).
+Run from a clean committed checkout:
 
 ```bash
 make example-tensorrt-llm \
@@ -28,7 +36,8 @@ make example-tensorrt-llm \
   --trust-root /secure/trust/tensorrt-llm"
 ```
 
-Use `EXAMPLE_ARGS="--workspace /new/path"` to choose a new output directory.
+Append `--workspace /new/path` to the complete `EXAMPLE_ARGS` value above to
+choose a new output directory; keep all signing and trust arguments.
 The command rejects dirty tracked source because the runtime image is built
 from the exact committed Git archive. TensorRT-LLM engine bytes are not
 assumed to be reproducible across builds. Instead, the transaction
@@ -80,10 +89,17 @@ verifier-output paths are never overwritten. The prepared workflow requires
 the caller-owned keys and trust root shown above; those materials are never
 generated inside the transaction workspace.
 
+On completion, inspect the printed evidence, receipt and HTML report paths. The
+receipt records independent verification of the engine comparison. The report
+shows exact-match accuracy, the paired interval and each policy requirement.
+Changing the GPU, engine build or runner requires checking those new artifacts;
+the example does not authorize them by sharing a model name.
+
 The 102-record schedule covers factual, numeric, temporal, spatial, and common
 language completions. Its policy, selected before execution, requires all 102
 records, limits the paired 95% confidence-interval width to 20 percentage
-points, and rejects a regression larger than 10 percentage points. The command
+points, and requires the interval's lower bound to be at least −10 percentage
+points. The command
 also requires each engine to solve at least 40% of the records, so an
 uninformative zero-correct comparison cannot be presented as a successful
 showcase. Its result supports only the bound one-token exact-match comparison;

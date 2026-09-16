@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -10,6 +11,7 @@ from invarlock.evaluator_qualification import (
     EvaluatorQualificationError,
     qualify_evaluator_export,
 )
+from invarlock.filesystem import atomic_file
 from tests.core.test_evaluator_qualification import (
     _digest_text,
     _write_json,
@@ -198,6 +200,35 @@ def test_result_write_refuses_to_replace_existing_file(tmp_path: Path) -> None:
 
     with pytest.raises(EvaluatorQualificationError, match="already exists"):
         result.write(destination)
+
+
+def test_result_write_closes_descriptor_when_stream_creation_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    result = _qualify(qualification_fixture(tmp_path / "inputs"))
+    real_open = atomic_file.os.open
+    opened: list[int] = []
+
+    def _tracked_open(path, flags, *args, **kwargs):
+        descriptor = real_open(path, flags, *args, **kwargs)
+        if path == "payload":
+            opened.append(descriptor)
+        return descriptor
+
+    def _fail_fdopen(_descriptor: int, _mode: str, **_kwargs):
+        raise RuntimeError("injected stream construction failure")
+
+    monkeypatch.setattr(atomic_file.os, "open", _tracked_open)
+    monkeypatch.setattr(atomic_file.os, "fdopen", _fail_fdopen)
+
+    with pytest.raises(RuntimeError, match="stream construction"):
+        result.write(tmp_path / "result.json")
+
+    assert len(opened) == 1
+    with pytest.raises(OSError):
+        os.fstat(opened[0])
+    assert sorted(path.name for path in tmp_path.iterdir()) == ["inputs"]
 
 
 def test_core_qualification_module_has_no_evaluator_name_dispatch() -> None:

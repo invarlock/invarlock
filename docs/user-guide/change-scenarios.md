@@ -6,20 +6,20 @@ party can verify independently. The system that trained, pruned, quantized,
 converted, or compiled the subject remains responsible for creating that
 artifact.
 
-!!! tip "User guide"
-
-    **In plain language:** Create the candidate with the tool you already use,
-    then give InvarLock the immutable before-and-after artifacts or complete
-    per-record results.
-
-    **Outcome:** A signed comparison bundle, an independently signed
-    verification receipt, and a human-readable report.
-
-    **Audience:** Model adaptation, runtime, evaluation, and release teams.
-
-    **Prerequisites:** Stable record IDs, a representative paired schedule, a
-    policy, and independently managed artifact, runtime, signer, and policy
-    identities.
+> **User guide**
+>
+> **In plain language:** Create the candidate with the tool you already use,
+> then give InvarLock the immutable before-and-after artifacts or complete
+> per-record results.
+>
+> **Outcome:** A signed comparison bundle, an independently signed
+> verification receipt, and an evidence report.
+>
+> **Audience:** Model adaptation, runtime, evaluation, and release teams.
+>
+> **Prerequisites:** Stable record IDs, a representative paired schedule, a
+> policy, and independently managed artifact, runtime, signer, and policy
+> identities.
 
 ## Choose the execution boundary
 
@@ -31,7 +31,8 @@ artifact.
 | GGUF artifact | Run mode | Optional [`invarlock-runtime-gguf`](https://github.com/invarlock/invarlock/tree/main/addins/gguf) package; [runnable llama.cpp journey](https://github.com/invarlock/invarlock/tree/main/examples/integrations/gguf-llama-cpp) |
 | Vision-text checkpoint | Run mode | Optional [`invarlock-runtime-hf-vision-text`](https://github.com/invarlock/invarlock/tree/main/addins/multimodal) package |
 | TensorRT-LLM engine | Run mode | Optional [`invarlock-runtime-tensorrt-llm`](https://github.com/invarlock/invarlock/tree/main/addins/tensorrt_llm) package |
-| Complete per-record results from a harness or endpoint | Import mode | Runtime-import authoring API and closed request contract; [runnable LM Evaluation Harness journey](https://github.com/invarlock/invarlock/tree/main/examples/integrations/lm-evaluation-harness) |
+| Complete InvarLock provider sidecars produced by a harness | Native import mode | Runtime-import authoring API and closed request contract; [runnable LM Evaluation Harness journey](https://github.com/invarlock/invarlock/tree/main/examples/integrations/lm-evaluation-harness) |
+| Evaluator exports or hosted endpoint captures | Captured mode | [Captured results](captured-results.md), with complete-run pins and captured assurance |
 
 The runtime must match the artifact that will be released. A quantized model
 loaded by llama.cpp should be evaluated through the GGUF provider rather than a
@@ -56,30 +57,38 @@ training · pruning · quantization · conversion · compilation
                 independent verify → report
 ```
 
-Configuration, lineage, throughput, memory, sparsity, and similar facts can be
-attached as authenticated observations. They do not influence acceptance
-unless a versioned policy and replayable scorer explicitly authorize them.
+Native requests can attach configuration, lineage, throughput, memory, sparsity,
+and similar facts as authenticated observations. Observation payloads have no
+acceptance authority; the selected scorer and its policy use their own
+authenticated inputs.
 
 ## Select a metric that matches the task
 
-- Use exact match for closed-answer tasks. InvarLock reports paired regressions,
-  paired improvements, effect size, an interval, and McNemar's exact test.
+- Use exact match for closed-answer tasks. Native pack-v1 reports include paired
+  regressions, paired improvements, effect size, an interval, and McNemar's exact
+  test. Captured exact-match comparisons report the effect and interval without
+  those discordance counts or McNemar probability.
 - Use normalized NLL for expected-continuation likelihood. It does not measure
   general model quality. When tokenizers and target-token accounting are
-  comparable, the report renders perplexity ratio as a derived interpretation,
-  not a second acceptance metric.
-- Use a verifier-replayable scorer extension for task-specific F1, structured
-  extraction, VQA normalization, or another deterministic text score computed
-  only from authenticated record facts.
-- Keep model-judge results as authenticated observations until the judge,
-  prompt, references, and calibration have an independently verifiable
-  acceptance contract.
+  comparable, native pack-v1 reports render perplexity ratio as a derived
+  interpretation, not a second acceptance metric. Captured NLL reports retain
+  the mean ratio and its interval without that perplexity interpretation.
+- Use a verifier-replayable native scorer extension for task-specific F1,
+  structured extraction, VQA normalization, or another deterministic text score
+  computed only from authenticated record facts.
+- Use the built-in `judge` scorer and [native judge workflow](evaluation-request.md#judge)
+  when fixed answers, a declared
+  rubric, a supported text judge, repeated ratings, and independent-unit
+  analysis fit the decision. Keep other model-judge results as authenticated
+  observations.
 
 ## Prepare a meaningful paired schedule
 
-Every conclusion is limited by its schedule. Baseline and subject must use the
-same stable IDs in the same order. Select records from the real task
-distribution, record the source revision and selection method, and include
+Every conclusion is limited by its schedule. Native baseline and subject
+observations must use the same stable IDs in schedule order. Captured
+deterministic comparisons require identical ID sets and matching input,
+reference and metadata facts; they pair records in sorted ID order. Select
+records from the real task distribution, record the source revision and selection method, and include
 important subgroups.
 
 A small tutorial can prove that integration code works; it cannot support a
@@ -114,9 +123,10 @@ invarlock report evidence/ --html verifier/report.html --explain
 ```
 
 Import mode uses the same public transaction without runtime-image arguments.
-It accepts complete per-record results with stable IDs, not aggregate scores.
-The verifier recomputes the named built-in or extension score from those
-records.
+It requires complete provider sidecars and paired records, not aggregate scores.
+For evaluator exports and hosted captures, use captured mode and its independent
+run/request pins. Deterministic scorers replay retained facts; judge verification
+replays admitted ratings and analysis without calling the judge again.
 
 ## Interpret the outcome
 

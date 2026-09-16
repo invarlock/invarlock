@@ -5,6 +5,11 @@ over two pinned checkpoints, imports every output, and completes `invarlock
 evaluate`, `invarlock verify`, and `invarlock report`. InvarLock recomputes the
 paired exact-match result instead of trusting the Harness aggregate.
 
+This launcher is an example-owned container bridge, not an installed Harness
+provider. It runs real inference and imports complete records into native
+InvarLock evidence. If you already have model outputs, the captured workflow
+below avoids rerunning them.
+
 Four profiles serve different purposes:
 
 | Profile | Models | Records | Runtime | Purpose |
@@ -20,31 +25,79 @@ backend, generation settings, seed, runtime image, task configuration, and
 per-record output digests. Remote model code and checkpoint generation defaults
 are disabled.
 
+## Capture an existing Harness workflow
+
+The profiles below use the example-owned signed OCI bridge. Existing Harness
+users can instead hand off per-case sample exports through the installed
+`lm-eval-samples` adapter, or map original records with
+`invarlock.engine.capture_evaluator_run`, then use the
+[captured-results workflow](../../captured-results/README.md). The selected
+InvarLock scorer owns the comparison; importing a Harness aggregate does not
+establish per-case facts.
+
+Generated samples can provide answer/reference text for exact match and task
+text for a declared judge recipe. Judge scoring requires complete retained calls
+or collection under that recipe. An explicit input projection preserves the
+original structured task; `prompt.reference_mode: per_case` adds a string
+reference to the judge request separately from the evaluated model input.
+
+For normalized NLL, capture the actual `HFLM` reference-continuation result, not a
+generation score or task aggregate. The
+[real Harness likelihood reference](../../captured-results/references/harness-likelihood/README.md)
+uses unmodified `lm-eval==0.4.12`, a pinned tiny GPT-2 snapshot and two independent
+CPU calls over six authored cases. It retains raw likelihood/greedy pairs,
+context and continuation tokens, UTF-8 counts, and model/tokenizer/configuration
+pins before a separate core-wheel signed evaluation and recipient replay.
+Its same-model conformance result does not qualify other tasks, models or the
+separate derived exact-match image used by the OCI profiles below.
+
 ## Run a profile
 
-From a clean committed checkout with Docker or Podman available, the quick
-profile is:
+Complete the [shared setup](../README.md#before-running-a-model-example), including
+Git, Make, Python, `uv`, Docker or Podman, external evidence/verifier/builder keys,
+and a new trust root. The first run downloads models and image dependencies.
+From the clean committed repository root, run the CPU quick profile:
 
 ```bash
-make example-lm-evaluation-harness EXAMPLE_ARGS="--evidence-signing-key /secure/keys/evidence.pem --verifier-signing-key /secure/keys/verifier.pem --builder-signing-key /secure/keys/builder.pem --builder-public-key /secure/keys/builder-public.pem --trust-root /secure/trust/lm-evaluation-harness"
+make example-lm-evaluation-harness EXAMPLE_ARGS="\
+  --evidence-signing-key /secure/keys/evidence.pem \
+  --verifier-signing-key /secure/keys/verifier.pem \
+  --builder-signing-key /secure/keys/builder.pem \
+  --builder-public-key /secure/keys/builder-public.pem \
+  --trust-root /secure/trust/lm-evaluation-harness"
 ```
 
-Select the Qwen3.5 flagship with:
+Run the Qwen3.5 flagship and retain an authenticated policy rejection if one occurs:
 
 ```bash
-make example-lm-evaluation-harness EXAMPLE_ARGS="--corpus-profile flagship --evidence-signing-key /secure/keys/evidence.pem --verifier-signing-key /secure/keys/verifier.pem --builder-signing-key /secure/keys/builder.pem --builder-public-key /secure/keys/builder-public.pem --trust-root /secure/trust/lm-evaluation-harness"
+make example-lm-evaluation-harness EXAMPLE_ARGS="--corpus-profile flagship --allow-policy-fail \
+  --evidence-signing-key /secure/keys/evidence.pem \
+  --verifier-signing-key /secure/keys/verifier.pem \
+  --builder-signing-key /secure/keys/builder.pem \
+  --builder-public-key /secure/keys/builder-public.pem \
+  --trust-root /secure/trust/lm-evaluation-harness-flagship"
 ```
 
 Select the compact deployment profile with:
 
 ```bash
-make example-lm-evaluation-harness EXAMPLE_ARGS="--corpus-profile deployment --evidence-signing-key /secure/keys/evidence.pem --verifier-signing-key /secure/keys/verifier.pem --builder-signing-key /secure/keys/builder.pem --builder-public-key /secure/keys/builder-public.pem --trust-root /secure/trust/lm-evaluation-harness"
+make example-lm-evaluation-harness EXAMPLE_ARGS="--corpus-profile deployment \
+  --evidence-signing-key /secure/keys/evidence.pem \
+  --verifier-signing-key /secure/keys/verifier.pem \
+  --builder-signing-key /secure/keys/builder.pem \
+  --builder-public-key /secure/keys/builder-public.pem \
+  --trust-root /secure/trust/lm-evaluation-harness-deployment"
 ```
 
 Select the Gemma 4 portability profile with:
 
 ```bash
-make example-lm-evaluation-harness EXAMPLE_ARGS="--corpus-profile portability --evidence-signing-key /secure/keys/evidence.pem --verifier-signing-key /secure/keys/verifier.pem --builder-signing-key /secure/keys/builder.pem --builder-public-key /secure/keys/builder-public.pem --trust-root /secure/trust/lm-evaluation-harness"
+make example-lm-evaluation-harness EXAMPLE_ARGS="--corpus-profile portability --allow-policy-fail \
+  --evidence-signing-key /secure/keys/evidence.pem \
+  --verifier-signing-key /secure/keys/verifier.pem \
+  --builder-signing-key /secure/keys/builder.pem \
+  --builder-public-key /secure/keys/builder-public.pem \
+  --trust-root /secure/trust/lm-evaluation-harness-portability"
 ```
 
 The GPU profiles require an NVIDIA CUDA runtime and enough memory for one model
@@ -56,6 +109,12 @@ Pass `--workspace PATH` to retain the complete transaction at a new path. The
 launcher otherwise creates a temporary workspace and prints it at completion.
 It removes the exact temporary base and evaluator image tags it creates,
 including when the workspace is retained.
+
+Completion prints the evidence, separately signed verification receipt and HTML
+report paths. The flagship and portability commands above allow a verified
+policy rejection to remain a completed example, matching the retained outcomes.
+Inspect the receipt's `policy_verdict`; successful execution of the example is
+not itself a passing model decision.
 
 ## Frozen 400-record suite
 
@@ -97,8 +156,18 @@ the declared −2-point floor.
 
 ## Trust boundary
 
-The command builds a source-authenticated runtime and adds a cache-free package
-derived from the hash-pinned `lm-eval` 0.4.12 wheel. The immutable inspected
+The command builds a source-authenticated runtime and adds
+`lm-eval==0.4.12+invarlock.exactmatch.1`, derived from the hash-pinned upstream
+0.4.12 wheel. This image supports the fixed HF causal `generate_until` and
+exact-match path. Its selected scorer and HF execution code remain unchanged.
+Response caching is explicitly disabled, and unused ROUGE and NLTK dependencies
+are removed. ROUGE metrics and NLTK-dependent task suites are unsupported in
+this image. Their upstream modules can fail on missing optional dependencies;
+the maintained entry point fixes its task and scorer.
+The broader qualification profiles and historical signed transactions retain
+their original dependency identities.
+
+The immutable inspected
 image ID is bound into both runtime receipts and a builder-signed image
 attestation before the evidence is signed.
 

@@ -1,14 +1,19 @@
 from __future__ import annotations
 
+import hashlib
 import inspect
 import json
 import math
 import os
 import re
+import shlex
+import shutil
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
+import pytest
 import yaml
 
 from scripts.release import verify_hosted_distributions as hosted_verifier
@@ -93,6 +98,26 @@ def test_workflow_pip_installs_use_hashed_lock_files() -> None:
     assert offenders == []
 
 
+def test_hf_installed_audit_binds_reviewed_locks_and_preserves_report() -> None:
+    steps = _steps(_load(WORKFLOWS / "supply-chain-pr.yml"))
+    arguments = shlex.split(_step(steps, "Run HF surface pip-audit")["run"])
+    for flag in ("installed-lock", "installed-bootstrap-lock"):
+        path = Path(arguments[arguments.index(f"--{flag}") + 1])
+        expected = arguments[arguments.index(f"--{flag}-sha256") + 1]
+        assert hashlib.sha256(path.read_bytes()).hexdigest() == expected
+    install = _step(steps, "Create HF surface venv")["run"]
+    for line in install.splitlines():
+        if "pip install" in line and "pip-bootstrap" not in line:
+            assert "--no-compile" in line
+    assert "--ignore-vuln" not in arguments
+    assert "--installed-project-wheel" in arguments
+    assert "--installed-wheel" in arguments
+    report = arguments[arguments.index("--report") + 1]
+    upload = _step(steps, "Upload HF installed audit")
+    assert upload["if"] == "${{ always() }}"
+    assert upload["with"]["path"] == report
+
+
 def test_container_front_door_authenticates_its_runtime_source_bundle() -> None:
     workflow = _load(WORKFLOWS / "container-front-door-smoke.yml")
     steps = workflow["jobs"]["smoke"]["steps"]
@@ -173,6 +198,56 @@ def test_pr_supply_chain_scans_only_shipped_dependency_surfaces() -> None:
     )
 
 
+@pytest.mark.parametrize(
+    "excluded_path",
+    [
+        None,
+        "src/invarlock/captured_evidence_publication.py",
+        "src/invarlock/pipeline/evidence.py",
+        "examples/qualification/k2-horizon/model-card-observations.json",
+        "examples/qualification/k2_runtime_expat.py",
+        "examples/captured-results/harness_model_comparison.py",
+        "examples/captured-results/harness_likelihood_rehearsal.py",
+        "examples/captured-results/references/mistral-7b-likelihood/capture/baseline/protocol.json",
+        "examples/captured-results/references/mistral-7b-likelihood/capture/subject/protocol.json",
+        "examples/hosted-service/references/mistral-7b-http/capture/checkpoint-loader-source.txt",
+        "examples/hosted-service/references/mistral-7b-http/capture/checkpoint-loading-protocol.json",
+        "src/invarlock/judge_measurements/acceptance.py",
+        "src/invarlock/judge_measurements/evidence.py",
+    ],
+)
+def test_supply_chain_scanner_probe_rejects_broad_path_exclusions(
+    tmp_path: Path, excluded_path: str | None
+) -> None:
+    if shutil.which("gitleaks") is None:
+        pytest.skip("the pinned Gitleaks executable is required for the workflow probe")
+    workflow = _load(WORKFLOWS / "supply-chain-pr.yml")
+    probe = _step(workflow["jobs"]["scan"]["steps"], "Test gitleaks allowlist boundary")
+    config = Path(".gitleaks.toml").read_text(encoding="utf-8")
+    if excluded_path:
+        config += (
+            '\n[[allowlists]]\ndescription = "Deliberately overbroad test allowance"\n'
+            f"paths = ['''^{re.escape(excluded_path)}$''']\n"
+        )
+    (tmp_path / ".gitleaks.toml").write_text(config, encoding="utf-8")
+    result = subprocess.run(
+        ["bash", "-c", probe["run"]],
+        cwd=tmp_path,
+        env={
+            **os.environ,
+            "GITHUB_WORKSPACE": str(tmp_path),
+            "PATH": f"{Path(sys.executable).parent}{os.pathsep}{os.environ['PATH']}",
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if excluded_path:
+        assert result.returncode != 0
+    else:
+        assert result.returncode == 0, result.stderr
+
+
 def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> None:
     workflow = _load(WORKFLOWS / "release.yml")
     jobs = workflow["jobs"]
@@ -217,7 +292,7 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     )
     distribution_build = _step(build["steps"], "Build first-party distributions")["run"]
     assert "python -m build --no-isolation" in distribution_build
-    for addin in ("diagnostics", "gguf", "multimodal", "tensorrt_llm"):
+    for addin in ("diagnostics", "gguf", "multimodal", "tensorrt_llm", "inspect_judge"):
         assert f"addins/{addin}" in distribution_build
 
     assert _step(build["steps"], "Run complete repository gates")["run"] == (
@@ -255,8 +330,8 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
 
     digest_record = _step(build["steps"], "Record distribution digests")["run"]
     assert 'dist / "SHA256SUMS"' in digest_record
-    assert "len(wheels) != 5" in digest_record
-    assert "len(source_archives) != 5" in digest_record
+    assert "len(wheels) != 6" in digest_record
+    assert "len(source_archives) != 6" in digest_record
     assert "ledger_sha256=" in digest_record
     assert build["outputs"]["dist_ledger_sha256"] == (
         "${{ steps.dist_digests.outputs.ledger_sha256 }}"
@@ -301,22 +376,10 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     assert "is_relative_to(site)" in install_smoke
     assert "first-party version mismatch" in install_smoke
     assert "release tag/version mismatch" in install_smoke
-    assert "examples/quickstart/run.py" in install_smoke
-    assert "examples/acceptance-handoff/golden" in install_smoke
-    assert "python run.py --fixture golden" in install_smoke
-    assert "examples/ci/standalone-consumer/." in install_smoke
-    assert (
-        "examples/evaluator-qualification/signed-transactions/"
-        "deployment-approval-inspect-ai/evidence"
-    ) in install_smoke
-    assert "signed-transactions/inspect-ai/" not in install_smoke
-    assert "review/verify_deployment_receipt.py" in install_smoke
-    assert install_smoke.index(core_install) < install_smoke.index(
-        "python run.py --fixture golden"
-    )
-    assert install_smoke.index("review/verify_deployment_receipt.py") < (
-        install_smoke.index(addin_install)
-    )
+    consumers = "scripts/release/core_wheel_consumers.py"
+    assert install_smoke.index(core_install) < install_smoke.index(consumers)
+    assert install_smoke.index(consumers) < install_smoke.index(addin_install)
+
     assert (
         _step(build["steps"], "Install smoke from wheel")["env"][
             "INVARLOCK_RELEASE_TAG"
@@ -325,6 +388,7 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     )
     for project in (
         "invarlock-diagnostics",
+        "invarlock-inspect-judge",
         "invarlock-runtime-gguf",
         "invarlock-runtime-hf-vision-text",
         "invarlock-runtime-tensorrt-llm",
@@ -515,6 +579,7 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     for project in (
         "invarlock",
         "invarlock-diagnostics",
+        "invarlock-inspect-judge",
         "invarlock-runtime-gguf",
         "invarlock-runtime-hf-vision-text",
     ):
@@ -563,6 +628,7 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     for package in (
         "core",
         "diagnostics",
+        "inspect-judge",
         "runtime-gguf",
         "runtime-hf-vision-text",
         "runtime-tensorrt-llm",
@@ -614,6 +680,7 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     for project in (
         "invarlock",
         "invarlock-diagnostics",
+        "invarlock-inspect-judge",
         "invarlock-runtime-gguf",
         "invarlock-runtime-hf-vision-text",
         "invarlock-runtime-tensorrt-llm",
@@ -766,22 +833,8 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     assert "get_plugin_info" in smoke["run"]
     assert "is_relative_to(site)" in smoke["run"]
     assert "first-party version mismatch" in smoke["run"]
-    assert "examples/quickstart/run.py" in smoke["run"]
-    assert "examples/acceptance-handoff/golden" in smoke["run"]
-    assert "python run.py --fixture golden" in smoke["run"]
-    assert "examples/ci/standalone-consumer/." in smoke["run"]
-    assert (
-        "examples/evaluator-qualification/signed-transactions/"
-        "deployment-approval-inspect-ai/evidence"
-    ) in smoke["run"]
-    assert "signed-transactions/inspect-ai/" not in smoke["run"]
-    assert "review/verify_deployment_receipt.py" in smoke["run"]
-    assert smoke["run"].index(core_install) < smoke["run"].index(
-        "python run.py --fixture golden"
-    )
-    assert smoke["run"].index("review/verify_deployment_receipt.py") < (
-        smoke["run"].index(addin_install)
-    )
+    assert smoke["run"].index(core_install) < smoke["run"].index(consumers)
+    assert smoke["run"].index(consumers) < smoke["run"].index(addin_install)
 
     assert "record_testpypi_promotion" not in jobs
 
@@ -892,6 +945,7 @@ def test_release_publication_plan_is_closed_and_phase_specific(tmp_path: Path) -
         "complete": [
             "core",
             "diagnostics",
+            "inspect-judge",
             "runtime-gguf",
             "runtime-hf-vision-text",
             "runtime-tensorrt-llm",
@@ -899,6 +953,7 @@ def test_release_publication_plan_is_closed_and_phase_specific(tmp_path: Path) -
         "bootstrap": [
             "core",
             "diagnostics",
+            "inspect-judge",
             "runtime-gguf",
             "runtime-hf-vision-text",
         ],
@@ -951,6 +1006,7 @@ def test_release_stages_each_distribution_before_its_publish_job(
     expected_prefixes = {
         "core": (release_dist, "invarlock"),
         "diagnostics": (addin_dist, "invarlock_diagnostics"),
+        "inspect-judge": (addin_dist, "invarlock_inspect_judge"),
         "runtime-gguf": (addin_dist, "invarlock_runtime_gguf"),
         "runtime-hf-vision-text": (
             addin_dist,
@@ -1186,3 +1242,20 @@ def test_repo_hygiene_covers_integration_branch_and_renames() -> None:
     )
     assert "--diff-filter=ACMR" in generated["run"]
     assert "--diff-filter=ACMR" in large["run"]
+
+
+def test_runtime_workflow_installs_verify_the_derived_wheel_before_resolution() -> None:
+    for path in sorted(WORKFLOWS.glob("*.yml")):
+        for step in _steps(_load(path)):
+            command = str(step.get("run", ""))
+            for line in command.splitlines():
+                if "pip install" not in line or not any(
+                    lock in line for lock in ("/ci-hf-", "/hf-py")
+                ):
+                    continue
+                assert "--find-links runtime/wheels" in line, (path, step)
+                prefix = command.split(line, 1)[0]
+                assert (
+                    "python scripts/security/build_hardened_accelerate_wheel.py bootstrap"
+                    in prefix
+                ), (path, step)

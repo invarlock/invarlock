@@ -857,3 +857,67 @@ def test_verification_binding_requires_strict_result_and_anchor_inventory(
 def test_inputs_rejects_invalid_source_commit_before_opening_inputs() -> None:
     with pytest.raises(qualification.QualificationError, match="source commit"):
         qualification._inputs(SimpleNamespace(source_commit="not-a-commit"))
+
+
+@pytest.mark.parametrize("failure", ["parent-close", "wheel-fdopen"])
+def test_acquired_descriptors_remain_owned_on_transfer_failure(
+    tmp_path, monkeypatch, failure
+):
+    import errno
+
+    opened = []
+    real_open, real_dup, real_close, real_fstat = os.open, os.dup, os.close, os.fstat
+    child = None
+    injected = False
+
+    def track_open(path, flags, *args, **kwargs):
+        nonlocal child
+        fd = real_open(path, flags, *args, **kwargs)
+        opened.append(fd)
+        if path == "child":
+            child = fd
+        return fd
+
+    def track_dup(fd):
+        duplicate = real_dup(fd)
+        opened.append(duplicate)
+        return duplicate
+
+    def fail_close(fd):
+        nonlocal injected
+        real_close(fd)
+        if (
+            failure == "parent-close"
+            and child is not None
+            and fd != child
+            and not injected
+        ):
+            injected = True
+            raise OSError(errno.EIO, "close failed")
+
+    def fail_fdopen(*_args, **_kwargs):
+        raise OSError(errno.EIO, "stream adoption failed")
+
+    spec = _candidate_wheel_with_members(tmp_path, ())
+    target = tmp_path / "child"
+    target.mkdir()
+    monkeypatch.setattr(qualification.os, "open", track_open)
+    monkeypatch.setattr(qualification.os, "dup", track_dup)
+    monkeypatch.setattr(qualification.os, "close", fail_close)
+    monkeypatch.setattr(qualification.os, "fdopen", fail_fdopen)
+    with pytest.raises(qualification.QualificationError):
+        if failure == "parent-close":
+            with qualification._opened_real_directory(target, label="test"):
+                pytest.fail("failed parent release must not yield a directory")
+        else:
+            _capture_candidate(spec, tmp_path=tmp_path)
+    leaked = []
+    for fd in set(opened):
+        try:
+            real_fstat(fd)
+        except OSError as exc:
+            assert exc.errno == errno.EBADF
+        else:
+            leaked.append(fd)
+            real_close(fd)
+    assert opened and not leaked, "acquired descriptors must close on setup failure"

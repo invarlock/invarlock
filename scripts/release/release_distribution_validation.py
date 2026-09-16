@@ -29,7 +29,10 @@ MAX_METADATA_BYTES = 1_048_576
 MAX_ARCHIVE_MEMBERS = 50_000
 RUNTIME_PACKAGE_SUFFIXES = frozenset({".json", ".py", ".pyi", ".yaml", ".yml"})
 RUNTIME_PACKAGE_FILENAMES = frozenset({"py.typed"})
-IGNORED_RUNTIME_PACKAGE_FILENAMES = frozenset({".DS_Store"})
+NATIVE_STARTER_DATA_FILES = frozenset(
+    {"_data/examples/native-judge/README.md", "_data/examples/native-judge/cases.jsonl"}
+)
+OS_METADATA_FILENAMES = frozenset({".DS_Store", "Thumbs.db", "desktop.ini"})
 IMPORT_AFFECTING_SUFFIXES = frozenset({".pth"})
 EXECUTABLE_PAYLOAD_SUFFIXES = frozenset(
     {".dll", ".dylib", ".exe", ".pyd", ".py", ".pyc", ".pyo", ".so"}
@@ -103,6 +106,8 @@ class ExpectedPackageMetadata:
     requires_python: str | None
     requires_dist: tuple[RequirementIdentity, ...]
     provides_extra: tuple[str, ...]
+    description_content_type: str | None = None
+    description_body: str | None = None
 
 
 @dataclass(frozen=True)
@@ -215,6 +220,78 @@ def _parse_package_metadata(
         raise ReleasePreflightError(
             f"{label} metadata Provides-Extra does not match checkout"
         )
+    if expected.description_content_type is not None:
+        content_types = message.get_all("Description-Content-Type", [])
+        if (
+            len(content_types) != 1
+            or str(content_types[0]) != expected.description_content_type
+        ):
+            raise ReleasePreflightError(
+                f"{label} metadata Description-Content-Type does not match checkout"
+            )
+    if expected.description_body is not None:
+        # Core metadata is UTF-8, even when the email parser defaults to ASCII.
+        payload = message.get_payload(decode=True)
+        try:
+            if not isinstance(payload, bytes):
+                raise ValueError("description is not a text payload")
+            description = payload.decode("utf-8")
+        except (UnicodeDecodeError, ValueError) as exc:
+            raise ReleasePreflightError(
+                f"{label} metadata README body is malformed"
+            ) from exc
+        if _normalize_description(description) != _normalize_description(
+            expected.description_body
+        ):
+            raise ReleasePreflightError(
+                f"{label} metadata README body does not match checkout"
+            )
+
+
+def _normalize_description(value: str) -> str:
+    # Archive writers may use CRLF and add a final newline. Preserve all other
+    # whitespace, including Markdown's meaningful trailing spaces/blank lines.
+    value = value.replace("\r\n", "\n").replace("\r", "\n")
+    return value + "\n" if value and not value.endswith("\n") else value
+
+
+def _expected_readme(
+    project_root: Path, project: dict[str, object]
+) -> tuple[str | None, str | None]:
+    readme = project.get("readme")
+    if readme is None:
+        return None, None
+    if isinstance(readme, str):
+        filename = readme
+        content_type = {
+            ".md": "text/markdown",
+            ".rst": "text/x-rst",
+        }.get(Path(filename).suffix.lower())
+        text = None
+    elif isinstance(readme, dict):
+        filename = readme.get("file")
+        text = readme.get("text")
+        content_type = readme.get("content-type")
+        if (filename is None) == (text is None):
+            raise ReleasePreflightError("checkout project readme is invalid")
+    else:
+        raise ReleasePreflightError("checkout project readme is invalid")
+    if not isinstance(content_type, str) or not content_type.strip():
+        raise ReleasePreflightError("checkout readme content type is invalid")
+    if filename is not None:
+        if not isinstance(filename, str) or not _safe_archive_member_name(filename):
+            raise ReleasePreflightError("checkout readme file is invalid")
+        path = project_root / filename
+        if not _is_within(path, project_root):
+            raise ReleasePreflightError("checkout readme file is outside the project")
+        _require_regular_file(path, "checkout readme")
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as exc:
+            raise ReleasePreflightError("checkout readme is unreadable") from exc
+    if not isinstance(text, str):
+        raise ReleasePreflightError("checkout readme text is invalid")
+    return content_type, text
 
 
 def _canonical_specifier(value: str, *, label: str) -> str:
@@ -331,12 +408,15 @@ def _expected_package_metadata(project_root: Path) -> ExpectedPackageMetadata:
             )
             for value in values
         )
+    description_content_type, description_body = _expected_readme(project_root, project)
     return ExpectedPackageMetadata(
         name=name,
         version=version,
         requires_python=requires_python,
         requires_dist=tuple(sorted(requirements)),
         provides_extra=tuple(sorted(extras)),
+        description_content_type=description_content_type,
+        description_body=description_body,
     )
 
 
@@ -537,6 +617,13 @@ def _package_ancestor(path: str, package_path: str) -> bool:
     return bool(normalized) and package_path.startswith(f"{normalized}/")
 
 
+def _is_os_metadata_path(value: str) -> bool:
+    return any(
+        part in OS_METADATA_FILENAMES or part.startswith("._")
+        for part in PurePosixPath(value).parts
+    )
+
+
 def _checkout_package_files(
     spec: DistributionValidationSpec,
 ) -> dict[str, CheckoutSource]:
@@ -550,9 +637,7 @@ def _checkout_package_files(
     sources: dict[str, CheckoutSource] = {}
     for path in sorted(source_root.rglob("*")):
         relative = path.relative_to(source_root)
-        if "__pycache__" in relative.parts or path.name in (
-            IGNORED_RUNTIME_PACKAGE_FILENAMES
-        ):
+        if "__pycache__" in relative.parts or _is_os_metadata_path(relative.as_posix()):
             continue
         if path.is_symlink():
             raise ReleasePreflightError(
@@ -567,6 +652,10 @@ def _checkout_package_files(
         if (
             path.suffix not in RUNTIME_PACKAGE_SUFFIXES
             and path.name not in RUNTIME_PACKAGE_FILENAMES
+            and not (
+                spec.package_path == "invarlock"
+                and relative.as_posix() in NATIVE_STARTER_DATA_FILES
+            )
         ):
             raise ReleasePreflightError(
                 "checkout runtime package contains an unexpected file"
@@ -643,6 +732,10 @@ def _validate_wheel_distribution(
                 if not _safe_archive_member_name(member.filename):
                     raise ReleasePreflightError(
                         "wheel has an unsafe archive member name"
+                    )
+                if _is_os_metadata_path(member.filename):
+                    raise ReleasePreflightError(
+                        "wheel must not contain operating-system metadata"
                     )
                 if stat.S_ISLNK(member.external_attr >> 16):
                     raise ReleasePreflightError("wheel contains a symbolic link")
@@ -790,6 +883,10 @@ def _validate_sdist_distribution(
                 if not _safe_archive_member_name(member.name):
                     raise ReleasePreflightError(
                         "sdist has an unsafe archive member name"
+                    )
+                if _is_os_metadata_path(member.name):
+                    raise ReleasePreflightError(
+                        "sdist must not contain operating-system metadata"
                     )
                 if not (member.isdir() or member.isreg()):
                     raise ReleasePreflightError(

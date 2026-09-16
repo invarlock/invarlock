@@ -4,12 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "invarlock"
-version = "0.15.0"
+version = "0.16.0"
 description = "Paired model release-regression evaluation with independently verifiable evidence"
 authors = [{ name = "InvarLock Team", email = "oss@invarlock.dev" }]
 maintainers = [{ name = "InvarLock Maintainers", email = "support@invarlock.dev" }]
 license = "Apache-2.0"
-readme = { file = "README.md", content-type = "text/markdown" }
+readme = { file = "packaging/README.md", content-type = "text/markdown" }
 requires-python = ">=3.12"
 keywords = [
   "machine-learning", "evaluation", "verification", "evidence",
@@ -38,43 +38,31 @@ dependencies = [
 [project.urls]
 Homepage = "https://invarlock.ai"
 Repository = "https://github.com/invarlock/invarlock"
-Documentation = "https://invarlock.github.io/invarlock/0.15.0/"
+Documentation = "https://invarlock.github.io/invarlock/0.16.0/"
 Issues = "https://github.com/invarlock/invarlock/issues"
-Changelog = "https://github.com/invarlock/invarlock/blob/v0.15.0/CHANGELOG.md"
+Changelog = "https://github.com/invarlock/invarlock/blob/v0.16.0/CHANGELOG.md"
 
 [project.optional-dependencies]
-# Canonical built-in Hugging Face runtime. GGUF and TensorRT-LLM are separate
-# first-party distributions under addins/.
-hf = [
-  "accelerate>=1.14.0",
-  "torch>=2.11.0,!=2.12.0",
-  "transformers>=5.14.1",
-  "safetensors>=0.8.0",
-  "protobuf>=4.25",
-  "sentencepiece>=0.2.2",
-  "tiktoken>=0.9.0",
-]
-
 # Development dependencies
 dev = [
   "pytest>=9.1.1",
   "pytest-cov>=7.1.0",
   "pytest-xdist>=3.6",
   "pillow>=11.3,<13",
-  "ruff==0.16.2",
-  "mypy==2.3.0",
+  "ruff==0.16.7",
+  "mypy==2.3.1",
   "types-jsonschema>=4.26",
   "hypothesis>=6.98",
   "pre-commit>=4.6.1",
+  "markdown>=3.10.2",
+  "markdown-it-py>=4.0.0",
   "mkdocs>=1.5",
-  "mkdocs-material>=9.7.6",
+  "mkdocs-material>=9.7.7",
   "mkdocs-mermaid2-plugin>=1.2.3",
   "pymdown-extensions>=11.0.0",
   "build>=0.10.0",
-  "wheel>=0.47.0",
+  "wheel>=0.48.0",
   "twine>=4.0.0",
-  "peft==0.20.0",
-  "torchao==0.18.0",
 ]
 
 ci = [
@@ -84,20 +72,20 @@ ci = [
   "pytest-xdist>=3.6",
   "pillow>=11.3,<13",
   "hypothesis>=6.98",
-  "ruff==0.16.2",
-  "mypy==2.3.0",
+  "ruff==0.16.7",
+  "mypy==2.3.1",
   "types-jsonschema>=4.26",
   "build>=0.10.0",
-  "wheel>=0.47.0",
+  "markdown>=3.10.2",
+  "markdown-it-py>=4.0.0",
+  "wheel>=0.48.0",
   "twine>=4.0.0",
-  "peft==0.20.0",
-  "torchao==0.18.0",
 ]
 
 docs-ci = [
   "linkchecker>=10.6.0",
   "mkdocs>=1.5",
-  "mkdocs-material>=9.7.6",
+  "mkdocs-material>=9.7.7",
   "mkdocs-mermaid2-plugin>=1.2.3",
   "pymdown-extensions>=11.0.0",
 ]
@@ -109,25 +97,46 @@ precommit-ci = [
 release-ci = [
   "build>=0.10.0",
   "setuptools>=83.0.0",
-  "wheel==0.47.0",
+  "wheel==0.48.0",
   "twine>=4.0.0",
   "cyclonedx-bom>=4.1",
 ]
 
 security-ci = [
-  "pip>=26.1.2",
+  "pip>=26.2",
   "pip-audit>=2.8",
   "msgpack>=1.2.1",
   "cyclonedx-bom>=4.1",
 ]
 
+# Runtime preparation is source-bound and uses the verified generated wheelhouse.
+# Public extras contain tooling only; they cannot supply this local wheel.
 [dependency-groups]
+hf = [
+  "accelerate==1.14.0+invarlock.1",
+  "torch>=2.11.0,!=2.12.0",
+  "transformers>=5.14.1",
+  "safetensors>=0.8.0",
+  "protobuf>=4.25",
+  "sentencepiece>=0.2.2",
+  "tiktoken>=0.9.0",
+]
+runtime-test = [
+  {include-group = "hf"},
+  "peft==0.20.0",
+  "torchao==0.18.0",
+]
 example-peft = [
+  {include-group = "hf"},
   "peft==0.20.0",
 ]
 example-torchao = [
+  {include-group = "hf"},
   "torchao==0.18.0",
 ]
+
+[tool.uv]
+find-links = ["runtime/wheels"]
 
 [project.entry-points."invarlock.runtime_providers"]
 hf_transformers = "invarlock.runtime_providers.hf_transformers:HFTransformersProvider"
@@ -145,7 +154,11 @@ where = ["src"]
 "invarlock" = [
   "_data/contracts/*.json",
   "_data/public_evidence/*.json",
+  "_data/examples/native-judge/*",
 ]
+
+[tool.setuptools.exclude-package-data]
+"*" = [".DS_Store", "._*", "Thumbs.db", "desktop.ini"]
 
 # Enable namespace packages
 [tool.setuptools]

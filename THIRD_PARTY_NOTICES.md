@@ -20,10 +20,12 @@ The `invarlock` distribution declares these direct runtime dependencies in
 | `pyyaml` | [yaml/pyyaml](https://github.com/yaml/pyyaml) | MIT | Evaluation request parsing |
 | `jsonschema` | [python-jsonschema/jsonschema](https://github.com/python-jsonschema/jsonschema) | MIT | Public contract validation |
 
-## Hugging Face extra
+## Hugging Face runtime group
 
-The built-in Hugging Face provider is installed with the `hf` extra. Its direct
-optional dependencies are:
+The built-in Hugging Face provider executes in the maintained runtime image.
+The repository `hf` dependency group supplies the same stack for preparation
+and development, including the verified source-derived Accelerate wheel. Its
+direct dependencies are:
 
 | Component | Upstream | License | Use |
 | --- | --- | --- | --- |
@@ -37,15 +39,16 @@ optional dependencies are:
 
 ## First-party optional distributions
 
-The release builds five separately installable Python distributions:
+The release builds the core and five optional Python distributions:
 
 | Distribution | Direct runtime dependency boundary |
 | --- | --- |
-| `invarlock` | Core dependencies above; the Hugging Face stack is an optional extra |
+| `invarlock` | Core dependencies above; the Hugging Face stack belongs to the runtime image and repository groups |
 | `invarlock-diagnostics` | NumPy, licensed under BSD 3-Clause |
 | `invarlock-runtime-gguf` | A compatible `invarlock` core distribution |
-| `invarlock-runtime-hf-vision-text` | A compatible `invarlock` core distribution; its `runtime` extra adds the Hugging Face stack and Pillow (HPND) |
+| `invarlock-runtime-hf-vision-text` | A compatible `invarlock` core distribution and Pillow (HPND); the runtime image supplies the inference stack |
 | `invarlock-runtime-tensorrt-llm` | A compatible `invarlock` core distribution |
+| `invarlock-inspect-judge` | A compatible `invarlock` core distribution; its `inspect` extra adds Inspect AI, the OpenAI client and `httpx` |
 
 The GGUF, vision-text, and TensorRT-LLM connector wheels do not bundle model
 weights or native backends. The vision-text image adds Pillow from a hash-pinned
@@ -57,10 +60,15 @@ whose CUDA, TensorRT, and other components remain subject to their upstream
 license terms. Inspect the relevant Dockerfile, pinned requirements, image
 contents, and generated SBOM before redistributing an image.
 
+The Inspect judge package supports bounded collection and retained export import.
+The optional evaluator and provider clients remain separately installed; their
+upstream license files and the installed artifact metadata apply. The core
+verifies retained judge evidence without these optional clients.
+
 ## Public qualification data
 
-The repository contains deterministic 400-record qualification schedules
-derived from these pinned public datasets:
+The native and evaluator qualification references include deterministic
+400-record schedules derived from these pinned public datasets:
 
 | Dataset | Upstream license | Material represented in evidence |
 | --- | --- | --- |
@@ -138,6 +146,19 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+## Retained judge task data
+
+The judge references also contain selected SQuAD 2.0 question/context material
+and Schema-Guided Dialogue (SGD) extraction tasks, frozen answers and retained
+ratings. Their original source revisions, publisher notices and transformation
+records are retained with the [frozen-answer attribution](examples/judge-measurements/references/k2-32b/ATTRIBUTION.md)
+and inside each reference archive.
+
+SGD-derived data retains its CC BY-SA 4.0 terms. SQuAD includes Wikipedia-derived
+text; its MIT software license does not relicense all dataset material. Preserve
+the supplied attribution and applicable source terms. These selected records
+are not relicensed under InvarLock's Apache-2.0 software license.
 
 ## External artifacts
 

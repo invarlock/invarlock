@@ -1,22 +1,26 @@
 # Pairing and replay
 
-!!! abstract "Assurance note"
-    **In plain language:** Baseline and subject results are comparable only
-    when they cover the same records in the same order with the same inputs.
-    Any mismatch stops verification instead of being averaged away.
+> **Assurance note**
+>
+> **In plain language:** Baseline and subject must refer to the same declared
+> cases under the selected pairing contract. Missing required measurements
+> prevent acceptance; they are not silently discarded to improve the result.
+>
+> **Question:** How does verification establish matching cases and handle
+> ordering, changed inputs and missing measurements in each workflow?
+>
+> **Decision use:** Use this page to diagnose pairing failures and to judge
+> whether imported or executed observations support the same replay claim.
+>
+> **Evidence:** The canonical schedule, ordered provider observations,
+> record and input digests, derived paired records, and exact replay checks.
 
-    **Question:** How does verification establish that baseline and subject
-    results describe the same ordered evaluation records?
-
-    **Decision use:** Use this page to diagnose pairing failures and to judge
-    whether imported or executed observations support the same replay claim.
-
-    **Evidence:** The canonical schedule, ordered provider observations,
-    record and input digests, derived paired records, and exact replay checks.
-
-Pairing is the central comparison invariant. The baseline and subject must
-produce one successful observation for every scheduled record, in exactly the
-same order, with the same record identity and input digest.
+Pairing is the central comparison invariant. In native pack-v1 evidence, the
+baseline and subject must produce one successful observation for every scheduled
+record, in exactly the same order, with the same record identity and input digest.
+The derivation below describes that native contract. Captured comparisons pair
+by unique record ID, while judge replay additionally binds each scheduled trial;
+their rules are described below.
 
 ## Notation
 
@@ -56,7 +60,9 @@ The `invarlock/runtime-behavioral-schedule-v1` document contains:
 - a unique, safe logical `record_id` for each record;
 - an ordered array of authenticated text or content input parts and its
   lowercase SHA-256 digest; and
-- nonempty `expected_output` used by all supported metrics.
+- nonempty `expected_output` retained with each scheduled record. Exact match
+  compares against it and NLL scores its continuation. Native judging includes
+  it in judge prompts only when the plan selects per-case reference mode.
 
 The loader rejects unknown fields, unsafe logical names, duplicate record IDs,
 empty material, hosted-dataset revisions that are not canonical, and an input
@@ -163,12 +169,13 @@ these observations all fail closed:
 | Correct IDs, `sample-002` has `status: error` | Partial evidence is not scored |
 | Correct records, wrong `schedule_sha256` | Observation is bound to another schedule |
 
-The verifier never sorts, intersects, truncates, or drops records to manufacture
+The native pack-v1 verifier never sorts, intersects, truncates, or drops records to manufacture
 a paired subset.
 
-## Run and import equivalence
+## Native run and import equivalence
 
-Run mode asks installed providers to authenticate and score both artifacts.
+For native exact match, NLL and deterministic extensions, run mode asks
+installed providers to authenticate and score both artifacts.
 Import mode accepts complete provider evidence created elsewhere. Both modes
 converge on the same pair derivation, canonical report, and
 `invarlock/evidence-pack-v1` publication path.
@@ -177,14 +184,41 @@ Import mode is not a relaxed path. Imported paired records must equal the pairs
 derived from the imported schedule and provider observations. All provider,
 artifact, runtime, order, digest, and score checks still apply.
 
+Native judge run/import modes reuse authenticated provider capture but publish
+the separate judge evidence format. They additionally bind frozen answers,
+planned judge trials and retained measurements; they do not publish a native
+pack-v1 judge comparison report.
+
 See the [evaluation request guide](../user-guide/evaluation-request.md) for the
 two request shapes and the
 [provider contracts](../reference/contracts.md#provider-contracts) for their
 versioned documents.
 
+## Captured records and judge trials
+
+Captured comparison requires equal sets of unique record IDs and canonical
+equality of each pair's input, expected value and metadata. It sorts pairs by
+record ID, so differing export order alone is not a pairing failure. Explicit
+text projection also retains and verifies the original input/context binding.
+The complete run digests still identify the exact submitted runs, including
+original record order. Missing IDs or changed paired facts reject comparison;
+missing metric facts or errored results yield `insufficient_evidence` for the
+applicable metric instead of silently dropping cases.
+
+Bounded judge replay binds frozen runs, the case set, declared case-to-unit
+mapping and every case/side/repetition slot. It retains attempts, parses and
+source locations; a failed or incomplete scheduled trial cannot be replaced
+by a favorable extra sample. Repetitions are averaged within each case and cases
+within each unit. The independently declared units determine the inference
+sample size. Native judge evidence additionally retains and replays its provider
+capture; captured or frozen-answer imports retain supplied-source provenance.
+
+See [captured records](../reference/evaluation-records.md) and
+[judge measurements](../reference/judge-measurements.md) for these contracts.
+
 ## Replay guarantees and limits
 
-Replay detects:
+For native pack-v1 evidence, replay detects:
 
 - baseline or subject artifact identity different from the caller-owned
   expected digest;
@@ -196,6 +230,12 @@ Replay detects:
 - changes to paired scores, decision arithmetic, or the policy-relevant paired
   interval bound; and
 - use of policy bytes different from the independently supplied policy.
+
+Captured verification uses complete-run and request pins instead of native
+runtime anchors. Judge verification additionally checks its plan, measurement
+and analysis bindings. Reordering captured exports can preserve paired results
+while changing the complete-run identity; an independently pinned run still
+rejects that substitution.
 
 Replay does not prove that provider facts came from genuine model execution. An
 evidence signer able to fabricate a complete, mutually consistent set of measurements can

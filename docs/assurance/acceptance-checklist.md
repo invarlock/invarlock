@@ -1,26 +1,34 @@
 # Acceptance checklist
 
-!!! abstract "Assurance note"
-    **In plain language:** A valid signature is only the start. A decision owner must
-    also confirm the independent anchors, decision scope, key authorization,
-    and known limitations before relying on the result.
+> **Assurance note**
+>
+> **In plain language:** A valid signature is only the start. A decision owner must
+> also confirm the independent anchors, decision scope, key authorization,
+> and known limitations before relying on the result.
+>
+> **Question:** Has a decision owner established every prerequisite needed to rely
+> on one signed evidence decision?
+>
+> **Decision use:** Use this for recipient-owned acceptance after strict
+> verification, before an evidence pack supports a downstream decision.
+>
+> **Evidence:** Independently sourced anchors, a verified immutable pack, a
+> signed verifier receipt, and the decision-owner-maintained decision record.
 
-    **Question:** Has a decision owner established every prerequisite needed to rely
-    on one signed evidence decision?
+Use this checklist for one native exact-match, normalized-NLL or deterministic
+extension `invarlock/evidence-pack-v1` decision. For captured comparisons and
+bounded judge evidence, use the contract-specific checks below.
 
-    **Decision use:** Use this as the final human acceptance gate after strict
-    verification, before an evidence pack supports a downstream decision.
+This is a decision-owner checklist, not an additional runtime approval workflow.
+Apply conditional items only when relevant and record which operational checks
+your decision requires. Independent expectations can be maintained by the same
+team that evaluates models; their authority comes from approved inputs outside
+the submitted evidence. A checked item means those expectations were established,
+not merely that the bundle contains a matching assertion.
 
-    **Evidence:** Independently sourced anchors, a verified immutable pack, a
-    signed verifier receipt, and the decision-owner-maintained decision record.
-
-Use this checklist for one `invarlock/evidence-pack-v1` decision. A checked item means
-the decision owner established it independently; it must not mean merely that the
-bundle contains a matching assertion.
-
-**Hard stop:** one unchecked required item means the evidence has not completed
-this acceptance gate. Record an exception outside the pack; do not modify the
-pack, suppress a verifier error, or reinterpret a failed policy result.
+An unmet verifier requirement or configured policy check prevents acceptance.
+Record organizational exceptions outside the pack; do not modify the pack,
+suppress a verifier error, or reinterpret a failed policy result.
 
 ## Before evaluation
 
@@ -88,9 +96,12 @@ pack, suppress a verifier error, or reinterpret a failed policy result.
 - [ ] For a scorer extension, confirm the same paired-resampling method and
       lower-bound `delta_min_pp` rule are used, and that strict replay used the
       explicitly authorized scorer registry.
-- [ ] Treat LLM judges and any network, human, external-model, SQL-execution,
-      code-execution, or model-similarity result as observation-only evidence,
-      not an acceptance scorer.
+- [ ] Keep LLM judges outside the deterministic scorer-extension boundary.
+      Use the separate bounded judge contract when selecting `judge`; its
+      acceptance checks are listed below. A captured `recorded` metric can
+      apply policy to approved externally assigned scores, but replay
+      checks their aggregation and provenance rather than reconstructing the
+      original judgment.
 - [ ] Confirm the verdict uses the policy-relevant conservative bound: lower
       for exact-match delta and upper for normalized NLL.
 - [ ] If sample qualification is present, confirm its minimum and maximum match
@@ -99,18 +110,62 @@ pack, suppress a verifier error, or reinterpret a failed policy result.
 - [ ] If exact-match `side_accuracy` is present, confirm its minimum matches the
       independently reviewed `minimum_side_accuracy` and both observed side
       means and the combined check pass.
-- [ ] Treat the result as a finite-schedule decision. The paired interval
-      describes schedule-composition sensitivity; it does not establish
-      population coverage or representativeness.
+- [ ] Treat the result as scoped to the authenticated schedule. NLL and
+      extension bootstrap intervals describe schedule-composition sensitivity;
+      exact match uses its paired Newcombe method. None supplies a sampling
+      design or establishes population representativeness on its own.
 - [ ] Review runtime, sampling, run-selection, baseline-trust, and execution-
       attestation limitations before approving downstream use.
 - [ ] If the result lies on or near a policy boundary, independently rerun it
       or record why one run is sufficient for this decision.
 
+## Captured and judge evidence
+
+For a captured comparison, use `invarlock/trust-inputs-v2` with independently
+approved complete baseline and subject run digests, normalized-request digest,
+policy bytes and signer fingerprint. Confirm the signed v3 receipt names
+`captured_comparison` and that every required metric and slice passes. Read each
+row's `scoring_assurance`: recorded scores retain source judgments; recomputed
+scores derive from retained facts. Hosted-service descriptors identify declared
+configuration and an observation window, not underlying model weights or future
+service behavior. See [captured verification](../user-guide/captured-results.md#signed-handoff).
+
+For native, captured or frozen-answer judge evidence, use an independently
+maintained `invarlock/judge-measurement-recipient-policy-v1`. Confirm its
+intended subject, required metric name, trusted signer identity and fingerprint,
+and `required_decision: pass`. Hosted subjects use the service descriptor
+identity rather than a model-weight digest. Check the exact run, case-set, plan,
+measurement, analysis-policy and analysis-result pins, plus
+`native_capture_sha256` for native judge evidence.
+
+Confirm `authenticated`, `replayed`, `verified` and `accepted`, and inspect
+`decision` separately. Recipient acceptance requires a required judge policy
+and `decision: pass`. Verified regression, insufficient evidence or an advisory
+pass is not accepted; verified insufficient evidence is not an integrity failure.
+A signed judge
+receipt is optional for local verification and needed when transporting the
+verifier's signed result; its contract differs from native and captured receipts.
+See [judge verification](../reference/judge-measurements.md).
+
+A judge policy's `decision_role: required` makes that metric part of the required
+conjunction. Reference-label studies and
+independent reruns can support a broader reliance decision but are not runtime
+prerequisites. Optional per-case references are judge inputs only when the
+plan selects `reference_mode: per_case`; they are separate from such studies.
+
+For a combined deterministic and judge evidence set, use an independently
+maintained `invarlock/evidence-set-recipient-policy-v1`. Confirm the index and
+component trust profiles, identical complete baseline/subject runs, original
+case set and subject identity, and acceptance of both components. The judge
+component must be required; advisory results cannot be promoted into acceptance.
+The composition result is a local computation, not a new signed attestation;
+component receipts keep their separate scopes. The conjunction does not create
+a joint statistical confidence guarantee. See [evidence sets](../reference/evidence-sets.md).
+
 ## Present and retain
 
 - [ ] Use `invarlock report evidence/ --html evidence.html --explain` for a
-      human view; do not treat the rendered file as the signed acceptance
+      report; do not treat the rendered file as the signed acceptance
       record.
 - [ ] Record any external attestation, independent rerun, exception, or decision owner
       decision beside the bundle without modifying it.
@@ -138,6 +193,12 @@ external rerun or attestation references:
 decision, decision owner, and decision time:
 exceptions and expiry/re-evaluation trigger:
 ```
+
+These fields describe the native decision record. For captured and judge
+workflows, record their complete-run, request, case-set, service, plan and
+measurement identities where applicable instead of inventing unavailable model
+or runtime identities. For evidence sets, retain the index and composition-policy
+pins alongside both component decisions.
 
 The record is review metadata, not part of `invarlock/evidence-pack-v1`. If it requires
 cryptographic authentication, sign it through the review system rather than

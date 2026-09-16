@@ -6,6 +6,7 @@ import subprocess
 import sys
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -942,23 +943,54 @@ def test_worker_cancellation_stops_late_identified_container(
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX pipe inheritance contract")
-def test_worker_return_is_bounded_when_a_descendant_inherits_diagnostic_pipes() -> None:
-    started = time.monotonic()
-    completed = evaluation_oci.run_side_worker(
-        [
-            sys.executable,
-            "-c",
-            "import subprocess, sys; "
-            "subprocess.Popen([sys.executable, '-c', "
-            "'import time; time.sleep(3)'], stdout=sys.stdout, stderr=sys.stderr); "
-            "print('parent complete')",
-        ],
-        timeout_seconds=10,
+def test_worker_return_is_bounded_when_a_descendant_inherits_diagnostic_pipes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ready = tmp_path / "descendant-ready"
+    release = tmp_path / "release-descendant"
+    launcher_exited = threading.Event()
+
+    class ObservedProcess(subprocess.Popen[bytes]):
+        def wait(self, timeout: float | None = None) -> int:
+            returncode = super().wait(timeout=timeout)
+            launcher_exited.set()
+            return returncode
+
+    monkeypatch.setattr(evaluation_oci.subprocess, "Popen", ObservedProcess)
+    descendant = (
+        "import pathlib, sys, time\n"
+        "ready, release = map(pathlib.Path, sys.argv[1:])\n"
+        "ready.touch()\n"
+        "while not release.exists():\n"
+        "    time.sleep(0.01)\n"
     )
+    launcher = (
+        "import pathlib, subprocess, sys, time\n"
+        "subprocess.Popen([sys.executable, '-c', sys.argv[1], *sys.argv[2:]], "
+        "stdout=sys.stdout, stderr=sys.stderr)\n"
+        "ready = pathlib.Path(sys.argv[2])\n"
+        "while not ready.exists():\n"
+        "    time.sleep(0.01)\n"
+        "print('parent complete')\n"
+    )
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        result = executor.submit(
+            evaluation_oci.run_side_worker,
+            [sys.executable, "-c", launcher, descendant, str(ready), str(release)],
+            timeout_seconds=10,
+        )
+        try:
+            # Interpreter startup and host scheduling are not pipe cleanup.
+            assert launcher_exited.wait(timeout=10)
+            assert ready.is_file()
+            # Keep both inherited pipes open until after the worker returns.
+            # Waiting for descendant EOF must fail, even on a slow test host.
+            completed = result.result(timeout=2)
+        finally:
+            release.touch()
 
     assert completed.returncode == 0
     assert "parent complete" in completed.stdout
-    assert time.monotonic() - started < 2
 
 
 def test_worker_outer_deadline_terminates_a_hung_process() -> None:

@@ -1,0 +1,201 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Independent ModelKit recipient request",
+  "type": "object",
+  "properties": {
+    "format": {
+      "const": "invarlock/example-modelkit-recipient-v1"
+    },
+    "sides": {
+      "type": "object",
+      "properties": {
+        "baseline": {
+          "type": "object",
+          "properties": {
+            "blobs": {
+              "type": "string",
+              "minLength": 1
+            },
+            "package_digest": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "content_digest": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "candidate": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "blobs",
+            "package_digest",
+            "content_digest",
+            "candidate"
+          ],
+          "additionalProperties": false
+        },
+        "subject": {
+          "type": "object",
+          "properties": {
+            "blobs": {
+              "type": "string",
+              "minLength": 1
+            },
+            "package_digest": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "content_digest": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "candidate": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "blobs",
+            "package_digest",
+            "content_digest",
+            "candidate"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "baseline",
+        "subject"
+      ],
+      "additionalProperties": false
+    },
+    "evidence": {
+      "type": "string",
+      "minLength": 1
+    },
+    "technical_policy": {
+      "type": "string",
+      "minLength": 1
+    },
+    "technical_anchors": {
+      "type": "object",
+      "properties": {
+        "artifact_digests": {
+          "type": "object",
+          "properties": {
+            "baseline": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "subject": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            }
+          },
+          "required": [
+            "baseline",
+            "subject"
+          ],
+          "additionalProperties": false
+        },
+        "runtime_digests": {
+          "type": "object",
+          "properties": {
+            "baseline": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "subject": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            }
+          },
+          "required": [
+            "baseline",
+            "subject"
+          ],
+          "additionalProperties": false
+        },
+        "schedule_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "evidence_signer_fingerprint": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "request_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "artifact_digests",
+        "runtime_digests",
+        "schedule_digest",
+        "evidence_signer_fingerprint"
+      ],
+      "additionalProperties": false
+    },
+    "envelope": {
+      "type": "string",
+      "minLength": 1
+    },
+    "recipient_policy": {
+      "type": "string",
+      "minLength": 1
+    },
+    "trusted_public_keys": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^sha256:[0-9a-f]{64}$"
+      },
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_json_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_blob_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_archive_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_model_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_members": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  },
+  "required": [
+    "format",
+    "sides",
+    "evidence",
+    "technical_policy",
+    "technical_anchors",
+    "envelope",
+    "recipient_policy",
+    "trusted_public_keys"
+  ],
+  "additionalProperties": false
+}

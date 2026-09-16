@@ -1,0 +1,1551 @@
+{
+  "assessment": {
+    "blocks": 320,
+    "endpoint_index": {
+      "sha256": "sha256:58729e00913485f61de851484ce880f6695abc3ef99fc6cdb2457222d2d50ba2",
+      "size_bytes": 14689
+    },
+    "endpoint_record_sets": 20,
+    "generation_call_total": null,
+    "missing_run_records": 10473,
+    "native_retries": 0,
+    "new_generation_calls_during_closeout": 0,
+    "planned_run_records": 80000,
+    "returned_token_total": null,
+    "scored_run_records": 69527,
+    "successful_pilots_counted_once": 4,
+    "unassessed_blocks": 0,
+    "union_manifest_sha256": "sha256:5d2f78afb9910e8e542c334e767ed64521987425e0d77e176c594b43aa52ba21",
+    "unsafe_numeric_block_audit_sha256": "sha256:a3d2db41297fa83c75068f318fb9b3554a2987642b8f86b263539a2e9bb21619"
+  },
+  "comparison_kind": "Prompt roles A and B on the same model revision.",
+  "digest_semantics": "Artifact sha256 values hash exact file bytes. Canonical bindings use the historical comparison contract.",
+  "earlier_two_model_capsule": {
+    "capsule_manifest": {
+      "sha256": "sha256:b80f3fdaa78f8f96600b4d30705cffacf2a5d86a148555e94ad4231ebb6506a0",
+      "size_bytes": 16643
+    },
+    "decisions": {
+      "insufficient_evidence": 5,
+      "regression": 5
+    },
+    "historical_helper": {
+      "sha256": "sha256:a2f843767b08fc69d02ad78a9ba67f9db6d5d58d6b9fcd5fe7e0b609c5bcb5f5",
+      "size_bytes": 5791
+    },
+    "historical_wheel_sha256": "sha256:a1c707452ff01c82d7207e75a805231898efbe3d1034caca9843a103ea54d659",
+    "missing_run_records": 1236,
+    "models": {
+      "k2-0.9b": {
+        "artifact_digest": "sha256:164f456bde6842a8646e8bac353ca1535c209a653617a8a66b109b8ff2dbbdc3",
+        "native_parser": "k2_horizon",
+        "native_parser_effort": "low",
+        "repo": "IFM/K2-Horizon-0.9B",
+        "revision": "02d0da0fefe5a2f8dc3db091cad29b15c9d8e4fa",
+        "tensor_parallel": 1
+      },
+      "k2-3.7b": {
+        "artifact_digest": "sha256:01d6c18c6f8c412f711fbad02300008743203349c2bb5ea2b24bda8b1af2b2d3",
+        "native_parser": "k2_horizon",
+        "native_parser_effort": "low",
+        "repo": "IFM/K2-Horizon-3.7B",
+        "revision": "633f52ad28b17edeabd82afc61d2d13b4c59a561",
+        "tensor_parallel": 1
+      }
+    },
+    "offline_replay_receipt": {
+      "sha256": "sha256:77f9e7dd2a51b606403c1b97d4e45b4500429b48ac8970b3e7fc30dfd49b49bb",
+      "size_bytes": 2693
+    },
+    "planned_run_records": 80000,
+    "publication_status": "metadata_only_payload_held",
+    "replay_environment": {
+      "architecture": "arm64",
+      "dependency_wheels": 18,
+      "native_rescores": 0,
+      "new_model_calls": 0,
+      "os": "macOS",
+      "python": "3.12.13"
+    },
+    "reports": 10,
+    "scored_run_records": 78764,
+    "trusted_inputs": {
+      "sha256": "sha256:3934d66c178df610d58ff0b4f108e46419623b0c2281ffd7c69382e9054191f2",
+      "size_bytes": 8327
+    }
+  },
+  "limitations": [
+    "Original missing, withheld and adverse records remain unchanged.",
+    "Source rows are reused across models and prompt roles.",
+    "Recorded-score replay does not authenticate model execution or rerun native scorers.",
+    "No model, portfolio, current runtime, GPU, population or deployment qualification.",
+    "Public metadata alone cannot reproduce held payloads."
+  ],
+  "publication": {
+    "public_download_url": null,
+    "raw_artifacts_in_git": false,
+    "reason": "Combined source attribution and redistribution review remains unresolved.",
+    "status": "metadata_only_payload_held"
+  },
+  "reports": [
+    {
+      "artifacts": {
+        "approved_run_anchors": {
+          "sha256": "sha256:f27d6fb1da3945f049e903413b8229f2fa76ff7ef743f050afc256493b4c88d7",
+          "size_bytes": 191
+        },
+        "approved_signer": {
+          "sha256": "sha256:6dd70879f023570aa034f09424df623553dd97763adccf67744aff9d1c6e5595",
+          "size_bytes": 113
+        },
+        "input_plan": {
+          "sha256": "sha256:3bfcd143a37816bbb6a1a4b538ba0c8e72ad6aad871c52c5f2fb12b89334bdc4",
+          "size_bytes": 21713
+        },
+        "policy": {
+          "sha256": "sha256:9eeaa8bb5e19dbfb49d15870c23dc7935110ae0e515ad60e3e3c813a395a060c",
+          "size_bytes": 1097
+        },
+        "recipient_receipt": {
+          "sha256": "sha256:87e7cd7b2ca033a4407fe2f929bc3b364f5d4cc9d6b6a62de9a898cf5c277ffa",
+          "size_bytes": 692
+        },
+        "recipient_trust": {
+          "sha256": "sha256:7eb274b73628e52ab9521611fbc8d2ebdb55041351502aeb3b7bda02d2051524",
+          "size_bytes": 1402
+        },
+        "report_manifest": {
+          "sha256": "sha256:77d2e5ad5b148470abebe071c87b3ab6a0fae5e3846e1385957a6e9349691450",
+          "size_bytes": 4527
+        },
+        "signed_evidence": {
+          "sha256": "sha256:7196becbebf225099dc87dcf2f00d05c40484664f5da2ca013772fa61175b6d1",
+          "size_bytes": 46046316
+        },
+        "summary": {
+          "sha256": "sha256:6faea2b2bd6980605b76d67e5ef0657f04aca47d110bb1581e2ef58467e697f5",
+          "size_bytes": 2963
+        }
+      },
+      "baseline_correct": 3082,
+      "baseline_missing": 0,
+      "canonical_bindings": {
+        "baseline_run_digest": "sha256:dc164c2a67d5ea64ce3eb65b6ad4bfd96c8345daf877513f2d2096b41e0fa96b",
+        "policy_digest": "sha256:0da66de45b275ce01f702c984b421880c77ac6f1b8b2d3de2bca6e1f2db0f047",
+        "subject_run_digest": "sha256:bf398f4b5608728e08e8d0e278df39c3a1d3ac45c285a0f65953ae8071c831e3"
+      },
+      "comparison_id": "k2-32-A--k2-32-B--routing",
+      "coverage_assurance": "not_validated",
+      "decision": "regression",
+      "endpoints": [
+        {
+          "correct": 3082,
+          "manifest_sha256": "c088d1ce1e1e6d5816b6f4d509940ab7bffb524247b78bb88105506f0c886882",
+          "null": 0,
+          "planned": 4000,
+          "role": "A",
+          "run_sha256": "c447bad7511edcca90e90982d57b5a49c56b302a57a667df061d8a685b8ef45e",
+          "scored": 4000
+        },
+        {
+          "correct": 2909,
+          "manifest_sha256": "af925007c4d4e17a319501d4dc2d49f0d3f4d54972171d297cc4f965407f49f1",
+          "null": 0,
+          "planned": 4000,
+          "role": "B",
+          "run_sha256": "b1578485b391cfe537998adff169315ababf5e0f36f980f8333d7fc592b66b1d",
+          "scored": 4000
+        }
+      ],
+      "historical_wheel_sha256": "sha256:c2657a2a009604525f94e5df6e43fbec0d07ef8a79061596484bc0290ab99d19",
+      "metric_scopes": [
+        {
+          "aggregation": "mean",
+          "baseline_mean": 0.7705,
+          "candidate_mean": 0.72725,
+          "count": 4000,
+          "decision": "regression",
+          "delta": -0.04325000000000001,
+          "direction": "higher",
+          "interval": {
+            "lower": -0.05125,
+            "mass": 0.95,
+            "method": "paired_mean_shake256_percentile_v1",
+            "replicates": 2048,
+            "upper": -0.03625
+          },
+          "kind": "recorded",
+          "missing_count": 0,
+          "name": "native_quality",
+          "reasons": [
+            "lower interval bound exceeds allowed regression",
+            "candidate mean fails absolute bounds"
+          ],
+          "scoring_assurance": "recorded",
+          "slice": "overall",
+          "unit": "score"
+        },
+        {
+          "aggregation": "mean",
+          "baseline_mean": 0.801,
+          "candidate_mean": 0.77,
+          "count": 2000,
+          "decision": "regression",
+          "delta": -0.031000000000000028,
+          "direction": "higher",
+          "interval": {
+            "lower": -0.04,
+            "mass": 0.95,
+            "method": "paired_mean_shake256_percentile_v1",
+            "replicates": 2048,
+            "upper": -0.022
+          },
+          "kind": "recorded",
+          "missing_count": 0,
+          "name": "native_quality",
+          "reasons": [
+            "candidate mean fails absolute bounds"
+          ],
+          "scoring_assurance": "recorded",
+          "slice": "early_history",
+          "unit": "score"
+        },
+        {
+          "aggregation": "mean",
+          "baseline_mean": 0.74,
+          "candidate_mean": 0.6845,
+          "count": 2000,
+          "decision": "regression",
+          "delta": -0.055499999999999994,
+          "direction": "higher",
+          "interval": {
+            "lower": -0.067,
+            "mass": 0.95,
+            "method": "paired_mean_shake256_percentile_v1",
+            "replicates": 2048,
+            "upper": -0.044
+          },
+          "kind": "recorded",
+          "missing_count": 0,
+          "name": "native_quality",
+          "reasons": [
+            "lower interval bound exceeds allowed regression",
+            "candidate mean fails absolute bounds"
+          ],
+          "scoring_assurance": "recorded",
+          "slice": "later_history",
+          "unit": "score"
+        }
+      ],
+      "model": "k2-32b",
+      "planned_pairs": 4000,
+      "publication_status": "metadata_only_payload_held",
+      "recipient_scope": "Separate local process; not an independent organization.",
+      "recipient_status": "verified",
+      "scoring_assurance": "recorded",
+      "subject_correct": 2909,
+      "subject_missing": 0,
+      "workflow": "routing"
+    },
+    {
+      "artifacts": {
+        "approved_run_anchors": {
+          "sha256": "sha256:f0c7426a493a188ad3602f037aa0b6981291ec0098b8a6e227b6e546d2216039",
+          "size_bytes": 191
+        },
+        "approved_signer": {
+          "sha256": "sha256:ce694f0d51aa229c5e7990cf5dcbe63fc22833a0312b93eee56375f6c174a92b",
+          "size_bytes": 113
+        },
+        "input_plan": {
+          "sha256": "sha256:e4914489c13b67db1e654ff003f8a4e10c8a286121bbfd3341562dfa9e1c89ba",
+          "size_bytes": 22067
+        },
+        "policy": {
+          "sha256": "sha256:a41caf42a190a0877db05eeb2b93ccd02e45dcb52e4b91e7e083332203056423",
+          "size_bytes": 1082
+        },
+        "recipient_receipt": {
+          "sha256": "sha256:fe320587368d5efc410c815cfaaa481390811d85b6ca0b0e6d4790e96c40a8b3",
+          "size_bytes": 692
+        },
+        "recipient_trust": {
+          "sha256": "sha256:7608d0993e6279817f310f9ac52711ee301585f55cc63e208d854d934a124a10",
+          "size_bytes": 1435
+        },
+        "report_manifest": {
+          "sha256": "sha256:038c741cfbce144b3920c471313a2db7c86bc2d081ac0142433ca52656823242",
+          "size_bytes": 5131
+        },
+        "signed_evidence": {
+          "sha256": "sha256:ea4a36e5d6c9e218ac024f2cfa2137bf2877f22e7d267873819d2ebc4b1da0b4",
+          "size_bytes": 39669137
+        },
+        "summary": {
+          "sha256": "sha256:d573cc24be77d190371d769091ff328694a8b0a8cfe1b14786aad6efd162d905",
+          "size_bytes": 2719
+        }
+      },
+      "baseline_correct": 3324,
+      "baseline_missing": 0,
+      "canonical_bindings": {
+        "baseline_run_digest": "sha256:d5595cfc4b453e2a8b19c065bf342c95b048c28d19f03f823132d82e92e48845",
+        "policy_digest": "sha256:3dc73fc23af1d8c98052e0853c3c71264ce6f3e7127ea2bcf5e3c180e8190dcc",
+        "subject_run_digest": "sha256:31ed118f904def5f1586b447aa74e2bc0420e7fef309a8cb94443b667564e423"
+      },
+      "comparison_id": "k2-32-A--k2-32-B--extraction",
+      "coverage_assurance": "not_validated",
+      "decision": "regression",
+      "endpoints": [
+        {
+          "correct": 3324,
+          "manifest_sha256": "0a09cd829d72ff8f72aee0e0812f6139f8b94ebb02d1cdf8b582cd1cd0e277cb",
+          "null": 0,
+          "planned": 4000,
+          "role": "A",
+          "run_sha256": "f59477862e0640f9d8c1b04376ee6f923361f6b137dc18bc4c1e81ebea468a1a",
+          "scored": 4000
+        },
+        {
+          "correct": 3316,
+          "manifest_sha256": "744499aff1f9c1ec55d602907be011f8105677a8b0a9f89bd3fae12f5e0b267a",
+          "null": 0,
+          "planned": 4000,
+          "role": "B",
+          "run_sha256": "1a27d7fb79a943660b6154617dc3bd0ba042cdecebc2b12859b2d8332b1e3bb2",
+          "scored": 4000
+        }
+      ],
+      "historical_wheel_sha256": "sha256:c2657a2a009604525f94e5df6e43fbec0d07ef8a79061596484bc0290ab99d19",
+      "metric_scopes": [
+        {
+          "aggregation": "mean",
+          "baseline_mean": 0.831,
+          "candidate_mean": 0.829,
+          "count": 4000,
+          "decision": "pass",
+          "delta": -0.0020000000000000018,
+          "direction": "higher",
+          "interval": {
+            "lower": -0.0065,
+            "mass": 0.95,
+            "method": "paired_mean_shake256_percentile_v1",
+            "replicates": 2048,
+            "upper": 0.00275
+          },
+          "kind": "recorded",
+          "missing_count": 0,
+          "name": "native_quality",
+          "reasons": [],
+          "scoring_assurance": "recorded",
+          "slice": "overall",
+          "unit": "score"
+        },
+        {
+          "aggregation": "mean",
+          "baseline_mean": 0.9845,
+          "candidate_mean": 0.973,
+          "count": 2000,
+          "decision": "pass",
+          "delta": -0.011500000000000066,
+          "direction": "higher",
+          "interval": {
+            "lower": -0.016,
+            "mass": 0.95,
+            "method": "paired_mean_shake256_percentile_v1",
+            "replicates": 2048,
+            "upper": -0.007
+          },
+          "kind": "recorded",
+          "missing_count": 0,
+          "name": "native_quality",
+          "reasons": [],
+          "scoring_assurance": "recorded",
+          "slice": "empty_span",
+          "unit": "score"
+        },
+        {
+          "aggregation": "mean",
+          "baseline_mean": 0.6775,
+          "candidate_mean": 0.685,
+          "count": 2000,
+          "decision": "regression",
+          "delta": 0.007500000000000062,
+          "direction": "higher",
+          "interval": {
+            "lower": -0.001,
+            "mass": 0.95,
+            "method": "paired_mean_shake256_percentile_v1",
+            "replicates": 2048,
+            "upper": 0.016
+          },
+          "kind": "recorded",
+          "missing_count": 0,
+          "name": "native_quality",
+          "reasons": [
+            "candidate mean fails absolute bounds"
+          ],
+          "scoring_assurance": "recorded",
+          "slice": "has_span",
+          "unit": "score"
+        }
+      ],
+      "model": "k2-32b",
+      "planned_pairs": 4000,
+      "publication_status": "metadata_only_payload_held",
+      "recipient_scope": "Separate local process; not an independent organization.",
+      "recipient_status": "verified",
+      "scoring_assurance": "recorded",
+      "subject_correct": 3316,
+      "subject_missing": 0,
+      "workflow": "extraction"
+    },
+    {
+      "artifacts": {
+        "approved_run_anchors": {
+          "sha256": "sha256:27d8fbd110b96bc77f0261bec44edda782599f5abeaba2d93ce5f1c319bcf271",
+          "size_bytes": 191
+        },
+        "approved_signer": {
+          "sha256": "sha256:df68925ec57173e16de1fa02ca7a0dc3024eafd7efb261204c44a003873c1e97",
+          "size_bytes": 113
+        },
+        "input_plan": {
+          "sha256": "sha256:08dfa5054a6a4903f9838e2b47d6e16d488c59c66dc2b96559d5906a21711c51",
+          "size_bytes": 21684
+        },
+        "policy": {
+          "sha256": "sha256:e3ac46f9756dcb6363dfe97a1cbd9928fb6f29fc3ce5616b657f1d4bde8cb7f8",
+          "size_bytes": 1110
+        },
+        "recipient_receipt": {
+          "sha256": "sha256:05e24a0021cc256c565fd254f1d8107e71b2dc478c9d22b037ebb685b5f26514",
+          "size_bytes": 703
+        },
+        "recipient_trust": {
+          "sha256": "sha256:5b9fe90539e973eea73e6be064cdf1f6eb1b7fb5143f076af386724920bad796",
+          "size_bytes": 1403
+        },
+        "report_manifest": {
+          "sha256": "sha256:1a0d46b8232aa418def535dd7ab47934db2ecf51248fdd4edabf9d38ca0216d5",
+          "size_bytes": 4912
+        },
+        "signed_evidence": {
+          "sha256": "sha256:153fc0bdc50465ea748bec24f6a10fffd0f774d5706ef92158fac472eadf204e",
+          "size_bytes": 91491554
+        },
+        "summary": {
+          "sha256": "sha256:38745b145dacb3a573e0a98d92cb22b80ea2df2f9a8843ccf1442f1463fbebc9",
+          "size_bytes": 6817
+        }
+      },
+      "baseline_correct": 1380,
+      "baseline_missing": 0,
+      "canonical_bindings": {
+        "baseline_run_digest": "sha256:645beff0fd5d73d62d0ea7950e6ca00b781716053b9186a4b1fa3ac12dc5cac0",
+        "policy_digest": "sha256:93937305ce71588b35abb6d7dd9868b3cb2a2ae8997ceacd49999767fcd18c6f",
+        "subject_run_digest": "sha256:eb386dd12090b4e75f4633666d4220ffc029930b73b5123c5c75ce088131319f"
+      },
+      "comparison_id": "k2-32-A--k2-32-B--numeric",
+      "coverage_assurance": "not_validated",
+      "decision": "insufficient_evidence",
+      "endpoints": [
+        {
+          "correct": 1380,
+          "manifest_sha256": "1a9549cf1f06167d5dd2b12c92123fcbd98971a06fbfc2c5454b60c3557a743d",
+          "null": 0,
+          "planned": 4000,
+          "role": "A",
+          "run_sha256": "c228c6f4baad0e849cff369826256e32d118a252b7da3cb372942b043f499a9f",
+          "scored": 4000
+        },
+        {
+          "correct": 1551,
+          "manifest_sha256": "2ab121ed86aab2aae6e95b48e48435558bd108e30166ae88703ab80b616facff",
+          "null": 29,
+          "planned": 4000,
+          "role": "B",
+          "run_sha256": "b73dfdde4248ca58e25f515d7cf0558ff5915429132767253bf6e3b35cf11853",
+          "scored": 3971
+        }
+      ],
+      "historical_wheel_sha256": "sha256:c2657a2a009604525f94e5df6e43fbec0d07ef8a79061596484bc0290ab99d19",
+      "metric_scopes": [
+        {
+          "aggregation": "mean",
+          "baseline_mean": null,
+          "candidate_mean": null,
+          "count": 4000,
+          "decision": "insufficient_evidence",
+          "delta": null,
+          "direction": "higher",
+          "interval": null,
+          "kind": "recorded",
+          "missing_count": 29,
+          "name": "native_quality",
+          "reasons": [
+            "missing results"
+          ],
+          "scoring_assurance": "recorded",
+          "slice": "overall",
+          "unit": "score"
+        },
+        {
+          "aggregation": "mean",
+          "baseline_mean": null,
+          "candidate_mean": null,
+          "count": 2000,
+          "decision": "insufficient_evidence",
+          "delta": null,
+          "direction": "higher",
+          "interval": null,
+          "kind": "recorded",
+          "missing_count": 15,
+          "name": "native_quality",
+          "reasons": [
+            "missing results"
+          ],
+          "scoring_assurance": "recorded",
+          "slice": "composed_program",
+          "unit": "score"
+        },
+        {
+          "aggregation": "mean",
+          "baseline_mean": null,
+          "candidate_mean": null,
+          "count": 2000,
+          "decision": "insufficient_evidence",
+          "delta": null,
+          "direction": "higher",
+          "interval": null,
+          "kind": "recorded",
+          "missing_count": 14,
+          "name": "native_quality",
+          "reasons": [
+            "missing results"
+          ],
+          "scoring_assurance": "recorded",
+          "slice": "single_step",
+          "unit": "score"
+        }
+      ],
+      "model": "k2-32b",
+      "planned_pairs": 4000,
+      "publication_status": "metadata_only_payload_held",
+      "recipient_scope": "Separate local process; not an independent organization.",
+      "recipient_status": "verified",
+      "scoring_assurance": "recorded",
+      "subject_correct": 1551,
+      "subject_missing": 29,
+      "workflow": "numeric"
+    },
+    {
+      "artifacts": {
+        "approved_run_anchors": {
+          "sha256": "sha256:898ee93272554d3410ea4ca99768624f76b4f5ccb2ba74657096a9bc9b34e7db",
+          "size_bytes": 191
+        },
+        "approved_signer": {
+          "sha256": "sha256:79fb5d63db2d67c8750822f1ccde5824ac23eb15a0ef9512d9f4db69756ff813",
+          "size_bytes": 113
+        },
+        "input_plan": {
+          "sha256": "sha256:1236d51e9a25dc60dad45c6a66b9450a5064804833b7bf89dc92f6cc6089cc8d",
+          "size_bytes": 22123
+        },
+        "policy": {
+          "sha256": "sha256:2492a40ca476f60ef60d6fc28e34f45be8ab6e8e34e53ffc314d88e437b5615c",
+          "size_bytes": 1095
+        },
+        "recipient_receipt": {
+          "sha256": "sha256:e1738f3bf20a1df3c89ff4996fab125bdd1f126f8dc9ab9fb479738447d2887d",
+          "size_bytes": 691
+        },
+        "recipient_trust": {
+          "sha256": "sha256:2f4e532757fe42b70ebb0b874615a3b4538a15705acd74d30e7eef994e4e3e4f",
+          "size_bytes": 1437
+        },
+        "report_manifest": {
+          "sha256": "sha256:b3065bac29469d8df16f95d473c230dfb70a87680d09d35a4a743e623ff54682",
+          "size_bytes": 4863
+        },
+        "signed_evidence": {
+          "sha256": "sha256:33e3cd2d7c833d789c1571c113623f8d9e18ec7b7ccb52631d6f9498da937d3e",
+          "size_bytes": 31305062
+        },
+        "summary": {
+          "sha256": "sha256:4ec580a1ad3326bad3bb77324a9ce498bbeda207f2c7c9480e2704c7a3d07195",
+          "size_bytes": 2858
+        }
+      },
+      "baseline_correct": 2219,
+      "baseline_missing": 0,
+      "canonical_bindings": {
+        "baseline_run_digest": "sha256:4b2d2154163928c3d83b3628a23d75703ee4c3ee01809d5d9151b00a0af71ada",
+        "policy_digest": "sha256:553feb8f3da4156c76147617ea379ce44c3d453d3cf84c905fb8bfc896b8dc6b",
+        "subject_run_digest": "sha256:191640c9c36c0ce723c754d3d9ea691688a447f7fbbba39c16c65a5adcc2e0ad"
+      },
+      "comparison_id": "k2-32-A--k2-32-B--grounded_qa",
+      "coverage_assurance": "not_validated",
+      "decision": "regression",
+      "endpoints": [
+        {
+          "correct": 2219,
+          "manifest_sha256": "17d576a15c10c54f38c2a3665f926f4cb80a306dd3839ebe2f75e2cade675a75",
+          "null": 0,
+          "planned": 4000,
+          "role": "A",
+          "run_sha256": "b2dd006337118f22e68a73c2df8765df413b1d762a09c3f0d0ebe5c2db028d47",
+          "scored": 4000
+        },
+        {
+          "correct": 2288,
+          "manifest_sha256": "a38e17f05699bf49a2b250c8fe649b37b34bcd8c62ccf9c3d61d98ade5ee4d2e",
+          "null": 0,
+          "planned": 4000,
+          "role": "B",
+          "run_sha256": "54eee66b9ad8bb44882fa31ef14796b4902c249fe6987a9d4f762fab2d401e50",
+          "scored": 4000
+        }
+      ],
+      "historical_wheel_sha256": "sha256:c2657a2a009604525f94e5df6e43fbec0d07ef8a79061596484bc0290ab99d19",
+      "metric_scopes": [
+        {
+          "aggregation": "mean",
+          "baseline_mean": 0.55475,
+          "candidate_mean": 0.572,
+          "count": 4000,
+          "decision": "regression",
+          "delta": 0.017249999999999988,
+          "direction": "higher",
+          "interval": {
+            "lower": 0.0105,
+            "mass": 0.95,
+            "method": "paired_mean_shake256_percentile_v1",
+            "replicates": 2048,
+            "upper": 0.024
+          },
+          "kind": "recorded",
+          "missing_count": 0,
+          "name": "native_quality",
+          "reasons": [
+            "candidate mean fails absolute bounds"
+          ],
+          "scoring_assurance": "recorded",
+          "slice": "overall",
+          "unit": "score"
+        },
+        {
+          "aggregation": "mean",
+          "baseline_mean": 0.5025,
+          "candidate_mean": 0.5015,
+          "count": 2000,
+          "decision": "regression",
+          "delta": -0.0010000000000000009,
+          "direction": "higher",
+          "interval": {
+            "lower": -0.009912499999999998,
+            "mass": 0.95,
+            "method": "paired_mean_shake256_percentile_v1",
+            "replicates": 2048,
+            "upper": 0.0075
+          },
+          "kind": "recorded",
+          "missing_count": 0,
+          "name": "native_quality",
+          "reasons": [
+            "candidate mean fails absolute bounds"
+          ],
+          "scoring_assurance": "recorded",
+          "slice": "answerable",
+          "unit": "score"
+        },
+        {
+          "aggregation": "mean",
+          "baseline_mean": 0.607,
+          "candidate_mean": 0.6425,
+          "count": 2000,
+          "decision": "regression",
+          "delta": 0.035499999999999976,
+          "direction": "higher",
+          "interval": {
+            "lower": 0.025,
+            "mass": 0.95,
+            "method": "paired_mean_shake256_percentile_v1",
+            "replicates": 2048,
+            "upper": 0.0465
+          },
+          "kind": "recorded",
+          "missing_count": 0,
+          "name": "native_quality",
+          "reasons": [
+            "candidate mean fails absolute bounds"
+          ],
+          "scoring_assurance": "recorded",
+          "slice": "unanswerable",
+          "unit": "score"
+        }
+      ],
+      "model": "k2-32b",
+      "planned_pairs": 4000,
+      "publication_status": "metadata_only_payload_held",
+      "recipient_scope": "Separate local process; not an independent organization.",
+      "recipient_status": "verified",
+      "scoring_assurance": "recorded",
+      "subject_correct": 2288,
+      "subject_missing": 0,
+      "workflow": "grounded_qa"
+    },
+    {
+      "artifacts": {
+        "approved_run_anchors": {
+          "sha256": "sha256:bf89c5c5f5f5399928515d7c4b142e94053b6bf7d3204336ef32cc8ff82b711e",
+          "size_bytes": 191
+        },
+        "approved_signer": {
+          "sha256": "sha256:5485db649c2bf398c626338dee230deb086a1e5afdd06855c66b1e7ae258ffd8",
+          "size_bytes": 113
+        },
+        "input_plan": {
+          "sha256": "sha256:e682dee7986a2e42503ec8823f6f72c52ff34b26e45d57c619da617ff480b4e6",
+          "size_bytes": 22491
+        },
+        "policy": {
+          "sha256": "sha256:8b3316536f28c637bd378a65881bf51f2d2c4aa946b3b7e748ab0aeaf94fdf04",
+          "size_bytes": 1135
+        },
+        "recipient_receipt": {
+          "sha256": "sha256:037d80fa1ffb92e16eb46cf96db75f8bd04437121bed9bbfb81812b7b9cb55f7",
+          "size_bytes": 692
+        },
+        "recipient_trust": {
+          "sha256": "sha256:d8f243c8ab74a8a809096250f90a76f4fb34f40259beb544558e77482f94e228",
+          "size_bytes": 1468
+        },
+        "report_manifest": {
+          "sha256": "sha256:487fa7887c309ac07e84ed69a90583e9fbdf134609a7eee0b4ac9e4928930ff2",
+          "size_bytes": 4902
+        },
+        "signed_evidence": {
+          "sha256": "sha256:1bb9d557b5f442724b60b0c810df915dcac90ea0a13d76bbe86e995f980c7485",
+          "size_bytes": 46782674
+        },
+        "summary": {
+          "sha256": "sha256:dfed8cf00a7cf7d6a63cb6f32572e16f2dff0fc5154bcbe6354799ea81315eb6",
+          "size_bytes": 2828
+        }
+      },
+      "baseline_correct": 3100,
+      "baseline_missing": 0,
+      "canonical_bindings": {
+        "baseline_run_digest": "sha256:d648ef8c73a8c5ef3fc54a7d00ed660f2c21e1b2877f236d38f3ce6f1af93284",
+        "policy_digest": "sha256:ffa353a9d67306da2101735a2965fa963a2ddb8476d56ba720bc13f64eabb779",
+        "subject_run_digest": "sha256:b6675e0bc7ab05b0480869f511d301a97c8c806f8bda721c3f08557bf5a4e0a9"
+      },
+      "comparison_id": "k2-32-A--k2-32-B--transformation",
+      "coverage_assurance": "not_validated",
+      "decision": "regression",
+      "endpoints": [
+        {
+          "correct": 3100,
+          "manifest_sha256": "afd42cdf779d4b201dfbbe0554b1d6f3215729e81f4e6ece21256f991119b0d7",
+          "null": 0,
+          "planned": 4000,
+          "role": "A",
+          "run_sha256": "03a278c0126747fcd686e8f5a115ba6953147a4a7a42c1c88cbb5c0a9ba2afb7",
+          "scored": 4000
+        },
+        {
+          "correct": 3094,
+          "manifest_sha256": "e1d9d72621b80e7a1b57f827f174f79451c23c368361d2ad1b63b0c463dc747e",
+          "null": 0,
+          "planned": 4000,
+          "role": "B",
+          "run_sha256": "7c7ddb195b1c5647b273d98fbdd5ac75bee26737e9691d68f7b3a60b15ef12d3",
+          "scored": 4000
+        }
+      ],
+      "historical_wheel_sha256": "sha256:c2657a2a009604525f94e5df6e43fbec0d07ef8a79061596484bc0290ab99d19",
+      "metric_scopes": [
+        {
+          "aggregation": "mean",
+          "baseline_mean": 0.775,
+          "candidate_mean": 0.7735,
+          "count": 4000,
+          "decision": "regression",
+          "delta": -0.0015000000000000568,
+          "direction": "higher",
+          "interval": {
+            "lower": -0.00675,
+            "mass": 0.95,
+            "method": "paired_mean_shake256_percentile_v1",
+            "replicates": 2048,
+            "upper": 0.00375
+          },
+          "kind": "recorded",
+          "missing_count": 0,
+          "name": "native_quality",
+          "reasons": [
+            "candidate mean fails absolute bounds"
+          ],
+          "scoring_assurance": "recorded",
+          "slice": "overall",
+          "unit": "score"
+        },
+        {
+          "aggregation": "mean",
+          "baseline_mean": 0.6885,
+          "candidate_mean": 0.687,
+          "count": 2000,
+          "decision": "regression",
+          "delta": -0.0014999999999999458,
+          "direction": "higher",
+          "interval": {
+            "lower": -0.009912499999999998,
+            "mass": 0.95,
+            "method": "paired_mean_shake256_percentile_v1",
+            "replicates": 2048,
+            "upper": 0.0065
+          },
+          "kind": "recorded",
+          "missing_count": 0,
+          "name": "native_quality",
+          "reasons": [
+            "candidate mean fails absolute bounds"
+          ],
+          "scoring_assurance": "recorded",
+          "slice": "relational_or_structured",
+          "unit": "score"
+        },
+        {
+          "aggregation": "mean",
+          "baseline_mean": 0.8615,
+          "candidate_mean": 0.86,
+          "count": 2000,
+          "decision": "pass",
+          "delta": -0.0015000000000000568,
+          "direction": "higher",
+          "interval": {
+            "lower": -0.008,
+            "mass": 0.95,
+            "method": "paired_mean_shake256_percentile_v1",
+            "replicates": 2048,
+            "upper": 0.0055
+          },
+          "kind": "recorded",
+          "missing_count": 0,
+          "name": "native_quality",
+          "reasons": [],
+          "scoring_assurance": "recorded",
+          "slice": "single_table_simple",
+          "unit": "score"
+        }
+      ],
+      "model": "k2-32b",
+      "planned_pairs": 4000,
+      "publication_status": "metadata_only_payload_held",
+      "recipient_scope": "Separate local process; not an independent organization.",
+      "recipient_status": "verified",
+      "scoring_assurance": "recorded",
+      "subject_correct": 3094,
+      "subject_missing": 0,
+      "workflow": "transformation"
+    },
+    {
+      "artifacts": {
+        "approved_run_anchors": {
+          "sha256": "sha256:1292d3704f5dad2cf1ded67e397c35e4a3530c6a667825f4c021de18017ba60d",
+          "size_bytes": 191
+        },
+        "approved_signer": {
+          "sha256": "sha256:777eb74e826427f02a7f0641aeda32bb788e0be32205490d0ff7c6234c253281",
+          "size_bytes": 113
+        },
+        "input_plan": {
+          "sha256": "sha256:5dbafa44c6666d9f647acee442c3329cafa955fbcc3771ff46c1985026fb5b53",
+          "size_bytes": 23060
+        },
+        "policy": {
+          "sha256": "sha256:9eeaa8bb5e19dbfb49d15870c23dc7935110ae0e515ad60e3e3c813a395a060c",
+          "size_bytes": 1097
+        },
+        "recipient_receipt": {
+          "sha256": "sha256:df736bad2a484b63347931a69514e42cc266d1f0b2519c06c6d4b5c4b79ee85d",
+          "size_bytes": 755
+        },
+        "recipient_trust": {
+          "sha256": "sha256:51d8f58ea175d2e8c6e62c45ad27e92b47394b3d657d4c3ab93635293ad962f9",
+          "size_bytes": 1445
+        },
+        "report_manifest": {
+          "sha256": "sha256:8b2c58d2853c2d58931fd6f19796ca09fe2bdd9bb3f9fb8fedf4894512146163",
+          "size_bytes": 4687
+        },
+        "signed_evidence": {
+          "sha256": "sha256:64614b9d227be56a13b1aa65de5d4b710491730bd882d756540250c35994656b",
+          "size_bytes": 46137508
+        },
+        "summary": {
+          "sha256": "sha256:96cfbfb9a62f63e12bbae004e3faff0d164f623fcf7b2a7259137d1b8b45b457",
+          "size_bytes": 4931
+        }
+      },
+      "baseline_correct": 2965,
+      "baseline_missing": 0,
+      "canonical_bindings": {
+        "baseline_run_digest": "sha256:68665756d52987b0f2c9b2127b3427aabdce598cb37a4714dd340bacf090376b",
+        "policy_digest": "sha256:0da66de45b275ce01f702c984b421880c77ac6f1b8b2d3de2bca6e1f2db0f047",
+        "subject_run_digest": "sha256:b39b1dde74a0207a788901faab5a88e7a1c160a154deffa5a49e3fe5269b25a7"
+      },
+      "comparison_id": "k2-mova-A--k2-mova-B--routing",
+      "coverage_assurance": "not_validated",
+      "decision": "insufficient_evidence",
+      "endpoints": [
+        {
+          "correct": 2965,
+          "manifest_sha256": "ca68e50dc978fb73afa0bf67d24bcbd1dd18ddbbb9719c22e5a335c14fba3c93",
+          "null": 0,
+          "planned": 4000,
+          "role": "A",
+          "run_sha256": "bc51f965153694e0c3c843e3b842910b46bd61624ff73d81d14f295d47d25df3",
+          "scored": 4000
+        },
+        {
+          "correct": 1001,
+          "manifest_sha256": "6857a115992552334e01128de3671bf18716c2cc800734a88ff3f509a0ea8c0c",
+          "null": 31,
+          "planned": 4000,
+          "role": "B",
+          "run_sha256": "f95078b6fee58fba197232d35652854743aa20ca160b2c3f8c73ceb5fb8e293b",
+          "scored": 3969
+        }
+      ],
+      "historical_wheel_sha256": "sha256:c2657a2a009604525f94e5df6e43fbec0d07ef8a79061596484bc0290ab99d19",
+      "metric_scopes": [
+        {
+          "aggregation": "mean",
+          "baseline_mean": null,
+          "candidate_mean": null,
+          "count": 4000,
+          "decision": "insufficient_evidence",
+          "delta": null,
+          "direction": "higher",
+          "interval": null,
+          "kind": "recorded",
+          "missing_count": 31,
+          "name": "native_quality",
+          "reasons": [
+            "missing results"
+          ],
+          "scoring_assurance": "recorded",
+          "slice": "overall",
+          "unit": "score"
+        },
+        {
+          "aggregation": "mean",
+          "baseline_mean": null,
+          "candidate_mean": null,
+          "count": 2000,
+          "decision": "insufficient_evidence",
+          "delta": null,
+          "direction": "higher",
+          "interval": null,
+          "kind": "recorded",
+          "missing_count": 11,
+          "name": "native_quality",
+          "reasons": [
+            "missing results"
+          ],
+          "scoring_assurance": "recorded",
+          "slice": "early_history",
+          "unit": "score"
+        },
+        {
+          "aggregation": "mean",
+          "baseline_mean": null,
+          "candidate_mean": null,
+          "count": 2000,
+          "decision": "insufficient_evidence",
+          "delta": null,
+          "direction": "higher",
+          "interval": null,
+          "kind": "recorded",
+          "missing_count": 20,
+          "name": "native_quality",
+          "reasons": [
+            "missing results"
+          ],
+          "scoring_assurance": "recorded",
+          "slice": "later_history",
+          "unit": "score"
+        }
+      ],
+      "model": "k2-mova-36b-a4b",
+      "planned_pairs": 4000,
+      "publication_status": "metadata_only_payload_held",
+      "recipient_scope": "Separate local process; not an independent organization.",
+      "recipient_status": "verified",
+      "scoring_assurance": "recorded",
+      "subject_correct": 1001,
+      "subject_missing": 31,
+      "workflow": "routing"
+    },
+    {
+      "artifacts": {
+        "approved_run_anchors": {
+          "sha256": "sha256:2218714a54e75d261673e6303d7b56ab890ff0696705dcc61a5dc2d60891da37",
+          "size_bytes": 191
+        },
+        "approved_signer": {
+          "sha256": "sha256:236275e3ad8a2ff9e3fc039dfdbf90bf6fdc0ee78c288acfd9ea37351bb450ee",
+          "size_bytes": 113
+        },
+        "input_plan": {
+          "sha256": "sha256:f333437ca5815f8026539f3ffcc3385fc3bea2473ae626b515260aa2031239ed",
+          "size_bytes": 23418
+        },
+        "policy": {
+          "sha256": "sha256:a41caf42a190a0877db05eeb2b93ccd02e45dcb52e4b91e7e083332203056423",
+          "size_bytes": 1082
+        },
+        "recipient_receipt": {
+          "sha256": "sha256:286d257fdf4dcee94d1c106643f138817d927fbe9a69c086fe184af0246626e2",
+          "size_bytes": 755
+        },
+        "recipient_trust": {
+          "sha256": "sha256:230c413ecda86a78a07c2ad6c2b807bbf5b5c4dd52df6e9dbc7bba494a1fff19",
+          "size_bytes": 1479
+        },
+        "report_manifest": {
+          "sha256": "sha256:ac3755ae7bbefddf6a0768ad055a6692b893c59e9aba285f0feee6a097dea5e4",
+          "size_bytes": 4726
+        },
+        "signed_evidence": {
+          "sha256": "sha256:4bce74522e511a80e6ad88f20bc9a1da82aa2baccf83ddc9a01880983671ad28",
+          "size_bytes": 39244875
+        },
+        "summary": {
+          "sha256": "sha256:56c24fa4457a99ed72614f1207cb58a02dd51862e80901b260c533223e92650c",
+          "size_bytes": 64594
+        }
+      },
+      "baseline_correct": 2438,
+      "baseline_missing": 4,
+      "canonical_bindings": {
+        "baseline_run_digest": "sha256:446c5bb2df490a285887f459927f20f70a25223d9e9c95357d66dd37952f81ec",
+        "policy_digest": "sha256:3dc73fc23af1d8c98052e0853c3c71264ce6f3e7127ea2bcf5e3c180e8190dcc",
+        "subject_run_digest": "sha256:063b1ce07f844a830618e01c95ee1cfa282e10549e4aa9fece646e3d56a53b0b"
+      },
+      "comparison_id": "k2-mova-A--k2-mova-B--extraction",
+      "coverage_assurance": "not_validated",
+      "decision": "insufficient_evidence",
+      "endpoints": [
+        {
+          "correct": 2438,
+          "manifest_sha256": "3972ff5a454f3ea3380027b46c6ed11e16fc2d3d46f8ae4f70124888445a9b1b",
+          "null": 4,
+          "planned": 4000,
+          "role": "A",
+          "run_sha256": "3b486e37186f3e7ea58d53f050bb336f478556bfcb3f949a93dd86f7a5a87850",
+          "scored": 3996
+        },
+        {
+          "correct": 454,
+          "manifest_sha256": "04965ce1e56eb3c6404f3b7fdebbe85ea00c6028ed712d7af4ab7a67720dc212",
+          "null": 527,
+          "planned": 4000,
+          "role": "B",
+          "run_sha256": "bf6ba434cde12e9962b7fad96c2d69769adab7502538954842a798d79eecce03",
+          "scored": 3473
+        }
+      ],
+      "historical_wheel_sha256": "sha256:c2657a2a009604525f94e5df6e43fbec0d07ef8a79061596484bc0290ab99d19",
+      "metric_scopes": [
+        {
+          "aggregation": "mean",
+          "baseline_mean": null,
+          "candidate_mean": null,
+          "count": 4000,
+          "decision": "insufficient_evidence",
+          "delta": null,
+          "direction": "higher",
+          "interval": null,
+          "kind": "recorded",
+          "missing_count": 530,
+          "name": "native_quality",
+          "reasons": [
+            "missing results"
+          ],
+          "scoring_assurance": "recorded",
+          "slice": "overall",
+          "unit": "score"
+        },
+        {
+          "aggregation": "mean",
+          "baseline_mean": null,
+          "candidate_mean": null,
+          "count": 2000,
+          "decision": "insufficient_evidence",
+          "delta": null,
+          "direction": "higher",
+          "interval": null,
+          "kind": "recorded",
+          "missing_count": 7,
+          "name": "native_quality",
+          "reasons": [
+            "missing results"
+          ],
+          "scoring_assurance": "recorded",
+          "slice": "empty_span",
+          "unit": "score"
+        },
+        {
+          "aggregation": "mean",
+          "baseline_mean": null,
+          "candidate_mean": null,
+          "count": 2000,
+          "decision": "insufficient_evidence",
+          "delta": null,
+          "direction": "higher",
+          "interval": null,
+          "kind": "recorded",
+          "missing_count": 523,
+          "name": "native_quality",
+          "reasons": [
+            "missing results"
+          ],
+          "scoring_assurance": "recorded",
+          "slice": "has_span",
+          "unit": "score"
+        }
+      ],
+      "model": "k2-mova-36b-a4b",
+      "planned_pairs": 4000,
+      "publication_status": "metadata_only_payload_held",
+      "recipient_scope": "Separate local process; not an independent organization.",
+      "recipient_status": "verified",
+      "scoring_assurance": "recorded",
+      "subject_correct": 454,
+      "subject_missing": 527,
+      "workflow": "extraction"
+    },
+    {
+      "artifacts": {
+        "approved_run_anchors": {
+          "sha256": "sha256:2ba7eb419e219c2d0579cef235dd9ff6d620158b05e168bee27991740b044da5",
+          "size_bytes": 191
+        },
+        "approved_signer": {
+          "sha256": "sha256:48755b8b27106b220638ec59e1c943d94f67dcee0588a522ecce04021ff0b914",
+          "size_bytes": 113
+        },
+        "input_plan": {
+          "sha256": "sha256:e6e1d634e4c8f44512d7e79f53bef56ea4ba01ce3d84c88fb6029bb3bf0fb2a5",
+          "size_bytes": 22997
+        },
+        "policy": {
+          "sha256": "sha256:e3ac46f9756dcb6363dfe97a1cbd9928fb6f29fc3ce5616b657f1d4bde8cb7f8",
+          "size_bytes": 1110
+        },
+        "recipient_receipt": {
+          "sha256": "sha256:75c4a8e6c5a75ec708b00c86759c2d4d15c39c4847efe2559ad5069647b312e1",
+          "size_bytes": 755
+        },
+        "recipient_trust": {
+          "sha256": "sha256:c3fc97cebaac9619d036219a847f04676b39a3994cc2945f0edc43369453c5b2",
+          "size_bytes": 1448
+        },
+        "report_manifest": {
+          "sha256": "sha256:a3aba9bf34d02dc74cbd1f797202e5188088d36fbd4e3256ced9633cfa1a1337",
+          "size_bytes": 4687
+        },
+        "signed_evidence": {
+          "sha256": "sha256:75ae62006ae6229529a3e4eba97e8b8647d84bce8aad016240e575da293f1963",
+          "size_bytes": 91884261
+        },
+        "summary": {
+          "sha256": "sha256:f410e0eb03c9e3b70d638587d408da34531db660afda631df06961dcfe0593fd",
+          "size_bytes": 625573
+        }
+      },
+      "baseline_correct": 0,
+      "baseline_missing": 4000,
+      "canonical_bindings": {
+        "baseline_run_digest": "sha256:1bee695ddb96a0aaa9c03582ca73bc0d6b1e40b0d9968c06403f091eeceb631e",
+        "policy_digest": "sha256:93937305ce71588b35abb6d7dd9868b3cb2a2ae8997ceacd49999767fcd18c6f",
+        "subject_run_digest": "sha256:5d315386f33bc9b8d6c8f2c9a6b571ffe8e5a62997920edb26b1f398e5e60b60"
+      },
+      "comparison_id": "k2-mova-A--k2-mova-B--numeric",
+      "coverage_assurance": "not_validated",
+      "decision": "insufficient_evidence",
+      "endpoints": [
+        {
+          "correct": 0,
+          "manifest_sha256": "49e19f3d5338cc45ceebb4ad32a2f7d8dcdc4f0d5265100bca09a24ac2a77c49",
+          "null": 4000,
+          "planned": 4000,
+          "role": "A",
+          "run_sha256": "04cf7be91f7de2547671353d5853e0d2acc9352c7c2de994baf461351efb1816",
+          "scored": 0
+        },
+        {
+          "correct": 0,
+          "manifest_sha256": "ef12f801ad84f217c2d9d68292849279dd8b7da3e4cfcbdacfb75e8925c860be",
+          "null": 4000,
+          "planned": 4000,
+          "role": "B",
+          "run_sha256": "d8be332f9618180ae8ce8f2c67abb50c46ebe1cf24a80ac8e087bee7a1efcb58",
+          "scored": 0
+        }
+      ],
+      "historical_wheel_sha256": "sha256:c2657a2a009604525f94e5df6e43fbec0d07ef8a79061596484bc0290ab99d19",
+      "metric_scopes": [
+        {
+          "aggregation": "mean",
+          "baseline_mean": null,
+          "candidate_mean": null,
+          "count": 4000,
+          "decision": "insufficient_evidence",
+          "delta": null,
+          "direction": "higher",
+          "interval": null,
+          "kind": "recorded",
+          "missing_count": 4000,
+          "name": "native_quality",
+          "reasons": [
+            "missing results"
+          ],
+          "scoring_assurance": "recorded",
+          "slice": "overall",
+          "unit": "score"
+        },
+        {
+          "aggregation": "mean",
+          "baseline_mean": null,
+          "candidate_mean": null,
+          "count": 2000,
+          "decision": "insufficient_evidence",
+          "delta": null,
+          "direction": "higher",
+          "interval": null,
+          "kind": "recorded",
+          "missing_count": 2000,
+          "name": "native_quality",
+          "reasons": [
+            "missing results"
+          ],
+          "scoring_assurance": "recorded",
+          "slice": "composed_program",
+          "unit": "score"
+        },
+        {
+          "aggregation": "mean",
+          "baseline_mean": null,
+          "candidate_mean": null,
+          "count": 2000,
+          "decision": "insufficient_evidence",
+          "delta": null,
+          "direction": "higher",
+          "interval": null,
+          "kind": "recorded",
+          "missing_count": 2000,
+          "name": "native_quality",
+          "reasons": [
+            "missing results"
+          ],
+          "scoring_assurance": "recorded",
+          "slice": "single_step",
+          "unit": "score"
+        }
+      ],
+      "model": "k2-mova-36b-a4b",
+      "planned_pairs": 4000,
+      "publication_status": "metadata_only_payload_held",
+      "recipient_scope": "Separate local process; not an independent organization.",
+      "recipient_status": "verified",
+      "scoring_assurance": "recorded",
+      "subject_correct": 0,
+      "subject_missing": 4000,
+      "workflow": "numeric"
+    },
+    {
+      "artifacts": {
+        "approved_run_anchors": {
+          "sha256": "sha256:cd71be0e986be46f8df6a6916f6c11621825828871f424fbb255fc6aba688276",
+          "size_bytes": 191
+        },
+        "approved_signer": {
+          "sha256": "sha256:154f732e1914043315d55d8b01488425fca067f03072f3b352f20c302c53a724",
+          "size_bytes": 113
+        },
+        "input_plan": {
+          "sha256": "sha256:5dc69b4d5473d3d4405bab18aeff5e47866c030c0fc0cd343d3fb385dd624186",
+          "size_bytes": 23338
+        },
+        "policy": {
+          "sha256": "sha256:2492a40ca476f60ef60d6fc28e34f45be8ab6e8e34e53ffc314d88e437b5615c",
+          "size_bytes": 1095
+        },
+        "recipient_receipt": {
+          "sha256": "sha256:f2200a9958f2257eef8c24dd556eab148be65c91baaf05eba14ef57bd28f4477",
+          "size_bytes": 755
+        },
+        "recipient_trust": {
+          "sha256": "sha256:237a6e9f8d3ff680a2cbad18184129e8a6537dcaea009e8ebdcfd6088a0b7149",
+          "size_bytes": 1480
+        },
+        "report_manifest": {
+          "sha256": "sha256:eb52afe47a5f7ad647a974b7d7edbb5134eba0dd51066459aa5899e40291a2cf",
+          "size_bytes": 4739
+        },
+        "signed_evidence": {
+          "sha256": "sha256:386160df58d26b54dbc6e0a2980dbe398d02b519cab6bbb9bab072422a6086dd",
+          "size_bytes": 30920292
+        },
+        "summary": {
+          "sha256": "sha256:f2dc14aeaca01b6babaf3c434a68b5bb061773fcf8097788d5fc4aa1924dadea",
+          "size_bytes": 31131
+        }
+      },
+      "baseline_correct": 2323,
+      "baseline_missing": 41,
+      "canonical_bindings": {
+        "baseline_run_digest": "sha256:29330d1762b3ca305c82c0fcfc458e9dfdc127bc8b4491fb36e2eb89cdee9f63",
+        "policy_digest": "sha256:553feb8f3da4156c76147617ea379ce44c3d453d3cf84c905fb8bfc896b8dc6b",
+        "subject_run_digest": "sha256:c4b72fb1084effe3779dba1a3e6af211f8c1aa67acf931e6c096b870c7365744"
+      },
+      "comparison_id": "k2-mova-A--k2-mova-B--grounded_qa",
+      "coverage_assurance": "not_validated",
+      "decision": "insufficient_evidence",
+      "endpoints": [
+        {
+          "correct": 2323,
+          "manifest_sha256": "77b59c33d4218919b933fc5f0e510f25af15bde89542c59f2baaa7c5f9bb2849",
+          "null": 41,
+          "planned": 4000,
+          "role": "A",
+          "run_sha256": "fbae4783b10f45312727c0ecdb39842f71a37f8a3ddf811148c3a1d77cc45221",
+          "scored": 3959
+        },
+        {
+          "correct": 1887,
+          "manifest_sha256": "7690375c3029da5fe4a8a4279aaf5d253a36ad453f341167183184ca4c613a05",
+          "null": 304,
+          "planned": 4000,
+          "role": "B",
+          "run_sha256": "87f76801304e000e59b7153fd0db9fe31c34b26863d5bc8f5e5fbf92aa1509db",
+          "scored": 3696
+        }
+      ],
+      "historical_wheel_sha256": "sha256:c2657a2a009604525f94e5df6e43fbec0d07ef8a79061596484bc0290ab99d19",
+      "metric_scopes": [
+        {
+          "aggregation": "mean",
+          "baseline_mean": null,
+          "candidate_mean": null,
+          "count": 4000,
+          "decision": "insufficient_evidence",
+          "delta": null,
+          "direction": "higher",
+          "interval": null,
+          "kind": "recorded",
+          "missing_count": 334,
+          "name": "native_quality",
+          "reasons": [
+            "missing results"
+          ],
+          "scoring_assurance": "recorded",
+          "slice": "overall",
+          "unit": "score"
+        },
+        {
+          "aggregation": "mean",
+          "baseline_mean": null,
+          "candidate_mean": null,
+          "count": 2000,
+          "decision": "insufficient_evidence",
+          "delta": null,
+          "direction": "higher",
+          "interval": null,
+          "kind": "recorded",
+          "missing_count": 39,
+          "name": "native_quality",
+          "reasons": [
+            "missing results"
+          ],
+          "scoring_assurance": "recorded",
+          "slice": "answerable",
+          "unit": "score"
+        },
+        {
+          "aggregation": "mean",
+          "baseline_mean": null,
+          "candidate_mean": null,
+          "count": 2000,
+          "decision": "insufficient_evidence",
+          "delta": null,
+          "direction": "higher",
+          "interval": null,
+          "kind": "recorded",
+          "missing_count": 295,
+          "name": "native_quality",
+          "reasons": [
+            "missing results"
+          ],
+          "scoring_assurance": "recorded",
+          "slice": "unanswerable",
+          "unit": "score"
+        }
+      ],
+      "model": "k2-mova-36b-a4b",
+      "planned_pairs": 4000,
+      "publication_status": "metadata_only_payload_held",
+      "recipient_scope": "Separate local process; not an independent organization.",
+      "recipient_status": "verified",
+      "scoring_assurance": "recorded",
+      "subject_correct": 1887,
+      "subject_missing": 304,
+      "workflow": "grounded_qa"
+    },
+    {
+      "artifacts": {
+        "approved_run_anchors": {
+          "sha256": "sha256:75ce9c9402271b0e88d4949223fd2fba48794786ae8c3307916566907714105a",
+          "size_bytes": 191
+        },
+        "approved_signer": {
+          "sha256": "sha256:ab131eb96eedf0d9ed5b4d4c56aa37c436c5e4d23935df9431c7ea9d13d1a01f",
+          "size_bytes": 113
+        },
+        "input_plan": {
+          "sha256": "sha256:5a249592983d78201c8bf3b89d1ac7d3e67d4df5012a599c326b0f84d394e749",
+          "size_bytes": 23708
+        },
+        "policy": {
+          "sha256": "sha256:8b3316536f28c637bd378a65881bf51f2d2c4aa946b3b7e748ab0aeaf94fdf04",
+          "size_bytes": 1135
+        },
+        "recipient_receipt": {
+          "sha256": "sha256:d4ae33a31adfa397c4522e2276e7065817add06223710e2db829bc7a70f00ed1",
+          "size_bytes": 755
+        },
+        "recipient_trust": {
+          "sha256": "sha256:a1a56d6b63643be93b347bd493ba35a111c2080219fd079dc3fc4ab3a2d6b959",
+          "size_bytes": 1512
+        },
+        "report_manifest": {
+          "sha256": "sha256:c211e0906034265ae5abcc1a4d5b68f1d3b10c090a81ed5c1b497b109224deb9",
+          "size_bytes": 4778
+        },
+        "signed_evidence": {
+          "sha256": "sha256:5f13ab7eeb2691e92bb05039bc5e5848793873e4cda9f1c7a66505cf25a1c1d8",
+          "size_bytes": 42705535
+        },
+        "summary": {
+          "sha256": "sha256:17a545de377e7cc76fd172f5dc9b78f210cc95dcc677c4aea2fc89a3a0798ea3",
+          "size_bytes": 89277
+        }
+      },
+      "baseline_correct": 1609,
+      "baseline_missing": 13,
+      "canonical_bindings": {
+        "baseline_run_digest": "sha256:ea1f630dee35a15f0ca9f727f05d3388d60248bcb09ccda5af506b70be444851",
+        "policy_digest": "sha256:ffa353a9d67306da2101735a2965fa963a2ddb8476d56ba720bc13f64eabb779",
+        "subject_run_digest": "sha256:a7e1656bfdf235295dae96a3c61207775ffe44b29a2d893aaacaea7e86596d1a"
+      },
+      "comparison_id": "k2-mova-A--k2-mova-B--transformation",
+      "coverage_assurance": "not_validated",
+      "decision": "insufficient_evidence",
+      "endpoints": [
+        {
+          "correct": 1609,
+          "manifest_sha256": "02ff8f5fcfe1a0c9aa8b35bece6af10c3165c91bf460ebe4712de73fc9f6aa06",
+          "null": 13,
+          "planned": 4000,
+          "role": "A",
+          "run_sha256": "44a3bf98d982083bff0ec9db8a9f8c2966f3753eeb875ed7507e92f5ce0aa684",
+          "scored": 3987
+        },
+        {
+          "correct": 952,
+          "manifest_sha256": "c43219730a809f9b8848a358bd5db7ab1a20a7ce2e0f649e858e1ba07df4b562",
+          "null": 1524,
+          "planned": 4000,
+          "role": "B",
+          "run_sha256": "ec327408ce449720080e05295cec39b33cb11f24d1ebe853884bc237ccc846ed",
+          "scored": 2476
+        }
+      ],
+      "historical_wheel_sha256": "sha256:c2657a2a009604525f94e5df6e43fbec0d07ef8a79061596484bc0290ab99d19",
+      "metric_scopes": [
+        {
+          "aggregation": "mean",
+          "baseline_mean": null,
+          "candidate_mean": null,
+          "count": 4000,
+          "decision": "insufficient_evidence",
+          "delta": null,
+          "direction": "higher",
+          "interval": null,
+          "kind": "recorded",
+          "missing_count": 1525,
+          "name": "native_quality",
+          "reasons": [
+            "missing results"
+          ],
+          "scoring_assurance": "recorded",
+          "slice": "overall",
+          "unit": "score"
+        },
+        {
+          "aggregation": "mean",
+          "baseline_mean": null,
+          "candidate_mean": null,
+          "count": 2000,
+          "decision": "insufficient_evidence",
+          "delta": null,
+          "direction": "higher",
+          "interval": null,
+          "kind": "recorded",
+          "missing_count": 1509,
+          "name": "native_quality",
+          "reasons": [
+            "missing results"
+          ],
+          "scoring_assurance": "recorded",
+          "slice": "relational_or_structured",
+          "unit": "score"
+        },
+        {
+          "aggregation": "mean",
+          "baseline_mean": null,
+          "candidate_mean": null,
+          "count": 2000,
+          "decision": "insufficient_evidence",
+          "delta": null,
+          "direction": "higher",
+          "interval": null,
+          "kind": "recorded",
+          "missing_count": 16,
+          "name": "native_quality",
+          "reasons": [
+            "missing results"
+          ],
+          "scoring_assurance": "recorded",
+          "slice": "single_table_simple",
+          "unit": "score"
+        }
+      ],
+      "model": "k2-mova-36b-a4b",
+      "planned_pairs": 4000,
+      "publication_status": "metadata_only_payload_held",
+      "recipient_scope": "Separate local process; not an independent organization.",
+      "recipient_status": "verified",
+      "scoring_assurance": "recorded",
+      "subject_correct": 952,
+      "subject_missing": 1524,
+      "workflow": "transformation"
+    }
+  ],
+  "scope": "Selected retained K2 prompt-role studies; descriptive metadata, not a published evidence pack or a complete campaign inventory."
+}

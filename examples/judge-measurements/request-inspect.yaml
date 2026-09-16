@@ -1,0 +1,13 @@
+format_version: invarlock/evaluation-request-v3
+execution:
+  mode: judge_import
+  collection: null
+comparison:
+  baseline_run: baseline_run.json
+  subject_run: subject_run.json
+  plan: plan.json
+  measurements: measurements-inspect.json
+  policy: analysis_policy.json
+output:
+  evidence: evidence-inspect
+  signer_identity: example-signer

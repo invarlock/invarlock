@@ -5,6 +5,13 @@ InvarLock transaction. Each published entry contains an
 `invarlock/evidence-pack-v1` bundle and its independently signed verification
 receipt.
 
+A separate [captured reference index](../examples/captured-results/references/README.md) provides the complete
+4,000-pair K2 Horizon 32B routing prompt comparison with current captured
+verification and an authentic regression receipt. Its recorded-score assurance
+differs from this native transaction index. The broader
+[campaign inventory](../examples/qualification/k2-horizon/retained-results.md)
+retains the other workflow outcomes and source references.
+
 Every current entry uses a 400-record paired schedule selected from pinned
 public datasets. Text comparisons use a domain-balanced MMLU-Pro suite;
 vision-text comparisons use a subject-balanced MMMU-Pro Vision suite. Both

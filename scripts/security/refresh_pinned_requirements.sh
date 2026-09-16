@@ -61,6 +61,8 @@ if ! command -v uv >/dev/null 2>&1; then
   exit 127
 fi
 
+python3 "${ROOT_DIR}/scripts/security/build_hardened_accelerate_wheel.py" bootstrap
+
 REQ_DIR="${SOURCE_REQ_DIR}"
 TMP_REQ_DIR=""
 if [[ "${MODE}" == "check" ]]; then
@@ -85,6 +87,7 @@ compile_pyproject() {
     cd "${ROOT_DIR}"
     uv pip compile pyproject.toml \
       --python-platform x86_64-unknown-linux-gnu \
+      --find-links runtime/wheels \
       --generate-hashes \
       --output-file "${output_arg}" \
       "$@"
@@ -104,6 +107,7 @@ compile_req_platform() {
   (
     cd "${ROOT_DIR}"
     uv pip compile "${input_arg}" \
+      --find-links runtime/wheels \
       --generate-hashes \
       --output-file "${output_arg}" \
       "$@"
@@ -126,6 +130,7 @@ compile_release_install() {
       --python-version "${python_version}" \
       --constraints requirements/workflows/release-security-py313.txt \
       --constraints "requirements/workflows/ci-hf-py${python_tag}.txt" \
+      --find-links runtime/wheels \
       --generate-hashes \
       --custom-compile-command "scripts/security/refresh_pinned_requirements.sh --write --group workflows" \
       --output-file "${output_arg}"
@@ -135,7 +140,7 @@ compile_release_install() {
 run_workflow_locks() {
   compile_pyproject "${WORKFLOW_DIR}/ci-hf-py312.txt" \
     --python-version 3.12 \
-    --extra hf \
+    --group runtime-test \
     --extra ci
 
   compile_pyproject "${WORKFLOW_DIR}/core-py312.txt" \
@@ -143,7 +148,7 @@ run_workflow_locks() {
 
   compile_pyproject "${WORKFLOW_DIR}/ci-hf-py313.txt" \
     --python-version 3.13 \
-    --extra hf \
+    --group runtime-test \
     --extra ci
 
   compile_pyproject "${WORKFLOW_DIR}/docs-ci-py313.txt" \
@@ -152,7 +157,7 @@ run_workflow_locks() {
 
   compile_pyproject "${WORKFLOW_DIR}/hf-py313.txt" \
     --python-version 3.13 \
-    --extra hf
+    --group hf
 
   compile_req_platform \
     "${WORKFLOW_DIR}/runtime-image.in" \
@@ -191,6 +196,9 @@ run_workflow_locks() {
     --no-deps
 
   local harness_full_lock="${WORKFLOW_DIR}/.lm-evaluation-harness-full-py312.txt"
+  if [[ -f "${WORKFLOW_DIR}/lm-evaluation-harness-py312.txt" ]]; then
+    cp "${WORKFLOW_DIR}/lm-evaluation-harness-py312.txt" "${harness_full_lock}"
+  fi
   compile_req_platform \
     "${WORKFLOW_DIR}/lm-evaluation-harness.in" \
     "${harness_full_lock}" \
@@ -209,6 +217,9 @@ run_workflow_locks() {
   rm -f "${harness_full_lock}"
 
   local harness_cuda_full_lock="${WORKFLOW_DIR}/.lm-evaluation-harness-full-py312-cu129.txt"
+  if [[ -f "${WORKFLOW_DIR}/lm-evaluation-harness-py312-cu129.txt" ]]; then
+    cp "${WORKFLOW_DIR}/lm-evaluation-harness-py312-cu129.txt" "${harness_cuda_full_lock}"
+  fi
   compile_req_platform \
     "${WORKFLOW_DIR}/lm-evaluation-harness.in" \
     "${harness_cuda_full_lock}" \
@@ -225,6 +236,13 @@ run_workflow_locks() {
     return 1
   fi
   rm -f "${harness_cuda_full_lock}"
+
+  for judge_python in 3.12 3.13; do
+    compile_pyproject "${WORKFLOW_DIR}/inspect-judge-tests-py${judge_python/./}.txt" \
+      "${WORKFLOW_DIR}/inspect-judge-tests.in" \
+      --python-version "${judge_python}" \
+      --custom-compile-command "scripts/security/refresh_pinned_requirements.sh --write --group workflows"
+  done
 
   compile_req_platform \
     "${WORKFLOW_DIR}/inspect-ai-runtime.in" \
@@ -244,23 +262,47 @@ run_workflow_locks() {
     --torch-backend cu129 \
     --custom-compile-command "scripts/security/refresh_pinned_requirements.sh --write --group workflows"
 
+  local evals_full_lock="${WORKFLOW_DIR}/.openai-evals-runtime-full-py312.txt"
+  if [[ -f "${WORKFLOW_DIR}/openai-evals-runtime-py312.txt" ]]; then
+    cp "${WORKFLOW_DIR}/openai-evals-runtime-py312.txt" "${evals_full_lock}"
+  fi
   compile_req_platform \
     "${WORKFLOW_DIR}/openai-evals-runtime.in" \
-    "${WORKFLOW_DIR}/openai-evals-runtime-py312.txt" \
+    "${evals_full_lock}" \
     --python-version 3.12 \
     --python-platform x86_64-unknown-linux-gnu \
     --constraints "${WORKFLOW_DIR}/evaluator-transaction-runtime.in" \
     --torch-backend cpu \
     --custom-compile-command "scripts/security/refresh_pinned_requirements.sh --write --group workflows"
+  if ! python3 "${ROOT_DIR}/scripts/security/build_restricted_openai_evals_wheel.py" \
+    filter-lock \
+    --input "${evals_full_lock}" \
+    --output "${WORKFLOW_DIR}/openai-evals-runtime-py312.txt"; then
+    rm -f "${evals_full_lock}"
+    return 1
+  fi
+  rm -f "${evals_full_lock}"
 
+  local evals_cuda_full_lock="${WORKFLOW_DIR}/.openai-evals-runtime-full-py312-cu129.txt"
+  if [[ -f "${WORKFLOW_DIR}/openai-evals-runtime-py312-cu129.txt" ]]; then
+    cp "${WORKFLOW_DIR}/openai-evals-runtime-py312-cu129.txt" "${evals_cuda_full_lock}"
+  fi
   compile_req_platform \
     "${WORKFLOW_DIR}/openai-evals-runtime.in" \
-    "${WORKFLOW_DIR}/openai-evals-runtime-py312-cu129.txt" \
+    "${evals_cuda_full_lock}" \
     --python-version 3.12 \
     --python-platform x86_64-unknown-linux-gnu \
     --constraints "${WORKFLOW_DIR}/evaluator-transaction-runtime-cu129.in" \
     --torch-backend cu129 \
     --custom-compile-command "scripts/security/refresh_pinned_requirements.sh --write --group workflows"
+  if ! python3 "${ROOT_DIR}/scripts/security/build_restricted_openai_evals_wheel.py" \
+    filter-lock \
+    --input "${evals_cuda_full_lock}" \
+    --output "${WORKFLOW_DIR}/openai-evals-runtime-py312-cu129.txt"; then
+    rm -f "${evals_cuda_full_lock}"
+    return 1
+  fi
+  rm -f "${evals_cuda_full_lock}"
 
   compile_pyproject "${WORKFLOW_DIR}/precommit-ci-py313.txt" \
     --python-version 3.13 \

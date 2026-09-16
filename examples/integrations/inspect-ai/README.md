@@ -6,6 +6,11 @@ its exact-match scorer over two pinned model evaluations, then completes
 recomputes the paired result from every imported record instead of trusting the
 evaluator aggregate.
 
+This is a source-checkout example that runs Inspect and imports its records into
+native InvarLock evidence. It is not an installed Inspect provider or a model
+judge. For answers you already collected, use the captured route below instead
+of rerunning inference.
+
 The default `quick` profile compares Qwen3.5 0.8B Base with its post-trained
 checkpoint over 102 local records on CPU. The retained `deployment` profile
 uses the same checkpoints with a tokenizer-qualified 400-record LAMBADA
@@ -15,24 +20,69 @@ balanced MMLU-Pro records on CUDA. Every required snapshot file, tokenizer
 contract, task setting, evaluator version, runtime image, and per-record output
 is digest-bound.
 
+## Capture existing Inspect answers or collect judgments
+
+The profiles below execute the example-owned signed OCI bridge. To keep an
+existing Inspect workflow, import supported per-case JSON with the installed
+`inspect-json` adapter or explicitly map records through
+`invarlock.engine.capture_evaluator_run`. Follow the separate
+[captured-results workflow](../../captured-results/README.md) to select InvarLock
+exact match, normalized NLL or judge scoring according to the available facts.
+The JSON answer parser does not import arbitrary `.eval` archives or turn an
+aggregate score into complete judge evidence.
+
+The optional [Inspect judge add-in](../../../addins/inspect_judge/README.md)
+collects or imports complete retained calls for the shared native/captured judge
+recipe. Its live collection pins Inspect `0.3.263` and OpenAI `3.13.0`; this does
+not relabel the historical exact-match profiles below. Per-case references use
+`prompt.reference_mode: per_case` and remain a distinct judge request field.
+Structured task inputs require an explicit text projection, with the original
+input and context retained and bound.
+
+A generated answer export does not provide reference-continuation likelihoods.
+Normalized NLL needs actual typed measurements with token/byte counts and
+model, tokenizer, configuration and source bindings. The separate real
+[Harness likelihood reference](../../captured-results/references/harness-likelihood/README.md)
+establishes one `HFLM` CPU compatibility profile, not native Inspect likelihood
+qualification. Contract and mocked-transport judge tests establish integration
+behavior; they do not establish a new hosted judge result.
+
 ## Run the integration
 
-From a clean committed checkout with Docker or Podman available:
+Complete the [shared setup](../README.md#before-running-a-model-example): a clean
+committed checkout, Git, Make, Python, `uv`, Docker or Podman, and external
+evidence/verifier/builder keys. Initial model and image preparation needs network
+access. The default profile runs on CPU; the larger profiles need CUDA.
 
 ```bash
-make example-inspect-ai EXAMPLE_ARGS="--evidence-signing-key /secure/keys/evidence.pem --verifier-signing-key /secure/keys/verifier.pem --builder-signing-key /secure/keys/builder.pem --builder-public-key /secure/keys/builder-public.pem --trust-root /secure/trust/inspect-ai"
+make example-inspect-ai EXAMPLE_ARGS="\
+  --evidence-signing-key /secure/keys/evidence.pem \
+  --verifier-signing-key /secure/keys/verifier.pem \
+  --builder-signing-key /secure/keys/builder.pem \
+  --builder-public-key /secure/keys/builder-public.pem \
+  --trust-root /secure/trust/inspect-ai"
 ```
 
-Select the current-model flagship with:
+Run the flagship profile and retain its result even if the policy rejects it:
 
 ```bash
-make example-inspect-ai EXAMPLE_ARGS="--corpus-profile flagship --evidence-signing-key /secure/keys/evidence.pem --verifier-signing-key /secure/keys/verifier.pem --builder-signing-key /secure/keys/builder.pem --builder-public-key /secure/keys/builder-public.pem --trust-root /secure/trust/inspect-ai"
+make example-inspect-ai EXAMPLE_ARGS="--corpus-profile flagship --allow-policy-fail \
+  --evidence-signing-key /secure/keys/evidence.pem \
+  --verifier-signing-key /secure/keys/verifier.pem \
+  --builder-signing-key /secure/keys/builder.pem \
+  --builder-public-key /secure/keys/builder-public.pem \
+  --trust-root /secure/trust/inspect-ai-flagship"
 ```
 
 Run the compact deployment-approval profile with:
 
 ```bash
-make example-inspect-ai EXAMPLE_ARGS="--corpus-profile deployment --evidence-signing-key /secure/keys/evidence.pem --verifier-signing-key /secure/keys/verifier.pem --builder-signing-key /secure/keys/builder.pem --builder-public-key /secure/keys/builder-public.pem --trust-root /secure/trust/inspect-ai"
+make example-inspect-ai EXAMPLE_ARGS="--corpus-profile deployment \
+  --evidence-signing-key /secure/keys/evidence.pem \
+  --verifier-signing-key /secure/keys/verifier.pem \
+  --builder-signing-key /secure/keys/builder.pem \
+  --builder-public-key /secure/keys/builder-public.pem \
+  --trust-root /secure/trust/inspect-ai-deployment"
 ```
 
 The shared `portability` profile can also run the Gemma 4 12B instruction and
@@ -43,9 +93,15 @@ from cross-family portability.
 
 The GPU profiles require an NVIDIA CUDA runtime and enough memory for one model
 at a time. A 32 GB GPU is a practical minimum for the BF16 singleton runs.
-Pass `EXAMPLE_ARGS="--workspace PATH"` to retain the complete transaction at a
-new path. Signing keys and the trust root remain caller-owned and outside the
+Append `--workspace PATH` to the full command's `EXAMPLE_ARGS` to retain the
+complete transaction at a new path. Signing keys and the trust root remain caller-owned and outside the
 transaction.
+
+The command prints paths for the evidence pack, separate verification receipt
+and HTML report. Check the receipt's policy verdict as well as integrity: the
+retained flagship result is an authentic rejection, while the separate retained
+deployment profile passes its different policy. `--allow-policy-fail` preserves
+that distinction and never accepts malformed evidence.
 
 ## Frozen 400-record suite
 

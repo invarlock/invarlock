@@ -1,28 +1,58 @@
 # Assurance case
 
-!!! abstract "Assurance note"
-    **In plain language:** A pass records that one subject met one policy
-    against one baseline on the fixed schedule. Broader quality, safety, and
-    deployment decisions use complementary evidence.
+> **Assurance note**
+>
+> **In plain language:** A pass records that one subject met one policy
+> against one baseline on the fixed schedule. Broader quality, safety, and
+> deployment decisions use complementary evidence.
+>
+> **Question:** What decision does a strictly verified InvarLock transaction
+> support, and which broader questions use complementary evidence?
+>
+> **Decision use:** Use this page to decide whether a signed receipt and its
+> operational assumptions are sufficient for a particular acceptance case.
+>
+> **Evidence:** Authenticated inputs, paired provider records, deterministic
+> replay, the signed evidence pack, independent anchors, and the
+> verifier-signed receipt.
 
-    **Question:** What decision does a strictly verified InvarLock transaction
-    support, and which broader questions use complementary evidence?
-
-    **Decision use:** Use this page to decide whether a signed receipt and its
-    operational assumptions are sufficient for a particular acceptance case.
-
-    **Evidence:** Authenticated inputs, paired provider records, deterministic
-    replay, the signed evidence pack, independent anchors, and the
-    verifier-signed receipt.
-
-InvarLock supports one narrow assurance claim: a named subject satisfied a
-caller-approved acceptance policy relative to a named baseline on one authenticated,
-ordered evaluation schedule, under the runtime identities recorded for that
-transaction.
+InvarLock supports a scoped acceptance claim: the recorded comparison met
+independently supplied requirements under its declared inputs, measurement
+provenance and decision contract. The evidence family determines which facts
+are replayed and what the result means.
 
 The claim covers the submitted records. Questions about other inputs, model
 safety, model intent, and deployment fitness remain explicit complementary
 review domains.
+
+The formal argument below concerns native exact-match/NLL and deterministic
+extension pack-v1 evidence. [Captured comparisons](../user-guide/captured-results.md)
+authenticate supplied case facts and replay, with independent run/request pins.
+[Judge evidence](../reference/judge-measurements.md) adds a bounded measurement
+plan, retained ratings and its own recipient policy; native judge evidence also
+retains runtime provenance. Judge accuracy and broader model quality require
+separate validation when those claims matter to the decision; such studies are
+not prerequisites for running or verifying the bounded judge workflow.
+
+Trusted teams can use these checks to catch ordinary handoff mistakes: the wrong
+model, stale policy, incomplete capture or mismatched report. Independent anchors
+mean separately controlled expectations, not a requirement for separate people
+or organizations.
+
+## Evidence-family scope
+
+| Evidence family | What independent verification checks | Main boundary |
+| --- | --- | --- |
+| Native exact match, NLL and deterministic extensions | Artifact, runtime, schedule, provider observations, paired arithmetic and policy bindings | Recorded runtime facts are not execution attestation |
+| Signed captured comparisons, including hosted runs | Complete normalized runs, declared source identities, request, policy, scorer-specific facts and every metric/slice result | Imported facts are supplied observations; a hosted descriptor does not identify hidden weights |
+| Signed bounded judge evidence, including native judge | Authorized signer and subject, frozen runs, case set, plan, retained trials, analysis and recipient policy; native evidence also binds provider capture | Replay establishes the retained decision, not judge accuracy or independence of the declared units |
+| Deterministic and judge evidence set | Both independently verified components and identical complete runs, case set and subject identity | The local conjunction is not a new signed attestation or joint confidence guarantee |
+
+Unsigned local evaluations remain useful for development, but do not establish
+independent recipient acceptance. A report presents the recorded result; it does
+not replace verification under independently controlled inputs.
+
+The native formal argument below is one instance of this common structure.
 
 ## Top-level claim
 
@@ -104,7 +134,7 @@ and
 | Verifier anchors are controlled outside the evidence submission path. | Otherwise the evidence signer can choose the expected policy, artifacts, schedule, runtimes, signer, and GGUF request. | Anchors parsed from the bundle or supplied by the same actor without independent review. |
 | Schedule and policy were selected before subject results were inspected. | Post-result selection can preserve perfect internal consistency while biasing the result. | Cherry-picked records, changed expected outputs, favorable run selection, or threshold tuning. |
 | Provider measurements are credible enough for the decision context. | Replay checks consistency, not physical execution truth. | Compromised evaluation environment or provider, missing external attestation where one is required. |
-| Selected scorer code was reviewed and independently authorized. | A scorer extension executes code that determines per-record values, although the core retains aggregation and policy arithmetic. | Scorer authorization copied from the request, substituted installed package, malicious scorer code, or an extension that uses a network, external model, human judgment, or LLM judge. |
+| Selected scorer code was reviewed and independently authorized. | A scorer extension executes code that determines per-record values, although the core retains aggregation and policy arithmetic. | Scorer authorization copied from the request, substituted installed package, malicious scorer code, or an extension that uses a network, external model, externally assigned ratings, or LLM judge. |
 | The baseline is an appropriate reference. | The result is relative to that baseline. | Backdoored, obsolete, misidentified, or otherwise unsuitable baseline. |
 | The finite schedule matches the intended decision scope. | No population inference or representativeness test is performed. | Unsupported generalization to users, tasks, languages, or conditions not scheduled. |
 
@@ -155,13 +185,21 @@ facts.
 
 ## Result states
 
-Use three review states rather than collapsing every outcome into pass/fail:
+For native pack-v1 evidence, use three review states rather than collapsing
+every outcome into pass/fail:
 
 | State | Meaning | Action |
 | --- | --- | --- |
-| Verified pass | Integrity and replay succeeded; policy verdict is `pass`; required operational assumptions were explicitly approved. | May support the scoped decision recorded by the decision owner. |
-| Verified policy fail | Integrity and replay succeeded; policy verdict is `fail`. | Preserve the signed failure receipt; do not publish or describe as accepted. |
+| Verified pass | Integrity and replay succeeded; policy verdict is `pass`. | May support the scoped decision after the decision owner assesses applicable operational assumptions. |
+| Verified policy fail | Integrity and replay succeeded; policy verdict is `fail`. | Preserve the signed failure receipt and share it as a rejection, not an accepted change. |
 | Not verified | Format, inventory, signature, anchor, runtime, pairing, or replay failed. | Treat as no accepted evidence. Diagnose without bypassing the failed check. |
+
+Captured and judge decisions separately distinguish `regression` and
+`insufficient_evidence`. Either can be an authentic, replayed result without
+recipient acceptance. An advisory judge pass is also not a required accepted
+result. Their `regression` labels have different statistical meanings; use the
+[decision contract](decision-semantics.md#choose-the-decision-contract) and the
+[recipient checklist](acceptance-checklist.md#captured-and-judge-evidence).
 
 An incompatible or not-yet-evaluated lane belongs in the third category. It is
 not a negative model result and must not be converted to one.

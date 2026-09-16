@@ -4,11 +4,13 @@ Applications embed InvarLock through `invarlock.engine`. This module is the
 stable facade for the paired evaluation engine. Modules that encode or decode
 individual bundle files remain internal unless explicitly documented.
 
-!!! info "Reference"
-
-    - **Surface:** Python facade exported by `invarlock.engine`
-    - **Stability:** Stable public API; undocumented `invarlock.*` imports remain internal
-    - **Use this page when:** Embedding evaluate, verify, report, request loading, receipt verification, or provider-ABI types in Python
+> **Reference**
+>
+> **Surface:** Python facade exported by `invarlock.engine`
+>
+> **Stability:** Stable public API; undocumented `invarlock.*` imports remain internal
+>
+> **Use this page when:** Embedding evaluate, verify, report, request loading, receipt verification, or provider-ABI types in Python
 
 ## Stable exports
 
@@ -16,8 +18,11 @@ The facade deliberately groups these stable surfaces:
 
 | Surface | Exports |
 | --- | --- |
-| Transactions | `evaluate_request_file`, `verify_evidence`, `render_evidence`, `verify_signed_verification_receipt`, `write_acceptance_attestation`, `verify_acceptance_attestation` |
+| Transactions | `evaluate_request_file`, `verify_evidence`, `render_evidence`, native/captured receipt verification, judge verification and signed judge receipts, acceptance attestations |
 | Request | `load_evaluation_request`, `EvaluationRequest`, `EvaluationRequestError` |
+| Captured authoring | `CapturedEvaluationRequest`, `make_run`, `load_run`, `write_run`, `run_digest`, `physical_file_digest`, `freeze_case_set`, `case_set_digest`, `validate_run_case_set`, `compare_runs`, `comparison_policy_digest`, `normalize_captured_request`, `captured_request_digest`, `EvaluationRecordsError`, `DEFAULT_MAX_BOOTSTRAP_DRAWS` |
+| Evaluator scorer inputs | `CapturedSourceRequest`, `CapturedJudgeRequest`, `capture_evaluator_run`, `evaluator_input_capabilities`, `prepare_evaluator_judge`, `import_judge_sources` |
+| Trust profiles | `load_trust_inputs`, `TrustInputs`, `CapturedTrustInputs`, `TrustInputsError` |
 | Results and errors | Evaluation, verification, reporting, receipt, and evidence-pack result types |
 | OCI host execution | Per-side launch values, host executor, and environment-backed launch resolution |
 | Provider ABI | ABI constant, provider/session protocols, capabilities, runtime specs/resources/context, resolver protocols, batches, identities, receipts, and observations |
@@ -25,10 +30,17 @@ The facade deliberately groups these stable surfaces:
 | Scorer extension | ABI constant, descriptor and binding types, replay protocol and request/result types, explicit registry, and binding/result builders |
 | Evaluator qualification | `qualify_evaluator_export`, `EvaluatorQualificationResult`, `EvaluatorQualificationError`, and four format constants |
 | HF identity | `checkpoint_tree_sha256`, `hf_tokenizer_contract_sha256` |
+| Captured subject identity | `digest`, `validate_service_identity`, `evaluated_subject_digest` |
 
 Imports from other `invarlock.*` modules are not stable merely because they are
 importable. Use the facade unless implementing the provider protocol documented
 in [Runtime providers](runtime-providers.md).
+
+The captured evaluation helpers are part of the documented SDK for
+captured-result comparisons. They expose normalized run construction and loading,
+multi-metric comparison, evidence publication, independent verification, and
+scoped receipt handling through the same evaluation transaction surface. Their
+evidence and recorded-score semantics are described in [evaluation records](evaluation-records.md).
 
 ## Transactions
 
@@ -57,6 +69,10 @@ evaluation = evaluate_request_file(
     Path("request.yaml"),
     signing_key_path=Path("keys/evidence-signer.pem"),
     runtime_executor=OciRuntimeExecutor(launch_from_environment()),
+    runtime_image_digests={
+        "baseline": "sha256:" + "1" * 64,
+        "subject": "sha256:" + "2" * 64,
+    },
 )
 
 verification = verify_evidence(
@@ -96,15 +112,32 @@ receipt_check = verify_signed_verification_receipt(
 assert receipt_check.ok
 ```
 
+Replace the illustrative anchors with independently approved values. Before a
+run, inspect both selected images with Docker or Podman and supply those exact
+local identities in `runtime_image_digests`; the executor cannot provide its own
+trust inputs. This example is for native deterministic evidence.
+
 The result types are:
 
 | Type | Important fields |
 | --- | --- |
 | `EvaluationPreflightResult` | `execution_mode`, `output`, input digests, providers, checks, `as_json()` |
-| `EvaluationTransactionResult` | `evidence_path`, `comparison_id`, `pack_manifest_digest`, `as_json()` |
+| `EvaluationTransactionResult` | `evidence_path`, `comparison_id`, `pack_manifest_digest`, optional `policy_verdict`, `as_json()` |
 | `EvidenceVerification` | `evidence_path`, `payload`, `receipt_path`, `summary`, `as_json()` |
-| `EvidenceReport` | `text`, `html_path`, `evidence_signer` |
+| `EvidenceReport` | `text`, `html_path`, `evidence_signer`, `pack_manifest_digest`, `observations` |
+| `EvidenceReportV2` | `text`, `kind`, `pack_manifest_digest`, `requested_outputs`, `written_outputs`, `failed_output`, `errors`, `as_json()` |
+| `CapturedEvaluationPreflightResult` | `requested_authentication`, run/policy/request digests, record/scope counts, required/allowed draws, `output`, `checks`, `as_json()` |
+| `CapturedEvaluationTransactionResult` | `evidence_path`, `comparison_id`, run/policy/request/manifest digests, `authentication`, `policy_verdict`, `as_json()` |
 | `ReceiptVerification` | `ok`, `signed`, `statement`, `verifier_fingerprint`, `errors` |
+| `JudgeVerificationResult` | `authenticated`, `replayed`, `verified`, `accepted`, decision, policy/evidence bindings, errors |
+| `JudgeReceiptVerification` | `ok`, `signed`, authenticated `statement`, embedded local `result`, verifier fingerprint, errors |
+
+`EvaluationTransactionResult.policy_verdict` is optional presentation metadata
+from publication. It is not added to `as_json()` and does not establish
+recipient acceptance. Use independent verification for that decision.
+`EvidenceReport.text` is Markdown presentation content; console and HTML
+layouts are not stable parsing interfaces. Use canonical evidence and verifier
+payloads for automation.
 
 `EvaluationPreflightError`, `EvaluationTransactionError`,
 `EvidenceVerificationError`, and `EvidenceReportError` carry CLI-compatible
@@ -116,17 +149,23 @@ Applications should treat every exception or verification payload with
 processing. Ordinary receipt authenticity or anchor mismatches are reported in
 `ReceiptVerification.errors` with `ok` set to false.
 
-`render_evidence` authenticates the bundle's internal evidence signature but
-does not take independent artifact, schedule, policy, runtime, or signer
-anchors. Call `verify_evidence` when an independent acceptance decision is
-required.
+For native and captured directory packs, `render_evidence` checks the closed
+bundle and authenticates its internal evidence signature when the manifest
+declares signed authentication. Unsigned captured packs retain their explicit
+local assurance label. Judge rendering validates envelope structure and replays
+measurements; it does not authenticate the envelope signature. Rendering does not
+take independent artifact, schedule, policy, runtime, run, request, or signer
+anchors. For independent acceptance in Python, call `verify_evidence` for native
+deterministic or captured v2 packs and `verify_judge_evidence_with_policy` for
+judge evidence. The CLI dispatches both through `invarlock verify` with the
+corresponding recipient trust inputs.
 
 ## External evaluator qualification
 
 The stable SDK accepts a normalized export from any open or proprietary
 evaluator. The caller owns evaluator execution and native-output parsing;
 InvarLock owns closed-contract validation, digest binding, schedule matching,
-and deterministic exact-match replay.
+and replay of the supported deterministic metric declared by the profile.
 
 ```python
 from pathlib import Path
@@ -146,7 +185,7 @@ else:
     assert result.runtime_records() == ()
 ```
 
-`runtime_records()` never exposes records for aggregate-only, human-review,
+`runtime_records()` never exposes records for aggregate-only, externally rated,
 nondeterministic-judge, or unsupported-replay profiles. See [Evaluator
 qualification](evaluator-qualification.md) for the contracts, private
 evaluator path, and maintained matrix.
@@ -172,29 +211,37 @@ policy.
 
 ```python
 evaluate_request_file(
-    request_path: Path,
+    request_path: Path | EvaluationRequest | CapturedEvaluationRequest,
     *,
     signing_key_path: Path | None,
     resource_resolver: RuntimeResourceResolver | None = None,
     runtime_executor: OciRuntimeExecutor | None = None,
     runtime_image_digests: Mapping[str, str] | None = None,
     scorer_registry: ScorerExtensionRegistry | None = None,
-) -> EvaluationTransactionResult
+    unsigned: bool = False,
+    max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
+) -> EvaluationTransactionResult | CapturedEvaluationTransactionResult | JudgeWorkflowResult
 
 preflight_evaluation_request(
-    request_path: Path,
+    request_path: Path | EvaluationRequest | CapturedEvaluationRequest,
     *,
     signing_key_path: Path | None,
     scorer_registry: ScorerExtensionRegistry | None = None,
     runtime_image_digests: Mapping[str, str] | None = None,
     resource_resolver: RuntimeResourceResolver | None = None,
-) -> EvaluationPreflightResult
+    unsigned: bool = False,
+    max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
+) -> EvaluationPreflightResult | CapturedEvaluationPreflightResult | JudgeWorkflowResult
 
 load_evaluation_request(
     path: str | Path,
     *,
     provider_resolver: ProviderResolver | None = None,
-) -> EvaluationRequest
+    request_root: Path | None = None,
+    baseline_run: Path | None = None,
+    subject_run: Path | None = None,
+    output: Path | None = None,
+) -> EvaluationRequest | CapturedEvaluationRequest
 
 verify_evidence(
     evidence_path: Path,
@@ -221,8 +268,50 @@ render_evidence(
     *,
     html_path: Path | None = None,
     explain: bool = False,
-) -> EvidenceReport
+    markdown_path: Path | None = None,
+    junit_path: Path | None = None,
+    case_ids: tuple[str, ...] = (),
+) -> EvidenceReport | EvidenceReportV2
 ```
+
+Native deterministic requests return native results. Native judge evaluation
+returns `JudgeWorkflowResult`, while its preflight returns
+`EvaluationPreflightResult`. Captured judge preflight and evaluation both return
+`JudgeWorkflowResult`; other captured requests return captured results. A path
+is dispatched after loading and returns the corresponding union.
+
+For captured calls, omit native runtime/executor/registry/scorer keywords entirely,
+including explicit `None`. Frozen-answer v3 requests use the CLI judge workflow;
+these request-loader annotations do not include v3. `render_evidence` additionally
+accepts judge evidence and evidence sets; `case_ids` selects up to 50 retained
+judge cases and is rejected for native or captured deterministic packs.
+Omission and explicit null preserve their distinct
+native validation semantics; do not forward a bag of unrelated keyword defaults.
+
+Captured `verify_evidence` uses `policy_path`, `expected_baseline_run`,
+`expected_subject_run`, `expected_request_digest`, `expected_signer`,
+`receipt_path`, `verifier_signing_key_path`, and `verifier_identity`, plus optional
+`trust_profile_digest`, immutable `policy_bytes`/`verifier_signing_key_bytes`, and
+the recipient's `max_bootstrap_draws`. It does not accept native artifact,
+schedule, runtime, or scorer anchors. `load_trust_inputs` returns
+`CapturedTrustInputs` for a v2 captured profile and `TrustInputs` for native v1;
+the CLI's `--trust-profile` resolves those inputs through the same facade.
+
+For captured receipt authentication, `verify_signed_verification_receipt` takes
+`expected_run_digests={"baseline": ..., "subject": ...}` and
+`expected_request_digest` instead of native artifact/schedule/runtime digests.
+It still requires independent policy, evidence-signer fingerprint, verifier
+identity/fingerprint, and the expected profile digest when used. Its `ok` means
+the receipt authenticates, not that the embedded technical verdict passes.
+Native-only acceptance and deployment APIs reject captured scope.
+
+`compare_runs` takes baseline, subject, policy and a local work budget; it does
+not publish or gate. `EvaluationRecordsError` is the canonical record validation,
+adapter, capacity, and safe-I/O exception. `normalize_captured_request`,
+`captured_request_digest`, `run_digest`, and `comparison_policy_digest` derive
+portable pins without signing keys, scoring, or publication. A local SDK budget
+of `None` explicitly removes the work allowance, not byte/record limits. The CLI
+accepts only integer allowances and never infers an unlimited value from evidence.
 
 The optional annotations on `verify_evidence` support a uniform Python
 signature; the public evidence-pack v1 transaction requires every artifact,
@@ -266,6 +355,13 @@ Neither an installed package nor a binding inside the submitted evidence
 authorizes scorer code by itself. Strict verification resolves the policy-
 pinned scorer through this registry and replays it deterministically.
 
+The registry includes five built-in deterministic scorers:
+`invarlock.normalized_match`, `invarlock.numeric_tolerance`,
+`invarlock.json_fields`, `invarlock.json_exact` and `invarlock.token_f1`. Pass
+`ScorerExtensionRegistry(allow_installed=False)` to use these through the SDK
+without enabling third-party discovery. The core CLI supplies this registry
+automatically. Bindings still pin the scorer's version and configuration schema.
+
 ## Request loading
 
 ```python
@@ -274,7 +370,8 @@ from invarlock.engine import load_evaluation_request
 request = load_evaluation_request(Path("request.yaml"))
 ```
 
-The loader returns an immutable `EvaluationRequest` whose paths are resolved
+The loader returns an immutable native `EvaluationRequest` or
+`CapturedEvaluationRequest` whose paths are resolved
 beneath the request root. Its default provider resolver exposes only the
 built-in Hugging Face provider. `evaluate_request_file` uses the core registry,
 which also discovers installed first-party add-ins.
@@ -534,8 +631,8 @@ write_runtime_import_paired_records(
 The timestamp is explicit so identical inputs produce identical files. The
 writer records strict container execution, offline operation, disabled remote
 code, and disabled third-party discovery. Those fields describe facts the
-caller is responsible for measuring; serialization does not attest that an
-untrusted host reported them honestly. Independent verification must still pin
+caller is responsible for measuring; serialization does not independently
+establish their accuracy or attest execution. Independent verification must still pin
 the artifact, schedule, policy, runtime-image, and signer identities.
 
 `RuntimeImportAuthoringError` is raised before publication when record pairing,
@@ -580,10 +677,8 @@ verification = verify_evidence(
     verifier_signing_key_bytes=trust.verifier_signing_key_bytes,
     verifier_identity=trust.verifier_identity,
     trust_profile_digest=trust.profile_digest,
-    scorer_registry=(
-        ScorerExtensionRegistry(allow_installed=True)
-        if trust.allow_installed_scorers
-        else None
+    scorer_registry=ScorerExtensionRegistry(
+        allow_installed=trust.allow_installed_scorers
     ),
 )
 ```
@@ -623,6 +718,82 @@ verify_signed_verification_receipt(
 There is no separate receipt-verification CLI command. Applications and
 automation use this Python facade when consuming a receipt issued by another
 verifier.
+
+### Judge verification results and receipts
+
+Native `evaluate_request_file` also accepts `metric: judge` in a run/import
+request. It retains the normal native resource and signing-key requirements and
+returns `JudgeWorkflowResult`, whose JSON has `kind: judge`, the evidence path,
+analysis decision and collection stop state. Native preflight retains
+`EvaluationPreflightResult` and adds judge model, unit, trial and budget metadata.
+The installed optional collector reads credentials from its process environment;
+callers do not pass keys in the request or plan. Recipient replay requires only
+the core package. Native judge evidence includes a bound runtime capture, whereas
+ordinary frozen-answer import makes no runtime-provenance claim.
+
+Captured v2 requests also select `metric: judge`; both preflight and evaluation
+return `JudgeWorkflowResult`. `CapturedJudgeRequest` supplies the private
+workspace, signer identity and optional retained measurements path.
+`prepare_evaluator_judge(recipe, baseline, subject)` freezes a plan and analysis
+policy without calls. `import_judge_sources(sources, plan=plan,
+baseline_run=baseline, subject_run=subject)` accepts a mapping of source IDs to
+unchanged canonical retained-call JSON bytes, validates all trial bindings and
+returns the measurements object. Import does not invoke a provider or Inspect.
+
+`verify_judge_evidence` and `verify_judge_evidence_with_policy` replay bounded
+judge evidence under an external judge recipient policy and return an unsigned
+`JudgeVerificationResult`. `write_signed_judge_verification_receipt` signs that
+complete validated result, its recipient-policy digest, the verifier identity
+and verifier key fingerprint under the judge receipt domain. The destination and
+signing key must remain outside the submitted evidence.
+
+`verify_signed_judge_verification_receipt` authenticates a received receipt
+against caller-owned verifier identity, fingerprint and recipient-policy digest.
+It does not reopen evidence. `replay_signed_judge_verification_receipt` adds exact
+fresh evidence replay under the external recipient policy. Use
+`verify_stored_judge_result` for the same fresh comparison when the stored object
+is an unsigned local result rather than a signed receipt.
+
+```python
+from pathlib import Path
+from invarlock.engine import (
+    replay_signed_judge_verification_receipt,
+    verify_judge_evidence_with_policy,
+    verify_signed_judge_verification_receipt,
+    write_signed_judge_verification_receipt,
+)
+
+policy = Path("recipient/judge-policy.json")
+evidence = Path("judge-evidence")
+receipt = Path("recipient/judge.receipt.json")
+local = verify_judge_evidence_with_policy(evidence, policy)
+fingerprint = write_signed_judge_verification_receipt(
+    evidence,
+    local,
+    receipt,
+    recipient_policy_path=policy,
+    verifier_identity="release-verifier",
+    verifier_signing_key_path=Path("recipient/verifier.pem"),
+)
+authenticated = verify_signed_judge_verification_receipt(
+    receipt,
+    expected_verifier_identity="release-verifier",
+    expected_verifier_fingerprint=fingerprint,
+    expected_recipient_policy_sha256=local.recipient_policy_sha256,
+)
+assert authenticated.ok
+assert replay_signed_judge_verification_receipt(
+    receipt,
+    evidence_path=evidence,
+    recipient_policy_path=policy,
+    expected_verifier_identity="release-verifier",
+    expected_verifier_fingerprint=fingerprint,
+).accepted
+```
+
+These APIs preserve `bounded-judge-fixed-benchmark-v1`. Receipt authentication
+does not establish that the benchmark represents deployment traffic or that the
+judge is correct outside the retained rubric and cases.
 
 ## Evidence pack result types
 

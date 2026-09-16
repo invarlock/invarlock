@@ -32,6 +32,52 @@ def test_atomic_directory_publication_moves_complete_tree(tmp_path: Path) -> Non
     assert (destination / "payload.txt").read_text(encoding="utf-8") == "complete"
 
 
+def test_atomic_directory_publication_keeps_expected_descriptors_open(tmp_path: Path):
+    staging = _staging(tmp_path)
+    source_fd = os.open(staging, os.O_RDONLY | os.O_DIRECTORY)
+    parent_fd = os.open(tmp_path, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        publish_directory_no_replace(
+            staging,
+            tmp_path / "published",
+            expected_source_fd=source_fd,
+            expected_source_parent_fd=parent_fd,
+        )
+        assert os.fstat(source_fd).st_ino == (tmp_path / "published").stat().st_ino
+        assert os.fstat(parent_fd).st_ino == tmp_path.stat().st_ino
+    finally:
+        os.close(source_fd)
+        os.close(parent_fd)
+
+
+def test_atomic_directory_publication_rejects_rebound_expected_parent(tmp_path: Path):
+    parent = tmp_path / "parent"
+    parent.mkdir()
+    staging = _staging(parent)
+    source_fd = os.open(staging, os.O_RDONLY | os.O_DIRECTORY)
+    parent_fd = os.open(parent, os.O_RDONLY | os.O_DIRECTORY)
+    retained = tmp_path / "retained-parent"
+    try:
+        parent.rename(retained)
+        parent.mkdir()
+        (retained / staging.name).rename(staging)
+        with pytest.raises(
+            AtomicDirectoryPublicationError, match="staging parent identity changed"
+        ):
+            publish_directory_no_replace(
+                staging,
+                parent / "published",
+                expected_source_fd=source_fd,
+                expected_source_parent_fd=parent_fd,
+            )
+        assert os.fstat(source_fd).st_ino == staging.stat().st_ino
+        assert os.fstat(parent_fd).st_ino == retained.stat().st_ino
+        assert not (parent / "published").exists()
+    finally:
+        os.close(source_fd)
+        os.close(parent_fd)
+
+
 @pytest.mark.skipif(platform.system() != "Linux", reason="Linux O_PATH contract")
 def test_atomic_directory_publication_supports_non_listable_writable_parent(
     tmp_path: Path,

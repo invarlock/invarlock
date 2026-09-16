@@ -1,0 +1,261 @@
+{
+  "archive_restoration_receipt": {
+    "sha256": "sha256:e7768033f7dba3048b1616322be905ebe173d3a85f62febd46428bf22f100978",
+    "size_bytes": 3379
+  },
+  "attribution_manifest": {
+    "sha256": "sha256:2715eebc95b22e377e1f5b2afd7ba1c7f9f102f5c34640a45131cf93ff49416f",
+    "size_bytes": 2491
+  },
+  "combined_attribution_review": {
+    "sha256": "sha256:84693643398488cabca57b7845260dac430e4c361a7f4387525821a08d0b32e5",
+    "size_bytes": 3039
+  },
+  "configuration_catalog": {
+    "sha256": "sha256:fcf15797c672892db1f9a238a462ff15c994e81db24449948a4add87aa9edc6d",
+    "size_bytes": 4342931
+  },
+  "custody_index": {
+    "sha256": "sha256:c6929b0c0f05bd273f82748996729ca2845083af2890e83846a900c3adf439ef",
+    "size_bytes": 29716
+  },
+  "datasets": [
+    {
+      "dataset": "sgd",
+      "notice_sources": [
+        {
+          "revision": "e852981ae34990f4358979625854259302feaa78",
+          "sha256": "e16545f163578037e6b7315b8da243f9f9871f4f071a812ab86b73702f124168",
+          "url": "https://raw.githubusercontent.com/google-research-datasets/dstc8-schema-guided-dialogue/e852981ae34990f4358979625854259302feaa78/README.md"
+        },
+        {
+          "revision": "e852981ae34990f4358979625854259302feaa78",
+          "sha256": "71a43a169b52bb1b39510b65ec5b43b4bbb59196d449a835fe58b50af6a72742",
+          "url": "https://raw.githubusercontent.com/google-research-datasets/dstc8-schema-guided-dialogue/e852981ae34990f4358979625854259302feaa78/LICENSE.txt"
+        }
+      ],
+      "publisher_terms_observed": "CC BY-SA 4.0",
+      "redistribution_status": "held_for_combined_material_review",
+      "workflows": [
+        "routing",
+        "extraction"
+      ]
+    },
+    {
+      "dataset": "finqa",
+      "notice_sources": [
+        {
+          "revision": "0f16e2867befa6840783e58be38c9efb9229d742",
+          "sha256": "eb86779cfed6f0a253913761d8e4fabe032a29d9fcf2944e56c23bf007064605",
+          "url": "https://raw.githubusercontent.com/czyssrs/FinQA/0f16e2867befa6840783e58be38c9efb9229d742/README.md"
+        },
+        {
+          "revision": null,
+          "sha256": "5a5dd25ec23beeb8130534aa83da1ad6cce21b729757dc173544ca108dd911d7",
+          "url": "https://finqasite.github.io/"
+        }
+      ],
+      "publisher_terms_observed": "CC BY 4.0",
+      "redistribution_status": "held_for_combined_material_review",
+      "workflows": [
+        "numeric"
+      ]
+    },
+    {
+      "dataset": "squad",
+      "notice_sources": [
+        {
+          "revision": null,
+          "sha256": "989f7e43f27faa490ed9fc8fb440e6f0aa791c49131346a27b8361deb4a18baf",
+          "url": "https://rajpurkar.github.io/SQuAD-explorer/"
+        }
+      ],
+      "publisher_terms_observed": "CC BY-SA 4.0",
+      "redistribution_status": "held_for_combined_material_review",
+      "workflows": [
+        "grounded_qa"
+      ]
+    },
+    {
+      "dataset": "xquad",
+      "notice_sources": [
+        {
+          "revision": "7d30520c717524000f0d9d2f9c10a069acd9d285",
+          "sha256": "838793dc603e6820b6bf2d6f5d9f7fbf656384958012265d42a47c93200b12f8",
+          "url": "https://raw.githubusercontent.com/google-deepmind/xquad/7d30520c717524000f0d9d2f9c10a069acd9d285/README.md"
+        },
+        {
+          "revision": "7d30520c717524000f0d9d2f9c10a069acd9d285",
+          "sha256": "25ddafc153e4cfdafd70729574ef1b44348e1814709e57680d55347038d3f92c",
+          "url": "https://raw.githubusercontent.com/google-deepmind/xquad/7d30520c717524000f0d9d2f9c10a069acd9d285/CC-BY-SA4.0.txt"
+        }
+      ],
+      "publisher_terms_observed": "CC BY-SA 4.0",
+      "redistribution_status": "held_for_combined_material_review",
+      "workflows": [
+        "grounded_qa"
+      ]
+    },
+    {
+      "dataset": "spider",
+      "notice_sources": [
+        {
+          "revision": null,
+          "sha256": "d79c8da0bae54df44f54afdbebdc124c71e517008d214061b95b1d909ef23dc2",
+          "url": "https://yale-lily.github.io/spider"
+        }
+      ],
+      "publisher_terms_observed": "CC BY-SA 4.0",
+      "redistribution_status": "held_for_combined_material_review",
+      "workflows": [
+        "transformation"
+      ]
+    }
+  ],
+  "models": [
+    {
+      "configuration": {
+        "concurrency": 1,
+        "context_length": 8192,
+        "maximum_output_tokens": 512,
+        "route": "bf16"
+      },
+      "expert_parallel": 1,
+      "key": "k2-32b",
+      "model_artifact_digest": "sha256:77fda55d5f3f9a89e06bec64fee5dab69a2429fa3cc223163771441a14005004",
+      "protocols": [
+        {
+          "role": "A",
+          "sha256": "sha256:d4553906eb941ea69d75b777a38c6682fee7d8716f15147559c6b330a6b8a919",
+          "size_bytes": 26990
+        },
+        {
+          "role": "B",
+          "sha256": "sha256:e70723df6c891f9a1c75d1527a3026d72a9786ddb5d28fb79f3c7a2c17f923d4",
+          "size_bytes": 26986
+        }
+      ],
+      "repository": "IFM/K2-Horizon-32B",
+      "revision": "466db5f23c8a7c96b0b320b688612ee6f4446a35",
+      "roles": [
+        "A",
+        "B"
+      ],
+      "tensor_parallel": 2,
+      "tokenizer_and_configuration_files": [
+        {
+          "path": "chat_template.jinja",
+          "sha256": "a892cd0b0195599f283a8c706787520d9a6747640efb2f4dec4144b0abb62590",
+          "size_bytes": 51034
+        },
+        {
+          "path": "config.json",
+          "sha256": "40025dbc5b18f276956fba48f83953f7f5074f29eac12dba1ac767be980ec834",
+          "size_bytes": 1980
+        },
+        {
+          "path": "generation_config.json",
+          "sha256": "2da7d47641f4509da4ae47711e31d8b5f0f3f801ee08d87e7e9f07f814bdc4a3",
+          "size_bytes": 81
+        },
+        {
+          "path": "model.safetensors.index.json",
+          "sha256": "82de1ea6513d0618e5d6a1b73397a0f2f69d5d31612b083cb998e73ae3386ddd",
+          "size_bytes": 47927
+        },
+        {
+          "path": "tokenizer.json",
+          "sha256": "2fa69519ff1ee3ee55ac50927b00058e88b9eb90802fabaf3c6b05804601c53b",
+          "size_bytes": 29197477
+        },
+        {
+          "path": "tokenizer_config.json",
+          "sha256": "581375b2ce8d56d59f609f08a7165365ac53b6543f3442ef0117b4951b0d747c",
+          "size_bytes": 253
+        }
+      ]
+    },
+    {
+      "configuration": {
+        "concurrency": 1,
+        "context_length": 8192,
+        "maximum_output_tokens": 512,
+        "route": "bf16"
+      },
+      "expert_parallel": 1,
+      "key": "k2-mova-36b-a4b",
+      "model_artifact_digest": "sha256:545e79d5ef59f6c434fcc154378a0e76a9ecb09c0a4360ee18eb2c40ef7843a8",
+      "protocols": [
+        {
+          "role": "A",
+          "sha256": "sha256:e9ae013490e7e2bfff50104f9637c4d9b18d51ad123dd5ae8f8502ddc877a986",
+          "size_bytes": 23377
+        },
+        {
+          "role": "B",
+          "sha256": "sha256:365948dafecf03ac3db38c86b207c4cb8e2affa43fc2bab7d9351c794e0f660a",
+          "size_bytes": 23373
+        }
+      ],
+      "repository": "IFM/K2-Horizon-MoVA-36B-A4B",
+      "revision": "05cab0a4d7150c1c460a000b37ff40cc1af2feaa",
+      "roles": [
+        "A",
+        "B"
+      ],
+      "tensor_parallel": 2,
+      "tokenizer_and_configuration_files": [
+        {
+          "path": "chat_template.jinja",
+          "sha256": "a892cd0b0195599f283a8c706787520d9a6747640efb2f4dec4144b0abb62590",
+          "size_bytes": 51034
+        },
+        {
+          "path": "config.json",
+          "sha256": "3ee828b698d51aa23bbf8418823b7904bd35b0347dbf8a464b2aff5fe25b76fc",
+          "size_bytes": 1508
+        },
+        {
+          "path": "generation_config.json",
+          "sha256": "2da7d47641f4509da4ae47711e31d8b5f0f3f801ee08d87e7e9f07f814bdc4a3",
+          "size_bytes": 81
+        },
+        {
+          "path": "model.safetensors.index.json",
+          "sha256": "f5ce28dd7fb6d6287e6a307ff23c43529e3a72984f386ea6716748736939aa4b",
+          "size_bytes": 1524127
+        },
+        {
+          "path": "tokenizer.json",
+          "sha256": "2fa69519ff1ee3ee55ac50927b00058e88b9eb90802fabaf3c6b05804601c53b",
+          "size_bytes": 29197477
+        },
+        {
+          "path": "tokenizer_config.json",
+          "sha256": "581375b2ce8d56d59f609f08a7165365ac53b6543f3442ef0117b4951b0d747c",
+          "size_bytes": 253
+        }
+      ]
+    }
+  ],
+  "observer_manifest": {
+    "sha256": "sha256:9ea03d2e618ab16eea00632c3f8d2a8168a5cacf0ca32966f1121ca2a452a148",
+    "size_bytes": 2535
+  },
+  "policy_and_selection_manifest": {
+    "sha256": "sha256:605f397a9033acbaf738e79be4c3ad6f940c6622a6518973389fb459dd07ad42",
+    "size_bytes": 4477
+  },
+  "publication": {
+    "delivery": "No public download is provided. An authorized recipient must obtain the original companion artifacts and independently approved checksums and trust inputs.",
+    "preservation": "Do not redact signed files. Keep original bytes and derive any new format separately.",
+    "public_payload_url": null,
+    "reason": "Review of attribution sufficiency, combined-data notices, incorporated article, financial-report and database material, and generated text remains unresolved.",
+    "status": "held"
+  },
+  "runtime_preparation_sha256": "sha256:8fd705689a55f2f0c3afe0e809c28511348b2ba8b1c7d8c83fbfc42ef937f95e",
+  "scope": "Source and configuration references for retained prompt-role comparisons. No raw dataset, model or output payload is distributed here.",
+  "source_dependence": "The five workflows reuse a fixed 20000-case portfolio across models and prompt roles; record counts are not independent task counts.",
+  "source_lineage_sha256": "sha256:32f50b188cce725cefe4c91a940a12ef06dddd803b65fc3e44ae8da76af4ec8d",
+  "terms_status": "Historical publisher notices; not an exhaustive rights clearance or a new legal determination."
+}

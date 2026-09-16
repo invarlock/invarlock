@@ -4,6 +4,8 @@ import re
 import tomllib
 from pathlib import Path
 
+import pytest
+
 ROOT = Path.cwd()
 
 
@@ -48,6 +50,7 @@ def test_runtime_dockerfile_has_one_hf_runtime_dependency_surface() -> None:
         "requirements/workflows/runtime-image-py312.txt",
         "requirements/workflows/runtime-image-py312-aarch64.txt",
         "requirements/workflows/runtime-wheel-build-py312.txt",
+        "requirements/workflows/accelerate-upstream-wheel.txt",
     ]
     assert "RUNTIME_REQUIREMENTS_AMD64" in text
     assert "RUNTIME_REQUIREMENTS_ARM64" in text
@@ -113,11 +116,13 @@ def test_runtime_input_is_the_core_plus_canonical_hf_dependencies() -> None:
         assert retired not in text.lower()
 
 
-def test_hf_extra_declares_fp8_runtime_support() -> None:
+def test_hf_group_declares_fp8_runtime_support() -> None:
     project = tomllib.loads(ROOT.joinpath("pyproject.toml").read_text(encoding="utf-8"))
-    requirements = project["project"]["optional-dependencies"]["hf"]
+    requirements = project["dependency-groups"]["hf"]
 
-    assert any(str(item).startswith("accelerate>=1.14.0") for item in requirements)
+    assert any(
+        str(item).startswith("accelerate==1.14.0+invarlock.1") for item in requirements
+    )
     assert any(str(item).startswith("safetensors>=0.8.0") for item in requirements)
 
 
@@ -126,7 +131,7 @@ def test_runtime_smokes_assert_the_supported_hf_stack() -> None:
 
     for expected in (
         "import accelerate, safetensors, torch, transformers",
-        "accelerate.__version__ == '1.14.0'",
+        "accelerate.__version__ == '1.14.0+invarlock.1'",
         "safetensors.__version__ == '0.8.0'",
         "transformers.__version__ == '5.14.1'",
     ):
@@ -187,7 +192,7 @@ def test_cuda_runtime_lock_is_hash_locked_and_cuda_specific() -> None:
     assert "nvidia-cuda-runtime-cu12==" in text
     assert "triton==" in text
     assert "--hash=sha256:" in text
-    assert "accelerate==1.14.0" in text
+    assert "accelerate==1.14.0+invarlock.1" in text
     assert "transformers==5.14.1" in text
     assert "safetensors==0.8.0" in text
     assert "bitsandbytes==" not in text
@@ -204,7 +209,7 @@ def test_blackwell_cuda_runtime_lock_is_hash_locked_and_cuda_specific() -> None:
     assert "nvidia-cuda-runtime-cu12==" in text
     assert "triton==" in text
     assert "--hash=sha256:" in text
-    assert "accelerate==1.14.0" in text
+    assert "accelerate==1.14.0+invarlock.1" in text
     assert "transformers==5.14.1" in text
     assert "safetensors==0.8.0" in text
 
@@ -258,3 +263,41 @@ def test_make_exposes_separate_cuda_build_and_gpu_smoke_targets() -> None:
     ).read_text(encoding="utf-8")
     assert "torch.bmm(left, right)" in text
     assert "runtime-image-cuda-quant" not in text
+
+
+@pytest.mark.parametrize("dockerfile", ["Dockerfile", "Dockerfile.cuda"])
+def test_runtime_images_derive_and_retain_the_authenticated_accelerate_wheel(
+    dockerfile: str,
+) -> None:
+    text = ROOT.joinpath("runtime", dockerfile).read_text()
+    bootstrap = (
+        "python /runtime-build/scripts/security/build_hardened_accelerate_wheel.py "
+        "bootstrap --output-directory /wheelhouse"
+    )
+    assert bootstrap in text
+    assert "--find-links /mnt/wheelhouse" in text
+    assert "/mnt/wheelhouse/accelerate-*.whl /opt/invarlock/runtime-wheels/" in text
+    assert text.index(bootstrap) < text.index("--find-links /mnt/wheelhouse")
+    for name in (
+        "build_hardened_accelerate_wheel.py",
+        "accelerate_checkpoint_files.py",
+        "build_cache_free_lm_eval_wheel.py",
+    ):
+        assert f"scripts/security/{name}" in text
+        assert f"!scripts/security/{name}" in ROOT.joinpath(".dockerignore").read_text()
+
+
+@pytest.mark.parametrize(
+    "evaluator", ["lm-evaluation-harness", "inspect-ai", "openai-evals"]
+)
+def test_evaluator_images_resolve_dependency_locks_from_the_runtime_wheelhouse(
+    evaluator: str,
+) -> None:
+    text = ROOT.joinpath("examples/integrations", evaluator, "Dockerfile").read_text()
+    install = text.split("python -m pip install", 1)[1].split("    &&", 1)[0]
+    assert "--require-hashes" in install
+    assert "--find-links /opt/invarlock/runtime-wheels" in install
+    if "python -m pip download" in text:
+        download = text.split("python -m pip download", 1)[1].split("    &&", 1)[0]
+        assert "upstream-wheel.txt" in download
+        assert "--find-links" not in download

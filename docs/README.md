@@ -6,63 +6,50 @@
   alt="InvarLock"
 />
 
-<p class="invarlock-hero__kicker">Paired release-regression assurance</p>
+<p class="invarlock-hero__kicker">Model evaluation and independent verification</p>
 
-# Evaluate once. Verify independently. Report clearly
+# Evaluate model changes. Verify the evidence
 
 <p class="invarlock-hero__lead">
-InvarLock runs a pinned baseline and subject over one deterministic paired
-schedule, applies an explicit interval-based regression policy, publishes
-signed evidence, and lets another party replay the decision against
-independently supplied trust anchors.
+Compare a candidate with a baseline under your chosen tests and policy.
+Run a supported comparison or use records from an existing evaluator, then
+produce signed evidence that a customer or internal reviewer can check offline.
 </p>
 
 </div>
 
-[Run a paired comparison](user-guide/getting-started.md) ·
-[Read the assurance case](assurance/assurance-case.md)
+## Start with your task
+
+| You want to… | Start here | What you need |
+| --- | --- | --- |
+| See a verified result and HTML report | [CPU quickstart](https://github.com/invarlock/invarlock/tree/main/examples/quickstart) | Python 3.12+ and matching package/example files; no model or API key |
+| Compare existing evaluator outputs | [Captured results](user-guide/captured-results.md) | Paired per-case observations, source identities and a comparison policy |
+| Execute a model comparison | [Getting started](user-guide/getting-started.md) | Pinned local artifacts, evaluation data and an authorized runtime image |
+| Judge baseline and subject answers | [Judge measurements](reference/judge-measurements.md) | Frozen answers or native capture inputs, a rubric, declared units and retained calls or bounded collection |
+| Recheck a hosted service | [Hosted-service requalification](user-guide/hosted-service-requalification.md) | A harness that captures fresh service executions and their configuration |
+| Verify a delivered result | [Evidence and verification](user-guide/evidence-and-verification.md) | The evidence and independently obtained trust inputs for its workflow |
+
+Use the package, documentation and examples from the same source revision or
+release. The [installation convention](user-guide/getting-started.md#matching-wheels-and-examples)
+explains how to match them. Start with `invarlock --help` for installed commands.
+
+## Evaluate, verify, report
+
+The three commands share a workflow; the selected request determines which
+evidence and verification contract applies. For a captured deterministic
+comparison, prepare the request, keys and recipient-owned trust profile, then run:
 
 ```bash
-invarlock evaluate request.yaml
-invarlock verify evidence/
-invarlock report evidence/
+invarlock evaluate request.yaml --signing-key signing-key.pem --preflight --json
+invarlock evaluate request.yaml --signing-key signing-key.pem
+invarlock verify evidence/ --trust-profile trust/trust-inputs.json --receipt verification.receipt.json
+invarlock report evidence/ --html report.html
 ```
 
-![A pinned request runs a paired baseline and subject comparison, publishes signed evidence, is independently verified, and is rendered as a report](assets/evaluation-verification-flow.svg)
-
-## The primary path
-
-Run mode is the normal release-regression path:
-
-1. Pin local baseline and subject artifacts, a local JSONL source, provider
-   settings, one built-in metric or scorer binding, one policy, and a fresh
-   output path in `request.yaml`.
-2. Invoke `invarlock evaluate` from the host with digest-addressed baseline and
-   subject runtime images, Docker or Podman, CPU/CUDA selections, and an
-   evidence-signing key held by the host.
-3. The host authenticates the JSONL bytes, prepares the ordered schedule, and
-   launches one constrained worker per side. Each worker sees only its artifact
-   and support resources read-only plus an isolated writable output directory.
-   The host validates both outputs, derives built-in scores or replays the
-   authorized scorer, derives the paired interval, publishes one bundle, and
-   signs it without exposing the private key to either worker.
-4. A verifier supplies its own policy copy, expected artifact identities,
-   canonical schedule digest, runtime digests, evidence signer, identity, and
-   signing key. `verify` replays the pack and writes a separately signed receipt.
-5. `report` renders the signature-authenticated comparison as console text and,
-   optionally, standalone HTML.
-
-Shared image, device, and entrypoint options act as defaults when both sides use
-the same runtime. Workers sharing a generic or identical CUDA device run
-sequentially; explicitly different CUDA indexes can run in parallel. The host
-owns the no-clobber evidence destination and evidence-signing key.
-
-Import mode is the secondary path for complete provider sidecars created by
-another controlled execution. It publishes the same bundle format and faces
-the same verifier. Its inputs must include authenticated record-level material;
-aggregate scores alone are insufficient.
-
-## The three transactions
+Use the evidence destination from your request. Native runs additionally need
+runtime resources; judge receipts need the judge verifier key and identity.
+The linked task guides provide those complete family-specific examples,
+including trust-profile and signing-key preparation.
 
 <div class="invarlock-transaction" markdown>
 
@@ -72,13 +59,10 @@ aggregate scores alone are insufficient.
 
 ### `evaluate`
 
-Validate one closed baseline-versus-subject request. In run mode, prepare the
-canonical schedule from digest-pinned local JSONL and execute the selected
-providers in the delegated OCI environment. In import mode, authenticate
-complete provider materials. Pair records by schedule identity, compute the
-selected built-in metric or replay the authorized scorer, derive its paired
-interval, apply the policy to the
-conservative interval bound, and atomically publish signed evidence.
+Validate the request and its inputs, run or import the selected comparison,
+apply the declared policy and publish canonical evidence. Preflight checks setup without
+model or provider execution. Supported captured and frozen-answer workflows
+also allow explicit unsigned local evaluation.
 
 </div>
 
@@ -88,11 +72,9 @@ conservative interval bound, and atomically publish signed evidence.
 
 ### `verify`
 
-Treat the bundle as untrusted. Verify inventory, checksums, signatures,
-cross-bindings, schedule order, record-level scores, interval arithmetic, and
-the canonical report. Compare the artifact identities, schedule, policy,
-runtime identities, and evidence signer with caller-owned anchors, then record
-the result in a separately signed receipt.
+Check the submitted package against independent expectations for the policy,
+identities and signer, then reconstruct the supported analysis. Verification
+can issue a separate signed receipt. It makes no model or judge calls.
 
 </div>
 
@@ -102,118 +84,110 @@ the result in a separately signed receipt.
 
 ### `report`
 
-Authenticate the bundle's embedded evidence signature and integrity, then
-render its canonical report. The view includes the point comparison,
-selected paired interval, threshold, and scoped verdict. Evidence
-remains the source of truth and the signed verification receipt remains the
-independent acceptance record.
+Explain the comparison identities, measured changes, uncertainty and every
+configured check. HTML, terminal and Markdown presentations share the result;
+JSON and JUnit support automation where available. Directory-pack reporting
+checks embedded signatures when signed. Judge reporting replays retained
+measurements but leaves signature authentication to `verify`. Rendering does
+not replace recipient verification. Explicit unsigned captured reports retain
+their local, unauthenticated status.
 
 </div>
 
 </div>
 
-## Metrics and verdicts
+Commands default to readable text; use `--json` for machine-readable status.
+Publication, recorded policy outcome and independent verification are separate
+results. Use the [CLI's exit-code contract](reference/cli.md) for automation,
+rather than interpreting a rendered report's successful exit as policy approval.
 
-| Metric | What is compared | Passing rule |
+## Select a scorer and its evidence
+
+| Scorer | Required facts | What the result measures |
 | --- | --- | --- |
-| `exact_match` | Difference between subject and baseline literal accuracy, with paired regression/improvement counts and exact McNemar probability | Paired Newcombe interval lower bound is at least `metrics.exact_match.delta_min_pp` |
-| `normalized_nll_per_utf8_byte` | Ratio of arithmetic means of teacher-forced expected-continuation NLL per UTF-8 byte | Paired schedule-resampling interval upper bound is at most `metrics.normalized_nll_per_utf8_byte.ratio_max` |
-| Authorized deterministic text scorer | Difference between subject and baseline arithmetic-mean `[0,1]` scores, in percentage points | Paired schedule-resampling interval lower bound is at least `metrics.scorer_extension.delta_min_pp` |
+| `exact_match` | Paired outputs and independent references | Change in literal-answer accuracy |
+| `normalized_nll_per_utf8_byte` | Bound reference-continuation likelihoods, byte/token counts and tokenizer identities | Ratio of mean byte-normalized NLL |
+| `judge` | Frozen task text and answers, rubric, units, repetitions and retained calls | Change in bounded ratings under the declared judge profile |
 
-Exact match uses the continuity-corrected paired Newcombe 95% effect-size
-interval emitted by `invarlock/comparison-report-v3`. Normalized NLL
-uses the deterministic `paired_percentile_bootstrap_sha256_v1` method with
-2,048 replicates over the authenticated finite schedule. The selected policy
-reads the conservative bound of the corresponding interval.
+The native and captured entry points expose these three scorer choices.
+Native judging first retains runtime-bound answers; captured judging binds
+supplied answer records. Live collection uses the optional Inspect judge
+package with explicit budgets. Offline import and replay need no provider SDK
+or credentials. Per-case references are an explicit judge-profile choice and
+remain separate from the evaluated model input.
 
-A metric policy may additionally bind `minimum_record_count` and the matching
-maximum interval-width field. The two fields are supplied together. When they
-are present, the metric bound, record count, and precision width must all pass;
-the canonical report records each result. Preflight can qualify record count
-but leaves interval width pending until execution produces paired outcomes.
-Exact match may also bind `minimum_side_accuracy`; both baseline and subject
-accuracy must meet that floor, preventing an apparently acceptable delta
-between two unusably inaccurate models.
+Captured requests without an explicit `comparison.metric` can combine policy
+metrics and slices under the captured bootstrap contract. Selecting a built-in
+scorer dispatches to that scorer's evidence and statistical treatment. Native
+exact match uses its paired Newcombe interval, normalized NLL uses paired
+schedule resampling, and bounded judging uses its declared independent-unit
+analysis. These methods do not share an interchangeable confidence claim.
 
-Normalized NLL measures expected-continuation likelihood under teacher forcing,
-not general model quality. If tokenizer contracts and paired token counts are
-comparable, the report also includes a verifier-derived token-weighted
-perplexity ratio as interpretation only; it has no policy, interval, or verdict
-authority.
+Deterministic extensions cover normalized labels, numeric tolerances,
+structured fields and token overlap. [Evidence sets](reference/evidence-sets.md)
+combine independently verified components over the same frozen answers without
+claiming a joint confidence bound. Consult [schedule and policy](user-guide/schedule-and-policy.md),
+[captured records](reference/evaluation-records.md) and
+[judge measurements](reference/judge-measurements.md) for exact requirements.
 
-A request selects exactly one built-in `metric` or one complete
-`scorer_extension` binding. Extension scorers receive only authenticated
-expected-output and output-text facts, run only when explicitly authorized, and
-cannot redefine aggregation or direction. Deterministic F1, extraction, and VQA
-scorers can be supplied as separately installed packages and run only when
-explicitly authorized through the extension contract. Network, external-model,
-human, executable SQL/code, semantic-model, and judge scoring remain outside
-acceptance; judges fit the authenticated-observation path.
+## Run here or integrate your workflow
 
-## Choose a reading path
+**Native execution** prepares an ordered schedule from pinned local data and
+runs baseline and subject in authorized Docker or Podman images. Workers receive
+scoped artifact and support mounts; the evidence-signing key stays on the host.
+A [runtime profile](reference/cli.md#reusable-runtime-profiles) supplies reusable
+execution settings without choosing policy or signer trust. Authenticated
+provider import uses complete existing sidecars instead of rerunning answers.
 
-| Responsibility | Start here | Continue with |
-| --- | --- | --- |
-| Run a first comparison | [Getting started](user-guide/getting-started.md) | [Evaluation request](user-guide/evaluation-request.md) and [schedule and policy](user-guide/schedule-and-policy.md) |
-| Run a model-backed example | [Runnable integrations](https://github.com/invarlock/invarlock/tree/main/examples/integrations) | [Runtime providers](user-guide/runtime-providers.md) and [evidence and verification](user-guide/evidence-and-verification.md) |
-| Apply InvarLock to a model or runtime change | [Model-change workflows](user-guide/change-scenarios.md) | [Runnable examples](https://github.com/invarlock/invarlock/tree/main/examples) and [runtime providers](user-guide/runtime-providers.md) |
-| Review or accept evidence | [Evidence and verification](user-guide/evidence-and-verification.md) | [Acceptance checklist](assurance/acceptance-checklist.md) and [decision semantics](assurance/decision-semantics.md) |
-| Automate a gate | [CI integration](user-guide/ci-integration.md) | [Key management](user-guide/key-management.md) and [CLI reference](reference/cli.md) |
-| Integrate a runtime | [Runtime providers](user-guide/runtime-providers.md) | [Provider reference](reference/runtime-providers.md) and [contracts](reference/contracts.md) |
-| Import existing provider evidence | [Evaluation request](user-guide/evaluation-request.md#import-mode) | [Evidence artifacts](reference/artifacts.md) and [reports and receipts](reference/reports.md) |
-| Embed the engine | [Python API](reference/api-guide.md) | [Architecture](reference/architecture.md) and [runtime-security API](reference/runtime-security.md) |
-| Assess claims and risk | [Assurance case](assurance/assurance-case.md) | [Pairing and replay](assurance/pairing-and-replay.md), [trust model](security/trust-model.md), and [threat model](security/threat-model.md) |
-| Maintain the project | [Documentation development](reference/documentation.md) | [Release verification](reference/release-verification.md) |
+![Native comparisons, captured records and frozen answers feed evaluation, followed by independent verification and reporting](assets/evaluation-verification-flow.svg)
 
-## What the evidence establishes
+**Captured evaluation** accepts supported Inspect AI, Harness and Promptfoo
+export profiles, canonical records or data prepared through the
+[Python API](reference/api-guide.md). Original per-case observations and their
+identities are required; aggregate scores cannot fill gaps. The
+[qualification matrix](reference/evaluator-qualification.md) distinguishes
+adapter support, replay authority and retained runtime demonstrations.
 
-| Bound material | Why it is present | Verification consequence |
-| --- | --- | --- |
-| Baseline and subject identities | Name the exact artifacts being compared | Artifact substitution changes the authenticated comparison |
-| Local JSONL identity and canonical schedule | Fix the source bytes, field mapping, selected ordered records, inputs, and targets | Changed source bytes, mapping, order, or schedule fail closed |
-| Provider observations | Preserve record-level outputs or log-likelihood facts and runtime bindings | The verifier independently re-derives every paired score |
-| Policy digest and content | Record the threshold applied at evaluation time | Verification requires the caller-supplied policy to match exactly |
-| Point comparison and paired interval | Show the estimate and deterministic finite-schedule resampling bounds | The conservative interval bound, not the point value alone, controls the verdict |
-| Runtime identities | Bind each side to a declared OCI execution environment | The verifier compares them with independent expected identities |
-| Checksums and evidence signature | Authenticate the fixed bundle inventory and bytes | Integrity or signer mismatch rejects the bundle |
+**Hosted-service requalification** uses fresh runs collected by your harness.
+Service identity records customer-controlled configuration and observation
+windows without asserting hidden model weights. Scheduling and service calls
+belong to the collection workflow; verifying a historical package does not
+measure the service again.
 
-These bindings support a precise claim: an authorized evidence signer signed a
-complete comparison for named inputs, and a named verifier accepted or rejected
-that evidence under explicit anchors. Runtime digests identify declared bytes;
-execution attestation requires separate evidence. The schedule fixes the
-evaluated sample; population representativeness, safety, and broad quality
-remain separate assessments.
+Hugging Face Transformers is the built-in runtime provider. Optional GGUF,
+TensorRT-LLM and vision-text providers support their declared collection
+profiles. Provider collection capabilities and the scorer applied to those
+observations are different interfaces; see [runtime providers](user-guide/runtime-providers.md).
+Optional [diagnostics](user-guide/diagnostics.md) are observation-only and do
+not determine policy acceptance.
 
-![The evidence signer authenticates canonical evidence while a verifier applies external anchors and signs a separate receipt](assets/evidence-signer-verifier-trust.svg)
+## Understand the result
 
-## Runtime and integration choices
+A signed pack records the supported comparison and its policy result. A separate
+recipient supplies its expected identities, policy and signer trust; a signed verification
+receipt records that recipient's check. Imported observations and native
+runtime bindings retain distinct provenance claims.
 
-| Path | Package | Metrics | Intended use |
-| --- | --- | --- | --- |
-| Hugging Face Transformers | `invarlock[hf]` | Exact match and byte-normalized expected-continuation NLL | Built-in reference provider for local PyTorch/SafeTensors snapshots |
-| GGUF / llama.cpp | `invarlock-runtime-gguf` | Exact match | Optional first-party provider for authenticated GGUF artifacts |
-| TensorRT-LLM | `invarlock-runtime-tensorrt-llm` | Exact match | Optional first-party provider for authenticated engine bundles |
-| Hugging Face vision-text | `invarlock-runtime-hf-vision-text` | Exact match | Optional first-party provider for authenticated prompt-and-image schedules |
-| Imported provider material | Core plus the provider package needed to validate identities | Provider-declared metric | Secondary/offline integration when complete sidecars already exist |
-| Custom runtime | Provider package | Declared by provider | ABI integration; strict evidence still requires explicit authorization |
+The result is bounded by the supplied cases, observations and assumptions.
+Verification does not independently rerun model execution, establish production
+representativeness or authorize deployment. A valid signature alone cannot
+supply an independent trust decision, and a comparative pass can coexist with
+poor absolute task performance. Read the [assurance case](assurance/assurance-case.md)
+and [trust model](security/trust-model.md) for the complete boundaries.
 
-Optional spectral, random-matrix, and variance diagnostics live in
-`invarlock-diagnostics`. They remain observation-only; the paired metric and
-policy exclusively determine the verdict. Authenticated attachments appear in
-the report's separate authenticated-observations section.
+## Find the detailed contract
 
-## How the documentation is organized
+| Documentation | Use it to… |
+| --- | --- |
+| [User guides](user-guide/getting-started.md) | Complete a task, validate its output and recover from errors |
+| [Assurance notes](assurance/assurance-case.md) | Understand claims, statistical meaning, assumptions and limits |
+| [Reference](reference/cli.md) | Look up exact fields, defaults, outputs and failure behavior |
+| [Security guidance](security/best-practices.md) | Configure trust, keys, isolation and evidence handling |
+| [Runnable examples](https://github.com/invarlock/invarlock/tree/main/examples) | Exercise a specific supported integration |
+| [Public evidence](user-guide/public-evidence.md) | Inspect and publish scoped retained comparisons |
+| [Contributing](https://github.com/invarlock/invarlock/blob/main/CONTRIBUTING.md) | Run development checks and prepare a pull request |
 
-| Type | Reader question | What the page provides | Start here |
-| --- | --- | --- | --- |
-| User guide | How do I complete this task safely? | Outcome, prerequisites, procedure, validation, and recovery | [Getting started](user-guide/getting-started.md) |
-| Assurance note | Why is this scoped decision justified, and what could defeat it? | Plain-language interpretation, evidence, assumptions, arithmetic, and limits | [Assurance case](assurance/assurance-case.md) |
-| Reference | What exactly does this interface accept, produce, or guarantee? | Current syntax, fields, outputs, and failure behavior | [CLI reference](reference/cli.md) |
-| Security guidance | What must be protected and what risk remains? | Plain-language boundaries, adversaries, controls, and residual risk | [Trust model](security/trust-model.md) |
-
-User guides explain complete tasks. Assurance pages state claims and replay
-semantics. Reference pages define exact interfaces. Security pages describe
-assets, threats, controls, and residual risk.
-
-InvarLock is pre-1.0. Canonical artifact formats carry explicit versions;
-non-contract embedding APIs may evolve between minor releases.
+InvarLock is pre-1.0. Artifact formats carry explicit versions; the Python
+embedding facade may evolve between minor releases. The
+[compatibility covenant](reference/compatibility.md) preserves historical v0.13
+evidence and receipts while leaving acceptance to current recipient policy.

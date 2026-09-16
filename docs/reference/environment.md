@@ -5,17 +5,27 @@ InvarLock keeps environment configuration narrow. Comparison intent belongs in
 supply secrets, independent verification anchors, OCI launch choices, and
 caller-owned provider resources.
 
-!!! info "Reference"
-
-    - **Surface:** Public CLI, OCI launcher, provider-resource, and security
-      environment variables
-    - **Stability:** Documented variables are public operator inputs;
-      repository-test and add-in-internal variables are excluded
-    - **Use this page when:** Supplying key paths, independent verifier anchors,
-      runtime-image identity, device selection, or caller-owned provider support
+> **Reference**
+>
+> **Surface:** Public CLI, OCI launcher, provider-resource, and security
+> environment variables
+>
+> **Stability:** Documented variables are public operator inputs;
+> repository-test and add-in-internal variables are excluded
+>
+> **Use this page when:** Supplying key paths, independent verifier anchors,
+> runtime-image identity, device selection, or caller-owned provider support
 
 An explicit command option wins over its environment alternative. Empty values
 do not satisfy required paths, digests, fingerprints, or identities.
+
+Run-mode `evaluate --runtime-profile FILE` also accepts explicit host resource
+settings. In profile mode, explicit CLI values take precedence over profile
+values, then environment values and defaults. Per-side resolution is detailed
+in [Runtime profiles](cli.md#reusable-runtime-profiles). There is no profile
+environment variable or automatic discovery. Use `--preflight` to inspect the
+effective settings and their origins. Profiles cannot supply signing keys,
+verification anchors or scorer authorization; import requests reject them.
 
 ## Transaction inputs
 
@@ -28,10 +38,18 @@ do not satisfy required paths, digests, fingerprints, or identities.
 | `INVARLOCK_EXPECTED_SCHEDULE` | `verify` | Approved canonical schedule `sha256:...` digest |
 | `INVARLOCK_EXPECTED_BASELINE_RUNTIME` | `verify` | Expected baseline `sha256:...` runtime-image digest |
 | `INVARLOCK_EXPECTED_SUBJECT_RUNTIME` | `verify` | Expected subject `sha256:...` runtime-image digest |
+| `INVARLOCK_EXPECTED_BASELINE_RUN` | `verify` | Approved complete baseline run digest for captured evidence |
+| `INVARLOCK_EXPECTED_SUBJECT_RUN` | `verify` | Approved complete subject run digest for captured evidence |
 | `INVARLOCK_EXPECTED_SIGNER` | `verify` | Expected Ed25519 evidence-signer fingerprint |
-| `INVARLOCK_EXPECTED_REQUEST_DIGEST` | `verify` | Approved normalized-request digest; required when either evidence side uses `llama_cpp` |
+| `INVARLOCK_EXPECTED_REQUEST_DIGEST` | `verify` | Approved normalized-request digest; required for captured evidence and when either native evidence side uses `llama_cpp` |
 | `INVARLOCK_VERIFIER_SIGNING_KEY` | `verify` | Ed25519 verifier private-key path |
 | `INVARLOCK_VERIFIER_IDENTITY` | `verify` | Stable verifier identity included in the receipt |
+
+Captured `evaluate --unsigned` ignores the signing-key environment alternative
+and rejects an explicit signing key. Captured verification uses run/request pins;
+native artifact, schedule, and runtime anchors cannot be mixed with them.
+`verify --trust-profile` uses only its own policy, anchors, and verifier inputs;
+environment values do not override the profile.
 
 The receipt destination intentionally has no environment alternative. It must
 be an explicit new path outside the immutable evidence pack.
@@ -131,8 +149,8 @@ invarlock evaluate release-check/request.yaml
 ```
 
 Replace the illustrative digest with the exact local CUDA image identity. Keep
-the signing-key path in a caller-controlled location; the host reads it only
-when signing the validated evidence bundle.
+the signing-key path in a caller-controlled location; the host validates it
+during preflight and uses it to sign the validated evidence bundle.
 
 Equivalent explicit options are often clearer for one-off runs:
 
@@ -180,6 +198,24 @@ The primary artifact path remains in `request.yaml`. Executable, source, and
 tokenizer-support resources remain caller-controlled when they are provider
 inputs. The TensorRT-LLM runner is instead installed in and authenticated from
 the selected runtime image; a submitted request cannot replace it.
+
+## Optional judge collection
+
+The installed Inspect judge collector has a separate, explicitly budgeted hosted
+collection boundary. Native model workers remain offline. These environment
+inputs apply only when new judge ratings are collected:
+
+| Variable | Behavior |
+| --- | --- |
+| `OPENAI_API_KEY` | Required nonempty credential for the configured collector; never retain it in a request or evidence |
+| `OPENAI_BASE_URL`, `OPENAI_API_BASE` | Presence is rejected, including an empty value; custom endpoints are unsupported |
+| `OPENAI_SAFETY_IDENTIFIER` | Presence is rejected; inherited identifier controls are unsupported |
+
+Collection preflight checks this environment and the pinned optional
+dependencies without making calls. Offline retained-measurement import,
+verification and reporting need neither credentials nor these SDKs. See
+[judge measurements](judge-measurements.md#frozen-answer-requests-and-preflight)
+for the configuration and reservation limits.
 
 ## Security switches
 

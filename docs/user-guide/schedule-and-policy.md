@@ -18,17 +18,17 @@ choose a representative sample or a suitable threshold for you.
 
 ![One fixed schedule produces exactly paired baseline and subject records before metric arithmetic and policy evaluation](../assets/user-guide-pairing-contract.svg)
 
-!!! tip "User guide"
-
-    **Outcome:** Freeze a digest-pinned local JSONL source and one closed
-    comparison policy before collecting subject results.
-
-    **Audience:** Evaluation owners, dataset curators, policy authors, and
-    independent decision owners.
-
-    **Prerequisites:** A concrete release-regression claim, fixed source
-    material, stable record identities, a supported built-in metric or
-    authorized scorer binding, and an independent policy-distribution path.
+> **User guide**
+>
+> **Outcome:** Freeze a digest-pinned local JSONL source and one closed
+> comparison policy before collecting subject results.
+>
+> **Audience:** Evaluation owners, dataset curators, policy authors, and
+> independent decision owners.
+>
+> **Prerequisites:** A concrete release-regression claim, fixed source
+> material, stable record identities, a supported built-in metric or
+> authorized scorer binding, and an independent policy-distribution path.
 
 ## Design the decision first
 
@@ -37,11 +37,19 @@ choose a representative sample or a suitable threshold for you.
 3. Select prompts and expected outputs without inspecting subject outcomes.
 4. Choose `exact_match` for literal closed answers or
    `normalized_nll_per_utf8_byte` for teacher-forced expected-continuation
-   likelihood regression, or bind an explicitly authorized deterministic text
-   scorer for a task-specific unit-interval result.
+   likelihood regression. Select `judge` for bounded rubric-based ratings of
+   frozen answers, or bind an explicitly authorized deterministic text scorer
+   for a task-specific unit-interval result.
 5. Select the threshold, unit, conservative interval bound, and failure action.
 6. Freeze the JSONL bytes, field mapping, optional exact prefix, and SHA-256.
 7. Freeze the policy bytes and distribute an independent copy to verifiers.
+
+The JSONL and policy shapes below describe native exact match, normalized NLL
+and deterministic extensions. Judge requests also freeze a rubric, independent
+unit mapping, repetitions, reference mode and collection budgets. Follow the
+[judge policy contract](../reference/judge-measurements.md) for that scorer's
+uncertainty and recipient acceptance rules; captured evaluator records follow
+the [captured-results guide](captured-results.md).
 
 A reviewable claim is:
 
@@ -61,7 +69,7 @@ Run requests identify source bytes and field mapping directly:
 ```yaml
 dataset:
   path: inputs/release-regression.jsonl
-  sha256: 4444444444444444444444444444444444444444444444444444444444444444
+  sha256: "4444444444444444444444444444444444444444444444444444444444444444"
   format: jsonl
   name: release-regression
   split: validation
@@ -87,8 +95,10 @@ If `id_field` is absent, deterministic position IDs are generated as
 `record/00000000`, `record/00000001`, and so on. Prefer durable source IDs when
 they exist; they make a failed record identifiable outside one array position.
 
-The source may contain additional metadata fields, but only the declared ID,
-input, and expected-output fields enter the schedule. Preserve any separate
+The source may contain additional metadata fields. The declared ID, input,
+expected-output and optional content mappings enter the schedule; unmapped
+metadata does not. See the [dataset mapping contract](evaluation-request.md#run-mode-dataset-object)
+for authenticated media inputs. Preserve any separate
 provenance, licenses, or adjudication records needed to justify the selection.
 
 ## Canonical prepared schedule
@@ -188,7 +198,7 @@ biased schedule remains biased.
 
 ## Metric-specific paired intervals
 
-New `invarlock/comparison-report-v3` reports use the continuity-corrected
+New exact-match `invarlock/comparison-report-v3` reports use the continuity-corrected
 paired Newcombe hybrid-score 95% interval over the subject-minus-baseline
 binary effect. The report also records baseline-pass to
 subject-fail regressions, baseline-fail to subject-pass improvements, both-pass
@@ -359,8 +369,10 @@ optional but coupled and use the same ranges.
 Separately installed scorer packages may implement deterministic token F1,
 structured-field extraction, and VQA answer normalization and require explicit
 authorization. Executable SQL/code tests, model-based semantic similarity,
-network or human scoring, external-model calls, and LLM judges require separate
-authenticated contracts. Judge results remain observations.
+network services or externally assigned ratings, and external-model calls are outside this extension
+contract. The built-in `metric: judge` has its own bounded collection, retained
+measurement, analysis-policy and recipient contracts. Other judge summaries may
+be attached as observations, which have no acceptance authority.
 
 ## Derived perplexity interpretation
 

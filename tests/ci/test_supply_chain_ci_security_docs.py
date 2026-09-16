@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import re
+import shutil
+import subprocess
 import tomllib
 from pathlib import Path
 from typing import Any
 
+import pytest
 import yaml
 
 
@@ -88,6 +93,9 @@ def test_end_of_file_hook_preserves_canonical_signed_evidence_bytes() -> None:
         "build-attestation.json",
         "examples/integrations/spdx-ai-observation/source/model-aibom.spdx3.json",
         "examples/integrations/spdx-ai-observation/source/model-artifact.identity.json",
+        "examples/captured-results/references/harness-likelihood/capture/raw-results.json",
+        "examples/captured-results/references/harness-likelihood/evidence/manifest.json",
+        "examples/captured-results/references/harness-likelihood/verification.receipt.json",
         "tests/fixtures/compatibility/v0.13.0/package/verification.receipt.json",
     ):
         assert excluded.search(path)
@@ -101,6 +109,98 @@ def test_end_of_file_hook_preserves_canonical_signed_evidence_bytes() -> None:
     assert not excluded.search(
         "examples/integrations/spdx-ai-observation/observation-payload.json"
     )
+    assert not excluded.search(
+        "examples/captured-results/references/harness-likelihood/README.md"
+    )
+    assert not excluded.search(
+        "examples/captured-results/references/harness-likelihood/reference.json"
+    )
+    check_json = next(hook for hook in hooks if hook["id"] == "check-json")
+    assert "exclude" not in check_json
+
+
+def test_capture_annotation_allowance_requires_exact_path_and_empty_default() -> None:
+    config = tomllib.loads(Path(".gitleaks.toml").read_text(encoding="utf-8"))
+    allowance = next(
+        item
+        for item in config["allowlists"]
+        if "captured-evaluation signing-key" in item["description"]
+    )
+    assert allowance["condition"] == "AND"
+    assert allowance["regexTarget"] == "line"
+    assert allowance["targetRules"] == ["generic-api-key"]
+    path = "src/invarlock/captured_evidence_publication.py"
+    name = "_".join(("signing", "key"))
+    annotation = "Ed25519" + "PrivateKey"
+    line = f"    {name}: {annotation} | None = None,"
+    assert any(re.search(pattern, path) for pattern in allowance["paths"])
+    for detected_line in (line, "\n" + line):
+        assert any(
+            re.search(pattern, detected_line) for pattern in allowance["regexes"]
+        )
+    for other_path in (
+        f"prefix/{path}",
+        f"{path}.bak",
+        path.replace("evidence", "other"),
+    ):
+        assert not any(re.search(pattern, other_path) for pattern in allowance["paths"])
+    for other_line in (
+        line.replace("= None", '= "credential"'),
+        line + ' api_key = "credential"',
+        line.replace(name, "private_key"),
+        f'{name} = "credential"',
+    ):
+        assert not any(
+            re.search(pattern, other_line) for pattern in allowance["regexes"]
+        )
+
+
+def test_gitleaks_still_detects_credentials_on_capture_annotation_path(
+    tmp_path: Path,
+) -> None:
+    executable = shutil.which("gitleaks")
+    if executable is None:
+        pytest.skip("the pinned Gitleaks executable is required for the scanner probe")
+    config = Path(".gitleaks.toml").resolve()
+    relative = Path("src/invarlock/captured_evidence_publication.py")
+    source = tmp_path / relative
+    source.parent.mkdir(parents=True)
+    name = "_".join(("signing", "key"))
+    annotation = "Ed25519" + "PrivateKey"
+    canary = hashlib.sha256(b"invarlock synthetic scanner boundary probe").hexdigest()
+    source.write_text(
+        "# Synthetic scanner boundary probe.\n"
+        f"    {name}: {annotation} | None = None,\n"
+        f'{name} = "{canary}"\n'
+        f'    {name}: {annotation} | None = "{canary}",\n',
+        encoding="utf-8",
+    )
+    report = tmp_path / "findings.json"
+    result = subprocess.run(
+        [
+            executable,
+            "dir",
+            ".",
+            "--config",
+            str(config),
+            "--redact",
+            "--no-banner",
+            "--report-format",
+            "json",
+            "--report-path",
+            str(report),
+        ],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 1, result.stderr
+    findings = json.loads(report.read_text(encoding="utf-8"))
+    assert {(item["File"], item["StartLine"]) for item in findings} == {
+        (relative.as_posix(), 3),
+        (relative.as_posix(), 4),
+    }
 
 
 def test_full_ci_pins_make_to_setup_python() -> None:
@@ -110,3 +210,73 @@ def test_full_ci_pins_make_to_setup_python() -> None:
     assert _step(full["steps"], "Run complete repository gates")["run"] == (
         "make verify"
     )
+
+
+@pytest.mark.parametrize(
+    ("description", "target", "paths"),
+    [
+        (
+            "Captured harness source pins",
+            "match",
+            (
+                "examples/captured-results/harness_model_comparison.py",
+                "examples/captured-results/harness_likelihood_rehearsal.py",
+            ),
+        ),
+        (
+            "Retained Mistral harness source pins",
+            "match",
+            (
+                "examples/captured-results/references/mistral-7b-likelihood/capture/baseline/protocol.json",
+                "examples/captured-results/references/mistral-7b-likelihood/capture/subject/protocol.json",
+                "examples/hosted-service/references/mistral-7b-http/capture/checkpoint-loader-source.txt",
+                "examples/hosted-service/references/mistral-7b-http/capture/checkpoint-loading-protocol.json",
+            ),
+        ),
+        (
+            "Captured likelihood tokenizer source pins",
+            "match",
+            ("examples/captured-results/harness_likelihood_rehearsal.py",),
+        ),
+        (
+            "Judge acceptance signer key-file size bounds",
+            "line",
+            ("src/invarlock/judge_measurements/acceptance.py",),
+        ),
+        (
+            "Judge evidence signing key-file size bounds",
+            "line",
+            ("src/invarlock/judge_measurements/evidence.py",),
+        ),
+    ],
+)
+def test_public_source_allowances_are_rule_and_exact_path_scoped(
+    description: str, target: str, paths: tuple[str, ...]
+) -> None:
+    config = tomllib.loads(Path(".gitleaks.toml").read_text(encoding="utf-8"))
+    allowance = next(
+        item
+        for item in config["allowlists"]
+        if item["description"].startswith(description)
+    )
+    assert allowance["targetRules"] == ["generic-api-key"]
+    assert allowance["condition"] == "AND"
+    assert allowance["regexTarget"] == target
+    assert set(allowance) == {
+        "description",
+        "targetRules",
+        "condition",
+        "regexTarget",
+        "paths",
+        "regexes",
+    }
+    assert len(allowance["paths"]) == len(paths)
+    for path in paths:
+        assert any(re.search(pattern, path) for pattern in allowance["paths"])
+        for other_path in ("prefix/" + path, path + ".bak", "unrelated.py"):
+            assert not any(
+                re.search(pattern, other_path) for pattern in allowance["paths"]
+            )
+    for pattern in allowance["regexes"]:
+        assert pattern.startswith("^")
+        assert pattern.endswith("$")

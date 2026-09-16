@@ -138,6 +138,17 @@ def approve(
     if not verified.ok or verified.statement is None:
         diagnostic = "; ".join(verified.errors) or "signed receipt was not accepted"
         raise DeploymentApprovalError(diagnostic)
+    if (
+        verified.statement.get("format")
+        not in {
+            "invarlock/evidence-verification-receipt-v1",
+            "invarlock/evidence-verification-receipt-v2",
+        }
+        or "verification_scope" in verified.statement
+    ):
+        raise DeploymentApprovalError(
+            "deployment requires a native receipt; captured scope is unsupported"
+        )
     verdict = verified.statement.get("verdict")
     if (
         not isinstance(verdict, dict)

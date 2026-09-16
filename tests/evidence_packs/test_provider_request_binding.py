@@ -54,8 +54,15 @@ def test_strict_pack_verifier_rejects_resigned_provider_request_substitution(
     shutil.copytree(source, pack)
     request_path = pack / "request.json"
     request = json.loads(request_path.read_text(encoding="utf-8"))
-    request["comparison"]["baseline"]["runtime"]["settings"][field] = replacement
-    request_path.write_bytes(canonical_json_bytes(request))
+    reference = json.loads(
+        (
+            _REPOSITORY
+            / "scripts/release/reference_evidence"
+            / f"{fixture}-anchors.json"
+        ).read_bytes()
+    )
+    policy_bytes = (_REPOSITORY / reference["policy"]["path"]).read_bytes()
+    assert sha256_digest(policy_bytes) == reference["policy"]["digest"]
 
     signing_key, signer_fingerprint = _signing_key(tmp_path)
     manifest_path = pack / "manifest.json"
@@ -66,22 +73,32 @@ def test_strict_pack_verifier_rejects_resigned_provider_request_substitution(
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     inputs = manifest["inputs"]
 
-    result = verify_comparison_evidence(
-        pack,
-        policy_path=None,
-        policy_bytes=(pack / "inputs/policy.json").read_bytes(),
-        expected_artifact_digests={
-            "baseline": inputs["baseline"]["material_digest"],
-            "subject": inputs["subject"]["material_digest"],
-        },
-        expected_schedule_digest=inputs["dataset"]["material_digest"],
-        expected_runtime_digests={
-            "baseline": inputs["baseline_runtime"]["material_digest"],
-            "subject": inputs["subject_runtime"]["material_digest"],
-        },
-        expected_signer_fingerprint=signer_fingerprint,
-        expected_request_digest=sha256_digest(request_path.read_bytes()),
-    )
+    def verify():
+        return verify_comparison_evidence(
+            pack,
+            policy_path=None,
+            policy_bytes=policy_bytes,
+            expected_artifact_digests={
+                "baseline": inputs["baseline"]["material_digest"],
+                "subject": inputs["subject"]["material_digest"],
+            },
+            expected_schedule_digest=inputs["dataset"]["material_digest"],
+            expected_runtime_digests={
+                "baseline": inputs["baseline_runtime"]["material_digest"],
+                "subject": inputs["subject_runtime"]["material_digest"],
+            },
+            expected_signer_fingerprint=signer_fingerprint,
+            expected_request_digest=sha256_digest(request_path.read_bytes()),
+        )
+
+    control = verify()
+    assert control.payload["ok"] is True
+    assert control.payload["errors"] == []
+    request["comparison"]["baseline"]["runtime"]["settings"][field] = replacement
+    request_path.chmod(0o600)
+    request_path.write_bytes(canonical_json_bytes(request))
+    _rebind_and_resign_pack(pack, signing_key)
+    result = verify()
 
     assert result.payload["ok"] is False
     assert expected_error in "\n".join(result.payload["errors"])

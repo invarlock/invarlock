@@ -8,6 +8,9 @@ RUFF := $(PYTHON) -m ruff
 MYPY := $(PYTHON) -m mypy
 MKDOCS := $(PYTHON) -m mkdocs
 PYTEST_WORKERS ?= 0
+TEST_EXCLUDES ?=
+COVERAGE_ARTIFACT_DIR ?= artifacts/coverage
+COVERAGE_COMBINED_FILE ?= $(CURDIR)/.coverage.combined
 OPA ?= opa
 CUE ?= cue
 PYTEST_WORKER_ARGS := $(if $(filter-out 0,$(PYTEST_WORKERS)),-n $(PYTEST_WORKERS),)
@@ -36,7 +39,7 @@ COVERAGE_QUALIFICATION_FILE ?= $(CURDIR)/.coverage.qualification
 COVERAGE_RELEASE_FILE ?= $(CURDIR)/.coverage.release
 COVERAGE_EXAMPLES_FILE ?= $(CURDIR)/.coverage.examples
 COVERAGE_MAINTENANCE_FILE ?= $(CURDIR)/.coverage.maintenance
-COVERAGE_TARGET_JOBS ?= 3
+COVERAGE_TARGET_JOBS ?= 1
 VERIFY_TARGET_JOBS ?= 3
 
 MYPY_TYPED_SURFACE := \
@@ -46,6 +49,7 @@ MYPY_TYPED_SURFACE := \
 	src/invarlock/core/evaluation_request.py \
 	src/invarlock/core/runtime_provider \
 	src/invarlock/evaluator_qualification.py \
+	src/invarlock/core/builtin_scorers.py \
 	src/invarlock/evaluation_run.py \
 	src/invarlock/evaluation_runtime.py \
 	src/invarlock/evaluation_transaction.py \
@@ -57,16 +61,27 @@ MYPY_TYPED_SURFACE := \
 RELEASE_EXAMPLE_COVERAGE_FILES := \
 	examples/ci/standalone-consumer/review/verify_deployment_receipt.py \
 	examples/evaluator-qualification/measure_signed_transactions.py \
-	examples/quickstart/run.py
+	examples/quickstart/run.py \
+	examples/captured-results/scorer_wheel_smoke.py \
+	examples/captured-results/harness_likelihood_rehearsal.py \
+	examples/captured-results/harness_likelihood_handoff.py \
+	examples/captured-results/harness_model_comparison.py \
+	examples/captured-results/harness_model_handoff.py \
+	examples/hosted-service/capture.py \
+	examples/hosted-service/journey.py \
+	examples/hosted-service/agent_outcomes.py
 
 .PHONY: help install dev-install lock-sync test test-fast test-parallel test-integration addins-test
 .PHONY: coverage coverage-addins coverage-qualification coverage-release coverage-examples coverage-maintenance coverage-enforce coverage-enforce-parallel
+.PHONY: coverage-report coverage-core-report coverage-addins-report coverage-qualification-report coverage-release-report coverage-examples-report coverage-maintenance-report coverage-linux-check
+.PHONY: coverage-collect-core coverage-collect-examples coverage-collect-support coverage-collect-addins verify-checks
 .PHONY: compatibility-test trust-smoke trust-boundary-demo example-evidence-handoff example-acceptance-handoff example-quickstart example-hf-transformers example-hf-vision-text example-peft-lora
-.PHONY: evaluator-qualification evaluator-replayable-imports evaluator-upstream-qualification evaluator-replayable-corpus evaluator-docs-matrix-check
+.PHONY: evaluator-qualification evaluator-replayable-imports evaluator-upstream-qualification evaluator-replayable-corpus evaluator-docs-matrix-check evaluator-scalar-semantics
+.PHONY: evaluator-inspect-semantics evaluator-batch-semantics
 .PHONY: acceptance-policy-interop
 .PHONY: example-torchao-int8 example-gguf-llama-cpp example-gguf-deployment example-spdx-ai-observation example-lm-evaluation-harness example-inspect-ai example-openai-evals example-tensorrt-llm example-tensorrt-llm-prepared
 .PHONY: lint typecheck mypy-typed-surface format verify verify-fast verify-ruff
-.PHONY: cli-smoke-core hf-provider-smoke local-hf-pipeline-smoke local-hf-pipeline-smoke-locked
+.PHONY: cli-smoke-core hf-provider-smoke local-hf-capture-smoke local-hf-capture-smoke-locked
 .PHONY: actionlint workflow-lint docs docs-ci docs-serve docs-check docs-live-fast docs-live
 .PHONY: docs-lint docs-lint-markdown docs-lint-spell docs-lint-public-text docs-lint-strict docs-check-build docs-check-links
 .PHONY: security supply-chain-security cve-audit dist-check addins-install-smoke quickstart-wheel-smoke packaging-smoke-minimal packaging-smoke-front-door
@@ -84,9 +99,13 @@ install:  ## Install the core package
 	$(MAKE) ensure-python
 	$(PIP) install -e .
 
-dev-install:  ## Install development dependencies
+dev-install: runtime-wheelhouse  ## Install development and runtime test dependencies
 	$(MAKE) ensure-python
-	$(PIP) install -e ".[dev]"
+	uv sync --locked --extra dev --group runtime-test
+
+.PHONY: runtime-wheelhouse
+runtime-wheelhouse:  ## Build and verify the pinned hardened Accelerate wheel
+	$(PYTHON) scripts/security/build_hardened_accelerate_wheel.py bootstrap
 
 lock-sync:  ## Check that uv.lock matches pyproject.toml
 	UV_NO_CACHE=1 uv lock --check
@@ -95,13 +114,13 @@ lock-sync:  ## Check that uv.lock matches pyproject.toml
 test: compatibility-test  ## Run the complete test suite
 	$(MAKE) ensure-python
 	PYTHONPATH=src $(PYTEST) $(PYTEST_WORKER_ARGS) -q \
-		--ignore=tests/compatibility tests
+		--ignore=tests/compatibility $(TEST_EXCLUDES) tests
 
 test-fast: compatibility-test  ## Run tests that need no network, GPU, or long-lived runtime
 	$(MAKE) ensure-python
 	PYTHONPATH=src $(PYTEST) $(PYTEST_WORKER_ARGS) -q \
 		-m "not integration and not slow and not manual and not gpu" \
-		--ignore=tests/compatibility tests
+		--ignore=tests/compatibility $(TEST_EXCLUDES) tests
 
 test-parallel: PYTEST_WORKERS = auto
 test-parallel:  ## Run the fast suite with pytest-xdist
@@ -112,9 +131,9 @@ test-integration:  ## Run integration tests
 	PYTHONPATH=src $(PYTEST) -q -m integration tests/integration
 
 addins-test:  ## Test every first-party optional package
-	PYTHONPATH=src:addins/diagnostics/src:addins/gguf/src:addins/multimodal/src:addins/tensorrt_llm/src \
+	PYTHONPATH=src:addins/diagnostics/src:addins/gguf/src:addins/multimodal/src:addins/tensorrt_llm/src:addins/inspect_judge/src \
 		$(PYTEST) $(PYTEST_WORKER_ARGS) -q \
-		addins/diagnostics/tests addins/gguf/tests addins/multimodal/tests addins/tensorrt_llm/tests
+		addins/diagnostics/tests addins/gguf/tests addins/multimodal/tests addins/tensorrt_llm/tests addins/inspect_judge/tests
 
 test-%:  ## Run one tests/<name> directory
 	$(MAKE) ensure-python
@@ -128,8 +147,16 @@ coverage:  ## Run the fast suite with statement-and-branch coverage
 		-m "not integration and not slow and not manual and not gpu" tests \
 		--cov=src/invarlock --cov-branch --cov-report=term-missing \
 		--cov-report=xml:reports/cov.xml --cov-fail-under=95
-	@git ls-files 'src/invarlock/**/*.py' 'src/invarlock/*.py' | \
-		grep -v '/__init__.py$$' | \
+	$(MAKE) coverage-core-report
+
+coverage-core-report:  ## Enforce retained core coverage measurements
+	COVERAGE_FILE=$(COVERAGE_CORE_FILE) $(PYTHON) -m coverage report --rcfile=pyproject.toml --include='src/invarlock/*' --omit='*/tests/*,*/test_*,*/__init__.py' --fail-under=95
+	COVERAGE_FILE=$(COVERAGE_CORE_FILE) $(PYTHON) -m coverage xml --rcfile=pyproject.toml --include='src/invarlock/*' --omit='*/tests/*,*/test_*,*/__init__.py' -o reports/cov.xml --fail-under=95
+	$(MAKE) coverage-check-files
+
+.PHONY: coverage-check-files
+coverage-check-files:  ## Enforce per-file thresholds against collected core coverage
+	@$(PYTHON) -c 'from pathlib import Path; print("\n".join(str(path) for path in sorted(Path("src/invarlock").rglob("*.py")) if path.name != "__init__.py"))' | \
 		while IFS= read -r source; do \
 			COVERAGE_FILE=$(COVERAGE_CORE_FILE) $(PYTHON) -m coverage report --include="$$source" --fail-under=95 || exit $$?; \
 		done
@@ -142,13 +169,18 @@ coverage-linux-check:
 
 coverage-addins: coverage-linux-check  ## Enforce branch-aware coverage for optional packages
 	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) $(PYTHON) -m coverage erase
-	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) PYTHONPATH=src:addins/diagnostics/src:addins/gguf/src:addins/multimodal/src:addins/tensorrt_llm/src:. \
+	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) PYTHONPATH=src:addins/diagnostics/src:addins/gguf/src:addins/multimodal/src:addins/tensorrt_llm/src:addins/inspect_judge/src:. \
 		$(PYTEST) $(PYTEST_WORKER_ARGS) -q \
-		addins/diagnostics/tests addins/gguf/tests addins/multimodal/tests addins/tensorrt_llm/tests \
+		addins/diagnostics/tests addins/gguf/tests addins/multimodal/tests addins/tensorrt_llm/tests addins/inspect_judge/tests \
 		--cov --cov-config=scripts/addins.coveragerc \
 		--cov-branch --cov-report=term-missing \
 		--cov-report=xml:reports/addins-cov.xml \
 		--cov-fail-under=95
+	$(MAKE) coverage-addins-report
+
+coverage-addins-report:  ## Enforce retained addins coverage measurements
+	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) $(PYTHON) -m coverage report --rcfile=scripts/addins.coveragerc --include='addins/*' --omit='addins/*/tests/*' --fail-under=95
+	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) $(PYTHON) -m coverage xml --rcfile=scripts/addins.coveragerc --include='addins/*' --omit='addins/*/tests/*' -o reports/addins-cov.xml --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) $(PYTHON) -m coverage report \
 		--include='addins/diagnostics/src/*' \
 		--fail-under=95
@@ -160,6 +192,9 @@ coverage-addins: coverage-linux-check  ## Enforce branch-aware coverage for opti
 		--fail-under=95
 	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) $(PYTHON) -m coverage report \
 		--include='addins/tensorrt_llm/src/*' \
+		--fail-under=95
+	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) $(PYTHON) -m coverage report \
+		--include='addins/inspect_judge/src/*' \
 		--fail-under=95
 	@git ls-files 'addins/*/src/**/*.py' | \
 		grep -v '/__init__.py$$' | \
@@ -184,6 +219,11 @@ coverage-qualification:  ## Enforce branch-aware coverage for qualification tool
 		--cov-report=term-missing \
 		--cov-report=xml:reports/qualification-cov.xml \
 		--cov-fail-under=95
+	$(MAKE) coverage-qualification-report
+
+coverage-qualification-report:  ## Enforce retained qualification coverage measurements
+	COVERAGE_FILE=$(COVERAGE_QUALIFICATION_FILE) $(PYTHON) -m coverage report --rcfile=scripts/qualification.coveragerc --include='scripts/authenticated_runtime_build.py,scripts/qualification_precheck.py,scripts/qualification_candidate_wheels.py,scripts/qualification_receipt_check.py,scripts/qualification_render_preflight.py,scripts/qualification_source.py,scripts/runtime_qualification.py,scripts/tensorrt_llm_canary_preflight.py' --fail-under=95
+	COVERAGE_FILE=$(COVERAGE_QUALIFICATION_FILE) $(PYTHON) -m coverage xml --rcfile=scripts/qualification.coveragerc --include='scripts/authenticated_runtime_build.py,scripts/qualification_precheck.py,scripts/qualification_candidate_wheels.py,scripts/qualification_receipt_check.py,scripts/qualification_render_preflight.py,scripts/qualification_source.py,scripts/runtime_qualification.py,scripts/tensorrt_llm_canary_preflight.py' -o reports/qualification-cov.xml --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_QUALIFICATION_FILE) $(PYTHON) -m coverage report --rcfile=scripts/qualification.coveragerc \
 		--include='scripts/authenticated_runtime_build.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_QUALIFICATION_FILE) $(PYTHON) -m coverage report --rcfile=scripts/qualification.coveragerc \
@@ -204,7 +244,9 @@ coverage-qualification:  ## Enforce branch-aware coverage for qualification tool
 coverage-release:  ## Enforce branch-aware coverage for release helpers
 	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage erase
 	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) PYTHONPATH=src $(PYTEST) $(PYTEST_WORKER_ARGS) -q \
+		tests/scripts/test_core_wheel_consumers.py \
 		tests/scripts/test_first_party_distribution_validation.py \
+		tests/scripts/test_package_readme.py \
 		tests/scripts/test_release_distribution_validation_edges.py \
 		tests/scripts/test_release_preflight.py \
 		tests/scripts/test_release_preflight_adversarial.py \
@@ -217,6 +259,13 @@ coverage-release:  ## Enforce branch-aware coverage for release helpers
 		--cov-report=term-missing \
 		--cov-report=xml:reports/release-cov.xml \
 		--cov-fail-under=95
+	$(MAKE) coverage-release-report
+
+coverage-release-report:  ## Enforce retained release coverage measurements
+	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc --include='scripts/release/*.py' --fail-under=95
+	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage xml --rcfile=scripts/release.coveragerc --include='scripts/release/*.py' -o reports/release-cov.xml --fail-under=95
+	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc \
+		--include='scripts/release/core_wheel_consumers.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc \
 		--include='scripts/release/first_party_distribution_validation.py' --fail-under=95
 	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/release.coveragerc \
@@ -239,10 +288,15 @@ coverage-examples:  ## Enforce branch-aware coverage for example launchers
 		--cov-branch \
 		--cov-report=term-missing \
 		--cov-report=xml:reports/examples-cov.xml
+	$(MAKE) coverage-examples-report
+
+coverage-examples-report:  ## Enforce retained examples coverage measurements
+	COVERAGE_FILE=$(COVERAGE_EXAMPLES_FILE) $(PYTHON) -m coverage report --rcfile=scripts/examples.coveragerc --include='examples/*' --fail-under=0
+	COVERAGE_FILE=$(COVERAGE_EXAMPLES_FILE) $(PYTHON) -m coverage xml --rcfile=scripts/examples.coveragerc --include='examples/*' -o reports/examples-cov.xml --fail-under=0
 	@exemptions="$$(grep -Ev '^(#|$$)' examples/coverage-exemptions.txt | paste -sd, -)"; \
 		test -n "$$exemptions"; \
 		COVERAGE_FILE=$(COVERAGE_EXAMPLES_FILE) $(PYTHON) -m coverage report \
-			--omit="$$exemptions" --fail-under=95
+			--include='examples/*' --omit="$$exemptions" --fail-under=95
 	@find examples -type f -name '*.py' \
 		! -name '__init__.py' | sort | \
 		while IFS= read -r source; do \
@@ -259,32 +313,54 @@ coverage-maintenance:  ## Measure maintained repository checks and security tool
 	COVERAGE_FILE=$(COVERAGE_MAINTENANCE_FILE) $(PYTHON) -m coverage erase
 	COVERAGE_FILE=$(COVERAGE_MAINTENANCE_FILE) PYTHONPATH=src:. $(PYTEST) $(PYTEST_WORKER_ARGS) -q \
 		tests/ci/test_coverage_branch_rate.py \
+		tests/ci/test_coverage_shards.py \
 		tests/ci/test_public_evidence_audit.py \
 		tests/ci/test_public_text_check.py \
+		tests/judge_measurements/test_statistics_calibration.py \
 		tests/scripts/test_check_repo_cruft.py \
 		tests/scripts/test_sync_packaged_contracts.py \
 		tests/scripts/test_sync_packaged_public_evidence.py \
 		tests/scripts/test_prepare_qualification_suites.py \
+		tests/scripts/test_accelerate_checkpoint_files.py \
 		tests/scripts/test_build_cache_free_lm_eval_wheel.py \
+		tests/scripts/test_build_hardened_accelerate_wheel.py \
+		tests/scripts/test_hardened_accelerate_audit.py \
+		tests/scripts/test_hardened_accelerate_installed.py \
+		tests/scripts/test_build_restricted_openai_evals_wheel.py \
+		tests/scripts/test_refresh_pinned_requirements.py \
 		tests/scripts/test_cve_audit.py \
 		tests/scripts/test_filter_scorecard_sarif.py \
 		tests/scripts/test_run_pip_audit.py \
+		tests/scripts/test_installed_pip_audit.py \
 		--cov --cov-config=scripts/maintenance.coveragerc --cov-branch \
 		--cov-report=term-missing \
 		--cov-report=xml:reports/maintenance-cov.xml \
 		--cov-fail-under=95
-	@git ls-files 'scripts/checks/*.py' 'scripts/security/*.py' \
+	$(MAKE) coverage-maintenance-report
+
+coverage-maintenance-report:  ## Enforce retained maintenance coverage measurements
+	COVERAGE_FILE=$(COVERAGE_MAINTENANCE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/maintenance.coveragerc --include='scripts/checks/*.py,scripts/security/*.py,scripts/ci/*.py,scripts/prepare_qualification_suites.py' --fail-under=95
+	COVERAGE_FILE=$(COVERAGE_MAINTENANCE_FILE) $(PYTHON) -m coverage xml --rcfile=scripts/maintenance.coveragerc --include='scripts/checks/*.py,scripts/security/*.py,scripts/ci/*.py,scripts/prepare_qualification_suites.py' -o reports/maintenance-cov.xml --fail-under=95
+	@git ls-files 'scripts/checks/*.py' 'scripts/security/*.py' 'scripts/ci/*.py' \
 		'scripts/prepare_qualification_suites.py' | \
 		while IFS= read -r source; do \
 			COVERAGE_FILE=$(COVERAGE_MAINTENANCE_FILE) $(PYTHON) -m coverage report --rcfile=scripts/maintenance.coveragerc --include="$$source" --fail-under=95 || exit $$?; \
 		done
 
 coverage-enforce: PYTEST_WORKERS = 2
-coverage-enforce: coverage-linux-check  ## Enforce branch-aware coverage in parallel by default
-	$(MAKE) -j $(COVERAGE_TARGET_JOBS) \
-		coverage coverage-addins coverage-qualification \
-		coverage-release coverage-examples coverage-maintenance \
-		PYTEST_WORKERS=$(PYTEST_WORKERS)
+coverage-enforce: coverage-linux-check  ## Run disjoint coverage suites and enforce every domain
+	$(MAKE) -j $(COVERAGE_TARGET_JOBS) coverage-collect-core coverage-collect-examples coverage-collect-support coverage-collect-addins PYTEST_WORKERS=$(PYTEST_WORKERS)
+	$(MAKE) coverage-report
+
+coverage-collect-core coverage-collect-examples coverage-collect-support coverage-collect-addins: coverage-collect-%: coverage-linux-check
+	$(PYTHON) scripts/ci/coverage_runner.py run $* --artifact-dir "$(COVERAGE_ARTIFACT_DIR)" --workers $(PYTEST_WORKERS)
+
+coverage-report: coverage-linux-check  ## Combine all successful shards and enforce unchanged coverage requirements
+	$(PYTHON) scripts/ci/coverage_runner.py combine "$(COVERAGE_ARTIFACT_DIR)" --output "$(COVERAGE_COMBINED_FILE)"
+	$(MAKE) coverage-core-report coverage-addins-report coverage-qualification-report coverage-release-report coverage-examples-report coverage-maintenance-report \
+		COVERAGE_CORE_FILE="$(COVERAGE_COMBINED_FILE)" COVERAGE_ADDINS_FILE="$(COVERAGE_COMBINED_FILE)" \
+		COVERAGE_QUALIFICATION_FILE="$(COVERAGE_COMBINED_FILE)" COVERAGE_RELEASE_FILE="$(COVERAGE_COMBINED_FILE)" \
+		COVERAGE_EXAMPLES_FILE="$(COVERAGE_COMBINED_FILE)" COVERAGE_MAINTENANCE_FILE="$(COVERAGE_COMBINED_FILE)"
 	$(PYTHON) scripts/checks/check_coverage_branch_rate.py \
 		reports/cov.xml reports/addins-cov.xml \
 		reports/qualification-cov.xml reports/release-cov.xml \
@@ -321,62 +397,98 @@ evaluator-qualification:  ## Requalify the retained evaluator matrix offline
 evaluator-replayable-imports:  ## Replay independently replayable 102-record imports
 	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py verify-replayable
 
-evaluator-upstream-qualification:  ## Execute and retain all pinned upstream evaluator examples
+evaluator-inspect-semantics:  ## Check the pinned Inspect scorer's literal-pair domain
+	@set -eu; \
+		audit_dir="$$(mktemp -d)"; \
+		trap 'rm -rf "$$audit_dir"' EXIT; \
+		uv run --no-project --python "$(PYTHON)" \
+			--with-requirements examples/evaluator-qualification/locks/inspect-ai.txt \
+			python examples/evaluator-qualification/maintained/inspect_differential.py \
+			--output "$$audit_dir/observation.json"
+
+evaluator-batch-semantics:  ## Check the five pinned batch scorers against literal boundaries
+	@set -eu; \
+		audit_dir="$$(mktemp -d)"; \
+		trap 'rm -rf "$$audit_dir"' EXIT; \
+		for provider in evidently langfuse azure-ai-evaluation pydantic-evals; do \
+			uv run --no-project --python "$(PYTHON)" \
+				--with-requirements "examples/evaluator-qualification/locks/$$provider.txt" \
+				python examples/evaluator-qualification/maintained/batch_differential.py \
+				--provider "$$provider" --output "$$audit_dir/$$provider.json"; \
+		done; \
+		$(PYTHON) examples/evaluator-qualification/maintained/batch_differential.py \
+			--provider promptfoo --output "$$audit_dir/promptfoo.json"
+
+evaluator-scalar-semantics:  ## Check the eleven pinned scalar scorers against literal boundaries
+	@set -eu; \
+		repo_root="$$(pwd)"; \
+		qualification_python="$$($(PYTHON) -c 'import sys; print(sys.executable)')"; \
+		audit_dir="$$(mktemp -d)"; \
+		trap 'rm -rf "$$audit_dir"' EXIT; \
+		cd "$$audit_dir"; \
+		for provider in lm-evaluation-harness deepeval ragas lighteval hugging-face-evaluate autoevals openevals openai-evals arize-phoenix-evals opik trulens; do \
+			uv run --no-project --python "$$qualification_python" \
+				--with-requirements "$$repo_root/examples/evaluator-qualification/locks/$$provider.txt" \
+				python "$$repo_root/examples/evaluator-qualification/maintained/scalar_differential.py" \
+				--provider "$$provider" --output "$$audit_dir/$$provider.json"; \
+		done
+
+evaluator-upstream-qualification:  ## Reproduce the retained historical corpora with their original runners
 	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py execute
 	PYTHONPATH=src $(PYTHON) examples/evaluator-qualification/matrix.py execute-replayable
 	$(MAKE) evaluator-qualification
 
-evaluator-replayable-corpus:  ## Re-execute and check the pinned Qwen3 model corpus
+evaluator-replayable-corpus: runtime-wheelhouse  ## Re-execute and check the pinned Qwen3 model corpus
 	PYTHONPATH=src:. HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
-		uv run --isolated --locked --extra hf python \
+		uv run --isolated --locked --group hf python \
 		examples/evaluator-qualification/authoritative/generate_cases.py --check
 
 acceptance-policy-interop:  ## Run standalone OPA and CUE acceptance-policy fixtures
 	$(PYTHON) examples/policy-engine-interop/build_fixtures.py --check
 	$(PYTHON) examples/policy-engine-interop/run.py --opa "$(OPA)" --cue "$(CUE)"
 
-example-hf-transformers:  ## Run a real one-command Hugging Face comparison
-	PYTHONPATH=src uv run --isolated --locked --extra hf python \
+example-hf-transformers: runtime-wheelhouse  ## Run a real one-command Hugging Face comparison
+	PYTHONPATH=src uv run --isolated --locked --group hf python \
 		-m examples.integrations.launch hf-transformers $(EXAMPLE_ARGS)
 
-example-hf-vision-text:  ## Compare two pinned Qwen2-VL checkpoints on an authenticated image fixture
-	PYTHONPATH=src:addins/multimodal/src uv run --isolated --locked --extra hf \
+example-hf-vision-text: runtime-wheelhouse  ## Compare two pinned Qwen2-VL checkpoints on an authenticated image fixture
+	PYTHONPATH=src:addins/multimodal/src uv run --isolated --locked --group hf \
 		--with ./addins/multimodal python \
 		-m examples.integrations.launch hf-vision-text $(EXAMPLE_ARGS)
 
-example-peft-lora:  ## Train and merge with PEFT, then evaluate, verify, and report
-	PYTHONPATH=src uv run --isolated --locked --extra hf --group example-peft python \
+example-peft-lora: runtime-wheelhouse  ## Train and merge with PEFT, then evaluate, verify, and report
+	PYTHONPATH=src uv run --isolated --locked --group hf --group example-peft python \
 		-m examples.integrations.launch peft-lora $(EXAMPLE_ARGS)
 
-example-torchao-int8:  ## Quantize with TorchAO, then evaluate, verify, and report
-	PYTHONPATH=src uv run --isolated --locked --extra hf --group example-torchao python \
+example-torchao-int8: runtime-wheelhouse  ## Quantize with TorchAO, then evaluate, verify, and report
+	PYTHONPATH=src uv run --isolated --locked --group hf --group example-torchao python \
 		-m examples.integrations.launch torchao-int8 $(EXAMPLE_ARGS)
 
 example-gguf-llama-cpp:  ## Compare two pinned GGUF quantizations with llama.cpp
 	PYTHONPATH=src:addins/gguf/src uv run --isolated --locked --with . \
 		--with ./addins/gguf python -m examples.integrations.gguf_llama_cpp $(EXAMPLE_ARGS)
 
-example-gguf-deployment:  ## Compare a pinned BF16 profile with a source-derived Q5_K_M GGUF
-	PYTHONPATH=src:addins/gguf/src uv run --isolated --locked --with '.[hf]' \
+example-gguf-deployment: runtime-wheelhouse  ## Compare a pinned BF16 profile with a source-derived Q5_K_M GGUF
+	PYTHONPATH=src:addins/gguf/src uv run --isolated --locked --group hf \
 		--with ./addins/gguf python -m examples.integrations.gguf_deployment $(EXAMPLE_ARGS)
 
 example-spdx-ai-observation:  ## Check the bounded SPDX 3.0.1 AI observation fixture
 	PYTHONPATH=src:. $(PYTHON) -m examples.integrations.spdx_ai_observation --check
 
-example-lm-evaluation-harness:  ## Import real per-record LM Evaluation Harness output
-	PYTHONPATH=src:. uv run --isolated --locked --extra hf python \
+example-lm-evaluation-harness: runtime-wheelhouse  ## Import real per-record LM Evaluation Harness output
+	PYTHONPATH=src:. uv run --isolated --locked --group hf python \
 		examples/integrations/lm-evaluation-harness/launch.py $(EXAMPLE_ARGS)
 
-example-inspect-ai:  ## Run Inspect AI through the signed evaluator transaction
-	PYTHONPATH=src:. uv run --isolated --locked --extra hf python \
+example-inspect-ai: runtime-wheelhouse  ## Run Inspect AI through the signed evaluator transaction
+	PYTHONPATH=src:. uv run --isolated --locked --group hf python \
 		examples/integrations/inspect-ai/launch.py $(EXAMPLE_ARGS)
 
-example-openai-evals:  ## Run OpenAI Evals through the signed evaluator transaction
-	PYTHONPATH=src:. uv run --isolated --locked --extra hf python \
+example-openai-evals: runtime-wheelhouse  ## Run OpenAI Evals through the signed evaluator transaction
+	PYTHONPATH=src:. uv run --isolated --locked --group hf python \
 		examples/integrations/openai-evals/launch.py $(EXAMPLE_ARGS)
 
-example-tensorrt-llm:  ## Compare BF16 and calibrated FP8 Qwen3 TensorRT-LLM engines
-	PYTHONPATH=src:addins/tensorrt_llm/src:. uv run --isolated --locked --extra hf \
+example-tensorrt-llm: runtime-wheelhouse  ## Compare BF16 and calibrated FP8 Qwen3 TensorRT-LLM engines
+	PYTHONPATH=src:addins/tensorrt_llm/src:. uv run --isolated --locked --group hf \
 		--with . --with ./addins/tensorrt_llm python \
 		examples/integrations/tensorrt-llm/showcase.py $(EXAMPLE_ARGS)
 
@@ -404,6 +516,7 @@ typecheck:  ## Type-check the core package
 	PYTHONPATH=src:addins/gguf/src $(MYPY) -p invarlock_addins.gguf
 	PYTHONPATH=src:addins/multimodal/src $(MYPY) -p invarlock_addins.multimodal
 	PYTHONPATH=src:addins/tensorrt_llm/src $(MYPY) -p invarlock_addins.tensorrt_llm
+	PYTHONPATH=src:addins/inspect_judge/src $(MYPY) -p invarlock_addins.inspect_judge
 
 mypy-typed-surface:  ## Type-check the public transaction and evidence surface
 	$(MAKE) ensure-mypy
@@ -430,13 +543,14 @@ hf-provider-smoke:  ## Exercise the canonical built-in Hugging Face provider
 
 local-hf-pipeline-smoke: hf-provider-smoke  ## CI alias for the built-in provider smoke
 
-local-hf-pipeline-smoke-locked:  ## Run the built-in provider smoke in the locked environment
-	uv run --isolated --locked --extra hf --extra ci $(MAKE) hf-provider-smoke
+local-hf-pipeline-smoke-locked: runtime-wheelhouse  ## Run the built-in provider smoke in the locked environment
+	uv run --isolated --locked --group runtime-test --extra ci $(MAKE) hf-provider-smoke
 
 container-front-door-smoke: runtime-image  ## Run the host-to-container evaluation smoke
 	INVARLOCK_RUN_CONTAINER_SMOKE=1 INVARLOCK_CONTAINER_ENGINE=$(CONTAINER_ENGINE) \
 		INVARLOCK_RUNTIME_IMAGE=$(RUNTIME_IMAGE) \
-		PYTHONPATH=src $(PYTEST) -q -m integration tests/integration/test_container_front_door_journey.py
+		PYTHONPATH=src $(PYTEST) -q -m integration \
+		tests/integration/test_container_front_door_journey.py tests/integration/test_oci_isolation.py
 
 qualification-source-bundle:  ## Create the exact Git archive used by runtime qualification
 	$(foreach variable,SOURCE_BUNDLE_OUTPUT,$(if $(strip $($(variable))),,$(error $(variable) is required)))
@@ -525,7 +639,7 @@ verify:  ## Run repository, product, docs, and contract gates in parallel by def
 	$(MAKE) -j $(VERIFY_TARGET_JOBS) \
 		public-evidence-audit contracts-check test addins-test \
 		cli-smoke-core lint docs-check-build \
-		PYTEST_WORKERS=$(PYTEST_WORKERS)
+		PYTEST_WORKERS=$(PYTEST_WORKERS) TEST_EXCLUDES=--ignore=tests/examples
 	$(MAKE) examples-check PYTEST_WORKERS=$(PYTEST_WORKERS)
 
 verify-fast: PYTEST_WORKERS = 2
@@ -534,10 +648,14 @@ verify-fast:  ## Run local gates in parallel without network, GPU, or downloads
 	$(MAKE) -j $(VERIFY_TARGET_JOBS) \
 		public-evidence-audit contracts-check test-fast addins-test \
 		cli-smoke-core lint \
-		PYTEST_WORKERS=$(PYTEST_WORKERS)
+		PYTEST_WORKERS=$(PYTEST_WORKERS) TEST_EXCLUDES=--ignore=tests/examples
 	$(MAKE) examples-check PYTEST_WORKERS=$(PYTEST_WORKERS)
 
-contracts-check:  ## Check that packaged contracts match repository contracts
+verify-checks:  ## Run non-test repository gates; CI behavioral coverage runs separately
+	$(MAKE) repo-cruft-check
+	$(MAKE) -j $(VERIFY_TARGET_JOBS) public-evidence-audit contracts-check cli-smoke-core lint
+
+contracts-check: package-readmes-check  ## Check that packaged contracts match repository contracts
 	PYTHONPATH=src $(PYTHON) scripts/checks/sync_packaged_contracts.py --check
 
 contracts-sync:  ## Refresh packaged contracts
@@ -601,30 +719,35 @@ workflow-lint: actionlint  ## Run workflow linting
 
 security: supply-chain-security cve-audit  ## Run supply-chain security gates
 
-supply-chain-security:  ## Generate an SBOM and audit the isolated tool environment
+supply-chain-security: runtime-wheelhouse  ## Generate an SBOM and audit the isolated tool environment
 	@command -v uv >/dev/null 2>&1 || { echo "uv is required" >&2; exit 1; }
 	$(SECURITY_RUN) bash -c 'scripts/security/generate_sbom.sh --scope tool-environment --python "$$(command -v python)" "$(SECURITY_ARTIFACT_DIR)/sbom.json"'
 	$(SECURITY_RUN) python scripts/security/run_pip_audit.py
 
-cve-audit:  ## Audit locked dependencies against OSV
+cve-audit: runtime-wheelhouse  ## Audit locked dependencies against OSV
 	@command -v uv >/dev/null 2>&1 || { echo "uv is required" >&2; exit 1; }
 	$(SECURITY_RUN) python scripts/security/cve_audit.py \
 		--out-json "$(SECURITY_ARTIFACT_DIR)/cve-audit.json" \
 		--out-md "$(SECURITY_ARTIFACT_DIR)/cve-audit.md"
 
-dist-check:  ## Build and validate the core and first-party add-in distributions
+dist-check: package-readmes-check  ## Build and validate the core and first-party add-in distributions
 	rm -rf build dist src/*.egg-info addins/*/build addins/*/src/*.egg-info
 	$(DIST_RUN) python -m build --no-isolation
 	$(DIST_RUN) python -m build --no-isolation --outdir dist/addins addins/diagnostics
 	$(DIST_RUN) python -m build --no-isolation --outdir dist/addins addins/gguf
 	$(DIST_RUN) python -m build --no-isolation --outdir dist/addins addins/multimodal
 	$(DIST_RUN) python -m build --no-isolation --outdir dist/addins addins/tensorrt_llm
+	$(DIST_RUN) python -m build --no-isolation --outdir dist/addins addins/inspect_judge
 	$(DIST_RUN) python -m twine check dist/*.whl dist/*.tar.gz
 	$(DIST_RUN) python -m twine check dist/addins/*
 	$(DIST_RUN) python scripts/release/first_party_distribution_validation.py \
 		--repo-root . --core-dist-dir dist --addin-dist-dir dist/addins
 
-addins-install-smoke: dist-check  ## Install and discover all five wheels in a disposable environment
+.PHONY: inspect-judge-sdk-test
+inspect-judge-sdk-test: dist-check  ## Resolve the optional judge SDK extra and replay real SDK events offline
+	PYTHON=$(PYTHON) bash scripts/inspect_judge_sdk_gate.sh
+
+addins-install-smoke: dist-check  ## Install and discover all six wheels in a disposable environment
 	@test -f $(ADDINS_SMOKE_RELEASE_LOCK) || { echo "No coordinated release lock for $(PYTHON); expected $(ADDINS_SMOKE_RELEASE_LOCK)" >&2; exit 2; }
 	@set -eu; \
 		smoke_venv="$$(mktemp -d "$${TMPDIR:-/tmp}/invarlock-addins-smoke.XXXXXX")"; \
@@ -638,24 +761,8 @@ addins-install-smoke: dist-check  ## Install and discover all five wheels in a d
 		"$$smoke_venv/bin/python" -m pip install --require-hashes -r $(ADDINS_SMOKE_RELEASE_LOCK); \
 		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -m pip install --no-deps --force-reinstall dist/*.whl; \
 		"$$smoke_venv/bin/python" -m pip check; \
-		consumer_root="$$smoke_venv/quickstart-consumer"; \
-		mkdir "$$consumer_root"; \
-		cp examples/quickstart/run.py "$$consumer_root/run.py"; \
-		cp -R examples/acceptance-handoff/golden "$$consumer_root/golden"; \
-		( cd "$$consumer_root"; PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= \
-			"$$smoke_venv/bin/python" run.py --fixture golden ); \
-		approval_root="$$smoke_venv/deployment-consumer"; \
-		cp -R examples/ci/standalone-consumer "$$approval_root"; \
-		mkdir "$$approval_root/incoming"; \
-		cp -R examples/evaluator-qualification/signed-transactions/deployment-approval-inspect-ai/evidence "$$approval_root/incoming/evidence"; \
-		cp examples/evaluator-qualification/signed-transactions/deployment-approval-inspect-ai/verification.receipt.json "$$approval_root/incoming/verification.receipt.json"; \
-		( cd "$$approval_root"; PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= \
-			"$$smoke_venv/bin/python" review/verify_deployment_receipt.py \
-			--approval-inputs review/inspect-ai-deployment-approval-inputs.json \
-			--evidence incoming/evidence \
-			--policy review/policy/acceptance.json \
-			--receipt incoming/verification.receipt.json \
-			--output deployment-approval.json ); \
+		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" scripts/release/core_wheel_consumers.py \
+			--cli "$$smoke_venv/bin/invarlock"; \
 		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -m pip install --no-deps --force-reinstall dist/addins/*.whl; \
 		"$$smoke_venv/bin/python" -m pip check; \
 		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -m invarlock_addins.gguf.conformance; \
@@ -663,6 +770,7 @@ addins-install-smoke: dist-check  ## Install and discover all five wheels in a d
 		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -m invarlock_addins.tensorrt_llm.conformance; \
 		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -c "from pathlib import Path; import invarlock; import sysconfig; site = Path(sysconfig.get_path('purelib')).resolve(); assert Path(invarlock.__file__).resolve().is_relative_to(site)"; \
 		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -c "from invarlock_addins.diagnostics import spectral_observation; assert spectral_observation([[1.0]])['status'] == 'observation'"; \
+		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -c "from importlib.metadata import version; from pathlib import Path; from sysconfig import get_path; import sys; import invarlock; import invarlock_addins.inspect_judge as judge; assert version('invarlock-inspect-judge') == judge.__version__ == invarlock.__version__; assert Path(judge.__file__).resolve().is_relative_to(Path(get_path('purelib')).resolve()); assert callable(judge.import_export) and callable(judge.prepare_collection); assert 'inspect_ai' not in sys.modules"; \
 		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -c "from importlib.metadata import entry_points; assert {'hf_vision_text', 'llama_cpp', 'tensorrt_llm'} <= {item.name for item in entry_points(group='invarlock.runtime_providers')}"; \
 		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -c "from importlib import import_module; from pathlib import Path; import sysconfig; from invarlock import __version__; from invarlock.core.registry import CoreRegistry; from invarlock.core.runtime_provider import INVARLOCK_RUNTIME_PROVIDER_ABI; registry = CoreRegistry(); expected = {'hf_vision_text': 'invarlock-runtime-hf-vision-text', 'llama_cpp': 'invarlock-runtime-gguf', 'tensorrt_llm': 'invarlock-runtime-tensorrt-llm'}; providers = {name: registry.get_runtime_provider(name) for name in expected}; assert all(provider.name == name and provider.abi_version == INVARLOCK_RUNTIME_PROVIDER_ABI for name, provider in providers.items()); assert all(registry.get_plugin_info(name, 'runtime_providers')['package'] == package and registry.get_plugin_info(name, 'runtime_providers')['version'] == __version__ and registry.get_plugin_info(name, 'runtime_providers')['entry_point'] == name for name, package in expected.items()); site = Path(sysconfig.get_path('purelib')).resolve(); assert all(Path(import_module(provider.__class__.__module__).__file__).resolve().is_relative_to(site) for provider in providers.values())"
 
@@ -672,7 +780,7 @@ packaging-smoke-minimal: addins-install-smoke  ## Validate distributable artifac
 
 packaging-smoke-front-door: addins-install-smoke cli-smoke-core  ## Validate artifacts and CLI entry point
 
-release-preflight:  ## Validate a clean exact release checkout and distributions
+release-preflight: package-readmes-check  ## Validate a clean exact release checkout and distributions
 	@test -n "$(RELEASE_PREFLIGHT_ARGS)" || { echo "RELEASE_PREFLIGHT_ARGS is required" >&2; exit 2; }
 	$(PYTHON) scripts/release/release_preflight.py $(RELEASE_PREFLIGHT_ARGS)
 
@@ -748,7 +856,7 @@ runtime-smoke:  ## Check the canonical runtime image imports
 		--tmpfs "/tmp:rw,noexec,nosuid,nodev,size=4g" \
 		--env HOME=/tmp --env PYTHONDONTWRITEBYTECODE=1 \
 		--entrypoint python $(RUNTIME_IMAGE) \
-		-c "import accelerate, safetensors, torch, transformers; assert accelerate.__version__ == '1.14.0'; assert safetensors.__version__ == '0.8.0'; assert transformers.__version__ == '5.14.1'; print('runtime image imports ok')"
+		-c "import accelerate, safetensors, torch, transformers; assert accelerate.__version__ == '1.14.0+invarlock.1'; assert safetensors.__version__ == '0.8.0'; assert transformers.__version__ == '5.14.1'; print('runtime image imports ok')"
 
 runtime-smoke-podman: CONTAINER_ENGINE=podman
 runtime-smoke-podman: runtime-smoke  ## Smoke the runtime image with Podman
@@ -761,7 +869,7 @@ runtime-smoke-cuda:  ## Confirm the CUDA runtime imports and sees an NVIDIA GPU
 		--tmpfs "/tmp:rw,noexec,nosuid,nodev,size=4g" \
 		--env HOME=/tmp --env PYTHONDONTWRITEBYTECODE=1 \
 		--entrypoint python $(RUNTIME_IMAGE_CUDA) \
-		-c "import os; import accelerate, safetensors, torch, transformers; assert accelerate.__version__ == '1.14.0'; assert safetensors.__version__ == '0.8.0'; assert transformers.__version__ == '5.14.1'; assert torch.__version__ == '2.13.0+cu126'; assert torch.version.cuda == '12.6'; assert torch.cuda.is_available(); assert os.environ.get('TORCH_DISABLE_NATIVE_JIT') == '1'; left = torch.ones((1, 64, 1), device='cuda'); right = torch.ones((1, 1, 11), device='cuda'); assert tuple(torch.bmm(left, right).shape) == (1, 64, 11); print(torch.cuda.get_device_name(0))"
+		-c "import os; import accelerate, safetensors, torch, transformers; assert accelerate.__version__ == '1.14.0+invarlock.1'; assert safetensors.__version__ == '0.8.0'; assert transformers.__version__ == '5.14.1'; assert torch.__version__ == '2.13.0+cu126'; assert torch.version.cuda == '12.6'; assert torch.cuda.is_available(); assert os.environ.get('TORCH_DISABLE_NATIVE_JIT') == '1'; left = torch.ones((1, 64, 1), device='cuda'); right = torch.ones((1, 1, 11), device='cuda'); assert tuple(torch.bmm(left, right).shape) == (1, 64, 11); print(torch.cuda.get_device_name(0))"
 
 runtime-smoke-cuda-podman: CONTAINER_ENGINE=podman
 runtime-smoke-cuda-podman: runtime-smoke-cuda  ## Smoke the CUDA runtime image with Podman
@@ -774,7 +882,7 @@ runtime-smoke-cuda129:  ## Confirm the CUDA 12.9 runtime executes on an NVIDIA G
 		--tmpfs "/tmp:rw,noexec,nosuid,nodev,size=4g" \
 		--env HOME=/tmp --env PYTHONDONTWRITEBYTECODE=1 \
 		--entrypoint python $(RUNTIME_IMAGE_CUDA129) \
-		-c "import os; import accelerate, safetensors, torch, transformers; assert accelerate.__version__ == '1.14.0'; assert safetensors.__version__ == '0.8.0'; assert transformers.__version__ == '5.14.1'; assert torch.__version__ == '2.13.0+cu129'; assert torch.version.cuda == '12.9'; assert torch.cuda.is_available(); assert os.environ.get('TORCH_DISABLE_NATIVE_JIT') == '1'; left = torch.ones((1, 64, 1), device='cuda'); right = torch.ones((1, 1, 11), device='cuda'); assert tuple(torch.bmm(left, right).shape) == (1, 64, 11); print(torch.cuda.get_device_name(0))"
+		-c "import os; import accelerate, safetensors, torch, transformers; assert accelerate.__version__ == '1.14.0+invarlock.1'; assert safetensors.__version__ == '0.8.0'; assert transformers.__version__ == '5.14.1'; assert torch.__version__ == '2.13.0+cu129'; assert torch.version.cuda == '12.9'; assert torch.cuda.is_available(); assert os.environ.get('TORCH_DISABLE_NATIVE_JIT') == '1'; left = torch.ones((1, 64, 1), device='cuda'); right = torch.ones((1, 1, 11), device='cuda'); assert tuple(torch.bmm(left, right).shape) == (1, 64, 11); print(torch.cuda.get_device_name(0))"
 
 ##@ Housekeeping
 pre-commit:  ## Run configured pre-commit hooks
@@ -803,3 +911,10 @@ ensure-ruff: ensure-python
 
 ensure-mypy: ensure-python
 	@$(PYTHON) -c "import mypy" 2>/dev/null || { echo "mypy is required" >&2; exit 1; }
+
+.PHONY: package-readmes-check package-readmes-sync
+package-readmes-check:  ## Check versioned package descriptions
+	$(PYTHON) scripts/release/package_readme.py --check
+
+package-readmes-sync:  ## Refresh package descriptions after README or version changes
+	$(PYTHON) scripts/release/package_readme.py --write

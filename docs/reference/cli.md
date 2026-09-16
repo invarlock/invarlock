@@ -1,22 +1,30 @@
 # Command-line interface
 
-The public command line is intentionally limited to one ordered journey:
+The public command line supports one evaluation, verification and reporting
+journey for native execution, authenticated imports, and captured results:
 
-!!! info "Reference"
-
-    - **Surface:** `invarlock evaluate`, `invarlock verify`, and `invarlock report`
-    - **Stability:** Stable public CLI; command help is authoritative for installed options
-    - **Use this page when:** Automating a transaction, selecting flags or environment fallbacks, or interpreting outputs and exit status
+> **Reference**
+>
+> **Surface:** `invarlock evaluate`, `invarlock verify`, and `invarlock report`
+>
+> **Stability:** Stable public CLI; command help is authoritative for installed options
+>
+> **Use this page when:** Automating a transaction, selecting flags or environment fallbacks, or interpreting outputs and exit status
 
 ```text
+invarlock --help
 invarlock evaluate request.yaml
 invarlock verify evidence/
 invarlock report evidence/
 ```
 
 Use `invarlock --version` for the installed version and `invarlock --help` for
-the authoritative option list. The commands have the same transaction
+the authoritative option list. The core commands have the same transaction
 boundaries as the [Python facade](api-guide.md).
+
+The deterministic captured-results flow compares existing records without inference while
+retaining an explicit captured-evidence and verifier-receipt scope. See the
+[captured-results guide](../user-guide/captured-results.md).
 
 External evaluator qualification uses a separate companion executable so the
 three-command release transaction remains unchanged:
@@ -28,7 +36,7 @@ invarlock-qualify-evaluator qualify PROFILE SCHEDULE EXPORT RAW_OUTPUT \
 
 This command is evaluator-neutral: it never executes or dispatches to a named
 evaluator. It authenticates one already-normalized export and independently
-recomputes deterministic exact-match records. See [Evaluator
+recomputes the supported deterministic metric declared by its profile. See [Evaluator
 qualification](evaluator-qualification.md).
 
 ## Root command
@@ -36,7 +44,7 @@ qualification](evaluator-qualification.md).
 | Form | Result |
 | --- | --- |
 | `invarlock` | Show help; no transaction runs |
-| `invarlock --help` | Show the three-command surface and exit |
+| `invarlock --help` | Show the three transactions and exit |
 | `invarlock --version` | Print `InvarLock <installed-version>` and exit |
 | `invarlock COMMAND --help` | Show the exact arguments and options for one transaction |
 
@@ -50,6 +58,7 @@ command implementation imports a runtime backend.
 invarlock evaluate REQUEST \
   --signing-key PATH \
   [--allow-installed-scorers] \
+  [--runtime-profile FILE] \
   [--runtime-image IMAGE] \
   [--runtime-image-digest sha256:...] \
   [--baseline-runtime-image IMAGE] \
@@ -70,8 +79,9 @@ invarlock evaluate REQUEST \
   [--json]
 ```
 
-`evaluate` loads one closed YAML request and runs the complete execution-free
-preflight before any worker starts. It then prepares or validates the canonical
+For native exact-match/NLL and deterministic-extension run/import requests,
+`evaluate` loads one closed YAML request and runs
+the complete execution-free preflight before any worker starts. It then prepares or validates the canonical
 schedule, executes or imports paired runtime records, derives the selected
 metric and its paired interval, applies the policy to the conservative bound,
 applies any coupled count and width controls and exact-match side-accuracy
@@ -113,9 +123,10 @@ publishes the evidence directory. Import requests do not launch workers.
 
 | Input | Required | Environment alternative | Purpose |
 | --- | --- | --- | --- |
-| `REQUEST` | Yes | None | Existing readable YAML governed by `evaluation_request.schema.json`; its parent is the request root |
-| `--signing-key PATH` | Yes | `INVARLOCK_SIGNING_KEY` | Ed25519 evidence-signing private-key file |
-| `--allow-installed-scorers` | Only for a scorer-bound request | `INVARLOCK_ALLOW_INSTALLED_SCORERS` | Authorize loading and executing the exact installed scorer bound by the request and policy |
+| `REQUEST` | Except setup actions | None | Existing readable YAML governed by native v1, captured v2 or frozen-answer judge v3; its parent is the request root |
+| `--signing-key PATH` | For signed publication; native run/import requires it | `INVARLOCK_SIGNING_KEY` | Ed25519 evidence-signing private-key file; captured and frozen-answer judge requests permit explicit `--unsigned` |
+| `--allow-installed-scorers` | Only for a separately installed scorer | `INVARLOCK_ALLOW_INSTALLED_SCORERS` | Authorize loading and executing the exact installed scorer bound by the request and policy |
+| `--runtime-profile FILE` | No | None | Explicit closed JSON runtime settings for run requests; maximum 16 KiB |
 | `--runtime-image IMAGE` | Run mode from host | `INVARLOCK_RUNTIME_IMAGE` | Local OCI image reference; must contain a digest or be paired with the digest option |
 | `--runtime-image-digest DIGEST` | When not embedded in image; recommended explicitly | `INVARLOCK_RUNTIME_IMAGE_DIGEST` | Pinned lowercase OCI `sha256:...` identity |
 | `--baseline-runtime-image IMAGE` | No | `INVARLOCK_BASELINE_RUNTIME_IMAGE` | Baseline image override; otherwise the common image is used |
@@ -132,8 +143,123 @@ publishes the evidence directory. Import requests do not launch workers.
 | `--runtime-cpus DECIMAL` | No | `INVARLOCK_RUNTIME_CPUS` | Per-worker CPU ceiling; defaults to `4` and accepts up to three decimal places |
 | `--runtime-memory-mib INTEGER` | No | `INVARLOCK_RUNTIME_MEMORY_MIB` | Per-worker memory ceiling in MiB; defaults to `65536` |
 | `--runtime-user UID:GID` | No | `INVARLOCK_RUNTIME_USER` | Numeric non-root worker identity; defaults to `65532:65532` |
-| `--preflight` | No | None | Perform execution-free qualification and emit `invarlock/evaluation-preflight-v2` |
-| `--json` | No | None | Emit one compact `invarlock/evaluation-result-v1` object |
+| `--preflight` | No | None | Perform the selected workflow's execution-free validation; native requests emit `invarlock/evaluation-preflight-v2` |
+| `--json` | No | None | Emit the selected workflow's versioned status JSON, described below |
+
+Runtime image, device, entrypoint and resource controls apply only to run-mode
+requests. Import evidence already records its runtime identity, so `evaluate`
+rejects explicit run controls for an import request instead of silently ignoring
+them. The command also fails if the request's execution mode changes between
+mode detection and full loading.
+
+The five shipped deterministic scorer IDs are available without
+`--allow-installed-scorers`; see [scorer extensions](contracts.md#deterministic-scorer-extension).
+The flag enables discovery of separately installed scorer code, which must still
+match the request and policy bindings.
+
+### Native judge scoring
+
+A native request can select `comparison.metric: judge` with its own rubric,
+analysis policy and private collection workspace. `evaluate` captures or imports
+the native answers and calls the optional installed collector, then publishes
+judge evidence. Preflight makes no calls; interrupted judging retains its
+checkpoint and leaves the final output absent for continuation. Native runtime
+resources and artifact authentication still apply. `verify` replays the native
+capture and judgments offline using a judge recipient policy; `report` displays
+model, runtime, rubric, judge identity, outcomes and uncertainty. See the
+[judge reference](judge-measurements.md) for the policy and supported profile.
+
+### Captured evaluation controls
+
+Captured requests use `invarlock/evaluation-request-v2` with
+`execution.mode: captured`. Use `--signing-key` (or `INVARLOCK_SIGNING_KEY`) for
+handoff, or explicit `--unsigned` for local reporting. The latter rejects an
+explicit key. `--baseline-run`, `--subject-run`, and `--output` are caller-relative
+path overrides confined to the request root; they do not change source identity
+pins. `--max-bootstrap-draws` controls the caller-owned captured work allowance
+(default 102,400,000). Runtime, container, and scorer-extension flags are rejected
+for this mode. Native resource limits are unchanged.
+
+`--init DIRECTORY --example classification|extraction|judge|native-judge`, `--keygen DIRECTORY`,
+and `--freeze-cases FILE` are mutually exclusive setup actions on `evaluate`, without
+a request argument. `--case-set-output FILE` optionally writes the canonical case
+set. These actions emit `invarlock/evaluation-setup-v1` with `--json` and
+do not evaluate or establish assurance.
+
+```bash
+invarlock evaluate --freeze-cases cases.json --case-set-output frozen-cases.json --json
+```
+
+When `comparison.metric: judge` is selected, captured requests use the judge
+recipe, private workspace and optional retained measurements. Preflight and
+evaluation return judge result envelopes; `--max-bootstrap-draws` does not apply.
+Without retained measurements, judging uses the installed collector under the
+recipe's explicit budgets. Verification uses a judge recipient policy.
+
+Deterministic captured preflight emits `invarlock/evaluation-preflight-v3`; captured publication
+emits `invarlock/evaluation-result-v2`. The
+[captured-results guide](../user-guide/captured-results.md) gives the request,
+complete trust profile, and output fields. `--fail-on-policy` applies after either
+native or captured publication, retaining its success JSON: passing decisions
+exit `0`, adverse decisions exit `7`, and unknown/unavailable decisions exit `2`.
+It cannot be combined with preflight or setup actions.
+
+### Reusable runtime profiles
+
+Use `--runtime-profile runtime.json` to reuse local runtime settings without
+putting host resources into the signed request schema. Profiles are explicit:
+there is no automatic file discovery. Import requests reject this option.
+
+```json
+{
+  "format": "invarlock/runtime-profile-v1",
+  "runtime": {
+    "engine": "docker",
+    "image": "registry.example/runtime@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "device": "cpu",
+    "entrypoint": "auto",
+    "cpus": "4",
+    "memory_mib": 65536,
+    "user": "65532:65532"
+  },
+  "subject": {
+    "device": "cuda:0"
+  }
+}
+```
+
+`format` and the `runtime` object are required. `baseline` and `subject` are
+optional objects accepting only `image`, `image_digest`, `device`, and
+`entrypoint`. The common `runtime` object also accepts `engine`, `cpus`,
+`memory_mib`, and `user`. Every value is a nonempty string except `memory_mib`,
+which must be a positive JSON integer; `cpus` is a decimal string. Existing OCI
+validation still enforces pinned local images, supported devices and
+entrypoints, resource limits, and a non-root user. Profiles cannot authorize
+network access, signing keys, or installed scorers.
+
+For each side's field, profile mode uses this precedence:
+
+1. Explicit side-specific command-line option.
+2. Explicit common command-line option.
+3. Side-specific profile value.
+4. Common profile value.
+5. Side-specific environment variable.
+6. Common environment variable.
+7. The existing default.
+
+Engine and resource fields use the applicable common steps. Without a profile,
+existing option and environment resolution stays unchanged. Image and digest
+are resolved independently: if an overridden image embeds a digest that
+conflicts with the selected separate digest, the command fails and asks you to
+update the matching value. It never silently repairs the mismatch.
+
+Profiles must be regular, non-symlink files of at most **16 KiB**. This is a
+configuration-file limit. Unknown fields, duplicate JSON keys, non-finite
+numbers, and invalid value types are rejected. Run `evaluate REQUEST
+--runtime-profile runtime.json --preflight` to validate the complete effective
+launch before execution. Preflight text output shows the profile SHA-256,
+resolved side settings, resource limits and each setting's origin. Existing
+preflight JSON and signed request/evidence formats do not change.
 
 The signing key must be a real regular file. The request and every referenced
 input must remain beneath the request root. Keep the signing key in a separate,
@@ -175,8 +301,9 @@ The `auto` entrypoint profile selects `nvidia` for TensorRT-LLM and `python` for
 the other first-party providers. Explicit per-side profiles are available when
 an authenticated image requires one of those known launch forms.
 
-Text success output identifies the published directory. JSON success output
-contains `format_version`, `ok`, `comparison_id`, `evidence`, and the immutable
+For native pack-v1 evaluation, text success output identifies the published
+directory. JSON success output contains `format_version`, `ok`, `comparison_id`,
+`evidence`, and the immutable
 `pack_manifest_digest` calculated from the canonical manifest bytes before
 publication. JSON failures use the same format version with `ok: false` and an
 `errors` array.
@@ -214,7 +341,9 @@ invarlock verify EVIDENCE \
   [--json]
 ```
 
-The preferred form uses one closed `invarlock/trust-inputs-v1` object:
+Native exact-match/NLL and deterministic-extension evidence uses one closed
+`invarlock/trust-inputs-v1` object. Native judge evidence instead requires the
+[judge recipient policy](judge-measurements.md#replay-authentication-and-acceptance):
 
 ```json
 {
@@ -245,8 +374,20 @@ an error. The profile, its policy, and its verifier key must remain outside the
 submitted evidence directory. The canonical profile digest is included in the
 signed receipt.
 
-`request_digest` is optional for existing non-GGUF evidence and required when
-either request side selects `llama_cpp`. Record it from the execution-free
+Captured evidence instead requires a `kind: captured`
+`invarlock/trust-inputs-v2` profile with `baseline_run_digest`,
+`subject_run_digest`, `request_digest`, and `evidence_signer_fingerprint` anchors,
+plus policy and verifier fields. It has no runtime anchors or installed-scorer
+authorization. See the [complete captured profile](../user-guide/captured-results.md#signed-handoff).
+Without a profile, use `--expected-baseline-run` and `--expected-subject-run`
+(environment alternatives `INVARLOCK_EXPECTED_BASELINE_RUN` and
+`INVARLOCK_EXPECTED_SUBJECT_RUN`) along with policy, request, signer and verifier
+options. The request digest is mandatory for captured evidence. Native and
+captured anchor families cannot be mixed. A recipient may independently set
+`--max-bootstrap-draws`, also with a profile; it is local work control, not trust.
+
+For native evidence, `request_digest` is optional for existing non-GGUF evidence
+and required when either request side selects `llama_cpp`. Record it from the execution-free
 `evaluate --preflight --json` result after reviewing the normalized request.
 
 For systems that already keep each anchor separately, the equivalent explicit
@@ -269,8 +410,14 @@ invarlock verify EVIDENCE \
   [--json]
 ```
 
-`verify` treats the bundle as untrusted. It requires all acceptance anchors
-from the caller and writes a signed receipt outside the bundle.
+Native and captured directory-pack verification treats the bundle as untrusted,
+requires all acceptance anchors from the caller, and writes a signed receipt
+outside the bundle. Judge verification has an optional signed receipt, as
+described under [Frozen-answer judge evidence](#frozen-answer-judge-evidence).
+
+The following table describes native pack-v1 verification. With a trust profile,
+the profile supplies the trust fields; the explicit alternatives are not also
+required. Judge and evidence-set inputs use their separate policies.
 
 | Input | Required | Environment alternative | Meaning |
 | --- | --- | --- | --- |
@@ -287,7 +434,7 @@ from the caller and writes a signed receipt outside the bundle.
 | `--receipt PATH` | Yes | None | New receipt path outside the pack |
 | `--verifier-signing-key PATH` | Yes | `INVARLOCK_VERIFIER_SIGNING_KEY` | Independent verifier Ed25519 private key |
 | `--verifier-identity TEXT` | Yes | `INVARLOCK_VERIFIER_IDENTITY` | Stable verifier name placed in the receipt |
-| `--allow-installed-scorers` | Only for scorer-bound evidence | `INVARLOCK_ALLOW_INSTALLED_SCORERS` | Independently authorize loading and replaying the exact installed scorer pinned by the request and policy |
+| `--allow-installed-scorers` | Only for a separately installed scorer | `INVARLOCK_ALLOW_INSTALLED_SCORERS` | Independently authorize loading and replaying the exact installed scorer pinned by the request and policy |
 | `--json` | No | None | Emit one compact verification result |
 
 Use either `--trust-profile` or all explicit trust-anchor options, never both.
@@ -311,8 +458,8 @@ descriptor digest, configuration digest, task, and policy pins bound by the
 transaction. Evaluation and independent verification must authorize and load
 the same scorer identity separately.
 
-`--json` emits `invarlock/evidence-pack-verify-v1`, the signed-receipt path,
-verifier identity, and `pack_manifest_digest`. That digest is the same immutable
+For native evidence, `--json` emits `invarlock/evidence-pack-verify-v1`, the
+signed-receipt path, verifier identity, and `pack_manifest_digest`. That digest is the same immutable
 manifest identity signed into the receipt. Exit status `0` means the evidence
 passed both integrity and policy verification. Any nonzero status must be
 treated as rejection.
@@ -325,29 +472,90 @@ receipts](reports.md#verification-result) for the complete field matrix.
 ## `report`
 
 ```text
-invarlock report EVIDENCE [--html report.html] [--explain] [--json]
+invarlock report EVIDENCE [--html report.html] [--markdown report.md] [--junit results.xml] [--explain] [--case-id ID]... [--json]
 ```
 
-`report` verifies the bundle's closed inventory, checksums, reference digests,
-canonical JSON, and embedded evidence signature before rendering
-`reports/evaluation.report.json`.
+For native and captured directory packs, `report` checks the closed inventory,
+checksums, reference digests, canonical JSON and embedded signature when signed,
+then renders `reports/evaluation.report.json` without a full comparison replay.
+Judge and evidence-set reports replay their retained judge measurements under
+their own contracts. None of these paths performs recipient acceptance.
 
 | Input | Required | Meaning |
 | --- | --- | --- |
 | `EVIDENCE` | Yes | Existing readable evidence-pack directory |
 | `--html PATH` | No | Write a new self-contained HTML report outside the pack |
+| `--markdown PATH` | No | Write Markdown outside the pack |
+| `--junit PATH` | No | Write recorded policy checks as JUnit XML outside the pack |
 | `--explain` | No | Add a concise explanation of the decision and evidence bindings |
+| `--case-id ID` | No | Select one retained judge case for detailed inspection; repeat for up to 50 cases |
 | `--json` | No | Emit one compact machine-readable rendering result instead of the text view |
 
-`--html` refuses to overwrite an existing file. By default, `report` emits the
-text view to standard output and prints the written path when HTML is
+Every output option refuses to overwrite an existing file. By default, `report`
+emits the text view to standard output and prints the written path when HTML is
 requested. With `--json`, it instead emits one compact
 `invarlock/evidence-report-v1` object containing `ok`, the pack-manifest digest,
-and the optional HTML path.
+and `html` (a path or `null`) for native default/HTML-only calls. Captured calls,
+and native calls requesting Markdown or JUnit, emit
+`invarlock/evidence-report-v2` with `kind`, `ok`, `pack_manifest_digest`,
+`requested_outputs`, `written_outputs`, `failed_output`, and `errors`.
+Judge reports emit `invarlock/judge-evidence-report-v1` with `kind: judge`
+and `evidence_digest`; evidence-set reports emit
+`invarlock/evidence-set-report-v1` with `kind: evidence_set` and `index_sha256`.
+Both include output maps and their scoped report facts. These formats do not
+reuse the native manifest identity field.
+
+All destinations are checked up front; a later write failure leaves earlier
+completed outputs accurately listed. There is no automatic receipt discovery.
+Unsigned captured reports remain explicitly local, without independent assurance.
+
+Judge evidence and evidence sets show the first 50 case IDs by default. Repeat
+`--case-id` to render any specific retained cases in HTML or in the expanded
+text/Markdown view produced by `--explain`. Selection changes presentation only;
+the report still replays the complete retained measurement set. Other evidence
+formats reject this option.
+
+Captured text, HTML and Markdown reports include the baseline and subject run
+IDs, complete-run digests, attributed artifact digests and evaluator source
+identities in their technical details. The comparison context also shows the
+recorded model, workflow, dataset and prompt metadata when supplied. These
+details identify what was compared without changing the report's assurance.
+
+Hosted runs use `execution.mode: captured`, `artifact_digest: null` and explicit
+service identity. Their complete-run pins cover the service configuration,
+harness and observation window. They do not use native artifact or runtime
+anchors. Captured `evaluate` consumes supplied service records; it does not
+execute a hosted service. Offline verification does not refresh that observation.
+See [hosted requalification](../user-guide/hosted-service-requalification.md).
 
 Reporting does not accept independent artifact, schedule, policy, runtime, or
 signer anchors and does not issue a verification receipt. It is therefore a
 safe renderer, not a substitute for `invarlock verify`.
+
+## Text and JSON output
+
+Core text output separates operation completion, recorded policy result and
+independent verification. `evaluate` prints `Evidence created` and the recorded
+policy result. A published policy failure exits `0` unless `--fail-on-policy` requests a
+nonzero policy gate; publication does not establish recipient acceptance. Preflight shows the mode, paired record count,
+destination and number of validated checks, without execution or publication.
+
+`verify` distinguishes an authentic policy rejection from evidence integrity or
+input failures. On policy rejection, it shows failed checks with observed and
+required values and the signed receipt location. Diagnostic text is rendered
+literally, including brackets in signer fingerprints and paths.
+
+`report` renders Markdown as terminal content and can write self-contained HTML.
+Its `--json` mode emits a rendering result object on success or an application
+error object with `ok: false` and `errors` on failure. Native evaluate and verify
+JSON contracts are unchanged; captured evaluation and verification use v2 result
+formats. CLI syntax, option and path-validation failures
+that occur before the command handler still use usage diagnostics on stderr and
+exit `2`; `--json` does not convert those parser errors into result objects.
+
+Runtime resources and explicit trust anchors are grouped separately in command
+help. Grouping changes presentation only; flag defaults and environment-variable
+resolution remain unchanged.
 
 ## Exit and write behavior
 
@@ -361,6 +569,9 @@ bytes. Output files and directories are no-clobber by design.
 | `0` | Requested transaction completed successfully |
 | `1` | Operational write failure where the command reports one explicitly, such as an HTML output error |
 | `2` | Invalid invocation, missing trust input, request/evaluation failure, or high-level verification/report rejection |
+| `4` | Captured structural/contract rejection, or judge/evidence-set authentication or replay failure |
+| `6` | Captured authenticated binding or source-integrity rejection |
+| `7` | Completed captured policy rejection, verified but unaccepted judge/evidence-set result, or evaluation policy gate after publication |
 | Other nonzero | A lower-level evidence-pack status surfaced by a transaction; reject and inspect machine output |
 
 Do not build automation that accepts a particular nonzero value. The
@@ -418,4 +629,23 @@ runtime inventory.
   applications.
 - [Evaluation lifecycle](lifecycle.md) explains write boundaries and retry
   behavior.
-- [Reports and receipts](reports.md) defines the machine and human outputs.
+- [Reports and receipts](reports.md) defines JSON results and formatted reports.
+
+## Frozen-answer judge evidence
+
+The versioned judge request uses the same `evaluate`, `verify` and `report`
+commands. See [judge measurements](judge-measurements.md) for import preflight,
+bounded reports and independent recipient policy verification. Judge
+verification returns an unsigned local result. `--receipt` requires both
+`--verifier-signing-key` and `--verifier-identity` and writes a separately signed
+judge receipt outside the evidence. Its JSON `ok` field is true only when
+`accepted` is true.
+
+
+## Deterministic and judge evidence sets
+
+Use the existing `evaluate` requests for each component, then index the two
+packs and run `verify` with an independent composition recipient policy.
+`report` shows their metrics together. Both components must bind the same
+original runs and case set; their statistical methods retain separate meanings.
+See [evidence sets](evidence-sets.md) for commands, policies and exit codes.

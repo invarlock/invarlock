@@ -4,29 +4,28 @@ Evaluator-specific execution and native-output parsing stay outside the core.
 This module authenticates a closed normalized export, its independent schedule,
 the retained upstream output, and the exact runner/dependency identities chosen
 by the profile owner. Deterministic per-record exports can become runtime-import
-facts; aggregate, human, or model-judge outputs remain observation-only.
+facts; aggregate or externally rated outputs remain observation-only.
 """
 
 from __future__ import annotations
 
-import errno
 import hashlib
-import os
-import tempfile
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, cast
 
 from jsonschema import Draft202012Validator
 
 from invarlock.core.runtime_provider import RuntimeScoringRecord
+from invarlock.core.scorer_extension import ScorerExtensionBinding
 from invarlock.evidence_pack_contract import canonical_json_bytes
 from invarlock.evidence_pack_json import (
     StrictJsonError,
     parse_json_bytes,
     read_regular_file_bytes,
 )
+from invarlock.filesystem.atomic_file import write_file_no_replace
 from invarlock.public_contracts import (
     EVALUATOR_QUALIFICATION_EXPORT_FORMAT_VERSION,
     EVALUATOR_QUALIFICATION_PROFILE_FORMAT_VERSION,
@@ -178,7 +177,24 @@ class EvaluatorQualificationResult:
     runner_sha256: str
     dependency_lock_sha256: str
     _records: tuple[RuntimeScoringRecord, ...]
+    _metric: dict[str, object] = field(default_factory=lambda: {"kind": "exact_match"})
     format: str = EVALUATOR_QUALIFICATION_FORMAT
+
+    def scorer_binding(self) -> ScorerExtensionBinding | None:
+        """Return the shipped scoring binding for non-exact runtime import."""
+        if (
+            self.authority != "verdict_authority"
+            or self._metric["kind"] == "exact_match"
+        ):
+            return None
+        from invarlock.core.builtin_scorers import BuiltinScorer
+        from invarlock.core.scorer_extension import build_scorer_binding
+
+        scorer = BuiltinScorer(str(self._metric["kind"]))
+        return build_scorer_binding(
+            scorer.descriptor(),
+            cast(dict[str, object], self._metric.get("configuration", {})),
+        )
 
     def runtime_records(self) -> tuple[RuntimeScoringRecord, ...]:
         """Return qualified import facts; observation-only results return none."""
@@ -217,39 +233,17 @@ class EvaluatorQualificationResult:
 
     def write(self, destination: str | Path) -> Path:
         """Atomically publish a new result without replacing an existing file."""
-
         path = Path(destination)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        temporary: Path | None = None
         try:
-            descriptor, temporary_name = tempfile.mkstemp(
-                dir=path.parent,
-                prefix=f".{path.name}.",
-                suffix=".tmp",
-            )
-            temporary = Path(temporary_name)
-            with os.fdopen(descriptor, "wb") as handle:
-                handle.write(self.as_json().encode("utf-8"))
-                handle.flush()
-                os.fsync(handle.fileno())
-            os.chmod(temporary, 0o600)
-            os.link(temporary, path, follow_symlinks=False)
-            temporary.unlink()
-            temporary = None
+            write_file_no_replace(path, self.as_json().encode("utf-8"))
+        except FileExistsError as exc:
+            raise EvaluatorQualificationError(
+                f"qualification result already exists: {path}"
+            ) from exc
         except OSError as exc:
-            if exc.errno == errno.EEXIST:
-                raise EvaluatorQualificationError(
-                    f"qualification result already exists: {path}"
-                ) from exc
             raise EvaluatorQualificationError(
                 f"could not write qualification result: {exc}"
             ) from exc
-        finally:
-            if temporary is not None:
-                try:
-                    temporary.unlink()
-                except FileNotFoundError:
-                    pass
         return path
 
 
@@ -351,6 +345,19 @@ def _deterministic_result(
     runner_sha256: str,
     dependency_lock_sha256: str,
 ) -> EvaluatorQualificationResult:
+    from invarlock.core.scoring import MetricError, score, validate_configuration
+
+    metric = _object(
+        _object(profile["authority"], field="authority")["metric"], field="metric"
+    )
+    kind = _string(metric["kind"], field="metric.kind")
+    configuration = _object(
+        metric.get("configuration", {}), field="metric.configuration"
+    )
+    try:
+        validate_configuration(kind, configuration)
+    except MetricError as exc:
+        raise EvaluatorQualificationError(str(exc)) from exc
     if export.get("summary") is not None:
         raise EvaluatorQualificationError(
             "deterministic export must not substitute an aggregate summary"
@@ -390,6 +397,31 @@ def _deterministic_result(
         expected_score = (
             1.0 if output_sha256 == expected_record["reference_output_sha256"] else 0.0
         )
+        if "reference_output" in expected_record:
+            reference = _string(
+                expected_record["reference_output"], field="reference_output"
+            )
+            if (
+                _sha256(reference.encode())
+                != expected_record["reference_output_sha256"]
+            ):
+                raise EvaluatorQualificationError(
+                    "reference text differs from its independent digest"
+                )
+        if kind != "exact_match":
+            if "reference_output" not in expected_record:
+                raise EvaluatorQualificationError(
+                    "non-exact replay requires independently supplied reference_output text"
+                )
+            try:
+                expected_score = score(
+                    kind,
+                    expected_record["reference_output"],
+                    output_text,
+                    configuration,
+                )
+            except MetricError as exc:
+                raise EvaluatorQualificationError(str(exc)) from exc
         reported_score = _number(
             observed_record["reported_score"],
             field=f"record {record_id!r} reported_score",
@@ -397,7 +429,7 @@ def _deterministic_result(
         if reported_score != expected_score:
             raise EvaluatorQualificationError(
                 f"export record {record_id!r} reported score does not match "
-                "independent exact-match replay"
+                f"independent {kind} replay"
             )
         input_sha256 = _string(
             observed_record["input_sha256"],
@@ -430,6 +462,7 @@ def _deterministic_result(
         runner_sha256=runner_sha256,
         dependency_lock_sha256=dependency_lock_sha256,
         _records=runtime_record_tuple,
+        _metric=metric,
     )
     error = _schema_error(
         result.as_dict(),

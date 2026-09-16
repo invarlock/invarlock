@@ -32,6 +32,7 @@ from tests.runtime_providers._hf_transformers_helpers import (
     _batch,
     _BindingTokenizer,
     _observation,
+    _save_safetensors,
     _spec,
 )
 
@@ -147,6 +148,7 @@ def test_hf_strict_loader_rejects_incomplete_loading_info(
     field: str,
     value: object,
 ) -> None:
+    _save_safetensors(tmp_path / "model.safetensors", "weight")
     model = SimpleNamespace(base_model_prefix="transformer")
     loading_info: dict[str, object] = {
         "missing_keys": set(),
@@ -166,6 +168,7 @@ def test_hf_strict_loader_rejects_incomplete_loading_info(
 def test_hf_strict_loader_requires_and_returns_complete_loading_info(
     tmp_path: Path,
 ) -> None:
+    _save_safetensors(tmp_path / "model.safetensors", "weight")
     model = SimpleNamespace(base_model_prefix="transformer")
     observed: list[tuple[tuple[object, ...], dict[str, object]]] = []
 

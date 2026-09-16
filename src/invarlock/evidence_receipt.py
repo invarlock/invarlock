@@ -5,11 +5,11 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
-import os
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, overload
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import serialization
@@ -25,9 +25,11 @@ from invarlock.evidence_pack_json import (
     read_regular_file_bytes,
 )
 from invarlock.evidence_pack_support import EvidencePackResult
+from invarlock.filesystem.atomic_file import write_file_no_replace
 
 SIGNED_RECEIPT_FORMAT_V1 = "invarlock/evidence-verification-receipt-v1"
 SIGNED_RECEIPT_FORMAT_V2 = "invarlock/evidence-verification-receipt-v2"
+SIGNED_RECEIPT_FORMAT_V3 = "invarlock/evidence-verification-receipt-v3"
 # Compatibility alias for callers that imported the original public constant.
 SIGNED_RECEIPT_FORMAT = SIGNED_RECEIPT_FORMAT_V1
 SIGNED_RECEIPT_SIGNATURE_FORMAT = "invarlock/evidence-verification-receipt-signature-v1"
@@ -138,22 +140,13 @@ def _outside_pack(pack_dir: Path, candidate: Path) -> bool:
 
 
 def _write_no_clobber(path: Path, payload: bytes) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    created = False
     try:
-        with path.open("xb") as handle:
-            created = True
-            handle.write(payload)
-            handle.flush()
-            os.fsync(handle.fileno())
-        path.chmod(0o444)
+        write_file_no_replace(path, payload, mode=0o444)
     except FileExistsError as exc:
         raise EvidenceReceiptError(
             f"receipt destination already exists: {path.name}"
         ) from exc
     except OSError as exc:
-        if created:
-            path.unlink(missing_ok=True)
         raise EvidenceReceiptError("could not write signed receipt") from exc
 
 
@@ -545,6 +538,14 @@ def _pack_request_context(pack_dir: Path) -> tuple[str | None, bool]:
     return request_digest, "llama_cpp" in providers
 
 
+class _Omitted:
+    """Distinguish omitted native anchors from explicitly invalid null values."""
+
+
+_OMITTED = _Omitted()
+
+
+@overload
 def verify_signed_verification_receipt(
     receipt_path: Path,
     pack_dir: Path,
@@ -556,15 +557,113 @@ def verify_signed_verification_receipt(
     expected_pack_signer_fingerprint: str,
     expected_verifier_identity: str,
     expected_verifier_fingerprint: str,
+    expected_request_digest: str | None = None,
+    expected_trust_profile_digest: str | None = None,
+) -> ReceiptVerification: ...
+
+
+@overload
+def verify_signed_verification_receipt(
+    receipt_path: Path,
+    pack_dir: Path,
+    *,
+    policy_path: Path,
+    expected_run_digests: Mapping[str, str],
+    expected_request_digest: str,
+    expected_pack_signer_fingerprint: str,
+    expected_verifier_identity: str,
+    expected_verifier_fingerprint: str,
+    expected_trust_profile_digest: str | None = None,
+) -> ReceiptVerification: ...
+
+
+def verify_signed_verification_receipt(
+    receipt_path: Path,
+    pack_dir: Path,
+    *,
+    policy_path: Path,
+    expected_artifact_digests: dict[str, str] | _Omitted = _OMITTED,
+    expected_schedule_digest: str | _Omitted = _OMITTED,
+    expected_runtime_digests: dict[str, str] | _Omitted = _OMITTED,
+    expected_pack_signer_fingerprint: str,
+    expected_verifier_identity: str,
+    expected_verifier_fingerprint: str,
     expected_trust_profile_digest: str | None = None,
     expected_request_digest: str | None = None,
     require_signed: bool = True,
+    expected_run_digests: Mapping[str, str] | None = None,
 ) -> ReceiptVerification:
     """Verify a receipt only against independently supplied trust anchors."""
 
     errors: list[str] = []
     receipt_path = Path(receipt_path)
     pack_dir = Path(pack_dir)
+    # Captured v3 deliberately authenticates expected anchors without asking
+    # the rejected pack to satisfy them. Keep this branch ahead of the native
+    # request-context checks, whose semantics are preserved for v1/v2.
+    try:
+        raw_receipt = read_regular_file_bytes(
+            receipt_path, label="verification receipt", max_bytes=_MAX_RECEIPT_BYTES
+        )
+        decoded_receipt = parse_json_bytes(raw_receipt, label="verification receipt")
+    except (EvidenceReceiptError, StrictJsonError):
+        decoded_receipt = None
+    if (
+        isinstance(decoded_receipt, dict)
+        and isinstance(decoded_receipt.get("statement"), dict)
+        and decoded_receipt["statement"].get("format") == SIGNED_RECEIPT_FORMAT_V3
+    ):
+        from invarlock.captured_verification import verify_captured_receipt
+
+        if any(
+            not isinstance(value, _Omitted)
+            for value in (
+                expected_artifact_digests,
+                expected_schedule_digest,
+                expected_runtime_digests,
+            )
+        ):
+            return ReceiptVerification(
+                False,
+                True,
+                None,
+                None,
+                ("native anchors are not valid for captured receipts",),
+            )
+        runs = dict(expected_run_digests) if expected_run_digests is not None else {}
+        if set(runs) != {"baseline", "subject"} or expected_request_digest is None:
+            return ReceiptVerification(
+                False,
+                True,
+                None,
+                None,
+                ("captured receipt run/request anchors are required",),
+            )
+        return verify_captured_receipt(
+            receipt_path,
+            pack_dir,
+            policy_path=policy_path,
+            expected_baseline_run=runs["baseline"],
+            expected_subject_run=runs["subject"],
+            expected_request_digest=expected_request_digest,
+            expected_signer=expected_pack_signer_fingerprint,
+            expected_verifier_identity=expected_verifier_identity,
+            expected_verifier_fingerprint=expected_verifier_fingerprint,
+            expected_profile_digest=expected_trust_profile_digest,
+        )
+    if (
+        isinstance(expected_artifact_digests, _Omitted)
+        or isinstance(expected_schedule_digest, _Omitted)
+        or isinstance(expected_runtime_digests, _Omitted)
+    ):
+        raise TypeError(
+            "native receipt verification requires artifact, schedule and runtime anchors"
+        )
+    errors.extend(
+        ["run anchors require a captured receipt"]
+        if expected_run_digests is not None
+        else []
+    )
     if not _outside_pack(pack_dir, receipt_path):
         errors.append("verification receipt is inside the evidence pack")
     try:
@@ -692,6 +791,7 @@ __all__ = [
     "SIGNED_RECEIPT_FORMAT",
     "SIGNED_RECEIPT_FORMAT_V1",
     "SIGNED_RECEIPT_FORMAT_V2",
+    "SIGNED_RECEIPT_FORMAT_V3",
     "verify_signed_verification_receipt",
     "write_signed_verification_receipt",
 ]

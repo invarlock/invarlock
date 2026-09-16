@@ -1,0 +1,200 @@
+{
+  "format": "invarlock/strict-batch-profile-definitions-v1",
+  "profiles": [
+    {
+      "profile_id": "promptfoo-strict-batch-v1",
+      "historical_profile": "promptfoo",
+      "upstream": {
+        "ecosystem": "npm",
+        "name": "promptfoo",
+        "version": "0.121.19"
+      },
+      "project_url": "https://www.promptfoo.dev/",
+      "lock": "locks/promptfoo.txt",
+      "runner": "maintained/batch_runner.py",
+      "runner_assets": [
+        "maintained/batch_native.py",
+        "maintained/batch_semantics.py",
+        "maintained/batch-profiles.json",
+        "maintained/profile_binding.py"
+      ],
+      "authority": {
+        "metric": {
+          "kind": "exact_match"
+        },
+        "mode": "deterministic_per_record",
+        "reason": null
+      },
+      "scorer_configuration": {
+        "provider": "echo",
+        "assertion": "equals",
+        "reference_type": "string",
+        "max_concurrency": 1
+      },
+      "supported_domain": {
+        "name": "single-string-ordered-literal-batch-v1",
+        "records": "Unique nonempty string IDs in the independent schedule order; repeated prompts retain distinct case outputs.",
+        "strings": "One string input, output and reference per record; exact case-sensitive literal equality including leading whitespace, internal whitespace, punctuation, Unicode and empty strings, subject to the renderer restrictions below.",
+        "unsupported": "Missing, duplicate, extra or reordered native rows; aggregate-only results; multiple targets, wrong metric configuration, native/source/score contradictions. Output-final LF is rejected because the pinned echo variable renderer removes one final newline. Output/reference values containing Nunjucks opening delimiters {{, {%, {# or file:// or package: are rejected before execution."
+      },
+      "qualification_status": "separate current execution profile; retained historical evidence is not promoted"
+    },
+    {
+      "profile_id": "evidently-strict-batch-v1",
+      "historical_profile": "evidently",
+      "upstream": {
+        "ecosystem": "pypi",
+        "name": "evidently",
+        "version": "0.7.21"
+      },
+      "project_url": "https://github.com/evidentlyai/evidently",
+      "lock": "locks/evidently.txt",
+      "runner": "maintained/batch_runner.py",
+      "runner_assets": [
+        "maintained/batch_native.py",
+        "maintained/batch_semantics.py",
+        "maintained/batch-profiles.json",
+        "maintained/profile_binding.py"
+      ],
+      "authority": {
+        "metric": {
+          "kind": "exact_match"
+        },
+        "mode": "deterministic_per_record",
+        "reason": null
+      },
+      "scorer_configuration": {
+        "descriptor": "ExactMatch",
+        "columns": [
+          "output",
+          "reference"
+        ],
+        "alias": "exact_match"
+      },
+      "supported_domain": {
+        "name": "single-string-ordered-literal-batch-v1",
+        "records": "Unique nonempty string IDs in the independent schedule order; repeated prompts retain distinct case outputs.",
+        "strings": "One string input, output and reference per record; exact case-sensitive literal equality including whitespace, punctuation, Unicode and empty strings.",
+        "unsupported": "Missing, duplicate, extra or reordered native rows; aggregate-only results; multiple targets, wrong metric configuration, native/source/score contradictions."
+      },
+      "qualification_status": "separate current execution profile; retained historical evidence is not promoted"
+    },
+    {
+      "profile_id": "langfuse-strict-batch-v1",
+      "historical_profile": "langfuse",
+      "upstream": {
+        "ecosystem": "pypi",
+        "name": "langfuse",
+        "version": "4.14.1"
+      },
+      "project_url": "https://github.com/langfuse/langfuse",
+      "lock": "locks/langfuse.txt",
+      "runner": "maintained/batch_runner.py",
+      "runner_assets": [
+        "maintained/batch_native.py",
+        "maintained/batch_semantics.py",
+        "maintained/batch-profiles.json",
+        "maintained/profile_binding.py"
+      ],
+      "authority": {
+        "metric": {
+          "kind": "exact_match"
+        },
+        "mode": "deterministic_per_record",
+        "reason": null
+      },
+      "scorer_configuration": {
+        "evaluator": "local literal string equality",
+        "name": "exact_match",
+        "data_type": "BOOLEAN",
+        "max_concurrency": 1
+      },
+      "supported_domain": {
+        "name": "single-string-ordered-literal-batch-v1",
+        "records": "Unique nonempty string IDs in the independent schedule order; repeated prompts retain distinct case outputs.",
+        "strings": "One string input, output and reference per record; exact case-sensitive literal equality including whitespace, punctuation, Unicode and empty strings.",
+        "unsupported": "Missing, duplicate, extra or reordered native rows; aggregate-only results; multiple targets, wrong metric configuration, native/source/score contradictions."
+      },
+      "qualification_status": "separate current execution profile; retained historical evidence is not promoted"
+    },
+    {
+      "profile_id": "azure-ai-evaluation-strict-batch-v1",
+      "historical_profile": "azure-ai-evaluation",
+      "upstream": {
+        "ecosystem": "pypi",
+        "name": "azure-ai-evaluation",
+        "version": "1.18.1"
+      },
+      "project_url": "https://github.com/Azure/azure-sdk-for-python/tree/main/sdk/evaluation/azure-ai-evaluation",
+      "lock": "locks/azure-ai-evaluation.txt",
+      "runner": "maintained/batch_runner.py",
+      "runner_assets": [
+        "maintained/batch_native.py",
+        "maintained/batch_semantics.py",
+        "maintained/batch-profiles.json",
+        "maintained/profile_binding.py"
+      ],
+      "authority": {
+        "metric": {
+          "kind": "exact_match"
+        },
+        "mode": "deterministic_per_record",
+        "reason": null
+      },
+      "scorer_configuration": {
+        "evaluator": "local literal string equality",
+        "name": "exact_match",
+        "column_mapping": {
+          "ground_truth": "${data.ground_truth}",
+          "response": "${data.response}"
+        },
+        "fail_on_evaluator_errors": true
+      },
+      "supported_domain": {
+        "name": "single-string-ordered-literal-batch-v1",
+        "records": "Unique nonempty string IDs in the independent schedule order; repeated prompts retain distinct case outputs.",
+        "strings": "One string input, output and reference per record; exact case-sensitive literal equality including whitespace, punctuation, Unicode and empty strings.",
+        "unsupported": "Missing, duplicate, extra or reordered native rows; aggregate-only results; multiple targets, wrong metric configuration, native/source/score contradictions."
+      },
+      "qualification_status": "separate current execution profile; retained historical evidence is not promoted"
+    },
+    {
+      "profile_id": "pydantic-evals-strict-batch-v1",
+      "historical_profile": "pydantic-evals",
+      "upstream": {
+        "ecosystem": "pypi",
+        "name": "pydantic-evals",
+        "version": "2.18.0"
+      },
+      "project_url": "https://ai.pydantic.dev/evals/",
+      "lock": "locks/pydantic-evals.txt",
+      "runner": "maintained/batch_runner.py",
+      "runner_assets": [
+        "maintained/batch_native.py",
+        "maintained/batch_semantics.py",
+        "maintained/batch-profiles.json",
+        "maintained/profile_binding.py"
+      ],
+      "authority": {
+        "metric": {
+          "kind": "exact_match"
+        },
+        "mode": "deterministic_per_record",
+        "reason": null
+      },
+      "scorer_configuration": {
+        "evaluator": "EqualsExpected",
+        "evaluation_name": "exact_match",
+        "max_concurrency": 1,
+        "inputs": "per-case record_id, input and captured output"
+      },
+      "supported_domain": {
+        "name": "single-string-ordered-literal-batch-v1",
+        "records": "Unique nonempty string IDs in the independent schedule order; repeated prompts retain distinct case outputs.",
+        "strings": "One string input, output and reference per record; exact case-sensitive literal equality including whitespace, punctuation, Unicode and empty strings.",
+        "unsupported": "Missing, duplicate, extra or reordered native rows; aggregate-only results; multiple targets, wrong metric configuration, native/source/score contradictions."
+      },
+      "qualification_status": "separate current execution profile; retained historical evidence is not promoted"
+    }
+  ]
+}

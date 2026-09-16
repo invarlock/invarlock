@@ -18,6 +18,77 @@ def _error(message: str):
     return pytest.raises(oci.OciEvaluationError, match=message)
 
 
+def test_bounded_command_removes_partial_output_after_close_failure(
+    tmp_path, monkeypatch
+):
+    destination = tmp_path / "partial"
+    original_open = Path.open
+
+    class Output:
+        def __init__(self, handle):
+            self.handle = handle
+
+        def close(self):
+            self.handle.close()
+            raise OSError("output close failed")
+
+    def open_output(path, *args, **kwargs):
+        return Output(original_open(path, *args, **kwargs))
+
+    def fail_launch(*args, **kwargs):
+        raise OSError("launch failed")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(Path, "open", open_output)
+        patch.setattr(subprocess, "Popen", fail_launch)
+        with pytest.raises(OSError, match="output close failed"):
+            oci._run_bounded_command(
+                ["unused"], stdout_path=destination, timeout_seconds=1, stdout_limit=10
+            )
+    assert not destination.exists()
+
+
+@pytest.mark.parametrize("failed_start", [1, 2])
+def test_worker_drain_start_failure_reaps_process_and_closes_pipes(
+    monkeypatch, failed_start
+):
+    original_popen, original_start = subprocess.Popen, threading.Thread.start
+    processes = []
+    starts = 0
+
+    def launch(*args, **kwargs):
+        process = original_popen(*args, **kwargs)
+        processes.append(process)
+        return process
+
+    def start(thread):
+        nonlocal starts
+        starts += 1
+        if starts == failed_start:
+            raise RuntimeError("cannot start drain")
+        original_start(thread)
+
+    monkeypatch.setattr(subprocess, "Popen", launch)
+    monkeypatch.setattr(threading.Thread, "start", start)
+    try:
+        with pytest.raises(RuntimeError, match="cannot start drain"):
+            oci.run_side_worker(
+                [sys.executable, "-c", "import time; time.sleep(30)"],
+                timeout_seconds=10,
+            )
+        assert len(processes) == 1
+        assert processes[0].poll() is not None
+        assert processes[0].stdout.closed
+        assert processes[0].stderr.closed
+    finally:
+        for process in processes:
+            if process.poll() is None:
+                process.kill()
+            process.wait(timeout=5)
+            process.stdout.close()
+            process.stderr.close()
+
+
 def test_execution_discriminator_and_worker_limit_edge_types(tmp_path: Path) -> None:
     request = tmp_path / "request.yaml"
     request.write_text(

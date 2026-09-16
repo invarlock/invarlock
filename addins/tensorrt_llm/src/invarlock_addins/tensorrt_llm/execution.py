@@ -144,11 +144,12 @@ class _PinnedFile:
                         raise TensorRTLLMExecutionError(
                             "pinned file path has a group- or other-writable parent"
                         )
-                except Exception:
+                except BaseException:
                     os.close(next_descriptor)
                     raise
-                os.close(parent_descriptor)
+                previous_descriptor = parent_descriptor
                 parent_descriptor = next_descriptor
+                os.close(previous_descriptor)
                 parent_stat = next_stat
             try:
                 named = os.stat(
@@ -198,10 +199,10 @@ class _PinnedFile:
                     initial_stat=opened,
                     sha256=observed_sha256,
                 )
-            except Exception:
+            except BaseException:
                 os.close(descriptor)
                 raise
-        except Exception:
+        except BaseException:
             os.close(parent_descriptor)
             raise
 
@@ -230,8 +231,10 @@ class _PinnedFile:
         if self._closed:
             return
         self._closed = True
-        os.close(self.descriptor)
-        os.close(self.parent_descriptor)
+        try:
+            os.close(self.descriptor)
+        finally:
+            os.close(self.parent_descriptor)
 
 
 def _pin_trusted_executable(
@@ -420,7 +423,7 @@ class _ImmutableExecutionBoundary:
             )
             boundary.recheck(runner, vendor_python)
             return boundary
-        except Exception:
+        except BaseException:
             os.close(root_descriptor)
             raise
 

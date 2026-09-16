@@ -1,0 +1,56 @@
+{
+  "error": "Expected output \" stairs stairs stairs stairs stairs stairs stairs stairs\" to equal \"positive\"",
+  "gradingResult": {
+    "pass": false,
+    "score": 0,
+    "reason": "Expected output \" stairs stairs stairs stairs stairs stairs stairs stairs\" to equal \"positive\"",
+    "namedScores": {},
+    "tokensUsed": {
+      "total": 0,
+      "prompt": 0,
+      "completion": 0,
+      "cached": 0,
+      "numRequests": 0
+    },
+    "componentResults": [
+      {
+        "pass": false,
+        "score": 0,
+        "reason": "Expected output \" stairs stairs stairs stairs stairs stairs stairs stairs\" to equal \"positive\"",
+        "assertion": {
+          "type": "equals",
+          "value": "positive"
+        }
+      }
+    ]
+  },
+  "latencyMs": 85,
+  "prompt": {
+    "raw": "Question: Classify sentiment as positive or negative: I loved the meal.\nAnswer:",
+    "label": "Question: {{input}}\nAnswer:",
+    "config": {}
+  },
+  "promptIdx": 0,
+  "score": 0,
+  "success": false,
+  "testCase": {
+    "assert": [
+      {
+        "type": "equals",
+        "value": "positive"
+      }
+    ],
+    "metadata": {
+      "invarlock_expected": "positive"
+    },
+    "vars": {
+      "input": "Classify sentiment as positive or negative: I loved the meal."
+    },
+    "options": {}
+  },
+  "testIdx": 0,
+  "failureReason": 1,
+  "response": {
+    "output": " stairs stairs stairs stairs stairs stairs stairs stairs"
+  }
+}

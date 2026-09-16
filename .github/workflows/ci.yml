@@ -35,12 +35,28 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
+          cache-dependency-path: requirements/workflows/core-py312.txt
       - name: Install core dependencies
         run: python -m pip install --require-hashes -r requirements/workflows/core-py312.txt
       - name: Install pinned policy engines
         run: |
-          go install github.com/open-policy-agent/opa@v1.17.0
-          go install cuelang.org/go/cmd/cue@v0.16.1
+          install_pinned_engine() {
+            local module="$1" attempt status
+            for attempt in 1 2 3; do
+              if go install "$module"; then
+                return 0
+              else
+                status=$?
+              fi
+              if [ "$attempt" -eq 3 ]; then
+                return "$status"
+              fi
+              echo "Policy engine download/build failed; retrying pinned installation ($attempt/3)." >&2
+              sleep 5
+            done
+          }
+          install_pinned_engine github.com/open-policy-agent/opa@v1.17.0
+          install_pinned_engine cuelang.org/go/cmd/cue@v0.16.1
       - name: Run policy-engine interoperability matrix
         run: |
           gopath="$(go env GOPATH)"
@@ -62,21 +78,48 @@ jobs:
         with:
           python-version: '3.13'
           cache: pip
+          cache-dependency-path: |
+            requirements/workflows/ci-hf-py313.txt
+            requirements/workflows/inspect-judge-tests-py313.txt
+            requirements/workflows/pip-bootstrap.txt
+            requirements/workflows/release-install-py313.txt
       - name: Set up uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4
         with:
           version: "0.10.10"
       - name: Install dependencies
         run: |
-          python -m pip install --require-hashes -r requirements/workflows/ci-hf-py313.txt
+          python scripts/security/build_hardened_accelerate_wheel.py bootstrap
+          python -m pip install --require-hashes --find-links runtime/wheels -r requirements/workflows/ci-hf-py313.txt
           python -m build --wheel --no-isolation
           python -m pip install --no-deps --force-reinstall dist/*.whl
+      - name: Check installed hardened Accelerate APIs
+        run: python -I tests/scripts/hardened_accelerate_checks.py
       - name: Install actionlint
         run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
-      - name: Run fast repository gates
-        run: make verify-fast
+      - name: Exercise installed captured evaluation workflows
+        run: python examples/captured-results/wheel_smoke.py
+      - name: Verify real ModelKit package handoff
+        shell: bash
+        run: |
+          set -euo pipefail
+          kit_root="$(mktemp -d)"
+          trap 'rm -rf "$kit_root"' EXIT
+          curl --fail --location --retry 2 --max-time 120 \
+            https://github.com/kitops-ml/kitops/releases/download/v1.15.0/kitops-linux-x86_64.tar.gz \
+            --output "$kit_root/kit.tar.gz"
+          echo "c95ab7cfe1a57fcb37101454ff1d5b2783781a72cbbb4016018a701c892bf26f  $kit_root/kit.tar.gz" | sha256sum --check --status
+          tar -xzf "$kit_root/kit.tar.gz" -C "$kit_root"
+          export INVARLOCK_KIT_BINARY="$kit_root/kit"
+          INVARLOCK_KIT_BINARY_SHA256="$(sha256sum "$INVARLOCK_KIT_BINARY" | cut -d ' ' -f1)"
+          export INVARLOCK_KIT_BINARY_SHA256
+          python -m pytest -q tests/integration/test_modelkit_cli.py
+      - name: Run repository checks
+        run: make verify-checks
+      - name: Check full-capacity signed verification
+        run: python -m pytest -q 'tests/evaluation_comparison/test_capacity.py::test_full_capacity_signed_independent_recipient[50000]'
       - name: Build, install, and validate distributions
-        run: make addins-install-smoke
+        run: make addins-install-smoke inspect-judge-sdk-test
       - name: Lint workflows
         run: |
           gopath="$(go env GOPATH)"
@@ -99,13 +142,19 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
+          cache-dependency-path: |
+            requirements/workflows/ci-hf-py312.txt
+            requirements/workflows/inspect-judge-tests-py312.txt
+            requirements/workflows/pip-bootstrap.txt
+            requirements/workflows/release-install-py312.txt
       - name: Set up uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4
         with:
           version: "0.10.10"
       - name: Install dependencies
         run: |
-          python -m pip install --require-hashes -r requirements/workflows/ci-hf-py312.txt
+          python scripts/security/build_hardened_accelerate_wheel.py bootstrap
+          python -m pip install --require-hashes --find-links runtime/wheels -r requirements/workflows/ci-hf-py312.txt
           python -m build --wheel --no-isolation
           python -m pip install --no-deps --force-reinstall dist/*.whl
       - name: Run minimum-Python tests
@@ -113,12 +162,16 @@ jobs:
       - name: Check command surface
         run: make cli-smoke-core
       - name: Build, install, and validate distributions
-        run: make addins-install-smoke
+        run: make addins-install-smoke inspect-judge-sdk-test
 
-  coverage:
+  coverage-tests:
     if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.full) }}
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [core, examples, support, addins]
     env:
       PYTHON: python
       PYTHONPATH: ${{ github.workspace }}/src
@@ -131,13 +184,69 @@ jobs:
         with:
           python-version: '3.13'
           cache: pip
+          cache-dependency-path: requirements/workflows/ci-hf-py313.txt
       - name: Install dependencies
         run: |
-          python -m pip install --require-hashes -r requirements/workflows/ci-hf-py313.txt
+          python scripts/security/build_hardened_accelerate_wheel.py bootstrap
+          python -m pip install --require-hashes --find-links runtime/wheels -r requirements/workflows/ci-hf-py313.txt
           python -m build --wheel --no-isolation
           python -m pip install --no-deps --force-reinstall dist/*.whl
+      - name: Collect disjoint test coverage
+        run: make coverage-collect-${{ matrix.shard }} PYTEST_WORKERS=2
+      - name: Retain coverage and test timings
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: coverage-shard-${{ matrix.shard }}
+          path: artifacts/coverage/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
+  coverage:
+    if: ${{ always() && !(github.event_name == 'workflow_dispatch' && inputs.full) }}
+    needs: [coverage-tests, verify-fast]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PYTHON: python
+      PYTHONPATH: ${{ github.workspace }}/src
+    steps:
+      - name: Require successful test and capacity checks
+        env:
+          SHARD_RESULT: ${{ needs.coverage-tests.result }}
+          CHECK_RESULT: ${{ needs.verify-fast.result }}
+        run: test "$SHARD_RESULT" = success && test "$CHECK_RESULT" = success
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: requirements/workflows/ci-hf-py313.txt
+      - name: Install dependencies
+        run: |
+          python scripts/security/build_hardened_accelerate_wheel.py bootstrap
+          python -m pip install --require-hashes --find-links runtime/wheels -r requirements/workflows/ci-hf-py313.txt
+          python -m build --wheel --no-isolation
+          python -m pip install --no-deps --force-reinstall dist/*.whl
+      - name: Download coverage measurements
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          pattern: coverage-shard-*
+          path: artifacts/coverage/
+          merge-multiple: true
       - name: Enforce coverage
-        run: make coverage-enforce
+        run: make coverage-report
+      - name: Retain coverage reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: coverage-reports
+          path: reports/*cov.xml
+          if-no-files-found: error
+          retention-days: 7
 
   verify-full:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.full }}
@@ -155,8 +264,14 @@ jobs:
         with:
           python-version: '3.13'
           cache: pip
+          cache-dependency-path: |
+            requirements/workflows/ci-hf-py313.txt
+            requirements/workflows/docs-ci-py313.txt
+            requirements/workflows/inspect-judge-tests-py313.txt
+            requirements/workflows/pip-bootstrap.txt
+            requirements/workflows/release-install-py313.txt
       - name: Set up uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4
         with:
           version: "0.10.10"
       - name: Set up Node.js
@@ -166,9 +281,13 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: |
-          python -m pip install --require-hashes -r requirements/workflows/ci-hf-py313.txt
+          python scripts/security/build_hardened_accelerate_wheel.py bootstrap
+          python -m pip install --require-hashes --find-links runtime/wheels -r requirements/workflows/ci-hf-py313.txt
+          python -m pip install --require-hashes -r requirements/workflows/docs-ci-py313.txt
           python -m build --wheel --no-isolation
           python -m pip install --no-deps --force-reinstall dist/*.whl
+      - name: Check installed hardened Accelerate APIs
+        run: python -I tests/scripts/hardened_accelerate_checks.py
       - name: Install documentation linters
         run: npm ci
       - name: Install actionlint
@@ -181,7 +300,7 @@ jobs:
           export PATH="${gopath}/bin:$PATH"
           make workflow-lint
       - name: Build, install, and validate distributions
-        run: make addins-install-smoke
+        run: make addins-install-smoke inspect-judge-sdk-test
 
   supply-chain:
     if: ${{ startsWith(github.ref, 'refs/tags/') }}
@@ -202,6 +321,7 @@ jobs:
         run: python scripts/security/run_pip_audit.py
       - name: Audit maintained dependency locks
         run: |
+          python scripts/security/build_hardened_accelerate_wheel.py bootstrap
           python scripts/security/cve_audit.py \
             --out-json artifacts/supply-chain/cve-audit.json \
             --out-md artifacts/supply-chain/cve-audit.md

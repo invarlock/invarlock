@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import importlib
 import json
+import shlex
 import subprocess
 import sys
 import types
@@ -117,6 +118,28 @@ def test_evaluator_transaction_worker_images_include_flat_script_dependencies(
     assert "/opt/invarlock/examples/evaluator_transaction" in dockerfile
 
 
+@pytest.mark.parametrize(
+    "evaluator", ["lm-evaluation-harness", "inspect-ai", "openai-evals"]
+)
+def test_evaluator_image_copy_inputs_are_explicitly_allowlisted(evaluator: str) -> None:
+    dockerfile = (ROOT / "examples/integrations" / evaluator / "Dockerfile").read_text(
+        encoding="utf-8"
+    )
+    rules = set((ROOT / ".dockerignore").read_text(encoding="utf-8").splitlines())
+    sources = [
+        source
+        for line in dockerfile.replace("\\\n", " ").splitlines()
+        if line.startswith("COPY ")
+        for source in shlex.split(line)[1:-1]
+    ]
+    assert sources
+    for source in sources:
+        path = ROOT / source
+        assert path.exists(), f"{evaluator} COPY input does not exist: {source}"
+        rule = f"!{source}/**" if path.is_dir() else f"!{source}"
+        assert rule in rules, f"{evaluator} COPY input is not allowlisted: {source}"
+
+
 def test_evaluator_transaction_dataset_digest_matches_the_staging_writer() -> None:
     module = _module()
     records = json.loads(
@@ -227,8 +250,10 @@ def test_inspect_runner_binds_each_sample_to_native_output_and_score(
     assert scored[0][1]["value"] == "C"
 
 
+@pytest.mark.parametrize("close_error", [False, True])
 def test_openai_runner_binds_event_identity_and_restores_environment(
     monkeypatch: pytest.MonkeyPatch,
+    close_error: bool,
 ) -> None:
     module = _module()
     records = [json.loads(line) for line in _records_bytes(module).splitlines()]
@@ -244,6 +269,8 @@ def test_openai_runner_binds_event_identity_and_restores_environment(
 
         def close(self) -> None:
             self.closed = True
+            if close_error:
+                raise RuntimeError("generator cleanup failed")
 
     class FakeMatch:
         def __init__(self, *, completion_fns: list[object], **_kwargs: object) -> None:
@@ -296,11 +323,15 @@ def test_openai_runner_binds_event_identity_and_restores_environment(
     monkeypatch.delenv("EVALS_THREADS", raising=False)
     monkeypatch.delenv("EVALS_SHOW_EVAL_PROGRESS", raising=False)
 
-    generated, scored = module.adapters._run_openai_evals(
-        Path("/model"), _records_bytes(module)
-    )
-    assert generated[0]["output"] == records[0]["expected"]
-    assert scored[-1][0] == 1.0
+    if close_error:
+        with pytest.raises(RuntimeError, match="generator cleanup failed"):
+            module.adapters._run_openai_evals(Path("/model"), _records_bytes(module))
+    else:
+        generated, scored = module.adapters._run_openai_evals(
+            Path("/model"), _records_bytes(module)
+        )
+        assert generated[0]["output"] == records[0]["expected"]
+        assert scored[-1][0] == 1.0
     assert module.os.environ["EVALS_SEQUENTIAL"] == "before"
     assert "EVALS_THREADS" not in module.os.environ
 
@@ -2420,3 +2451,23 @@ def test_evaluator_transaction_lock_and_worker_contract_mismatch_guards(
     monkeypatch.setitem(sys.modules, "transformers", fake_transformers)
     with pytest.raises(module.BridgeError, match="generation defaults"):
         module.adapters._HfGreedyGenerator(model)
+
+
+def test_generation_failure_releases_the_model_owner(tmp_path, monkeypatch):
+    module = _module()
+    error = RuntimeError("generation failed")
+    closed = []
+
+    class Generator:
+        def generate(self, prompts):
+            raise error
+
+        def close(self):
+            closed.append(self)
+
+    generator = Generator()
+    monkeypatch.setattr(module.adapters, "_HfGreedyGenerator", lambda path: generator)
+    with pytest.raises(RuntimeError) as failure:
+        module.adapters._generate(tmp_path, _records_bytes(module))
+    assert failure.value is error
+    assert closed == [generator]

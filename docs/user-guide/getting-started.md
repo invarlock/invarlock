@@ -18,18 +18,48 @@ invarlock verify evidence/ ... --receipt verification.receipt.json
 invarlock report evidence/
 ```
 
-!!! tip "User guide"
+> **User guide**
+>
+> **Outcome:** Prepare and run a real paired Hugging Face comparison through
+> the OCI-backed `evaluate -> verify -> report` path.
+>
+> **Audience:** First-time operators, release decision owners, and engineers
+> integrating a model build with an evidence gate.
+>
+> **Prerequisites:** Python 3.12 or newer; Docker or Podman; a digest-addressed
+> local InvarLock runtime image; two local SafeTensors snapshots; a pinned
+> JSONL evaluation source; and separate Ed25519 evidence-signer and verifier
+> keys.
 
-    **Outcome:** Prepare and run a real paired Hugging Face comparison through
-    the OCI-backed `evaluate -> verify -> report` path.
+To check results from an existing evaluator without preparing an OCI runtime,
+start with [Captured results](captured-results.md). Native requests support
+`exact_match`, `normalized_nll_per_utf8_byte`, and `judge`; this tutorial uses
+normalized NLL. For rubric-based grading of native answers, use the
+[judge request workflow](evaluation-request.md#judge). The same commands and SDK
+support multiple metrics and slices with explicit captured assurance. This page
+walks through native execution and its independent receipt. For periodic or
+incident-triggered hosted evaluation, follow
+[Requalify a hosted service](hosted-service-requalification.md); the capture
+harness supplies fresh executions and the core verifies their retained evidence.
 
-    **Audience:** First-time operators, release decision owners, and engineers
-    integrating a model build with an evidence gate.
+## Matching wheels and examples
 
-    **Prerequisites:** Python 3.12 or newer; Docker or Podman; a digest-addressed
-    local InvarLock runtime image; two local SafeTensors snapshots; a pinned
-    JSONL evaluation source; and separate Ed25519 evidence-signer and verifier
-    keys.
+For a released wheel, install `invarlock` and obtain its version with
+`importlib.metadata.version("invarlock")`. The root README and
+[quickstart](https://github.com/invarlock/invarlock/tree/main/examples/quickstart)
+download the GitHub tag archive `v${INVARLOCK_VERSION}` and extract
+`invarlock-${INVARLOCK_VERSION}/examples/quickstart` and
+`invarlock-${INVARLOCK_VERSION}/examples/acceptance-handoff/golden`. Stop if that
+matching archive is unavailable; never substitute `main` or another version.
+
+For a locally built wheel, use examples from the exact checkout used for the
+build. A package version does not identify a local commit or uncommitted source.
+Copy `examples/quickstart/run.py` and `examples/acceptance-handoff/golden` to an
+empty directory outside the checkout, clear `PYTHONPATH`, and run with the
+interpreter that installed the wheel. `make quickstart-wheel-smoke` automates
+the isolated local-build checks, including captured evaluation/recipient commands
+before optional add-ins are installed. Never regenerate retained evidence to
+make a recipe pass.
 
 ## What each command owns
 
@@ -37,20 +67,25 @@ invarlock report evidence/
 | --- | --- | --- | --- |
 | `evaluate` | Closed request, JSONL source, local artifacts, caller-owned OCI/runtime inputs, evidence-signing key | One no-clobber signed evidence directory | Paired comparison, interval, optional sample and side-accuracy qualification, and evaluation-time policy verdict |
 | `verify` | Untrusted evidence plus independent artifact, schedule, policy, runtime, and signer anchors; verifier identity; and verifier key | One no-clobber signed receipt outside the bundle | Independent replay and acceptance/rejection record |
-| `report` | Signature-authenticated evidence | Console text and optional no-clobber HTML | Human view of the canonical comparison |
+| `report` | Signature-authenticated evidence | Console text and optional no-clobber HTML | Summary of the canonical comparison |
 
 Run mode is the primary path. Import mode is available when another controlled
 execution already produced the complete provider sidecars; the final section
 uses the repository fixture to exercise that secondary path without model
 inference.
 
-## 1. Install the HF provider
+## 1. Install the host CLI
 
 ```bash
-python -m pip install "invarlock[hf]"
+python -m pip install invarlock
 invarlock --version
 invarlock evaluate --help
 ```
+
+The core includes the HF provider. Model execution dependencies are supplied by
+the runtime image, including the source-derived hardened Accelerate wheel.
+For host-side model preparation from a source checkout, use the
+[repository runtime setup](runtime-providers.md#hugging-face-transformers).
 
 Build or obtain the runtime image from the same release you intend to run. It
 must be available locally under a digest-bearing reference or exact image ID.
@@ -238,6 +273,23 @@ pinned images without starting a container or creating output. Rerun the same
 command without `--preflight` only when you deliberately want to continue into
 the evaluation.
 
+For repeated run requests, put the image, device and
+resource settings in an explicit
+[runtime profile](../reference/cli.md#reusable-runtime-profiles), then use:
+
+```bash
+invarlock evaluate release-check/request.yaml \
+  --signing-key evidence-signer.pem \
+  --runtime-profile runtime.json --preflight
+```
+
+Create `runtime.json` using that reference and your actual pinned images before
+running this command. Preflight text output shows the effective settings and
+where they came from. Explicit CLI overrides take precedence over profile
+values. The profile does not contain signing keys or acceptance policy and is
+not accepted for import requests. Remove `--preflight` to execute the same
+resolved setup.
+
 Use `--container-engine podman` when appropriate. Device values are `cpu`,
 `cuda`, or `cuda:<index>`. Shared `--runtime-image`,
 `--runtime-image-digest`, `--runtime-device`, and `--runtime-entrypoint`
@@ -254,7 +306,9 @@ host validates both outputs, atomically publishes
 `release-check/evidence/release-001`, and signs the bundle with its host-only
 key.
 
-A successful command exits `0` and reports the evidence directory. The bundle
+A successful publication exits `0`, prints `Evidence created`, and shows the
+recorded policy result and evidence directory. A policy failure can still be
+published successfully; use independent `verify` to gate acceptance. The bundle
 contains the prepared canonical schedule, both provider observations, paired
 records, the comparison report, runtime bindings, checksums, manifest, and
 evidence signature.
@@ -300,14 +354,21 @@ invarlock report release-check/evidence/release-001/ \
   --explain
 ```
 
-The report shows both side means, the point comparison, the selected paired
-interval, threshold, and canonical verdict. `report` checks the embedded
+The report leads with **Policy satisfied** or **Policy not met** and identifies
+the baseline and subject. It shows both side means, the point comparison, the
+selected paired interval, and every configured metric, count, precision and
+side-accuracy check. HTML details expand to show exact values and bindings.
+`report` checks the embedded
 evidence signature and bundle integrity before rendering, but it does not use
 the independent verifier anchors or replace the signed receipt.
+Successful rendering exits `0` even when the recorded policy failed. Use
+`--json` for a machine-readable rendering status and HTML path; do not parse
+the terminal layout to decide acceptance.
 
 ## Interpret the result
 
-Every current `invarlock/comparison-report-v3` report records:
+Native exact-match and normalized-NLL `invarlock/comparison-report-v3` reports
+record:
 
 - a point estimate over all authenticated records;
 - a paired Newcombe 95% interval plus regression/improvement counts and an
@@ -321,8 +382,8 @@ Every current `invarlock/comparison-report-v3` report records:
 - a verdict controlled by the conservative interval bound and any configured
   sample and side-accuracy qualification.
 
-For exact match, the lower bound must clear the percentage-point floor. For
-byte-normalized NLL, the upper bound must remain below the ratio ceiling. Its
+For exact match, the lower bound must meet or exceed the percentage-point floor.
+For byte-normalized NLL, the upper bound must be at or below the ratio ceiling. Its
 interval resamples paired schedule positions, so each baseline observation
 stays coupled to its subject observation.
 

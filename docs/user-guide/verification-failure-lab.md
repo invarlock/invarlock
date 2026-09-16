@@ -5,11 +5,13 @@ uses the checked-in offline example, so it exercises real signing, bundle
 integrity, policy replay, receipt signing, and report authentication without
 downloading a model.
 
-!!! tip "User guide"
-
-    **Outcome:** Reproduce an authentic report-local policy rejection plus wrong-anchor, tamper, extra-file, and receipt-authorization failures.
-    **Audience:** Verifier operators, CI authors, and maintainers validating fail-closed behavior.
-    **Prerequisites:** A source checkout, the core package installed, a shell with `mktemp`, and permission to create a disposable working directory.
+> **User guide**
+>
+> **Outcome:** Reproduce an authentic report-local policy rejection plus wrong-anchor, tamper, extra-file, and receipt-authorization failures.
+>
+> **Audience:** Verifier operators, CI authors, and maintainers validating fail-closed behavior.
+>
+> **Prerequisites:** A source checkout, the core package installed, a shell with `mktemp`, and permission to create a disposable working directory.
 
 ## Create a disposable valid transaction
 
@@ -49,9 +51,12 @@ unchanged; each failure starts from a separate copy.
 ## Authentic policy rejection
 
 The second checked-in request uses the same schedule, policy, identities, and
-runtimes. Its subject answers one of two records incorrectly, so the independently
-replayed exact-match delta is `-50` percentage points against a required minimum
-of `0`. Produce its immutable evidence, then verify it under the same anchors:
+runtimes. Its subject answers one of 50 records incorrectly: baseline accuracy
+is 100%, candidate accuracy is 98%, and the point change is −2 percentage
+points. The paired interval lower bound is approximately −10.4954 percentage
+points, below the approved minimum of −10. The minimum count of 50 and maximum
+interval width of 20 percentage points both pass; the conservative change bound
+fails. Produce its immutable evidence, then verify it under the same anchors:
 
 ```bash
 invarlock evaluate rejected-request.yaml --signing-key .keys/evidence-signer.pem
@@ -74,9 +79,12 @@ fi
 ```
 
 Expected result: the evidence remains authentic and integrity-valid, the
-replayed policy verdict is `fail`, the command exits nonzero, and
+replayed policy verdict is `fail`, verification exits `7`, and
 `policy-rejected.receipt.json` is a verifier-signed rejection. This is a valid
 measurement outcome rather than an infrastructure or cryptographic failure.
+Evaluation itself exits `0` because evidence publication succeeded. Its terminal
+summary shows the recorded policy failure separately from publication; recipient
+verification has not yet occurred at that point.
 
 ## Wrong evidence signer anchor
 
@@ -171,14 +179,21 @@ self-authorize. Verify the receipt through the Python facade with a deliberately
 wrong expected verifier fingerprint:
 
 ```python
+import json
 from pathlib import Path
 
 from invarlock.engine import verify_signed_verification_receipt
 
+anchors = json.loads(Path("trusted-inputs/input-digests.json").read_text())
 result = verify_signed_verification_receipt(
     Path("accepted.receipt.json"),
     Path("artifacts/evidence"),
     policy_path=Path("policy/acceptance.json"),
+    expected_artifact_digests={
+        "baseline": anchors["baseline_artifact"],
+        "subject": anchors["subject_artifact"],
+    },
+    expected_schedule_digest=anchors["canonical_schedule"],
     expected_runtime_digests={
         "baseline": "sha256:" + "1" * 64,
         "subject": "sha256:" + "2" * 64,
@@ -190,7 +205,7 @@ result = verify_signed_verification_receipt(
     expected_verifier_fingerprint="sha256:" + "0" * 64,
 )
 assert not result.ok
-assert result.errors
+assert "receipt verifier key does not match caller expectation" in result.errors
 ```
 
 Expected result: the receipt signature may be cryptographically valid while

@@ -87,7 +87,7 @@ evidence. The local tag is only a build handle.
 
 The image applies the tracked
 `runtime/llama-completion-user-output.patch` to the pinned b10015 source. Normal
-EOG termination remains enabled, while llama.cpp's human-readable
+EOG termination remains enabled, while llama.cpp's
 `[end of text]` console marker is kept out of the generated-text stream. The
 provider rejects that marker if an unpatched executable emits it; it never
 guesses whether marker-shaped bytes were backend control or model-authored text.
@@ -199,7 +199,9 @@ Bootstrap that transaction once for the exact image with
 `RECEIPT`, and verifier-owned `TRUST_PROFILE`. For every later request using
 the same image digest, pass those paths to `qualify-preflight` and
 `qualify-evidence` as `CANARY_EVIDENCE`, `CANARY_RECEIPT`, and
-`CANARY_TRUST_PROFILE`. A different image digest requires a new signed canary.
+`CANARY_TRUST_PROFILE`, keeping its referenced verifier private key available.
+Reuse requires the same image, providers, task, acceptance binding and device
+class; see the [canary compatibility rules](../../docs/reference/runtime-providers.md).
 Set `QUALIFICATION_DEVICE`, `QUALIFICATION_CPUS`,
 `QUALIFICATION_MEMORY_MIB`, and `QUALIFICATION_USER` for the bounded worker
 environment and keep them unchanged through canary, preflight, and evidence.
@@ -227,7 +229,8 @@ make -C addins/gguf qualify-canary \
 ```
 
 Run `make -C addins/gguf qualify-preflight` for each target request. It
-reverifies the signed canary and performs execution-free checks without loading
+authenticates the saved canary receipt and checks evidence integrity and
+compatibility. It performs execution-free checks without loading
 the target model. After it succeeds, `make -C addins/gguf qualify-evidence`
 evaluates and verifies with `REQUEST`, `SIGNING_KEY`, `QUALIFICATION_IMAGE`,
 `IMAGE_DIGEST`,

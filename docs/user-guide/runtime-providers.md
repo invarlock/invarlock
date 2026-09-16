@@ -6,24 +6,24 @@ prepares a session from caller-owned resources, scores the ordered schedule,
 and emits typed records. InvarLock owns pairing, metric arithmetic, policy
 evaluation, bundle publication, and independent verification.
 
-!!! tip "User guide"
-
-    **Outcome:** Select, inspect, and configure a provider so both artifacts
-    emit contract-complete records for one independently verifiable comparison.
-
-    **Audience:** Runtime integration engineers and evaluation operators working
-    with Hugging Face text, Hugging Face vision-text, GGUF/`llama.cpp`,
-    TensorRT-LLM, or complete imported provider material.
-
-    **Prerequisites:** Materialized artifacts and support files, a canonical
-    schedule and caller-approved policy, a provider-compatible offline environment,
-    and caller-owned runtime-image and device configuration.
+> **User guide**
+>
+> **Outcome:** Select, inspect, and configure a provider so both artifacts
+> emit contract-complete records for one independently verifiable comparison.
+>
+> **Audience:** Runtime integration engineers and evaluation operators working
+> with Hugging Face text, Hugging Face vision-text, GGUF/`llama.cpp`,
+> TensorRT-LLM, or complete imported provider material.
+>
+> **Prerequisites:** Materialized artifacts and support files, a canonical
+> schedule and caller-approved policy, a provider-compatible offline environment,
+> and caller-owned runtime-image and device configuration.
 
 ## Choose a provider path
 
 | Artifact you need to evaluate | Provider | Packaging | Start with |
 | --- | --- | --- | --- |
-| Local Hugging Face safetensors checkpoint | `hf_transformers` | Built into `invarlock`; execution dependencies in `invarlock[hf]` | Run mode |
+| Local Hugging Face safetensors checkpoint | `hf_transformers` | Built into `invarlock`; execution dependencies in the maintained runtime image | Run mode |
 | Local Hugging Face vision-text checkpoint | `hf_vision_text` | `invarlock-runtime-hf-vision-text` add-in | Run mode with authenticated image content store |
 | GGUF file used by `llama.cpp` | `llama_cpp` | `invarlock-runtime-gguf` add-in | Run mode after runtime inspection |
 | TensorRT-LLM engine bundle | `tensorrt_llm` | `invarlock-runtime-tensorrt-llm` add-in | Run mode after GPU-bound inspection |
@@ -36,12 +36,21 @@ built-in `hf_transformers` integration also declares
 likelihoods over the authenticated local checkpoint. When authenticated
 tokenizer contracts and paired token counts are comparable, the verifier may
 render a token-weighted perplexity ratio as interpretation only. The GGUF,
-TensorRT-LLM, and vision-text add-ins remain exact-match only.
+TensorRT-LLM, and vision-text add-ins expose exact-match text collection.
+The built-in `judge` scorer and deterministic extensions use that same
+authenticated text-output surface, then score the frozen answers separately.
+They do not require the provider to advertise a `judge` metric. Native judging
+currently requires exactly one text input part, so it cannot grade the
+vision-text add-in's image schedules.
 
-| Metric | Hugging Face text | Vision-text | GGUF | TensorRT-LLM | Use when |
+| Provider collection metric | Hugging Face text | Vision-text | GGUF | TensorRT-LLM | Use when |
 | --- | --- | --- | --- | --- | --- |
 | `exact_match` | Yes | Yes | Yes | Yes | Exact generated text is the release criterion |
 | `normalized_nll_per_utf8_byte` | Yes | No | No | No | Expected-continuation likelihood regression is the release criterion; tokenizers may differ |
+
+For native judging, follow the [judge request workflow](evaluation-request.md#judge).
+Judge collection, evidence and recipient verification have separate contracts;
+the provider still owns the original artifact and answer-capture provenance.
 
 ## Common provider workflow
 
@@ -120,12 +129,20 @@ documented in their sections below.
 
 ## Hugging Face Transformers
 
-`hf_transformers` is the canonical built-in provider. Install its runtime
-dependencies with:
+`hf_transformers` is the canonical built-in provider. The public core package
+supplies the host CLI; the maintained runtime image supplies model execution
+dependencies. For host-side model preparation or development, run from the
+matching source checkout with `uv` 0.10.10:
 
 ```bash
-python -m pip install "invarlock[hf]"
+python scripts/security/build_hardened_accelerate_wheel.py bootstrap
+uv sync --locked --group hf
 ```
+
+Bootstrap authenticates the upstream wheel and the derived
+`accelerate==1.14.0+invarlock.1` wheel before `uv` consumes it. The `hf` repository
+group uses the generated `runtime/wheels` directory. The public package has no
+full inference extra; use the maintained image or this source-bound setup.
 
 Strict run mode expects locally materialized safetensors and tokenizer files.
 It binds the immutable revision or checkpoint-tree digest, tokenizer metadata
@@ -353,14 +370,20 @@ make runtime-qualification-canary \
   CANDIDATE_WHEEL_MANIFEST="$CANDIDATE_WHEEL_MANIFEST"
 ```
 
-Retain the canary evidence, its strictly verified signed receipt, and the
-verifier-owned trust profile together. They may be reused by later readiness
-and evidence targets only while `IMAGE_DIGEST` is unchanged. A new image digest
-requires a new signed canary.
+Retain the canary evidence, its signed strict-pass verification receipt, and the
+verifier-owned trust profile together. Later readiness and evidence targets can
+reuse it only when the image digest, baseline and subject runtime-provider
+identities, task, acceptance binding, and device class match. The acceptance
+binding is the same built-in metric, or the same scorer ID, version, descriptor
+digest and configuration digest. Device matching distinguishes CPU from CUDA;
+CUDA indices may differ. Run a new signed canary when any required match changes.
 
-Before destroying the verifier signing key, export its Ed25519 public key into
-the retained trust unit. The maintained checker can then replay the signed
-receipt after transfer without private material:
+Keep the original canary trust profile and its referenced verifier private key
+available while using `runtime-qualification-readiness` or
+`runtime-qualification-evidence`. These targets read that key to authenticate the
+retained receipt and do not expose a public-key override. For standalone receipt
+checking after transfer or archival, retain an independently trusted Ed25519
+verifier public key. The checker supports that key without the private material:
 
 ```bash
 python scripts/qualification_receipt_check.py \
@@ -370,10 +393,12 @@ python scripts/qualification_receipt_check.py \
   --verifier-public-key "$PWD/canary/verifier-public.pem"
 ```
 
-The supplied public key is authenticated by the verifier fingerprint in the
-signed receipt; a substituted key, changed profile, policy, anchor, receipt, or
-evidence manifest fails closed. The trust-profile digest remains the digest of
-the profile used when the receipt was created.
+The checker verifies the receipt signature against the supplied public key and
+requires its fingerprint to match the receipt. Obtain that key through a trusted
+channel. Changed profile, policy, anchor, receipt or evidence-manifest bindings
+fail verification. Keep the original profile unchanged: its digest must match
+the profile used when the receipt was created. This standalone check does not
+replace the private key required by the readiness and evidence targets.
 
 Next, run readiness for each planned request with the same source binding,
 image, verifier inputs, fresh destinations, and retained canary inputs:
@@ -400,8 +425,10 @@ must be distinct absent paths with existing real parent directories. They may
 not use symlinked parents or be placed inside the evidence destination. The
 source archive is limited to 512 MiB and 50,000 members; an execution-source
 file is limited to 32 MiB. Readiness starts no model worker and publishes no
-result. It also strictly reverifies the retained canary and its exact image
-binding. Use the same variables with `make runtime-qualification-evidence`
+result. Its canary prerequisite authenticates the retained signed strict-pass
+receipt, checks the evidence inventory and checksum chain, and enforces the
+image and request compatibility described above. It does not rerun full semantic
+verification of the canary. Use the same variables with `make runtime-qualification-evidence`
 plus `SUMMARY` and optional `REPORT` only after readiness succeeds. Carry the
 same `QUALIFICATION_DEVICE`, and any CPU, memory, or user controls, into that
 command.
@@ -435,8 +462,9 @@ needed for execution-free media preflight:
 ```
 
 The heavier Torch and Transformers inference dependencies belong in the
-digest-pinned runtime image. The `[runtime]` extra is for development that
-executes the model outside that maintained image.
+digest-pinned runtime image, which derives and hash-checks the hardened
+Accelerate dependency during its build. The base add-in has no full inference
+extra.
 
 `hf_vision_text` evaluates `vision_text_generation` schedules containing one
 `prompt` text part and one `image` content part per record. Schedule content

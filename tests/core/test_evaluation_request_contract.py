@@ -9,7 +9,9 @@ import yaml
 
 import invarlock.core.evaluation_request as evaluation_request
 from invarlock.core.evaluation_request import (
+    CAPTURED_EVALUATION_REQUEST_FORMAT_VERSION,
     EVALUATION_REQUEST_FORMAT,
+    CapturedEvaluationRequest,
     EvaluationRequestError,
     ProviderResolver,
     load_evaluation_request,
@@ -231,6 +233,87 @@ def _valid_request(tmp_path: Path, *, mode: str = "run") -> Path:
     if mode == "import":
         _materialize_import_inputs(tmp_path)
     return _write_request(tmp_path / "request.yaml", _request_payload(mode=mode))
+
+
+@pytest.mark.parametrize("mode", ["run", "import"])
+def test_native_judge_selects_text_collection_and_confined_workspace(tmp_path, mode):
+    request_path = _valid_request(tmp_path, mode=mode)
+    payload = yaml.safe_load(request_path.read_text())
+    payload["comparison"].update(
+        metric="judge",
+        judge={"workspace": "judge-workspace", "signer_identity": "release"},
+    )
+    _write_request(request_path, payload)
+    request = load_evaluation_request(request_path)
+    assert request.comparison.metric == "judge"
+    assert request.comparison.collection_metric == "exact_match"
+    assert request.comparison.judge.workspace == tmp_path / "judge-workspace"
+    assert request.comparison.judge.signer_identity == "release"
+    (tmp_path / "judge-workspace").mkdir(mode=0o700)
+    assert (
+        load_evaluation_request(request_path).comparison.judge
+        == request.comparison.judge
+    )
+
+
+@pytest.mark.parametrize(
+    ("metric", "judge"),
+    [
+        ("judge", None),
+        ("exact_match", {"workspace": "judge-workspace", "signer_identity": "release"}),
+        ("judge", {"workspace": "../escape", "signer_identity": "release"}),
+        ("judge", {"workspace": "judge-workspace", "signer_identity": ""}),
+        (
+            "judge",
+            {
+                "workspace": "judge-workspace",
+                "signer_identity": "release",
+                "api_key": "forbidden",
+            },
+        ),
+    ],
+)
+def test_native_judge_configuration_is_closed_and_required(tmp_path, metric, judge):
+    request_path = _valid_request(tmp_path)
+    payload = yaml.safe_load(request_path.read_text())
+    payload["comparison"]["metric"] = metric
+    if judge is not None:
+        payload["comparison"]["judge"] = judge
+    _write_request(request_path, payload)
+    with pytest.raises(EvaluationRequestError):
+        load_evaluation_request(request_path)
+
+
+@pytest.mark.parametrize(
+    "workspace", ["artifacts/evidence", "artifacts", "artifacts/evidence/work"]
+)
+def test_native_judge_workspace_and_evidence_must_not_overlap(tmp_path, workspace):
+    request_path = _valid_request(tmp_path)
+    payload = yaml.safe_load(request_path.read_text())
+    payload["comparison"].update(
+        metric="judge", judge={"workspace": workspace, "signer_identity": "release"}
+    )
+    _write_request(request_path, payload)
+    with pytest.raises(EvaluationRequestError, match="overlap"):
+        load_evaluation_request(request_path)
+
+
+@pytest.mark.parametrize("kind", ["symlink", "file"])
+def test_native_judge_workspace_rejects_unsafe_existing_destination(tmp_path, kind):
+    request_path = _valid_request(tmp_path)
+    payload = yaml.safe_load(request_path.read_text())
+    payload["comparison"].update(
+        metric="judge",
+        judge={"workspace": "judge-workspace", "signer_identity": "release"},
+    )
+    _write_request(request_path, payload)
+    workspace = tmp_path / "judge-workspace"
+    if kind == "symlink":
+        workspace.symlink_to(tmp_path / "models", target_is_directory=True)
+    else:
+        workspace.write_bytes(b"not a directory")
+    with pytest.raises(EvaluationRequestError, match="symlink|directory"):
+        load_evaluation_request(request_path)
 
 
 class _TaskContractProvider:
@@ -1082,3 +1165,135 @@ def test_request_rejects_files_over_one_mibibyte(tmp_path: Path) -> None:
 
     with pytest.raises(EvaluationRequestError, match="1048576-byte size limit"):
         load_evaluation_request(path)
+
+
+def _captured_payload() -> dict[str, object]:
+    source = {"path": "inputs/run.json", "adapter": "invarlock"}
+    return {
+        "format_version": CAPTURED_EVALUATION_REQUEST_FORMAT_VERSION,
+        "execution": {"mode": "captured"},
+        "comparison": {
+            "baseline": dict(source),
+            "subject": dict(source, path="inputs/subject.json"),
+            "policy": "policy.json",
+        },
+        "output": {"evidence": "artifacts/evidence"},
+    }
+
+
+def test_captured_request_dispatches_without_provider_resolution(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "inputs").mkdir()
+    (tmp_path / "inputs/run.json").write_text("{}\n", encoding="utf-8")
+    (tmp_path / "inputs/subject.json").write_text("{}\n", encoding="utf-8")
+    (tmp_path / "policy.json").write_text("{}\n", encoding="utf-8")
+
+    request = load_evaluation_request(
+        _write_request(tmp_path / "request.yaml", _captured_payload())
+    )
+
+    assert isinstance(request, CapturedEvaluationRequest)
+    assert request.execution_mode == "captured"
+    assert request.baseline.path == tmp_path / "inputs/run.json"
+    assert request.subject.path == tmp_path / "inputs/subject.json"
+    assert request.policy == tmp_path / "policy.json"
+    assert request.evidence == tmp_path / "artifacts/evidence"
+
+
+@pytest.mark.parametrize(
+    ("path", "value"),
+    [
+        (("execution", "mode"), "run"),
+        (("execution", "unknown"), True),
+        (("comparison", "baseline", "unknown"), True),
+    ],
+)
+def test_captured_request_rejects_unknown_modes_and_fields(
+    tmp_path: Path, path: tuple[str, ...], value: object
+) -> None:
+    (tmp_path / "inputs").mkdir()
+    (tmp_path / "inputs/run.json").write_text("{}\n", encoding="utf-8")
+    (tmp_path / "inputs/subject.json").write_text("{}\n", encoding="utf-8")
+    (tmp_path / "policy.json").write_text("{}\n", encoding="utf-8")
+    payload = _captured_payload()
+    cursor: object = payload
+    for key in path[:-1]:
+        assert isinstance(cursor, dict)
+        cursor = cursor[key]
+    assert isinstance(cursor, dict)
+    cursor[path[-1]] = value
+
+    with pytest.raises(EvaluationRequestError, match="does not match"):
+        load_evaluation_request(_write_request(tmp_path / "request.yaml", payload))
+
+
+@pytest.mark.parametrize(
+    "reference", ["../outside.json", "/outside.json", "inputs/../outside.json"]
+)
+def test_captured_request_rejects_paths_that_escape_request_root(
+    tmp_path: Path, reference: str
+) -> None:
+    (tmp_path / "inputs").mkdir()
+    (tmp_path / "inputs/run.json").write_text("{}\n", encoding="utf-8")
+    (tmp_path / "inputs/subject.json").write_text("{}\n", encoding="utf-8")
+    (tmp_path / "policy.json").write_text("{}\n", encoding="utf-8")
+    payload = _captured_payload()
+    comparison = payload["comparison"]
+    assert isinstance(comparison, dict)
+    baseline = comparison["baseline"]
+    assert isinstance(baseline, dict)
+    baseline["path"] = reference
+
+    with pytest.raises(EvaluationRequestError):
+        load_evaluation_request(_write_request(tmp_path / "request.yaml", payload))
+
+
+@pytest.mark.parametrize(
+    "workspace", ["models/baseline", "models/baseline/judge", "models"]
+)
+def test_judge_workspace_cannot_modify_authenticated_model_inputs(tmp_path, workspace):
+    request_path = _valid_request(tmp_path)
+    payload = yaml.safe_load(request_path.read_text())
+    baseline_path = payload["comparison"]["baseline"]["artifact"]["path"]
+    workspace = workspace.replace("models/baseline", baseline_path)
+    if workspace == "models":
+        workspace = str(Path(baseline_path).parent)
+    payload["comparison"].update(
+        metric="judge", judge={"workspace": workspace, "signer_identity": "release"}
+    )
+    _write_request(request_path, payload)
+    with pytest.raises(EvaluationRequestError, match="overlap.*artifact"):
+        load_evaluation_request(request_path)
+    assert not (tmp_path / workspace / ".evaluation.lock").exists()
+
+
+def test_judge_workspace_cannot_contain_policy_dataset_or_request(tmp_path):
+    request_path = _valid_request(tmp_path)
+    payload = yaml.safe_load(request_path.read_text())
+    policy = Path(payload["comparison"]["policy"])
+    payload["comparison"].update(
+        metric="judge",
+        judge={"workspace": str(policy.parent), "signer_identity": "release"},
+    )
+    _write_request(request_path, payload)
+    with pytest.raises(EvaluationRequestError, match="contain request inputs"):
+        load_evaluation_request(request_path)
+
+
+def test_native_judge_signer_has_same_closed_identity_as_its_envelope(tmp_path):
+    request_path = _valid_request(tmp_path)
+    payload = yaml.safe_load(request_path.read_text())
+    payload["comparison"].update(
+        metric="judge",
+        judge={"workspace": "judge-work", "signer_identity": "release/team:judge"},
+    )
+    _write_request(request_path, payload)
+    assert (
+        load_evaluation_request(request_path).comparison.judge.signer_identity
+        == "release/team:judge"
+    )
+    payload["comparison"]["judge"]["signer_identity"] = "release\n"
+    _write_request(request_path, payload)
+    with pytest.raises(EvaluationRequestError):
+        load_evaluation_request(request_path)

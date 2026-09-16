@@ -1,5 +1,10 @@
 # Hugging Face Transformers integration
 
+Use this example to see how a saved checkpoint change becomes signed,
+independently verified behavioral evidence. It runs both checkpoints through
+InvarLock's built-in Hugging Face provider; it does not import an external
+evaluator's scores.
+
 This example downloads the official Apache-2.0 `Qwen/Qwen3.5-0.8B` checkpoint at
 immutable revision `2fc06364715b967f1860aea9cf38778875588b17`. It saves that
 checkpoint as the baseline and creates a distinct subject by fitting one causal
@@ -17,6 +22,10 @@ caller-owned evidence key and independent trust root stay outside it. The
 script refuses to reuse an existing workspace or evidence output.
 
 Run the complete journey from the repository root:
+
+First complete the [shared setup](../README.md#before-running-a-model-example):
+use a clean committed checkout, `uv`, Docker or Podman, and separate evidence
+and verifier keys. CPU execution is supported; a compatible CUDA GPU is optional.
 
 ```bash
 make example-hf-transformers \
@@ -39,7 +48,7 @@ time, use a new workspace with `--prepare-only`:
 
 ```bash
 make example-hf-transformers \
-  EXAMPLE_ARGS="--prepare-only --workspace /tmp/invarlock-hf-inputs \
+  EXAMPLE_ARGS="--prepare-only --workspace /new/path/invarlock-hf-inputs \
   --evidence-signing-key /secure/keys/evidence.pem \
   --verifier-signing-key /secure/keys/verifier.pem \
   --trust-root /secure/trust/hf-transformers"
@@ -48,6 +57,10 @@ make example-hf-transformers \
 Preparation uses an explicit placeholder runtime digest because no image is
 executed. The complete journey derives the real image digest and passes it in
 the generated `invarlock/trust-inputs-v1` profile to `invarlock verify`.
+Replace `/new/path` with a real parent directory without symlink components.
+Preparation is for inspecting inputs; it produces no verified comparison.
+It still downloads and creates the model checkpoints. It skips the runtime image
+build and the container evaluation, not model preparation.
 
 The first run downloads the pinned checkpoint and needs several gigabytes of
 cache and workspace capacity. The 50 records and fitted subject intentionally

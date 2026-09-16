@@ -274,7 +274,7 @@ def main(argv: list[str] | None = None) -> int:
                 "org.invarlock.example.source-commit": commit,
                 "org.invarlock.example.source-bundle-sha256": source_bundle_sha256,
                 "org.invarlock.example.evaluator": "lm-evaluation-harness",
-                "org.invarlock.example.evaluator-version": "0.4.12+invarlock.nocache.1",
+                "org.invarlock.example.evaluator-version": "0.4.12+invarlock.exactmatch.1",
                 "org.invarlock.example.evaluator-lock-sha256": lock_sha256,
                 "org.invarlock.example.evaluator-runtime": runtime_profile,
             },
@@ -315,7 +315,7 @@ def main(argv: list[str] | None = None) -> int:
         write_evaluator_attestation(
             path=build / "evaluator-build-attestation.json",
             evaluator="lm-evaluation-harness",
-            evaluator_version="0.4.12+invarlock.nocache.1",
+            evaluator_version="0.4.12+invarlock.exactmatch.1",
             runtime_image_id=image_id,
             base_image_id=base_id,
             source_commit=commit,

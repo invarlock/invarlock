@@ -211,7 +211,10 @@ def test_deployment_gate_rejects_a_signed_non_authorizing_verdict(
         lambda *_args, **_kwargs: SimpleNamespace(
             errors=(),
             ok=True,
-            statement={"verdict": verdict},
+            statement={
+                "format": "invarlock/evidence-verification-receipt-v2",
+                "verdict": verdict,
+            },
             verifier_fingerprint=APPROVAL_INPUTS["verifier_fingerprint"],
         ),
     )
@@ -237,6 +240,30 @@ def test_deployment_output_is_canonical_and_no_clobber(tmp_path: Path) -> None:
     repeated = _run(inputs, output=output)
     assert repeated.returncode == 2
     assert "output already exists" in repeated.stderr
+
+
+@pytest.mark.parametrize("version", ["v1", "v2", "v3", "unknown"])
+def test_deployment_rejects_captured_scope_even_after_receipt_authentication(
+    monkeypatch, version
+):
+    module = _module()
+    statement = {
+        "format": f"invarlock/evidence-verification-receipt-{version}",
+        "verification_scope": "captured_comparison",
+        "verdict": {"ok": True, "policy_verdict": "pass"},
+    }
+    monkeypatch.setattr(
+        module,
+        "verify_signed_verification_receipt",
+        lambda *args, **kwargs: SimpleNamespace(ok=True, statement=statement),
+    )
+    with pytest.raises(module.DeploymentApprovalError, match="native receipt"):
+        module.approve(
+            approval_inputs_path=APPROVAL_INPUTS_PATH,
+            evidence_path=TRANSACTION / "evidence",
+            policy_path=POLICY,
+            receipt_path=TRANSACTION / "verification.receipt.json",
+        )
 
 
 def test_consumer_fixture_runs_from_an_independent_copy(tmp_path: Path) -> None:

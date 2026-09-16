@@ -1,7 +1,7 @@
 # Contributing to InvarLock
 
-Thank you for improving InvarLock. The repository is intentionally centered on
-one user journey:
+Thank you for improving InvarLock. The runtime transaction executes or imports
+paired model evaluations:
 
 ```text
 invarlock evaluate request.yaml
@@ -9,20 +9,64 @@ invarlock verify evidence/
 invarlock report evidence/
 ```
 
-Changes should make that transaction easier to understand, safer to execute,
-or easier to verify.
+The `invarlock evaluate`, `invarlock verify`, and `invarlock report` commands
+run or import native comparisons with exact-match, normalized-NLL or judge scoring,
+compare captured evaluator exports, and replay imported judge measurements.
+They apply the corresponding policy
+and verify signed evidence. Use `invarlock --help` for these workflows;
+`invarlock evaluate --help` describes controlled execution or import, including
+the optional run-mode resource profile.
+See the [captured-results guide](docs/user-guide/captured-results.md).
+Changes should make these workflows easier to understand, safer to execute,
+or easier to verify. Preserve the distinct assurance meaning of each evidence
+format.
 
 ## Development setup
 
-InvarLock requires Python 3.12 or newer. Clone the repository, create a virtual
+InvarLock requires Python 3.12 or newer. Use Python 3.13 to match the main CI
+jobs; Python 3.12 has a separate minimum-version gate. Documentation tooling
+requires Node.js 22.18 or newer and npm. Clone the repository, create a virtual
 environment, and install the development dependencies:
 
 ```bash
-python -m venv .venv
+python3.13 -m venv .venv
 source .venv/bin/activate
-python -m pip install -e ".[dev,hf]"
+python -m pip install uv==0.10.10
+python scripts/security/build_hardened_accelerate_wheel.py bootstrap
+uv sync --locked --extra dev --group runtime-test
 npm ci
 ```
+
+Install `uv` for lock, distribution, and dependency-audit targets; CI currently
+uses version `0.10.10`. Workflow changes also require `actionlint` on `PATH`.
+With Go installed:
+
+```bash
+python -m pip install uv==0.10.10
+go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
+```
+
+The bootstrap verifies and builds the pinned hardened Accelerate wheel in
+`runtime/wheels`. Repository runtime groups use that wheel; the public tooling
+extras do not install model execution dependencies.
+
+Add Go's binary directory to `PATH`. These tools are not installed by the
+Python development extra.
+
+For an exact Linux x86_64 CI reproduction, create a separate Python 3.13
+environment and run:
+
+```bash
+python scripts/security/build_hardened_accelerate_wheel.py bootstrap
+python -m pip install --require-hashes --find-links runtime/wheels \
+  -r requirements/workflows/ci-hf-py313.txt
+python -m build --wheel --no-isolation
+python -m pip install --no-deps --force-reinstall dist/*.whl
+```
+
+Use the matching `py312` lock for Python 3.12. These locks include the build
+requirements needed by `--no-isolation`. Do not use an editable install as
+evidence that the wheel contains every module, entry point, and schema.
 
 Run the local gate before opening a pull request:
 
@@ -30,25 +74,31 @@ Run the local gate before opening a pull request:
 make verify-fast
 ```
 
-`make verify`, `make verify-fast`, and `make coverage-enforce` run independent
-suites concurrently and use bounded pytest-xdist workers. Set
-`VERIFY_TARGET_JOBS=1 COVERAGE_TARGET_JOBS=1 PYTEST_WORKERS=0` when diagnosing
-a failure sequentially.
-`make verify` adds the complete test and documentation build. The opt-in
-container journey builds the final runtime image and exercises all three
-commands:
+`make verify` and `make verify-fast` run independent suites concurrently with
+bounded pytest-xdist workers. Examples run once, separately from the other tests.
+`make coverage-enforce` runs disjoint groups with two workers per group;
+locally, one group runs at a time to avoid CPU contention. Pass overrides as
+Make command-line arguments when diagnosing a failure sequentially:
 
 ```bash
-make container-front-door-smoke
+make verify-fast VERIFY_TARGET_JOBS=1 PYTEST_WORKERS=0
+make coverage-enforce COVERAGE_TARGET_JOBS=1 PYTEST_WORKERS=0
 ```
+
+`make verify` adds the complete test suite and strict documentation build.
+Some integration tests download pinned model artifacts. It does not include
+the separate coverage, distribution, workflow, lock, or dependency-audit gates
+listed below. Run them for the affected surface before requesting review.
 
 ## Repository shape
 
 - `src/invarlock/` contains the request transaction, provider ABI, canonical
-  evidence bundle, independent verifier, and report renderer.
+  evidence bundle, independent verifier, and report renderer. Captured records,
+  comparison, and record contracts have evaluator-neutral implementation owners
+  behind the same `invarlock.engine` facade.
 - `contracts/` contains the shipped JSON contracts.
 - `addins/` contains the independently installable GGUF, TensorRT-LLM,
-  Hugging Face vision-text, and diagnostics packages.
+  Hugging Face vision-text, diagnostics, and Inspect judge collection packages.
 - `tests/` mirrors the maintained runtime, contract, evidence, CLI, and release
   surfaces.
 - `scripts/` contains repository checks, release validation, and security
@@ -61,8 +111,9 @@ specific dependencies out of the core distribution.
 
 ## Contract changes
 
-The request, runtime manifest, provider evidence, evidence pack, and signed
-verification receipt are security boundaries. Contract changes must:
+The request, runtime manifest, provider evidence, evidence pack, signed
+verification receipt, and captured run, policy, and evidence formats are
+security boundaries. Contract changes must:
 
 1. start with adversarial tests that demonstrate the intended failure mode;
 2. keep schemas closed with `additionalProperties: false` where applicable;
@@ -111,10 +162,85 @@ make coverage-enforce
 make dist-check
 ```
 
+Choose additional gates from the change, rather than treating `verify-fast`
+as the complete pull-request check:
+
+| Changed surface | Additional validation |
+| --- | --- |
+| Python behavior or example launcher | Focused failing test first, then `make verify` and the applicable coverage target |
+| Coverage across the repository | `make coverage-enforce` on Linux; CI enforces 95% combined and branch coverage, including per-file checks |
+| Documentation or public command examples | `make docs-check` and `python -m pytest tests/docs -q`; exercise the documented commands |
+| Entry points, imports, packaged schemas, or dependencies | `make addins-install-smoke`; this includes `dist-check` and isolated wheel consumers |
+| Captured evaluation behavior | Build and install the candidate wheel, then run `python examples/captured-results/wheel_smoke.py` and `python examples/captured-results/scorer_wheel_smoke.py --fixture examples/judge-measurements` |
+| Native evaluator capture or mapping | Follow the captured-results example with explicit model, protocol, and environment inputs; verify captured outputs in a separate wheel-only recipient; the [Harness likelihood reference](examples/captured-results/references/harness-likelihood/README.md) covers real NLL capture and offline replay |
+| Evidence interpretation or verification | `make release-retained-evidence-compatibility`; retain the declared outcomes of historical evidence |
+| Inspect qualification semantics | `make evaluator-inspect-semantics`; run a fresh source-bound qualification and preserve historical profiles and evidence |
+| Batch evaluator qualification semantics | `make evaluator-batch-semantics`; replay the current profile's native rows and retain separate source-bound qualification artifacts |
+| Scalar evaluator qualification semantics | `make evaluator-scalar-semantics`; qualify fresh outputs under the current literal profile and preserve historical runner identities |
+| ModelKit package handoff | Run `tests/examples/test_modelkit_handoff.py` and the pinned real-CLI test described in the [handoff guide](docs/user-guide/modelkit-handoff.md) |
+| K2 campaign or runtime preparation | Run `tests/examples/test_k2_*.py` and follow the [candidate campaign gates](examples/qualification/k2-horizon/README.md), including the exact image's offline native probe and dependency scans; CPU tests do not qualify a GPU model |
+| Dependency declarations or locks | `make lock-sync` and `make security`, plus affected installed-package checks |
+| GitHub Actions | `make workflow-lint` |
+
+For new documentation pages, follow the
+[page-type contracts](docs/reference/documentation.md#page-type-contracts), add
+the page to `mkdocs.yml`, and update `EXPECTED_DOC_PAGES` in
+`tests/docs/test_documentation.py`. The documentation build alone does not run
+these page inventory and reader-contract tests.
+
+Run `make pre-commit` for the repository hooks. Some hooks rewrite files;
+review their changes and repeat affected validation before committing.
+
+The complete coverage gate requires Linux descriptor execution. On another
+operating system, run the relevant portable target such as `make
+coverage-examples`, and report the full Linux result from CI separately.
+CI collects Python 3.13 coverage in separate core, examples, support-tooling and
+add-in jobs. Each test belongs to one group. The required `coverage` gate combines
+all four successful measurements and enforces the existing domain, per-file and
+aggregate branch thresholds. Missing, failed or mismatched measurements cannot
+pass. Test timing reports are retained with each group's coverage data.
+
+The `verify-fast` CI job runs `make verify-checks`, the installed-package journeys
+and the 50,000-record signed-recipient case without tracing. Its success is also
+required by the coverage gate. Python 3.13 behavioral tests run under coverage;
+the separate Python 3.12 suite checks the minimum supported interpreter. Local
+`make verify-fast` still includes its behavioral tests.
+
+The 12,000-record capacity case remains under subprocess branch coverage. Both
+capacity cases retain the same assertions and watchdog; the large case is
+classified as slow and is also included in `make verify`.
+
+Coverage includes newly added example launchers: successful execution in a
+separate smoke job does not collect their branch coverage. Add meaningful
+tests under `tests/examples/`; do not weaken thresholds to make a change pass.
+
+Changes to command output or reports must preserve policy outcomes, signed bytes,
+recipient-owned trust inputs and documented exit codes. Test text and JSON
+modes separately, including policy rejection, missing evidence and malformed
+input. A rendered report must not inherit independent verification status from
+a signature's presence. Retain the distinction between transaction publication,
+recorded comparison decisions, and independent verification.
+
 Tests must exercise production code and assert meaningful outcomes. A passing
 test that only restates fixture data is not evidence that a user journey works.
 `make dist-check` builds and validates the core, diagnostics, GGUF connector,
-Hugging Face vision-text connector, and TensorRT-LLM connector distributions.
+Hugging Face vision-text connector, TensorRT-LLM connector, and Inspect judge
+preparation distributions.
+
+For runtime launcher changes, run the opt-in real-container journey with a
+working Docker or Podman engine. Commit the source being tested, create its
+archive with `scripts/qualification_source.py create`, and supply
+`RUNTIME_SOURCE_COMMIT`, `RUNTIME_SOURCE_BUNDLE`, and
+`RUNTIME_SOURCE_BUNDLE_SHA256` to `make container-front-door-smoke`. The
+[Container Front Door workflow](.github/workflows/container-front-door-smoke.yml)
+shows the complete source authentication and installed-wheel procedure.
+A skipped container test does not establish isolation or cleanup behavior.
+The container gate includes network positive controls, resource limits,
+interruption, exact-container cleanup, and failed-transaction publication checks.
+
+Investigate dependency-audit failures even when the affected lock predates the
+pull request. Follow the [dependency-audit policy](docs/security/dependency-audit.md)
+for remediation and any explicitly approved, time-bounded exception.
 
 ## Documentation and public text
 
@@ -123,15 +249,50 @@ artifact locations, credentials, execution notes intended only for maintainers,
 and unrelated product planning out of public files and pull requests. Examples
 should use portable request-relative paths and placeholder digests.
 
-Documentation lint discovers every tracked Markdown file through Git. It checks
-formatting, spelling, machine-specific paths, credential-like values, and
-review-process wording. Update affected public surfaces together when a product
-or release boundary changes.
+Keep calendar dates and dated status updates out of maintained documentation.
+Describe current behavior; use Git history and the changelog for the sequence
+of changes. Public reference pages explain supported interfaces and failure
+behavior, rather than narrating development experiments or internal reviews.
+
+Describe the current revision without temporary publication-availability notices.
+Keep the installation convention in getting-started: released wheels use the tag
+archive matching `importlib.metadata.version("invarlock")`; local builds use the
+same checkout as the wheel. Missing matching archives fail closed without a
+mutable-branch fallback. Preserve schema identifiers, dependency constraints,
+historical evidence provenance, and the v0.13 compatibility covenant.
+
+Formatting and spelling lint discover every tracked Markdown file through Git.
+The public-text check also includes new Markdown files that Git does not ignore
+and excludes Git-reported deletions. It rejects machine-specific paths, credential-like
+values, and review-process wording. Update affected public surfaces together when
+a product or release boundary changes. Stage intended new source and documentation files
+before the final gates so checks that enumerate Git's file inventory include
+them. Inspect the staged diff to keep generated artifacts, local evidence, and
+secrets out of the change.
+
+### Example guides
+
+Write examples for a developer who knows Python and a terminal but has not read
+InvarLock's contracts. Start with the task the example solves, who it is for and
+what it produces. State setup requirements before commands, distinguish offline
+fixtures from model execution or billed calls, and explain the expected result,
+including intentional rejections. Define unfamiliar terms when first needed.
+Put schema details and advanced reproduction steps after the shortest useful
+path, or link to the relevant reference. Keep hardware and key requirements
+beside the commands that need them. Historical evidence and attribution files
+retain their original facts and identities.
+
+The native-judge starter is also shipped as package data. When editing
+`examples/native-judge/`, update the matching files in
+`src/invarlock/_data/examples/native-judge/` and run
+`python -m pytest tests/cli/test_native_evaluation_setup.py`. The consistency
+check ensures `evaluate --init --example native-judge` delivers the same
+instructions and inputs as the maintained example.
 
 ### Documentation type contracts
 
 Choose the document type from the reader's task, then make that type visible
-in a short opening admonition. The fields in the admonition are a reader
+in a short opening Markdown blockquote. The fields in the blockquote are a reader
 contract, not decorative metadata: they should say why the page exists, who or
 what it applies to, and what a reader can decide or accomplish with it.
 
@@ -141,6 +302,10 @@ what it applies to, and what a reader can decide or accomplish with it.
 | Assurance note | `In plain language`, `Question`, `Decision use`, `Evidence` | State the scoped claim or question, develop the argument or derivation, identify runtime enforcement and observable evidence, and name assumptions, defeaters, and limits. |
 | Reference | `Surface`, `Stability`, `Use this page when` | Describe the exact current interface or contract. Include defaults, accepted forms, outputs, and failure behavior, with a minimal example and security notes where they affect correct use. |
 | Security guidance | `In plain language`, `Objective`, `Assets or boundary`, `Use this page when` | Identify threats and trust assumptions, connect controls to residual risks, and state operational response, non-goals, and authoritative references where applicable. |
+
+Use a standard Markdown blockquote and bold field labels so the opener renders
+on GitHub and in the MkDocs site. Separate the fields with quoted blank lines;
+do not use MkDocs-only callout syntax or indented code for prose.
 
 Use headings that fit the subject instead of reproducing a rigid outline. A
 glossary, acceptance checklist, CLI reference, and threat model should remain
@@ -165,6 +330,10 @@ enumerating commits.
 
 Create branches with the `work/` prefix. Keep commits small enough to review,
 but group implementation, tests, and documentation for one logical change.
+Target `staging/next` for normal integration work. Run the relevant checks on
+the final changes, inspect `git diff --check` and `git status`, and include
+their outcomes in the pull request. Distinguish passed, failed, and skipped
+checks; an earlier commit's result does not validate a later behavior change.
 Pull requests should explain:
 
 - the user or verifier problem being solved;
@@ -177,3 +346,17 @@ keys, or caches. Report security issues through [SECURITY.md](SECURITY.md), not
 a public issue.
 
 By contributing, you agree that your work is licensed under Apache-2.0.
+
+### Package descriptions
+
+Edit each package's `README.md`; `packaging/README.md` is generated from it.
+Repository links stay relative for branch and tag browsing. Package descriptions
+use absolute links to the package version's release tag, including image URLs.
+After README or version changes, run `make package-readmes-sync`, then
+`make package-readmes-check`. Commit the generated descriptions with the source
+change. They are included in source distributions for standalone rebuilds.
+A pre-release build targets its future release tag; publish only after that tag
+contains the linked files. The CI badge continues to describe the main branch.
+
+Validate built wheel and source-distribution descriptions as well as rendering
+with `readme-renderer[md]`; `twine check` alone does not render Markdown.

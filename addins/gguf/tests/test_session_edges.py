@@ -576,3 +576,113 @@ def test_session_cleanup_handles_a_failure_before_any_pin_is_opened() -> None:
     candidate.close()
 
     assert calls == ["directory"]
+
+
+@pytest.mark.parametrize(
+    "failed_resource", ["model", "source_archive", "executable", "run_directory", None]
+)
+def test_session_cleanup_releases_all_resources_after_close_failure(
+    tmp_path, monkeypatch, failed_resource
+):
+    candidate = _bare_session()
+    resources = {}
+    descriptors = []
+    for name in ("model", "source_archive", "executable"):
+        path = tmp_path / name
+        path.write_bytes(b"pinned payload")
+        pinned = session._PinnedFile.open(
+            path, expected_sha256=None, require_executable=False
+        )
+        resources[name] = pinned
+        descriptors.extend((pinned.descriptor, pinned.parent_descriptor))
+        setattr(candidate, f"_{name}", pinned)
+    directory = tmp_path / "runtime"
+    directory.mkdir()
+    (directory / "cache").write_bytes(b"temporary data")
+    directory_fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY)
+    resources["run_directory"] = session._RunDirectory(
+        path=directory, descriptor=directory_fd, initial_stat=os.fstat(directory_fd)
+    )
+    descriptors.append(directory_fd)
+    candidate._run_directory = resources["run_directory"]
+    failed_descriptor = (
+        resources[failed_resource].descriptor if failed_resource is not None else None
+    )
+    original_close = os.close
+    failed = False
+
+    def close_then_fail(descriptor):
+        nonlocal failed
+        original_close(descriptor)
+        if descriptor == failed_descriptor and not failed:
+            failed = True
+            raise OSError("resource close failed")
+
+    try:
+        with monkeypatch.context() as patch:
+            patch.setattr(os, "close", close_then_fail)
+            if failed_resource is None:
+                candidate.close()
+            else:
+                with pytest.raises(OSError, match="resource close failed"):
+                    candidate.close()
+            candidate.close()
+        assert failed is (failed_resource is not None)
+        for descriptor in descriptors:
+            with pytest.raises(OSError):
+                os.fstat(descriptor)
+        assert not directory.exists()
+    finally:
+        for descriptor in descriptors:
+            try:
+                os.fstat(descriptor)
+            except OSError:
+                continue
+            original_close(descriptor)
+        session.shutil.rmtree(directory, ignore_errors=True)
+
+
+@pytest.mark.parametrize("failure", ["parent_close", "leaf_close", "hash_interrupt"])
+def test_pinned_file_cleanup_keeps_ownership_on_failures(
+    tmp_path, monkeypatch, failure
+):
+    source = tmp_path / "pinned"
+    source.write_bytes(b"pinned payload")
+    original_open, original_close = os.open, os.close
+    active = set()
+    failed = False
+    armed = failure == "parent_close"
+
+    def open_tracked(*args, **kwargs):
+        descriptor = original_open(*args, **kwargs)
+        active.add(descriptor)
+        return descriptor
+
+    def close_checked(descriptor):
+        nonlocal failed
+        original_close(descriptor)
+        active.discard(descriptor)
+        if not failed and armed and failure in {"parent_close", "leaf_close"}:
+            failed = True
+            raise OSError("close failed")
+
+    def interrupt_hash(*args):
+        raise KeyboardInterrupt("hash interrupted")
+
+    try:
+        with monkeypatch.context() as patch:
+            patch.setattr(os, "open", open_tracked)
+            patch.setattr(os, "close", close_checked)
+            if failure == "hash_interrupt":
+                patch.setattr(session, "_hash_descriptor", interrupt_hash)
+            expected = KeyboardInterrupt if failure == "hash_interrupt" else OSError
+            with pytest.raises(expected):
+                pinned = session._PinnedFile.open(
+                    source, expected_sha256=None, require_executable=False
+                )
+                armed = True
+                pinned.close()
+        assert not active, f"leaked descriptors {active}"
+    finally:
+        for descriptor in active:
+            original_close(descriptor)

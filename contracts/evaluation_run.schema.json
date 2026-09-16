@@ -1,0 +1,447 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://invarlock.dev/contracts/evaluation_run.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "format": {
+      "const": "invarlock/evaluation-run-v1"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+        }
+      },
+      "required": [
+        "name",
+        "version"
+      ]
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+    },
+    "artifact_digest": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "source_digest": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "score_provenance": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "judge",
+              "human",
+              "measurement",
+              "external_metric"
+            ]
+          },
+          "source": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+          },
+          "rubric_digest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^sha256:[a-f0-9]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "source",
+          "version",
+          "unit",
+          "rubric_digest"
+        ]
+      },
+      "maxProperties": 100
+    },
+    "records": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+          },
+          "input": {},
+          "expected": {},
+          "output": {},
+          "scores": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            },
+            "maxProperties": 100
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 4096
+            },
+            "maxProperties": 100
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4096
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "context": {},
+          "likelihood": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "basis": {
+                "const": "reference_continuation"
+              },
+              "logprob_sum": {
+                "type": "number",
+                "maximum": 0
+              },
+              "token_count": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "utf8_byte_count": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "input_digest": {
+                "type": "string",
+                "pattern": "^sha256:[a-f0-9]{64}$"
+              },
+              "reference_digest": {
+                "type": "string",
+                "pattern": "^sha256:[a-f0-9]{64}$"
+              },
+              "artifact_digest": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^sha256:[a-f0-9]{64}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "configuration_digest": {
+                "type": "string",
+                "pattern": "^sha256:[a-f0-9]{64}$"
+              },
+              "tokenizer_digest": {
+                "type": "string",
+                "pattern": "^sha256:[a-f0-9]{64}$"
+              },
+              "source": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                  },
+                  "version": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                  }
+                },
+                "required": [
+                  "name",
+                  "version"
+                ]
+              },
+              "service_identity_digest": {
+                "type": "string",
+                "pattern": "^sha256:[a-f0-9]{64}(?![\\s\\S])"
+              }
+            },
+            "required": [
+              "basis",
+              "logprob_sum",
+              "token_count",
+              "utf8_byte_count",
+              "input_digest",
+              "reference_digest",
+              "artifact_digest",
+              "configuration_digest",
+              "tokenizer_digest",
+              "source"
+            ],
+            "allOf": [
+              {
+                "if": {
+                  "required": [
+                    "service_identity_digest"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "artifact_digest": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "else": {
+                  "properties": {
+                    "artifact_digest": {
+                      "type": "string",
+                      "pattern": "^sha256:[a-f0-9]{64}$"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "input",
+          "expected",
+          "output",
+          "scores",
+          "metadata",
+          "error",
+          "context"
+        ]
+      },
+      "minItems": 1,
+      "maxItems": 50000
+    },
+    "service_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "hosted_service"
+        },
+        "provider": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "^(?!\\s*$)[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
+        },
+        "service": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "^(?!\\s*$)[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
+        },
+        "deployment": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "^(?!\\s*$)[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
+        },
+        "requested_model": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "^(?!\\s*$)[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
+        },
+        "observed_model": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512,
+              "pattern": "^(?!\\s*$)[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "exposed_revision": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512,
+              "pattern": "^(?!\\s*$)[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "configuration": {
+          "type": "object",
+          "maxProperties": 100
+        },
+        "configuration_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}(?![\\s\\S])",
+          "minLength": 71,
+          "maxLength": 71
+        },
+        "harness": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512,
+              "pattern": "^(?!\\s*$)[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512,
+              "pattern": "^(?!\\s*$)[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
+            },
+            "source_digest": {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}(?![\\s\\S])",
+              "minLength": 71,
+              "maxLength": 71
+            }
+          },
+          "required": [
+            "name",
+            "version",
+            "source_digest"
+          ]
+        },
+        "observation_window": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "started_at": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?Z(?![\\s\\S])"
+            },
+            "ended_at": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?Z(?![\\s\\S])"
+            }
+          },
+          "required": [
+            "started_at",
+            "ended_at"
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "provider",
+        "service",
+        "deployment",
+        "requested_model",
+        "observed_model",
+        "exposed_revision",
+        "configuration",
+        "configuration_digest",
+        "harness",
+        "observation_window"
+      ]
+    }
+  },
+  "required": [
+    "format",
+    "source",
+    "run_id",
+    "artifact_digest",
+    "source_digest",
+    "score_provenance",
+    "records"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "service_identity"
+        ]
+      },
+      "then": {
+        "required": [
+          "artifact_digest"
+        ],
+        "properties": {
+          "artifact_digest": {
+            "type": "null"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "artifact_digest": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          }
+        }
+      }
+    }
+  ]
+}

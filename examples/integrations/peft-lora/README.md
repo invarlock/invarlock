@@ -1,5 +1,11 @@
 # PEFT LoRA integration
 
+Use this example to compare the behavior of a base checkpoint and a merged
+LoRA adapter. PEFT creates the model change; InvarLock evaluates the two saved
+checkpoints through its native Hugging Face provider. The evidence therefore
+applies to the merged checkpoint, not an unmerged adapter loaded by another
+serving stack.
+
 This journey invokes Hugging Face PEFT directly. It downloads the official
 Apache-2.0 `Qwen/Qwen3.5-0.8B` checkpoint at immutable revision
 `2fc06364715b967f1860aea9cf38778875588b17`, trains LoRA parameters on fixed
@@ -7,7 +13,8 @@ continuations, saves and reloads the adapter, and merges it into a standalone
 `safetensors` checkpoint. The baseline and merged subject then pass through
 InvarLock's built-in Hugging Face runtime.
 
-From a clean checkout with `uv` and Docker or Podman installed:
+From a clean committed checkout with `uv` and Docker or Podman installed, follow
+the [shared key and path setup](../README.md#before-running-a-model-example), then run:
 
 ```bash
 make example-peft-lora \
@@ -32,11 +39,18 @@ worker:
 
 ```bash
 make example-peft-lora \
-  EXAMPLE_ARGS="--prepare-only --workspace /tmp/invarlock-peft-inputs \
+  EXAMPLE_ARGS="--prepare-only --workspace /new/path/invarlock-peft-inputs \
   --evidence-signing-key /secure/keys/evidence.pem \
   --verifier-signing-key /secure/keys/verifier.pem \
   --trust-root /secure/trust/peft-lora"
 ```
+
+Replace `/new/path` with an existing parent directory without symlinks.
+Preparation lets you inspect inputs but does not produce an independently
+verified result. After a complete run, read the report alongside the separate
+verification receipt to distinguish the measured change from policy acceptance.
+Preparation still downloads the model and trains, saves, reloads and merges the
+adapter. It skips container construction and evaluation, not LoRA training.
 
 CUDA is selected when available and CPU remains supported. The first run needs
 several gigabytes of download, cache, and workspace capacity. The 50 distinct

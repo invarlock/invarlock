@@ -1,11 +1,10 @@
 """Verifier-replayable scorer extension boundary.
 
-Exact match and normalized NLL remain package-owned acceptance metrics.  This
-module defines the smaller boundary for optional, task-specific scorers: an
-authorized installed extension receives only authenticated per-record facts and
-returns finite per-record values plus one deterministic aggregate.  Network,
-external-model, and human/LLM judgment are deliberately outside this acceptance
-boundary.
+This module defines the boundary for optional deterministic text scorers. An
+authorized extension receives authenticated per-record facts and returns finite
+per-record values. Network services, external models and externally assigned
+ratings are outside this extension boundary. The native judge scorer uses its
+own retained-measurement contract.
 
 Extensions do not define aggregate or direction semantics.  Every replayed
 record value is a finite unit-interval score where higher is better, and core
@@ -241,8 +240,8 @@ class ScorerExtensionDescriptor:
             or self.uses_human_judgment is not False
         ):
             raise ScorerExtensionError(
-                "network, external-model, human, and LLM judges are not eligible "
-                "for acceptance replay"
+                "network services, external models, and externally assigned ratings "
+                "are not eligible for deterministic extension replay"
             )
 
 
@@ -743,15 +742,23 @@ class ScorerExtensionRegistry:
             )
 
     def list_scorers(self) -> tuple[str, ...]:
-        """List installed extension IDs without importing their code."""
+        """List shipped and installed extension IDs without loading external code."""
+
+        from invarlock.core.builtin_scorers import BUILTIN_SCORER_IDS
 
         self._ensure_initialized()
-        return tuple(sorted({*self._entries, *self._authorized}))
+        return tuple(sorted({*BUILTIN_SCORER_IDS, *self._entries, *self._authorized}))
 
     def _load(self, scorer_id: str) -> _LoadedScorer:
+        from invarlock.core.builtin_scorers import BUILTIN_SCORER_IDS, BuiltinScorer
+
         self._ensure_initialized()
         entry = self._entries.get(scorer_id)
         authorized = self._authorized.get(scorer_id)
+        if scorer_id in BUILTIN_SCORER_IDS:
+            if entry is not None or authorized is not None:
+                raise ScorerExtensionError("a shipped scorer cannot be shadowed")
+            authorized = BuiltinScorer(scorer_id.split(".", 1)[1])
         if entry is None and authorized is None:
             raise ScorerExtensionError(
                 f"required scorer extension {scorer_id!r} is not installed or enabled"

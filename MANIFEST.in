@@ -1,4 +1,5 @@
 exclude sitecustomize.py
+global-exclude .DS_Store ._* Thumbs.db desktop.ini
 
 # Exclude development assets from sdist/wheels
 recursive-exclude tests *

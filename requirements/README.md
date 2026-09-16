@@ -8,7 +8,14 @@ documentation, release, security, and runtime-image builds.
 `requirements/workflows/` contains the complete maintained lock surface. The
 core and tooling locks stay independent of a model runtime. Hugging Face locks
 resolve the published Torch distribution for their target platform, while
-runtime-image locks select the container's Torch backend explicitly.
+runtime-image locks select the container's Torch backend explicitly. All
+maintained HF closures select `accelerate==1.14.0+invarlock.1`, built and verified
+from the authenticated upstream wheel by
+`scripts/security/build_hardened_accelerate_wheel.py bootstrap`. Run bootstrap
+before installing those locks with `--find-links runtime/wheels`; the lock
+authenticates the derived wheel hash. OCI builds use the same derivation.
+`accelerate-upstream-wheel.txt` records the build input only and must not be
+installed as a runtime dependency.
 The CPU and aarch64 locks share `runtime-image.in`. The CUDA runtime uses
 `runtime-image-cu126.in` so its platform-specific wheel closure remains
 explicit while matching the patched Torch release used by the CPU images.
@@ -31,17 +38,21 @@ runtime or introduce an unchecked CUDA closure.
 Python-version-specific, hash-pinned dependency closures installed before the
 coordinated local release wheels. Both are compiled from
 `release-install.in`, which is the exact union of the external base
-dependencies declared by the core and four optional first-party
+dependencies declared by the core and five optional first-party
 distributions. That closure includes NumPy for diagnostics and Pillow for the
-vision-text host package. Heavy inference stacks exposed only through optional
-runtime extras are deliberately outside this coordinated base-install gate.
+vision-text host package. Heavy inference stacks in repository dependency groups and maintained runtime
+images are outside this coordinated base-install gate.
 
 These workflow locks cover repository automation and runtime-image builds; they
 are not a substitute for each distribution's declared metadata. The release
 build validates the `invarlock`, diagnostics, GGUF connector, Hugging Face
-vision-text connector, and TensorRT-LLM connector distributions separately,
-then installs all five wheels together against the matching Python 3.12 or
+vision-text connector, TensorRT-LLM connector, and Inspect judge collection
+distributions separately, then installs all six wheels together against the matching Python 3.12 or
 3.13 closure in a disposable environment.
+
+The separate `inspect-judge-tests-py312.txt` and `inspect-judge-tests-py313.txt`
+locks pin the live judge SDK extra for its installed-package gate. They do not
+add provider SDKs to the base core or coordinated base-install closure.
 
 ## Refresh
 
@@ -51,8 +62,10 @@ Refresh them with:
 bash scripts/security/refresh_pinned_requirements.sh
 ```
 
-That compiler owns every generated workflow lock except two deliberately
-minimal, hand-maintained bootstrap surfaces:
+The compiler first bootstraps and verifies the derived runtime wheel. It then
+refreshes the workflow locks from the repository's ordinary
+runtime and tooling inputs. Two minimal bootstrap surfaces are maintained
+separately:
 
 - `pip-bootstrap.txt` contains the Python-version-independent pip bootstrap
   wheel and source hashes already reviewed in `release-security-py313.txt`;
@@ -65,6 +78,14 @@ ownership comments. The refresh script does not rewrite them. The same rule
 applies to `lm-evaluation-harness-upstream-wheel.txt`: update its reviewed wheel
 hash and the cache-free derivation script together when the upstream Harness
 version changes.
+
+`workflows/k2-campaign-py312.txt` is owned by the authenticated K2 runtime recipe
+in [source review](../examples/qualification/k2-horizon/source-review.md#source-derivation-and-runtime-gate).
+The general refresh script does not regenerate it. Preserve its frozen target,
+source derivation, build and kernel inputs, and vendor wheel hashes. Its
+regeneration command constrains existing versions; deliberate updates require
+reviewing the changed closure and repeating the image checks. This optional
+campaign runtime does not change the core installation requirements.
 
 After refreshing, run the lock and security checks:
 

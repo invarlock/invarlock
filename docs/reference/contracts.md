@@ -6,20 +6,46 @@ byte-identical package-owned copies ship in the core wheel. Verification always
 loads the package-owned copies: a working directory or environment variable
 cannot substitute a different schema.
 
-!!! info "Reference"
-
-    - **Surface:** Versioned request, evidence, provider, runtime, report, and receipt contracts
-    - **Stability:** Closed public interchange formats; incompatible shape or meaning changes require a new format identifier
-    - **Use this page when:** Authoring contract objects, validating canonical bytes, or reviewing cross-file digest and signature bindings
+> **Reference**
+>
+> **Surface:** Versioned request, evidence, provider, runtime, report, and receipt contracts
+>
+> **Stability:** Closed public interchange formats; incompatible shape or meaning changes require a new format identifier
+>
+> **Use this page when:** Authoring contract objects, validating canonical bytes, or reviewing cross-file digest and signature bindings
 
 ## Schema-backed contracts
 
 | File | Format | Purpose |
 | --- | --- | --- |
 | `evaluation_request.schema.json` | `invarlock/evaluation-request-v1` | One closed run-or-import request |
+| `evaluation_request_v2.schema.json` | `invarlock/evaluation-request-v2` | Captured-only request with paired source specifications and complete-run pins |
+| `evaluation_request_v3.schema.json` | `invarlock/evaluation-request-v3` | Bounded judge import or collection request over frozen runs |
+| `evaluation_setup_result.schema.json` | `invarlock/evaluation-setup-v1` | CLI example, key generation, or case-set preparation result; no evaluation assurance |
+| `evaluation_case_set.schema.json` | `invarlock/evaluation-case-set-v1` | Immutable case membership and inputs shared by captured runs |
+| `evaluation_run.schema.json` | `invarlock/evaluation-run-v1` | Complete attributed answers and optional recorded scores for one side |
+| `normalized_captured_request.schema.json` | `invarlock/evaluation-request-v2` | Canonical captured-request projection retained in evidence |
+| `comparison_policy.schema.json` | `invarlock/comparison-policy-v1` | Deterministic metric, slice, count, precision, and regression requirements |
+| `multi_metric_comparison.schema.json` | `invarlock/multi-metric-comparison-v1` | Recomputed deterministic results across declared metrics and slices |
+| `scorer_extension_descriptor.schema.json` | `invarlock/scorer-extension-descriptor-v1` | Installed deterministic scorer identity and declared capabilities |
+| `scorer_extension_binding.schema.json` | `invarlock/scorer-extension-binding-v1` | Request binding to an exact scorer descriptor and configuration |
+| `scorer_extension_result.schema.json` | `invarlock/scorer-extension-result-v1` | Per-side deterministic scorer replay facts |
 | `evidence_pack.schema.json` | `invarlock/evidence-pack-v1` | Canonical bundle manifest and fixed payload paths |
+| `evidence_pack_v2.schema.json` | `invarlock/evidence-pack-v2` | Captured-only closed directory inventory and explicit signed/unsigned authentication |
+| `evidence_verification_receipt_v3.schema.json` | `invarlock/evidence-verification-receipt-v3` | Captured-only external verifier statement with run/request anchors and per-metric/slice scoring assurance |
+| `judge_measurement_plan.schema.json` | `invarlock/judge-measurement-plan-v1` | Frozen judge identity, prompt, rubric, scale, answer bindings, units, and schedule |
+| `judge_measurements.schema.json` | `invarlock/judge-measurements-v1` | Retained per-trial attempts, responses, parsed ratings, and completeness |
+| `judge_analysis_policy.schema.json` | `invarlock/judge-analysis-policy-v1` | Independent judge metric, interval, precision, and degradation requirements |
+| `judge_measurement_evidence.schema.json` | `invarlock/judge-measurement-evidence-v1` | Signed or unsigned judge evidence envelope and artifact digests |
+| `judge_measurement_recipient_policy.schema.json` | `invarlock/judge-measurement-recipient-policy-v1` | Recipient signer, subject, metric, result, and exact-artifact pins |
+| `judge_verification_result.schema.json` | `invarlock/judge-verification-result-v1` | Unsigned local judge authentication, replay, policy decision, and acceptance result |
+| `judge_measurement_verification_receipt.schema.json` | `invarlock/judge-measurement-verification-receipt-v1` | Scoped Ed25519 verifier statement binding the complete local judge result and recipient policy |
+| `evidence_set.schema.json` | `invarlock/evidence-set-v1` | Unsigned index of one deterministic captured pack and one bounded judge pack |
+| `evidence_set_recipient_policy.schema.json` | `invarlock/evidence-set-recipient-policy-v1` | Independent shared-run and component-policy pins for required conjunction |
+| `evidence_set_verification.schema.json` | `invarlock/evidence-set-verification-v1` | Fresh local conjunction result retaining distinct component receipts |
 | `evidence_observation.schema.json` | `invarlock/evidence-observation-v1` | Typed observation-only envelope and comparison bindings |
 | `trust_inputs.schema.json` | `invarlock/trust-inputs-v1` | Independent policy, anchors, verifier identity/key path, and scorer authorization |
+| `trust_inputs_v2.schema.json` | `invarlock/trust-inputs-v2` | Captured independent policy, complete-run/request/signer anchors and verifier identity/key path |
 | `acceptance_predicate.schema.json` | `invarlock/acceptance-predicate-v2` | Portable projection of one technical decision in an in-toto Statement |
 | `recipient_acceptance_policy.schema.json` | `invarlock/recipient-acceptance-policy-v2` | Current recipient trust, freshness, version, signer, and verdict rules |
 | `evaluator_qualification_profile.schema.json` | `invarlock/evaluator-qualification-profile-v1` | Evaluator identity, execution provenance, and authority classification |
@@ -30,6 +56,18 @@ cannot substitute a different schema.
 The acceptance predicate and recipient policy are described in
 [Acceptance attestations](acceptance-attestations.md). The detailed InvarLock
 receipt remains the authoritative replayable result.
+Native pack v1 and receipt v1/v2 retain their published meanings. Captured pack
+v2 and receipt v3 are the deterministic captured evidence family; captured
+`metric: judge` uses the separate judge envelope and receipt. Legacy monolithic
+comparison evidence is not accepted. A captured receipt's
+`verification_scope: captured_comparison` does not qualify native execution,
+acceptance attestations, ModelKit acceptance, or deployment approval. See
+[Captured records](evaluation-records.md) for run, case-set, policy and request
+normalization contracts; these schema identifiers are not product-release pins.
+
+[Evidence sets](evidence-sets.md) compose existing deterministic and judge
+components over the same original runs. Their combined decision does not add a
+joint confidence guarantee or change either component's acceptance scope.
 
 Evaluator qualification has two stable wire classifications:
 
@@ -41,6 +79,55 @@ Evaluator qualification has two stable wire classifications:
 These fields do not express adapter maintenance or signed-journey maturity.
 Those independent axes belong to the examples-layer qualification catalog, so
 an export cannot promote itself by claiming support or demonstration status.
+
+## Identity and evaluation-context boundaries
+
+A model name is a display label. It does not select the evaluated artifact,
+package, runtime, scorer or complete execution context. Independent verification
+requires recipient-selected expectations and checks the relationships between
+the authenticated objects, in addition to validating their schemas.
+
+| Requirement | Existing binding and recipient check | Authority and limit |
+| --- | --- | --- |
+| Exact artifact | Typed HF snapshot, GGUF or TensorRT-LLM identity; independent artifact-identity digest and actual content checks where supplied | Content identity is separate from a model name or declared ancestry |
+| Tokenizer and template | Artifact tokenizer-metadata digest; supported providers measure relevant files, including HF chat-template metadata | Additional processor or execution settings must be checked through the applicable provider/request binding |
+| Evaluated task and schedule | Normalized request, canonical schedule, and both authenticated provider capability declarations must agree | A valid signature cannot make conflicting task declarations consistent |
+| Generation, runtime and security settings | Provider-specific request/receipt checks and independent runtime digests; a full normalized-request digest can additionally pin the exact declared context | Authenticated settings and local enforcement tests do not establish independent hardware attestation |
+| Scorer and evaluation data | Scorer identifier/version/descriptor/configuration bindings, policy bytes, and independently selected schedule identity | A qualified scoring domain does not imply support for every behavior of the external evaluator |
+| Complete transaction request | Optional independent `request_digest` in the trust-input profile, or `--expected-request-digest`; required for the llama.cpp path | Receipt v2 records this expectation; receipt v1 does not acquire it retroactively |
+| Package-to-model mapping | The [ModelKit example](../user-guide/modelkit-handoff.md) verifies recipient-selected package blobs, both model directories and their relation to replayed evidence | This is an example-owned point-of-use check; the generic acceptance envelope alone does not verify a ModelKit |
+| Transformation or contextual observations | Canonical payload digest in the normalized request, comparison-bound observation envelope, and signed manifest inventory | Authenticates the payload and its association; arbitrary payload claims are not independently validated |
+| Current recipient acceptance | Trusted envelope and receipt signers, exact transported identity consistency, independent subject digest or actual-content binding, contract versions, freshness and current policy | Current acceptance is separate from the original technical result |
+
+The independently selected complete-request digest can require exact declared
+settings and observation contents without introducing another model hash. It
+does not independently confirm a hosted service's reported revision or an
+observation's scientific conclusion. Do not obtain an expected digest
+from incoming evidence and describe the resulting equality as independent trust.
+
+Observation payloads may use a versioned profile for method, configuration,
+probe-set identity, assumptions, result and uncertainty. A consumer must implement
+that profile's semantic checks before claiming to understand or validate it.
+The current recipient policy does not implement a generic required lineage or
+context-profile result. Its optional receipt trust-profile digest identifies the
+selected verifier configuration; it does not create missing validation logic.
+Unknown policy fields reject, while opaque observation payloads retain only
+observation authority.
+
+Declared transformation history, empirical similarity and exact artifact
+identity remain separate. No supported behavioral fingerprint proves ancestry
+merely because its payload is signed. A future profile must avoid including the
+complete normalized-request digest inside a payload already hashed by that
+request; bind component identities first and let the envelope add comparison
+bindings after normalization.
+
+The [evaluation-record contracts](evaluation-records.md) bind complete captured
+runs and policy bytes, including source versions and per-record context. Their
+independent run digests include outputs, so they are not pre-execution context
+identities. Replaying signed captured evidence verifies the comparison;
+it does not prove that an untrusted capture worker executed the declared model.
+The [captured rehearsal](../user-guide/captured-results.md) independently pins
+the protocol and capture before reconstructing those runs.
 
 ## Provider contracts
 
@@ -118,11 +205,16 @@ Each comparison side has the same closed shape:
 
 | Path | Type | Requirement | Meaning |
 | --- | --- | --- | --- |
-| `artifact.model_id` | String | Yes | Human-stable artifact name; URL syntax is rejected |
+| `artifact.model_id` | String | Yes | Display name for the artifact; URL syntax is rejected |
 | `artifact.locator` | String | Yes | Portable source locator bound into request intent |
 | `artifact.path` | Safe relative path | Required in run mode | Artifact path below the request root |
 | `runtime.provider` | Provider name | Yes | Selected runtime-provider ABI implementation |
 | `runtime.settings` | Object of JSON scalars | Yes | Provider-owned settings validated against capabilities |
+
+For `metric: judge`, `comparison.judge` additionally requires a private
+`workspace` and `signer_identity`, and `comparison.policy` names the closed
+`invarlock/native-judge-policy-v1` recipe. Its code-enforced plan and analysis
+bindings are described in [judge measurements](judge-measurements.md#native-scorer).
 
 `comparison.policy` is always a safe relative path. `comparison.dataset` is
 mode-specific:
@@ -139,12 +231,13 @@ capabilities, evaluation batches, and provider receipts. Built-in identifiers
 are `text_causal`, `masked_language`, `text_seq2seq`, and
 `vision_text_generation`; a provider must explicitly declare execution
 support. The request selects exactly one built-in `metric` or one complete
-`scorer_extension` binding. Built-in metrics are `exact_match` and
-`normalized_nll_per_utf8_byte`; request loading requires both selected
-providers to declare the chosen built-in metric. A scorer extension instead
-uses `exact_match` as its provider collection metric so that expected and
+`scorer_extension` binding. Built-in scorers are `exact_match`,
+`normalized_nll_per_utf8_byte` and `judge`. Providers declare the required
+collection metric: judge and deterministic scorer extensions use `exact_match`
+to retain complete text outputs; normalized NLL requires its own likelihood
+facts. A scorer extension uses that authenticated collection so that expected and
 observed text are authenticated for verifier replay. The built-in
-`hf_transformers` provider declares both built-in metrics. The
+`hf_transformers` provider declares exact-match and normalized-NLL collection. The
 first-party `llama_cpp`, `tensorrt_llm`, and `hf_vision_text` add-ins currently
 declare exact match for their tasks.
 
@@ -161,8 +254,8 @@ input/output kinds, the configuration-schema digest, and these v1 semantics:
 - each result is a finite higher-is-better value in `[0, 1]`;
 - the core computes the arithmetic mean, subject-minus-baseline percentage-
   point delta, and fixed 2,048-replicate paired interval; and
-- network access, an external model, and human judgment are forbidden in an
-  acceptance scorer.
+- network access, external models and externally assigned ratings are forbidden
+  in a deterministic extension scorer.
 
 The independently supplied policy must contain
 `resolved_policy.metrics.scorer_extension` with the same `scorer_id`,
@@ -173,31 +266,42 @@ code. The verifier runs the scorer twice, requires identical canonical
 results, then independently reconstructs the core-owned aggregate, paired
 interval, threshold comparison, and verdict.
 
-This boundary can support deterministic text scorers such as token F1,
-structured-field extraction, or VQA answer normalization when separately
-implemented and authorized. Those scorer packages are separately installed and
-require explicit authorization. SQL or code execution, model-based semantic
-similarity, network services,
-human review, and LLM judges require different trust contracts; judge outputs
-can be attached as authenticated observations without acceptance authority.
+Core ships `invarlock.normalized_match`, `invarlock.numeric_tolerance`,
+`invarlock.json_fields`, `invarlock.json_exact` and `invarlock.token_f1` through
+this boundary. The CLI enables them without `--allow-installed-scorers`; SDK
+callers supply `ScorerExtensionRegistry(allow_installed=False)`. Their exact
+version, descriptor and configuration bindings remain mandatory. Additional
+implementations, such as a VQA normalization scorer, require separate
+installation or caller injection and explicit authorization. SQL or code
+execution, model-based semantic similarity, network services, externally
+supplied ratings, and LLM judges require different trust contracts. The bounded
+frozen-answer judge formats provide one such contract for their declared text
+profile; other judge outputs can be attached as authenticated observations
+without acceptance authority.
 
 ### Evaluator input boundary
 
-Import mode is the general extension boundary for measurements produced by an
-external evaluator. An evaluator's output is admissible for an acceptance
+Native provider import mode is an extension boundary for measurements produced
+by an external evaluator. Under that contract, output is admissible for an acceptance
 decision only when InvarLock can authenticate the ordered per-record inputs
 and outputs, bind them to the exact schedule, artifacts, runtime, and source,
 and deterministically recompute the decision-contract metric or authorized
 scorer.
+
+Captured evaluator integrations use the separate
+[evaluation-record contracts](evaluation-records.md). They bind supplied runs
+and scorer-specific facts without requiring native provider sidecars or asserting
+native execution. Captured judge requests use the bounded judge evidence and
+recipient-policy contracts.
 
 An adapter alone does not establish evaluator neutrality. The generic
 qualification boundary binds the profile, independent schedule, normalized
 export, retained upstream output, runner bundle, and dependency declaration.
 For a deterministic exact-match profile, every ordered input and output must be
 present and InvarLock independently recomputes every score. Aggregate-only
-results, missing or reordered record facts, and external-judge outputs whose
-scores cannot be deterministically replayed remain observation-only and expose
-no runtime-import records.
+results, missing or reordered record facts, and external-judge outputs outside
+the bounded judge-measurement profile remain observation-only and expose no
+runtime-import records.
 
 The maintained [evaluator qualification
 matrix](evaluator-qualification.md) executes representative upstream tools
@@ -324,6 +428,10 @@ not sufficient.
 
 ## Parser and path limits
 
+These are native v1 request limits. Captured comparisons use the separate
+[capacity limits](evaluation-capacity.md); judge recipes and measurements use
+[judge operational bounds](judge-measurements.md#operational-bounds-and-measured-reference-workload).
+
 | Boundary | Limit or rule |
 | --- | --- |
 | Request YAML | At most 1 MiB, 64 nested levels, and 10,000 syntax nodes |
@@ -338,8 +446,9 @@ unsafe scalar types, and non-canonical scalar spellings. File reads repeat
 component-by-component no-follow checks at use time, so a path that passed the
 first parse cannot be replaced with a symbolic link unnoticed.
 
-The built-in comparison metrics are `exact_match` and
-`normalized_nll_per_utf8_byte`. Exact-match reports include paired outcome
+The built-in deterministic native metrics are `exact_match` and
+`normalized_nll_per_utf8_byte`; native `judge` uses the separately described
+[judge analysis policy](judge-measurements.md). Exact-match reports include paired outcome
 counts, an exact two-sided McNemar probability, and a versioned paired Newcombe
 95% interval whose lower bound controls policy. Current v3 reports and
 historical v2 reports use the continuity-corrected method; strict verification
@@ -410,9 +519,6 @@ separate JSON Schema file:
 | `invarlock/evidence-input-identity-v1` | One input role, material digest, and optional locator/media type |
 | `invarlock/paired-records-v1` | Verifier-derived baseline/subject scores in schedule order |
 | `invarlock/runtime-side-report-v1` | Minimal link from one side to its provider observation |
-| `invarlock/scorer-extension-descriptor-v1` | One scorer's capabilities, input facts, result semantics, and trust constraints |
-| `invarlock/scorer-extension-binding-v1` | Exact scorer identity and canonical configuration selected by the request |
-| `invarlock/scorer-extension-result-v1` | Ordered unit-interval record results and core-owned arithmetic mean from replay |
 | `invarlock/comparison-report-v3` | Current canonical means, point comparison, metric-specific paired interval, optional sample and exact-match side-accuracy qualification, threshold, and verdict |
 | `invarlock/comparison-report-v2` | Historical canonical report without side-accuracy qualification; accepted for backward verification, not emitted for new evaluations |
 | `invarlock/comparison-report-v1` | Legacy canonical report replayed with its original exact-match interval method; accepted for backward verification, not emitted for new evaluations |

@@ -7,6 +7,7 @@ import selectors
 import subprocess
 import time
 from collections.abc import Callable
+from contextlib import ExitStack
 from typing import BinaryIO, cast
 
 _IO_CHUNK_BYTES = 64 * 1024
@@ -127,10 +128,11 @@ def communicate_bounded(
         failed = False
         return status, bytes(stdout), bytes(stderr)
     finally:
-        if failed or terminate_after:
-            terminate(process)
-        if selector is not None:
-            selector.close()
-        for final_stream in (process.stdin, process.stdout, process.stderr):
-            if final_stream is not None and not final_stream.closed:
-                final_stream.close()
+        with ExitStack() as cleanup:
+            for final_stream in (process.stderr, process.stdout, process.stdin):
+                if final_stream is not None and not final_stream.closed:
+                    cleanup.callback(final_stream.close)
+            if selector is not None:
+                cleanup.callback(selector.close)
+            if failed or terminate_after:
+                terminate(process)

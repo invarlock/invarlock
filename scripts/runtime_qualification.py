@@ -605,7 +605,7 @@ def _capture_candidate_wheel(
             raise QualificationError(
                 "candidate_bootstrap", "candidate wheel is not one bounded regular file"
             )
-        with os.fdopen(os.dup(descriptor), "rb", closefd=True) as handle:
+        with os.fdopen(descriptor, "rb", closefd=False) as handle:
             digest = hashlib.sha256()
             while chunk := handle.read(1024 * 1024):
                 digest.update(chunk)
@@ -1093,8 +1093,8 @@ def _opened_real_directory(path: Path, *, label: str) -> Iterator[int]:
         descriptor = os.open(path.anchor, directory_flags)
         for part in path.parts[1:]:
             next_descriptor = os.open(part, directory_flags, dir_fd=descriptor)
-            os.close(descriptor)
-            descriptor = next_descriptor
+            previous_descriptor, descriptor = descriptor, next_descriptor
+            os.close(previous_descriptor)
     except OSError as exc:
         try:
             os.close(descriptor)

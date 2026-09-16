@@ -38,8 +38,9 @@ from tests.runtime_providers._hf_transformers_helpers import (
 )
 
 
+@pytest.mark.parametrize("max_shard_size", ["5GB", "1KB"])
 def test_hf_provider_receipts_a_real_tiny_local_transformers_journey(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, max_shard_size: str
 ) -> None:
     torch = pytest.importorskip("torch")
     transformers = pytest.importorskip("transformers")
@@ -68,7 +69,12 @@ def test_hf_provider_receipts_a_real_tiny_local_transformers_journey(
     )
     model.eval()
     checkpoint = tmp_path / "tiny-local-hf"
-    model.save_pretrained(checkpoint, safe_serialization=True)
+    model.save_pretrained(
+        checkpoint, safe_serialization=True, max_shard_size=max_shard_size
+    )
+    assert (checkpoint / "model.safetensors.index.json").exists() == (
+        max_shard_size == "1KB"
+    )
     vocab = {
         "<pad>": 0,
         "<bos>": 1,

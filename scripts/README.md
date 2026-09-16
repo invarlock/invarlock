@@ -14,16 +14,26 @@ and security checks.
 ## Maintained families
 
 - `checks/` contains the packaged-contract synchronizer, public-evidence and
-  example-scenario audits, and the source-tree cruft check.
+  example-scenario audits, the bounded judge statistics calibration, and the
+  source-tree cruft check.
 - `release/` validates a clean release checkout and built distributions.
-  `make dist-check` binds the core wheel/sdist and all four first-party
+  `make dist-check` binds the core wheel/sdist and all five first-party
   optional wheel/sdist pairs to their exact checkout sources, metadata, and
   entry points. `make addins-install-smoke` then installs the pinned base
-  dependency closure and all five wheels in a disposable environment, runs
+  dependency closure and all six wheels in a disposable environment, runs
   `pip check`, and exercises provider discovery and conformance without using
   the checkout or user site. It selects the maintained Python 3.12 or 3.13
-  lock for the invoking interpreter.
+  lock for the invoking interpreter. The shared `release/core_wheel_consumers.py`
+  stages five consumers outside the checkout: quickstart, captured evaluation,
+  judge replay, the three-scorer SDK journey and a retained deployment receipt.
+  Local installation checks and both release wheel jobs run this same inventory
+  before optional add-ins are installed.
 - `security/` generates the SBOM and runs dependency vulnerability checks.
+  `build_hardened_accelerate_wheel.py bootstrap` authenticates the upstream
+  Accelerate build input and the deterministic hardened wheel in `runtime/wheels`
+  before repository runtime installation. Both CPU and CUDA images use the same
+  derivation. The audit retains the upstream vulnerability identity and requires
+  the exact derived artifact before recognizing the checkpoint remediation.
 - `authenticated_runtime_build.py` consumes an authenticated Git archive,
   validates Dockerfile base overrides as named `repository@sha256:...`
   manifest references, and can publish a no-clobber build statement. Raw local
@@ -121,5 +131,5 @@ the checkout as Python source. Preflight does not approve or publish a release.
 
 GGUF, TensorRT-LLM, and Hugging Face vision-text conformance commands are
 shipped by their optional first-party distributions under `addins/`. The
-release workflow publishes those runtime packages, the diagnostics package,
-and the core distribution together.
+release workflow publishes those runtime packages, the diagnostics and Inspect
+judge preparation packages, and the core distribution together.

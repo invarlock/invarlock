@@ -1,13 +1,22 @@
 # Evaluation lifecycle and failure boundaries
 
 The evaluate, verify, and report transactions have deliberately separate read
-and write boundaries.
+and write boundaries. The stages below describe native exact-match/NLL and deterministic-extension
+run/import evidence. Native `judge` retains its runtime capture but uses the
+[judge collection, publication and recipient contracts](judge-measurements.md),
+including a private resumable workspace.
+[Captured deterministic, likelihood and recorded-score comparisons](../user-guide/captured-results.md)
+use the same transactions
+with paired runs, a captured directory pack, and independent run/request pins
+in place of native provider, schedule, and runtime bindings.
 
-!!! info "Reference"
-
-    - **Surface:** Transaction stages, write boundaries, failure classification, and outputs
-    - **Stability:** Behavioral contract for public evaluate, verify, and report transactions
-    - **Use this page when:** Diagnosing where a transaction stopped, designing retries, or determining which output may exist after failure
+> **Reference**
+>
+> **Surface:** Transaction stages, write boundaries, failure classification, and outputs
+>
+> **Stability:** Behavioral contract for public evaluate, verify, and report transactions
+>
+> **Use this page when:** Diagnosing where a transaction stopped, designing retries, or determining which output may exist after failure
 
 ```text
 request parsed
@@ -114,8 +123,10 @@ schedule, policy, runtime digests, and paired records.
 Publication validates the complete candidate in a private staging directory,
 writes canonical payloads and checksums, signs the manifest, and atomically
 renames the directory into place. The destination and a sibling publication
-lock are no-clobber. A failed publication removes staging and leaves no partial
-evidence directory.
+lock are no-clobber. Only a completed staged tree is renamed into place. If a
+publication check observes a changed path, the operation fails; completed or
+competing output, or private staging, may remain for inspection. Cleanup does not
+recursively remove a replacement at an old staging name.
 
 Published permissions are read-only, and all later outputs remain external.
 See [Evidence artifacts](artifacts.md) for the exact inventory.
@@ -140,6 +151,13 @@ Structural failure that prevents the verification transaction from reaching a
 completed result may prevent receipt creation. Automation must check both exit
 status and expected receipt presence.
 
+Receipt and report files are written in private staging, synchronized, and
+published without replacing an existing destination. A synchronization or path
+check failure after publication can leave a completed or competing file even
+though the command failed. Inspect and authenticate any retained evidence, and
+choose a new destination for a retry; file presence alone does not establish
+successful verification.
+
 Verification snapshots the submitted pack before replay so subsequent reads
 refer to the same regular-file inventory. It validates syntax and signatures
 before depending on semantic content, then reconstructs identities, pairings,
@@ -148,8 +166,11 @@ scores, interval, report, and policy decision under the independent anchors.
 ## 6. Render the authenticated report
 
 Reporting authenticates signed evidence bundle integrity and renders its closed
-canonical report. It can write one new HTML file outside the pack. Independent
-verification and its signed receipt remain the acceptance record.
+canonical report. It can write new HTML, Markdown, and JUnit files outside the
+pack. Independent verification and its signed receipt remain the acceptance
+record. Output destinations are checked together before writing. A later write
+failure can leave earlier completed outputs; the v2 rendering result lists them
+in `written_outputs`.
 
 ## Failure classification
 
@@ -161,22 +182,22 @@ verification and its signed receipt remain the acceptance record.
 | Publication | Destination exists, signing failure, parent changes | No partial destination |
 | Verification integrity | Signature, checksum, inventory, runtime, pairing, or report mismatch | Nonzero; rejection receipt when verification completed |
 | Verification policy | Replayed report verdict is `fail` | Integrity may be true, but command is nonzero and receipt records failure |
-| Reporting | Unauthenticated or malformed bundle, existing HTML destination | No rendered output and no bundle mutation |
+| Reporting | Unauthenticated or malformed bundle, existing destination, later write failure | No bundle mutation; earlier completed outputs may remain after a later write failure |
 
 Retries should use a new output or receipt path after correcting the underlying
 input. InvarLock never treats overwriting an earlier result as a retry.
 
 ## Transaction outputs
 
-| Transaction result | Evidence directory | Receipt | HTML | Exit |
+| Transaction result | Evidence directory | Receipt | Rendered files | Exit |
 | --- | --- | --- | --- | --- |
-| Evaluation succeeds | New immutable directory | None | None | `0` |
+| Evaluation publishes | New immutable directory | None | None | `0`; `--fail-on-policy` returns `7` for adverse policy or `2` for an unavailable decision |
 | Evaluation fails | Absent | None | None | Nonzero |
 | Verification accepts | Unchanged | Signed success receipt | None | `0` |
 | Verification completes rejection | Unchanged | Signed rejection receipt | None | Nonzero |
 | Verification cannot complete safely | Unchanged | May be absent | None | Nonzero |
-| Reporting succeeds | Unchanged | None | Optional new file | `0` |
-| Reporting fails | Unchanged | None | Absent or no replacement | Nonzero |
+| Reporting succeeds | Unchanged | None | Optional new files | `0` |
+| Reporting fails | Unchanged | None | Earlier completed files may remain; no replacement | Nonzero |
 
 For forensic retention, preserve the immutable pack and any external signed
 receipt together. Do not modify either to add annotations; store operator notes

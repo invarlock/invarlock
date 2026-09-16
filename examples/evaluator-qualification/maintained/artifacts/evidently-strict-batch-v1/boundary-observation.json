@@ -1,0 +1,403 @@
+{
+  "format": "invarlock/batch-semantic-observation-v1",
+  "provider": "evidently",
+  "upstream_version": "0.7.21",
+  "candidate_dependency": false,
+  "authority": "none",
+  "semantic_drift": false,
+  "problems": [],
+  "scorer_configuration": {
+    "descriptor": "ExactMatch",
+    "columns": [
+      "output",
+      "reference"
+    ],
+    "alias": "exact_match"
+  },
+  "cases": [
+    {
+      "record_id": "plain_equal",
+      "supported": true,
+      "literal_score": 1.0
+    },
+    {
+      "record_id": "case",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "distinct",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "equal_leading_space",
+      "supported": true,
+      "literal_score": 1.0
+    },
+    {
+      "record_id": "output_leading_space",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "reference_leading_space",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "equal_trailing_newline",
+      "supported": true,
+      "literal_score": 1.0
+    },
+    {
+      "record_id": "trailing_newline",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "equal_boundary_punctuation",
+      "supported": true,
+      "literal_score": 1.0
+    },
+    {
+      "record_id": "boundary_punctuation",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "internal_whitespace",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "internal_punctuation",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "unicode_equal",
+      "supported": true,
+      "literal_score": 1.0
+    },
+    {
+      "record_id": "unicode_case",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "unicode_composition",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "unicode_punctuation",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "unicode_boundary_space",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "equal_unicode_boundary_space",
+      "supported": true,
+      "literal_score": 1.0
+    },
+    {
+      "record_id": "zero_width_space",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "empty_equal",
+      "supported": true,
+      "literal_score": 1.0
+    },
+    {
+      "record_id": "empty_mismatch",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "empty_whitespace",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "empty_punctuation",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "multiple_targets_match",
+      "supported": false,
+      "literal_score": null
+    },
+    {
+      "record_id": "multiple_targets_miss",
+      "supported": false,
+      "literal_score": null
+    },
+    {
+      "record_id": "single_target_array",
+      "supported": false,
+      "literal_score": null
+    },
+    {
+      "record_id": "numeric_disabled_internal",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "numeric_disabled_boundary",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "template",
+      "supported": true,
+      "literal_score": 1.0
+    },
+    {
+      "record_id": "statement",
+      "supported": true,
+      "literal_score": 1.0
+    },
+    {
+      "record_id": "comment",
+      "supported": true,
+      "literal_score": 1.0
+    },
+    {
+      "record_id": "file_reference",
+      "supported": true,
+      "literal_score": 1.0
+    },
+    {
+      "record_id": "array_output",
+      "supported": false,
+      "literal_score": null
+    },
+    {
+      "record_id": "package_reference",
+      "supported": true,
+      "literal_score": 1.0
+    }
+  ],
+  "native_scores": [
+    1.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+  ],
+  "native_rows": [
+    {
+      "record_id": "plain_equal",
+      "output": "answer",
+      "reference": "answer",
+      "exact_match": true
+    },
+    {
+      "record_id": "case",
+      "output": "Answer",
+      "reference": "answer",
+      "exact_match": false
+    },
+    {
+      "record_id": "distinct",
+      "output": "answer",
+      "reference": "different",
+      "exact_match": false
+    },
+    {
+      "record_id": "equal_leading_space",
+      "output": " answer",
+      "reference": " answer",
+      "exact_match": true
+    },
+    {
+      "record_id": "output_leading_space",
+      "output": " answer",
+      "reference": "answer",
+      "exact_match": false
+    },
+    {
+      "record_id": "reference_leading_space",
+      "output": "answer",
+      "reference": " answer",
+      "exact_match": false
+    },
+    {
+      "record_id": "equal_trailing_newline",
+      "output": "answer\n",
+      "reference": "answer\n",
+      "exact_match": true
+    },
+    {
+      "record_id": "trailing_newline",
+      "output": "answer\n",
+      "reference": "answer",
+      "exact_match": false
+    },
+    {
+      "record_id": "equal_boundary_punctuation",
+      "output": "!answer!",
+      "reference": "!answer!",
+      "exact_match": true
+    },
+    {
+      "record_id": "boundary_punctuation",
+      "output": "answer!",
+      "reference": "answer",
+      "exact_match": false
+    },
+    {
+      "record_id": "internal_whitespace",
+      "output": "a b",
+      "reference": "a  b",
+      "exact_match": false
+    },
+    {
+      "record_id": "internal_punctuation",
+      "output": "a,b",
+      "reference": "ab",
+      "exact_match": false
+    },
+    {
+      "record_id": "unicode_equal",
+      "output": "é",
+      "reference": "é",
+      "exact_match": true
+    },
+    {
+      "record_id": "unicode_case",
+      "output": "É",
+      "reference": "é",
+      "exact_match": false
+    },
+    {
+      "record_id": "unicode_composition",
+      "output": "é",
+      "reference": "é",
+      "exact_match": false
+    },
+    {
+      "record_id": "unicode_punctuation",
+      "output": "“yes”",
+      "reference": "yes",
+      "exact_match": false
+    },
+    {
+      "record_id": "unicode_boundary_space",
+      "output": " answer",
+      "reference": "answer",
+      "exact_match": false
+    },
+    {
+      "record_id": "equal_unicode_boundary_space",
+      "output": " answer",
+      "reference": " answer",
+      "exact_match": true
+    },
+    {
+      "record_id": "zero_width_space",
+      "output": "​answer",
+      "reference": "answer",
+      "exact_match": false
+    },
+    {
+      "record_id": "empty_equal",
+      "output": "",
+      "reference": "",
+      "exact_match": true
+    },
+    {
+      "record_id": "empty_mismatch",
+      "output": "",
+      "reference": "no",
+      "exact_match": false
+    },
+    {
+      "record_id": "empty_whitespace",
+      "output": "",
+      "reference": "  ",
+      "exact_match": false
+    },
+    {
+      "record_id": "empty_punctuation",
+      "output": "!",
+      "reference": "",
+      "exact_match": false
+    },
+    {
+      "record_id": "numeric_disabled_internal",
+      "output": "1,000",
+      "reference": "1000",
+      "exact_match": false
+    },
+    {
+      "record_id": "numeric_disabled_boundary",
+      "output": "$42",
+      "reference": "42",
+      "exact_match": false
+    },
+    {
+      "record_id": "template",
+      "output": "{{output}}",
+      "reference": "{{output}}",
+      "exact_match": true
+    },
+    {
+      "record_id": "statement",
+      "output": "{% print 'x' %}",
+      "reference": "{% print 'x' %}",
+      "exact_match": true
+    },
+    {
+      "record_id": "comment",
+      "output": "{# comment #}",
+      "reference": "{# comment #}",
+      "exact_match": true
+    },
+    {
+      "record_id": "file_reference",
+      "output": "file://reference.txt",
+      "reference": "file://reference.txt",
+      "exact_match": true
+    },
+    {
+      "record_id": "package_reference",
+      "output": "package:module:function",
+      "reference": "package:module:function",
+      "exact_match": true
+    }
+  ]
+}

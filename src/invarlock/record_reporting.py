@@ -1,0 +1,1019 @@
+"""Pure comparison views, optionally bound to a captured pack snapshot."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import math
+from typing import Any, cast
+from xml.etree.ElementTree import Element, SubElement, tostring
+
+from invarlock.captured_contracts import (
+    CAPTURED_PACK_FORMAT,
+    PAYLOADS,
+    CapturedContractError,
+    CapturedSnapshot,
+    check_sizes,
+    json_object,
+    load_payloads,
+    validate_contract,
+)
+from invarlock.evaluation_record_contracts.contracts import (
+    EvaluationRecordsError,
+    digest,
+    validate,
+)
+from invarlock.evidence_pack_contract import canonical_json_bytes
+from invarlock.report_presentation import (
+    CheckView,
+    IntervalView,
+    MetricView,
+    ReportView,
+    number,
+    xml_text,
+)
+from invarlock.report_presentation import (
+    render_html as render_report_html,
+)
+from invarlock.report_presentation import (
+    render_markdown as render_report_markdown,
+)
+
+
+def _configuration_preview(value: Any) -> dict[str, Any]:
+    """Bound advanced configuration display without copying its full subtrees."""
+    remaining = 128
+
+    def text(item: Any, depth: int) -> str:
+        nonlocal remaining
+        if remaining == 0:
+            return "… node budget reached"
+        remaining -= 1
+        if isinstance(item, str):
+            shortened = item[:256]
+            if len(item) > 256:
+                shortened += f"… ({len(item)} characters; preview)"
+            return json.dumps(shortened, ensure_ascii=False)
+        if isinstance(item, (dict, list)):
+            if depth >= 6:
+                return "… depth limit reached"
+            parts = []
+            children = item.items() if isinstance(item, dict) else enumerate(item)
+            for key, child in children:
+                if remaining == 0:
+                    parts.append("… node budget reached")
+                    break
+                prefix = text(key, depth + 1) + ": " if isinstance(item, dict) else ""
+                parts.append(prefix + text(child, depth + 1))
+            opening, closing = ("{", "}") if isinstance(item, dict) else ("[", "]")
+            if not parts:
+                return opening + closing
+            indentation = "  " * (depth + 1)
+            return (
+                opening
+                + "\n"
+                + indentation
+                + (",\n" + indentation).join(parts)
+                + "\n"
+                + "  " * depth
+                + closing
+            )
+        return json.dumps(item, allow_nan=False, ensure_ascii=False)
+
+    return {
+        "preview_only": True,
+        "limits": {"depth": 6, "nodes": 128, "string_characters": 256},
+        "text": text(value, 0),
+        "note": "Display preview, not a replacement configuration. Full configuration remains in evidence under the original policy binding.",
+    }
+
+
+def _policy_preview(policy: dict[str, Any]) -> dict[str, Any]:
+    return {
+        **policy,
+        "metrics": [
+            {**metric, "configuration": _configuration_preview(metric["configuration"])}
+            for metric in policy["metrics"]
+        ],
+    }
+
+
+def _short_context(value: str, limit: int = 256) -> str:
+    return value if len(value) <= limit else value[:limit] + "… (truncated)"
+
+
+def _common_context(
+    records: list[dict[str, Any]], key: str, container: str = "context"
+) -> tuple[str | None, str]:
+    first = None
+    present = 0
+    mixed = False
+    for record in records:
+        context = record.get(container)
+        value = context.get(key) if isinstance(context, dict) else None
+        if isinstance(value, str) and value.strip():
+            present += 1
+            if first is None:
+                first = value
+            elif first != value:
+                mixed = True
+    if not present:
+        return None, "Unavailable in recorded context"
+    if mixed or present != len(records):
+        return None, "Mixed or incomplete across records"
+    return first, _short_context(cast(str, first))
+
+
+def _effective_messages(
+    records: list[dict[str, Any]],
+    source: str = "effective_messages",
+) -> dict[str, tuple[tuple[str, str], ...]] | None:
+    indexed = {}
+    for record in records:
+        context = record.get("context")
+        container = context
+        if source == "http_request":
+            observation = (
+                context.get("http_observation") if isinstance(context, dict) else None
+            )
+            container = (
+                observation.get("request") if isinstance(observation, dict) else None
+            )
+        messages = (
+            container.get(
+                "messages" if source == "http_request" else "effective_messages"
+            )
+            if isinstance(container, dict)
+            else None
+        )
+        if not isinstance(messages, list) or not messages:
+            return None
+        parsed = []
+        for message in messages:
+            if (
+                not isinstance(message, dict)
+                or not isinstance(message.get("role"), str)
+                or not message["role"].strip()
+                or not isinstance(message.get("content"), str)
+                or set(message) != {"role", "content"}
+            ):
+                return None
+            parsed.append((message["role"], message["content"]))
+        identity = record.get("id")
+        if not isinstance(identity, str) or not identity or identity in indexed:
+            return None
+        indexed[identity] = tuple(parsed)
+    return indexed
+
+
+def _prompt_roles(messages: dict[str, tuple[tuple[str, str], ...]] | None) -> str:
+    if not messages:
+        return "Unavailable in recorded context"
+    first = tuple(role for role, _ in next(iter(messages.values())))
+    if any(tuple(role for role, _ in row) != first for row in messages.values()):
+        return "Mixed across records"
+    visible = " → ".join(_short_context(role, 32) for role in first[:8])
+    if len(first) > 8:
+        visible += " → … (truncated)"
+    return visible
+
+
+def _prompt_change(
+    baseline: dict[str, tuple[tuple[str, str], ...]] | None,
+    subject: dict[str, tuple[tuple[str, str], ...]] | None,
+    source: str = "effective_messages",
+) -> tuple[str, tuple[tuple[str, Any], ...]]:
+    description = (
+        "HTTP request messages" if source == "http_request" else "effective messages"
+    )
+    if not baseline or not subject or baseline.keys() != subject.keys():
+        return (
+            "Prompt comparison unavailable in this report projection: no complete, uniquely paired supported message view is available.",
+            (),
+        )
+    changed = sum(baseline[key] != subject[key] for key in baseline)
+    if not changed:
+        return (
+            f"Recorded {description} are unchanged across all {len(baseline):,} paired cases.",
+            (),
+        )
+    common = None
+    for key, before in baseline.items():
+        after = subject[key]
+        if (
+            len(after) != len(before) + 1
+            or after[0][0] != "system"
+            or after[1:] != before
+        ):
+            break
+        instruction = after[0][1]
+        if common is None:
+            common = instruction
+        elif common != instruction:
+            break
+    else:
+        text = cast(str, common)
+        detail = {
+            "source": (
+                "Recorded context.http_observation.request.messages; not hidden backend instructions or an effective internal prompt"
+                if source == "http_request"
+                else "Evaluator-recorded context.effective_messages; not execution attestation"
+            ),
+            "paired_cases_checked": len(baseline),
+            "system_instruction": text[:4096],
+            "characters": len(text),
+            "truncated": len(text) > 4096,
+            "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+            "note": "Full messages remain in the captured run records. User messages are not expanded here.",
+        }
+        return (
+            f"The subject adds the same system instruction across all {len(baseline):,} paired cases; all other {description} are unchanged.",
+            (("Recorded added system instruction", detail),),
+        )
+    return (
+        f"Recorded {description} differ in {changed:,} of {len(baseline):,} paired cases; the change is not one uniform added system instruction.",
+        (),
+    )
+
+
+def _captured_context(
+    inputs: dict[str, dict[str, Any]],
+) -> tuple[
+    tuple[tuple[str, str], ...],
+    tuple[tuple[str, str], ...],
+    tuple[str, ...],
+    tuple[tuple[str, Any], ...],
+]:
+    subjects = []
+    context = [("Evaluation mode", "Captured evaluator outputs")]
+    service_details: list[tuple[str, Any]] = []
+    model_keys = []
+    messages = [
+        _effective_messages(inputs[side]["records"]) for side in ("baseline", "subject")
+    ]
+    message_source = "effective_messages"
+    if not messages[0] or not messages[1] or messages[0].keys() != messages[1].keys():
+        requests = [
+            _effective_messages(inputs[side]["records"], "http_request")
+            for side in ("baseline", "subject")
+        ]
+        if requests[0] and requests[1] and requests[0].keys() == requests[1].keys():
+            messages = requests
+            message_source = "http_request"
+    for side in ("baseline", "subject"):
+        run = inputs[side]
+        records = run["records"]
+        fields = {
+            key: _common_context(records, key)
+            for key in ("model_key", "model_id", "model_revision", "role")
+        }
+        model_keys.append(fields["model_key"][0])
+        indexed = messages[0 if side == "baseline" else 1]
+        label = side.title()
+        identity = (
+            "Recorded model ID: " + fields["model_id"][1]
+            if fields["model_id"][0] is not None
+            else "Recorded model key: " + fields["model_key"][1]
+            if fields["model_key"][0] is not None
+            else "Recorded run: " + _short_context(str(run["run_id"]), 128)
+        )
+        service = run.get("service_identity")
+        if service is not None:
+            model_label = (
+                "Observed model" if service["observed_model"] else "Requested model"
+            )
+            identity = (
+                model_label
+                + ": "
+                + _short_context(
+                    service["observed_model"] or service["requested_model"]
+                )
+            )
+            identity += " · Deployment: " + _short_context(service["deployment"])
+            window = service["observation_window"]
+            context.extend(
+                (label + " " + key, value)
+                for key, value in (
+                    ("provider", _short_context(service["provider"])),
+                    ("service", _short_context(service["service"])),
+                    ("deployment", _short_context(service["deployment"])),
+                    ("requested model", _short_context(service["requested_model"])),
+                    (
+                        "observed model",
+                        _short_context(service["observed_model"] or "Not exposed"),
+                    ),
+                    (
+                        "exposed revision",
+                        _short_context(service["exposed_revision"] or "Not exposed"),
+                    ),
+                    (
+                        "observation window",
+                        f"{window['started_at']} → {window['ended_at']}",
+                    ),
+                    (
+                        "service provenance",
+                        "Captured service declaration. Model weights are not identified.",
+                    ),
+                    (
+                        "service harness",
+                        _short_context(
+                            f"{service['harness']['name']} {service['harness']['version']}"
+                        ),
+                    ),
+                )
+            )
+            preview = _configuration_preview(service["configuration"])
+            preview["note"] = (
+                "Full declared configuration remains in the captured run. Its digest identifies the declaration."
+            )
+            service_details.append((label + " declared service configuration", preview))
+        subjects.append((label, identity))
+        source = run.get("source")
+        evaluator = (
+            _short_context(f"{source['name']} {source['version']}")
+            if isinstance(source, dict)
+            and isinstance(source.get("name"), str)
+            and isinstance(source.get("version"), str)
+            else "Unavailable in recorded run"
+        )
+        recorded_context: tuple[tuple[str, str], ...] = (
+            (label + " evaluator", evaluator),
+            (label + " model revision", fields["model_revision"][1]),
+            (label + " capture role", fields["role"][1]),
+            (
+                label + " workflow",
+                _common_context(records, "workflow", "metadata")[1],
+            ),
+            (
+                label + " dataset",
+                _common_context(records, "dataset", "metadata")[1],
+            ),
+            (label + " records", f"{len(records):,}"),
+            (
+                label
+                + (
+                    " HTTP request message roles"
+                    if message_source == "http_request"
+                    else " effective message roles"
+                ),
+                _prompt_roles(indexed),
+            ),
+        )
+        if service is not None:
+            source_is_harness = isinstance(source, dict) and all(
+                source.get(key) == service["harness"][key]
+                for key in ("name", "version")
+            )
+            recorded_context = tuple(
+                (key, value)
+                for key, value in recorded_context
+                if value != "Unavailable in recorded context"
+                and not (key == label + " evaluator" and source_is_harness)
+            )
+        context.extend(recorded_context)
+    services = [
+        inputs[side].get("service_identity") for side in ("baseline", "subject")
+    ]
+    if any(service is not None for service in services):
+        context.append(
+            (
+                "Measurement scope",
+                "Verification checks retained observations; it does not remeasure the service.",
+            )
+        )
+        if all(service is not None for service in services):
+            left, right = (cast(dict[str, Any], service) for service in services)
+            changed = [
+                key.replace("_", " ")
+                for key in (
+                    "provider",
+                    "service",
+                    "deployment",
+                    "requested_model",
+                    "observed_model",
+                    "exposed_revision",
+                    "configuration",
+                    "harness",
+                )
+                if left[key] != right[key]
+            ]
+            model = (
+                "Declared service fields differ: " + ", ".join(changed) + "."
+                if changed
+                else "Declared service and configuration fields are unchanged across the recorded observation windows."
+            )
+            model += " This comparison does not identify the cause of an observed performance change or establish identical hidden weights."
+        else:
+            model = "The runs use different identity profiles: a model artifact and a hosted service. The service declaration does not identify model weights."
+    elif model_keys[0] is not None and model_keys[0] == model_keys[1]:
+        model = (
+            "Both runs record model key "
+            + _short_context(model_keys[0])
+            + ". This does not establish identical model weights or revisions."
+        )
+    elif all(key is not None for key in model_keys):
+        model = "The runs record different model keys; these labels do not establish checkpoint identities."
+    else:
+        model = "Model-key comparison is unavailable because recorded values are missing or mixed."
+    prompt, details = _prompt_change(messages[0], messages[1], source=message_source)
+    if message_source == "http_request":
+        context.append(
+            (
+                "Prompt observation scope",
+                "Recorded HTTP request messages; these do not establish hidden backend instructions or the service's effective internal prompt.",
+            )
+        )
+    return (
+        tuple(subjects),
+        tuple(context),
+        (model, prompt),
+        (*details, *service_details),
+    )
+
+
+def _captured_identities(
+    inputs: dict[str, dict[str, Any]],
+) -> tuple[tuple[str, str], ...]:
+    """Expose mandatory run identities with the same labels in every report path."""
+    identities: list[tuple[str, str]] = []
+    for role in ("baseline", "subject"):
+        run = inputs[role]
+        label = role.title()
+        source = run["source"]
+        identities.extend(
+            (
+                (label + " run", run["run_id"]),
+                (label + " run digest", digest(run)),
+                (
+                    label + " service identity"
+                    if "service_identity" in run
+                    else label + " attributed artifact",
+                    digest(run["service_identity"])
+                    if "service_identity" in run
+                    else run["artifact_digest"],
+                ),
+                (label + " evaluator", f"{source['name']} {source['version']}"),
+            )
+        )
+        if "service_identity" in run:
+            service = run["service_identity"]
+            identities.extend(
+                (
+                    (label + " service configuration", service["configuration_digest"]),
+                    (label + " harness source", service["harness"]["source_digest"]),
+                )
+            )
+    return tuple(identities)
+
+
+def _binary_match_counts(metric: dict[str, Any]) -> tuple[int, int] | None:
+    """Invert complete binary means only when the unrounded arithmetic agrees."""
+    count = metric["count"]
+    if (
+        metric["aggregation"] != "mean"
+        or metric["missing_ids"]
+        or not 0 < count <= 2**53
+    ):
+        # Beyond this range, float means cannot distinguish consecutive counts.
+        return None
+    counts = []
+    for mean in (metric["baseline_mean"], metric["subject_mean"]):
+        if mean is None or not math.isfinite(mean) or not 0 <= mean <= 1:
+            return None
+        matches = round(mean * count)
+        if matches / count != mean:
+            return None
+        counts.append(matches)
+    return counts[0], counts[1]
+
+
+def _metric_views(
+    comparison: dict[str, Any], policy_metrics: dict[str, dict[str, Any]]
+) -> tuple[MetricView, ...]:
+    """Project recorded metrics consistently for CLI and SDK presentation."""
+    metrics: list[MetricView] = []
+    for m in comparison["metrics"]:
+        policy = policy_metrics.get(m["name"])
+        likelihood = m["kind"] == "normalized_nll_per_utf8_byte"
+        change = m["ratio"] if likelihood else m["delta"]
+        binary = m["kind"] in {
+            "exact_match",
+            "normalized_match",
+            "numeric_tolerance",
+            "json_exact",
+        }
+        display_values = [m["baseline_mean"], m["subject_mean"], m["delta"]]
+        if m["interval"]:
+            display_values.extend((m["interval"]["lower"], m["interval"]["upper"]))
+        if policy:
+            display_values.extend(
+                policy.get(key)
+                for key in (
+                    "maximum_regression",
+                    "maximum_interval_width",
+                    "subject_minimum",
+                    "subject_maximum",
+                )
+            )
+        percentage = binary and all(
+            math.isfinite(value * 100) for value in display_values if value is not None
+        )
+        scale = 100 if percentage else 1
+        unit = "ratio" if likelihood else "pp" if percentage else m["unit"]
+        display_unit = "nats / byte" if likelihood else m["unit"]
+        suffix = "%" if percentage else " " + display_unit
+        missing = len(m["missing_ids"])
+        complete = m["count"] - missing
+        checks: list[CheckView] = [
+            CheckView(
+                "Complete paired results",
+                f"{complete:,} of {m['count']:,}",
+                "All included pairs",
+                missing == 0,
+                "Missing results are retained; they cannot be dropped to obtain a pass.",
+            )
+        ]
+        if policy:
+            checks.append(
+                CheckView(
+                    "Included pair count",
+                    f"{m['count']:,}",
+                    f">= {policy['minimum_count']:,}",
+                    m["count"] >= policy["minimum_count"],
+                )
+            )
+        else:
+            checks.append(
+                CheckView(
+                    "Policy thresholds",
+                    "Not supplied to renderer",
+                    "Bound policy to explain requirements",
+                    None,
+                )
+            )
+        interval = m["interval"]
+        visual = None
+        if interval:
+            higher = m["direction"] == "higher"
+            threshold = (
+                (
+                    policy["ratio_max"]
+                    if likelihood
+                    else -policy["maximum_regression"]
+                    if higher
+                    else policy["maximum_regression"]
+                )
+                if policy
+                else None
+            )
+            label = (
+                "95% paired-schedule ratio resampling interval"
+                if likelihood
+                else "Paired 95% confidence interval"
+                if binary
+                else "95% paired-schedule resampling interval"
+            )
+            visual = IntervalView(
+                interval["lower"] * scale,
+                interval["upper"] * scale,
+                change * scale,
+                threshold * scale if threshold is not None else None,
+                label,
+                unit,
+                threshold_direction=("minimum" if higher else "maximum")
+                if policy
+                else None,
+                neutral=1.0 if likelihood else 0.0,
+                method={
+                    "newcombe_hybrid_score_paired_v1": "Newcombe hybrid score",
+                    "newcombe_hybrid_score_paired_v2": "Newcombe hybrid score",
+                }.get(interval.get("method", ""), ""),
+            )
+            if policy:
+                bound = interval["lower" if higher else "upper"]
+                checks.append(
+                    CheckView(
+                        "Maximum NLL ratio" if likelihood else "Allowed change",
+                        number(bound * scale) + " " + unit,
+                        (">= " if higher else "<= ")
+                        + number(cast(float, threshold) * scale)
+                        + " "
+                        + unit,
+                        bound >= threshold if higher else bound <= threshold,
+                        "Uses the interval bound, not just the observed change.",
+                    )
+                )
+                width = interval["upper"] - interval["lower"]
+                checks.append(
+                    CheckView(
+                        "Interval width",
+                        number(width * scale) + " " + unit,
+                        "<= "
+                        + number(policy["maximum_interval_width"] * scale)
+                        + " "
+                        + unit,
+                        width <= policy["maximum_interval_width"],
+                    )
+                )
+                for key, label, minimum in (
+                    ("subject_minimum", "Subject minimum", True),
+                    ("subject_maximum", "Subject maximum", False),
+                ):
+                    if key in policy:
+                        value = m["subject_mean"]
+                        checks.append(
+                            CheckView(
+                                label,
+                                number(value * scale) + suffix,
+                                (">= " if minimum else "<= ")
+                                + number(policy[key] * scale)
+                                + suffix,
+                                value >= policy[key]
+                                if minimum
+                                else value <= policy[key],
+                            )
+                        )
+        elif policy:
+            checks.append(
+                CheckView(
+                    "Score and uncertainty",
+                    "Not evaluated",
+                    "Complete results and sufficient count",
+                    None,
+                )
+            )
+        unmet = [c.name for c in checks if c.passed is False]
+        explanation = (
+            "All configured checks passed."
+            if m["decision"] == "pass"
+            else (
+                "More evidence is needed: "
+                + (", ".join(unmet) if unmet else "; ".join(m["reasons"]))
+                + "."
+                if m["decision"] == "insufficient_evidence"
+                else "The policy was not met: "
+                + (", ".join(unmet) if unmet else "; ".join(m["reasons"]))
+                + "."
+            )
+        )
+        notes = [
+            "Higher values are better."
+            if m["direction"] == "higher"
+            else "Lower values are better.",
+            "Recorded scoring basis: captured reference-continuation likelihood facts; NLL means, ratio and interval were recomputed when the comparison was created. Model execution and the supplied likelihood facts are not independently established."
+            if likelihood
+            else "Recorded scoring basis: expected and output values, scored when the comparison was created."
+            if m["scoring_assurance"] == "recomputed"
+            else "Recorded scoring basis: external measurements or judgments, aggregated when the comparison was created.",
+            f"{complete:,} usable pairs; {missing:,} missing results; {m['count']:,} included pairs. Counts in overlapping slices must not be added together.",
+        ]
+        counts = _binary_match_counts(m) if binary else None
+        if counts is not None:
+            notes.append(
+                f"Matches: baseline {counts[0]:,} of {m['count']:,}; subject {counts[1]:,} of {m['count']:,}."
+            )
+        if binary and policy is not None and "subject_minimum" not in policy:
+            notes.append("No absolute minimum score is required by this policy.")
+        if m["reasons"]:
+            notes.append("Recorded reasons: " + "; ".join(m["reasons"]))
+        if policy is None:
+            notes.append(
+                "Requirements are unavailable in this comparison-only view. The original decision is displayed without independent replay."
+            )
+        metrics.append(
+            MetricView(
+                name=m["name"],
+                scope=m["slice"],
+                decision=m["decision"],
+                baseline="Unavailable"
+                if m["baseline_mean"] is None
+                else number(m["baseline_mean"] * scale) + suffix,
+                candidate="Unavailable"
+                if m["subject_mean"] is None
+                else number(m["subject_mean"] * scale) + suffix,
+                change="Unavailable"
+                if change is None
+                else number(change * scale, signed=not likelihood) + " " + unit,
+                count=f"{complete:,}",
+                count_label="Usable pairs",
+                baseline_detail=f"{counts[0]:,} of {m['count']:,} matched"
+                if counts is not None
+                else "",
+                candidate_detail=f"{counts[1]:,} of {m['count']:,} matched"
+                if counts is not None
+                else "",
+                count_detail=(
+                    f"{missing:,} missing · {m['count']:,} included"
+                    + (f" · ≥ {policy['minimum_count']:,} required" if policy else "")
+                ),
+                explanation=explanation,
+                checks=tuple(checks),
+                interval=visual,
+                notes=tuple(notes),
+            )
+        )
+    # Bring actionable findings first; original order and exact values remain in evidence.
+    metrics.sort(
+        key=lambda m: {"regression": 0, "insufficient_evidence": 1, "pass": 2}[
+            m.decision
+        ]
+    )
+    return tuple(metrics)
+
+
+def _view(comparison: dict[str, Any], evidence: CapturedSnapshot | None) -> ReportView:
+    validate(comparison, "comparison")
+    manifest = None
+    signer = None
+    inputs = None
+    if evidence is not None:
+        try:
+            check_sizes(evidence.files)
+            manifest = json_object(evidence.manifest_bytes, "captured manifest")
+            validate_contract(manifest)
+            expected = {"manifest.json", "checksums.sha256", *PAYLOADS.values()}
+            if manifest["authentication"] == "signed":
+                expected.add("manifest.signature.json")
+            if set(evidence.files) != expected:
+                raise CapturedContractError("captured file inventory is invalid")
+            manifest, inputs, signer = load_payloads(evidence)
+        except CapturedContractError as exc:
+            raise EvaluationRecordsError(str(exc)) from exc
+        if canonical_json_bytes(inputs["report"]) != canonical_json_bytes(comparison):
+            raise EvaluationRecordsError(
+                "report comparison differs from supplied evidence"
+            )
+    return _assemble_view(comparison, inputs, manifest, signer)
+
+
+def _captured_summary(
+    metrics: tuple[MetricView, ...], comparison: dict[str, Any] | None = None
+) -> str:
+    if len(metrics) != 1:
+        failed = sum(m.decision == "regression" for m in metrics)
+        insufficient = sum(m.decision == "insufficient_evidence" for m in metrics)
+        passed = len(metrics) - failed - insufficient
+        overview = (
+            f"{len(metrics):,} metric / scope results: {passed:,} passed, "
+            f"{failed:,} did not meet policy, and {insufficient:,} need more evidence. "
+            "Each result applies to its recorded scope; overlapping slice counts must not be added together."
+        )
+        # Different metrics have different units; lead with the first adverse
+        # result in report order, without ranking their numeric magnitudes.
+        focus = next((m for m in metrics if m.decision == "regression"), None)
+        if focus is None:
+            focus = next(
+                (m for m in metrics if m.decision == "insufficient_evidence"), None
+            )
+        if focus is None:
+            return overview
+        outcome = (
+            "did not meet policy"
+            if focus.decision == "regression"
+            else "needs more evidence"
+        )
+        lead = f"{focus.name} ({focus.scope}) {outcome}"
+        check = next((c for c in focus.checks if c.passed is False), None)
+        if check is not None:
+            lead += f": the {check.name} check recorded {check.observed} against a requirement of {check.required}"
+        return lead + ". " + overview
+    metric = metrics[0]
+    recorded = (
+        next(
+            (
+                item
+                for item in comparison["metrics"]
+                if (item["name"], item["slice"]) == (metric.name, metric.scope)
+            ),
+            None,
+        )
+        if comparison is not None
+        else None
+    )
+    likelihood = (
+        recorded["kind"] == "normalized_nll_per_utf8_byte"
+        if recorded is not None
+        else metric.interval is not None and metric.interval.neutral == 1
+    )
+    parts = [] if metric.decision == "pass" else [metric.explanation]
+    scope = "" if metric.scope == "overall" else f" within the {metric.scope} slice"
+    pairs = "pair" if metric.count == "1" else "pairs"
+    if metric.baseline != "Unavailable" and metric.candidate != "Unavailable":
+        sentence = (
+            f"Across {metric.count} usable {pairs}{scope}, the subject's {metric.name} "
+            f"was {metric.candidate}, compared with {metric.baseline} for the baseline"
+        )
+        if metric.change != "Unavailable":
+            if likelihood:
+                ratio = (
+                    recorded["ratio"]
+                    if recorded is not None
+                    else cast(IntervalView, metric.interval).estimate
+                )
+                sentence += f", giving a subject-to-baseline ratio of {number(ratio)}"
+            else:
+                sentence += f", a change of {metric.change}"
+        parts.append(sentence + ".")
+    else:
+        unavailable = (
+            "Baseline and subject scores"
+            if metric.baseline == metric.candidate == "Unavailable"
+            else "The baseline score"
+            if metric.baseline == "Unavailable"
+            else "The subject score"
+        )
+        verb = "are" if unavailable == "Baseline and subject scores" else "is"
+        parts.append(
+            f"{unavailable} for {metric.name} {verb} unavailable across {metric.count} usable {pairs}{scope}."
+        )
+    if recorded is not None and recorded["missing_ids"]:
+        missing = len(recorded["missing_ids"])
+        parts.append(
+            f"Of {recorded['count']:,} included {'pair' if recorded['count'] == 1 else 'pairs'}, {missing:,} "
+            + ("has a missing result." if missing == 1 else "have missing results.")
+        )
+    if metric.interval is not None:
+        interval = metric.interval
+        parts.append(
+            f"The 95% interval for the {'ratio' if likelihood else 'change'} runs from "
+            f"{number(interval.lower)} to {number(interval.upper)}"
+            + ("." if likelihood else f" {interval.unit}.")
+        )
+    elif metric.change == "Unavailable":
+        parts.append(
+            f"No {'ratio' if likelihood else 'change'} estimate or uncertainty interval is available."
+        )
+    else:
+        parts.append("No uncertainty interval is available.")
+    for check in metric.checks:
+        if check.name == "Included pair count" and check.passed is False:
+            _, minimum = check.required.split(" ", 1)
+            parts.append(f"The policy requires at least {minimum} included pairs.")
+        elif check.name in {"Allowed change", "Maximum NLL ratio"}:
+            relation, value = check.required.split(" ", 1)
+            parts.append(
+                "The policy requires the interval to stay "
+                + ("at or above " if relation == ">=" else "at or below ")
+                + value
+                + "."
+            )
+        elif check.name in {"Subject minimum", "Subject maximum"}:
+            relation, value = check.required.split(" ", 1)
+            parts.append(
+                "The subject score must be "
+                + ("at least " if relation == ">=" else "at most ")
+                + value
+                + "."
+            )
+    parts.extend(
+        note
+        for note in metric.notes
+        if note == "No absolute minimum score is required by this policy."
+    )
+    return " ".join(parts)
+
+
+def _assemble_view(
+    comparison: dict[str, Any],
+    inputs: dict[str, dict[str, Any]] | None = None,
+    manifest: dict[str, Any] | None = None,
+    signer: str | None = None,
+) -> ReportView:
+    """Assemble presentation only after the caller's independent validation."""
+    policy_metrics = (
+        {m["name"]: m for m in inputs["policy"]["metrics"]} if inputs else {}
+    )
+    identity: list[tuple[str, str]] = []
+    if inputs is not None and manifest is not None:
+        identity.extend(
+            (
+                ("Manifest", digest(manifest)),
+                ("Comparison", str(manifest.get("comparison_id"))),
+                ("Evidence signer", str(signer)),
+                *_captured_identities(inputs),
+            )
+        )
+        signing = (
+            "Unsigned local evidence; no signer authentication."
+            if manifest["authentication"] == "unsigned_local"
+            else "Signed manifest verified. This rendering has not authenticated it against a recipient-owned key."
+        )
+    else:
+        signing = "Signing state unavailable: this view was created from comparison data only."
+    identity.extend(
+        (name.title() + " binding", value)
+        for name, value in comparison["bindings"].items()
+    )
+    metrics = _metric_views(comparison, policy_metrics)
+    summary = _captured_summary(metrics, comparison)
+    # Report detail remains compact even when evidence lists many missing case IDs.
+    technical = {
+        **comparison,
+        "metrics": [
+            {k: v for k, v in m.items() if k != "missing_ids"}
+            | {
+                "missing_count": len(m["missing_ids"]),
+                "missing_ids_preview": m["missing_ids"][:20],
+                "missing_ids_preview_is_complete": len(m["missing_ids"]) <= 20,
+            }
+            for m in comparison["metrics"]
+        ],
+    }
+    subjects, context, changes, context_details = (
+        _captured_context(inputs) if inputs else ((), (), (), ())
+    )
+    return ReportView(
+        title="InvarLock captured comparison",
+        family="Captured evaluation evidence",
+        decision=comparison["decision"],
+        summary=summary,
+        context=context,
+        changes=changes,
+        metrics=tuple(metrics),
+        assurance=(
+            *((("Pack format", CAPTURED_PACK_FORMAT),) if manifest is not None else ()),
+            (
+                "Input checks",
+                "Evidence structure and comparison bindings checked."
+                if inputs
+                else "Comparison structure checked; evidence inputs were not supplied.",
+            ),
+            ("Signing", signing),
+            ("Replay and scoring", "Scoring and replay were not performed by report."),
+            (
+                "Independent recipient verification",
+                "Not performed by report. Use invarlock verify with independently supplied inputs.",
+            ),
+        ),
+        identity=tuple(identity),
+        subjects=subjects,
+        next_steps=(
+            "Review the recorded checks against the approved requirements.",
+            "For a signed handoff, run invarlock verify with independent signer, policy, request and complete-run anchors and an external signed receipt.",
+            "Use the comparison JSON and JUnit outputs in CI; preserve missing results and the original policy.",
+        ),
+        limitations=tuple(comparison["limitations"])
+        + (
+            (
+                "Model and prompt context is evaluator-recorded provenance, not independent execution or model-identity attestation.",
+            )
+            if inputs
+            else ()
+        ),
+        details=context_details
+        + (
+            (
+                "Bound policy (configuration preview)",
+                _policy_preview(inputs["policy"]),
+            ),
+        )
+        if inputs
+        else (),
+        technical=technical,
+    )
+
+
+def render_markdown(
+    comparison: dict[str, Any], *, evidence: CapturedSnapshot | None = None
+) -> str:
+    return render_report_markdown(_view(comparison, evidence))
+
+
+def render_html(
+    comparison: dict[str, Any], *, evidence: CapturedSnapshot | None = None
+) -> str:
+    return render_report_html(_view(comparison, evidence))
+
+
+def render_reports(
+    comparison: dict[str, Any], *, evidence: CapturedSnapshot | None = None
+) -> tuple[str, str]:
+    """Build one validated view for HTML and Markdown publication."""
+    view = _view(comparison, evidence)
+    return render_report_html(view), render_report_markdown(view)
+
+
+def render_junit(comparison: dict[str, Any]) -> bytes:
+    validate(comparison, "comparison")
+    metrics = comparison["metrics"]
+    root = Element(
+        "testsuite",
+        name="InvarLock release comparison",
+        tests=str(len(metrics)),
+        failures=str(sum(m["decision"] == "regression" for m in metrics)),
+        errors=str(sum(m["decision"] == "insufficient_evidence" for m in metrics)),
+    )
+    for metric in metrics:
+        case = SubElement(
+            root,
+            "testcase",
+            name=xml_text(metric["name"]),
+            classname=xml_text(metric["slice"]),
+        )
+        if metric["decision"] != "pass":
+            SubElement(
+                case,
+                "failure" if metric["decision"] == "regression" else "error",
+                message=xml_text("; ".join(metric["reasons"])),
+            )
+    return cast(bytes, tostring(root, encoding="utf-8", xml_declaration=True))

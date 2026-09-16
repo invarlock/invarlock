@@ -4,17 +4,17 @@ The InvarLock evidence-gate action verifies one immutable evidence pack against
 verifier-controlled anchors, writes a separately signed receipt, renders the
 authenticated report, and uploads the review material as one workflow artifact.
 
-!!! tip "User guide"
-
-    **Outcome:** Add a fail-closed GitHub Actions gate for an existing
-    `invarlock/evidence-pack-v1` directory.
-
-    **Audience:** Release engineers and verifier operators automating an
-    independent acceptance decision.
-
-    **Prerequisites:** An evidence pack, an independently managed policy and
-    trust anchors, an installed matching InvarLock version, and a verifier key
-    available to the job without being stored in the evidence artifact.
+> **User guide**
+>
+> **Outcome:** Add a fail-closed GitHub Actions gate for an existing
+> `invarlock/evidence-pack-v1` directory.
+>
+> **Audience:** Release engineers and verifier operators automating an
+> independent acceptance decision.
+>
+> **Prerequisites:** An evidence pack, an independently managed policy and
+> trust anchors, an installed matching InvarLock version, and a verifier key
+> available to the job without being stored in the evidence artifact.
 
 The action runs the same public transactions documented by the
 [CLI reference](../reference/cli.md):
@@ -24,9 +24,14 @@ The action runs the same public transactions documented by the
    evidence-signer fingerprint plus the normalized-request digest required for
    GGUF evidence, then writes a verifier-signed receipt.
 2. `invarlock report EVIDENCE --html PATH --explain` authenticates the bundle
-   and writes a human view without changing the evidence.
+   and writes a report without changing the evidence.
 3. The action uploads the evidence directory, verification JSON, signed
    receipt, and HTML report. It never uploads the verifier private key.
+
+This action and its deployment consumer are native pack-v1 integrations.
+Captured packs and judge evidence use different trust and receipt contracts;
+use the [captured CI workflow](captured-results.md#preflight-and-local-ci) or
+[judge recipient workflow](../reference/judge-measurements.md) for those families.
 
 ## Inputs
 
@@ -206,7 +211,7 @@ directory. Their roles remain distinct:
 | Evidence directory | Signed canonical evidence and comparison report |
 | `verification.result.json` | Machine-readable result for this verifier run |
 | `verification.receipt.json` | Verifier-signed decision and independent anchors |
-| `evidence.html` | Reproducible human rendering; not an acceptance record |
+| `evidence.html` | Reproducible HTML report; not an acceptance record |
 
 Verification JSON is written even when the verifier returns nonzero. The action
 then attempts the authenticated renderer and uploads available review material.

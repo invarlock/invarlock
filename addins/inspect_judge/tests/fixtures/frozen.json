@@ -1,0 +1,7 @@
+{
+  "case-1": {
+    "input": "Capital of France?",
+    "baseline": "Paris",
+    "subject": "Paris"
+  }
+}

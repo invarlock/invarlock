@@ -29,8 +29,20 @@ through `tests/integration/conftest.py`.
   policy, image contracts, and verification helpers.
 - `tests/evidence_packs/` covers canonical publication, integrity,
   verification, signed receipts, and rendering.
-- `tests/reporting/` covers public evidence schemas and behavioral observation
-  validation.
+- `tests/evaluation_records/` and `tests/evaluation_comparison/` cover captured
+  evaluator facts, explicit input projections, deterministic scores, typed NLL
+  and paired comparison replay.
+- `tests/judge_measurements/` covers bounded plans, retained calls, reference
+  modes, collection continuation, analysis and independent judge verification.
+  Native and captured dispatch also have tests under `tests/core/`.
+- `tests/evidence_sets/` covers recipient composition of deterministic and judge
+  evidence without merging their statistical meanings.
+- `tests/examples/` covers public launchers, installed scorer journeys and
+  unchanged retained references, including the real Harness likelihood capture.
+- `tests/reporting/` covers report views, comparison identities, interval charts,
+  format consistency, escaping and local output behavior. Public evidence and
+  behavioral-observation contracts also have dedicated tests in the evidence
+  and repository-check suites.
 - `tests/cli/` covers the installed `evaluate`, `verify`, and `report` surface,
   including fail-closed behavior.
 - `tests/integration/` covers the offline public example, packaging isolation,
@@ -46,6 +58,11 @@ through `tests/integration/conftest.py`.
   transaction under `examples/`.
 - Optional-package tests live beside their packages under `addins/*/tests/` and
   run together through `make addins-test`.
+
+Ordinary collection tests use substituted transports; they make no paid provider
+calls. The optional Inspect add-in also has a pinned-SDK gate with mocked HTTP
+transport. Retained model measurements and hosted judge qualification remain
+separate evidence, with their original scopes and decisions.
 
 Keep new tests with the production surface that owns the behavior. Shared
 helpers should use an explicit support name such as `_support_*.py`. Stable,

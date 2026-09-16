@@ -1,0 +1,2 @@
+{"case_id":"case-1","prompt":"Context: The Aurora museum opens at 09:00 and closes at 17:00. Question: When does the museum close? Answer using only this context.","expected":"17:00"}
+{"case_id":"case-2","prompt":"Context: The Cedar library is closed on Mondays and open Tuesday through Sunday. Question: Is the library open on Monday? Answer using only this context.","expected":"No"}

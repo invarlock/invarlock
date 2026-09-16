@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import json
 import re
+import shlex
 import subprocess
 import sys
 import tomllib
 from pathlib import Path
 
 import jsonschema
+import markdown
 import yaml
+from markdown_it import MarkdownIt
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CORE_DOCS = (
@@ -52,11 +55,15 @@ EXPECTED_DOC_PAGES = {
     "reference/cli.md",
     "reference/compatibility.md",
     "reference/contracts.md",
+    "reference/evaluation-records.md",
+    "reference/evaluation-capacity.md",
     "reference/evaluator-qualification.md",
     "reference/environment.md",
     "reference/lifecycle.md",
     "reference/release-verification.md",
     "reference/reports.md",
+    "reference/judge-measurements.md",
+    "reference/evidence-sets.md",
     "reference/policy-engine-interop.md",
     "reference/runtime-security.md",
     "reference/runtime-providers.md",
@@ -72,7 +79,10 @@ EXPECTED_DOC_PAGES = {
     "user-guide/evidence-and-verification.md",
     "user-guide/public-evidence.md",
     "user-guide/getting-started.md",
+    "user-guide/captured-results.md",
+    "user-guide/hosted-service-requalification.md",
     "user-guide/key-management.md",
+    "user-guide/modelkit-handoff.md",
     "user-guide/runtime-providers.md",
     "user-guide/schedule-and-policy.md",
     "user-guide/troubleshooting.md",
@@ -80,11 +90,11 @@ EXPECTED_DOC_PAGES = {
 }
 DOCUMENT_TYPE_CONTRACTS = {
     "user-guide": (
-        '!!! tip "User guide"',
+        "> **User guide**",
         ("**Outcome:**", "**Audience:**", "**Prerequisites:**"),
     ),
     "assurance": (
-        '!!! abstract "Assurance note"',
+        "> **Assurance note**",
         (
             "**In plain language:**",
             "**Question:**",
@@ -93,11 +103,11 @@ DOCUMENT_TYPE_CONTRACTS = {
         ),
     ),
     "reference": (
-        '!!! info "Reference"',
+        "> **Reference**",
         ("**Surface:**", "**Stability:**", "**Use this page when:**"),
     ),
     "security": (
-        '!!! warning "Security guidance"',
+        "> **Security guidance**",
         (
             "**In plain language:**",
             "**Objective:**",
@@ -139,21 +149,31 @@ def test_core_docs_present_the_three_transaction_journey() -> None:
         assert missing == [], f"{relative} misses {missing}"
 
 
-def test_readme_resources_use_absolute_urls_for_pypi() -> None:
+def test_readme_repository_resources_are_relative_and_exist() -> None:
     readme = _read("README.md")
     embedded_urls = re.findall(r'\b(?:href|src|srcset)="([^"]+)"', readme)
     markdown_urls = re.findall(r"\[[^\]]+\]\(([^)]+)\)", readme)
     resource_urls = embedded_urls + markdown_urls
 
     assert resource_urls
-    assert all(url.startswith(("https://", "mailto:")) for url in resource_urls)
+    repository_prefixes = (
+        "https://github.com/invarlock/invarlock/blob/",
+        "https://github.com/invarlock/invarlock/tree/",
+        "https://raw.githubusercontent.com/invarlock/invarlock/",
+    )
+    assert not any(url.startswith(repository_prefixes) for url in resource_urls)
+    relative_urls = [
+        url for url in resource_urls if not url.startswith(("https://", "mailto:"))
+    ]
+    assert relative_urls
+    for url in relative_urls:
+        assert not url.startswith("/"), url
+        assert REPO_ROOT.joinpath(url.split("#", 1)[0]).exists(), url
 
 
 def test_readme_links_to_the_schema_valid_public_request() -> None:
     readme = _read("README.md")
-    request_url = (
-        "https://github.com/invarlock/invarlock/blob/main/examples/request.yaml"
-    )
+    request_url = "[import request](examples/request.yaml)"
 
     assert request_url in readme
     assert "omits `--runtime-image` and `--runtime-image-digest`" in readme
@@ -162,52 +182,37 @@ def test_readme_links_to_the_schema_valid_public_request() -> None:
     jsonschema.Draft202012Validator(schema).validate(request)
 
 
-def test_readme_hierarchy_promotes_evaluator_neutral_evidence_paths() -> None:
+def test_readme_leads_with_a_runnable_workflow_and_scoped_capabilities() -> None:
     readme = _read("README.md")
     headings = (
-        "## Evidence paths",
-        "## Decision boundary",
-        "## Try the signed handoff locally",
-        "## Inspect published evidence",
-        "## Run, verify, and report",
-        "## The release-regression decision",
-        "## Import and qualify evaluator results",
-        "## Hand off acceptance",
-        "## Providers and diagnostics",
-        "## Documentation",
+        "## Quickstart",
+        "## What can you use it for?",
+        "## One workflow: evaluate, verify, report",
+        "## Choose a scorer",
+        "## Keep your evaluator or run the comparison here",
+        "## Inspect real retained examples",
+        "## What verification establishes",
+        "## Documentation and contributing",
     )
     positions = [readme.index(heading) for heading in headings]
-
     assert positions == sorted(positions)
-    evidence_paths = readme[positions[0] : positions[1]]
-    for phrase in (
-        "Native execution",
-        "Adapter support",
-        "Replay authority",
-        "Signed-journey maturity",
-        "evaluator-neutral contracts",
-    ):
-        assert phrase in evidence_paths
-    assert evidence_paths.index("evaluation-verification-flow.svg") < (
-        evidence_paths.index("| Axis |")
-    )
 
-    introduction = readme[: positions[0]]
-    assert "in-toto/DSSE" not in introduction
-    decision_boundary = " ".join(readme[positions[1] : positions[2]].split())
-    for phrase in (
-        "one precise question",
-        "authenticated evidence and independently supplied trust anchors",
-        "reproducible, portable, and suitable for recipient-controlled approval",
-        "Broader deployment, safety, compliance, and organizational decisions",
-        "complete claim boundary and assumptions",
-    ):
-        assert phrase in decision_boundary
-    assert "## Scope and non-goals" not in readme
+    quickstart = readme[positions[0] : positions[1]]
+    assert "python -m pip install ." in quickstart
+    assert "python examples/quickstart/run.py" in quickstart
+    assert "--fixture examples/acceptance-handoff/golden" in quickstart
+    assert "makes no new model calls" in quickstart
 
-    acceptance = readme[positions[7] : positions[8]]
-    assert "in-toto/DSSE" in acceptance
-    assert "**Compatibility note:**" in acceptance
+    scorers = readme[positions[3] : positions[4]]
+    for metric in ("exact_match", "normalized_nll_per_utf8_byte", "judge"):
+        assert f"(`{metric}`)" in scorers
+    integrations = readme[positions[4] : positions[5]]
+    assert "An aggregate score cannot substitute" in integrations
+    assert "Verifying old evidence does not measure" in integrations
+    boundary = " ".join(readme[positions[6] : positions[7]].split())
+    assert "does not independently rerun" in boundary
+    assert "recipient's current policy" in boundary
+    assert "v0.13 evidence and receipts remain verifiable and ingestible" in boundary
 
 
 def test_readme_first_run_commands_track_checked_in_surfaces() -> None:
@@ -226,14 +231,17 @@ def test_readme_first_run_commands_track_checked_in_surfaces() -> None:
     receipt_path = (
         "public_evidence/evidence/mistral-7b-weight-scale-hf/verification.receipt.json"
     )
-    assert report_path in readme
-    assert receipt_path in readme
+    assert "[Native model and runtime comparisons](public_evidence)" in readme
+    assert REPO_ROOT.joinpath(report_path).is_dir()
+    assert REPO_ROOT.joinpath(receipt_path).is_file()
     assert evidence_root.joinpath("evidence/manifest.json").is_file()
     assert evidence_root.joinpath("verification.receipt.json").is_file()
 
 
 def test_public_docs_describe_the_release_assurance_surface() -> None:
-    text = "\n".join(_read(relative) for relative in CORE_DOCS).lower()
+    text = " ".join(
+        "\n".join(_read(relative) for relative in CORE_DOCS).lower().split()
+    )
     for phrase in (
         "baseline",
         "subject",
@@ -267,6 +275,7 @@ def test_auxiliary_docs_track_the_product_and_release_surface() -> None:
         "addins/gguf/pyproject.toml",
         "addins/multimodal/pyproject.toml",
         "addins/tensorrt_llm/pyproject.toml",
+        "addins/inspect_judge/pyproject.toml",
     )
     distributions = {
         tomllib.loads(_read(relative))["project"]["name"]
@@ -278,6 +287,7 @@ def test_auxiliary_docs_track_the_product_and_release_surface() -> None:
         "invarlock-runtime-gguf",
         "invarlock-runtime-hf-vision-text",
         "invarlock-runtime-tensorrt-llm",
+        "invarlock-inspect-judge",
     }
     for distribution in distributions:
         assert distribution in workflows
@@ -288,17 +298,20 @@ def test_auxiliary_docs_track_the_product_and_release_surface() -> None:
     assert "shared MMLU-Pro semantic artifact" in notices
 
     core_section = notices.split("## Core distribution", maxsplit=1)[1].split(
-        "## Hugging Face extra", maxsplit=1
+        "## Hugging Face runtime group", maxsplit=1
     )[0]
-    hf_section = notices.split("## Hugging Face extra", maxsplit=1)[1].split(
+    hf_section = notices.split("## Hugging Face runtime group", maxsplit=1)[1].split(
         "## First-party optional distributions", maxsplit=1
     )[0]
     assert _code_table_names(core_section) == _declared_dependency_names(
         "pyproject.toml"
     )
-    assert _code_table_names(hf_section) == _declared_dependency_names(
-        "pyproject.toml", extra="hf"
-    )
+    assert _code_table_names(hf_section) == {
+        re.match(r"[A-Za-z0-9][A-Za-z0-9._-]*", requirement).group(0).lower()
+        for requirement in tomllib.loads(_read("pyproject.toml"))["dependency-groups"][
+            "hf"
+        ]
+    }
 
     scripts = text_by_path["scripts/README.md"]
     for argument in (
@@ -496,48 +509,53 @@ def test_typed_docs_declare_their_reader_contract() -> None:
                 value = opener.split(field, maxsplit=1)[1].splitlines()[0].strip()
                 assert value, f"empty {field} in {page}"
 
+            # GitHub treats MkDocs-only indented callouts as code. Exercise
+            # both Markdown engines, not just the presence of source labels.
+            contract_lines = []
+            for line in text[text.index(marker) :].splitlines():
+                if not line.startswith(">"):
+                    break
+                contract_lines.append(line)
+            contract = "\n".join(contract_lines)
+            rendered = (
+                MarkdownIt("commonmark").render(contract),
+                markdown.markdown(contract, extensions=["admonition", "tables"]),
+            )
+            for html in rendered:
+                assert "<blockquote>" in html, page
+                assert "<pre>" not in html, page
+                for field in fields:
+                    assert f"<strong>{field.strip('*')}</strong>" in html, page
+                    assert field not in html, page
+
 
 def test_workflow_diagram_tracks_current_transactions() -> None:
     svg = _read("docs/assets/evaluation-verification-flow.svg")
     diagram = svg.lower()
     for phrase in (
-        "request.yaml",
-        "baseline artifact",
-        "subject artifact",
-        "prepare schedule · run pinned oci sides or import evidence",
+        "native run or import",
+        "captured records",
+        "hosted-service runs",
+        "frozen answers",
         "invarlock evaluate",
-        "paired comparison and interval",
-        "invarlock/evidence-pack-v1",
-        "canonical signed evidence bundle",
-        "baseline + subject artifact digests · schedule digest",
+        "exact match · normalized nll · judge",
+        "native, captured and judge evidence keep their own contracts",
+        "independent recipient trust inputs",
         "invarlock verify",
-        "authenticate pack · replay pairs and interval under anchors",
-        "signed verification receipt",
-        "acceptance result",
-        "scoped pass or rejection",
+        "authenticate, bind and replay offline",
+        "optional signed receipt",
         "invarlock report",
-        "console · optional HTML",
-        "human-readable evidence view",
+        "a report does not replace verification",
+        "explicit unsigned evaluation is local",
+        "deployment remains your decision",
     ):
-        assert phrase.lower() in diagram
+        assert phrase in diagram
     for stale in (
-        "spectral -&gt; RMT",
-        "evaluation.report.json",
-        "report html",
-        "nonzero: rejected",
+        "canonical evidence directory",
+        "native pack v1 · captured pack v2",
+        "paired comparison and interval",
     ):
-        assert stale.lower() not in diagram
-    for connection in (
-        'd="M 530 99 L 565 99"',
-        'd="M 1100 99 L 1065 99"',
-        'd="M 815 141 L 815 163"',
-        'd="M 815 241 L 815 263"',
-        'd="M 510 680 L 510 700"',
-        'd="M 440 775 L 440 795"',
-        'd="M 650 775 C 700 783 790 788 840 795"',
-    ):
-        assert connection in svg
-    assert 'd="M 610 794 L 640 794"' not in svg
+        assert stale not in diagram
 
     dependency_svg = _read("docs/assets/reference-evidence-dependency.svg")
     assert "manifest + anchors + verdict" in dependency_svg
@@ -554,10 +572,7 @@ def test_workflow_diagram_tracks_current_transactions() -> None:
 
     readme = _read("README.md")
     architecture = _read("docs/reference/architecture.md")
-    assert (
-        'src="https://raw.githubusercontent.com/invarlock/invarlock/main/'
-        'docs/assets/evaluation-verification-flow.svg"'
-    ) in readme
+    assert 'src="docs/assets/evaluation-verification-flow.svg"' in readme
     assert "../assets/evaluation-verification-flow.svg" in architecture
 
 
@@ -580,6 +595,47 @@ def test_example_request_conforms_to_the_closed_schema_surface() -> None:
     )
 
 
+def test_released_quickstarts_match_installed_version_without_branch_fallback() -> None:
+    for path in ("README.md", "examples/quickstart/README.md"):
+        text = _read(path)
+        assert (
+            'from importlib.metadata import version; print(version("invarlock"))'
+            in text
+        )
+        assert 'archive/refs/tags/v${INVARLOCK_VERSION}.tar.gz" &&' in text
+        assert "invarlock-${INVARLOCK_VERSION}/examples/quickstart" in text
+        assert (
+            "invarlock-${INVARLOCK_VERSION}/examples/acceptance-handoff/golden" in text
+        )
+        assert "archive/refs/heads/" not in text
+        assert "invarlock==0.15.0" not in text
+        assert "local build" in text.lower()
+
+
+def test_captured_guide_describes_the_actual_trust_and_json_cutover() -> None:
+    guide = _read("docs/user-guide/captured-results.md")
+    for phrase in (
+        "--trust-profile",
+        "invarlock/trust-inputs-v2",
+        "baseline_run_digest",
+        "subject_run_digest",
+        "request_digest",
+        "signing_key_path",
+        "--unsigned",
+        "--fail-on-policy",
+        "--max-bootstrap-draws",
+        "requested_outputs",
+        "written_outputs",
+        "failed_output",
+        "invarlock/evidence-pack-v2",
+        "invarlock/evidence-verification-receipt-v3",
+        "captured_comparison",
+        "native-only",
+        "exit `6`",
+    ):
+        assert phrase in guide
+
+
 def test_public_example_includes_every_required_input_and_verify_anchor() -> None:
     for relative in (
         "examples/inputs/schedule.json",
@@ -594,8 +650,8 @@ def test_public_example_includes_every_required_input_and_verify_anchor() -> Non
         "make example-hf-vision-text",
         "make example-peft-lora",
         "make example-evidence-handoff",
-        "separately generated trust inputs",
-        "human-readable report",
+        "caller-owned evidence and verifier",
+        "evidence report",
     ):
         assert fragment in example
     assert re.search(r"signed evidence\s+pack", example)
@@ -742,7 +798,19 @@ def test_operational_guides_pin_current_failure_publication_and_release_paths() 
 
 def test_latest_release_changelog_is_a_product_synthesis() -> None:
     changelog = _read("CHANGELOG.md")
-    unreleased, remainder = changelog.split("## [0.15.0]", maxsplit=1)
+    unreleased, current = changelog.split("## [0.16.0]", maxsplit=1)
+    current_release, remainder = current.split("## [0.15.0]", maxsplit=1)
+    for phrase in (
+        "Three built-in scorers",
+        "Bounded judging",
+        "hosted-service",
+        "evaluate",
+        "verify",
+        "report",
+    ):
+        assert phrase in current_release
+    for heading in ("### Added", "### Changed", "### Removed", "### Fixed"):
+        assert heading in current_release
     release, remainder = remainder.split("## [0.14.0]", maxsplit=1)
     previous_release = remainder.split("## [0.13.0]", maxsplit=1)[0]
     normalized = " ".join(release.split())
@@ -814,3 +882,41 @@ def test_evaluator_documentation_matrix_matches_retained_manifests() -> None:
     )
 
     assert completed.returncode == 0, completed.stdout + completed.stderr
+
+
+def test_documented_case_freeze_command_writes_schema_valid_setup_result(
+    tmp_path, monkeypatch
+) -> None:
+    from typer.testing import CliRunner
+
+    from invarlock.cli.app import app
+
+    monkeypatch.chdir(tmp_path)
+    cases = {
+        "format": "invarlock/evaluation-case-set-v1",
+        "cases": [
+            {"id": "b", "input": "second", "expected": "yes", "metadata": {}},
+            {"id": "a", "input": "first", "expected": "no", "metadata": {}},
+        ],
+    }
+    (tmp_path / "cases.json").write_text(json.dumps(cases), encoding="utf-8")
+    command = next(
+        line
+        for line in _read("docs/reference/cli.md").splitlines()
+        if line.startswith("invarlock evaluate --freeze-cases ")
+    )
+    result = CliRunner().invoke(app, shlex.split(command)[1:])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.stdout)
+    schema = json.loads(_read("contracts/evaluation_setup_result.schema.json"))
+    jsonschema.Draft202012Validator(schema).validate(payload)
+    assert payload["format_version"] in _read("docs/reference/cli.md")
+    assert payload["action"] == "freeze_cases"
+    assert payload["details"]["case_count"] == 2
+    output = json.loads((tmp_path / "frozen-cases.json").read_text(encoding="utf-8"))
+    assert [case["id"] for case in output["cases"]] == ["a", "b"]
+    assert (tmp_path / "cases.json").read_text(encoding="utf-8") == json.dumps(cases)
+    assert {path.name for path in tmp_path.iterdir()} == {
+        "cases.json",
+        "frozen-cases.json",
+    }

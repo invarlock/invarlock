@@ -59,7 +59,20 @@ def test_version_callback_emits_installed_and_source_fallback_versions(
     cli_module._version_callback(False)
 
 
-def test_evaluate_renders_success_in_human_and_json_modes(
+def test_dynamic_terminal_values_cannot_create_or_reorder_lines(tmp_path: Path) -> None:
+    request = tmp_path / "missing\nPASS Evidence created\u202e"
+
+    result = _RUNNER.invoke(app, ["evaluate", str(request)])
+
+    assert result.exit_code == 2
+    assert "\nPASS Evidence created" not in result.stdout
+    assert "\u202e" not in result.stdout
+    assert "missing\\u000aPASS Evidence created\\u202e" in result.stdout.replace(
+        "\n", ""
+    )
+
+
+def test_evaluate_renders_success_in_terminal_and_json_modes(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -78,12 +91,12 @@ def test_evaluate_renders_success_in_human_and_json_modes(
     )
     _mock_loaded_import_request(monkeypatch)
 
-    human = _RUNNER.invoke(app, ["evaluate", str(request)])
+    terminal = _RUNNER.invoke(app, ["evaluate", str(request)])
     machine = _RUNNER.invoke(app, ["evaluate", str(request), "--json"])
 
-    assert human.exit_code == 0
-    assert "PASS Evidence pack published" in human.stdout
-    assert str(evidence) in human.stdout.replace("\n", "")
+    assert terminal.exit_code == 0
+    assert "Evidence created" in terminal.stdout
+    assert str(evidence) in terminal.stdout.replace("\n", "")
     assert machine.exit_code == 0
     assert json.loads(machine.stdout) == json.loads(result.as_json())
 
@@ -120,7 +133,7 @@ def test_evaluate_preserves_transaction_failure_code_and_diagnostics(
         assert "FAIL runtime digest is not independently bound" in result.stdout
 
 
-def test_verify_renders_success_in_human_and_json_modes(
+def test_verify_renders_success_in_terminal_and_json_modes(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -141,12 +154,12 @@ def test_verify_renders_success_in_human_and_json_modes(
         lambda *_args, **_kwargs: verified,
     )
 
-    human = _RUNNER.invoke(app, ["verify", str(evidence)])
+    terminal = _RUNNER.invoke(app, ["verify", str(evidence)])
     machine = _RUNNER.invoke(app, ["verify", str(evidence), "--json"])
 
-    assert human.exit_code == 0
-    assert "PASS Evidence verified" in human.stdout
-    assert "Comparison: comparison-123" in human.stdout
+    assert terminal.exit_code == 0
+    assert "PASS Independent verification complete" in terminal.stdout
+    assert "Comparison: comparison-123" in terminal.stdout
     assert machine.exit_code == 0
     assert json.loads(machine.stdout)["ok"] is True
 
@@ -190,7 +203,7 @@ def test_verify_preserves_signed_failure_receipt_and_exit_code(
         assert f"Receipt {receipt}" in result.stdout.replace("\n", "")
 
 
-def test_verify_human_failure_without_signed_receipt_does_not_invent_one(
+def test_verify_terminal_failure_without_signed_receipt_does_not_invent_one(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -236,7 +249,8 @@ def test_report_renders_text_and_html_location(
     )
 
     assert result.exit_code == 0
-    assert "# InvarLock comparison report" in result.stdout
+    assert "InvarLock comparison report" in result.stdout
+    assert "# InvarLock" not in result.stdout
     assert f"HTML {html}" in result.stdout.replace("\n", "")
 
 
@@ -246,7 +260,7 @@ def test_report_json_binds_the_rendered_pack(
 ) -> None:
     evidence = tmp_path / "evidence"
     evidence.mkdir()
-    html = tmp_path / "report.html"
+    html = tmp_path / "report\x9b2J.html"
     digest = "sha256:" + "b" * 64
     monkeypatch.setattr(
         evidence_reporting,
@@ -265,6 +279,7 @@ def test_report_json_binds_the_rendered_pack(
     )
 
     assert result.exit_code == 0
+    assert "\x9b" not in result.stdout
     payload = json.loads(result.stdout)
     assert payload == {
         "format_version": "invarlock/evidence-report-v1",

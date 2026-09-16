@@ -1,0 +1,404 @@
+{
+  "format": "invarlock/batch-semantic-observation-v1",
+  "provider": "azure-ai-evaluation",
+  "upstream_version": "1.18.1",
+  "candidate_dependency": false,
+  "authority": "none",
+  "semantic_drift": false,
+  "problems": [],
+  "scorer_configuration": {
+    "evaluator": "local literal string equality",
+    "name": "exact_match",
+    "column_mapping": {
+      "ground_truth": "${data.ground_truth}",
+      "response": "${data.response}"
+    },
+    "fail_on_evaluator_errors": true
+  },
+  "cases": [
+    {
+      "record_id": "plain_equal",
+      "supported": true,
+      "literal_score": 1.0
+    },
+    {
+      "record_id": "case",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "distinct",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "equal_leading_space",
+      "supported": true,
+      "literal_score": 1.0
+    },
+    {
+      "record_id": "output_leading_space",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "reference_leading_space",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "equal_trailing_newline",
+      "supported": true,
+      "literal_score": 1.0
+    },
+    {
+      "record_id": "trailing_newline",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "equal_boundary_punctuation",
+      "supported": true,
+      "literal_score": 1.0
+    },
+    {
+      "record_id": "boundary_punctuation",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "internal_whitespace",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "internal_punctuation",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "unicode_equal",
+      "supported": true,
+      "literal_score": 1.0
+    },
+    {
+      "record_id": "unicode_case",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "unicode_composition",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "unicode_punctuation",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "unicode_boundary_space",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "equal_unicode_boundary_space",
+      "supported": true,
+      "literal_score": 1.0
+    },
+    {
+      "record_id": "zero_width_space",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "empty_equal",
+      "supported": true,
+      "literal_score": 1.0
+    },
+    {
+      "record_id": "empty_mismatch",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "empty_whitespace",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "empty_punctuation",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "multiple_targets_match",
+      "supported": false,
+      "literal_score": null
+    },
+    {
+      "record_id": "multiple_targets_miss",
+      "supported": false,
+      "literal_score": null
+    },
+    {
+      "record_id": "single_target_array",
+      "supported": false,
+      "literal_score": null
+    },
+    {
+      "record_id": "numeric_disabled_internal",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "numeric_disabled_boundary",
+      "supported": true,
+      "literal_score": 0.0
+    },
+    {
+      "record_id": "template",
+      "supported": true,
+      "literal_score": 1.0
+    },
+    {
+      "record_id": "statement",
+      "supported": true,
+      "literal_score": 1.0
+    },
+    {
+      "record_id": "comment",
+      "supported": true,
+      "literal_score": 1.0
+    },
+    {
+      "record_id": "file_reference",
+      "supported": true,
+      "literal_score": 1.0
+    },
+    {
+      "record_id": "array_output",
+      "supported": false,
+      "literal_score": null
+    },
+    {
+      "record_id": "package_reference",
+      "supported": true,
+      "literal_score": 1.0
+    }
+  ],
+  "native_scores": [
+    1.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+  ],
+  "native_rows": [
+    {
+      "inputs.record_id": "plain_equal",
+      "inputs.response": "answer",
+      "inputs.ground_truth": "answer",
+      "outputs.exact_match.exact_match": 1.0
+    },
+    {
+      "inputs.record_id": "case",
+      "inputs.response": "Answer",
+      "inputs.ground_truth": "answer",
+      "outputs.exact_match.exact_match": 0.0
+    },
+    {
+      "inputs.record_id": "distinct",
+      "inputs.response": "answer",
+      "inputs.ground_truth": "different",
+      "outputs.exact_match.exact_match": 0.0
+    },
+    {
+      "inputs.record_id": "equal_leading_space",
+      "inputs.response": " answer",
+      "inputs.ground_truth": " answer",
+      "outputs.exact_match.exact_match": 1.0
+    },
+    {
+      "inputs.record_id": "output_leading_space",
+      "inputs.response": " answer",
+      "inputs.ground_truth": "answer",
+      "outputs.exact_match.exact_match": 0.0
+    },
+    {
+      "inputs.record_id": "reference_leading_space",
+      "inputs.response": "answer",
+      "inputs.ground_truth": " answer",
+      "outputs.exact_match.exact_match": 0.0
+    },
+    {
+      "inputs.record_id": "equal_trailing_newline",
+      "inputs.response": "answer\n",
+      "inputs.ground_truth": "answer\n",
+      "outputs.exact_match.exact_match": 1.0
+    },
+    {
+      "inputs.record_id": "trailing_newline",
+      "inputs.response": "answer\n",
+      "inputs.ground_truth": "answer",
+      "outputs.exact_match.exact_match": 0.0
+    },
+    {
+      "inputs.record_id": "equal_boundary_punctuation",
+      "inputs.response": "!answer!",
+      "inputs.ground_truth": "!answer!",
+      "outputs.exact_match.exact_match": 1.0
+    },
+    {
+      "inputs.record_id": "boundary_punctuation",
+      "inputs.response": "answer!",
+      "inputs.ground_truth": "answer",
+      "outputs.exact_match.exact_match": 0.0
+    },
+    {
+      "inputs.record_id": "internal_whitespace",
+      "inputs.response": "a b",
+      "inputs.ground_truth": "a  b",
+      "outputs.exact_match.exact_match": 0.0
+    },
+    {
+      "inputs.record_id": "internal_punctuation",
+      "inputs.response": "a,b",
+      "inputs.ground_truth": "ab",
+      "outputs.exact_match.exact_match": 0.0
+    },
+    {
+      "inputs.record_id": "unicode_equal",
+      "inputs.response": "é",
+      "inputs.ground_truth": "é",
+      "outputs.exact_match.exact_match": 1.0
+    },
+    {
+      "inputs.record_id": "unicode_case",
+      "inputs.response": "É",
+      "inputs.ground_truth": "é",
+      "outputs.exact_match.exact_match": 0.0
+    },
+    {
+      "inputs.record_id": "unicode_composition",
+      "inputs.response": "é",
+      "inputs.ground_truth": "é",
+      "outputs.exact_match.exact_match": 0.0
+    },
+    {
+      "inputs.record_id": "unicode_punctuation",
+      "inputs.response": "“yes”",
+      "inputs.ground_truth": "yes",
+      "outputs.exact_match.exact_match": 0.0
+    },
+    {
+      "inputs.record_id": "unicode_boundary_space",
+      "inputs.response": " answer",
+      "inputs.ground_truth": "answer",
+      "outputs.exact_match.exact_match": 0.0
+    },
+    {
+      "inputs.record_id": "equal_unicode_boundary_space",
+      "inputs.response": " answer",
+      "inputs.ground_truth": " answer",
+      "outputs.exact_match.exact_match": 1.0
+    },
+    {
+      "inputs.record_id": "zero_width_space",
+      "inputs.response": "​answer",
+      "inputs.ground_truth": "answer",
+      "outputs.exact_match.exact_match": 0.0
+    },
+    {
+      "inputs.record_id": "empty_equal",
+      "inputs.response": "",
+      "inputs.ground_truth": "",
+      "outputs.exact_match.exact_match": 1.0
+    },
+    {
+      "inputs.record_id": "empty_mismatch",
+      "inputs.response": "",
+      "inputs.ground_truth": "no",
+      "outputs.exact_match.exact_match": 0.0
+    },
+    {
+      "inputs.record_id": "empty_whitespace",
+      "inputs.response": "",
+      "inputs.ground_truth": "  ",
+      "outputs.exact_match.exact_match": 0.0
+    },
+    {
+      "inputs.record_id": "empty_punctuation",
+      "inputs.response": "!",
+      "inputs.ground_truth": "",
+      "outputs.exact_match.exact_match": 0.0
+    },
+    {
+      "inputs.record_id": "numeric_disabled_internal",
+      "inputs.response": "1,000",
+      "inputs.ground_truth": "1000",
+      "outputs.exact_match.exact_match": 0.0
+    },
+    {
+      "inputs.record_id": "numeric_disabled_boundary",
+      "inputs.response": "$42",
+      "inputs.ground_truth": "42",
+      "outputs.exact_match.exact_match": 0.0
+    },
+    {
+      "inputs.record_id": "template",
+      "inputs.response": "{{output}}",
+      "inputs.ground_truth": "{{output}}",
+      "outputs.exact_match.exact_match": 1.0
+    },
+    {
+      "inputs.record_id": "statement",
+      "inputs.response": "{% print 'x' %}",
+      "inputs.ground_truth": "{% print 'x' %}",
+      "outputs.exact_match.exact_match": 1.0
+    },
+    {
+      "inputs.record_id": "comment",
+      "inputs.response": "{# comment #}",
+      "inputs.ground_truth": "{# comment #}",
+      "outputs.exact_match.exact_match": 1.0
+    },
+    {
+      "inputs.record_id": "file_reference",
+      "inputs.response": "file://reference.txt",
+      "inputs.ground_truth": "file://reference.txt",
+      "outputs.exact_match.exact_match": 1.0
+    },
+    {
+      "inputs.record_id": "package_reference",
+      "inputs.response": "package:module:function",
+      "inputs.ground_truth": "package:module:function",
+      "outputs.exact_match.exact_match": 1.0
+    }
+  ]
+}

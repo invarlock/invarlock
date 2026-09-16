@@ -1,0 +1,64 @@
+# K2 Horizon 32B frozen-answer reference
+
+This deterministic archive retains the outcome-blind judge-study inputs and
+source mappings for English grounded QA and slot extraction. It contains no
+new judge outcomes. Pilot review uses 40 cases per workflow. Final membership
+is frozen at 422 QA clusters and 1,288 extraction clusters; final-validation
+review uses 80 cases per workflow, balanced across its two strata.
+
+Use this reference to check which answers were selected and how they map to the
+original campaign. It is the input archive for a judge study, not a completed
+evaluation. A case contains a task and two frozen answers; a source cluster
+groups related cases so the pilot and final subsets cannot reuse the same unit.
+
+The archive preserves executable pilot plans and final plans and policies inside
+explicit candidate wrappers. These are the original study inputs; the separate
+[held-out reference](../k2-32b-luna-xhigh-heldout/README.md) retains executed final
+plans and measurements. Changing a rubric must preserve frozen final membership.
+
+You need Python 3.12 or newer, the core InvarLock package and this helper from a
+matching source checkout. No API key, collector, model or GPU is needed. From
+the checkout root, validate without model calls:
+
+```bash
+python examples/judge_measurements_reference.py validate \
+  --bundle examples/judge-measurements/references/k2-32b/reference.zip \
+  --expected-sha256 ee8afde57d48879d9681fe8f3a6a1218aabf371d12b54967eae3246316771363
+```
+
+The command prints JSON and exits zero when the retained inputs and mappings
+validate. It does not produce judge ratings or an acceptance decision. A nonzero
+exit requires investigating the pin or archive mismatch; do not replace the
+expected digest with a value taken from the failing archive.
+
+[archive.json](archive.json) pins the ZIP transport and internal reference
+manifest. Obtain those pins from an independent trusted copy of the repository.
+The command's `--expected-sha256` is the internal reference-manifest digest;
+the ZIP transport digest is a separate field in `archive.json`.
+Default validation reconstructs retained selection, mappings, contracts and
+review sheets from the archive alone. Optional campaign-root validation also
+rechecks every original source block, endpoint, protocol and planned QA case.
+Internal consistency does not independently authenticate omitted original files.
+
+For selection rules, exact frozen protocol and the build command, see the
+[K2 reference guide](../../K2-REFERENCE.md). For a blinded label comparison, use
+the guide’s `upgrade` command to produce the current bundle layout, then give
+reviewers only the appropriate sheet under `reference_review/`,
+keeping source roles and native scores withheld until the labels are frozen.
+The sheet itself contains the frozen rubric, allowed labels and empty rating and
+notes fields needed to record the review.
+
+Preserve [source attribution](ATTRIBUTION.md), the
+[SGD data license](SGD-LICENSE.txt), and the accurately scoped
+[SQuAD software license](SQuAD-SOFTWARE-LICENSE.txt). Complete original publisher
+README files and pinned dataset source metadata are inside the archive.
+
+The separate [judge pilot reference](../k2-32b-pilot/README.md) retains corrected
+measurements, signed replay receipts and the original incomplete history. This
+frozen-answer archive remains unchanged. Judge outcomes are separate from the
+blinded rating sheets.
+
+The [Luna xHigh pilot reference](../k2-32b-luna-xhigh-pilot/README.md) repeats
+the same pilot schedule with a different judge configuration and retains a
+descriptive comparison. It also contains outcomes, so keep it from blinded
+reviewers until their labels are frozen.

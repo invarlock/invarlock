@@ -5,18 +5,31 @@ Workflow YAML is linted with `make workflow-lint`.
 
 ## Continuous integration
 
-- `ci.yml` runs `verify-fast`, the Python 3.12 suite, coverage enforcement,
+- `ci.yml` runs repository checks, the Python 3.12 suite, Python 3.13 coverage,
   manual full verification, distribution checks, and the tag supply-chain
-  backstop.
+  backstop. Its `verify-fast` job runs `make verify-checks`, downloads a
+  checksum-pinned KitOps executable, exercises installed package journeys and
+  checks signed verification at full capacity. Four separate coverage jobs run
+  disjoint test groups. The required `coverage` job accepts only complete,
+  successful measurements from the same source and enforces every coverage
+  threshold. Per-test timings are retained to diagnose slow runs.
 - `container-front-door-smoke.yml` builds the final runtime image and exercises
   `evaluate`, `verify`, and `report` through the installed command surface.
-- `pre-commit.yml` runs the repository pre-commit hooks.
-- `repo-hygiene.yml` rejects generated artifacts and oversized files.
+  It also checks network isolation with positive controls, resource limits,
+  interruption, exact-container cleanup, and failed evidence publication.
+- `pre-commit.yml` runs the repository hooks for every pull request, including
+  changes to shell scripts, TOML files and dependency locks.
+- `repo-hygiene.yml` rejects generated artifacts and oversized files. Obsolete
+  runs are cancelled; only the checks that inspect a change's history fetch it.
+
+Python dependency caches use each job's installed workflow locks as their keys.
+When adding an installation step or locked environment, include its lockfile in
+that job's `cache-dependency-path`.
 
 ## Documentation
 
-- `docs-ci.yml` lints and builds the current documentation and smoke-checks the
-  documented CLI command surface.
+- `docs-ci.yml` lints and builds the current documentation once and smoke-checks
+  the documented CLI command surface through `make docs-live-fast`.
 - `docs-publish.yml` serializes MkDocs publication to `gh-pages`. `main` pushes
   update `latest`, while the production release workflow calls it from the
   exact release tag to update the immutable version path, `latest`, and
@@ -24,7 +37,8 @@ Workflow YAML is linted with `make workflow-lint`.
 
 ## Security and release
 
-- `codeql.yml` performs static analysis.
+- `codeql.yml` analyzes core code, maintained scripts and all five shipped
+  add-in source trees.
 - `supply-chain-pr.yml` audits the core and Hugging Face install surfaces and
   scans the pull-request delta for secrets.
 - `scorecards.yml` publishes OpenSSF Scorecard results.
@@ -37,12 +51,17 @@ Workflow YAML is linted with `make workflow-lint`.
   disabled and a candidate version exercises the Linux release gates without
   creating or moving a tag.
 
-The release workflow builds, validates, attests, and publishes five Python
+The release workflow builds, validates, attests, and publishes six Python
 distributions: `invarlock`, `invarlock-diagnostics`,
-`invarlock-runtime-gguf`, `invarlock-runtime-hf-vision-text`, and
-`invarlock-runtime-tensorrt-llm`. The optional
+`invarlock-runtime-gguf`, `invarlock-runtime-hf-vision-text`,
+`invarlock-runtime-tensorrt-llm`, and `invarlock-inspect-judge`. The optional
 packages live under `addins/`; their provider-specific runtime dependencies
 stay outside the core wheel.
+Candidate and published core wheels use `scripts/release/core_wheel_consumers.py`,
+the same consumer suite as local installed-wheel validation. It stages quickstart,
+captured, judge, three-scorer and retained approval journeys outside the checkout
+and checks signing, independent verification, reports and rejection exit codes
+before the optional packages are installed.
 
 ## Local checks
 
@@ -54,12 +73,32 @@ make security
 make dist-check
 ```
 
-The container journey is opt-in because it builds an image:
+The container journey is opt-in because it builds an image from authenticated
+committed source. Create the archive with `scripts/qualification_source.py`
+and supply `RUNTIME_SOURCE_COMMIT`, `RUNTIME_SOURCE_BUNDLE`, and
+`RUNTIME_SOURCE_BUNDLE_SHA256` to `make container-front-door-smoke`.
+The [workflow](workflows/container-front-door-smoke.yml) contains the complete
+source authentication and installed-wheel procedure.
 
-```bash
-make container-front-door-smoke
-```
+## Dependency updates
 
 Dependabot version updates target `staging/next`. Security updates opened
 against the default branch are blocked until the equivalent change has passed
 through the integration branch.
+
+The Python configuration uses the `uv` ecosystem to update `pyproject.toml` and
+`uv.lock` together, following the [uv integration guide](https://docs.astral.sh/uv/guides/integration/dependabot/).
+Code-owner review is requested through `CODEOWNERS`.
+
+Before merging a dependency update, synchronize each affected hashed workflow
+lock, build-tool pin, and tool hook. Dependabot's root lock update does not
+regenerate those independent files. Use the existing compile recipes in
+`scripts/security/refresh_pinned_requirements.sh`, keeping unrelated versions
+fixed, and run the affected installed-package checks as well as `make
+lock-sync` and `make security`. Audit failures require remediation even when
+the affected dependency predates the pull request.
+
+The fixed evaluator images derive explicitly versioned wheels from
+SHA-256-pinned upstream wheels. Their upstream input requirement files remain
+in the dependency-audit inventory. Preserve historical signed evidence and its
+declared dependency identities when changing the current image build inputs.

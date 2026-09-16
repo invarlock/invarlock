@@ -4,11 +4,13 @@ The documentation is a tested product surface. Maintained Markdown spans the
 MkDocs site, repository entry points, first-party add-in READMEs, public
 evidence guidance, scripts, examples, tests, and GitHub contribution templates.
 
-!!! info "Reference"
-
-    - **Surface:** Local docs build, lint, spelling, navigation, links, and rendered-math behavior
-    - **Stability:** Make targets are maintained contributor interfaces; visual theme internals may evolve
-    - **Use this page when:** Editing documentation, reviewing a docs-only change, or reproducing the documentation CI gate
+> **Reference**
+>
+> **Surface:** Local docs build, lint, spelling, navigation, links, and rendered-math behavior
+>
+> **Stability:** Make targets are maintained contributor interfaces; visual theme internals may evolve
+>
+> **Use this page when:** Editing documentation, reviewing a docs-only change, or reproducing the documentation CI gate
 
 ## Authoritative commands
 
@@ -43,7 +45,9 @@ should mirror the pinned asset and review the resulting site change.
 ## Page-type contracts
 
 Every MkDocs page under a typed section declares its reader contract near the
-top:
+top. Use a standard Markdown blockquote with a bold page-type label and
+bold field names. Separate each field with a quoted blank line so it stays a
+distinct paragraph in both GitHub and the published MkDocs site:
 
 | Directory | Required opener |
 | --- | --- |
@@ -52,10 +56,39 @@ top:
 | `reference/` | Surface, stability, use-this-page-when |
 | `security/` | In plain language, objective, assets or boundary, use-this-page-when |
 
+For example:
+
+```markdown
+> **Assurance note**
+>
+> **In plain language:** Explain the supported result in ordinary terms.
+>
+> **Question:** State the question this page answers.
+>
+> **Decision use:** Explain how the reader can use the answer.
+>
+> **Evidence:** Identify the records or checks supporting the claim.
+```
+
+Use portable Markdown for content shared with GitHub. MkDocs-specific callout
+syntax exposes its indented fields as code on GitHub; escaping the asterisks
+also prevents bold labels. Keep literal Markdown examples inside fenced code
+blocks. Test both renderers when changing shared page structure.
+
 The opener does not replace the page body. A user guide must complete and
 validate a task; reference must enumerate exact syntax and failure behavior;
 assurance must connect claims to observable evidence and limits; security must
 name adversaries, controls, residual risks, and response.
+
+Describe the current repository state without calendar dates, dated status
+updates or development history. Use Git history and the changelog to trace
+changes. Keep public prose focused on the reader's task and supported behavior;
+internal experiment logs do not belong in an interface reference.
+Do not scatter publication-availability notices or hard-coded product pins across
+guides. Follow [Matching wheels and examples](../user-guide/getting-started.md#matching-wheels-and-examples):
+released wheels use their installed-version tag archive, and local wheels use
+their exact build checkout. Preserve contract versions, dependency constraints,
+historical evidence provenance, and v0.13 compatibility semantics.
 
 ## Links and versioned contracts
 

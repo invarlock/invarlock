@@ -6,17 +6,17 @@ engineering context. Its canonical JSON can travel inside the authenticated
 `evaluate -> verify -> report` evidence transaction while remaining outside
 the acceptance calculation.
 
-!!! tip "User guide"
-
-    **Outcome:** Produce deterministic numerical observations that support an
-    investigation without changing an InvarLock acceptance decision.
-
-    **Audience:** Engineers comparing numerical artifacts after conversion,
-    quantization, or another externally managed transformation.
-
-    **Prerequisites:** Fixed baseline and subject arrays, retained input
-    provenance, and a completed or planned paired evidence transaction whose
-    policy remains authoritative.
+> **User guide**
+>
+> **Outcome:** Produce deterministic numerical observations that support an
+> investigation without changing an InvarLock acceptance decision.
+>
+> **Audience:** Engineers comparing numerical artifacts after conversion,
+> quantization, or another externally managed transformation.
+>
+> **Prerequisites:** Fixed baseline and subject arrays, retained input
+> provenance, and a completed or planned paired evidence transaction whose
+> policy remains authoritative.
 
 ## Decide whether you need it
 
@@ -50,7 +50,7 @@ limit will be operationally cheap.
 | Function | Required shape | Additional constraints | Result type |
 | --- | --- | --- | --- |
 | `spectral_observation` | Exactly two dimensions | At least one row and column | `SpectralObservation` |
-| `rmt_observation` | Exactly two dimensions | At least two rows and one column; every standardized column must have nonzero sample deviation | `RmtObservation` |
+| `rmt_observation` | Exactly two dimensions | At least two rows and one varying column; constant columns are reported and excluded | `RmtObservation` |
 | `variance_observation` | One or more dimensions | At least one value; scalar/zero-dimensional input is rejected; singleton input reports population variance `0.0` and sample variance `null` | `VarianceObservation` |
 
 Catch `DiagnosticInputError` when a caller needs to distinguish an invalid
@@ -89,8 +89,9 @@ the full calculation is not operationally justified, and record that choice.
 
 ### Covariance and Marchenko--Pastur reference
 
-`rmt_observation` standardizes columns, computes covariance eigenvalues, and
-reports theoretical Marchenko--Pastur reference edges:
+`rmt_observation` excludes constant columns, standardizes the remaining columns
+by population deviation, computes covariance eigenvalues, and reports theoretical
+Marchenko--Pastur reference edges:
 
 ```python
 import numpy as np
@@ -146,14 +147,20 @@ a signed receipt.
 
 ## Attach an authenticated observation
 
-Create the diagnostic result, write its canonical JSON, and name it in the
-evaluation request:
+Create the diagnostic result, write its canonical JSON, and name it in a native
+v1 evaluation request. Captured v2 requests do not accept this `observations`
+field:
 
 ```python
 from pathlib import Path
 
-from invarlock_addins.diagnostics import canonical_observation_bytes
+from invarlock_addins.diagnostics import (
+    canonical_observation_bytes,
+    spectral_observation,
+)
 
+observation = spectral_observation([[3.0, 0.0], [0.0, 1.0]])
+Path("observations").mkdir(exist_ok=True)
 Path("observations/subject-spectral.json").write_bytes(
     canonical_observation_bytes(observation)
 )
@@ -167,13 +174,18 @@ observations:
     path: observations/subject-spectral.json
 ```
 
-`invarlock evaluate` binds the observation to the comparison, schedule, policy,
-and both artifact identities, includes its digest in the signed manifest, and
-places it under `observations/`. Strict verification rejects malformed,
-non-canonical, unbound, or tampered observations. The verification JSON lists
-the authenticated observation ID, kind, scope, and digest. Human reports place
-the payload under **Authenticated observations** and state that it is outside
+For native pack-v1 evidence, `invarlock evaluate` binds the observation to the
+comparison, schedule, policy, and both artifact identities, includes its digest
+in the signed manifest, and places it under `observations/`. Strict verification
+rejects malformed, non-canonical, unbound, or tampered observations. The
+verification JSON lists the authenticated observation ID, kind, scope, and digest.
+Reports place the payload under **Authenticated observations** and state that it is outside
 the acceptance calculation.
+
+Native judge requests retain these observation payloads inside
+`native_capture.json` under their separate signed judge envelope. Use the
+[judge evidence contract](../reference/judge-measurements.md) for that layout
+and its recipient verification.
 
 Absence is valid. Adding a JSON file after publication still violates the
 bundle's closed inventory and fails strict verification.
@@ -185,7 +197,7 @@ investigation record:
 - how the array was selected, reshaped, standardized, or projected;
 - package and NumPy versions;
 - the observation JSON; and
-- the human interpretation, clearly separated from the verified decision.
+- the interpretation, clearly separated from the verified decision.
 
 When diagnostic work leads to a new acceptance rule, define and calibrate that
 rule outside the current bundle, review it, then create a new versioned policy
