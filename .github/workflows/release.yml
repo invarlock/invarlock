@@ -296,6 +296,7 @@ jobs:
           fi
       - name: Build first-party distributions
         run: |
+          python scripts/release/package_readme.py --check
           rm -rf build dist
           python -m build --no-isolation
           python -m build --no-isolation --outdir dist/addins addins/diagnostics

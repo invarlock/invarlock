@@ -246,6 +246,7 @@ coverage-release:  ## Enforce branch-aware coverage for release helpers
 	COVERAGE_FILE=$(COVERAGE_RELEASE_FILE) PYTHONPATH=src $(PYTEST) $(PYTEST_WORKER_ARGS) -q \
 		tests/scripts/test_core_wheel_consumers.py \
 		tests/scripts/test_first_party_distribution_validation.py \
+		tests/scripts/test_package_readme.py \
 		tests/scripts/test_release_distribution_validation_edges.py \
 		tests/scripts/test_release_preflight.py \
 		tests/scripts/test_release_preflight_adversarial.py \
@@ -654,7 +655,7 @@ verify-checks:  ## Run non-test repository gates; CI behavioral coverage runs se
 	$(MAKE) repo-cruft-check
 	$(MAKE) -j $(VERIFY_TARGET_JOBS) public-evidence-audit contracts-check cli-smoke-core lint
 
-contracts-check:  ## Check that packaged contracts match repository contracts
+contracts-check: package-readmes-check  ## Check that packaged contracts match repository contracts
 	PYTHONPATH=src $(PYTHON) scripts/checks/sync_packaged_contracts.py --check
 
 contracts-sync:  ## Refresh packaged contracts
@@ -729,7 +730,7 @@ cve-audit: runtime-wheelhouse  ## Audit locked dependencies against OSV
 		--out-json "$(SECURITY_ARTIFACT_DIR)/cve-audit.json" \
 		--out-md "$(SECURITY_ARTIFACT_DIR)/cve-audit.md"
 
-dist-check:  ## Build and validate the core and first-party add-in distributions
+dist-check: package-readmes-check  ## Build and validate the core and first-party add-in distributions
 	rm -rf build dist src/*.egg-info addins/*/build addins/*/src/*.egg-info
 	$(DIST_RUN) python -m build --no-isolation
 	$(DIST_RUN) python -m build --no-isolation --outdir dist/addins addins/diagnostics
@@ -779,7 +780,7 @@ packaging-smoke-minimal: addins-install-smoke  ## Validate distributable artifac
 
 packaging-smoke-front-door: addins-install-smoke cli-smoke-core  ## Validate artifacts and CLI entry point
 
-release-preflight:  ## Validate a clean exact release checkout and distributions
+release-preflight: package-readmes-check  ## Validate a clean exact release checkout and distributions
 	@test -n "$(RELEASE_PREFLIGHT_ARGS)" || { echo "RELEASE_PREFLIGHT_ARGS is required" >&2; exit 2; }
 	$(PYTHON) scripts/release/release_preflight.py $(RELEASE_PREFLIGHT_ARGS)
 
@@ -910,3 +911,10 @@ ensure-ruff: ensure-python
 
 ensure-mypy: ensure-python
 	@$(PYTHON) -c "import mypy" 2>/dev/null || { echo "mypy is required" >&2; exit 1; }
+
+.PHONY: package-readmes-check package-readmes-sync
+package-readmes-check:  ## Check versioned package descriptions
+	$(PYTHON) scripts/release/package_readme.py --check
+
+package-readmes-sync:  ## Refresh package descriptions after README or version changes
+	$(PYTHON) scripts/release/package_readme.py --write

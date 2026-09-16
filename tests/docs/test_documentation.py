@@ -147,21 +147,31 @@ def test_core_docs_present_the_three_transaction_journey() -> None:
         assert missing == [], f"{relative} misses {missing}"
 
 
-def test_readme_resources_use_absolute_urls_for_pypi() -> None:
+def test_readme_repository_resources_are_relative_and_exist() -> None:
     readme = _read("README.md")
     embedded_urls = re.findall(r'\b(?:href|src|srcset)="([^"]+)"', readme)
     markdown_urls = re.findall(r"\[[^\]]+\]\(([^)]+)\)", readme)
     resource_urls = embedded_urls + markdown_urls
 
     assert resource_urls
-    assert all(url.startswith(("https://", "mailto:")) for url in resource_urls)
+    repository_prefixes = (
+        "https://github.com/invarlock/invarlock/blob/",
+        "https://github.com/invarlock/invarlock/tree/",
+        "https://raw.githubusercontent.com/invarlock/invarlock/",
+    )
+    assert not any(url.startswith(repository_prefixes) for url in resource_urls)
+    relative_urls = [
+        url for url in resource_urls if not url.startswith(("https://", "mailto:"))
+    ]
+    assert relative_urls
+    for url in relative_urls:
+        assert not url.startswith("/"), url
+        assert REPO_ROOT.joinpath(url.split("#", 1)[0]).exists(), url
 
 
 def test_readme_links_to_the_schema_valid_public_request() -> None:
     readme = _read("README.md")
-    request_url = (
-        "https://github.com/invarlock/invarlock/blob/main/examples/request.yaml"
-    )
+    request_url = "[import request](examples/request.yaml)"
 
     assert request_url in readme
     assert "omits `--runtime-image` and `--runtime-image-digest`" in readme
@@ -219,7 +229,7 @@ def test_readme_first_run_commands_track_checked_in_surfaces() -> None:
     receipt_path = (
         "public_evidence/evidence/mistral-7b-weight-scale-hf/verification.receipt.json"
     )
-    assert "https://github.com/invarlock/invarlock/tree/main/public_evidence" in readme
+    assert "[Native model and runtime comparisons](public_evidence)" in readme
     assert REPO_ROOT.joinpath(report_path).is_dir()
     assert REPO_ROOT.joinpath(receipt_path).is_file()
     assert evidence_root.joinpath("evidence/manifest.json").is_file()
@@ -541,10 +551,7 @@ def test_workflow_diagram_tracks_current_transactions() -> None:
 
     readme = _read("README.md")
     architecture = _read("docs/reference/architecture.md")
-    assert (
-        'src="https://raw.githubusercontent.com/invarlock/invarlock/main/'
-        'docs/assets/evaluation-verification-flow.svg"'
-    ) in readme
+    assert 'src="docs/assets/evaluation-verification-flow.svg"' in readme
     assert "../assets/evaluation-verification-flow.svg" in architecture
 
 

@@ -323,3 +323,17 @@ keys, or caches. Report security issues through [SECURITY.md](SECURITY.md), not
 a public issue.
 
 By contributing, you agree that your work is licensed under Apache-2.0.
+
+### Package descriptions
+
+Edit each package's `README.md`; `packaging/README.md` is generated from it.
+Repository links stay relative for branch and tag browsing. Package descriptions
+use absolute links to the package version's release tag, including image URLs.
+After README or version changes, run `make package-readmes-sync`, then
+`make package-readmes-check`. Commit the generated descriptions with the source
+change. They are included in source distributions for standalone rebuilds.
+A pre-release build targets its future release tag; publish only after that tag
+contains the linked files. The CI badge continues to describe the main branch.
+
+Validate built wheel and source-distribution descriptions as well as rendering
+with `readme-renderer[md]`; `twine check` alone does not render Markdown.

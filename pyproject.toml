@@ -9,7 +9,7 @@ description = "Paired model release-regression evaluation with independently ver
 authors = [{ name = "InvarLock Team", email = "oss@invarlock.dev" }]
 maintainers = [{ name = "InvarLock Maintainers", email = "support@invarlock.dev" }]
 license = "Apache-2.0"
-readme = { file = "README.md", content-type = "text/markdown" }
+readme = { file = "packaging/README.md", content-type = "text/markdown" }
 requires-python = ">=3.12"
 keywords = [
   "machine-learning", "evaluation", "verification", "evidence",
