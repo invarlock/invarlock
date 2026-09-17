@@ -14,8 +14,7 @@ admission and full budget reservation remain recorded.
 >
 > **Use this page when:** Running a native judge scorer, importing ratings or reviewing judge evidence
 
-Use the core wheel, optional collection package and example files from the same
-source revision. For released packages, use their matching release documentation;
+Use the core wheel and example files from the same source revision. For released packages, use their matching release documentation;
 see [matching wheels and examples](../user-guide/getting-started.md#matching-wheels-and-examples).
 
 ## Native scorer
@@ -97,7 +96,7 @@ recipe, and a private `comparison.judge.workspace` with an explicit
 [captured-results guide](../user-guide/captured-results.md#judge-captured-answers)
 shows source mapping, explicit text projection and offline measurement import.
 
-The optional pinned Inspect package is the maintained live collection backend.
+The core collector uses the optional pinned Inspect SDK for live collection.
 It does not require an upstream evaluator to use Inspect or change versions.
 Existing evaluators supply frozen case facts; InvarLock applies its own scorer.
 Core import, verification and reporting work without Inspect. A caller-owned
@@ -107,7 +106,7 @@ Neither route converts unrelated upstream scalar scores into replayable trials.
 
 For v2, omit `comparison.judge.measurements` to collect new ratings, or set it
 to a request-relative measurements file for offline import. Import requires
-neither the optional package nor credentials. Preflight and evaluation both
+neither the optional SDKs nor credentials. Preflight and evaluation both
 require a signing key or explicit `--unsigned`. Sources may be canonical frozen
 runs or supported evaluator exports; an explicit `input_projection` selects one
 string through a JSON pointer rooted at `/input` or `/context`. Structured
@@ -217,7 +216,7 @@ The committed `examples/judge-measurements` fixture includes a separate
 `request-collect.yaml` and bounded `collection.json` so this route can be
 inspected without editing the import example.
 
-The optional `invarlock-inspect-judge[inspect]` package exposes
+The core `invarlock.judge_collection` module exposes
 `collect_configured` for installed execution and a lower-level `collect` API for
 callers that construct their own Inspect model. Both use the same admitted-call
 checkpoint. Installed live collection requires exactly Inspect `0.3.263`,
@@ -255,11 +254,11 @@ invarlock evaluate judge-request.yaml --preflight --json
 invarlock evaluate judge-request.yaml --signing-key signer-private.pem --json
 ```
 
-The `judge` extra installs the matching `invarlock-inspect-judge[inspect]`
-package and pinned SDKs. Scoring, retained-measurement import, verification and
-reporting remain in core. For local source builds, use
-`python -m pip install '.[judge]' 'addins/inspect_judge[inspect]'` from the
-repository root so both packages come from the same checkout.
+The `judge` extra installs pinned Inspect, OpenAI and `httpx` SDK dependencies
+directly. Collection, scoring, retained-measurement import, verification and
+reporting are implemented in core. For local source builds, use
+`python -m pip install '.[judge]'` from the repository root. Offline import,
+verification and reporting do not require the extra.
 
 Review every call, token, cost and time cap first. The collector rejects custom
 provider URLs and reads credentials only from its environment. Remove both

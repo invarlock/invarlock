@@ -494,10 +494,8 @@ their own contracts. None of these paths performs recipient acceptance.
 Every output option refuses to overwrite an existing file. By default, `report`
 emits the text view to standard output and prints the written path when HTML is
 requested. With `--json`, it instead emits one compact
-`invarlock/evidence-report-v1` object containing `ok`, the pack-manifest digest,
-and `html` (a path or `null`) for native default/HTML-only calls. Captured calls,
-and native calls requesting Markdown or JUnit, emit
-`invarlock/evidence-report-v2` with `kind`, `ok`, `pack_manifest_digest`,
+`invarlock/evidence-report-v2` object for native and captured evidence, for every
+output selection. It contains `kind`, `ok`, `pack_manifest_digest`,
 `requested_outputs`, `written_outputs`, `failed_output`, and `errors`.
 Judge reports emit `invarlock/judge-evidence-report-v1` with `kind: judge`
 and `evidence_digest`; evidence-set reports emit

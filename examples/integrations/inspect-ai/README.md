@@ -31,7 +31,7 @@ exact match, normalized NLL or judge scoring according to the available facts.
 The JSON answer parser does not import arbitrary `.eval` archives or turn an
 aggregate score into complete judge evidence.
 
-The optional [Inspect judge add-in](../../../addins/inspect_judge/README.md)
+The core [Inspect judge collector](../../judge-measurements/collection.md)
 collects or imports complete retained calls for the shared native/captured judge
 recipe. Its live collection pins Inspect `0.3.263` and OpenAI `3.13.0`; this does
 not relabel the historical exact-match profiles below. Per-case references use

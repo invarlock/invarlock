@@ -11,7 +11,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Move judge collection into the core package. The `invarlock[judge]` extra now
+  installs the pinned provider SDKs directly; collection imports use
+  `invarlock.judge_collection`.
+- Return the shared `invarlock/evidence-report-v2` result for native reports in
+  every output format, including terminal and HTML. Output destinations are
+  recorded in `requested_outputs` and `written_outputs`.
+- Require structured runtime input parts and complete Harness capture provenance.
+  Direct Python callers must supply the canonical input parts instead of relying
+  on the former text-only constructor behavior.
+
 ### Removed
+
+- Remove the separate `invarlock-inspect-judge` distribution and its old import
+  namespace. Release builds now contain five distributions and ten archives.
+- Remove obsolete Python entry-point discovery fallbacks, the unused signed-receipt
+  alias and the old native report result class. No forwarding aliases are provided.
 
 ### Fixed
 

@@ -98,7 +98,8 @@ listed below. Run them for the affected surface before requesting review.
   behind the same `invarlock.engine` facade.
 - `contracts/` contains the shipped JSON contracts.
 - `addins/` contains the independently installable GGUF, TensorRT-LLM,
-  Hugging Face vision-text, diagnostics, and Inspect judge collection packages.
+  Hugging Face vision-text and diagnostics packages. Judge collection lives in
+  `src/invarlock/judge_collection/`; its provider SDKs are optional.
 - `tests/` mirrors the maintained runtime, contract, evidence, CLI, and release
   surfaces.
 - `scripts/` contains repository checks, release validation, and security
@@ -224,8 +225,7 @@ recorded comparison decisions, and independent verification.
 Tests must exercise production code and assert meaningful outcomes. A passing
 test that only restates fixture data is not evidence that a user journey works.
 `make dist-check` builds and validates the core, diagnostics, GGUF connector,
-Hugging Face vision-text connector, TensorRT-LLM connector, and Inspect judge
-preparation distributions.
+Hugging Face vision-text connector, and TensorRT-LLM connector distributions.
 
 For runtime launcher changes, run the opt-in real-container journey with a
 working Docker or Podman engine. Commit the source being tested, create its

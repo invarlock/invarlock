@@ -170,9 +170,9 @@ precision and quality requirements. A point estimate alone does not decide the
 result. [Schedule and policy](docs/user-guide/schedule-and-policy.md)
 explains the statistical scope and thresholds.
 
-Judge collection uses the optional `invarlock-inspect-judge[inspect]` package
-with explicit call, token, cost, timeout and checkpoint limits. Importing retained
-ratings, verification and reporting work offline in the core wheel. Start with
+Judge collection is built into core; `invarlock[judge]` installs its pinned
+provider SDKs. Collection uses explicit call, token, cost, timeout and checkpoint
+limits. Importing retained ratings, verification and reporting work offline in the core wheel. Start with
 `invarlock evaluate --init my-judge --example native-judge` and replace the
 illustrative model pins with your actual runtime inputs. See
 [judge scoring](docs/reference/judge-measurements.md)

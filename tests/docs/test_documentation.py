@@ -275,7 +275,6 @@ def test_auxiliary_docs_track_the_product_and_release_surface() -> None:
         "addins/gguf/pyproject.toml",
         "addins/multimodal/pyproject.toml",
         "addins/tensorrt_llm/pyproject.toml",
-        "addins/inspect_judge/pyproject.toml",
     )
     distributions = {
         tomllib.loads(_read(relative))["project"]["name"]
@@ -287,7 +286,6 @@ def test_auxiliary_docs_track_the_product_and_release_surface() -> None:
         "invarlock-runtime-gguf",
         "invarlock-runtime-hf-vision-text",
         "invarlock-runtime-tensorrt-llm",
-        "invarlock-inspect-judge",
     }
     for distribution in distributions:
         assert distribution in workflows
@@ -385,7 +383,7 @@ def test_runtime_and_report_references_track_current_closed_contracts() -> None:
 
     cli = _read("docs/reference/cli.md")
     assert "[--json]" in cli.split("## `report`", maxsplit=1)[1]
-    assert "invarlock/evidence-report-v1" in cli
+    assert "invarlock/evidence-report-v2" in cli
 
     api = _read("docs/reference/api-guide.md")
     assert "expected_request_digest: str | None = None" in api

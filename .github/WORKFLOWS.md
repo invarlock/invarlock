@@ -37,7 +37,7 @@ that job's `cache-dependency-path`.
 
 ## Security and release
 
-- `codeql.yml` analyzes core code, maintained scripts and all five shipped
+- `codeql.yml` analyzes core code, maintained scripts and all four shipped
   add-in source trees.
 - `supply-chain-pr.yml` audits the core and Hugging Face install surfaces and
   scans the pull-request delta for secrets.
@@ -51,10 +51,11 @@ that job's `cache-dependency-path`.
   disabled and a candidate version exercises the Linux release gates without
   creating or moving a tag.
 
-The release workflow builds, validates, attests, and publishes six Python
+The release workflow builds, validates, attests, and publishes five Python
 distributions: `invarlock`, `invarlock-diagnostics`,
 `invarlock-runtime-gguf`, `invarlock-runtime-hf-vision-text`,
-`invarlock-runtime-tensorrt-llm`, and `invarlock-inspect-judge`. The optional
+and `invarlock-runtime-tensorrt-llm`. Judge collection is in core with
+optional provider SDKs installed through `invarlock[judge]`. The optional
 packages live under `addins/`; their provider-specific runtime dependencies
 stay outside the core wheel.
 Candidate and published core wheels use `scripts/release/core_wheel_consumers.py`,
