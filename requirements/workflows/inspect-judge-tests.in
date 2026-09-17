@@ -1,4 +1,4 @@
-# Optional live judge adapter qualification; never installed by the core runtime.
+# Optional provider SDK qualification; installed through the core judge extra.
 inspect-ai==0.3.263
 openai==3.13.0
 httpx==0.28.1

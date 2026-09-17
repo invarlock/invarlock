@@ -19,18 +19,17 @@ JUDGE_BIN="${JUDGE_ENV}/venv/bin/python"
 "${JUDGE_BIN}" -m pip install --require-hashes -r "${JUDGE_LOCK}"
 shopt -s nullglob
 core_wheels=("${ROOT_DIR}"/dist/invarlock-*.whl)
-judge_wheels=("${ROOT_DIR}"/dist/addins/invarlock_inspect_judge-*.whl)
-if [[ ${#core_wheels[@]} -ne 1 || ${#judge_wheels[@]} -ne 1 ]]; then
-  echo "Expected exactly one built core wheel and Inspect judge wheel" >&2
+if [[ ${#core_wheels[@]} -ne 1 ]]; then
+  echo "Expected exactly one built core wheel" >&2
   exit 2
 fi
 # Resolve the real extra against the installed hashed closure. --no-index makes
 # an omitted or incompatible dependency fail rather than silently fetching it.
-"${JUDGE_BIN}" -m pip install --no-index --find-links "${ROOT_DIR}/dist/addins" "${core_wheels[0]}[judge]"
+"${JUDGE_BIN}" -m pip install --no-index "${core_wheels[0]}[judge]"
 "${JUDGE_BIN}" -m pip check
-"${JUDGE_BIN}" -c 'from pathlib import Path; from sysconfig import get_path; import invarlock, invarlock_addins.inspect_judge as judge; root=Path(get_path("purelib")).resolve(); assert all(Path(module.__file__).resolve().is_relative_to(root) for module in (invarlock, judge))'
+"${JUDGE_BIN}" -c 'from pathlib import Path; from sysconfig import get_path; import invarlock, invarlock.judge_collection as judge; root=Path(get_path("purelib")).resolve(); assert all(Path(module.__file__).resolve().is_relative_to(root) for module in (invarlock, judge))'
 mkdir "${JUDGE_ENV}/tests"
-cp "${ROOT_DIR}/addins/inspect_judge/tests/test_live_inspect_sdk.py" "${JUDGE_ENV}/tests/"
-cp -R "${ROOT_DIR}/addins/inspect_judge/tests/fixtures" "${JUDGE_ENV}/tests/fixtures"
+cp "${ROOT_DIR}/tests/judge_collection/test_live_inspect_sdk.py" "${JUDGE_ENV}/tests/"
+cp -R "${ROOT_DIR}/tests/judge_collection/fixtures" "${JUDGE_ENV}/tests/fixtures"
 cd "${JUDGE_ENV}"
 INVARLOCK_REQUIRE_INSPECT_SDK=1 "${JUDGE_BIN}" -m pytest -q tests/test_live_inspect_sdk.py

@@ -7,7 +7,6 @@ import copy
 import importlib
 import json
 import os
-import sys
 from pathlib import Path
 from types import ModuleType
 from unittest.mock import AsyncMock, Mock
@@ -24,17 +23,17 @@ from tests.judge_measurements.test_native_workspace import native as native
 from tests.judge_measurements.test_workflow import staged as staged
 
 
-def _installed_api(monkeypatch):
-    source = Path(__file__).parents[2] / "addins/inspect_judge/src"
-    monkeypatch.syspath_prepend(str(source))
-    return importlib.import_module("invarlock_addins.inspect_judge")
-
-
-def test_missing_installed_collector_has_safe_install_diagnostic(monkeypatch):
-    monkeypatch.setitem(sys.modules, "invarlock_addins.inspect_judge", None)
-    with pytest.raises(
-        workflow.JudgeWorkflowError, match=r"pip install .*invarlock\[judge\]=="
-    ):
+def test_missing_collection_sdk_has_safe_install_diagnostic(monkeypatch):
+    api = workflow.collection_api()
+    monkeypatch.setenv("OPENAI_API_KEY", "offline-unused-key")
+    for name in ("OPENAI_BASE_URL", "OPENAI_API_BASE", "OPENAI_SAFETY_IDENTIFIER"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(
+        importlib.metadata,
+        "version",
+        Mock(side_effect=importlib.metadata.PackageNotFoundError("missing")),
+    )
+    with pytest.raises(api.InspectJudgeError, match=r'install "invarlock\[judge\]"'):
         workflow.collection_preflight(_recipe()["collection"])
 
 
@@ -42,7 +41,7 @@ def test_missing_installed_collector_has_safe_install_diagnostic(monkeypatch):
     "fault", ["missing_key", "endpoint_override", "missing_dependency"]
 )
 def test_real_collection_environment_fails_without_loading_model(monkeypatch, fault):
-    api = _installed_api(monkeypatch)
+    api = workflow.collection_api()
     for name in ("OPENAI_API_KEY", "OPENAI_BASE_URL", "OPENAI_API_BASE"):
         monkeypatch.delenv(name, raising=False)
     if fault != "missing_key":
@@ -61,8 +60,8 @@ def test_real_collection_environment_fails_without_loading_model(monkeypatch, fa
 
 @pytest.fixture
 def delegated(monkeypatch):
-    real = _installed_api(monkeypatch)
-    api = ModuleType("invarlock_addins.inspect_judge")
+    real = workflow.collection_api()
+    api = ModuleType("invarlock.judge_collection")
     api.CollectionOptions = real.CollectionOptions
     api.RunnerOptions = real.RunnerOptions
     api.prepare_collection = real.prepare_collection
@@ -75,7 +74,7 @@ def delegated(monkeypatch):
         return {"retained": True}
 
     api.collect_configured = AsyncMock(side_effect=collected)
-    monkeypatch.setitem(sys.modules, "invarlock_addins.inspect_judge", api)
+    monkeypatch.setattr(workflow, "collection_api", lambda: api)
     return api
 
 

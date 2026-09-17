@@ -45,7 +45,6 @@ def test_addin_coverage_has_a_separate_parallel_ratchet() -> None:
         "gguf",
         "multimodal",
         "tensorrt_llm",
-        "inspect_judge",
     ):
         assert f"--include='addins/{package}/src/*'" in block
     assert "--cov --cov-config=scripts/addins.coveragerc" in block
@@ -53,7 +52,7 @@ def test_addin_coverage_has_a_separate_parallel_ratchet() -> None:
     assert "addins/*/tests/*" in config
     assert "--cov-branch" in block
     assert "--cov-fail-under=95" in block
-    assert block.count("--fail-under=95") == 8
+    assert block.count("--fail-under=95") == 7
     assert "git ls-files 'addins/*/src/**/*.py'" in block
     assert "grep -v '/__init__.py$$'" in block
     assert '--include="$$source" --fail-under=95' in block
@@ -63,7 +62,7 @@ def test_addin_coverage_has_a_separate_parallel_ratchet() -> None:
     assert "COVERAGE_FILE=$(COVERAGE_ADDINS_FILE)" in block
     assert (
         "PYTHONPATH=src:addins/diagnostics/src:addins/gguf/src:"
-        "addins/multimodal/src:addins/tensorrt_llm/src:addins/inspect_judge/src:."
+        "addins/multimodal/src:addins/tensorrt_llm/src:."
     ) in block
 
 

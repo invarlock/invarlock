@@ -36,7 +36,7 @@ FIXTURE_FILES = (
 
 
 def require_core_only() -> None:
-    for module in ("inspect_ai", "openai", "invarlock_addins.inspect_judge"):
+    for module in ("inspect_ai", "openai"):
         try:
             available = importlib.util.find_spec(module) is not None
         except ModuleNotFoundError:

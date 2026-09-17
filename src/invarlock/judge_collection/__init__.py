@@ -13,10 +13,7 @@ from .collector import (
 from .configured import collect_configured, validate_collection_environment
 from .runner import RunnerOptions, collect
 
-__version__ = "0.16.1"
-
 __all__ = [
-    "__version__",
     "INSPECT_VERSION",
     "CollectionOptions",
     "InspectJudgeError",

@@ -68,9 +68,7 @@ def test_core_judge_consumer_preserves_inconclusive_result_and_rejects_bad_pins(
     assert not roots[0].exists()
 
 
-@pytest.mark.parametrize(
-    "module_name", ["inspect_ai", "openai", "invarlock_addins.inspect_judge"]
-)
+@pytest.mark.parametrize("module_name", ["inspect_ai", "openai"])
 def test_rehearsal_refuses_optional_sdk_install_or_import(monkeypatch, module_name):
     module = load_module()
     monkeypatch.setattr(

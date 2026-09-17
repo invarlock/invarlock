@@ -12,7 +12,8 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
 import pytest
-from invarlock_addins.inspect_judge import (
+
+from invarlock.judge_collection import (
     CollectionOptions,
     InspectJudgeError,
     RunnerOptions,
@@ -21,7 +22,7 @@ from invarlock_addins.inspect_judge import (
     configured,
     validate_collection_environment,
 )
-from invarlock_addins.inspect_judge.runner import (
+from invarlock.judge_collection.runner import (
     _require_clean_model_configuration,
     _require_provider_retries_disabled,
 )

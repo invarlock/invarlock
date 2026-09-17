@@ -11,7 +11,8 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from invarlock_addins.inspect_judge import (
+
+from invarlock.judge_collection import (
     CollectionOptions,
     InspectJudgeError,
     RunnerOptions,
@@ -22,7 +23,6 @@ from invarlock_addins.inspect_judge import (
     prepare_inspect_config,
     render_request,
 )
-
 from invarlock.judge_measurements.contracts import (
     JudgeMeasurementContractError,
     canonical_payload,
@@ -884,8 +884,7 @@ def test_live_collection_checkpoints_and_resumes(data, monkeypatch, tmp_path):
     assert failed_attempt["status"] == "timeout_ambiguous"
     assert failed_attempt["error"]["code"] == "inspect-call-failed"
 
-    import invarlock_addins.inspect_judge.runner as runner_module
-
+    import invarlock.judge_collection.runner as runner_module
     from invarlock.filesystem.paths import UnsafePathError
 
     actual_parent = tmp_path / "actual-parent"
@@ -973,7 +972,7 @@ def test_malformed_duplicate_json_rejected(data):
 
 
 def test_oversized_export_is_rejected_before_parsing(data, monkeypatch):
-    import invarlock_addins.inspect_judge.collector as collector_module
+    import invarlock.judge_collection.collector as collector_module
 
     monkeypatch.setattr(collector_module, "MAX_EXPORT_BYTES", 32)
     with pytest.raises(InspectJudgeError, match="export exceeds byte allowance"):
@@ -1178,7 +1177,7 @@ def test_historical_inspect_projection_remains_replayable(data):
 def test_retained_sources_shard_deterministically_and_keep_local_mappings(
     data, monkeypatch
 ):
-    import invarlock_addins.inspect_judge.collector as collector
+    import invarlock.judge_collection.collector as collector
 
     monkeypatch.setattr(collector, "MAX_SOURCE_BYTES", 5000)
     result = ingest(data)
@@ -1197,7 +1196,7 @@ def test_retained_sources_shard_deterministically_and_keep_local_mappings(
 
 
 def test_sharded_source_reservations_are_aggregate(data, monkeypatch):
-    import invarlock_addins.inspect_judge.collector as collector
+    import invarlock.judge_collection.collector as collector
 
     monkeypatch.setattr(collector, "MAX_SOURCE_BYTES", 5000)
     result = ingest(data)
@@ -1215,7 +1214,7 @@ def test_sharded_source_reservations_are_aggregate(data, monkeypatch):
 
 
 def test_storage_reservation_stops_calls_before_aggregate_exhaustion(data, monkeypatch):
-    import invarlock_addins.inspect_judge.collector as collector
+    import invarlock.judge_collection.collector as collector
 
     # Plenty of call/token/cost budget; the retained-source reservation alone
     # makes the first provider call inadmissible.
@@ -1226,7 +1225,7 @@ def test_storage_reservation_stops_calls_before_aggregate_exhaustion(data, monke
 
 
 def test_source_count_and_single_record_caps_fail_closed(data, monkeypatch):
-    import invarlock_addins.inspect_judge.collector as collector
+    import invarlock.judge_collection.collector as collector
 
     monkeypatch.setattr(collector, "MAX_SOURCE_BYTES", 5000)
     monkeypatch.setattr(collector, "MAX_SOURCES", 1)
@@ -1303,8 +1302,7 @@ def test_reference_capacity_7728_completed_trials_shards_and_replays(data):
 def test_live_collection_replays_only_at_boundaries_for_thousands_of_slots(
     data, monkeypatch, tmp_path
 ):
-    import invarlock_addins.inspect_judge.runner as live
-
+    import invarlock.judge_collection.runner as live
     from invarlock.evaluation_records.cases import case_set_digest
     from invarlock.evaluation_records.io import run_digest
 
@@ -1406,7 +1404,7 @@ def test_live_collection_replays_only_at_boundaries_for_thousands_of_slots(
     ],
 )
 def test_live_incremental_validation_rejects_before_persistence(data, mutate, message):
-    from invarlock_addins.inspect_judge.collector import _LiveCheckpoint
+    from invarlock.judge_collection.collector import _LiveCheckpoint
 
     checkpoint = ingest(data)
     state = _LiveCheckpoint(
@@ -1427,7 +1425,7 @@ def test_live_incremental_validation_rejects_before_persistence(data, mutate, me
 
 
 def test_live_incremental_validation_rejects_duplicate_event(data):
-    from invarlock_addins.inspect_judge.collector import _LiveCheckpoint
+    from invarlock.judge_collection.collector import _LiveCheckpoint
 
     state = _LiveCheckpoint(
         plan=data[0],
@@ -1443,7 +1441,7 @@ def test_live_incremental_validation_rejects_duplicate_event(data):
 
 
 def test_live_incremental_storage_reservation_bounds_replayed_bytes(data, monkeypatch):
-    import invarlock_addins.inspect_judge.collector as collector
+    import invarlock.judge_collection.collector as collector
 
     checkpoint = ingest(data)
     state = collector._LiveCheckpoint(
@@ -1474,8 +1472,8 @@ def test_live_incremental_storage_reservation_bounds_replayed_bytes(data, monkey
 
 
 def test_live_incremental_reservations_charge_admissions_once(data):
-    from invarlock_addins.inspect_judge.collector import _LiveCheckpoint
-    from invarlock_addins.inspect_judge.runner import (
+    from invarlock.judge_collection.collector import _LiveCheckpoint
+    from invarlock.judge_collection.runner import (
         _admission_event,
         _empty_export,
         _frozen_rows,
@@ -1511,7 +1509,7 @@ def test_live_incremental_reservations_charge_admissions_once(data):
 
 @pytest.mark.parametrize("sharded", [False, True])
 def test_import_rejects_duplicate_provider_response_ids(data, monkeypatch, sharded):
-    import invarlock_addins.inspect_judge.collector as collector
+    import invarlock.judge_collection.collector as collector
 
     if sharded:
         monkeypatch.setattr(collector, "MAX_SOURCE_BYTES", 5000)
@@ -1524,7 +1522,7 @@ def test_import_rejects_duplicate_provider_response_ids(data, monkeypatch, shard
 
 
 def test_live_checkpoint_preserves_response_ownership_across_resume(data):
-    from invarlock_addins.inspect_judge.collector import _LiveCheckpoint
+    from invarlock.judge_collection.collector import _LiveCheckpoint
 
     checkpoint = ingest(data)
     state = _LiveCheckpoint(
@@ -1559,7 +1557,7 @@ def test_retry_cannot_reuse_a_prior_attempt_provider_response_id(data):
 
 
 def test_live_checkpoint_allows_unavailable_response_ids(data):
-    from invarlock_addins.inspect_judge.collector import _LiveCheckpoint
+    from invarlock.judge_collection.collector import _LiveCheckpoint
 
     state = _LiveCheckpoint(
         plan=data[0],

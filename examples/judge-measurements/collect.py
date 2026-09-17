@@ -22,7 +22,7 @@ def _input(path: Path, *, maximum: int) -> dict[str, Any]:
 
 
 async def _collect(args: argparse.Namespace) -> dict[str, Any]:
-    from invarlock_addins.inspect_judge import (
+    from invarlock.judge_collection import (
         CollectionOptions,
         RunnerOptions,
         collect_configured,

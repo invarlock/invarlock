@@ -292,7 +292,7 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     )
     distribution_build = _step(build["steps"], "Build first-party distributions")["run"]
     assert "python -m build --no-isolation" in distribution_build
-    for addin in ("diagnostics", "gguf", "multimodal", "tensorrt_llm", "inspect_judge"):
+    for addin in ("diagnostics", "gguf", "multimodal", "tensorrt_llm"):
         assert f"addins/{addin}" in distribution_build
 
     assert _step(build["steps"], "Run complete repository gates")["run"] == (
@@ -330,8 +330,8 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
 
     digest_record = _step(build["steps"], "Record distribution digests")["run"]
     assert 'dist / "SHA256SUMS"' in digest_record
-    assert "len(wheels) != 6" in digest_record
-    assert "len(source_archives) != 6" in digest_record
+    assert "len(wheels) != 5" in digest_record
+    assert "len(source_archives) != 5" in digest_record
     assert "ledger_sha256=" in digest_record
     assert build["outputs"]["dist_ledger_sha256"] == (
         "${{ steps.dist_digests.outputs.ledger_sha256 }}"
@@ -388,7 +388,6 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     )
     for project in (
         "invarlock-diagnostics",
-        "invarlock-inspect-judge",
         "invarlock-runtime-gguf",
         "invarlock-runtime-hf-vision-text",
         "invarlock-runtime-tensorrt-llm",
@@ -579,7 +578,6 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     for project in (
         "invarlock",
         "invarlock-diagnostics",
-        "invarlock-inspect-judge",
         "invarlock-runtime-gguf",
         "invarlock-runtime-hf-vision-text",
     ):
@@ -628,7 +626,6 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     for package in (
         "core",
         "diagnostics",
-        "inspect-judge",
         "runtime-gguf",
         "runtime-hf-vision-text",
         "runtime-tensorrt-llm",
@@ -680,7 +677,6 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     for project in (
         "invarlock",
         "invarlock-diagnostics",
-        "invarlock-inspect-judge",
         "invarlock-runtime-gguf",
         "invarlock-runtime-hf-vision-text",
         "invarlock-runtime-tensorrt-llm",
@@ -945,7 +941,6 @@ def test_release_publication_plan_is_closed_and_phase_specific(tmp_path: Path) -
         "complete": [
             "core",
             "diagnostics",
-            "inspect-judge",
             "runtime-gguf",
             "runtime-hf-vision-text",
             "runtime-tensorrt-llm",
@@ -953,7 +948,6 @@ def test_release_publication_plan_is_closed_and_phase_specific(tmp_path: Path) -
         "bootstrap": [
             "core",
             "diagnostics",
-            "inspect-judge",
             "runtime-gguf",
             "runtime-hf-vision-text",
         ],
@@ -1006,7 +1000,6 @@ def test_release_stages_each_distribution_before_its_publish_job(
     expected_prefixes = {
         "core": (release_dist, "invarlock"),
         "diagnostics": (addin_dist, "invarlock_diagnostics"),
-        "inspect-judge": (addin_dist, "invarlock_inspect_judge"),
         "runtime-gguf": (addin_dist, "invarlock_runtime_gguf"),
         "runtime-hf-vision-text": (
             addin_dist,

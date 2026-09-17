@@ -1489,7 +1489,9 @@ docs-ci = [
     { name = "pymdown-extensions" },
 ]
 judge = [
-    { name = "invarlock-inspect-judge", extra = ["inspect"] },
+    { name = "httpx" },
+    { name = "inspect-ai" },
+    { name = "openai" },
 ]
 precommit-ci = [
     { name = "pre-commit" },
@@ -1560,9 +1562,10 @@ requires-dist = [
     { name = "cryptography", specifier = ">=50.0.0" },
     { name = "cyclonedx-bom", marker = "extra == 'release-ci'", specifier = ">=4.1" },
     { name = "cyclonedx-bom", marker = "extra == 'security-ci'", specifier = ">=4.1" },
+    { name = "httpx", marker = "extra == 'judge'", specifier = "==0.28.1" },
     { name = "hypothesis", marker = "extra == 'ci'", specifier = ">=6.98" },
     { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.98" },
-    { name = "invarlock-inspect-judge", extras = ["inspect"], marker = "extra == 'judge'", directory = "addins/inspect_judge" },
+    { name = "inspect-ai", marker = "extra == 'judge'", specifier = "==0.3.263" },
     { name = "jsonschema", specifier = ">=4.0" },
     { name = "linkchecker", marker = "extra == 'docs-ci'", specifier = ">=10.6.0" },
     { name = "markdown", marker = "extra == 'ci'", specifier = ">=3.10.2" },
@@ -1578,6 +1581,7 @@ requires-dist = [
     { name = "msgpack", marker = "extra == 'security-ci'", specifier = ">=1.2.1" },
     { name = "mypy", marker = "extra == 'ci'", specifier = "==2.3.1" },
     { name = "mypy", marker = "extra == 'dev'", specifier = "==2.3.1" },
+    { name = "openai", marker = "extra == 'judge'", specifier = "==3.13.0" },
     { name = "pillow", marker = "extra == 'ci'", specifier = ">=11.3,<13" },
     { name = "pillow", marker = "extra == 'dev'", specifier = ">=11.3,<13" },
     { name = "pip", marker = "extra == 'security-ci'", specifier = ">=26.2" },
@@ -1654,30 +1658,6 @@ runtime-test = [
     { name = "torchao", specifier = "==0.18.0" },
     { name = "transformers", specifier = ">=5.14.1" },
 ]
-
-[[package]]
-name = "invarlock-inspect-judge"
-version = "0.16.1"
-source = { directory = "addins/inspect_judge" }
-dependencies = [
-    { name = "invarlock" },
-]
-
-[package.optional-dependencies]
-inspect = [
-    { name = "httpx" },
-    { name = "inspect-ai" },
-    { name = "openai" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "httpx", marker = "extra == 'inspect'", specifier = "==0.28.1" },
-    { name = "inspect-ai", marker = "extra == 'inspect'", specifier = "==0.3.263" },
-    { name = "invarlock", specifier = "==0.16.1" },
-    { name = "openai", marker = "extra == 'inspect'", specifier = "==3.13.0" },
-]
-provides-extras = ["inspect"]
 
 [[package]]
 name = "isoduration"

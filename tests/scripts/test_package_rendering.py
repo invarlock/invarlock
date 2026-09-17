@@ -108,7 +108,7 @@ def test_missing_or_incorrect_image_sources_fail(tmp_path, change):
 
 def test_addin_description_does_not_require_core_images(tmp_path):
     rendered = rendering.render_pair(
-        *_pair(tmp_path, "# Collector\n", name="invarlock-inspect-judge")
+        *_pair(tmp_path, "# Diagnostics\n", name="invarlock-diagnostics")
     )
     assert "<h1" in rendered
 
@@ -256,7 +256,7 @@ def test_empty_rendering_fails(tmp_path, monkeypatch, result):
         rendering.render_pair(*_pair(tmp_path))
 
 
-def test_cli_renders_all_six_distribution_pairs(tmp_path, capsys):
+def test_cli_renders_all_five_distribution_pairs(tmp_path, capsys):
     for relative in rendering.PROJECTS:
         name = {
             ".": "invarlock",
@@ -264,7 +264,6 @@ def test_cli_renders_all_six_distribution_pairs(tmp_path, capsys):
             "addins/tensorrt_llm": "invarlock-runtime-tensorrt-llm",
             "addins/gguf": "invarlock-runtime-gguf",
             "addins/diagnostics": "invarlock-diagnostics",
-            "addins/inspect_judge": "invarlock-inspect-judge",
         }[relative]
         project = tmp_path / relative
         project.mkdir(parents=True, exist_ok=True)
@@ -280,8 +279,8 @@ def test_cli_renders_all_six_distribution_pairs(tmp_path, capsys):
     assert (
         rendering.main(["--repo-root", str(tmp_path), "--output-dir", str(output)]) == 0
     )
-    assert len(list(output.glob("*.html"))) == 6
-    assert capsys.readouterr().out.count("rendering passed") == 6
+    assert len(list(output.glob("*.html"))) == 5
+    assert capsys.readouterr().out.count("rendering passed") == 5
     next((tmp_path / "dist/addins").glob("*.whl")).unlink()
     with pytest.raises(SystemExit) as exc:
         rendering.main(["--repo-root", str(tmp_path)])

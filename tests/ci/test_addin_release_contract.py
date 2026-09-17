@@ -6,7 +6,6 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ADDINS = {
-    "inspect_judge": REPO_ROOT / "addins/inspect_judge",
     "diagnostics": REPO_ROOT / "addins/diagnostics",
     "gguf": REPO_ROOT / "addins/gguf",
     "multimodal": REPO_ROOT / "addins/multimodal",
@@ -38,13 +37,15 @@ def test_first_party_distribution_versions_match_core() -> None:
         assert _module_version(path, name) == core_version
 
 
-def test_judge_extra_requires_matching_collector_without_enlarging_core() -> None:
+def test_judge_extra_requires_only_provider_sdks_without_enlarging_core() -> None:
     core = _project(REPO_ROOT)
     assert core["optional-dependencies"]["judge"] == [
-        f"invarlock-inspect-judge[inspect]=={core['version']}"
+        "inspect-ai==0.3.263",
+        "openai==3.13.0",
+        "httpx==0.28.1",
     ]
     assert not any(
-        str(dependency).startswith(("invarlock-inspect-judge", "inspect-ai", "openai"))
+        str(dependency).startswith(("inspect-ai", "openai", "httpx"))
         for dependency in core["dependencies"]
     )
 
@@ -71,7 +72,7 @@ def test_provider_addins_require_the_exact_matching_core_release() -> None:
     core_version = str(_project(REPO_ROOT)["version"])
     expected = f"invarlock=={core_version}"
 
-    for name in ("gguf", "tensorrt_llm", "inspect_judge"):
+    for name in ("gguf", "tensorrt_llm"):
         dependencies = _project(ADDINS[name])["dependencies"]
         assert isinstance(dependencies, list)
         assert dependencies == [expected]
@@ -120,19 +121,25 @@ def test_provider_images_expose_the_invarlock_front_door() -> None:
     assert 'CMD ["python", "-m", "invarlock"]' not in tensorrt
 
 
-def test_inspect_judge_keeps_the_sdk_optional_and_joins_installed_smokes() -> None:
-    project = _project(ADDINS["inspect_judge"])
-    assert project["optional-dependencies"] == {
-        "inspect": ["inspect-ai==0.3.263", "openai==3.13.0", "httpx==0.28.1"]
-    }
+def test_core_collector_keeps_sdk_optional_in_installed_smokes() -> None:
+    project = _project(REPO_ROOT)
+    assert project["optional-dependencies"]["judge"] == [
+        "inspect-ai==0.3.263",
+        "openai==3.13.0",
+        "httpx==0.28.1",
+    ]
     makefile = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
-    assert "-p invarlock_addins.inspect_judge" in makefile
+    assert "-p invarlock.judge_collection" in makefile
     for text in (
         makefile,
         (REPO_ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8"),
     ):
-        assert "import invarlock_addins.inspect_judge as judge" in text
-        assert "version('invarlock-inspect-judge') == judge.__version__" in text
+        assert "import invarlock.judge_collection as judge" in text
+        assert (
+            "callable(judge.import_export) and callable(judge.prepare_collection)"
+            in text
+        )
+        assert "Path(judge.__file__).resolve().is_relative_to" in text
         assert "'inspect_ai' not in sys.modules" in text
 
 
@@ -140,7 +147,7 @@ def test_optional_judge_sdk_has_hashed_release_gate_without_source_shadowing() -
     gate = (REPO_ROOT / "scripts/inspect_judge_sdk_gate.sh").read_text()
     assert '"${JUDGE_BIN}" -m pip install --no-index' in gate
     assert '"${core_wheels[0]}[judge]"' in gate
-    assert '--find-links "${ROOT_DIR}/dist/addins"' in gate
+    assert "judge_wheels" not in gate
     assert '"${JUDGE_BIN}" -m pip check' in gate
     assert "unset PYTHONPATH" in gate
     assert "INVARLOCK_REQUIRE_INSPECT_SDK=1" in gate
