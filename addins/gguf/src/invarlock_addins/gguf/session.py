@@ -726,21 +726,16 @@ class LlamaCppSession:
             self._require_open()
             self._latest_observation_sha256 = None
             for record in batch.records:
-                if record.input_parts:
-                    if len(record.input_parts) != 1 or (
-                        record.input_parts[0].kind != "text"
-                        or record.input_parts[0].role != "prompt"
-                    ):
-                        raise ValueError(
-                            "llama.cpp execution requires one prompt text input part"
-                        )
-                    expected_input_sha256 = evaluation_input_parts_sha256(
-                        record.input_parts
+                if len(record.input_parts) != 1 or (
+                    record.input_parts[0].kind != "text"
+                    or record.input_parts[0].role != "prompt"
+                ):
+                    raise ValueError(
+                        "llama.cpp execution requires one prompt text input part"
                     )
-                else:
-                    expected_input_sha256 = hashlib.sha256(
-                        record.input_text.encode("utf-8")
-                    ).hexdigest()
+                expected_input_sha256 = evaluation_input_parts_sha256(
+                    record.input_parts
+                )
                 if record.input_sha256 != expected_input_sha256:
                     raise ValueError(
                         f"record {record.record_id!r} input_sha256 does not match "

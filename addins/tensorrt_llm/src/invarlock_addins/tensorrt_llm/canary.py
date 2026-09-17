@@ -20,6 +20,7 @@ from invarlock_addins.tensorrt_llm.session import (
 
 from invarlock.core.runtime_provider import (
     EvaluationBatch,
+    EvaluationInputPart,
     EvaluationRecord,
     ModelRuntimeSpec,
     RuntimeExecutionContext,
@@ -27,6 +28,7 @@ from invarlock.core.runtime_provider import (
     ScoringObservation,
     TensorRTLLMArtifactIdentity,
     artifact_identity_sha256,
+    evaluation_input_parts_sha256,
 )
 from invarlock.evidence_pack_json import (
     StrictJsonError,
@@ -246,6 +248,14 @@ def qualify_candidate(
         ),
     )
     input_text = "InvarLock"
+    input_parts = (
+        EvaluationInputPart(
+            kind="text",
+            role="prompt",
+            text=input_text,
+            sha256=hashlib.sha256(input_text.encode("utf-8")).hexdigest(),
+        ),
+    )
     batch = EvaluationBatch(
         schedule_sha256=hashlib.sha256(
             b"invarlock/tensorrt-llm-candidate-schedule-v1\0InvarLock"
@@ -254,7 +264,8 @@ def qualify_candidate(
             EvaluationRecord(
                 record_id="candidate-1",
                 input_text=input_text,
-                input_sha256=hashlib.sha256(input_text.encode("utf-8")).hexdigest(),
+                input_parts=input_parts,
+                input_sha256=evaluation_input_parts_sha256(input_parts),
             ),
         ),
     )

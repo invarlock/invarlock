@@ -30,8 +30,6 @@ from invarlock.filesystem.atomic_file import write_file_no_replace
 SIGNED_RECEIPT_FORMAT_V1 = "invarlock/evidence-verification-receipt-v1"
 SIGNED_RECEIPT_FORMAT_V2 = "invarlock/evidence-verification-receipt-v2"
 SIGNED_RECEIPT_FORMAT_V3 = "invarlock/evidence-verification-receipt-v3"
-# Compatibility alias for callers that imported the original public constant.
-SIGNED_RECEIPT_FORMAT = SIGNED_RECEIPT_FORMAT_V1
 SIGNED_RECEIPT_SIGNATURE_FORMAT = "invarlock/evidence-verification-receipt-signature-v1"
 _IDENTITY_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}\Z")
 _DIGEST_RE = re.compile(r"sha256:[a-f0-9]{64}\Z")
@@ -788,7 +786,6 @@ def verify_signed_verification_receipt(
 __all__ = [
     "EvidenceReceiptError",
     "ReceiptVerification",
-    "SIGNED_RECEIPT_FORMAT",
     "SIGNED_RECEIPT_FORMAT_V1",
     "SIGNED_RECEIPT_FORMAT_V2",
     "SIGNED_RECEIPT_FORMAT_V3",

@@ -92,12 +92,26 @@ def _schedule() -> RuntimeBehavioralSchedule:
         records=[
             {
                 "record_id": "example-001",
-                "input_text": "Return A",
+                "input_parts": [
+                    {
+                        "kind": "text",
+                        "role": "prompt",
+                        "text": "Return A",
+                        "sha256": hashlib.sha256(b"Return A").hexdigest(),
+                    }
+                ],
                 "expected_output": "A",
             },
             {
                 "record_id": "example-002",
-                "input_text": "Return B",
+                "input_parts": [
+                    {
+                        "kind": "text",
+                        "role": "prompt",
+                        "text": "Return B",
+                        "sha256": hashlib.sha256(b"Return B").hexdigest(),
+                    }
+                ],
                 "expected_output": "B",
             },
         ],

@@ -6,12 +6,11 @@ import importlib
 import importlib.util
 import os
 import re
-from collections.abc import Iterable
 from dataclasses import dataclass
 from importlib.metadata import EntryPoint, PackageNotFoundError, entry_points
 from importlib.metadata import version as metadata_version
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 from invarlock import __version__ as INVARLOCK_VERSION
 from invarlock.runtime_security import third_party_plugins_allowed
@@ -55,18 +54,7 @@ class PluginInfo:
 
 
 def _select_entry_points(eps: Any) -> list[EntryPoint]:
-    selected: Iterable[EntryPoint]
-    if hasattr(eps, "select"):
-        selected = cast(
-            "Iterable[EntryPoint]",
-            eps.select(group="invarlock.runtime_providers"),
-        )
-    else:
-        selected = cast(
-            "Iterable[EntryPoint]",
-            eps.get("invarlock.runtime_providers", []),
-        )
-    return list(selected)
+    return list(eps.select(group="invarlock.runtime_providers"))
 
 
 def _normalized_distribution_name(value: str) -> str:

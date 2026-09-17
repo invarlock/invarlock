@@ -18,6 +18,17 @@ from invarlock.runtime_providers import hf_transformers as provider
 from tests.runtime_providers._hf_transformers_helpers import _save_safetensors
 
 
+def _text_parts(text: str) -> tuple[EvaluationInputPart, ...]:
+    return (
+        EvaluationInputPart(
+            kind="text",
+            role="prompt",
+            text=text,
+            sha256=hashlib.sha256(text.encode("utf-8")).hexdigest(),
+        ),
+    )
+
+
 def _settings(
     *, batch_size: int = 1, max_output_tokens: int = 4
 ) -> RuntimeExecutionSettings:
@@ -35,7 +46,8 @@ def _record(*, expected_output: str | None = "x") -> EvaluationRecord:
     return EvaluationRecord(
         record_id="record-1",
         input_text=input_text,
-        input_sha256=hashlib.sha256(input_text.encode("utf-8")).hexdigest(),
+        input_parts=_text_parts(input_text),
+        input_sha256=evaluation_input_parts_sha256(_text_parts(input_text)),
         expected_output=expected_output,
     )
 
@@ -202,9 +214,11 @@ def test_model_input_authentication_and_tokenizer_shape_fail_closed() -> None:
     mismatched = EvaluationRecord(
         record_id=record.record_id,
         input_text=record.input_text,
-        input_sha256="0" * 64,
+        input_parts=_text_parts(record.input_text),
+        input_sha256=evaluation_input_parts_sha256(_text_parts(record.input_text)),
         expected_output=record.expected_output,
     )
+    object.__setattr__(mismatched, "input_sha256", "0" * 64)
     with pytest.raises(ValueError, match="does not match input_sha256"):
         provider._hf_model_inputs(
             record=mismatched,

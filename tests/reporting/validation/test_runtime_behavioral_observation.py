@@ -10,13 +10,26 @@ import pytest
 
 from invarlock.core.runtime_provider import (
     EvaluationBatch,
+    EvaluationInputPart,
     EvaluationRecord,
     behavioral_observation,
+    evaluation_input_parts_sha256,
 )
 from invarlock.core.runtime_provider.behavioral_observation import (
     RuntimeBehavioralObservationError,
     verify_runtime_behavioral_observation,
 )
+
+
+def _text_parts(text: str) -> tuple[EvaluationInputPart, ...]:
+    return (
+        EvaluationInputPart(
+            kind="text",
+            role="prompt",
+            text=text,
+            sha256=hashlib.sha256(text.encode("utf-8")).hexdigest(),
+        ),
+    )
 
 
 def _sha256(text: str) -> str:
@@ -41,13 +54,19 @@ def _batch(metric: str = "exact_match") -> EvaluationBatch:
             EvaluationRecord(
                 record_id="sample-1",
                 input_text="What is the capital of France?",
-                input_sha256=_sha256("What is the capital of France?"),
+                input_parts=_text_parts("What is the capital of France?"),
+                input_sha256=evaluation_input_parts_sha256(
+                    _text_parts("What is the capital of France?")
+                ),
                 expected_output="Paris",
             ),
             EvaluationRecord(
                 record_id="sample-2",
                 input_text="Choose A or B.",
-                input_sha256=_sha256("Choose A or B."),
+                input_parts=_text_parts("Choose A or B."),
+                input_sha256=evaluation_input_parts_sha256(
+                    _text_parts("Choose A or B.")
+                ),
                 expected_output="A",
             ),
         ),
@@ -359,12 +378,16 @@ def test_verifier_rejects_unbound_expected_inputs_and_answers() -> None:
             EvaluationRecord(
                 record_id=batch.records[0].record_id,
                 input_text=batch.records[0].input_text,
-                input_sha256="a" * 64,
+                input_parts=_text_parts(batch.records[0].input_text),
+                input_sha256=evaluation_input_parts_sha256(
+                    _text_parts(batch.records[0].input_text)
+                ),
                 expected_output=batch.records[0].expected_output,
             ),
             batch.records[1],
         ),
     )
+    object.__setattr__(bad_hash_batch.records[0], "input_sha256", "a" * 64)
     missing_answer_batch = EvaluationBatch(
         schedule_sha256=batch.schedule_sha256,
         records=(
@@ -372,7 +395,10 @@ def test_verifier_rejects_unbound_expected_inputs_and_answers() -> None:
             EvaluationRecord(
                 record_id=batch.records[1].record_id,
                 input_text=batch.records[1].input_text,
-                input_sha256=batch.records[1].input_sha256,
+                input_parts=_text_parts(batch.records[1].input_text),
+                input_sha256=evaluation_input_parts_sha256(
+                    _text_parts(batch.records[1].input_text)
+                ),
                 expected_output=None,
             ),
         ),

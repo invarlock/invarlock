@@ -605,8 +605,7 @@ def load_run(
         run = json.loads(_read_regular_file(path, label=f"{role} run provenance"))
     except (BridgeError, OSError, json.JSONDecodeError) as exc:
         raise BridgeError(f"{role} run provenance is missing") from exc
-    legacy_fields = RUN_FIELDS - {"runtime_image_digest"}
-    if not isinstance(run, dict) or set(run) not in (RUN_FIELDS, legacy_fields):
+    if not isinstance(run, dict) or set(run) != RUN_FIELDS:
         raise BridgeError(f"{role} run provenance is incomplete")
     if (
         run["format"] != "invarlock/lm-evaluation-harness-run-v1"

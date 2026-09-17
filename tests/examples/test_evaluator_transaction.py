@@ -53,7 +53,14 @@ def _schedule():
         records=[
             {
                 "record_id": "stable-1",
-                "input_text": "Prompt",
+                "input_parts": [
+                    {
+                        "kind": "text",
+                        "role": "prompt",
+                        "text": "Prompt",
+                        "sha256": hashlib.sha256(b"Prompt").hexdigest(),
+                    }
+                ],
                 "expected_output": "Answer",
             }
         ],

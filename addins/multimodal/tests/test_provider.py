@@ -36,6 +36,17 @@ from invarlock.runtime_provider_evidence import encode_scoring_observation
 _DIGEST = "a" * 64
 
 
+def _text_parts(text: str) -> tuple[EvaluationInputPart, ...]:
+    return (
+        EvaluationInputPart(
+            kind="text",
+            role="prompt",
+            text=text,
+            sha256=hashlib.sha256(text.encode("utf-8")).hexdigest(),
+        ),
+    )
+
+
 def _png_bytes() -> bytes:
     image_module = importlib.import_module("PIL.Image")
     output = io.BytesIO()
@@ -245,7 +256,8 @@ def test_vision_session_rejects_missing_binding_and_closed_use() -> None:
             EvaluationRecord(
                 record_id="record",
                 input_text="prompt",
-                input_sha256=hashlib.sha256(b"prompt").hexdigest(),
+                input_parts=_text_parts("prompt"),
+                input_sha256=evaluation_input_parts_sha256(_text_parts("prompt")),
             ),
         ),
         task="vision_text_generation",
@@ -986,7 +998,8 @@ def test_scorer_requires_the_pinned_framework_api_surface(
             EvaluationRecord(
                 record_id="record",
                 input_text=record_text,
-                input_sha256=hashlib.sha256(record_text.encode()).hexdigest(),
+                input_parts=_text_parts(record_text),
+                input_sha256=evaluation_input_parts_sha256(_text_parts(record_text)),
             ),
         ),
         metric="exact_match",
@@ -1089,7 +1102,8 @@ def test_cuda_scoring_restores_deterministic_state_when_record_validation_fails(
             EvaluationRecord(
                 record_id="record",
                 input_text=record_text,
-                input_sha256=hashlib.sha256(record_text.encode()).hexdigest(),
+                input_parts=_text_parts(record_text),
+                input_sha256=evaluation_input_parts_sha256(_text_parts(record_text)),
             ),
         ),
         metric="exact_match",

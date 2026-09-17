@@ -188,7 +188,18 @@ def _run_fixture_side(
             "split": "validation",
         },
         records=[
-            {"record_id": "one", "input_text": "Return A", "expected_output": "A"}
+            {
+                "record_id": "one",
+                "input_parts": [
+                    {
+                        "kind": "text",
+                        "role": "prompt",
+                        "text": "Return A",
+                        "sha256": hashlib.sha256(b"Return A").hexdigest(),
+                    }
+                ],
+                "expected_output": "A",
+            }
         ],
     )
     schedule_path = tmp_path / "schedule.json"
@@ -266,7 +277,14 @@ def test_runtime_side_scores_the_validated_schedule_snapshot_not_changed_path(
             records=[
                 {
                     "record_id": record_id,
-                    "input_text": "Return A",
+                    "input_parts": [
+                        {
+                            "kind": "text",
+                            "role": "prompt",
+                            "text": "Return A",
+                            "sha256": hashlib.sha256(b"Return A").hexdigest(),
+                        }
+                    ],
                     "expected_output": "A",
                 }
             ],

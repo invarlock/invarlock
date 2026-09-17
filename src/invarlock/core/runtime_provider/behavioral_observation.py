@@ -105,11 +105,7 @@ def _require_expected_bindings(
             "expected_batch must be an EvaluationBatch"
         )
     for record in expected_batch.records:
-        input_sha256 = (
-            evaluation_input_parts_sha256(record.input_parts)
-            if record.input_parts
-            else hashlib.sha256(record.input_text.encode("utf-8")).hexdigest()
-        )
+        input_sha256 = evaluation_input_parts_sha256(record.input_parts)
         if record.input_sha256 != input_sha256:
             raise RuntimeBehavioralObservationError(
                 f"expected record {record.record_id!r} input_sha256 does not match "

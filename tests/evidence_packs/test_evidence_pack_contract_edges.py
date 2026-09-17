@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import dataclasses
+import hashlib
 from types import SimpleNamespace
 
 import pytest
@@ -182,7 +183,14 @@ def test_schedule_bytes_recomputes_and_rejects_claimed_digest_drift() -> None:
         records=[
             {
                 "record_id": "one",
-                "input_text": "prompt",
+                "input_parts": [
+                    {
+                        "kind": "text",
+                        "role": "prompt",
+                        "text": "prompt",
+                        "sha256": hashlib.sha256(b"prompt").hexdigest(),
+                    }
+                ],
                 "expected_output": "answer",
             }
         ],
