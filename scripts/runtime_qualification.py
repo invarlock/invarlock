@@ -1850,6 +1850,26 @@ def _verify_binding_unit(
             )
 
 
+def _verify_report_binding(
+    rendered: dict[str, object], *, pack_digest: str, report: Path
+) -> None:
+    if rendered.get("pack_manifest_digest") != pack_digest:
+        raise QualificationError(
+            "report_binding",
+            "rendered report does not bind the verified evidence pack",
+        )
+    if (
+        rendered.get("kind") != "runtime"
+        or rendered.get("requested_outputs") != {"html": str(report)}
+        or rendered.get("written_outputs") != {"html": str(report)}
+        or rendered.get("failed_output") is not None
+        or rendered.get("errors") != []
+    ):
+        raise QualificationError(
+            "report_binding", "renderer changed the report destination"
+        )
+
+
 def _run_captured(
     inputs: QualificationInputs,
     *,
@@ -1968,21 +1988,7 @@ def _run_captured(
             stage="report",
             expected_format="invarlock/evidence-report-v2",
         )
-        if rendered.get("pack_manifest_digest") != pack_digest:
-            raise QualificationError(
-                "report_binding",
-                "rendered report does not bind the verified evidence pack",
-            )
-        if (
-            rendered.get("kind") != "native"
-            or rendered.get("requested_outputs") != {"html": str(inputs.report)}
-            or rendered.get("written_outputs") != {"html": str(inputs.report)}
-            or rendered.get("failed_output") is not None
-            or rendered.get("errors") != []
-        ):
-            raise QualificationError(
-                "report_binding", "renderer changed the report destination"
-            )
+        _verify_report_binding(rendered, pack_digest=pack_digest, report=inputs.report)
         report_identity = {
             "pack_manifest_digest": pack_digest,
             "sha256": _sha256_bytes(
