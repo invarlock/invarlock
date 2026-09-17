@@ -75,16 +75,16 @@ RELEASE_EXAMPLE_COVERAGE_FILES := \
 .PHONY: coverage coverage-addins coverage-qualification coverage-release coverage-examples coverage-maintenance coverage-enforce coverage-enforce-parallel
 .PHONY: coverage-report coverage-core-report coverage-addins-report coverage-qualification-report coverage-release-report coverage-examples-report coverage-maintenance-report coverage-linux-check
 .PHONY: coverage-collect-core coverage-collect-examples coverage-collect-support coverage-collect-addins verify-checks
-.PHONY: compatibility-test trust-smoke trust-boundary-demo example-evidence-handoff example-acceptance-handoff example-quickstart example-hf-transformers example-hf-vision-text example-peft-lora
+.PHONY: compatibility-test trust-smoke example-evidence-handoff example-acceptance-handoff example-quickstart example-hf-transformers example-hf-vision-text example-peft-lora
 .PHONY: evaluator-qualification evaluator-replayable-imports evaluator-upstream-qualification evaluator-replayable-corpus evaluator-docs-matrix-check evaluator-scalar-semantics
 .PHONY: evaluator-inspect-semantics evaluator-batch-semantics
 .PHONY: acceptance-policy-interop
 .PHONY: example-torchao-int8 example-gguf-llama-cpp example-gguf-deployment example-spdx-ai-observation example-lm-evaluation-harness example-inspect-ai example-openai-evals example-tensorrt-llm example-tensorrt-llm-prepared
 .PHONY: lint typecheck mypy-typed-surface format verify verify-fast verify-ruff
-.PHONY: cli-smoke-core hf-provider-smoke local-hf-capture-smoke local-hf-capture-smoke-locked
-.PHONY: actionlint workflow-lint docs docs-ci docs-serve docs-check docs-live-fast docs-live
-.PHONY: docs-lint docs-lint-markdown docs-lint-spell docs-lint-public-text docs-lint-strict docs-check-build docs-check-links
-.PHONY: security supply-chain-security cve-audit dist-check addins-install-smoke quickstart-wheel-smoke packaging-smoke-minimal packaging-smoke-front-door
+.PHONY: cli-smoke-core hf-provider-smoke hf-provider-smoke-locked
+.PHONY: workflow-lint docs docs-serve docs-check docs-live-fast
+.PHONY: docs-lint docs-lint-markdown docs-lint-spell docs-lint-public-text
+.PHONY: security supply-chain-security cve-audit dist-check addins-install-smoke packaging-smoke-front-door
 .PHONY: runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-image-cuda129
 .PHONY: runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman runtime-smoke-cuda129 container-front-door-smoke
 .PHONY: qualification-source-bundle runtime-qualification-canary runtime-qualification-readiness runtime-qualification-evidence
@@ -378,10 +378,8 @@ trust-smoke:  ## Exercise pack tamper rejection and signed receipt verification
 compatibility-test:  ## Replay the permanent v0.13 compatibility corpus
 	PYTHONPATH=src $(PYTEST) -q tests/compatibility
 
-trust-boundary-demo:  ## Run the isolated evidence-signing/verifier example transaction
+example-evidence-handoff:  ## Run signed acceptance, rejection, and tamper handoff
 	PYTHONPATH=src $(PYTHON) examples/run_trust_boundary_demo.py
-
-example-evidence-handoff: trust-boundary-demo  ## Run signed acceptance, rejection, and tamper handoff
 
 example-acceptance-handoff:  ## Run the service-free acceptance handoff
 	PYTHONPATH=src:. $(PYTHON) examples/run_acceptance_handoff.py
@@ -541,9 +539,7 @@ hf-provider-smoke:  ## Exercise the canonical built-in Hugging Face provider
 		tests/runtime_providers/test_hf_transformers_strict.py \
 		tests/cli/test_import_journey.py
 
-local-hf-pipeline-smoke: hf-provider-smoke  ## CI alias for the built-in provider smoke
-
-local-hf-pipeline-smoke-locked: runtime-wheelhouse  ## Run the built-in provider smoke in the locked environment
+hf-provider-smoke-locked: runtime-wheelhouse  ## Run the built-in provider smoke in the locked environment
 	uv run --isolated --locked --group runtime-test --extra ci $(MAKE) hf-provider-smoke
 
 container-front-door-smoke: runtime-image  ## Run the host-to-container evaluation smoke
@@ -638,7 +634,7 @@ verify:  ## Run repository, product, docs, and contract gates in parallel by def
 	$(MAKE) repo-cruft-check
 	$(MAKE) -j $(VERIFY_TARGET_JOBS) \
 		public-evidence-audit contracts-check test addins-test \
-		cli-smoke-core lint docs-check-build \
+		cli-smoke-core lint docs-check \
 		PYTEST_WORKERS=$(PYTEST_WORKERS) TEST_EXCLUDES=--ignore=tests/examples
 	$(MAKE) examples-check PYTEST_WORKERS=$(PYTEST_WORKERS)
 
@@ -678,28 +674,18 @@ examples-check:  ## Test the maintained one-command integration journeys
 docs:  ## Build documentation strictly
 	$(MKDOCS) build --strict
 
-docs-ci: docs-check-build  ## Run documentation CI
-
 docs-serve:  ## Serve documentation locally
 	$(MKDOCS) serve -a 127.0.0.1:8000
 
-docs-check: docs-check-build  ## Run documentation validation
+docs-live-fast: cli-smoke-core docs-check  ## Check documented command surface and docs build
 
-docs-live-fast: cli-smoke-core docs-check-build  ## Check documented command surface and docs build
-
-docs-live: docs-live-fast  ## Run the maintained documentation checks
-
-docs-check-build: evaluator-docs-matrix-check docs-lint-strict  ## Lint and build documentation
+docs-check: evaluator-docs-matrix-check docs-lint  ## Lint and build documentation
 	$(MKDOCS) build --strict
 
 evaluator-docs-matrix-check:  ## Reject evaluator documentation drift
 	$(PYTHON) examples/evaluator-qualification/render_docs_matrix.py --check
 
-docs-check-links: docs-check-build  ## Link checking is part of the strict MkDocs build
-
 docs-lint: docs-lint-markdown docs-lint-spell docs-lint-public-text  ## Run documentation linters and public-text checks
-
-docs-lint-strict: docs-lint  ## Strict documentation lint alias
 
 docs-lint-markdown:  ## Run markdownlint-cli2
 	@git ls-files -z -- ':(icase,glob)**/*.md' | xargs -0 npx --no-install markdownlint-cli2 --
@@ -711,11 +697,9 @@ docs-lint-public-text:  ## Reject private operational details and process-only w
 	$(PYTHON) scripts/checks/check_public_text.py
 
 ##@ Packaging and security
-actionlint:  ## Lint GitHub Actions workflows
+workflow-lint:  ## Lint GitHub Actions workflows
 	@command -v actionlint >/dev/null 2>&1 || { echo "actionlint is required" >&2; exit 1; }
 	actionlint .github/workflows/*.yml
-
-workflow-lint: actionlint  ## Run workflow linting
 
 security: supply-chain-security cve-audit  ## Run supply-chain security gates
 
@@ -773,10 +757,6 @@ addins-install-smoke: dist-check  ## Install and discover all five wheels in a d
 		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -c "from importlib.metadata import version; from pathlib import Path; from sysconfig import get_path; import sys; import invarlock; import invarlock.judge_collection as judge; assert Path(judge.__file__).resolve().is_relative_to(Path(get_path('purelib')).resolve()); assert callable(judge.import_export) and callable(judge.prepare_collection); assert 'inspect_ai' not in sys.modules"; \
 		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -c "from importlib.metadata import entry_points; assert {'hf_vision_text', 'llama_cpp', 'tensorrt_llm'} <= {item.name for item in entry_points(group='invarlock.runtime_providers')}"; \
 		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -c "from importlib import import_module; from pathlib import Path; import sysconfig; from invarlock import __version__; from invarlock.core.registry import CoreRegistry; from invarlock.core.runtime_provider import INVARLOCK_RUNTIME_PROVIDER_ABI; registry = CoreRegistry(); expected = {'hf_vision_text': 'invarlock-runtime-hf-vision-text', 'llama_cpp': 'invarlock-runtime-gguf', 'tensorrt_llm': 'invarlock-runtime-tensorrt-llm'}; providers = {name: registry.get_runtime_provider(name) for name in expected}; assert all(provider.name == name and provider.abi_version == INVARLOCK_RUNTIME_PROVIDER_ABI for name, provider in providers.items()); assert all(registry.get_plugin_info(name, 'runtime_providers')['package'] == package and registry.get_plugin_info(name, 'runtime_providers')['version'] == __version__ and registry.get_plugin_info(name, 'runtime_providers')['entry_point'] == name for name, package in expected.items()); site = Path(sysconfig.get_path('purelib')).resolve(); assert all(Path(import_module(provider.__class__.__module__).__file__).resolve().is_relative_to(site) for provider in providers.values())"
-
-quickstart-wheel-smoke: addins-install-smoke  ## Run the five-minute flow from built wheels
-
-packaging-smoke-minimal: addins-install-smoke  ## Validate distributable artifacts
 
 packaging-smoke-front-door: addins-install-smoke cli-smoke-core  ## Validate artifacts and CLI entry point
 

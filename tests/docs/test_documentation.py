@@ -670,7 +670,9 @@ def test_public_example_includes_every_required_input_and_verify_anchor() -> Non
     assert 'expected_policy_verdict="fail"' in handoff
     assert "tampered_report.write_bytes" in handoff
     makefile = _read("Makefile")
-    handoff_recipe = makefile.split("trust-boundary-demo:", 1)[1].split("\n\n", 1)[0]
+    handoff_recipe = makefile.split("example-evidence-handoff:", 1)[1].split("\n\n", 1)[
+        0
+    ]
     assert "rm -rf" not in handoff_recipe
 
 

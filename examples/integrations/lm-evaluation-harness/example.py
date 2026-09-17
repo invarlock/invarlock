@@ -84,19 +84,9 @@ try:
 except ModuleNotFoundError as exc:  # pragma: no cover - flat-script compatibility
     if not exc.name or not exc.name.startswith("examples"):
         raise
-    try:
-        from evaluator_transaction.worker import run_evaluator_worker
-    except (
-        ModuleNotFoundError
-    ) as nested_exc:  # pragma: no cover - flat-script compatibility
-        if nested_exc.name not in {
-            "evaluator_transaction",
-            "evaluator_transaction.worker",
-        }:
-            raise
-        from evaluator_transaction_worker import (  # type: ignore[no-redef]
-            run_evaluator_worker,
-        )
+    from evaluator_transaction.worker import (  # type: ignore[no-redef]
+        run_evaluator_worker,
+    )
 try:
     from examples.integrations.evaluator_transaction.corpora import (
         CorpusProfile,

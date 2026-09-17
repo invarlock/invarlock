@@ -297,8 +297,8 @@ def test_primary_verification_runs_independent_suites_with_bounded_parallelism()
             "$(MAKE) examples-check"
         )
 
-    assert "docs-check-build" in complete
-    assert "docs-check-build" not in fast
+    assert "docs-check" in complete
+    assert "docs-check" not in fast
 
 
 def test_verify_fast_never_requires_a_container() -> None:
