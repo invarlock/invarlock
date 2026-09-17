@@ -22,6 +22,17 @@ from invarlock.core.runtime_provider import (
 )
 
 
+def _text_parts(text: str) -> tuple[EvaluationInputPart, ...]:
+    return (
+        EvaluationInputPart(
+            kind="text",
+            role="prompt",
+            text=text,
+            sha256=hashlib.sha256(text.encode("utf-8")).hexdigest(),
+        ),
+    )
+
+
 def test_hash_descriptor_rejects_truncation_and_growth(tmp_path: Path) -> None:
     candidate = tmp_path / "payload"
     candidate.write_bytes(b"abc")
@@ -535,7 +546,7 @@ def test_session_runtime_recheck_authenticates_identity_and_all_pins(
     assert calls == ["model", "executable", "source", "directory"]
 
 
-def test_session_score_supports_structured_and_legacy_authenticated_inputs() -> None:
+def test_session_score_preserves_structured_authenticated_inputs() -> None:
     candidate = _bare_session()
     candidate._latest_observation_sha256 = None  # noqa: SLF001
     candidate._artifact_identity_sha256 = "d" * 64  # noqa: SLF001
@@ -545,21 +556,22 @@ def test_session_score_supports_structured_and_legacy_authenticated_inputs() -> 
     candidate._execute_record = (  # type: ignore[method-assign]  # noqa: SLF001
         lambda record: f"answer:{record.record_id}"
     )
-    legacy_text = "legacy prompt"
-    legacy = EvaluationRecord(
-        record_id="legacy",
-        input_text=legacy_text,
-        input_sha256=hashlib.sha256(legacy_text.encode()).hexdigest(),
+    second_text = "second prompt"
+    second = EvaluationRecord(
+        record_id="second",
+        input_text=second_text,
+        input_parts=_text_parts(second_text),
+        input_sha256=evaluation_input_parts_sha256(_text_parts(second_text)),
     )
 
     observation = candidate.score(
-        EvaluationBatch("e" * 64, (_record(), legacy), task="text_causal")
+        EvaluationBatch("e" * 64, (_record(), second), task="text_causal")
     )
 
-    assert [record.record_id for record in observation.records] == ["record", "legacy"]
+    assert [record.record_id for record in observation.records] == ["record", "second"]
     assert [record.output_text for record in observation.records] == [
         "answer:record",
-        "answer:legacy",
+        "answer:second",
     ]
     assert len(rechecks) == 2
     assert candidate._latest_observation_sha256 is not None  # noqa: SLF001

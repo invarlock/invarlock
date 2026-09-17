@@ -11,14 +11,14 @@ from dataclasses import asdict, replace
 from pathlib import Path
 
 import pytest
-from invarlock_addins.inspect_judge import (
+
+from invarlock.judge_collection import (
     CollectionOptions,
     RunnerOptions,
     bind_requests,
     collect,
     import_export,
 )
-
 from invarlock.judge_measurements.contracts import (
     JudgeMeasurementContractError,
     canonical_payload,

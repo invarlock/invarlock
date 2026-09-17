@@ -1,6 +1,6 @@
 # Inspect judge collection and import
 
-This optional package collects bounded text judgments through the installed
+The core `invarlock.judge_collection` module collects bounded text judgments through the installed
 `evaluate` command or a caller-supplied Inspect model, and imports its
 expanded-event projection into
 `judge-measurements-v1`. It does not import arbitrary Inspect `.eval` archives.
@@ -43,10 +43,9 @@ invarlock evaluate judge-request.yaml --preflight --json
 invarlock evaluate judge-request.yaml --signing-key signer-private.pem --json
 ```
 
-The core `judge` extra installs this matching collector and its pinned SDKs.
-For a source build, run
-`python -m pip install '.[judge]' 'addins/inspect_judge[inspect]'` from the
-repository root. Offline judge analysis, verification and reporting are built
+The core `judge` extra directly installs the pinned Inspect, OpenAI and `httpx`
+SDKs. For a source build, run
+`python -m pip install '.[judge]'` from the repository root. Offline judge analysis, verification and reporting are built
 into `invarlock` and do not require the extra.
 
 Preflight checks without calling a provider. Execution uses the declared cost,
@@ -57,7 +56,7 @@ to Python callers. Native requests automatically freeze runtime answers before
 judging; captured requests freeze an explicit recipe against normalized evaluator
 records, and frozen-answer requests supply their approved plan and runs directly.
 A captured v2 request with `comparison.judge.measurements`, or a v3
-`judge_import` request, replays retained measurements without this package or
+`judge_import` request, replays retained measurements without the SDK extra or
 credentials. Caller-owned collectors can use the core `prepare_evaluator_judge`
 and `import_judge_sources` APIs for the generic retained-call format; arbitrary
 upstream scalar scores cannot replace those calls.
@@ -114,7 +113,7 @@ completed trials across multiple sources. This does not promise that 7,728
 maximum-size responses fit the aggregate allowance.
 
 `prepare_inspect_config` optionally constructs the pinned SDK's generation
-configuration. Install the package's `inspect` extra to use that helper. Ordinary
+configuration. Install `invarlock[judge]` to use that helper. Ordinary
 import and planning do not import Inspect or a provider SDK.
 
 ## Export boundary
@@ -124,12 +123,12 @@ collection options and scheduled samples. Samples bind case, side, repetition,
 plan and answer digests. Each expanded model event includes an explicit grader,
 generation settings, normalized model input, the bounded provider request and
 response, accessible completion, model identity and attempt outcome. The
-synthetic fixture in `tests/fixtures/export.json` describes this projection and
+synthetic fixture in `inspect-export.json` describes this projection and
 makes no external execution claim.
 
 The maintained `examples/judge-measurements/import_inspect.py` command imports
-that projection without the SDK extra or provider credentials. Install matching
-core and add-in packages, then run it from the copied example directory:
+that projection without the SDK extra or provider credentials. Install the core
+package, then run it from the copied example directory:
 
 ```bash
 python import_inspect.py --export inspect-export.json --collection collection-inspect.json --output measurements-inspect.json
@@ -149,7 +148,7 @@ the accessible model completion. Offline verification checks the provider
 messages, model, generation controls, completion, resolved model, request ID,
 finish reason and token usage against the normalized event and trial table. It
 does so without loading Inspect. As with any retained API log, these bytes
-establish what the producer signed and retained; they do not independently prove
+establish what the evidence signer signed and retained; they do not independently prove
 that a provider performed the call.
 
 The pinned SDK interfaces used for configuration and event-field inspection are
@@ -157,8 +156,8 @@ The pinned SDK interfaces used for configuration and event-field inspection are
 [`ModelEvent`](https://inspect.aisi.org.uk/reference/inspect_ai.event.html#modelevent)
 and [`ModelCall`](https://inspect.aisi.org.uk/reference/inspect_ai.model.html#modelcall).
 
-The release gate `make inspect-judge-sdk-test` installs built core and add-in
-wheels through `invarlock[judge]` against the dedicated hashed dependency
+The release gate `make inspect-judge-sdk-test` installs the built core
+wheel through `invarlock[judge]` against the dedicated hashed dependency
 locks, runs `pip check`, and executes real SDK request/event conversion using an
 offline HTTP transport. Missing or mismatched SDK dependencies fail that gate.
 The separate evaluator-qualification runtime retains its own historical version

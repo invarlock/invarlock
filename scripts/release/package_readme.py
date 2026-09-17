@@ -15,7 +15,6 @@ PROJECTS = (
     "addins/gguf",
     "addins/multimodal",
     "addins/tensorrt_llm",
-    "addins/inspect_judge",
 )
 LINK = re.compile(
     r'(?P<html>\b(?:href|src|srcset)=")(?P<url>[^"\n]+)(?P<end>")|(?P<md>!?\[[^\]\n]*\]\()(?P<target>[^)\s]+)(?P<close>\))'

@@ -47,6 +47,17 @@ _REQUIRE_ISOLATED_NETWORK_NAMESPACE = llama_cpp._require_isolated_network_namesp
 _OBSERVE_LINUX_CPU = llama_cpp._observe_linux_cpu
 
 
+def _text_parts(text: str) -> tuple[EvaluationInputPart, ...]:
+    return (
+        EvaluationInputPart(
+            kind="text",
+            role="prompt",
+            text=text,
+            sha256=hashlib.sha256(text.encode("utf-8")).hexdigest(),
+        ),
+    )
+
+
 def _authenticated_test_cpu() -> llama_cpp.RuntimeDeviceFacts:
     canonical_identity = {
         "fields": {"model name": ["observed test CPU"]},
@@ -292,7 +303,14 @@ def _schedule(*, task: str = "text_causal"):
         records=[
             {
                 "record_id": "qualification/0",
-                "input_text": "Prompt",
+                "input_parts": [
+                    {
+                        "kind": "text",
+                        "role": "prompt",
+                        "text": "Prompt",
+                        "sha256": hashlib.sha256(b"Prompt").hexdigest(),
+                    }
+                ],
                 "expected_output": "A",
             }
         ],
@@ -1178,7 +1196,11 @@ def test_llama_cpp_rechecks_input_and_artifact_before_and_after_score(
     invalid_record = EvaluationRecord(
         record_id="bad",
         input_text="actual",
-        input_sha256=hashlib.sha256(b"different").hexdigest(),
+        input_parts=_text_parts("actual"),
+        input_sha256=evaluation_input_parts_sha256(_text_parts("actual")),
+    )
+    object.__setattr__(
+        invalid_record, "input_sha256", hashlib.sha256(b"different").hexdigest()
     )
     with pytest.raises(ValueError, match="input_sha256"):
         session.score(_batch(invalid_record))

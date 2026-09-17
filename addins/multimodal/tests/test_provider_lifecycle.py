@@ -16,6 +16,7 @@ from invarlock_addins.multimodal.provider import (
 from invarlock.core.checkpoint_identity import checkpoint_tree_sha256
 from invarlock.core.runtime_provider import (
     EvaluationBatch,
+    EvaluationInputPart,
     EvaluationRecord,
     ModelRuntimeSpec,
     RuntimeArtifactResources,
@@ -26,6 +27,7 @@ from invarlock.core.runtime_provider import (
     RuntimeScoringRecord,
     ScoringObservation,
     artifact_identity_sha256,
+    evaluation_input_parts_sha256,
 )
 from invarlock.core.runtime_provider.behavioral_observation import (
     runtime_scoring_records_sha256,
@@ -33,6 +35,17 @@ from invarlock.core.runtime_provider.behavioral_observation import (
 from invarlock.runtime_provider_evidence import encode_scoring_observation
 
 _IMAGE_DIGEST = "sha256:" + "9" * 64
+
+
+def _text_parts(text: str) -> tuple[EvaluationInputPart, ...]:
+    return (
+        EvaluationInputPart(
+            kind="text",
+            role="prompt",
+            text=text,
+            sha256=hashlib.sha256(text.encode("utf-8")).hexdigest(),
+        ),
+    )
 
 
 def _spec(**overrides: object) -> ModelRuntimeSpec:
@@ -115,7 +128,8 @@ def _batch() -> EvaluationBatch:
             EvaluationRecord(
                 record_id="vision/1",
                 input_text=input_text,
-                input_sha256=hashlib.sha256(input_text.encode()).hexdigest(),
+                input_parts=_text_parts(input_text),
+                input_sha256=evaluation_input_parts_sha256(_text_parts(input_text)),
                 expected_output="cat",
             ),
         ),

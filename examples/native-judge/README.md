@@ -26,7 +26,7 @@ Omitting the mode or setting it to `none` preserves the original request bytes.
 
 You need Python 3.12 or newer, two local model snapshots, Docker or Podman, a
 digest-pinned native runtime image, a supported judge account and an Ed25519
-evidence-signing key. Use core, collector and example files from the same source
+evidence-signing key. Use core and example files from the same source
 revision. The [getting-started guide](../../docs/user-guide/getting-started.md)
 explains model identities, image preparation and key separation.
 
@@ -37,8 +37,8 @@ python -m pip install "invarlock[judge]"
 ```
 
 Use the example files matching the installed release. For a local source build,
-install both packages from the same repository root with
-`python -m pip install '.[judge]' 'addins/inspect_judge[inspect]'`.
+install from the same repository root with
+`python -m pip install '.[judge]'`.
 Offline judge import, verification and reporting need only the core package.
 
 Installed collection requires exactly Inspect `0.3.263`, OpenAI `3.13.0` and

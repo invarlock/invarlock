@@ -573,12 +573,12 @@ def test_registry_rejects_discovery_errors_and_malformed_entry_point_values(
         registry.list_scorers()
 
 
-def test_registry_supports_legacy_entry_point_metadata_shape() -> None:
+def test_registry_rejects_mapping_entry_point_metadata() -> None:
     entry = _EntryPoint(_SCORER_ID, "example.module:Scorer", object)
-    selected = scorer_module._select_scorer_entry_points(  # noqa: SLF001
-        {scorer_module.SCORER_EXTENSION_ENTRY_POINT_GROUP: [entry]}
-    )
-    assert selected == [entry]
+    with pytest.raises(AttributeError):
+        scorer_module._select_scorer_entry_points(  # noqa: SLF001
+            {scorer_module.SCORER_EXTENSION_ENTRY_POINT_GROUP: [entry]}
+        )
 
 
 @pytest.mark.parametrize(

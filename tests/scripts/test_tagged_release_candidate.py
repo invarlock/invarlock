@@ -393,7 +393,7 @@ def test_main_authenticates_then_verifies_candidate(
     assert "workflow run ID is malformed" in capsys.readouterr().err
 
 
-def test_coordinated_artifact_inventory_contains_six_distribution_pairs() -> None:
+def test_coordinated_artifact_inventory_contains_five_distribution_pairs() -> None:
     version = "0.15.0"
     expected = {
         f"{directory}{name}-{version}{suffix}"
@@ -403,7 +403,6 @@ def test_coordinated_artifact_inventory_contains_six_distribution_pairs() -> Non
             ("addins/", "invarlock_runtime_gguf"),
             ("addins/", "invarlock_runtime_hf_vision_text"),
             ("addins/", "invarlock_runtime_tensorrt_llm"),
-            ("addins/", "invarlock_inspect_judge"),
         )
         for suffix in ("-py3-none-any.whl", ".tar.gz")
     }

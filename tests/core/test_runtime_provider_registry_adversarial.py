@@ -38,16 +38,15 @@ class EntryPointStub:
         return self._loader
 
 
-def test_entry_point_selection_supports_legacy_mapping_shape() -> None:
+def test_entry_point_selection_rejects_mapping_metadata() -> None:
     entry = EntryPoint(
         name="vendor_runtime",
         value="vendor.runtime:Provider",
         group="invarlock.runtime_providers",
     )
 
-    assert registry_module._select_entry_points(
-        {"invarlock.runtime_providers": [entry]}
-    ) == [entry]
+    with pytest.raises(AttributeError):
+        registry_module._select_entry_points({"invarlock.runtime_providers": [entry]})
 
 
 def test_shipped_entry_point_requires_exact_distribution_version_and_value() -> None:

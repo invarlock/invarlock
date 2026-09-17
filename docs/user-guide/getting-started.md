@@ -62,7 +62,7 @@ For a locally built wheel, use examples from the exact checkout used for the
 build. A package version does not identify a local commit or uncommitted source.
 Copy `examples/quickstart/run.py` and `examples/acceptance-handoff/golden` to an
 empty directory outside the checkout, clear `PYTHONPATH`, and run with the
-interpreter that installed the wheel. `make quickstart-wheel-smoke` automates
+interpreter that installed the wheel. `make addins-install-smoke` automates
 the isolated local-build checks, including captured evaluation/recipient commands
 before optional add-ins are installed. Never regenerate retained evidence to
 make a recipe pass.

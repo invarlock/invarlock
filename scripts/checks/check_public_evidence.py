@@ -540,10 +540,14 @@ def _check_local_entry(errors: list[str], entry_root: Path) -> None:
         except EvidenceReportError as exc:
             errors.append(f"{pack}: signed pack validation failed: {exc}")
         else:
-            if rendered.evidence_signer != signer:
+            # The authenticated report binds the manifest containing the signer
+            # fingerprint already matched to the independent receipt anchor.
+            if rendered.pack_manifest_digest != _sha256_bytes(
+                _canonical_json_bytes(manifest)
+            ):
                 errors.append(
-                    f"{receipt}: signed receipt signer anchor does not match "
-                    "the verified pack signer"
+                    f"{receipt}: signed receipt manifest does not match "
+                    "the verified pack manifest"
                 )
 
 

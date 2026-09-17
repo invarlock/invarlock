@@ -76,8 +76,7 @@ def _recipe(case_ids=("one", "two")):
     )
     collection = json.loads(
         (
-            Path(__file__).parents[2]
-            / "addins/inspect_judge/tests/fixtures/export.json"
+            Path(__file__).parents[2] / "tests/judge_collection/fixtures/export.json"
         ).read_text()
     )["collection"]
     collection["grader"] = plan["judge"]["requested_model"]

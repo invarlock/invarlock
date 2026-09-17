@@ -8,6 +8,22 @@ from pathlib import Path
 
 import pytest
 
+from invarlock.core.runtime_provider import (
+    EvaluationInputPart,
+    evaluation_input_parts_sha256,
+)
+
+
+def _text_parts(text: str) -> tuple[EvaluationInputPart, ...]:
+    return (
+        EvaluationInputPart(
+            kind="text",
+            role="prompt",
+            text=text,
+            sha256=hashlib.sha256(text.encode("utf-8")).hexdigest(),
+        ),
+    )
+
 
 def test_runtime_provider_core_import_is_torch_free() -> None:
     before = set(sys.modules)
@@ -341,7 +357,8 @@ def test_evaluation_batch_and_scoring_observation_validate_pairing() -> None:
     record = EvaluationRecord(
         record_id="sample-1",
         input_text="hello",
-        input_sha256="a" * 64,
+        input_parts=_text_parts("hello"),
+        input_sha256=evaluation_input_parts_sha256(_text_parts("hello")),
         expected_output="world",
     )
     batch = EvaluationBatch(schedule_sha256="b" * 64, records=(record,))

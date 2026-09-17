@@ -18,7 +18,7 @@ SHARDS = ("core", "examples", "support", "addins")
 FAST_MARKERS = "not integration and not slow and not manual and not gpu"
 ADDIN_TESTS = tuple(
     f"addins/{name}/tests"
-    for name in ("diagnostics", "gguf", "multimodal", "tensorrt_llm", "inspect_judge")
+    for name in ("diagnostics", "gguf", "multimodal", "tensorrt_llm")
 )
 SUPPORT_TESTS = (
     "tests/ci/test_coverage_branch_rate.py",

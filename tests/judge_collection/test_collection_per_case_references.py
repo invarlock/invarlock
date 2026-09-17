@@ -8,10 +8,10 @@ import json
 from pathlib import Path
 
 import pytest
-from invarlock_addins.inspect_judge import bind_requests, render_request
-from invarlock_addins.inspect_judge.collector import _render_request
-from invarlock_addins.inspect_judge.runner import _frozen_rows
 
+from invarlock.judge_collection import bind_requests, render_request
+from invarlock.judge_collection.collector import _render_request
+from invarlock.judge_collection.runner import _frozen_rows
 from invarlock.judge_measurements.contracts import (
     canonical_payload,
     render_judge_request,
@@ -29,7 +29,7 @@ def _data():
     return bind_requests(plan, frozen), frozen
 
 
-def test_core_and_addin_reference_request_bytes_are_identical_and_pinned():
+def test_recipe_and_collector_reference_request_bytes_are_identical_and_pinned():
     plan, frozen = _data()
     for binding in plan["answer_bindings"]:
         row = frozen[binding["case_id"]]
@@ -64,7 +64,7 @@ def test_core_and_addin_reference_request_bytes_are_identical_and_pinned():
 
 
 @pytest.mark.parametrize("expected", [None, {}, 1])
-def test_addin_requires_per_case_text_reference(expected):
+def test_collector_requires_per_case_text_reference(expected):
     plan, frozen = _data()
     row = next(iter(frozen.values()))
     with pytest.raises(ValueError, match="string reference"):
@@ -76,7 +76,7 @@ def test_addin_requires_per_case_text_reference(expected):
         )
 
 
-def test_addin_frozen_rows_preserve_the_real_reference():
+def test_collector_frozen_rows_preserve_the_real_reference():
     baseline, subject = [
         json.loads((FIXTURES / f"{side}_run.json").read_text())
         for side in ("baseline", "subject")
@@ -111,10 +111,9 @@ def test_opt_in_binding_rejects_a_dropped_reference():
 
 
 def _reference_export():
-    from invarlock_addins.inspect_judge import CollectionOptions
-
     from invarlock.evaluation_records.cases import case_set_digest
     from invarlock.evaluation_records.io import run_digest
+    from invarlock.judge_collection import CollectionOptions
     from invarlock.judge_measurements.contracts import (
         expected_trial_id,
         measurement_plan_digest,
@@ -165,10 +164,9 @@ def _reference_export():
     )
 
 
-def test_addin_import_and_live_checkpoint_replay_per_case_references():
-    from invarlock_addins.inspect_judge import import_export
-    from invarlock_addins.inspect_judge.collector import _LiveCheckpoint
-
+def test_collector_import_and_live_checkpoint_replay_per_case_references():
+    from invarlock.judge_collection import import_export
+    from invarlock.judge_collection.collector import _LiveCheckpoint
     from invarlock.judge_measurements.contracts import validate_measurements
 
     plan, frozen, runs, exported, options = _reference_export()
@@ -201,8 +199,8 @@ def test_addin_import_and_live_checkpoint_replay_per_case_references():
 
 
 @pytest.mark.parametrize("expected", [None, "substituted gold"])
-def test_addin_import_rejects_missing_or_changed_per_case_reference(expected):
-    from invarlock_addins.inspect_judge import import_export
+def test_collector_import_rejects_missing_or_changed_per_case_reference(expected):
+    from invarlock.judge_collection import import_export
 
     plan, _, runs, exported, options = _reference_export()
     runs["subject"]["records"][0]["expected"] = expected

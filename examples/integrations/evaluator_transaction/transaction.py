@@ -96,25 +96,7 @@ from .corpora import (
     profile_for_descriptor,
 )
 from .model_profiles import model_profile
-
-try:
-    from examples.integrations.evaluator_transaction.worker import (
-        run_evaluator_worker,
-    )
-except ModuleNotFoundError as exc:  # pragma: no cover - flat-script compatibility
-    if not exc.name or not exc.name.startswith("examples"):
-        raise
-    try:
-        from evaluator_transaction.worker import run_evaluator_worker
-    except ModuleNotFoundError as nested_exc:
-        if nested_exc.name not in {
-            "evaluator_transaction",
-            "evaluator_transaction.worker",
-        }:
-            raise
-        from evaluator_transaction_worker import (  # type: ignore[no-redef]
-            run_evaluator_worker,
-        )
+from .worker import run_evaluator_worker
 
 IMAGE_ID = re.compile(r"^sha256:[0-9a-f]{64}$")
 SOURCE_COMMIT = re.compile(r"^[0-9a-f]{40}$")

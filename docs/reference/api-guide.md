@@ -124,7 +124,6 @@ The result types are:
 | `EvaluationPreflightResult` | `execution_mode`, `output`, input digests, providers, checks, `as_json()` |
 | `EvaluationTransactionResult` | `evidence_path`, `comparison_id`, `pack_manifest_digest`, optional `policy_verdict`, `as_json()` |
 | `EvidenceVerification` | `evidence_path`, `payload`, `receipt_path`, `summary`, `as_json()` |
-| `EvidenceReport` | `text`, `html_path`, `evidence_signer`, `pack_manifest_digest`, `observations` |
 | `EvidenceReportV2` | `text`, `kind`, `pack_manifest_digest`, `requested_outputs`, `written_outputs`, `failed_output`, `errors`, `as_json()` |
 | `CapturedEvaluationPreflightResult` | `requested_authentication`, run/policy/request digests, record/scope counts, required/allowed draws, `output`, `checks`, `as_json()` |
 | `CapturedEvaluationTransactionResult` | `evidence_path`, `comparison_id`, run/policy/request/manifest digests, `authentication`, `policy_verdict`, `as_json()` |
@@ -135,7 +134,7 @@ The result types are:
 `EvaluationTransactionResult.policy_verdict` is optional presentation metadata
 from publication. It is not added to `as_json()` and does not establish
 recipient acceptance. Use independent verification for that decision.
-`EvidenceReport.text` is Markdown presentation content; console and HTML
+`EvidenceReportV2.text` is Markdown presentation content; console and HTML
 layouts are not stable parsing interfaces. Use canonical evidence and verifier
 payloads for automation.
 
@@ -271,7 +270,7 @@ render_evidence(
     markdown_path: Path | None = None,
     junit_path: Path | None = None,
     case_ids: tuple[str, ...] = (),
-) -> EvidenceReport | EvidenceReportV2
+) -> EvidenceReportV2
 ```
 
 Native deterministic requests return native results. Native judge evaluation
@@ -537,7 +536,7 @@ The most commonly embedded ABI values have these stable constructor fields:
 | `RuntimeArtifactResources` | absolute `root`, relative `primary_artifact`, `support_resources`, `device_kind`, `container_image_digest` | Root and every resource are checked without following links; device is `cpu` or `cuda`; digest is required |
 | `RuntimeExecutionContext` | `strict`, `allow_network`, `container_image_digest`, `device_kind` | `artifact_identity_sha256`, opaque `provider_state`, scorer, and close callback default to `None` |
 | `EvaluationInputPart` | `kind`, canonical `role`, bare `sha256` | Text parts carry `text`; content parts carry `content_id`, `media_type`, and `byte_length` |
-| `EvaluationRecord` | `record_id`, first `input_text`, bare `input_sha256` | `expected_output=None`; `input_parts=()` retains the provider-construction compatibility path |
+| `EvaluationRecord` | `record_id`, first-text projection `input_text`, canonical bare `input_sha256`, nonempty canonical `input_parts` | Only `expected_output` is optional, defaulting to `None`; text and digest must match the ordered input parts |
 | `EvaluationBatch` | bare `schedule_sha256`, nonempty tuple of `records` | `metric="exact_match"`; `task="text_causal"`; record IDs must be unique |
 | `RuntimeProviderCapabilities` | provider, artifacts, tasks, metrics, modes, required extra/image | Format and ABI fields are fixed by the type |
 | `ScoringObservation` | provider, artifact digest, schedule digest, nonempty records, aggregate-source digest | Record IDs must be unique; format is fixed |

@@ -35,6 +35,7 @@ from invarlock_addins.tensorrt_llm.session import (
 )
 
 from invarlock.core.runtime_provider import (
+    EvaluationInputPart,
     EvaluationRecord,
     ModelRuntimeSpec,
     RuntimeArtifactResources,
@@ -44,10 +45,22 @@ from invarlock.core.runtime_provider import (
     RuntimeSession,
     TensorRTLLMArtifactIdentity,
     build_runtime_behavioral_schedule_from_material,
+    evaluation_input_parts_sha256,
 )
 from invarlock.core.runtime_provider.behavioral_observation import (
     runtime_scoring_records_sha256,
 )
+
+
+def _text_parts(text: str) -> tuple[EvaluationInputPart, ...]:
+    return (
+        EvaluationInputPart(
+            kind="text",
+            role="prompt",
+            text=text,
+            sha256=hashlib.sha256(text.encode("utf-8")).hexdigest(),
+        ),
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -416,7 +429,14 @@ def _tensorrt_llm_preflight_schedule(
         records=[
             {
                 "record_id": "qualification/0",
-                "input_text": "Prompt",
+                "input_parts": [
+                    {
+                        "kind": "text",
+                        "role": "prompt",
+                        "text": "Prompt",
+                        "sha256": hashlib.sha256(b"Prompt").hexdigest(),
+                    }
+                ],
                 "expected_output": "A",
             }
         ],
@@ -834,8 +854,10 @@ def test_tensorrt_llm_rejects_input_digest_and_runner_path_swap(
     invalid = EvaluationRecord(
         record_id="bad-digest",
         input_text="alpha",
-        input_sha256="0" * 64,
+        input_parts=_text_parts("alpha"),
+        input_sha256=evaluation_input_parts_sha256(_text_parts("alpha")),
     )
+    object.__setattr__(invalid, "input_sha256", "0" * 64)
     with pytest.raises(ValueError, match="does not match authenticated input material"):
         session.score(_batch(invalid))
     with pytest.raises(ValueError, match="supports only text_causal"):

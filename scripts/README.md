@@ -17,10 +17,10 @@ and security checks.
   example-scenario audits, the bounded judge statistics calibration, and the
   source-tree cruft check.
 - `release/` validates a clean release checkout and built distributions.
-  `make dist-check` binds the core wheel/sdist and all five first-party
+  `make dist-check` binds the core wheel/sdist and all four first-party
   optional wheel/sdist pairs to their exact checkout sources, metadata, and
   entry points. `make addins-install-smoke` then installs the pinned base
-  dependency closure and all six wheels in a disposable environment, runs
+  dependency closure and all five wheels in a disposable environment, runs
   `pip check`, and exercises provider discovery and conformance without using
   the checkout or user site. It selects the maintained Python 3.12 or 3.13
   lock for the invoking interpreter. The shared `release/core_wheel_consumers.py`

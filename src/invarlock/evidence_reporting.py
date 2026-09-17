@@ -33,7 +33,6 @@ from invarlock.evidence_pack_json import (
     read_regular_file_bytes,
 )
 from invarlock.evidence_pack_snapshot import PackSnapshot
-from invarlock.filesystem.atomic_file import write_file_no_replace
 from invarlock.paired_exact_match import (
     PAIRED_CONFIDENCE_INTERVAL_METHODS,
     PairedExactMatchError,
@@ -78,15 +77,6 @@ class EvidenceReportError(ValueError):
             dict(payload.get("written_outputs", {})) if payload else {}
         )
         self.failed_output = payload.get("failed_output") if payload else None
-
-
-@dataclass(frozen=True)
-class EvidenceReport:
-    text: str
-    html_path: Path | None
-    evidence_signer: str
-    pack_manifest_digest: str
-    observations: tuple[dict[str, Any], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -468,23 +458,6 @@ def _signature_verified_report(
     if canonical_json_bytes(report) != report_raw:
         raise EvidenceReportError("canonical evaluation report is not canonical JSON")
     return _closed_comparison_report(report), signer, observations
-
-
-def _write_html_no_clobber(path: Path, html: str) -> Path:
-    destination = Path(path).absolute()
-    if destination.name in {"", ".", ".."}:
-        raise EvidenceReportError("HTML destination must name a regular file")
-    try:
-        write_file_no_replace(destination, html.encode("utf-8"))
-    except FileExistsError as exc:
-        raise EvidenceReportError(
-            f"HTML destination already exists: {destination}"
-        ) from exc
-    except OSError as exc:
-        raise EvidenceReportError(
-            f"could not write HTML report: {exc}", exit_code=1
-        ) from exc
-    return destination
 
 
 def _number(value: object, *, field: str) -> float:
@@ -1308,27 +1281,9 @@ def _render_html(
     )
 
 
-def _render_native_evidence(
-    evidence_path: Path,
-    *,
-    html_path: Path | None = None,
-    explain: bool = False,
-    _view_sink: list[ReportView] | None = None,
-) -> EvidenceReport:
-    """Render the signature-authenticated canonical report without mutation."""
-
+def _render_native_evidence(evidence_path: Path) -> tuple[ReportView, str]:
+    """Load the signature-authenticated native presentation without mutation."""
     evidence = Path(evidence_path)
-    if not evidence.is_dir() or evidence.is_symlink():
-        raise EvidenceReportError("evidence must be a real directory")
-    if html_path is not None:
-        try:
-            Path(html_path).absolute().resolve().relative_to(evidence.resolve())
-        except ValueError:
-            pass
-        else:
-            raise EvidenceReportError(
-                "HTML destination must remain outside the immutable evidence pack"
-            )
     snapshot, capture_errors = PackSnapshot.capture(
         evidence, validate_structural_json=False
     )
@@ -1367,8 +1322,6 @@ def _render_native_evidence(
                 context=context,
                 changes=changes,
             )
-            text = render_report_markdown(view, include_details=explain)
-            rendered_html = render_report_html(view) if html_path is not None else None
             materialized_errors = snapshot.files.materialized_stability_errors(
                 snapshot_root
             )
@@ -1377,23 +1330,10 @@ def _render_native_evidence(
     stability_errors = [*materialized_errors, *snapshot.stability_errors()]
     if stability_errors:
         raise EvidenceReportError("; ".join(stability_errors))
-    if _view_sink is not None:
-        _view_sink.append(view)
     manifest_entry = snapshot.files.entry("manifest.json")
     if manifest_entry is None:  # pragma: no cover - capture contract owns inventory
         raise EvidenceReportError("evidence manifest snapshot is unavailable")
-    output = (
-        _write_html_no_clobber(html_path, rendered_html)
-        if html_path is not None and rendered_html is not None
-        else None
-    )
-    return EvidenceReport(
-        text=text,
-        html_path=output,
-        evidence_signer=evidence_signer,
-        pack_manifest_digest="sha256:" + manifest_entry.sha256,
-        observations=tuple(observations),
-    )
+    return view, "sha256:" + manifest_entry.sha256
 
 
 def render_evidence(
@@ -1404,7 +1344,7 @@ def render_evidence(
     markdown_path: Path | None = None,
     junit_path: Path | None = None,
     case_ids: tuple[str, ...] = (),
-) -> EvidenceReport | EvidenceReportV2:
+) -> EvidenceReportV2:
     """Render either evidence family without replay or implicit receipt discovery."""
     from invarlock.captured_contracts import atomic_write, sha
     from invarlock.captured_reporting import (
@@ -1455,8 +1395,6 @@ def render_evidence(
         raise EvidenceReportError(
             f"evidence manifest schema failed: {exc}", exit_code=exc.exit_code
         ) from exc
-    if not captured and markdown_path is None and junit_path is None:
-        return _render_native_evidence(evidence, html_path=html_path, explain=explain)
     requested = {
         name: str(path)
         for name, path in (
@@ -1481,7 +1419,7 @@ def render_evidence(
         for value in requested.values():
             destination = Path(value).absolute()
             if destination.name in {"", ".", ".."}:
-                raise EvidenceReportError("report destination must name a file")
+                raise EvidenceReportError("report destination must name a regular file")
             canonical = destination.resolve()
             if canonical.is_relative_to(
                 evidence.resolve()
@@ -1509,12 +1447,7 @@ def render_evidence(
             view = _view(manifest, values, signer)
             manifest_digest = sha(canonical_json_bytes(manifest))
         else:
-            views: list[ReportView] = []
-            native = _render_native_evidence(
-                evidence, explain=explain, _view_sink=views
-            )
-            view = views[0]
-            manifest_digest = native.pack_manifest_digest
+            view, manifest_digest = _render_native_evidence(evidence)
         payload["pack_manifest_digest"] = manifest_digest
         text = render_report_markdown(view, include_details=explain)
         rendered = {}
@@ -1568,7 +1501,6 @@ def render_evidence(
 
 
 __all__ = [
-    "EvidenceReport",
     "EvidenceReportV2",
     "EvidenceReportError",
     "render_evidence",

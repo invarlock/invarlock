@@ -10,12 +10,14 @@ import pytest
 from invarlock.core.checkpoint_identity import checkpoint_tree_sha256
 from invarlock.core.runtime_provider import (
     EvaluationBatch,
+    EvaluationInputPart,
     EvaluationRecord,
     HFSnapshotArtifactIdentity,
     ModelRuntimeSpec,
     RuntimeArtifactResources,
     RuntimeExecutionContext,
     artifact_identity_sha256,
+    evaluation_input_parts_sha256,
 )
 from invarlock.core.runtime_provider.behavioral_observation import (
     verify_runtime_behavioral_observation,
@@ -36,6 +38,17 @@ from tests.runtime_providers._hf_transformers_helpers import (
     _authenticated_test_runtime,  # noqa: F401
     _BindingTokenizer,
 )
+
+
+def _text_parts(text: str) -> tuple[EvaluationInputPart, ...]:
+    return (
+        EvaluationInputPart(
+            kind="text",
+            role="prompt",
+            text=text,
+            sha256=hashlib.sha256(text.encode("utf-8")).hexdigest(),
+        ),
+    )
 
 
 @pytest.mark.parametrize("max_shard_size", ["5GB", "1KB"])
@@ -120,7 +133,8 @@ def test_hf_provider_receipts_a_real_tiny_local_transformers_journey(
             EvaluationRecord(
                 record_id="tiny-1",
                 input_text=input_text,
-                input_sha256=hashlib.sha256(input_text.encode("utf-8")).hexdigest(),
+                input_parts=_text_parts(input_text),
+                input_sha256=evaluation_input_parts_sha256(_text_parts(input_text)),
                 # This expectation is fixed from the deterministic seed/model
                 # contract before the provider runs. Do not derive it from the
                 # observation under test.
@@ -176,7 +190,8 @@ def test_hf_provider_receipts_a_real_tiny_local_transformers_journey(
             EvaluationRecord(
                 record_id="tiny-nll-1",
                 input_text=input_text,
-                input_sha256=hashlib.sha256(input_text.encode("utf-8")).hexdigest(),
+                input_parts=_text_parts(input_text),
+                input_sha256=evaluation_input_parts_sha256(_text_parts(input_text)),
                 expected_output=" target",
             ),
         ),
@@ -313,7 +328,8 @@ def test_hf_provider_executes_text_through_a_real_tiny_image_text_model(
             EvaluationRecord(
                 record_id="tiny-image-text-1",
                 input_text=input_text,
-                input_sha256=hashlib.sha256(input_text.encode()).hexdigest(),
+                input_parts=_text_parts(input_text),
+                input_sha256=evaluation_input_parts_sha256(_text_parts(input_text)),
                 expected_output="token-23",
             ),
         ),

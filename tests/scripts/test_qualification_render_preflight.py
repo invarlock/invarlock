@@ -35,7 +35,14 @@ def _text_schedule(*, expected: str = " A"):
         records=[
             {
                 "record_id": "example-001",
-                "input_text": "Question?",
+                "input_parts": [
+                    {
+                        "kind": "text",
+                        "role": "prompt",
+                        "text": "Question?",
+                        "sha256": hashlib.sha256(b"Question?").hexdigest(),
+                    }
+                ],
                 "expected_output": expected,
             }
         ],

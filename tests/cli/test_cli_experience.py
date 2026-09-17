@@ -166,7 +166,7 @@ def test_real_report_json_failure_is_a_result_object(tmp_path):
     result = RUNNER.invoke(app, ["report", str(tmp_path), "--json"])
     assert result.exit_code == 2
     value = json.loads(result.stdout)
-    assert value["format_version"] == "invarlock/evidence-report-v1"
+    assert value["format_version"] == "invarlock/evidence-report-v2"
     assert value["ok"] is False
     assert value["errors"]
 

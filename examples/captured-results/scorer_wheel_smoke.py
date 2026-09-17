@@ -42,7 +42,7 @@ from invarlock.judge_measurements.evidence import object_sha256
 
 
 def require_core_only() -> None:
-    for name in ("inspect_ai", "openai", "invarlock_addins.inspect_judge"):
+    for name in ("inspect_ai", "openai"):
         try:
             available = importlib.util.find_spec(name) is not None
         except ModuleNotFoundError:

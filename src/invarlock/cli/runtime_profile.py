@@ -92,7 +92,7 @@ def resolve_runtime_profile(
     explicit: Mapping[str, str],
     environment: Mapping[str, str],
 ) -> ResolvedRuntimeProfile:
-    """Resolve profile mode; callers without a profile keep their old resolver path."""
+    """Resolve an explicit profile into the shared OCI launch arguments."""
     from invarlock.evaluation_oci import OciWorkerLimits
 
     limits = OciWorkerLimits()
@@ -106,7 +106,7 @@ def resolve_runtime_profile(
         "image": "",
         "image_digest": "",
     }
-    # Every side setting is materialized below. Do not let the legacy resolver
+    # Every side setting is materialized below. Do not let the OCI resolver
     # validate an unused common environment fallback ahead of those settings.
     arguments: dict[str, str] = {
         "default_device": "cpu",

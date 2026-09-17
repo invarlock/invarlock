@@ -235,10 +235,11 @@ def test_report_renders_text_and_html_location(
     monkeypatch.setattr(
         evidence_reporting,
         "render_evidence",
-        lambda *_args, **_kwargs: evidence_reporting.EvidenceReport(
+        lambda *_args, **_kwargs: evidence_reporting.EvidenceReportV2(
             text="# InvarLock comparison report",
-            html_path=html,
-            evidence_signer="sha256:" + "a" * 64,
+            kind="runtime",
+            requested_outputs={"html": str(html)},
+            written_outputs={"html": str(html)},
             pack_manifest_digest="sha256:" + "b" * 64,
         ),
     )
@@ -265,10 +266,11 @@ def test_report_json_binds_the_rendered_pack(
     monkeypatch.setattr(
         evidence_reporting,
         "render_evidence",
-        lambda *_args, **_kwargs: evidence_reporting.EvidenceReport(
+        lambda *_args, **_kwargs: evidence_reporting.EvidenceReportV2(
             text="# InvarLock comparison report",
-            html_path=html,
-            evidence_signer="sha256:" + "a" * 64,
+            kind="runtime",
+            requested_outputs={"html": str(html)},
+            written_outputs={"html": str(html)},
             pack_manifest_digest=digest,
         ),
     )
@@ -282,8 +284,12 @@ def test_report_json_binds_the_rendered_pack(
     assert "\x9b" not in result.stdout
     payload = json.loads(result.stdout)
     assert payload == {
-        "format_version": "invarlock/evidence-report-v1",
-        "html": str(html),
+        "format_version": "invarlock/evidence-report-v2",
+        "kind": "runtime",
+        "requested_outputs": {"html": str(html)},
+        "written_outputs": {"html": str(html)},
+        "failed_output": None,
+        "errors": [],
         "ok": True,
         "pack_manifest_digest": digest,
     }

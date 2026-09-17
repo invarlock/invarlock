@@ -46,7 +46,6 @@ def built_addins(tmp_path_factory: pytest.TempPathFactory) -> Path:
         "gguf",
         "multimodal",
         "tensorrt_llm",
-        "inspect_judge",
     ):
         isolated_source = sources / project
         shutil.copytree(
@@ -176,7 +175,6 @@ def test_first_party_addin_artifacts_match_exact_source(
         "gguf",
         "multimodal",
         "tensorrt_llm",
-        "inspect_judge",
     }
 
 
@@ -303,13 +301,13 @@ def test_first_party_artifacts_include_core_and_all_addins(
         "gguf",
         "multimodal",
         "tensorrt_llm",
-        "inspect_judge",
     ]
-    assert len({result.distribution for result in results}) == 6
+    assert len({result.distribution for result in results}) == 5
 
 
-def test_first_party_artifacts_reject_core_namespace_injection(
-    built_core: Path, built_addins: Path, tmp_path: Path
+@pytest.mark.parametrize("fault", ["namespace_injection", "collector_substitution"])
+def test_first_party_artifacts_reject_source_unbound_core_code(
+    built_core: Path, built_addins: Path, tmp_path: Path, fault: str
 ) -> None:
     copied = tmp_path / "core"
     shutil.copytree(built_core, copied)
@@ -320,7 +318,10 @@ def test_first_party_artifacts_reject_core_namespace_injection(
             for member in archive.infolist()
             if not member.is_dir()
         }
-    files["invarlock/injected.py"] = b"EXECUTED = True\n"
+    if fault == "namespace_injection":
+        files["invarlock/injected.py"] = b"EXECUTED = True\n"
+    else:
+        files["invarlock/judge_collection/collector.py"] += b"\nSUBSTITUTED = True\n"
     _rewrite_record(files)
     with zipfile.ZipFile(wheel, "w") as archive:
         for name, content in files.items():
@@ -447,7 +448,7 @@ def test_distribution_names_must_be_unique(
         )
 
 
-def test_cli_emits_one_core_and_five_addin_results(
+def test_cli_emits_one_core_and_four_addin_results(
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -478,7 +479,6 @@ def test_cli_emits_one_core_and_five_addin_results(
             "gguf",
             "multimodal",
             "tensorrt_llm",
-            "inspect_judge",
         )
     )
     observed: dict[str, object] = {}
@@ -587,9 +587,7 @@ def _write_wheel_files(wheel: Path, files: dict[str, bytes]) -> None:
             archive.writestr(name, content)
 
 
-@pytest.mark.parametrize(
-    "distribution", ["invarlock_runtime_gguf", "invarlock_inspect_judge"]
-)
+@pytest.mark.parametrize("distribution", ["invarlock_runtime_gguf"])
 def test_first_party_addin_rejects_removed_wheel_dependency(
     built_addins: Path, tmp_path: Path, distribution: str
 ) -> None:
@@ -658,25 +656,26 @@ def test_first_party_core_rejects_substituted_requires_python(
         )
 
 
-def test_first_party_addin_rejects_substituted_optional_dependency_marker(
-    built_addins: Path, tmp_path: Path
+def test_first_party_core_rejects_substituted_optional_dependency_marker(
+    built_core: Path, built_addins: Path, tmp_path: Path
 ) -> None:
-    copied = tmp_path / "addins"
-    shutil.copytree(built_addins, copied)
-    wheel = next(copied.glob("invarlock_inspect_judge-*.whl"))
+    copied = tmp_path / "core"
+    shutil.copytree(built_core, copied)
+    wheel = next(copied.glob("invarlock-*.whl"))
     files = _read_wheel_files(wheel)
     metadata = next(name for name in files if name.endswith(".dist-info/METADATA"))
-    assert b'extra == "inspect"' in files[metadata]
+    assert b'extra == "judge"' in files[metadata]
     files[metadata] = files[metadata].replace(
-        b'extra == "inspect"', b'extra == "unbound"', 1
+        b'extra == "judge"', b'extra == "unbound"', 1
     )
     _write_wheel_files(wheel, files)
 
     with pytest.raises(ReleasePreflightError, match="wheel metadata Requires-Dist"):
-        validate_first_party_addin_distributions(
+        validate_first_party_distributions(
             repo_root=ROOT,
             expected_version=VERSION,
-            dist_dir=copied,
+            core_dist_dir=copied,
+            addin_dist_dir=built_addins,
         )
 
 
@@ -722,7 +721,6 @@ def test_first_party_addin_rejects_substituted_sdist_dependency(
     ("distribution", "source"),
     [
         ("invarlock_diagnostics", "invarlock_addins/diagnostics/observations.py"),
-        ("invarlock_inspect_judge", "invarlock_addins/inspect_judge/collector.py"),
     ],
 )
 def test_first_party_addin_rejects_validly_recorded_source_substitution(

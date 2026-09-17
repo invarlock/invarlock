@@ -595,6 +595,6 @@ def test_hosted_project_rejects_malformed_metadata_and_insecure_urls(
         )
 
 
-def test_hosted_project_inventory_includes_the_inspect_judge_pair() -> None:
-    assert "invarlock-inspect-judge" in verifier.PROJECTS
-    assert len(verifier.PROJECTS) == 6
+def test_hosted_project_inventory_contains_only_separate_distributions() -> None:
+    assert "invarlock-inspect-judge" not in verifier.PROJECTS
+    assert len(verifier.PROJECTS) == 5

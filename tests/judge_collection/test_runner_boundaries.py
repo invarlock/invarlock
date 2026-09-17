@@ -9,16 +9,16 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from invarlock_addins.inspect_judge import (
+
+from invarlock.filesystem.paths import pinned_directory
+from invarlock.judge_collection import (
     CollectionOptions,
     InspectJudgeError,
     RunnerOptions,
     collect,
     render_request,
 )
-from invarlock_addins.inspect_judge import runner as live
-
-from invarlock.filesystem.paths import pinned_directory
+from invarlock.judge_collection import runner as live
 from invarlock.judge_measurements.contracts import canonical_payload
 
 FIXTURES = Path(__file__).with_name("fixtures")
@@ -262,7 +262,7 @@ def test_live_stop_reason_reports_actual_admission_boundary(
 
     monkeypatch.setattr(live, "_call_one", call_one)
     if stop == "capacity":
-        from invarlock_addins.inspect_judge import collector as planning
+        from invarlock.judge_collection import collector as planning
 
         # Actual live storage accounting can be stricter than the public batch
         # planner. The runner must report its own terminal admission boundary.

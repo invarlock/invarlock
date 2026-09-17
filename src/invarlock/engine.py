@@ -140,7 +140,6 @@ from invarlock.evidence_receipt import (
     verify_signed_verification_receipt,
 )
 from invarlock.evidence_reporting import (
-    EvidenceReport,
     EvidenceReportError,
     EvidenceReportV2,
     render_evidence,
@@ -285,7 +284,6 @@ __all__ = [
     "EvidencePackStatus",
     "EvidenceObservation",
     "EvidenceReceiptError",
-    "EvidenceReport",
     "EvidenceReportError",
     "EvidenceVerification",
     "EvidenceVerificationError",

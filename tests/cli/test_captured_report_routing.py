@@ -36,7 +36,6 @@ def no_presentation(monkeypatch):
                 "_report_view",
                 "render_report_html",
                 "render_report_markdown",
-                "_write_html_no_clobber",
             ),
         ),
     ):
@@ -349,4 +348,4 @@ def test_native_report_default_json_contract_remains_native(tmp_path: Path) -> N
     result = RUNNER.invoke(app, ["report", str(evidence), "--json"])
 
     assert result.exit_code != 0
-    assert json.loads(result.stdout)["format_version"] == "invarlock/evidence-report-v1"
+    assert json.loads(result.stdout)["format_version"] == "invarlock/evidence-report-v2"

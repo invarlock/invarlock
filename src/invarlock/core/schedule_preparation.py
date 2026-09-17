@@ -385,7 +385,14 @@ def prepare_local_evaluation_schedule_bytes(
                 source_index=source_index,
                 line_number=line_number,
             ),
-            "input_text": prompt,
+            "input_parts": [
+                {
+                    "kind": "text",
+                    "role": "prompt",
+                    "text": prompt,
+                    "sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
+                }
+            ],
             "expected_output": _mapped_text(
                 decoded,
                 source.expected_output_field,
@@ -407,7 +414,6 @@ def prepare_local_evaluation_schedule_bytes(
             content_media_type = _mapped_text(
                 decoded, source.content_media_type_field, line_number=line_number
             )
-            record.pop("input_text")
             record["input_parts"] = [
                 {
                     "kind": "content",

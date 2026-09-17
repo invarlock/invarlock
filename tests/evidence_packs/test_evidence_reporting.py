@@ -283,12 +283,11 @@ def test_render_markdown_from_complete_evidence_signed_pack(
     assert "independently supplied trust profile" in result.text
     assert "create the signed acceptance or rejection receipt" in result.text
     assert signer in result.text
-    assert result.evidence_signer == signer
     assert result.pack_manifest_digest == (
         "sha256:"
         + hashlib.sha256((evidence / "manifest.json").read_bytes()).hexdigest()
     )
-    assert result.html_path is None
+    assert result.requested_outputs == result.written_outputs == {}
     assert "### Artifact: Differs" in result.text
     assert "**Baseline:** fixture://baseline" in result.text
     assert "**Subject:** fixture://subject" in result.text
@@ -300,7 +299,7 @@ def test_render_html_is_self_contained_and_no_clobber(tmp_path: Path) -> None:
 
     result = render_evidence(evidence, html_path=html)
 
-    assert result.html_path == html.absolute()
+    assert result.written_outputs == {"html": str(html)}
     rendered = html.read_text(encoding="utf-8")
     assert '<h1 id="decision">Policy satisfied</h1>' in rendered
     assert "This report summarizes the evidence bundle." in rendered
@@ -411,7 +410,7 @@ def test_render_authenticated_observations_separately_from_verdict(
     )
     assert "spectral-summary" in result.text
     assert '"verdict": "fail"' in result.text
-    assert result.observations[0]["authority"] == "observation"
+    assert '"authority": "observation"' in result.text
     rendered = html.read_text(encoding="utf-8")
     assert "<summary>Authenticated observations</summary>" in rendered
     assert (
@@ -601,6 +600,6 @@ def test_render_html_rejects_symlinked_output_parent(tmp_path: Path) -> None:
     linked_parent = tmp_path / "linked-parent"
     linked_parent.symlink_to(real_parent, target_is_directory=True)
 
-    with pytest.raises(EvidenceReportError, match="could not write HTML report"):
+    with pytest.raises(EvidenceReportError, match="parent must be a real directory"):
         render_evidence(evidence, html_path=linked_parent / "report.html")
     assert not (real_parent / "report.html").exists()

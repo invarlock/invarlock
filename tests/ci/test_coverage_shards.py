@@ -309,6 +309,7 @@ def test_real_collection_is_disjoint_and_preserves_marker_exceptions(
         "tests/test_core.py": "def test_core(): pass\n",
         "tests/test_slow.py": "import pytest\n@pytest.mark.slow\ndef test_slow(): pass\n",
         "tests/compatibility/test_retained.py": "def test_retained(): pass\n",
+        "tests/judge_collection/test_collector.py": "def test_collector(): pass\n",
         "tests/examples/test_duplicate.py": "def test_example(): pass\n",
         support: "import pytest\n@pytest.mark.integration\ndef test_container(): pass\n",
         "addins/example/tests/test_duplicate.py": "def test_addin(): pass\n",
@@ -343,7 +344,11 @@ def test_real_collection_is_disjoint_and_preserves_marker_exceptions(
         )
         inventories.append(set(json.loads(path.read_text())))
     union = set().union(*inventories)
-    assert sum(map(len, inventories)) == len(union) == 5
+    assert sum(map(len, inventories)) == len(union) == 6
+    assert (
+        "tests/judge_collection/test_collector.py::test_collector"
+        in inventories[runner.SHARDS.index("core")]
+    )
     assert f"{support}::test_container" in union
     assert "tests/compatibility/test_retained.py::test_retained" in union
     assert not any("test_slow" in node for node in union)
