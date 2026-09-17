@@ -1966,14 +1966,20 @@ def _run_captured(
                 stage="report",
             ),
             stage="report",
-            expected_format="invarlock/evidence-report-v1",
+            expected_format="invarlock/evidence-report-v2",
         )
         if rendered.get("pack_manifest_digest") != pack_digest:
             raise QualificationError(
                 "report_binding",
                 "rendered report does not bind the verified evidence pack",
             )
-        if rendered.get("html") != str(inputs.report):
+        if (
+            rendered.get("kind") != "native"
+            or rendered.get("requested_outputs") != {"html": str(inputs.report)}
+            or rendered.get("written_outputs") != {"html": str(inputs.report)}
+            or rendered.get("failed_output") is not None
+            or rendered.get("errors") != []
+        ):
             raise QualificationError(
                 "report_binding", "renderer changed the report destination"
             )

@@ -1223,7 +1223,6 @@ def report(
 
     from invarlock.evidence_reporting import (
         EvidenceReportError,
-        EvidenceReportV2,
         render_evidence,
     )
 
@@ -1246,8 +1245,21 @@ def report(
                 json.dumps(
                     exc.payload
                     or {
-                        "format_version": "invarlock/evidence-report-v1",
+                        "format_version": "invarlock/evidence-report-v2",
+                        "kind": None,
                         "ok": False,
+                        "pack_manifest_digest": None,
+                        "requested_outputs": {
+                            name: str(path)
+                            for name, path in (
+                                ("html", html),
+                                ("markdown", markdown),
+                                ("junit", junit),
+                            )
+                            if path is not None
+                        },
+                        "written_outputs": {},
+                        "failed_output": None,
                         "errors": [str(exc)],
                     },
                     allow_nan=False,
@@ -1265,37 +1277,15 @@ def report(
             if exc.failed_output is not None:
                 console.print(f"Failed output: {_terminal_text(exc.failed_output)}")
         raise typer.Exit(exc.exit_code) from exc
-    if isinstance(result, EvidenceReportV2):
-        if json_out:
-            _echo_json(result.as_json())
-        else:
-            console.print(Markdown(result.text))
-            for name, destination in result.written_outputs.items():
-                console.print(
-                    f"{_terminal_text(name.upper())} {_terminal_text(destination)}",
-                    soft_wrap=True,
-                )
-        return
     if json_out:
-        _echo_json(
-            json.dumps(
-                {
-                    "format_version": "invarlock/evidence-report-v1",
-                    "ok": True,
-                    "pack_manifest_digest": result.pack_manifest_digest,
-                    "html": (
-                        str(result.html_path) if result.html_path is not None else None
-                    ),
-                },
-                allow_nan=False,
-                separators=(",", ":"),
-                sort_keys=True,
-            )
-        )
+        _echo_json(result.as_json())
     else:
         console.print(Markdown(result.text))
-        if result.html_path is not None:
-            console.print(f"HTML {_terminal_text(result.html_path)}", soft_wrap=True)
+        for name, destination in result.written_outputs.items():
+            console.print(
+                f"{_terminal_text(name.upper())} {_terminal_text(destination)}",
+                soft_wrap=True,
+            )
 
 
 def main() -> None:

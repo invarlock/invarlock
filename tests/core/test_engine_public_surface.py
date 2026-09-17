@@ -52,7 +52,6 @@ def test_engine_exports_only_supported_transactions_and_provider_contracts() -> 
         "EvidencePackStatus",
         "EvidenceObservation",
         "EvidenceReceiptError",
-        "EvidenceReport",
         "EvidenceReportError",
         "EvidenceReportV2",
         "EvidenceVerification",

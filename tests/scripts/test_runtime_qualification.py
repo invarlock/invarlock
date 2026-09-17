@@ -263,12 +263,18 @@ elif arguments[:3] == ["-m", "invarlock", "report"]:
         else {PACK_DIGEST!r}
     )
     print(json.dumps({{
-        "format_version": "invarlock/evidence-report-v1",
-        "html": (
-            str(report.with_name("other-report.html"))
-            if control.get("binding_mutation") == "report_destination"
-            else str(report)
-        ),
+        "format_version": "invarlock/evidence-report-v2",
+        "kind": "native",
+        "requested_outputs": {{"html": str(report)}},
+        "written_outputs": {{
+            "html": (
+                str(report.with_name("other-report.html"))
+                if control.get("binding_mutation") == "report_destination"
+                else str(report)
+            ),
+        }},
+        "failed_output": None,
+        "errors": [],
         "ok": True,
         "pack_manifest_digest": report_pack,
     }}))
