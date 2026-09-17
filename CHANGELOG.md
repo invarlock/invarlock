@@ -30,6 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Update the documentation dependency SoupSieve to 2.9.2 to address selector
+  parsing denial-of-service advisories.
+
 ## [0.16.1] - 2026-09-16
 
 ### Added
