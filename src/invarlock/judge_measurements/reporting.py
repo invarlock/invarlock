@@ -690,8 +690,9 @@ def _view(
         decision=analysis["decision"],
         summary=explanation
         + (
-            f" Across {counts['complete_units']:,} complete independent units, the subject's mean rubric score was {metric.candidate}, "
-            f"compared with {metric.baseline} for the baseline, a change of {metric.change}."
+            f" Across {counts['complete_units']:,} complete independent units, the subject's mean rubric score was {number(float(subject['mean']))}, "
+            f"compared with {number(float(baseline_mean))} for the baseline, "
+            f"a change of {number(float(effect['mean']), signed=True)} score points."
             if effect is not None and subject is not None and baseline_mean is not None
             else " Mean scores and a paired effect are unavailable for the incomplete schedule."
         )

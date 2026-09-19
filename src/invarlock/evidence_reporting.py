@@ -1244,7 +1244,7 @@ def _report_view(
         f" Across {metric.count} paired records, the subject scored {metric.candidate}, "
         f"compared with {metric.baseline} for the baseline, "
         + (
-            f"a subject-to-baseline ratio of {metric.change}."
+            f"a subject-to-baseline ratio of {number(comparison['value'])}."
             if ratio
             else f"a change of {metric.change}."
         )

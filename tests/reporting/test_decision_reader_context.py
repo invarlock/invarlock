@@ -6,11 +6,13 @@ from html import unescape
 
 import pytest
 
+from invarlock.evidence_pack_contract import build_comparison_report
 from invarlock.evidence_reporting import _report_view
 from invarlock.judge_measurements.reporting import _snapshot, _view
 from invarlock.report_presentation import render_html, render_markdown
 from tests.evidence_packs.test_evidence_reporting import _report
 from tests.judge_measurements import test_evidence_acceptance as support
+from tests.reporting.schema.test_evidence_contract_edges import _pairs
 
 
 def test_native_summary_explains_observed_result_and_exact_match_counts():
@@ -59,5 +61,30 @@ def test_judge_does_not_count_repetitions_or_clustered_cases_as_independent_unit
             assert metric.baseline == metric.candidate == metric.change == "Unavailable"
         else:
             assert "0 score" in rendered and "1 score" in rendered
-            assert "a change of +1 score" in rendered
+            assert (
+                "mean rubric score was 1, compared with 0 for the baseline" in rendered
+            )
+            assert "a change of +1 score points." in rendered
             assert "Across 2 complete independent units" in rendered
+
+
+def test_native_nll_summary_states_ratio_without_repeating_its_unit():
+    report = build_comparison_report(
+        comparison_id="nll-comparison",
+        paired_records=_pairs(
+            metric="normalized_nll_per_utf8_byte", baseline=2.0, subject=2.2
+        ),
+        policy={
+            "resolved_policy": {
+                "metrics": {"normalized_nll_per_utf8_byte": {"ratio_max": 1.2}}
+            }
+        },
+        policy_digest="sha256:" + "a" * 64,
+    )
+    view = _report_view(report, evidence_signer="demo", observations=[])
+    assert view.metrics[0].change == "1.1 ratio"
+    assert view.technical is report
+    for output in (render_html(view), render_markdown(view)):
+        rendered = unescape(re.sub(r"<[^>]+>", "", output))
+        assert "subject scored 2.2 nats / byte, compared with 2 nats / byte" in rendered
+        assert "a subject-to-baseline ratio of 1.1." in rendered
