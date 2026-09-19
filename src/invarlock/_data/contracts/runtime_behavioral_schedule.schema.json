@@ -29,7 +29,7 @@
       "pattern": "^[a-z][a-z0-9_]{0,63}$"
     },
     "taskName": {
-      "$comment": "Standard identifiers include text_causal, text_seq2seq, masked_language, and vision_text_generation. A provider must explicitly declare execution support; the canonical pattern permits later add-in tasks without changing the provider ABI.",
+      "$comment": "Standard identifiers include text_causal, text_seq2seq, masked_language, and vision_text_generation. A provider must explicitly declare execution support; the canonical pattern permits later provider tasks without changing the provider ABI.",
       "type": "string",
       "pattern": "^[a-z][a-z0-9_]{0,63}$"
     },

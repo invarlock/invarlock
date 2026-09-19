@@ -19,6 +19,10 @@ from transformers import AutoTokenizer
 
 from examples.integrations.bounded_command import run_bounded_command
 from examples.integrations.launch import _require_committed_checkout, _runtime_image
+from examples.integrations.trust_material import (
+    load_external_key,
+    validate_new_trust_root,
+)
 from invarlock.evidence_pack_contract import canonical_json_bytes
 
 _MODEL = (
@@ -232,6 +236,9 @@ def _run_transaction(
     image: str,
     devices: tuple[str, str],
     container_engine: str,
+    evidence_signing_key: Path,
+    verifier_signing_key: Path,
+    trust_root: Path,
 ) -> None:
     command = [
         sys.executable,
@@ -248,6 +255,12 @@ def _run_transaction(
         f"cuda:{devices[0]}",
         "--subject-device",
         f"cuda:{devices[1]}",
+        "--evidence-signing-key",
+        str(evidence_signing_key),
+        "--verifier-signing-key",
+        str(verifier_signing_key),
+        "--trust-root",
+        str(trust_root),
     ]
     environment = dict(os.environ)
     environment["INVARLOCK_CONTAINER_ENGINE"] = container_engine
@@ -266,12 +279,42 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--container-engine", choices=("docker",), default="docker")
     parser.add_argument("--baseline-device", default="0")
     parser.add_argument("--subject-device", default="1")
+    parser.add_argument("--evidence-signing-key", type=Path)
+    parser.add_argument("--verifier-signing-key", type=Path)
+    parser.add_argument("--trust-root", type=Path)
     arguments = parser.parse_args(argv)
     try:
         if arguments.baseline_device == arguments.subject_device:
             raise ValueError("the showcase requires two distinct GPU indices")
         _require_committed_checkout(Path(__file__).resolve().parents[3])
+        if any(
+            value is None
+            for value in (
+                arguments.evidence_signing_key,
+                arguments.verifier_signing_key,
+                arguments.trust_root,
+            )
+        ):
+            raise ValueError(
+                "caller-owned --evidence-signing-key, --verifier-signing-key, "
+                "and --trust-root are required together"
+            )
         paths = _create_workspace(arguments.workspace)
+        trust_root = validate_new_trust_root(
+            arguments.trust_root.expanduser(), transaction_root=paths.workspace
+        )
+        evidence_key, _, evidence_fingerprint = load_external_key(
+            arguments.evidence_signing_key.expanduser(),
+            transaction_root=paths.workspace,
+            label="evidence signing key",
+        )
+        verifier_key, _, verifier_fingerprint = load_external_key(
+            arguments.verifier_signing_key.expanduser(),
+            transaction_root=paths.workspace,
+            label="verifier signing key",
+        )
+        if evidence_fingerprint == verifier_fingerprint:
+            raise ValueError("evidence and verifier signing keys must be distinct")
         _download(paths)
         runtime_build = paths.workspace / "runtime-build"
         runtime_build.mkdir()
@@ -279,7 +322,7 @@ def main(argv: list[str] | None = None) -> int:
             repository=paths.repository,
             build_root=runtime_build,
             container_engine=arguments.container_engine,
-            dockerfile="addins/tensorrt_llm/runtime/Dockerfile",
+            dockerfile="runtime/Dockerfile.tensorrt-llm",
             image_prefix="invarlock-tensorrt-example-runtime",
         )
         if image != digest:
@@ -308,6 +351,9 @@ def main(argv: list[str] | None = None) -> int:
             image=image,
             devices=(arguments.baseline_device, arguments.subject_device),
             container_engine=arguments.container_engine,
+            evidence_signing_key=evidence_key,
+            verifier_signing_key=verifier_key,
+            trust_root=trust_root,
         )
     except (OSError, RuntimeError, ValueError, subprocess.CalledProcessError) as exc:
         print(f"FAIL {exc}", file=sys.stderr)

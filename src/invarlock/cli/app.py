@@ -845,12 +845,13 @@ def evaluate(  # noqa: C901
                 f"Collection budgets: {_terminal_text(str(judge['budgets']))}",
                 markup=False,
             )
-        if (
-            outcome.profile is not None
-            and outcome.profile_context is not None
-            and outcome.launch is not None
-        ):
-            console.print(f"Runtime profile: {_terminal_text(outcome.profile.digest)}")
+        if outcome.profile_context is not None and outcome.launch is not None:
+            if outcome.profile is not None:
+                console.print(
+                    f"Runtime profile: {_terminal_text(outcome.profile.digest)}"
+                )
+            else:
+                console.print("Runtime configuration: resolved")
             console.print(f"Container engine: {_terminal_text(outcome.launch.engine)}")
             for side in ("baseline", "subject"):
                 resolved_side = getattr(outcome.launch, side)

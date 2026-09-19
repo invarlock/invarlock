@@ -1176,7 +1176,7 @@ def preflight_evaluation_request(
         if prepared.sample_requirements:
             checks.append("sample_record_count")
         if prepared.judge is not None:
-            checks.append("judge_collection")
+            checks.append("judge_measurements")
         normalized_runtime_digests: dict[str, str] | None = None
         artifact_digests = prepared.artifact_digests
         if request.execution.mode == "run":

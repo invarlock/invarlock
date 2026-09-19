@@ -543,7 +543,7 @@ def _artifact_anchor(
             HFTransformersProvider().authenticate_artifact(spec, artifact_path)
         )
     if provider_name == "llama_cpp":
-        from invarlock_addins.gguf.provider import LlamaCppProvider
+        from invarlock.runtime_providers.llama_cpp import LlamaCppProvider
 
         return "sha256:" + artifact_identity_sha256(
             LlamaCppProvider().authenticate_artifact(spec, artifact_path)

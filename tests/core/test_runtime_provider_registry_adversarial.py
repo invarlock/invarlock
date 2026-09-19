@@ -154,6 +154,79 @@ def test_candidate_entry_point_requires_distribution_location_metadata(
     )
 
 
+def test_qualification_candidate_site_rejects_unusable_paths(
+    tmp_path,  # noqa: ANN001
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    missing = tmp_path / "missing"
+    monkeypatch.setenv(registry_module._QUALIFICATION_CANDIDATE_SITE, str(missing))
+    with pytest.raises(RuntimeError, match="unavailable"):
+        registry_module._qualification_candidate_site()  # noqa: SLF001
+
+    regular_file = tmp_path / "candidate.txt"
+    regular_file.write_text("not a directory", encoding="utf-8")
+    monkeypatch.setenv(
+        registry_module._QUALIFICATION_CANDIDATE_SITE,
+        str(regular_file),
+    )
+    with pytest.raises(RuntimeError, match="invalid"):
+        registry_module._qualification_candidate_site()  # noqa: SLF001
+
+
+@pytest.mark.parametrize(
+    "error", [OSError("missing"), TypeError("bad"), ValueError("bad")]
+)
+def test_candidate_entry_point_rejects_unresolvable_distribution_locations(
+    tmp_path,  # noqa: ANN001
+    error: Exception,
+) -> None:
+    class BrokenDist:
+        def locate_file(self, _path: str) -> object:
+            raise error
+
+    entry = SimpleNamespace(dist=BrokenDist())
+
+    assert (
+        registry_module._entry_point_is_from(  # noqa: SLF001
+            cast(EntryPoint, entry), candidate_site=tmp_path
+        )
+        is False
+    )
+
+
+def test_entry_point_distribution_metadata_falls_back_when_name_is_empty(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    entry = EntryPointStub(
+        name="vendor_runtime",
+        value="vendor.runtime:Provider",
+        dist=DistStub("", ""),
+    )
+    monkeypatch.setattr(registry_module, "metadata_version", lambda _package: "2.0")
+
+    registry = registry_module.CoreRegistry()
+    registry._register_entry_point(cast(EntryPoint, entry))
+
+    info = registry._runtime_providers["vendor_runtime"]
+    assert info.package == "vendor"
+    assert info.version == "2.0"
+
+
+def test_entry_point_distribution_metadata_accepts_name_without_version() -> None:
+    entry = EntryPointStub(
+        name="vendor_runtime",
+        value="vendor.runtime:Provider",
+        dist=DistStub("vendor-package", ""),
+    )
+
+    registry = registry_module.CoreRegistry()
+    registry._register_entry_point(cast(EntryPoint, entry))
+
+    info = registry._runtime_providers["vendor_runtime"]
+    assert info.package == "vendor-package"
+    assert info.version is None
+
+
 def test_entry_point_class_resolution_uses_deferred_loader() -> None:
     class Provider:
         pass

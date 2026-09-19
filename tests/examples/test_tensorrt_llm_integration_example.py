@@ -42,6 +42,22 @@ def showcase() -> Any:
 
 
 @pytest.fixture
+def showcase_trust(example: Any, tmp_path: Path) -> list[str]:
+    evidence = tmp_path / "evidence.pem"
+    verifier = tmp_path / "verifier.pem"
+    example._key(evidence)
+    example._key(verifier)
+    return [
+        "--evidence-signing-key",
+        str(evidence),
+        "--verifier-signing-key",
+        str(verifier),
+        "--trust-root",
+        str(tmp_path / "trust"),
+    ]
+
+
+@pytest.fixture
 def inputs(tmp_path: Path) -> Path:
     root = tmp_path / "inputs"
     root.mkdir()
@@ -759,17 +775,15 @@ def test_main_is_one_inspect_prepare_execute_transaction(
     assert observed == ["inspect", "prepare", "execute"]
 
 
-def test_image_probe_uses_addin_provider_and_official_runner(
+def test_image_probe_uses_core_provider_and_official_runner(
     monkeypatch: pytest.MonkeyPatch, inputs: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     packages = {
         name: ModuleType(name)
         for name in (
-            "invarlock_addins",
-            "invarlock_addins.tensorrt_llm",
-            "invarlock_addins.tensorrt_llm.execution",
-            "invarlock_addins.tensorrt_llm.provider",
-            "invarlock_addins.tensorrt_llm.session",
+            "invarlock.runtime_providers._tensorrt_llm_execution",
+            "invarlock.runtime_providers.tensorrt_llm",
+            "invarlock.runtime_providers.tensorrt_llm_session",
         )
     }
 
@@ -786,11 +800,11 @@ def test_image_probe_uses_addin_provider_and_official_runner(
             return spec
 
     packages[
-        "invarlock_addins.tensorrt_llm.execution"
+        "invarlock.runtime_providers._tensorrt_llm_execution"
     ].official_tensorrt_llm_runner_path = lambda: Path("/runner")  # type: ignore[attr-defined]
-    packages["invarlock_addins.tensorrt_llm.provider"].TensorRTLLMProvider = Provider  # type: ignore[attr-defined]
+    packages["invarlock.runtime_providers.tensorrt_llm"].TensorRTLLMProvider = Provider  # type: ignore[attr-defined]
     packages[
-        "invarlock_addins.tensorrt_llm.session"
+        "invarlock.runtime_providers.tensorrt_llm_session"
     ].TensorRTLLMRuntimeBindings = Bindings  # type: ignore[attr-defined]
     for name, module in packages.items():
         monkeypatch.setitem(sys.modules, name, module)
@@ -1037,12 +1051,23 @@ def test_showcase_container_build_and_transaction_commands(
         image=digest,
         devices=("0", "1"),
         container_engine="docker",
+        evidence_signing_key=tmp_path / "evidence.pem",
+        verifier_signing_key=tmp_path / "verifier.pem",
+        trust_root=tmp_path / "trust",
     )
     transaction, options = calls[-1]
     assert transaction[1].endswith("tensorrt-llm/run.py")
     assert transaction[transaction.index("--baseline-device") + 1] == "cuda:0"
     assert transaction[transaction.index("--subject-device") + 1] == "cuda:1"
     assert options["environment"]["INVARLOCK_CONTAINER_ENGINE"] == "docker"
+    for flag, path in (
+        ("--evidence-signing-key", tmp_path / "evidence.pem"),
+        ("--verifier-signing-key", tmp_path / "verifier.pem"),
+        ("--trust-root", tmp_path / "trust"),
+    ):
+        assert transaction[transaction.index(flag) + 1] == str(path)
+        assert all(str(path) not in str(command) for command, _ in calls[:-1])
+    assert "--ephemeral-trust-root" not in transaction
 
 
 def test_showcase_container_build_uses_unprivileged_identity_when_host_is_root(
@@ -1082,12 +1107,14 @@ def test_showcase_container_build_uses_unprivileged_identity_when_host_is_root(
 
 def test_showcase_main_runs_two_downloads_and_builds(
     showcase: Any,
+    showcase_trust: list[str],
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     paths = showcase._create_workspace(tmp_path / "prepared")
     events: list[str] = []
+    transaction_values: dict[str, Any] = {}
     monkeypatch.setattr(showcase, "_require_committed_checkout", lambda _root: "c" * 40)
     monkeypatch.setattr(showcase, "_create_workspace", lambda _value: paths)
     monkeypatch.setattr(
@@ -1111,9 +1138,17 @@ def test_showcase_main_runs_two_downloads_and_builds(
     monkeypatch.setattr(
         showcase,
         "_run_transaction",
-        lambda _paths, **_values: events.append("transaction"),
+        lambda _paths, **values: (
+            transaction_values.update(values),
+            events.append("transaction"),
+        ),
     )
-    assert showcase.main(["--workspace", str(tmp_path / "ignored")]) == 0
+    assert (
+        showcase.main(["--workspace", str(tmp_path / "ignored"), *showcase_trust]) == 0
+    )
+    assert transaction_values["evidence_signing_key"] == Path(showcase_trust[1])
+    assert transaction_values["verifier_signing_key"] == Path(showcase_trust[3])
+    assert transaction_values["trust_root"] == Path(showcase_trust[5])
     assert events[0] == "download"
     assert set(events[1:3]) == {"build-baseline", "build-subject"}
     assert events[-2:] == ["inputs", "transaction"]
@@ -1127,8 +1162,62 @@ def test_showcase_main_runs_two_downloads_and_builds(
         lambda **_arguments: ("sha256:" + "a" * 64, "sha256:" + "b" * 64),
     )
     (paths.workspace / "runtime-build").rmdir()
-    assert showcase.main([]) == 2
+    assert showcase.main(showcase_trust) == 2
     assert "not immutable" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    "invalid",
+    [
+        "missing",
+        "incomplete",
+        "malformed",
+        "same_key",
+        "symlink",
+        "existing_trust",
+        "inside_workspace",
+    ],
+)
+def test_showcase_authenticates_caller_trust_before_download_or_gpu_build(
+    showcase: Any,
+    showcase_trust: list[str],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    invalid: str,
+) -> None:
+    paths = showcase._create_workspace(tmp_path / "workspace")
+    monkeypatch.setattr(showcase, "_require_committed_checkout", lambda _root: "c" * 40)
+    monkeypatch.setattr(showcase, "_create_workspace", lambda _value: paths)
+    monkeypatch.setattr(
+        showcase,
+        "_download",
+        lambda _paths: pytest.fail("invalid trust reached download"),
+    )
+    monkeypatch.setattr(
+        showcase,
+        "_runtime_image",
+        lambda **_kwargs: pytest.fail("invalid trust reached image build"),
+    )
+    args = list(showcase_trust)
+    if invalid == "missing":
+        args = []
+    elif invalid == "incomplete":
+        args = args[:2]
+    elif invalid == "malformed":
+        Path(args[1]).write_text("invalid private key")
+    elif invalid == "same_key":
+        Path(args[3]).write_bytes(Path(args[1]).read_bytes())
+    elif invalid == "symlink":
+        alias = tmp_path / "alias.pem"
+        alias.symlink_to(args[1])
+        args[1] = str(alias)
+    elif invalid == "existing_trust":
+        Path(args[5]).mkdir()
+    else:
+        local = paths.workspace / "evidence.pem"
+        local.write_bytes(Path(args[1]).read_bytes())
+        args[1] = str(local)
+    assert showcase.main(args) == 2
 
 
 def test_showcase_rejects_dirty_source_before_downloads(

@@ -87,22 +87,6 @@ _LIVE_QUALIFICATION_SOURCES = (
 _CANDIDATE_MANIFEST_FORMAT = "invarlock/qualification-candidate-wheels-v1"
 _CANDIDATE_DISTRIBUTION_SOURCES = {
     "invarlock": ("src/invarlock", "invarlock"),
-    "invarlock-diagnostics": (
-        "addins/diagnostics/src/invarlock_addins/diagnostics",
-        "invarlock_addins/diagnostics",
-    ),
-    "invarlock-runtime-gguf": (
-        "addins/gguf/src/invarlock_addins/gguf",
-        "invarlock_addins/gguf",
-    ),
-    "invarlock-runtime-hf-vision-text": (
-        "addins/multimodal/src/invarlock_addins/multimodal",
-        "invarlock_addins/multimodal",
-    ),
-    "invarlock-runtime-tensorrt-llm": (
-        "addins/tensorrt_llm/src/invarlock_addins/tensorrt_llm",
-        "invarlock_addins/tensorrt_llm",
-    ),
 }
 _CANDIDATE_PROBE = r"""
 import importlib
@@ -731,11 +715,7 @@ def _is_execution_source(relative: str) -> bool:
     parts = Path(relative).parts
     if len(parts) >= 3 and parts[:2] == ("src", "invarlock"):
         return True
-    return (
-        len(parts) >= 5
-        and parts[0] == "addins"
-        and parts[2:4] == ("src", "invarlock_addins")
-    )
+    return False
 
 
 def _source_archive_files(payload: bytes, *, source_commit: str) -> dict[str, bytes]:

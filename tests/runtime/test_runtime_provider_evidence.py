@@ -259,8 +259,8 @@ def _tensorrt_request_values() -> tuple[
     receipt = RuntimeProviderReceipt(
         plugin=RuntimeProviderPluginIdentity(
             name="tensorrt_llm",
-            distribution="invarlock-runtime-tensorrt-llm",
-            distribution_version="0.13.0",
+            distribution="invarlock",
+            distribution_version="0.15.0",
         ),
         backend=RuntimeBackendIdentity(
             name="TensorRT-LLM",

@@ -35,7 +35,7 @@
       "pattern": "^[a-z][a-z0-9_]{0,63}$"
     },
     "taskName": {
-      "$comment": "Standard identifiers include text_causal, text_seq2seq, masked_language, and vision_text_generation. A provider must explicitly declare execution support; optional add-ins may use another canonical identifier.",
+      "$comment": "Standard identifiers include text_causal, text_seq2seq, masked_language, and vision_text_generation. A provider must explicitly declare execution support; optional extensions may use another canonical identifier.",
       "type": "string",
       "pattern": "^[a-z][a-z0-9_]{0,63}$"
     },
