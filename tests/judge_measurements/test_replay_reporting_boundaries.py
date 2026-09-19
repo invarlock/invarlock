@@ -118,6 +118,12 @@ def test_reports_preserve_decision_and_role_without_gating_advisory_metrics(
         publication.path, html_path=html_path, junit_path=junit_path
     )
     assert result.facts["assurance"]["policy_decision"] == outcome
+    policy_label = {
+        "pass": "Policy satisfied",
+        "regression": "Policy not met",
+        "insufficient_evidence": "More evidence needed",
+    }[outcome]
+    assert f"**Policy result:** {policy_label}" in result.text
     assert result.facts["assurance"]["decision_role"] == role
     assert f"Decision role: {role}" in result.text
     assert "16 cases" in result.text

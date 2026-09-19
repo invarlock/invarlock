@@ -41,6 +41,7 @@ checks determine the policy result, not the point estimate alone.
 | Evaluation engineer | Identify the changed inputs, affected metrics, missing results and unmet checks. | Original evidence, capture configuration and the example's reproduction commands. |
 | Customer or internal reviewer | Check the comparison against the expected candidate and agreed requirements. | Independently approved verification inputs and the resulting signed receipt. |
 | Release owner | See which requirements passed, failed or remain unresolved. | The intended workload, rationale for the thresholds and the organization's release decision. |
+| Integration partner | Connect the compared model artifact to the package being delivered. | The ModelKit mapping, recipient-owned artifact and package expectations, and the separate delivery-check result. |
 
 A policy can correctly pass a comparison whose absolute quality is unsuitable
 for an application. Confirm that the declared requirements cover that workload,
@@ -56,6 +57,12 @@ instructions for finding those records and replaying the comparison.
 **What was checked** states the operations actually performed by reporting.
 Recipient verification and organizational release approval are separate steps.
 Verifying an old package does not measure the current model or service again.
+
+Metric and scope headings use readable labels for identifier-style names, such
+as `grounded_qa-judge-quality` becoming **Grounded QA judge quality**. The original
+identifiers for these formatted labels remain in **Recorded metric and scope
+identifiers**. Display formatting does not change grouping, verification inputs
+or existing JUnit identifiers.
 
 ## Runtime-side report
 

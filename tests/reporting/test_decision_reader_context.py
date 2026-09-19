@@ -51,6 +51,7 @@ def test_judge_does_not_count_repetitions_or_clustered_cases_as_independent_unit
         else "2 scheduled units; 4 cases; 24/24 completed trials"
     )
     assert facts["analysis"] == publication.analysis_result.to_dict()
+    assert view.technical["method"] == "fixed-benchmark-hoeffding-v1"
     assert view.decision == publication.analysis_result.decision
     for output in (render_html(view), render_markdown(view)):
         rendered = unescape(re.sub(r"<[^>]+>", "", output))

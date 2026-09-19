@@ -202,6 +202,37 @@ class IntervalView:
     method: str = ""
 
 
+def display_label(value: str) -> str:
+    """Present metric/scope identifiers only; leave authored text unchanged."""
+    acronyms = {
+        "qa": "QA",
+        "nll": "NLL",
+        "utf8": "UTF-8",
+        "utf-8": "UTF-8",
+        "f1": "F1",
+        "api": "API",
+        "http": "HTTP",
+    }
+    if value.lower() in acronyms:
+        return acronyms[value.lower()]
+    tokens = re.split(r"[_-]", value)
+    if len(tokens) < 2 or any(
+        re.fullmatch(r"[A-Za-z0-9]+", token) is None for token in tokens
+    ):
+        return value
+    words = []
+    index = 0
+    while index < len(tokens):
+        word = tokens[index]
+        if word.lower() == "utf" and tokens[index + 1 : index + 2] == ["8"]:
+            word = "utf8"
+            index += 1
+        words.append(acronyms.get(word.lower(), word))
+        index += 1
+    words[0] = words[0][0].upper() + words[0][1:]
+    return " ".join(words)
+
+
 @dataclass(frozen=True)
 class MetricView:
     name: str
@@ -220,6 +251,14 @@ class MetricView:
     count_detail: str = ""
     count_label: str = "Observed pairs"
 
+    @property
+    def display_name(self) -> str:
+        return display_label(self.name)
+
+    @property
+    def display_scope(self) -> str:
+        return display_label(self.scope)
+
 
 @dataclass(frozen=True)
 class ReportView:
@@ -237,6 +276,23 @@ class ReportView:
     technical: dict[str, Any] = field(default_factory=dict)
     context: tuple[tuple[str, str], ...] = ()
     changes: tuple[str, ...] = ()
+
+
+def _metric_identifier_details(view: ReportView) -> tuple[tuple[str, Any], ...]:
+    identifiers = [
+        {
+            "result": index,
+            "metric": metric.name,
+            "scope": metric.scope,
+            "display_metric": metric.display_name,
+            "display_scope": metric.display_scope,
+        }
+        for index, metric in enumerate(view.metrics, 1)
+        if metric.display_name != metric.name or metric.display_scope != metric.scope
+    ]
+    return (
+        (("Recorded metric and scope identifiers", identifiers),) if identifiers else ()
+    )
 
 
 def decision_label(value: str) -> str:
@@ -509,7 +565,7 @@ def _results_overview(metrics: tuple[MetricView, ...]) -> str:
             else "Check details unavailable"
         )
         parts.append(
-            f'<tr><th scope="row"><a href="#metric-result-{index}">{escape(metric.name)}<span class="scope">{escape(metric.scope)}</span></a></th>'
+            f'<tr><th scope="row"><a href="#metric-result-{index}">{escape(metric.display_name)}<span class="scope">{escape(metric.display_scope)}</span></a></th>'
             + f'<td><span class="badge {_tone(metric.decision)}">{escape(decision_label(metric.decision))}</span></td>'
             + "".join(
                 f"<td>{escape(value)}</td>"
@@ -718,7 +774,7 @@ def _summary_html(view: ReportView) -> str:
     if len(view.metrics) != 1:
         return escape(view.summary)
     metric = view.metrics[0]
-    values = {metric.name, metric.baseline, metric.candidate, metric.change}
+    values = {metric.display_name, metric.baseline, metric.candidate, metric.change}
     if metric.interval:
         values.update(
             number(value)
@@ -792,7 +848,7 @@ def render_html(view: ReportView) -> str:
             parts.append(
                 '<div class="metric-controls"><nav class="metric-navigation" aria-label="Metric results">'
                 + "".join(
-                    f'<a href="#metric-group-{index}">{e(name)} <span>{len(group)} scope result{"s" if len(group) != 1 else ""}</span></a>'
+                    f'<a href="#metric-group-{index}">{e(display_label(name))} <span>{len(group)} scope result{"s" if len(group) != 1 else ""}</span></a>'
                     for index, (name, group) in enumerate(groups.items(), 1)
                 )
                 + '</nav><button class="metric-display-toggle" type="button" hidden>Show all metrics</button></div>'
@@ -804,18 +860,18 @@ def render_html(view: ReportView) -> str:
     for group_index, (metric_name, group) in enumerate(groups.items(), 1):
         if multiple_results:
             parts.append(
-                f'<section id="metric-panel-{group_index}" class="metric-group" aria-labelledby="metric-group-{group_index}"><div class="section-heading"><h3 id="metric-group-{group_index}" tabindex="-1">{e(metric_name)}</h3><a href="#results-overview-heading">Back to overview</a></div>'
+                f'<section id="metric-panel-{group_index}" class="metric-group" aria-labelledby="metric-group-{group_index}"><div class="section-heading"><h3 id="metric-group-{group_index}" tabindex="-1">{e(display_label(metric_name))}</h3><a href="#results-overview-heading">Back to overview</a></div>'
             )
         for result_index, metric in group:
             heading = (
-                f"<h4>{e(metric.scope)}</h4>"
+                f"<h4>{e(metric.display_scope)}</h4>"
                 if multiple_results
-                else f"<h3>{e(metric.name)}</h3>"
+                else f"<h3>{e(metric.display_name)}</h3>"
             )
             context = (
-                f"Metric: {e(metric.name)}"
+                f"Metric: {e(metric.display_name)}"
                 if multiple_results
-                else f"Scope: {e(metric.scope)}"
+                else f"Scope: {e(metric.display_scope)}"
             )
             parts.append(
                 f'<section id="metric-result-{result_index}" tabindex="-1" class="metric {_tone(metric.decision)}"><div class="metric-heading"><div>{heading}<p class="scope">{context}</p></div><span class="badge">{e(decision_label(metric.decision))}</span></div><p class="metric-explanation">{e(metric.explanation)}</p><dl class="values">'
@@ -885,7 +941,11 @@ def render_html(view: ReportView) -> str:
             f"<dt>{e(k)}</dt><dd><code>{e(v)}</code></dd>" for k, v in view.identity
         )
         parts.append("</dl></div></details>")
-    for heading, data in (*view.details, ("Exact comparison data", view.technical)):
+    for heading, data in (
+        *_metric_identifier_details(view),
+        *view.details,
+        ("Exact comparison data", view.technical),
+    ):
         parts.append(
             f'<details><summary>{e(heading)}</summary><div class="detail-content">{_detail_content(data)}</div></details>'
         )
@@ -902,7 +962,7 @@ def render_html(view: ReportView) -> str:
                 and isinstance(preview.get("text"), str)
             ):
                 parts.append(
-                    f'<details><summary>{e(str(item.get("name", "Metric")))} configuration preview</summary><div class="detail-content">{_detail_content(preview)}</div></details>'
+                    f'<details><summary>{e(display_label(str(item.get("name", "Metric"))))} configuration preview</summary><div class="detail-content">{_detail_content(preview)}</div></details>'
                 )
     parts.append(
         '<footer class="footer">InvarLock · Evidence report. Displayed values may be rounded; exact values are preserved in the evidence bundle. This report is not an independent acceptance receipt.</footer></main></body></html>\n'
@@ -960,7 +1020,7 @@ def render_markdown(view: ReportView, *, include_details: bool = False) -> str:
     for metric in view.metrics:
         lines += [
             "",
-            f"## {clean(metric.name)}: {clean(metric.scope)}",
+            f"## {clean(metric.display_name)}: {clean(metric.display_scope)}",
             "",
             f"**{decision_label(metric.decision)}**. {clean(metric.explanation)}",
             "",
@@ -1007,22 +1067,24 @@ def render_markdown(view: ReportView, *, include_details: bool = False) -> str:
     lines.extend(f"- {clean(s)}" for s in view.limitations)
     lines += ["", "## Evidence identities", ""]
     lines.extend(f"- **{clean(k)}:** {clean(v)}" for k, v in view.identity)
+    details = _metric_identifier_details(view)
     if include_details:
-        for heading, data in (*view.details, ("Exact comparison data", view.technical)):
-            lines += [
-                "",
-                f"## {clean(heading)}",
-                "",
-                "```json",
-                visible_controls(
-                    json.dumps(
-                        data,
-                        ensure_ascii=False,
-                        indent=2,
-                        sort_keys=True,
-                        allow_nan=False,
-                    )
-                ).replace("`", "\\u0060"),
-                "```",
-            ]
+        details += (*view.details, ("Exact comparison data", view.technical))
+    for heading, data in details:
+        lines += [
+            "",
+            f"## {clean(heading)}",
+            "",
+            "```json",
+            visible_controls(
+                json.dumps(
+                    data,
+                    ensure_ascii=False,
+                    indent=2,
+                    sort_keys=True,
+                    allow_nan=False,
+                )
+            ).replace("`", "\\u0060"),
+            "```",
+        ]
     return "\n".join(lines) + "\n"

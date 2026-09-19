@@ -772,7 +772,7 @@ def _captured_summary(
             if focus.decision == "regression"
             else "needs more evidence"
         )
-        lead = f"{focus.name} ({focus.scope}) {outcome}"
+        lead = f"{focus.display_name} ({focus.display_scope}) {outcome}"
         check = next((c for c in focus.checks if c.passed is False), None)
         if check is not None:
             lead += f": the {check.name} check recorded {check.observed} against a requirement of {check.required}"
@@ -796,11 +796,13 @@ def _captured_summary(
         else metric.interval is not None and metric.interval.neutral == 1
     )
     parts = [] if metric.decision == "pass" else [metric.explanation]
-    scope = "" if metric.scope == "overall" else f" within the {metric.scope} slice"
+    scope = (
+        "" if metric.scope == "overall" else f" within the {metric.display_scope} slice"
+    )
     pairs = "pair" if metric.count == "1" else "pairs"
     if metric.baseline != "Unavailable" and metric.candidate != "Unavailable":
         sentence = (
-            f"Across {metric.count} usable {pairs}{scope}, the subject's {metric.name} "
+            f"Across {metric.count} usable {pairs}{scope}, the subject's {metric.display_name} "
             f"was {metric.candidate}, compared with {metric.baseline} for the baseline"
         )
         if metric.change != "Unavailable":
@@ -824,7 +826,7 @@ def _captured_summary(
         )
         verb = "are" if unavailable == "Baseline and subject scores" else "is"
         parts.append(
-            f"{unavailable} for {metric.name} {verb} unavailable across {metric.count} usable {pairs}{scope}."
+            f"{unavailable} for {metric.display_name} {verb} unavailable across {metric.count} usable {pairs}{scope}."
         )
     if recorded is not None and recorded["missing_ids"]:
         missing = len(recorded["missing_ids"])

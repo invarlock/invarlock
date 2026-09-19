@@ -24,6 +24,7 @@ from invarlock.report_presentation import (
     IntervalView,
     MetricView,
     ReportView,
+    decision_label,
     number,
     render_html,
     render_markdown,
@@ -384,7 +385,7 @@ def _view(
             else "Decision role: advisory; this metric does not gate required decisions.",
             f"Allowed degradation: {policy['allowed_degradation']} ({policy['direction']} is better).",
             f"Minimum units: {policy['minimum_units']}; maximum interval width: {policy['maximum_interval_width']}.",
-            f"Two-sided Hoeffding intervals ({analysis['method']}); family confidence at least {confidence}% "
+            f"Two-sided Hoeffding intervals; family confidence at least {confidence}% "
             f"(alpha {policy['alpha']}; comparison family size {policy['comparison_family_size']}); "
             "Bonferroni error allocation alpha / comparison family size per interval.",
             "Effect is subject minus baseline; tabulated interval endpoints and widths retain analysis precision.",
@@ -714,7 +715,7 @@ def _view(
                 "Measurement and analysis replay",
                 "Completed offline against the retained plan and source records.",
             ),
-            ("Policy result", analysis["decision"]),
+            ("Policy result", decision_label(analysis["decision"])),
             ("Recipient acceptance", "Not performed by report."),
         ),
         subjects=captured_subjects

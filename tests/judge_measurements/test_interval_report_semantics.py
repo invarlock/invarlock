@@ -145,7 +145,7 @@ def test_numeric_policy_checks_in_html_markdown_and_terminal(
         assert f"Decision role: {role}" in text
         assert "Schedule completeness" in text
         assert checks["Schedule completeness"].observed in text
-        assert "fixed-benchmark-hoeffding-v1" in text
+        assert "Two-sided Hoeffding intervals" in text
         assert "family confidence at least 95%" in text
         assert "alpha 0.05; comparison family size 2" in text
         assert "Subject score bound interval width" in text
@@ -172,7 +172,7 @@ def test_numeric_policy_checks_in_html_markdown_and_terminal(
 
     terminal = " ".join(cli.stdout.split())
     assert "family confidence at least 95%" in terminal
-    assert "fixed-benchmark-hoeffding-v1" in terminal
+    assert "Two-sided Hoeffding intervals" in terminal
     assert changes["subject_bound"] in terminal
     assert "Paired score change" in terminal and "Subject score bound" in terminal
     assert (

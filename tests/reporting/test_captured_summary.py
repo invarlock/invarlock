@@ -22,7 +22,7 @@ def test_single_metric_summary_includes_values_interval_and_bound_requirements()
     view = record_reporting._view(comparison, snapshot)
     metric = view.metrics[0]
     assert (
-        f"the subject's {metric.name} was {metric.candidate}, compared with {metric.baseline} for the baseline, a change of {metric.change}."
+        f"the subject's {metric.display_name} was {metric.candidate}, compared with {metric.baseline} for the baseline, a change of {metric.change}."
         in view.summary
     )
     assert "The 95% interval for the change runs from" in view.summary
@@ -64,7 +64,7 @@ def test_summary_aggregates_scopes_without_adding_overlapping_pair_counts():
     ]
     metrics = record_reporting._metric_views(comparison, {})
     summary = record_reporting._captured_summary(metrics)
-    assert summary.startswith(f"{metrics[1].name} (west) did not meet policy")
+    assert summary.startswith(f"{metrics[1].display_name} (west) did not meet policy")
     assert (
         "3 metric / scope results: 1 passed, 1 did not meet policy, and 1 need more evidence."
         in summary
@@ -218,7 +218,7 @@ def test_nll_summary_describes_ratio_without_calling_it_a_delta(scope):
     summary = record_reporting._captured_summary(metrics, comparison)
     assert "Across 1 usable pair" in summary
     assert (
-        "the subject's nll was 1.5 nats / byte, compared with 2 nats / byte for the baseline"
+        "the subject's NLL was 1.5 nats / byte, compared with 2 nats / byte for the baseline"
         in summary
     )
     assert "a subject-to-baseline ratio of 0.75" in summary
