@@ -31,8 +31,11 @@ model contents and requires matching evaluation evidence.
 The example verifies the manifest, config, stored layer digest, decompressed
 archive digest, and every extracted file. It compares the complete file inventory
 with the actual candidate directory, including operational files that the core
-checkpoint identity intentionally excludes. It also recomputes the normal
-`hf_snapshot_tree_sha256` identity. Neither a package label nor a mapping supplied
+checkpoint identity intentionally excludes. For a Hugging Face directory, it also recomputes the normal
+`hf_snapshot_tree_sha256` identity. For a GGUF model, the recipient supplies an
+`artifact_file` relative to that directory, and the content identity is the exact
+file's SHA-256. Additional files still belong to the complete package inventory;
+a GGUF file digest does not authenticate those files by itself. Neither a package label nor a mapping supplied
 by a package author becomes an acceptance authority.
 
 The supported packaging subset is KitOps **1.15.0**, one embedded model directory,
@@ -90,7 +93,7 @@ Paths are relative to that file. Its fields are:
 | Field | Recipient input |
 | --- | --- |
 | `format` | `invarlock/example-modelkit-recipient-v1` |
-| `sides.baseline`, `sides.subject` | Each contains `blobs`, `package_digest`, `candidate`, and `content_digest` |
+| `sides.baseline`, `sides.subject` | Each contains `blobs`, `package_digest`, `candidate`, and `content_digest`; optional `artifact_file` selects a GGUF member relative to `candidate` |
 | `evidence` | The complete signed evidence directory |
 | `technical_policy` | The independently selected evaluated policy JSON |
 | `technical_anchors.artifact_digests` | Typed artifact-identity digests for `baseline` and `subject`; these differ from model-content digests |
@@ -118,6 +121,11 @@ an older receipt recorded a request anchor. Requiring a particular verifier
 trust profile remains a separate recipient-policy choice.
 
 The actual `candidate` paths must be directories with no symlink components.
+For GGUF, set `artifact_file` to a safe relative filename such as `model.gguf` and
+set `content_digest` to that file's SHA-256. The selected path must be a regular
+file ending in `.gguf`. Traversal, links, missing files and other formats fail
+closed. Both authenticated acceptance-predicate digest kinds must match the
+selected directory or file identity; a package author cannot switch that meaning.
 For a delivered ModelKit, unpack its frozen digest into private staging, then
 verify those actual paths. Keep staging inaccessible to untrusted writers during
 verification and model loading. The verifier extracts a separate temporary copy
@@ -160,6 +168,72 @@ Archive and model bytes are streamed, but verification needs temporary disk spac
 for the stored layer, decompressed archive, and extracted model. Large models also
 require repeated content reads. Apply an outer execution deadline and disk quota
 appropriate to the expected artifact sizes.
+
+## Transfer actual evaluated models and run an inference smoke
+
+The real journey is a separate launcher from the synthetic serialization tests.
+It requires actual model files, native signed evidence for those exact files,
+an acceptance envelope, and independently selected technical and recipient
+policies. The subject must be an executable GGUF model. A published quantized
+sibling and its baseline at original precision must each have a content identity;
+do not substitute evidence from a different model revision or conversion.
+Prepare the comparison through the [GGUF runtime example](https://github.com/invarlock/invarlock/blob/main/examples/integrations/gguf-llama-cpp/README.md)
+and retain its transformation provenance. A passing small sample establishes only
+the policy and precision stated in that sample, not a broader model qualification.
+
+Prepare `source-recipient.json` with the fields described above. Its `candidate`
+paths point to the actual source model directories. The source-side `blobs` and
+`package_digest` fields may be omitted: the launcher generates and freezes those
+package identities before transfer. All technical anchors, content digests,
+policies and public keys must already be selected independently. Keep private
+signing keys outside the package and recipient directories.
+
+Use a separate Python environment containing the installed InvarLock wheel for
+recipient verification. Build or select a reviewed local GGUF runtime image and
+freeze its immutable image ID in the selected Docker or Podman engine. The
+image used for evaluation is authenticated by
+the evidence's runtime anchors; the separate smoke image establishes only the
+bounded inference recorded by this launcher. Reserve disk for the source models,
+publisher blobs, recipient blobs and unpacked models, plus temporary verifier
+archives. A pair of 7B models at original and quantized precision can need over
+100 GiB of free space.
+
+Run from the matching example checkout, with an output directory outside it:
+
+```bash
+python -m examples.integrations.modelkit_real_journey \
+  --request source-recipient.json \
+  --kit /tools/kit --kit-sha256 REVIEWED_BINARY_SHA256 \
+  --python /environments/recipient/bin/python \
+  --container-engine docker \
+  --smoke-image sha256:REVIEWED_LOCAL_IMAGE_ID \
+  --container-llama /opt/llama.cpp/llama-completion \
+  --output /artifacts/modelkit-handoff
+```
+
+Use `--container-engine podman` for Podman. The default is `docker`; the
+launcher uses only the selected engine and does not fall back to another engine.
+Supply the full `sha256:` image ID from that engine's local image store; mutable
+tags and shortened IDs are rejected. Podman inspection may omit the `sha256:`
+prefix, which is normalized before checking the exact selected image identity.
+
+The launcher packs both actual models with KitOps 1.15.0, freezes their original
+manifest digests, changes each tag through a metadata repack, and copies the
+content store and evidence to a separate recipient directory. The recipient
+unpacks by the original digest, verifies the complete package/content/evidence
+and acceptance binding, and confirms that the repack has different package
+identities but the same model identities. It rejects a changed candidate,
+missing package blob, altered evidence, wrong runtime anchor and revoked signer.
+It then checks acceptance again and loads the exact unpacked subject for up to
+eight generated tokens by default. The Docker or Podman smoke uses CPU execution,
+no network, a non-root user, a read-only model mount, and explicit resource limits.
+
+`result.json` records the package digests, individual acceptance decisions and
+actual generated output, selected container engine and immutable smoke image ID.
+`logs/` retains commands, exit codes, runtime identity and diagnostics. `recipient/recipient.json` is a portable input to the verifier.
+A failed check stops the journey; inspect its saved diagnostics, restore the
+expected input, and rerun with a new output directory. The launcher does not
+contact an external registry or establish interoperability with a hosted service.
 
 ## Exercise the supported boundary
 

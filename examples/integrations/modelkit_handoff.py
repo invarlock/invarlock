@@ -244,9 +244,12 @@ def _archive_headers(archive: BinaryIO, limits: Limits) -> None:
     length = archive.seek(0, os.SEEK_END)
     archive.seek(0)
     members = 0
+    pending_size: int | None = None
     while True:
         block = archive.read(512)
         if block == b"\0" * 512:
+            if pending_size is not None:
+                raise ModelKitError("size extension has no following regular header")
             if archive.read(512) != b"\0" * 512:
                 raise ModelKitError("archive must have two zero end headers")
             while trailing := archive.read(_CHUNK):
@@ -257,13 +260,37 @@ def _archive_headers(archive: BinaryIO, limits: Limits) -> None:
         if len(block) != 512:
             raise ModelKitError("incomplete archive header")
         member = tarfile.TarInfo.frombuf(block, "utf-8", "strict")
-        if member.type not in {tarfile.REGTYPE, tarfile.AREGTYPE, tarfile.DIRTYPE}:
-            raise ModelKitError("unsupported extended or special archive header")
-        if member.size < 0 or (member.isdir() and member.size):
-            raise ModelKitError("invalid archive header size")
         members += 1
         if members > limits.max_members:
             raise ModelKitError("archive member limit exceeded")
+        if member.type == tarfile.XHDTYPE:
+            # KitOps uses one local POSIX size record when a regular file is
+            # too large for USTAR. Bound this payload before the tar parser can
+            # read it. No path, link, sparse, global or other overrides apply.
+            if pending_size is not None or not 1 <= member.size <= 128:
+                raise ModelKitError("unsupported size extension header")
+            payload = archive.read(member.size)
+            match = re.fullmatch(rb"([1-9][0-9]*) size=([1-9][0-9]*)\n", payload)
+            if match is None or int(match[1]) != len(payload):
+                raise ModelKitError("invalid or unsupported size extension header")
+            pending_size = int(match[2])
+            if pending_size > min(limits.max_model_bytes, limits.max_archive_bytes):
+                raise ModelKitError("size extension exceeds recipient byte limit")
+            padding_size = (-member.size) % 512
+            padding = archive.read(padding_size)
+            if len(padding) != padding_size or padding.strip(b"\0"):
+                raise ModelKitError("size extension padding must be complete and zero")
+            continue
+        if member.type not in {tarfile.REGTYPE, tarfile.AREGTYPE, tarfile.DIRTYPE}:
+            raise ModelKitError("unsupported extended or special archive header")
+        if pending_size is not None:
+            if not member.isfile() or member.size not in {0, pending_size}:
+                raise ModelKitError(
+                    "size extension requires one consistent regular header"
+                )
+            member.size, pending_size = pending_size, None
+        if member.size < 0 or (member.isdir() and member.size):
+            raise ModelKitError("invalid archive header size")
         position = archive.tell() + ((member.size + 511) // 512) * 512
         if position > length:
             raise ModelKitError("archive header exceeds available contents")
@@ -321,6 +348,7 @@ def verify_package_content(
     candidate: Path,
     expected_content_digest: str,
     limits: Limits = Limits(),
+    artifact_file: str | None = None,
 ) -> dict:
     """Recompute raw package, model and actual candidate bindings offline.
 
@@ -330,13 +358,23 @@ def verify_package_content(
     """
     _digest(expected_package_digest)
     _digest(expected_content_digest)
+    if artifact_file is not None:
+        selected = _relative(artifact_file)
+        if selected.suffix != ".gguf":
+            raise ModelKitError("selected artifact file must be GGUF")
+        artifact_file = str(selected)
     try:
         before = checkpoint_tree_observation(candidate.absolute())
-        if before.digest != expected_content_digest:
+        candidate_files = _inventory(candidate.absolute(), limits)
+        if artifact_file is not None and artifact_file not in candidate_files:
+            raise ModelKitError("selected GGUF artifact is missing from candidate")
+        actual_content = (
+            candidate_files[artifact_file][0] if artifact_file else before.digest
+        )
+        if actual_content != expected_content_digest:
             raise ModelKitError(
                 "actual candidate content differs from expected content"
             )
-        candidate_files = _inventory(candidate.absolute(), limits)
         size, config, layer, model_path, diff_id = _model_descriptor(
             blobs, expected_package_digest, limits
         )
@@ -365,7 +403,14 @@ def verify_package_content(
                     raise ModelKitError("model layer DiffID mismatch")
                 archive.seek(0)
                 files, model_bytes = _extract(archive, root, model_path, limits)
-            extracted = checkpoint_tree_sha256(root.joinpath(*model_path.parts))
+            if artifact_file is not None:
+                if artifact_file not in files:
+                    raise ModelKitError(
+                        "selected GGUF artifact is missing from package"
+                    )
+                extracted = files[artifact_file][0]
+            else:
+                extracted = checkpoint_tree_sha256(root.joinpath(*model_path.parts))
         if files != candidate_files:
             raise ModelKitError(
                 "package and actual candidate content file inventory differ"
@@ -399,7 +444,10 @@ def verify_package_content(
         "model_file_count": len(files),
         "model_file_inventory_digest": _inventory_digest(files),
         "model_bytes": model_bytes,
-        "artifact_digest_kind": "hf_snapshot_tree_sha256",
+        "artifact_digest_kind": (
+            "file_sha256" if artifact_file else "hf_snapshot_tree_sha256"
+        ),
+        **({"artifact_file": artifact_file} if artifact_file else {}),
         "artifact_content_digest": extracted,
     }
 
@@ -442,8 +490,12 @@ def verify_point_of_use(
     observations = {}
     for role, value in sides.items():
         side = _object(
-            value, {"blobs", "package_digest", "content_digest", "candidate"}, set()
+            value,
+            {"blobs", "package_digest", "content_digest", "candidate"},
+            {"artifact_file"},
         )
+        if "artifact_file" in side and not isinstance(side["artifact_file"], str):
+            raise ModelKitError("artifact_file must select a GGUF member")
         candidate = _path(root, side["candidate"]).absolute()
         observations[role] = checkpoint_tree_observation(candidate)
         mappings[role] = verify_package_content(
@@ -452,6 +504,7 @@ def verify_point_of_use(
             candidate=candidate,
             expected_content_digest=side["content_digest"],
             limits=limits,
+            artifact_file=side.get("artifact_file"),
         )
     anchors = _object(
         request["technical_anchors"],
@@ -488,7 +541,10 @@ def verify_point_of_use(
         _path(root, request["envelope"]),
         trusted_public_keys=trusted_keys,
         recipient_policy=_path(root, request["recipient_policy"]),
-        subject_artifact_path=_path(root, sides["subject"]["candidate"]),
+        subject_artifact_path=(
+            _path(root, sides["subject"]["candidate"])
+            / sides["subject"].get("artifact_file", "")
+        ),
         now=checked_at,
     )
     errors = list(technical.payload["errors"]) + list(decision.errors)
@@ -504,6 +560,8 @@ def verify_point_of_use(
         for role in ("baseline", "subject"):
             bound = bound and (
                 predicate[role]["artifact_digest"] == sides[role]["content_digest"]
+                and predicate[role]["digest_kind"]
+                == mappings[role]["artifact_digest_kind"]
                 and predicate[role]["artifact_identity_digest"]
                 == anchors["artifact_digests"][role]
             )
