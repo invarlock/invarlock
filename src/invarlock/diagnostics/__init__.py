@@ -6,7 +6,16 @@ extra installed.
 """
 
 from importlib import import_module
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from .observations import (
+        DiagnosticInputError,
+        canonical_observation_bytes,
+        rmt_observation,
+        spectral_observation,
+        variance_observation,
+    )
 
 __all__ = [
     "DiagnosticInputError",
