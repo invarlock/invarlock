@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Retain signed Docker and Podman CUDA execution references for native scorers,
+  TensorRT-LLM and vision-text, with compact offline replay and frozen provenance.
 - Add a maintained Langfuse experiment-export parser with explicit source and
   item identities, scorer-specific measurements, and offline verification.
 - Add a real ModelKit handoff journey and exact GGUF file mapping inside the

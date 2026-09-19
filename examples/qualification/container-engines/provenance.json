@@ -1,0 +1,581 @@
+{
+  "archive": {
+    "bytes": 344031,
+    "expanded_bytes": 721833,
+    "file_count": 373,
+    "pack_count": 14,
+    "sha256": "6e8fafb37a5e5c95a76351c3a35e4f01b6e471caa9b09091d61c447a590dd6ab"
+  },
+  "environment": {
+    "docker": "29.8.1",
+    "driver": "580.178.04",
+    "gpu": "NVIDIA H100 80GB HBM3",
+    "native_and_vision_cuda_profile": "cu126",
+    "os": "Ubuntu 26.04",
+    "podman": "5.7.0",
+    "podman_mode": "rootful"
+  },
+  "image_transport": {
+    "cuda": {
+      "config_digest": "sha256:27fc65fcb0f423e4e2ad934c45af10fe95214d92b56dab988ce8fea4453a4903",
+      "execution_digest": "sha256:f5c5161ececd8834d5ce2603ff3c2ae78316da609279194831cd06c9469c0052",
+      "rootfs_diff_ids": [
+        "sha256:188c9b34dfbe022075d01fc4f5a305412909ef97de440783c15043e68e1b1913",
+        "sha256:1c107a897b02ca7ece069bfef2339f4e02f95f12dbb025da7305fcbe2b626f34",
+        "sha256:481070cf8ce5b1834cf16a80eec044aced637a96ef8cd1e3c193947e2ff5cbd9",
+        "sha256:addf8d91bd2117a572c640e2bd2e0d15c7adf862773498ca0aea234b7a32528e",
+        "sha256:d61c3fbda2a02b279fe3046994696bf5500ebe366f7f0b7a1732a6b4c0094766",
+        "sha256:a1738a7291e7221ad70a9cb664f857accf14e002938203e5900713e8ca3d1af2",
+        "sha256:eabc489821c99349d5e94da2d91138257b208f0da0e7366f6247e0d249178ffe"
+      ],
+      "source_execution_id": "sha256:f5c5161ececd8834d5ce2603ff3c2ae78316da609279194831cd06c9469c0052",
+      "source_id_kind": "manifest"
+    },
+    "trt": {
+      "config_digest": "sha256:5c26e185a20fe9c890e0cde354d0aa0dd810e8d6f44e0c28c8ae2f98bc4a5e7c",
+      "execution_digest": "sha256:6aa5f8a789e9863a9af9a5563b1a342ef612051278a0e7d891e03786fa6f8282",
+      "rootfs_diff_ids": [
+        "sha256:e8bce0aabd687e9ee90e0bada33884f40b277196f72aac9934357472863a80ae",
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+        "sha256:ea22878e3933111a0822596c79611300d4d7ca3164b2bfa1c6b6b3bc5d216976",
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+        "sha256:83c28e1d9012a9a83ad7e6e1a9f6926c35245205a59318c97441e622d8f3fa5f",
+        "sha256:34a26442038bc2a3925772ed10d9ecaf0e65e232cab746383078395a8a8d6f66",
+        "sha256:9fd5c06969613caa2446b4286e4cbb9e5a7ecbcbc12165fec42def40e69d1856",
+        "sha256:b7a83899cba7a8aa8d916e10b926a2892ebd966449aa19a14478fae4ad04335a",
+        "sha256:8227d8db32f329a323a058737b3d4149092a0c7575f276221e04f047a1a8a075",
+        "sha256:46e80b10bdc92b872eb1a8b6e8251a904f090b6340a2f39e54f578eebdab16a6",
+        "sha256:5161682b19333fd62f5798b69ef425cea3cfed6072f04888a63e32fc6afdf151",
+        "sha256:662edf069e4554a3e00aeedc29b11ede7a376d489103b703497e141def239964",
+        "sha256:a17e6a17c70b2351d4553206f210aae5c3ef795af56c4cb9a2166c199d74aaee",
+        "sha256:dc8aed900216d8752dd1a8224267fd4055915923dd2d5fed7109aeb6319a2a9b",
+        "sha256:9bfa445b70efd2d5a00d9a479f311ed59669b9b5a970da12820077e20322c1c2",
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+        "sha256:e41d9f65d02db68880aeb6d96f5832dc50342899520bc8eedccab4f675c38f6e",
+        "sha256:fabb1f5c2079ebc137b9cc30c2726c2c55b155bf3c657be2af28684ed871d0fc",
+        "sha256:cac5c774c9b9fc395b655bfd4fe7450b28e690aa4f51f11791cacfe02dbda60f",
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+        "sha256:48d231fdeb649ce4106c2845ab1ae4e36b3112626482e45d42b7d07d8c17ff13",
+        "sha256:a273ef8e73062bcb5feef44081bd044b710dbb301500c31179de00e91663bff2",
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+        "sha256:cf938f6ddcc61953ce25c46bf65ef4cbddfff9f9e6d85dfaff125697263396dd",
+        "sha256:01c8036ff6a66fd19801dc98206bc67440fb44d5cdb7f5cec5909e8685a201b1",
+        "sha256:62b4df84d99cc63fb84265957cad039af62146977602b9b2d79c66551043af8f",
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+        "sha256:46a70a4e6a3f1f4c40446d7d0c0cb00db19993dc02a4ad21e8869a74aeecd796",
+        "sha256:01b9d1e83d4282f27f9395b060f7814cdd202ca0999510934f8269cdd533b217",
+        "sha256:d2c970eb98122ee7656e1ef8c89e3890b41dbc955a945b9f211727088cd6baee",
+        "sha256:af73093750d9a4511a9d07cc7a77c69d30a708544e2e41a962190e4295fd914d",
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+        "sha256:578b4717238910bb1918499499330f4bb6a22223de36618f0bbbe98a8bb773f0",
+        "sha256:e3559277697354358e053e6b7ec2a70e36c3b35005dae03697020b84c42edbba",
+        "sha256:0f8b6a1ea52a7830f0d2f362ce0be54c378e955687dec7c953c1d6c751cdda27",
+        "sha256:dc8fc088cd4a871436942708c53f3d7d98654989080f313d5bf5d278b6207ff0",
+        "sha256:0eaa7f27ce9e2ee349069a4a4ba76b4a404815f83ce061f9f89b7f661cf77ca4",
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+        "sha256:b81f0840a3a1032ec3dc9a0407db6f274ee6b35daee63fa8167cb9f54f8ca767",
+        "sha256:7e72c2b0f0a57749c1f9dae640c238f13d5d9b682941c160510fc70a68701d08",
+        "sha256:547a6c80a5310d8b191bebc342a81fc71b47afbb67dfe51d66258c2ddaee1ba1",
+        "sha256:667c2c37be3ce009ea3e6571fdc02cf53ece48a93e806f908849e5518e3adcd3",
+        "sha256:0ebda99c7a0d9dde62c6d50e3d413146bb8ad29672be0fa8ec6a9b5cd632a974",
+        "sha256:643aae16026972d465b5aea7a073b843c456f9617eb960904e221db7e8a037c7",
+        "sha256:ed03caf2e2792cdbbfe41770cb62e83ed6320b23fe35be26e2af2b9a06f55e55",
+        "sha256:da60d21bcbe8f388f030ebb11ec72fe7efd6c954721da49d18bcfc12ab34f82d",
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+        "sha256:e714eb3e583541923a9691b353b53c7605482fe2276c393d197154b7835f2c8e",
+        "sha256:ba88392f59cf1063e057661592c85da0f237cf832d9e716895dca04ca07bce0a",
+        "sha256:7952831b3e4c0a9cae083cfe3989667f7c25aaf49962a1da6a378268d9912213",
+        "sha256:dad05a96ea1a66e989e96c22553d429c03c6dedf69999d2890726beb4655dd7d",
+        "sha256:14c34f2ec5a8a396a0ce4e116733a961b8555892502e00d20976b36bad264100",
+        "sha256:c552db33fab3e9bd2942dd399e8df2a7bfc68a7fa08a6c838f83123aa8f4b349",
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+        "sha256:dc6056122a4572c46f16a9adf29a080f0f7d096c738873351cccdb70581a0a5b",
+        "sha256:49328bd8251dbeac505f7c81f8ecb03d2fd8da8016d39816b2755966a81342ec",
+        "sha256:805541d6ec1b3b2f056245915d935d0d955e8ac3caf6c806a69baa7ac81fa424",
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+        "sha256:a20b476ef00ca463bbe0821aea1b0664e85bd290999617910b0b6a621b6aaff5",
+        "sha256:22c27035450d4141da9ed5e293cfcb00815facd473e2bd5260040375cc9d5690",
+        "sha256:76c82e3d53e219ec2f5404ad86ae8ffa2f83303378b58f121e2f08afd2804a26",
+        "sha256:b3c6ebb6998f742f952b0e5e84acc98e32ebc9ba970f8f9e449c26f9f9f24e9f",
+        "sha256:2c5103ddc1bee7274698ef444ef57908a9c143fd979360f7d5f0a0a1d3066881",
+        "sha256:5528d991e935a7dea404fd06c06f8d880b421ae3a5286123b866c25442819adb",
+        "sha256:bdc5b11f77a58fc73f7bb339d33c3f0e04137b14c0bda9303aceb1b5ae806f90",
+        "sha256:5a9c78fbcde0d9e60363b61981aca7906e760bc7f3c880219af5fe736f7537c3",
+        "sha256:06f30efe3ca0a927fbfb7d1be204330efaf7cc8ab6cf54e8dc2433c47d866f62",
+        "sha256:de852dc2cfca70ca03f22eda5538396556fcc4cc8e36185bf8e426a9505a8e8e",
+        "sha256:38f1bbdcfb353a5ff159afc6db2a3074c033f09a987145b4a63b2e99a479e4e7",
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+        "sha256:4ff57dbf91a7d28e44a9ab8b2d4ac5e79313221d6232375886e8d346d9fc2c88",
+        "sha256:cb6adc877b41f9f3a01cbe6b88b73a8b79aebe068e415bb59502e8524d2f4e87",
+        "sha256:91a7bf77d5585dc2101746ac2031bf47b256e3bd7f75738565a7e9cb9ae1a183",
+        "sha256:dc2de9b326f8200a475f57b520188f245644db1a9c0725fc098de428280a6507",
+        "sha256:77d9610f0360fea2fa30c3224dd1223be03fdef384c3d54edc7ca4867df962c6",
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+        "sha256:b66e15608910933c05e70a8ed80290ab4f8caf4285d8d35d4aaa064911062b48",
+        "sha256:f9c911accf83abd355c0cbcc08e205d76d1d1adaea8aa24936dd518a8562e520",
+        "sha256:cf08a898d0f1fbdc4991e88daf977f43a1c895ad4dacbb9e35ec21394d140633",
+        "sha256:cce6f2fa12932acda7e4cbc7eaeb0b9332d02abeb547a57dda41f17cde9e94da",
+        "sha256:3c00fd0633bd1167b6496b3d54c61f683e77e8b305b4b3b307d376530d94a4ce",
+        "sha256:78937aa1b394b46d9416f87a58d065e3ce03f261bc2bbe13b64ea8e7fe86bdb5",
+        "sha256:e1192f592e99ba9476109d865f606fd100f76e7b3506af1c4ef6f114213bebee",
+        "sha256:ba8636257f7ef87bcf7366b90ae19401b1502945bb9d96691b0807c0488d9186",
+        "sha256:2022ad01f5bf1106d8c5c5802aa3765a0fe017d6b0fcecd7295dd67275f7cce9",
+        "sha256:24c63d5651c5a6613c64fdc5d991b1276302566a210ed8645106b5b4318a1267",
+        "sha256:3f2576a8cccfce5997b1f90037df314e60453caaaa998ecb0560042da2701328",
+        "sha256:3fc57461449ea3e195adeafcdea1c5957162cb106d139be4c9fd3f0057b54d27",
+        "sha256:3ad0a2d5e59d30b33c364c2dcb03d4cdd18b813409084296e2e42270bc9ed59e",
+        "sha256:8de67028a2dc049b93cc6e8e2ea27083a60cb8e5171e3e50ee0f3f86b25037b2",
+        "sha256:a21b0738d07f9a10d3a898905e582dccd514f3d0b935409bf904fa0183560c9d",
+        "sha256:9caee9d8f051325eb2752fd9afdf132cde536368c1b2240455497b1238643b35",
+        "sha256:4ab482bcd01d50164bb0e075049db0042c6f6471cb0438ed2fc519f52b2cfd05",
+        "sha256:3d7c4e0df692e3bdc012f4e91f09e3381561cf47992e4f86274234b249bdeb1e",
+        "sha256:31cf5f47604e33413ed493d8b885245ca1da2d55b2d19355b0748756bbe6836b",
+        "sha256:c17db15e6c27597f90415fbe0e0d9bf364dd400597fed37be0d7055f654e3bcc",
+        "sha256:23f358ab33d1192237ad56ac8f0ef877111b1f87e1501fdf43175027ac93e0e4",
+        "sha256:1beb86ae0d673a7c95df01877ff79e9932d63db86f6f59b9dd0025d291d49481",
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+        "sha256:3de1e474a0c807d9e689ea57691248f171236c3fc70ceeb98f95cdc4c209c1ea",
+        "sha256:7408cf850975c2570ae58c1304d057d7d174478fe4eea033877027cf58253e0f",
+        "sha256:2eb7010a4a027b8da2180b1221a73e33e8dd91f3d1b88ecd5b8d69ceec6675eb",
+        "sha256:b036abfa29af4caf44a7260f2967b389b872db8b71a2f2c141e26b559615d982",
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef"
+      ],
+      "source_execution_id": "sha256:6aa5f8a789e9863a9af9a5563b1a342ef612051278a0e7d891e03786fa6f8282",
+      "source_id_kind": "manifest"
+    },
+    "vision": {
+      "config_digest": "sha256:016a60c6e800ad079f3b622240e3916c62d6491520ea4a28fe0cb4a57b1b91f7",
+      "execution_digest": "sha256:52a78a4826ff4ebe8f4e4b571edd0a5556ba6c12682dc9b7e706ecf4a4a528b7",
+      "rootfs_diff_ids": [
+        "sha256:188c9b34dfbe022075d01fc4f5a305412909ef97de440783c15043e68e1b1913",
+        "sha256:1c107a897b02ca7ece069bfef2339f4e02f95f12dbb025da7305fcbe2b626f34",
+        "sha256:481070cf8ce5b1834cf16a80eec044aced637a96ef8cd1e3c193947e2ff5cbd9",
+        "sha256:addf8d91bd2117a572c640e2bd2e0d15c7adf862773498ca0aea234b7a32528e",
+        "sha256:d61c3fbda2a02b279fe3046994696bf5500ebe366f7f0b7a1732a6b4c0094766",
+        "sha256:a1738a7291e7221ad70a9cb664f857accf14e002938203e5900713e8ca3d1af2",
+        "sha256:eabc489821c99349d5e94da2d91138257b208f0da0e7366f6247e0d249178ffe",
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+        "sha256:9c40c84980ec6a9d84455c3e31f57331a75e3e5c4202eccbd6a5057010d9daa2",
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+        "sha256:6a4d5ee656667f3e6c0637fe9e26a6649bdc62191f5746854f606627f983112c",
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef"
+      ],
+      "source_execution_id": "sha256:52a78a4826ff4ebe8f4e4b571edd0a5556ba6c12682dc9b7e706ecf4a4a528b7",
+      "source_id_kind": "manifest"
+    }
+  },
+  "models": {
+    "native": {
+      "architecture": "GPT2LMHeadModel",
+      "construction": "tests/integration/test_container_front_door_journey.py::_tiny_checkpoint",
+      "identity_scope": "generated tiny fixture; artifact and tokenizer digests retained in each signed pack",
+      "n_embd": 8,
+      "n_head": 1,
+      "n_layer": 1,
+      "n_positions": 16,
+      "seed": 19,
+      "vocab_size": 32
+    },
+    "tensorrt": {
+      "baseline": "BF16 engine built with Docker",
+      "id": "Qwen/Qwen3-0.6B",
+      "inputs": {
+        "baseline-engine/config.json": {
+          "bytes": 5750,
+          "sha256": "9774d436b582ad49c38645cfd5b2c5c5cc4b1a92656a19aff1926b4103262edb"
+        },
+        "baseline-engine/rank0.engine": {
+          "bytes": 1533824932,
+          "sha256": "d6038c329fb32937d108f536d0565279d0b7cfa45b9f2f5d294d5567300d6e2c"
+        },
+        "policy.json": {
+          "bytes": 159,
+          "sha256": "dc5dcb9fc509a39de0b6730bc81e575ba1702f19fb42cd03dc874418b569a45e"
+        },
+        "records.jsonl": {
+          "bytes": 7982,
+          "sha256": "bf79b0b2f06b5d83c27aa1bfa31e21ee5caf9299b1256b88fabfd57e249f07a6"
+        },
+        "subject-engine/config.json": {
+          "bytes": 5782,
+          "sha256": "835641a38e07fed5cecb874ff1b4c66e3a4a88c7e3813b8a32cb876d60228ca8"
+        },
+        "subject-engine/rank0.engine": {
+          "bytes": 785122236,
+          "sha256": "a886272c5888f44df1be25fb9f5568c94834adce08b49775def6e0497710f3bd"
+        },
+        "tokenizer-contract.json": {
+          "bytes": 5363303,
+          "sha256": "cbe05f917fca67a10cd5a39e7118a327cc4970a4a5f747dd4e1a4344dbfd57fe"
+        }
+      },
+      "revision": "c1899de289a04d12100db370d81485cdf75e47ca",
+      "subject": "FP8 engine built with Podman"
+    },
+    "vision": {
+      "baseline": {
+        "id": "Qwen/Qwen2-VL-2B-Instruct",
+        "revision": "895c3a49bc3fa70a340399125c650a463535e71c"
+      },
+      "subject": {
+        "id": "Qwen/Qwen2-VL-7B-Instruct",
+        "revision": "eed13092ef92e448dd6875b2a00151bd3f7db0ac"
+      }
+    }
+  },
+  "native_tests": {
+    "device": "cuda:0",
+    "docker": {
+      "failures": 0,
+      "skipped": 0,
+      "tests": 3
+    },
+    "installed_wheel": true,
+    "judge_measurements": "fixed offline fixture after CUDA answer generation; no external judge calls",
+    "podman": {
+      "failures": 0,
+      "skipped": 0,
+      "tests": 3
+    }
+  },
+  "paired_record_payloads_equal": {
+    "native_exact_match": true,
+    "native_normalized_nll": true,
+    "tensorrt": true,
+    "vision": true
+  },
+  "rows": [
+    {
+      "checked_cli_exits": {
+        "evaluate": 0,
+        "report": 0,
+        "verify": 0
+      },
+      "comparison": {
+        "kind": "exact_match_delta_pp",
+        "minimum": -10.0,
+        "value": 0.0
+      },
+      "correct_counts": {
+        "baseline": 52,
+        "subject": 52
+      },
+      "devices": {
+        "baseline": {
+          "compute_capability": "9.0",
+          "cuda_runtime_version": "13.1",
+          "device_kind": "cuda",
+          "device_name": "NVIDIA H100 80GB HBM3",
+          "driver_version": "580.178.04"
+        },
+        "subject": {
+          "compute_capability": "9.0",
+          "cuda_runtime_version": "13.1",
+          "device_kind": "cuda",
+          "device_name": "NVIDIA H100 80GB HBM3",
+          "driver_version": "580.178.04"
+        }
+      },
+      "phase": "trt-docker",
+      "policy_verdict": "pass",
+      "record_count": 102,
+      "sample_qualification": {
+        "interval_width": {
+          "maximum": 20.0,
+          "observed": 9.98259059813628,
+          "passed": true,
+          "unit": "percentage_points"
+        },
+        "passed": true,
+        "record_count": {
+          "minimum": 102,
+          "observed": 102,
+          "passed": true
+        }
+      },
+      "side_accuracy": {
+        "baseline": {
+          "observed": 0.5098039215686274,
+          "passed": true
+        },
+        "minimum": 0.4,
+        "passed": true,
+        "subject": {
+          "observed": 0.5098039215686274,
+          "passed": true
+        }
+      },
+      "signed_verification_verdict": {
+        "integrity_ok": true,
+        "ok": true,
+        "policy_verdict": "pass",
+        "verification_status": 0
+      },
+      "uncertainty": {
+        "interval_mass": 0.95,
+        "lower": -4.991295299068142,
+        "method": "newcombe_hybrid_score_paired_v2",
+        "scope": "paired_binary_outcomes",
+        "upper": 4.991295299068138
+      }
+    },
+    {
+      "checked_cli_exits": {
+        "evaluate": 0,
+        "report": 0,
+        "verify": 0
+      },
+      "comparison": {
+        "kind": "exact_match_delta_pp",
+        "minimum": -10.0,
+        "value": 0.0
+      },
+      "correct_counts": {
+        "baseline": 52,
+        "subject": 52
+      },
+      "devices": {
+        "baseline": {
+          "compute_capability": "9.0",
+          "cuda_runtime_version": "13.1",
+          "device_kind": "cuda",
+          "device_name": "NVIDIA H100 80GB HBM3",
+          "driver_version": "580.178.04"
+        },
+        "subject": {
+          "compute_capability": "9.0",
+          "cuda_runtime_version": "13.1",
+          "device_kind": "cuda",
+          "device_name": "NVIDIA H100 80GB HBM3",
+          "driver_version": "580.178.04"
+        }
+      },
+      "phase": "trt-podman",
+      "policy_verdict": "pass",
+      "record_count": 102,
+      "sample_qualification": {
+        "interval_width": {
+          "maximum": 20.0,
+          "observed": 9.98259059813628,
+          "passed": true,
+          "unit": "percentage_points"
+        },
+        "passed": true,
+        "record_count": {
+          "minimum": 102,
+          "observed": 102,
+          "passed": true
+        }
+      },
+      "side_accuracy": {
+        "baseline": {
+          "observed": 0.5098039215686274,
+          "passed": true
+        },
+        "minimum": 0.4,
+        "passed": true,
+        "subject": {
+          "observed": 0.5098039215686274,
+          "passed": true
+        }
+      },
+      "signed_verification_verdict": {
+        "integrity_ok": true,
+        "ok": true,
+        "policy_verdict": "pass",
+        "verification_status": 0
+      },
+      "uncertainty": {
+        "interval_mass": 0.95,
+        "lower": -4.991295299068142,
+        "method": "newcombe_hybrid_score_paired_v2",
+        "scope": "paired_binary_outcomes",
+        "upper": 4.991295299068138
+      }
+    },
+    {
+      "checked_cli_exits": {
+        "evaluate": 0,
+        "report": 0,
+        "verify": 0
+      },
+      "comparison": {
+        "kind": "exact_match_delta_pp",
+        "minimum": -100.0,
+        "value": 50.0
+      },
+      "correct_counts": {
+        "baseline": 1,
+        "subject": 3
+      },
+      "devices": {
+        "baseline": {
+          "compute_capability": "9.0",
+          "cuda_runtime_version": "12.6",
+          "device_kind": "cuda",
+          "device_name": "NVIDIA H100 80GB HBM3",
+          "driver_version": null
+        },
+        "subject": {
+          "compute_capability": "9.0",
+          "cuda_runtime_version": "12.6",
+          "device_kind": "cuda",
+          "device_name": "NVIDIA H100 80GB HBM3",
+          "driver_version": null
+        }
+      },
+      "phase": "vision-docker",
+      "policy_verdict": "pass",
+      "record_count": 4,
+      "sample_qualification": {
+        "interval_width": {
+          "maximum": 200.0,
+          "observed": 92.45716686677072,
+          "passed": true,
+          "unit": "percentage_points"
+        },
+        "passed": true,
+        "record_count": {
+          "minimum": 4,
+          "observed": 4,
+          "passed": true
+        }
+      },
+      "side_accuracy": null,
+      "signed_verification_verdict": {
+        "integrity_ok": true,
+        "ok": true,
+        "policy_verdict": "pass",
+        "verification_status": 0
+      },
+      "uncertainty": {
+        "interval_mass": 0.95,
+        "lower": -13.548840058295152,
+        "method": "newcombe_hybrid_score_paired_v2",
+        "scope": "paired_binary_outcomes",
+        "upper": 78.90832680847556
+      }
+    },
+    {
+      "checked_cli_exits": {
+        "evaluate": 0,
+        "report": 0,
+        "verify": 0
+      },
+      "comparison": {
+        "kind": "exact_match_delta_pp",
+        "minimum": -100.0,
+        "value": 50.0
+      },
+      "correct_counts": {
+        "baseline": 1,
+        "subject": 3
+      },
+      "devices": {
+        "baseline": {
+          "compute_capability": "9.0",
+          "cuda_runtime_version": "12.6",
+          "device_kind": "cuda",
+          "device_name": "NVIDIA H100 80GB HBM3",
+          "driver_version": null
+        },
+        "subject": {
+          "compute_capability": "9.0",
+          "cuda_runtime_version": "12.6",
+          "device_kind": "cuda",
+          "device_name": "NVIDIA H100 80GB HBM3",
+          "driver_version": null
+        }
+      },
+      "phase": "vision-podman",
+      "policy_verdict": "pass",
+      "record_count": 4,
+      "sample_qualification": {
+        "interval_width": {
+          "maximum": 200.0,
+          "observed": 92.45716686677072,
+          "passed": true,
+          "unit": "percentage_points"
+        },
+        "passed": true,
+        "record_count": {
+          "minimum": 4,
+          "observed": 4,
+          "passed": true
+        }
+      },
+      "side_accuracy": null,
+      "signed_verification_verdict": {
+        "integrity_ok": true,
+        "ok": true,
+        "policy_verdict": "pass",
+        "verification_status": 0
+      },
+      "uncertainty": {
+        "interval_mass": 0.95,
+        "lower": -13.548840058295152,
+        "method": "newcombe_hybrid_score_paired_v2",
+        "scope": "paired_binary_outcomes",
+        "upper": 78.90832680847556
+      }
+    }
+  ],
+  "runtime_builds": {
+    "cuda": {
+      "base_image": "python:3.12-slim@sha256:3d5ed973e45820f5ba5e46bd065bd88b3a504ff0724d85980dcd05eab361fcf4",
+      "build_arguments": {
+        "CUDA_PROFILE": "cu126",
+        "SOURCE_DATE_EPOCH": "1789852810"
+      },
+      "dockerfile": {
+        "path": "runtime/Dockerfile.cuda",
+        "sha256": "sha256:23d2ef3f50bda31b8647c715bbf527b8d5b1f767ac6c5cdedbf90ba055a89138"
+      },
+      "runtime_image_id": "sha256:f5c5161ececd8834d5ce2603ff3c2ae78316da609279194831cd06c9469c0052",
+      "source_bundle_sha256": "sha256:733c4658c072a20543a6a6562f6bfc34330112ddae263576b690b17ed2615994",
+      "source_commit": "59d9bbc048d1fe10083e912b32912445cb7bb974"
+    },
+    "trt": {
+      "base_image": "nvcr.io/nvidia/tensorrt-llm/release:1.2.1@sha256:33cd085b772947bd22b7273886539331420404e5d2a4a039945241945ff927b9",
+      "build_arguments": {
+        "SOURCE_DATE_EPOCH": "1789852810"
+      },
+      "dockerfile": {
+        "path": "runtime/Dockerfile.tensorrt-llm",
+        "sha256": "sha256:7ab78f7025d982dca4dc598b5e46c94507471393f9de71ef836059b07c741b1b"
+      },
+      "runtime_image_id": "sha256:6aa5f8a789e9863a9af9a5563b1a342ef612051278a0e7d891e03786fa6f8282",
+      "source_bundle_sha256": "sha256:733c4658c072a20543a6a6562f6bfc34330112ddae263576b690b17ed2615994",
+      "source_commit": "59d9bbc048d1fe10083e912b32912445cb7bb974"
+    },
+    "vision": {
+      "base_image_manifest_digest": "sha256:f5c5161ececd8834d5ce2603ff3c2ae78316da609279194831cd06c9469c0052",
+      "build_arguments": {
+        "SOURCE_DATE_EPOCH": "1789852810"
+      },
+      "dockerfile": {
+        "path": "runtime/Dockerfile.hf-vision-text",
+        "sha256": "sha256:0352718a2eee50db09caac36036d81ecc19041980d1a6557ef5695020096f6fb"
+      },
+      "runtime_image_id": "sha256:52a78a4826ff4ebe8f4e4b571edd0a5556ba6c12682dc9b7e706ecf4a4a528b7",
+      "source_bundle_sha256": "sha256:733c4658c072a20543a6a6562f6bfc34330112ddae263576b690b17ed2615994",
+      "source_commit": "59d9bbc048d1fe10083e912b32912445cb7bb974"
+    }
+  },
+  "scope": "Historical container execution and signed offline replay reference; not a model-quality qualification or a release qualification.",
+  "source_bundle_sha256": "733c4658c072a20543a6a6562f6bfc34330112ddae263576b690b17ed2615994",
+  "source_commit": "59d9bbc048d1fe10083e912b32912445cb7bb974",
+  "wheel": {
+    "filename": "invarlock-0.16.1-py3-none-any.whl",
+    "installed_file_bytes_checked": 183,
+    "sha256": "f7663dd4a177e9497146461805a386e09e8fd696f57fb377acfd5f7664cc788e"
+  }
+}
