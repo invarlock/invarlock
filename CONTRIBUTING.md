@@ -195,6 +195,21 @@ these page inventory and reader-contract tests.
 Run `make pre-commit` for the repository hooks. Some hooks rewrite files;
 review their changes and repeat affected validation before committing.
 
+For full coverage, install the pinned judge SDK closure into the same test
+interpreter and require its offline SDK tests instead of allowing skips:
+
+```bash
+python -m pip install --require-hashes \
+  -r requirements/workflows/inspect-judge-tests-py313.txt
+python -m pip check
+INVARLOCK_REQUIRE_INSPECT_SDK=1 make coverage-enforce
+```
+
+The SDK lock intentionally replaces shared dependency versions with its pinned
+closure; `pip check` verifies compatibility with the other test dependencies.
+Use the matching `py312` lock for Python 3.12. The installed-SDK smoke gate
+uses a separate environment, so its execution does not contribute coverage.
+
 The complete coverage gate requires Linux descriptor execution. On another
 operating system, run the relevant portable target such as `make
 coverage-examples`, and report the full Linux result from CI separately.

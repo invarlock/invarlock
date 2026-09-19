@@ -138,3 +138,44 @@ def test_hygiene_cancels_obsolete_runs_and_retains_delta_history() -> None:
         )
         depth = checkout.get("with", {}).get("fetch-depth", 1)
         assert depth == (1 if name == "lockfile-sync" else 0)
+
+
+def test_runtime_coverage_requires_pinned_sdk_tests_in_its_measured_interpreter():
+    jobs = _load(WORKFLOWS / "ci.yml")["jobs"]
+    job = jobs["coverage-tests"]
+    steps = job["steps"]
+    sdk_steps = [
+        step
+        for step in steps
+        if "pip install" in step.get("run", "")
+        and "inspect-judge-tests-py313.txt" in step["run"]
+    ]
+    assert len(sdk_steps) == 1
+    install = sdk_steps[0]
+    assert install["if"] == "${{ matrix.shard == 'runtime' }}"
+    assert "python -m pip install --require-hashes -r " in install["run"]
+    assert install["run"].strip().endswith("python -m pip check")
+    collect = next(
+        step for step in steps if "make coverage-collect-" in step.get("run", "")
+    )
+    assert steps.index(install) < steps.index(collect)
+    assert collect["env"]["INVARLOCK_REQUIRE_INSPECT_SDK"] == (
+        "${{ matrix.shard == 'runtime' && '1' || '0' }}"
+    )
+    assert "INVARLOCK_REQUIRE_INSPECT_SDK" not in jobs["coverage"].get("env", {})
+
+
+def test_full_verification_requires_sdk_tests_before_collecting_coverage():
+    steps = _load(WORKFLOWS / "ci.yml")["jobs"]["verify-full"]["steps"]
+    install = next(
+        step
+        for step in steps
+        if "pip install" in step.get("run", "")
+        and "inspect-judge-tests-py313.txt" in step["run"]
+    )
+    verify = next(step for step in steps if step.get("run") == "make verify")
+    assert "python -m pip install --require-hashes -r " in install["run"]
+    assert install["run"].strip().endswith("python -m pip check")
+    assert "if" not in install
+    assert steps.index(install) < steps.index(verify)
+    assert verify["env"]["INVARLOCK_REQUIRE_INSPECT_SDK"] == "1"

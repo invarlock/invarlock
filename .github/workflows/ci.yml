@@ -186,14 +186,23 @@ jobs:
         with:
           python-version: '3.13'
           cache: pip
-          cache-dependency-path: requirements/workflows/ci-hf-py313.txt
+          cache-dependency-path: |
+            requirements/workflows/ci-hf-py313.txt
+            requirements/workflows/inspect-judge-tests-py313.txt
       - name: Install dependencies
         run: |
           python scripts/security/build_hardened_accelerate_wheel.py bootstrap
           python -m pip install --require-hashes --find-links runtime/wheels -r requirements/workflows/ci-hf-py313.txt
           python -m build --wheel --no-isolation
           python -m pip install --no-deps --force-reinstall dist/*.whl
+      - name: Install runtime coverage SDK dependencies
+        if: ${{ matrix.shard == 'runtime' }}
+        run: |
+          python -m pip install --require-hashes -r requirements/workflows/inspect-judge-tests-py313.txt
+          python -m pip check
       - name: Collect disjoint test coverage
+        env:
+          INVARLOCK_REQUIRE_INSPECT_SDK: ${{ matrix.shard == 'runtime' && '1' || '0' }}
         run: make coverage-collect-${{ matrix.shard }} PYTEST_WORKERS=2
       - name: Retain coverage and test timings
         if: ${{ always() }}
@@ -295,7 +304,13 @@ jobs:
         run: npm ci
       - name: Install actionlint
         run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
+      - name: Install runtime coverage SDK dependencies
+        run: |
+          python -m pip install --require-hashes -r requirements/workflows/inspect-judge-tests-py313.txt
+          python -m pip check
       - name: Run complete repository gates
+        env:
+          INVARLOCK_REQUIRE_INSPECT_SDK: "1"
         run: make verify
       - name: Lint workflows
         run: |
