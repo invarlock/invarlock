@@ -13,7 +13,7 @@ import stat
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import yaml
 from cryptography.hazmat.primitives import serialization
@@ -29,6 +29,7 @@ from invarlock.core.schedule_preparation import (
     LocalDatasetRequest,
     prepare_local_evaluation_schedule_bytes,
 )
+from invarlock.evaluation_oci import ContainerEngine, _gpu_arguments
 from invarlock.evidence_pack_contract import canonical_json_bytes
 from invarlock.evidence_pack_integrity import public_key_fingerprint
 
@@ -66,7 +67,7 @@ def _root(value: Path) -> Path:
     if (root / "records.jsonl").stat().st_size > 64 * 1024 * 1024:
         raise ValueError("records.jsonl exceeds 64 MiB")
     if any(character in str(root) for character in (",", "\n", "\r")):
-        raise ValueError("resource root cannot be represented in a Docker mount")
+        raise ValueError("resource root cannot be represented in a container mount")
     for name in (_REQUEST, _EVIDENCE):
         if os.path.lexists(root / name):
             raise FileExistsError(
@@ -113,16 +114,23 @@ def _require_signed_side_floor(policy: bytes) -> None:
         )
 
 
-def _inspect(root: Path, image: str, digest: str, device: str) -> dict[str, Any]:
+def _inspect(
+    root: Path,
+    image: str,
+    digest: str,
+    device: str,
+    container_engine: str = "docker",
+) -> dict[str, Any]:
+    if container_engine not in {"docker", "podman"}:
+        raise ValueError("container engine must be docker or podman")
     helper = Path(__file__).with_name("engine_inspect.py").resolve(strict=True)
     command = [
-        "docker",
+        container_engine,
         "run",
         "--rm",
         "--network",
         "none",
-        "--gpus",
-        "device=" + device.split(":", 1)[1],
+        *_gpu_arguments(cast(ContainerEngine, container_engine), device),
         "--pull=never",
         "--read-only",
         "--cap-drop=ALL",
@@ -402,7 +410,10 @@ def _execute(
     image: str,
     digest: str,
     devices: tuple[str, str],
+    container_engine: str = "docker",
 ) -> None:
+    if container_engine not in {"docker", "podman"}:
+        raise ValueError("container engine must be docker or podman")
     environment = dict(os.environ)
     environment["INVARLOCK_TENSORRT_LLM_RESOURCE_ROOT"] = str(root)
     environment["INVARLOCK_TENSORRT_LLM_TOKENIZER_CONTRACT"] = "tokenizer-contract.json"
@@ -413,6 +424,8 @@ def _execute(
         str(paths["request"]),
         "--signing-key",
         str(paths["signer"]),
+        "--container-engine",
+        container_engine,
         "--runtime-image",
         image,
         "--runtime-image-digest",
@@ -487,6 +500,11 @@ def _execute(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--container-engine",
+        choices=("docker", "podman"),
+        default=os.environ.get("INVARLOCK_CONTAINER_ENGINE", "docker"),
+    )
     parser.add_argument("--runtime-image", required=True)
     parser.add_argument("--resource-root", type=Path, required=True)
     parser.add_argument("--baseline-locator", required=True)
@@ -503,6 +521,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     arguments = parser.parse_args(argv)
     try:
+        if arguments.container_engine not in {"docker", "podman"}:
+            raise ValueError("container engine must be docker or podman")
         trust_values = (
             arguments.evidence_signing_key,
             arguments.verifier_signing_key,
@@ -531,7 +551,9 @@ def main(argv: list[str] | None = None) -> int:
         root = _root(arguments.resource_root)
         image, digest = _image(arguments.runtime_image)
         output = root.parent / f"{root.name}-invarlock-output"
-        inspection = _inspect(root, image, digest, devices[0])
+        inspection = _inspect(
+            root, image, digest, devices[0], arguments.container_engine
+        )
         paths = _prepare(
             root,
             output,
@@ -543,8 +565,8 @@ def main(argv: list[str] | None = None) -> int:
             trust_root=arguments.trust_root,
             ephemeral_trust_root=arguments.ephemeral_trust_root,
         )
-        _execute(root, paths, image, digest, devices)
-    except (OSError, ValueError, subprocess.CalledProcessError) as exc:
+        _execute(root, paths, image, digest, devices, arguments.container_engine)
+    except (OSError, RuntimeError, ValueError, subprocess.CalledProcessError) as exc:
         print(f"FAIL {exc}", file=sys.stderr)
         return 2
     print(f"PASS evidence={paths['evidence']} receipt={paths['receipt']}")
