@@ -40,35 +40,31 @@ def test_root_tooling_has_no_legacy_product_workflows() -> None:
     assert [value for value in forbidden if value in MAKEFILE] == []
 
 
-def test_optional_provider_runtime_images_stay_outside_root_tooling() -> None:
+def test_runtime_provider_images_use_the_consolidated_root_context() -> None:
     assert "gguf_runtime_blackbox.py" not in MAKEFILE
     assert "tensorrt_llm_runtime_fixture.py" not in MAKEFILE
     assert "runtime-image-gguf" not in MAKEFILE
     assert "runtime-image-tensorrt-llm" not in MAKEFILE
-    for addin in ("gguf", "tensorrt_llm"):
-        assert (
-            Path(__file__).resolve().parents[2] / "addins" / addin / "Makefile"
-        ).is_file()
+    assert (Path(__file__).resolve().parents[2] / "runtime/Dockerfile").is_file()
 
 
-def test_first_party_addins_share_test_and_distribution_gates() -> None:
-    assert "addins-test:" in MAKEFILE
-    assert "addins-install-smoke:" in MAKEFILE
-    for path in (
-        "addins/diagnostics",
-        "addins/gguf",
-        "addins/multimodal",
-        "addins/tensorrt_llm",
-    ):
-        assert path in MAKEFILE
-    install_smoke = MAKE.target("addins-install-smoke").text
-    assert "CoreRegistry" in install_smoke
-    assert "get_runtime_provider" in install_smoke
-    assert "get_plugin_info" in install_smoke
-    assert "ADDINS_SMOKE_RELEASE_LOCK" in install_smoke
+def test_first_party_runtime_modules_share_test_and_distribution_gates() -> None:
+    assert "runtime-test:" in MAKEFILE
+    assert "install-smoke:" in MAKEFILE
+    assert "tests/diagnostics" in MAKEFILE
+    assert "tests/runtime" in MAKEFILE
+    assert "tests/judge_measurements" in MAKEFILE
+    install_smoke = MAKE.target("install-smoke").text
+    assert "RELEASE_INSTALL_RELEASE_LOCK" in install_smoke
+    assert "RELEASE_INSTALL_OPTIONAL_LOCK" in install_smoke
     assert "--require-hashes" in install_smoke
-    assert 'mktemp -d "$${TMPDIR:-/tmp}/invarlock-addins-smoke.XXXXXX"' in install_smoke
-    assert 'cleanup_smoke_venv() { rm -rf "$$smoke_venv"; }' in install_smoke
+    assert (
+        'mktemp -d "$${TMPDIR:-/tmp}/invarlock-install-smoke.XXXXXX"' in install_smoke
+    )
+    assert (
+        'cleanup_smoke_venv() { rm -rf "$$smoke_venv" "$$optional_venv"; }'
+        in install_smoke
+    )
     assert "trap cleanup_smoke_venv EXIT" in install_smoke
     assert "trap 'exit 129' HUP" in install_smoke
     assert "trap 'exit 130' INT" in install_smoke
@@ -78,22 +74,20 @@ def test_first_party_addins_share_test_and_distribution_gates() -> None:
         '"$$smoke_venv/bin/python" -m pip install '
         "--no-deps --force-reinstall dist/*.whl"
     )
-    addin_install = (
-        "PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "
-        '"$$smoke_venv/bin/python" -m pip install '
-        "--no-deps --force-reinstall dist/addins/*.whl"
-    )
     assert core_install in install_smoke
-    assert addin_install in install_smoke
     assert install_smoke.index(core_install) < install_smoke.index(
         "scripts/release/core_wheel_consumers.py"
     )
-    assert install_smoke.index("scripts/release/core_wheel_consumers.py") < (
-        install_smoke.index(addin_install)
-    )
     assert "-m pip check" in install_smoke
     assert "PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH=" in install_smoke
-    assert ".addins-smoke-site" not in install_smoke
+    assert "CoreRegistry" not in install_smoke
+    assert install_smoke.count("scripts/release/core_wheel_consumers.py") == 2
+    assert "--mode optional" in install_smoke
+    assert (
+        "hf_vision_text_conformance"
+        not in install_smoke.split('$(PYTHON) -m venv "$$optional_venv"', 1)[0]
+    )
+    assert ".install-smoke-site" not in install_smoke
 
     clean = MAKE.target("clean").text
     assert "src/*.egg-info" in clean

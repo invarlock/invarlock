@@ -1,0 +1,4 @@
+# Optional host-feature closure exercised separately from the minimal wheel.
+# Keep this list equal to the diagnostics and vision-text extras in pyproject.toml.
+numpy>=1.24
+pillow>=11.3,<13

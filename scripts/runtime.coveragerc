@@ -3,9 +3,11 @@ branch = True
 parallel = True
 patch = subprocess
 source =
-    addins
+    src/invarlock/diagnostics
+    src/invarlock/runtime_providers
+    src/invarlock/judge_measurements
 omit =
-    addins/*/tests/*
+    tests/*
 
 [report]
 show_missing = True

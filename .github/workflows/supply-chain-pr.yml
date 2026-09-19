@@ -380,7 +380,7 @@ jobs:
           python scripts/security/run_pip_audit.py \
             --path "${{ steps.hf_surface.outputs.site_packages }}" \
             --installed-lock requirements/workflows/hf-py313.txt \
-            --installed-lock-sha256 034d95f20a71249b0321ac33d50f6b1eb9b16773ae891a2a43d3efe4fca64ec9 \
+            --installed-lock-sha256 482f8f578d2070e7c5f3fae746d4885a030ee73cdf8e2447add93b821ef85976 \
             --installed-bootstrap-lock requirements/workflows/pip-bootstrap.txt \
             --installed-bootstrap-lock-sha256 8639968bea3cd8bc234d2a6d38f2c54e5d1b09c3474ac954278c99c2fa44e944 \
             --installed-project-wheel dist/*.whl \

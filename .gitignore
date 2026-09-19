@@ -15,8 +15,6 @@ pip-wheel-metadata/
 .venv/
 .venv-invarlock/
 .venv-*/
-.addins-smoke-site/
-.addins-smoke-venv/
 venv/
 env/
 ENV/

@@ -17,13 +17,7 @@ from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path, PurePosixPath
 from typing import BinaryIO, cast
 
-PROJECTS = (
-    "invarlock",
-    "invarlock-diagnostics",
-    "invarlock-runtime-gguf",
-    "invarlock-runtime-hf-vision-text",
-    "invarlock-runtime-tensorrt-llm",
-)
+PROJECTS = ("invarlock",)
 API_ROOTS = {
     "pypi": "https://pypi.org/pypi",
     "testpypi": "https://test.pypi.org/pypi",
