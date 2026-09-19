@@ -108,3 +108,4 @@ def test_container_front_door_target_runs_the_opt_in_journey() -> None:
     assert "INVARLOCK_CONTAINER_ENGINE=$(CONTAINER_ENGINE)" in block
     assert "INVARLOCK_RUNTIME_IMAGE=$(RUNTIME_IMAGE)" in block
     assert "tests/integration/test_container_front_door_journey.py" in block
+    assert "tests/integration/test_container_native_judge_journey.py" in block

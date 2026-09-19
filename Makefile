@@ -529,7 +529,8 @@ container-front-door-smoke: runtime-image  ## Run the host-to-container evaluati
 	INVARLOCK_RUN_CONTAINER_SMOKE=1 INVARLOCK_CONTAINER_ENGINE=$(CONTAINER_ENGINE) \
 		INVARLOCK_RUNTIME_IMAGE=$(RUNTIME_IMAGE) \
 		PYTHONPATH=src $(PYTEST) -q -m integration \
-		tests/integration/test_container_front_door_journey.py tests/integration/test_oci_isolation.py
+		tests/integration/test_container_front_door_journey.py tests/integration/test_oci_isolation.py \
+		tests/integration/test_container_native_judge_journey.py
 
 qualification-source-bundle:  ## Create the exact Git archive used by runtime qualification
 	$(foreach variable,SOURCE_BUNDLE_OUTPUT,$(if $(strip $($(variable))),,$(error $(variable) is required)))
@@ -708,6 +709,10 @@ dist-check: package-readmes-check  ## Build and validate the single first-party 
 .PHONY: inspect-judge-sdk-test
 inspect-judge-sdk-test: dist-check  ## Resolve the optional judge SDK extra and replay real SDK events offline
 	PYTHON=$(PYTHON) bash scripts/inspect_judge_sdk_gate.sh
+
+.PHONY: langfuse-sdk-test
+langfuse-sdk-test: dist-check  ## Qualify real Langfuse exports and SDK-free installed recipients
+	PYTHON=$(PYTHON) bash scripts/langfuse_sdk_gate.sh
 
 install-smoke: dist-check  ## Install and discover the wheel outside the source checkout
 	@test -f $(RELEASE_INSTALL_RELEASE_LOCK) || { echo "No release lock for $(PYTHON); expected $(RELEASE_INSTALL_RELEASE_LOCK)" >&2; exit 2; }
