@@ -673,3 +673,41 @@ def test_real_non_openai_sdks_construct_without_http(
     if client is not None:
         assert client.is_closed()
     network.assert_not_called()
+
+
+def test_provider_without_async_cleanup_is_rejected():
+    with pytest.raises(InspectJudgeError, match="async cleanup"):
+        asyncio.run(configured._close_model(SimpleNamespace(api=SimpleNamespace())))
+
+
+def test_cancelled_provider_cleanup_preserves_cancellation():
+    async def close():
+        raise asyncio.CancelledError
+
+    model = SimpleNamespace(api=SimpleNamespace(aclose=close))
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(configured._close_model(model))
+
+
+def test_anthropic_implicit_temperature_change_cannot_dispatch(
+    inputs, sdk, monkeypatch
+):
+    grader = "anthropic/claude-sonnet-4-7"
+    inputs["plan"]["judge"].update(
+        provider="anthropic",
+        requested_model=grader,
+        approved_resolved_models=["claude-sonnet-4-7"],
+    )
+    inputs["options"] = replace(inputs["options"], grader=grader)
+    sdk[1].api.generate = AsyncMock()
+    sdk[1].api.is_claude_4_7_or_later = lambda: True
+    collect = AsyncMock()
+    monkeypatch.setattr(configured, "collect", collect)
+    with pytest.raises(InspectJudgeError, match="approved temperature=1"):
+        asyncio.run(
+            collect_configured(**inputs, environment={"ANTHROPIC_API_KEY": KEY})
+        )
+    collect.assert_not_called()
+    sdk[1].api.generate.assert_not_called()
+    sdk[2].messages.create.assert_not_called()
+    sdk[2].close.assert_awaited_once()

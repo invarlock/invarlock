@@ -419,11 +419,7 @@ def test_sdk_projection_rejects_unapproved_calls(
 def test_openai_wire_controls_are_checked_before_normalization(
     inputs, sdk_event, changed
 ):
-    grader = "openai/approved-model"
-    inputs["plan"]["judge"]["requested_model"] = grader
-    inputs["options"] = replace(inputs["options"], grader=grader)
-    sdk_event.model = grader
-    sdk_event.call.request["model"] = "approved-model"
+    _provider_wire(inputs, sdk_event, "openai")
     if changed == "service_tier":
         sdk_event.call.response["service_tier"] = "priority"
     else:
@@ -542,3 +538,163 @@ def test_collection_lock_closes_on_body_and_unlock_failures(
                     raise OSError("body failed")
         with pytest.raises(OSError):
             os.fstat(descriptor)
+
+
+def _provider_wire(inputs, event, provider):
+    """Start from a consistent completed call before corrupting provider evidence."""
+    grader = f"{provider}/approved-model"
+    inputs["plan"]["judge"]["requested_model"] = grader
+    inputs["options"] = replace(inputs["options"], grader=grader)
+    event.model = grader
+    identity = {
+        "model": event.output.model,
+        "id": event.output.metadata["request_id"],
+    }
+    if provider == "anthropic":
+        response = {
+            **identity,
+            "role": "assistant",
+            "content": [{"type": "text", "text": event.output.completion}],
+            "stop_reason": "end_turn",
+            "usage": {
+                "input_tokens": event.output.usage.input_tokens,
+                "output_tokens": event.output.usage.output_tokens,
+            },
+        }
+    elif provider == "google":
+        response = {
+            "modelVersion": identity["model"],
+            "responseId": identity["id"],
+            "candidates": [
+                {
+                    "content": {
+                        "role": "model",
+                        "parts": [{"text": event.output.completion}],
+                    },
+                    "finishReason": "STOP",
+                }
+            ],
+            "usageMetadata": {
+                "promptTokenCount": event.output.usage.input_tokens,
+                "candidatesTokenCount": event.output.usage.output_tokens,
+            },
+        }
+    else:
+        response = {
+            **identity,
+            "choices": [
+                {
+                    "message": {
+                        "role": "assistant",
+                        "content": event.output.completion,
+                    },
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {
+                "prompt_tokens": event.output.usage.input_tokens,
+                "completion_tokens": event.output.usage.output_tokens,
+            },
+        }
+    if provider == "openai":
+        event.call.request = {
+            "model": "approved-model",
+            "messages": [vars(message).copy() for message in event.input],
+            "temperature": event.config.temperature,
+            "top_p": event.config.top_p,
+            "max_tokens": event.config.max_tokens,
+        }
+    event.call.response = response
+    assert _project(inputs, event)["output"]["completion"] == event.output.completion
+    return response
+
+
+def _replace_wire_field(document, path, value):
+    for key in path[:-1]:
+        document = document[key]
+    document[path[-1]] = value
+
+
+@pytest.mark.parametrize(
+    "provider,path,value,message",
+    [
+        ("anthropic", ("role",), "user", "unsupported shape"),
+        ("anthropic", ("content",), {}, "unsupported shape"),
+        ("anthropic", ("usage", "iterations"), [{"input_tokens": 1}], "iterations"),
+        ("anthropic", ("content", 0), {"type": "tool_use"}, "unsupported content"),
+        ("anthropic", ("content", 0, "text"), 7, "text is invalid"),
+        ("anthropic", ("stop_reason",), "pause_turn", "finish reason"),
+        ("anthropic", ("usage", "input_tokens"), True, "nonnegative integers"),
+        ("anthropic", ("usage", "output_tokens"), -1, "nonnegative integers"),
+        ("google", ("candidates",), [], "unsupported shape"),
+        ("google", ("candidates",), [{}, {}], "unsupported shape"),
+        ("google", ("usageMetadata",), None, "unsupported shape"),
+        ("google", ("candidates", 0, "content", "role"), "user", "content is invalid"),
+        ("google", ("candidates", 0, "content", "parts"), "text", "content is invalid"),
+        (
+            "google",
+            ("candidates", 0, "content", "parts", 0),
+            {"functionCall": {}},
+            "unsupported content",
+        ),
+        (
+            "google",
+            ("candidates", 0, "content", "parts", 0, "text"),
+            7,
+            "text is invalid",
+        ),
+        (
+            "google",
+            ("candidates", 0, "finishReason"),
+            "MALFORMED_FUNCTION_CALL",
+            "finish reason",
+        ),
+        ("google", ("usageMetadata", "promptTokenCount"), "10", "nonnegative integers"),
+        ("openrouter", ("choices",), None, "missing its completion"),
+        ("openrouter", ("usage",), None, "missing its completion"),
+    ],
+)
+def test_completed_call_rejects_malformed_provider_evidence(
+    inputs, sdk_event, provider, path, value, message
+):
+    response = _provider_wire(inputs, sdk_event, provider)
+    _replace_wire_field(response, path, value)
+    with pytest.raises(InspectJudgeError, match=message):
+        _project(inputs, sdk_event)
+
+
+@pytest.mark.parametrize("provider", ["anthropic", "google"])
+def test_private_reasoning_is_excluded_from_retained_judgment(
+    inputs, sdk_event, provider
+):
+    response = _provider_wire(inputs, sdk_event, provider)
+    if provider == "anthropic":
+        response["content"][:0] = [
+            {"type": "thinking", "thinking": "private reasoning"},
+            {"type": "redacted_thinking", "data": "private signature"},
+        ]
+    else:
+        response["candidates"][0]["content"]["parts"][:0] = [
+            {"text": "private reasoning", "thought": True},
+            {"thoughtSignature": "private signature"},
+        ]
+    projected = _project(inputs, sdk_event)
+    assert projected["output"]["completion"] == sdk_event.output.completion
+    assert b"private" not in canonical_payload(projected)
+
+
+def test_unparseable_provider_cost_is_rejected_before_retention(inputs, sdk_event):
+    sdk_event.output.usage.total_cost = "not-a-number"
+    with pytest.raises(InspectJudgeError, match="finite nonnegative"):
+        _project(inputs, sdk_event)
+
+
+def test_anthropic_caller_cannot_bypass_continuation_reservation_guard():
+    class Model(NoCallModel):
+        def __str__(self):
+            return "anthropic/claude-sonnet-4-5"
+
+    model = Model()
+    with pytest.raises(InspectJudgeError, match="configured single-attempt"):
+        live._require_provider_retries_disabled(model)
+    assert model.calls == 0
