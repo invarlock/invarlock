@@ -1003,6 +1003,15 @@ def test_showcase_container_build_and_transaction_commands(
 
     def run(command: list[str], **options: Any) -> subprocess.CompletedProcess[str]:
         calls.append((command, options))
+        if "--engine" in command:
+            mount = next(value for value in command if value.endswith(",dst=/work"))
+            engine = (
+                Path(mount.removeprefix("type=bind,src=").removesuffix(",dst=/work"))
+                / "engine"
+            )
+            engine.mkdir()
+            (engine / "config.json").write_text("{}\n", encoding="utf-8")
+            (engine / "rank0.engine").write_bytes(b"engine")
         return subprocess.CompletedProcess(command, 0)
 
     monkeypatch.setattr(showcase, "run_bounded_command", run)
@@ -1022,7 +1031,10 @@ def test_showcase_container_build_and_transaction_commands(
     assert command[command.index("--gpus") + 1] == "device=1"
     assert "--network" in command and "none" in command
     assert "LD_LIBRARY_PATH=/usr/local/tensorrt/lib" in command
-    assert "/resources/baseline-engine" in command
+    assert command[command.index("--engine") + 1] == "/work/engine"
+    assert all("dst=/resources" not in value for value in command)
+    assert (paths.resources / "baseline-engine/rank0.engine").read_bytes() == b"engine"
+    assert not (paths.work / "baseline/engine").exists()
     assert command[command.index("--quantization") + 1] == "none"
 
     showcase._container_build(
@@ -1084,11 +1096,20 @@ def test_showcase_container_build_uses_unprivileged_identity_when_host_is_root(
         "chown",
         lambda path, uid, gid: ownership.append((Path(path), uid, gid)),
     )
-    monkeypatch.setattr(
-        showcase,
-        "run_bounded_command",
-        lambda command, **_options: commands.append(command),
-    )
+
+    def run(command: list[str], **_options: Any) -> None:
+        commands.append(command)
+        assert command[command.index("--engine") + 1] == "/work/engine"
+        assert all("dst=/resources" not in value for value in command)
+        assert stat.S_IMODE(paths.resources.stat().st_mode) == 0o755
+        assert not (paths.resources / "baseline-engine").exists()
+        engine = paths.work / "baseline/engine"
+        assert not engine.exists()
+        engine.mkdir()
+        (engine / "config.json").write_text("{}\n", encoding="utf-8")
+        (engine / "rank0.engine").write_bytes(b"engine")
+
+    monkeypatch.setattr(showcase, "run_bounded_command", run)
 
     showcase._container_build(
         paths,
@@ -1103,6 +1124,91 @@ def test_showcase_container_build_uses_unprivileged_identity_when_host_is_root(
         (paths.work, 65532, 65532),
         (paths.work / "baseline", 65532, 65532),
     ]
+    assert (paths.resources / "baseline-engine/rank0.engine").read_bytes() == b"engine"
+    assert not (paths.work / "baseline/engine").exists()
+
+
+@pytest.mark.parametrize("existing", ["directory", "dangling_symlink"])
+def test_showcase_container_build_preserves_existing_destination(
+    showcase: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, existing: str
+) -> None:
+    paths = showcase._create_workspace(tmp_path / "showcase-existing")
+    destination = paths.resources / "baseline-engine"
+    if existing == "directory":
+        destination.mkdir()
+    else:
+        destination.symlink_to(tmp_path / "missing")
+    monkeypatch.setattr(
+        showcase,
+        "run_bounded_command",
+        lambda *_args, **_kwargs: pytest.fail("existing output must prevent the build"),
+    )
+
+    with pytest.raises(FileExistsError, match="engine output already exists"):
+        showcase._container_build(
+            paths,
+            role="baseline",
+            device="0",
+            image="sha256:" + "a" * 64,
+            container_engine="docker",
+        )
+    assert not (paths.work / "baseline").exists()
+    assert showcase.os.path.lexists(destination)
+
+
+@pytest.mark.parametrize(
+    "invalid",
+    ["failed", "missing", "symlink", "incomplete", "linked_file", "collision"],
+)
+def test_showcase_container_build_does_not_publish_invalid_output(
+    showcase: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, invalid: str
+) -> None:
+    paths = showcase._create_workspace(tmp_path / "showcase-invalid")
+    monkeypatch.setattr(showcase.os, "geteuid", lambda: 1000)
+    monkeypatch.setattr(showcase.os, "getegid", lambda: 1000)
+    destination = paths.resources / "baseline-engine"
+
+    def run(command: list[str], **_options: Any) -> None:
+        engine = paths.work / "baseline/engine"
+        if invalid == "missing":
+            return
+        if invalid == "symlink":
+            engine.symlink_to(paths.resources, target_is_directory=True)
+            return
+        engine.mkdir()
+        (engine / "config.json").write_text("{}\n", encoding="utf-8")
+        if invalid == "failed":
+            raise subprocess.CalledProcessError(1, command)
+        if invalid == "incomplete":
+            return
+        if invalid == "linked_file":
+            (engine / "rank0.engine").symlink_to(engine / "config.json")
+            return
+        (engine / "rank0.engine").write_bytes(b"engine")
+        destination.mkdir()
+        (destination / "preserve").write_bytes(b"existing")
+
+    monkeypatch.setattr(showcase, "run_bounded_command", run)
+    expected_error = (
+        subprocess.CalledProcessError
+        if invalid == "failed"
+        else FileExistsError
+        if invalid == "collision"
+        else RuntimeError
+    )
+    with pytest.raises(expected_error):
+        showcase._container_build(
+            paths,
+            role="baseline",
+            device="0",
+            image="sha256:" + "a" * 64,
+            container_engine="docker",
+        )
+    if invalid == "collision":
+        assert [path.name for path in destination.iterdir()] == ["preserve"]
+        assert (destination / "preserve").read_bytes() == b"existing"
+    else:
+        assert not showcase.os.path.lexists(destination)
 
 
 def test_showcase_main_runs_two_downloads_and_builds(

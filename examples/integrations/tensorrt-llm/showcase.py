@@ -98,6 +98,9 @@ def _container_build(
 ) -> None:
     if not device.isdigit():
         raise ValueError("GPU device indices must be nonnegative integers")
+    destination = paths.resources / f"{role}-engine"
+    if os.path.lexists(destination):
+        raise FileExistsError(f"engine output already exists: {destination}")
     helper = Path(__file__).with_name("prepare.py").resolve(strict=True)
     bounded_runner = (
         Path(__file__).resolve().parents[1] / "bounded_command.py"
@@ -142,8 +145,6 @@ def _container_build(
         "--mount",
         f"type=bind,src={role_work},dst=/work",
         "--mount",
-        f"type=bind,src={paths.resources},dst=/resources",
-        "--mount",
         f"type=bind,src={helper},dst=/example/prepare.py,readonly",
         "--mount",
         f"type=bind,src={bounded_runner},dst=/example/bounded_command.py,readonly",
@@ -156,7 +157,7 @@ def _container_build(
         "--checkpoint",
         "/work/checkpoint",
         "--engine",
-        f"/resources/{role}-engine",
+        "/work/engine",
         "--tokenizer-contract",
         f"/work/{role}.tokenizer-contract.json",
         "--quantization",
@@ -170,6 +171,17 @@ def _container_build(
         ]
         command.extend(["--calibration-records", "/example/records.json"])
     run_bounded_command(command, check=True, label="TensorRT-LLM engine build")
+    engine = role_work / "engine"
+    if engine.is_symlink() or not engine.is_dir():
+        raise RuntimeError("TensorRT-LLM did not produce a real engine directory")
+    outputs = list(engine.iterdir())
+    if {path.name for path in outputs} != {"config.json", "rank0.engine"} or any(
+        path.is_symlink() or not path.is_file() for path in outputs
+    ):
+        raise RuntimeError("TensorRT-LLM produced an unexpected engine layout")
+    if os.path.lexists(destination):
+        raise FileExistsError(f"engine output already exists: {destination}")
+    engine.rename(destination)
 
 
 def _prepare_inputs(paths: Paths, *, tokenizer: Any | None = None) -> None:
