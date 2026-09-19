@@ -414,15 +414,15 @@ def test_launch_builds_layered_vision_runtime_and_dispatches_worker(
     )
     assert [build["dockerfile"] for build in builds] == [
         "runtime/Dockerfile.cuda",
-        "addins/multimodal/runtime/Dockerfile",
+        "runtime/Dockerfile.hf-vision-text",
     ]
     assert builds[1]["authenticated_base_image"] == (
         "127.0.0.1:49152/invarlock-example-runtime-cuda@sha256:" + ("1" * 64)
     )
-    dockerfile = Path(__file__).resolve().parents[2] / (
-        "addins/multimodal/runtime/Dockerfile"
+    dockerfile = (
+        Path(__file__).resolve().parents[2] / "runtime/Dockerfile.hf-vision-text"
     )
-    assert "ARG RUNTIME_BASE_IMAGE" in dockerfile.read_text(encoding="utf-8")
+    assert "RUNTIME_BASE_IMAGE" in dockerfile.read_text(encoding="utf-8")
     assert commands[-1][1].endswith("examples/integrations/hf_vision_text.py")
     assert commands[-1][commands[-1].index("--runtime-device") + 1] == "cuda:1"
 

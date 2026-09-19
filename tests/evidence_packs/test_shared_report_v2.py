@@ -2,6 +2,7 @@
 
 import json
 from itertools import permutations
+from pathlib import Path
 from unittest.mock import Mock
 from xml.etree.ElementTree import fromstring
 
@@ -166,6 +167,39 @@ def test_second_output_failure_keeps_first_and_stops_publication(
     assert (tmp_path / "out.html").is_file()
     assert not (tmp_path / "out.md").exists()
     assert not (tmp_path / "out.xml").exists()
+
+
+@pytest.mark.parametrize("captured", [False, True])
+@pytest.mark.parametrize("output", ["html", "markdown", "junit"])
+def test_single_output_write_failure_preserves_exit_code_two(
+    tmp_path, monkeypatch, captured, output
+):
+    pack = _pack(tmp_path, captured)
+
+    def fail_write(_path, _raw):
+        raise OSError("destination unavailable")
+
+    monkeypatch.setattr(captured_contracts, "atomic_write", fail_write)
+    with pytest.raises(
+        engine.EvidenceReportError, match="destination unavailable"
+    ) as caught:
+        engine.render_evidence(pack, **{f"{output}_path": tmp_path / "out"})
+    assert caught.value.exit_code == 2
+    assert caught.value.failed_output == output
+    assert caught.value.written_outputs == {}
+
+
+def test_v2_written_outputs_preserves_caller_path_spelling(tmp_path, monkeypatch):
+    pack = _pack(tmp_path, False)
+    monkeypatch.chdir(tmp_path)
+
+    result = engine.render_evidence(pack, html_path=Path("out.html"))
+
+    assert result.requested_outputs == result.written_outputs == {"html": "out.html"}
+    assert (
+        Path(result.written_outputs["html"]).read_text().startswith("<!doctype html>")
+    )
+    assert not hasattr(result, "html_path")
 
 
 def test_malformed_captured_payload_cannot_reach_view_or_native_fallback(

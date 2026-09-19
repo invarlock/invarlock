@@ -19,8 +19,8 @@ and security checks.
 - `release/` validates a clean release checkout and built distributions.
   `make dist-check` binds the core wheel/sdist and all four first-party
   optional wheel/sdist pairs to their exact checkout sources, metadata, and
-  entry points. `make addins-install-smoke` then installs the pinned base
-  dependency closure and all five wheels in a disposable environment, runs
+  entry points. `make install-smoke` then installs the pinned base dependency
+  closure and the wheel in a disposable environment, runs
   `pip check`, and exercises provider discovery and conformance without using
   the checkout or user site. It selects the maintained Python 3.12 or 3.13
   lock for the invoking interpreter. The shared `release/core_wheel_consumers.py`
@@ -115,7 +115,7 @@ Release preflight is intentionally read-only and does not publish, tag, or
 merge:
 
 ```bash
-make addins-install-smoke
+make install-smoke
 make release-preflight RELEASE_PREFLIGHT_ARGS="\
   --release-sha COMMIT_SHA \
   --expected-version X.Y.Z \
@@ -130,6 +130,5 @@ compatibility replay through the isolated candidate-wheel CLI without exposing
 the checkout as Python source. Preflight does not approve or publish a release.
 
 GGUF, TensorRT-LLM, and Hugging Face vision-text conformance commands are
-shipped by their optional first-party distributions under `addins/`. The
-release workflow publishes those runtime packages, the diagnostics and Inspect
-judge preparation packages, and the core distribution together.
+shipped by the core distribution. The release workflow publishes the core
+wheel and source archive together.

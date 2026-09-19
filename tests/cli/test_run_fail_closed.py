@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+from unittest.mock import Mock
 
 import pytest
 import yaml
@@ -33,6 +34,17 @@ def test_run_mode_requires_caller_owned_image_before_provider_preparation(
 ) -> None:
     monkeypatch.delenv("INVARLOCK_RUNTIME_IMAGE", raising=False)
     monkeypatch.delenv("INVARLOCK_RUNTIME_IMAGE_DIGEST", raising=False)
+    # This test isolates missing image authorization, independent of host tools.
+    monkeypatch.setattr(
+        "invarlock.cli.runtime_profile.shutil.which",
+        lambda name, *, path=None: f"/bin/{name}",
+    )
+    transaction = Mock(
+        side_effect=AssertionError("unapproved runtime reached execution")
+    )
+    monkeypatch.setattr(
+        "invarlock.evaluation_transaction.evaluate_request_file", transaction
+    )
     models = tmp_path / "models"
     models.joinpath("baseline").mkdir(parents=True)
     models.joinpath("subject").mkdir()
@@ -107,5 +119,6 @@ def test_run_mode_requires_caller_owned_image_before_provider_preparation(
     assert result.exit_code == 2
     payload = json.loads(result.stdout)
     assert payload["ok"] is False
-    assert "INVARLOCK_RUNTIME_IMAGE_DIGEST" in payload["errors"][0]
+    assert "runtime image digest" in payload["errors"][0]
+    transaction.assert_not_called()
     assert not tmp_path.joinpath("artifacts", "evidence").exists()

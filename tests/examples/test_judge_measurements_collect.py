@@ -173,7 +173,7 @@ def test_collector_delegates_frozen_inputs_to_installed_api_without_loading_sdk(
     # Model construction and lifetime belong to the installed API. The example
     # must remain usable with a delegated implementation and no SDK import.
     monkeypatch.setitem(sys.modules, "inspect_ai.model", None)
-    module = ModuleType("invarlock.judge_collection")
+    module = ModuleType("invarlock.judge_measurements")
     module.CollectionOptions = SimpleNamespace(
         from_mapping=lambda value: SimpleNamespace(grader="openai/pinned", config=value)
     )
@@ -186,7 +186,7 @@ def test_collector_delegates_frozen_inputs_to_installed_api_without_loading_sdk(
         return {"completed": 1}
 
     module.collect_configured = collect_configured
-    monkeypatch.setitem(sys.modules, "invarlock.judge_collection", module)
+    monkeypatch.setitem(sys.modules, "invarlock.judge_measurements", module)
     monkeypatch.setenv("OPENAI_API_KEY", "fixture-only")
     args = argparse.Namespace(
         root=tmp_path,
@@ -228,8 +228,6 @@ def test_collector_delegates_frozen_inputs_to_installed_api_without_loading_sdk(
         ("file_root", "existing real directory"),
         ("checkpoint_escape", "relative path"),
         ("output_in_checkpoint", "outside the checkpoint"),
-        ("missing_key", "OPENAI_API_KEY"),
-        ("custom_url", "custom OpenAI"),
         ("collection_error", "Judge collection failed"),
     ],
 )
@@ -250,10 +248,6 @@ def test_collector_cli_rejects_invalid_environment_and_paths(
         extra = ["--checkpoint", "../escape"]
     elif kind == "output_in_checkpoint":
         extra = ["--output", "judge-checkpoint/output.json"]
-    elif kind == "missing_key":
-        monkeypatch.delenv("OPENAI_API_KEY")
-    elif kind == "custom_url":
-        monkeypatch.setenv("OPENAI_BASE_URL", "https://invalid.example")
 
     async def forbidden(_args):
         if kind == "collection_error":

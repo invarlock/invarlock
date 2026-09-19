@@ -1,11 +1,8 @@
-# Base runtime dependency closure for the coordinated first-party release set.
-# Keep this list equal to the external [project].dependencies declared by the
-# core and every add-in; tests/ci/test_release_dependency_closure.py enforces it.
+# Base runtime dependency closure for the single first-party release artifact.
+# Keep this list equal to [project].dependencies in pyproject.toml.
 typer>=0.24.1
 click>=8.3.3
 cryptography>=50.0.0
 rich>=13.0
 pyyaml>=6.0.3
 jsonschema>=4.0
-numpy>=1.24
-pillow>=11.3,<13

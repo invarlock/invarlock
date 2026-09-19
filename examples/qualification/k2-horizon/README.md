@@ -135,7 +135,7 @@ group for later downloads, then install that candidate wheel. Ensure the
 
 ```bash
 python scripts/security/build_hardened_accelerate_wheel.py bootstrap
-uv sync --locked --extra ci --group hf
+uv sync --locked --group ci --group hf
 . .venv/bin/activate
 python -m pip install --no-deps --force-reinstall dist/invarlock-*.whl
 ```

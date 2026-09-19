@@ -242,7 +242,7 @@ source labels, and fresh target evidence, receipt, report, and private-summary
 destinations. The driver runs from the authenticated source archive through a
 private snapshot and empty working directory. It verifies each caller-digested
 candidate wheel against that archive, then runs the candidate core and maintained
-add-ins through an isolated interpreter bootstrap that does not process installed
+providers through an isolated interpreter bootstrap that does not process installed
 `.pth` files or `sitecustomize`. The private summary records the candidate-wheel
 and interpreter digests. It compares preflight's complete
 normalized-request digest with the strictly verified pack, independently

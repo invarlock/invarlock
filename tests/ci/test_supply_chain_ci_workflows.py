@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import inspect
-import json
 import math
 import os
 import re
@@ -23,6 +22,10 @@ PINNED_ACTION = re.compile(r"^[^@\s]+@[0-9a-f]{40}$")
 RELEASE_INSTALL_LOCKS = (
     Path("requirements/workflows/release-install-py312.txt"),
     Path("requirements/workflows/release-install-py313.txt"),
+)
+RELEASE_OPTION_LOCKS = (
+    Path("requirements/workflows/release-options-py312.txt"),
+    Path("requirements/workflows/release-options-py313.txt"),
 )
 
 
@@ -86,10 +89,8 @@ def test_workflow_pip_installs_use_hashed_lock_files() -> None:
                     pattern in line
                     for pattern in (
                         "dist/*.whl",
-                        "dist/addins/*.whl",
                         "wheelhouse/*.whl",
                         "wheelhouse/invarlock-*.whl",
-                        "wheelhouse/invarlock_*.whl",
                     )
                 )
                 if not is_built_artifact and "--require-hashes" not in line:
@@ -143,9 +144,16 @@ def test_release_install_dependency_closure_is_hash_pinned_and_refreshable() -> 
     for path in RELEASE_INSTALL_LOCKS:
         lock = path.read_text(encoding="utf-8")
         assert "--hash=sha256:" in lock
+        assert "numpy==" not in lock
+        assert "pillow==" not in lock
+        assert "typer==" in lock
+
+    for path in RELEASE_OPTION_LOCKS:
+        lock = path.read_text(encoding="utf-8")
+        assert "--hash=sha256:" in lock
         assert "numpy==" in lock
         assert "pillow==" in lock
-        assert "typer==" in lock
+        assert "typer==" not in lock
 
     refresh = Path("scripts/security/refresh_pinned_requirements.sh").read_text(
         encoding="utf-8"
@@ -153,6 +161,8 @@ def test_release_install_dependency_closure_is_hash_pinned_and_refreshable() -> 
     assert "compile_release_install" in refresh
     assert '"${WORKFLOW_DIR}/release-install-py312.txt"' in refresh
     assert '"${WORKFLOW_DIR}/release-install-py313.txt"' in refresh
+    assert '"${WORKFLOW_DIR}/release-options-py312.txt"' in refresh
+    assert '"${WORKFLOW_DIR}/release-options-py313.txt"' in refresh
 
 
 def test_pr_supply_chain_scans_only_shipped_dependency_surfaces() -> None:
@@ -274,12 +284,7 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     inputs = workflow["on"]["workflow_dispatch"]["inputs"]
     assert inputs["candidate_version"]["default"] == ""
     assert inputs["candidate_run_id"]["default"] == ""
-    assert inputs["publication_phase"]["default"] == "complete"
-    assert inputs["publication_phase"]["options"] == [
-        "complete",
-        "bootstrap",
-        "finish",
-    ]
+    assert "publication_phase" not in inputs
 
     build = jobs["build_check"]
     assert "github.event_name == 'push'" in build["if"]
@@ -292,8 +297,7 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     )
     distribution_build = _step(build["steps"], "Build first-party distributions")["run"]
     assert "python -m build --no-isolation" in distribution_build
-    for addin in ("diagnostics", "gguf", "multimodal", "tensorrt_llm"):
-        assert f"addins/{addin}" in distribution_build
+    assert "package_readme.py --check" in distribution_build
 
     assert _step(build["steps"], "Run complete repository gates")["run"] == (
         "make verify"
@@ -330,8 +334,8 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
 
     digest_record = _step(build["steps"], "Record distribution digests")["run"]
     assert 'dist / "SHA256SUMS"' in digest_record
-    assert "len(wheels) != 5" in digest_record
-    assert "len(source_archives) != 5" in digest_record
+    assert "len(wheels) != 1" in digest_record
+    assert "len(source_archives) != 1" in digest_record
     assert "ledger_sha256=" in digest_record
     assert build["outputs"]["dist_ledger_sha256"] == (
         "${{ steps.dist_digests.outputs.ledger_sha256 }}"
@@ -339,14 +343,12 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
 
     twine = _step(build["steps"], "Twine check")["run"]
     assert "dist/*.whl dist/*.tar.gz" in twine
-    assert "dist/addins/*" in twine
 
     parity = _step(build["steps"], "Validate first-party distribution source parity")[
         "run"
     ]
     assert "first_party_distribution_validation.py" in parity
     assert "--core-dist-dir dist" in parity
-    assert "--addin-dist-dir dist/addins" in parity
 
     preflight = _step(build["steps"], "Run clean-checkout release preflight")["run"]
     assert "git worktree add --detach" in preflight
@@ -357,7 +359,6 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
 
     install_smoke = _step(build["steps"], "Install smoke from wheel")["run"]
     core_install = "--no-deps --force-reinstall dist/*.whl"
-    addin_install = "--no-deps --force-reinstall dist/addins/*.whl"
     assert install_smoke.index("release-install-py313.txt") < install_smoke.index(
         core_install
     )
@@ -370,15 +371,11 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
             core_install
         )
     assert "python -m pip check" in install_smoke
-    assert "CoreRegistry" in install_smoke
-    assert "get_runtime_provider" in install_smoke
-    assert "get_plugin_info" in install_smoke
-    assert "is_relative_to(site)" in install_smoke
-    assert "first-party version mismatch" in install_smoke
     assert "release tag/version mismatch" in install_smoke
     consumers = "scripts/release/core_wheel_consumers.py"
     assert install_smoke.index(core_install) < install_smoke.index(consumers)
-    assert install_smoke.index(consumers) < install_smoke.index(addin_install)
+    assert "--mode optional" in install_smoke
+    assert "CoreRegistry" not in install_smoke
 
     assert (
         _step(build["steps"], "Install smoke from wheel")["env"][
@@ -386,19 +383,14 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
         ]
         == "${{ needs.resolve_release_ref.outputs.release_tag }}"
     )
-    for project in (
-        "invarlock-diagnostics",
-        "invarlock-runtime-gguf",
-        "invarlock-runtime-hf-vision-text",
-        "invarlock-runtime-tensorrt-llm",
-    ):
-        assert project in install_smoke
+    assert "invarlock" in install_smoke
 
     install_surface = _step(build["steps"], "Create release install-surface venv")[
         "run"
     ]
+    surface_install = "--no-deps --force-reinstall dist/*.whl"
     assert install_surface.index("release-install-py313.txt") < install_surface.index(
-        "--no-deps --force-reinstall dist/*.whl dist/addins/*.whl"
+        surface_install
     )
     for isolation_command in (
         "export PYTHONNOUSERSITE=1",
@@ -406,7 +398,7 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
         "unset PYTHONPATH",
     ):
         assert install_surface.index(isolation_command) < install_surface.index(
-            "--no-deps --force-reinstall dist/*.whl dist/addins/*.whl"
+            surface_install
         )
     assert "python -m pip check" in install_surface
 
@@ -562,47 +554,11 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
         < authorization["steps"].index(candidate_download)
         < authorization["steps"].index(verify_candidate)
     )
-    verify_bootstrap = _step(
-        authorization["steps"], "Verify completed bootstrap publication"
-    )
-    assert "inputs.target == 'pypi'" in verify_bootstrap["if"]
-    assert "inputs.publication_phase == 'finish'" in verify_bootstrap["if"]
-    assert verify_bootstrap["env"] == {
-        "EXPECTED_DIST_LEDGER_SHA256": (
-            "${{ steps.verify_candidate.outputs.dist_ledger_sha256 }}"
-        ),
-        "INVARLOCK_RELEASE_VERSION": (
-            "${{ needs.resolve_release_ref.outputs.release_tag }}"
-        ),
-    }
-    for project in (
-        "invarlock",
-        "invarlock-diagnostics",
-        "invarlock-runtime-gguf",
-        "invarlock-runtime-hf-vision-text",
-    ):
-        assert f"--project {project}" in verify_bootstrap["run"]
-    assert "invarlock-runtime-tensorrt-llm" not in verify_bootstrap["run"]
-
-    publication_plan = jobs["publication_plan"]
-    assert set(publication_plan["needs"]) == {
-        "authorize_candidate",
-        "resolve_release_ref",
-    }
-    plan_step = _step(publication_plan["steps"], "Resolve publication phase")
-    assert plan_step["env"] == {
-        "INVARLOCK_PUBLICATION_PHASE": "${{ inputs.publication_phase }}",
-        "INVARLOCK_PUBLISH_TARGET": "${{ inputs.target }}",
-    }
-    for phase in ("complete", "bootstrap", "finish"):
-        assert f"{phase})" in plan_step["run"]
-    assert "bootstrap publication is only valid for production PyPI" in plan_step["run"]
-    assert "finish publication is only valid for production PyPI" in plan_step["run"]
+    assert "publication_plan" not in jobs
 
     preparation = jobs["prepare_publication"]
     assert set(preparation["needs"]) == {
         "authorize_candidate",
-        "publication_plan",
         "resolve_release_ref",
     }
     assert preparation["permissions"] == {
@@ -612,25 +568,16 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     assert "environment" not in preparation
     assert "github.event_name == 'push'" not in preparation["if"]
     assert "github.event_name == 'workflow_dispatch'" in preparation["if"]
-    assert preparation["strategy"]["fail-fast"] is False
-    assert preparation["strategy"]["matrix"] == (
-        "${{ fromJSON(needs.publication_plan.outputs.matrix) }}"
-    )
+    assert "strategy" not in preparation
     candidate_download = _step(preparation["steps"], "Download dist artifacts")
     assert candidate_download["with"]["run-id"] == (
         "${{ needs.authorize_candidate.outputs.artifact_run_id }}"
     )
     assert candidate_download["with"]["github-token"] == ("${{ secrets.GITHUB_TOKEN }}")
     stage_publish = _step(preparation["steps"], "Stage publish distributions")
-    assert stage_publish["env"]["INVARLOCK_PACKAGE"] == "${{ matrix.package }}"
-    for package in (
-        "core",
-        "diagnostics",
-        "runtime-gguf",
-        "runtime-hf-vision-text",
-        "runtime-tensorrt-llm",
-    ):
-        assert f"{package})" in stage_publish["run"]
+    assert "find _release_dist -maxdepth 1 -type f" in stage_publish["run"]
+    assert '-name "invarlock-*.whl"' in stage_publish["run"]
+    assert '-name "invarlock-*.tar.gz"' in stage_publish["run"]
     assert 'if [ "${#distributions[@]}" -ne 2 ]' in stage_publish["run"]
     preparation_tag_recheck = _step(
         preparation["steps"], "Reconfirm immutable release tag"
@@ -668,20 +615,18 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
         "EXPECTED_DIST_LEDGER_SHA256": (
             "${{ needs.authorize_candidate.outputs.dist_ledger_sha256 }}"
         ),
-        "INVARLOCK_PACKAGE": "${{ matrix.package }}",
         "INVARLOCK_PUBLISH_TARGET": "${{ inputs.target }}",
         "INVARLOCK_RELEASE_VERSION": (
             "${{ needs.resolve_release_ref.outputs.release_tag }}"
         ),
     }
-    for project in (
-        "invarlock",
+    for removed_project in (
         "invarlock-diagnostics",
         "invarlock-runtime-gguf",
         "invarlock-runtime-hf-vision-text",
         "invarlock-runtime-tensorrt-llm",
     ):
-        assert project in conflict_check["run"]
+        assert removed_project not in conflict_check["run"]
     for required in (
         "scripts/release/verify_hosted_distributions.py",
         "--ledger _release_dist/SHA256SUMS",
@@ -689,7 +634,7 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
         '--target "${INVARLOCK_PUBLISH_TARGET}"',
         '--version "${INVARLOCK_RELEASE_VERSION}"',
         "--attempts 1",
-        '--project "${project}"',
+        "--project invarlock",
         "--allow-missing",
     ):
         assert required in conflict_check["run"]
@@ -702,7 +647,7 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     conflict_index = preparation["steps"].index(conflict_check)
     prepared_upload = _step(preparation["steps"], "Upload verified publication files")
     assert prepared_upload["with"] == {
-        "name": "publish-dist-${{ matrix.package }}",
+        "name": "publish-dist",
         "path": "publish-dist/*",
         "if-no-files-found": "error",
         "retention-days": 1,
@@ -717,17 +662,11 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     publish = jobs["publish"]
     assert set(publish["needs"]) == {
         "prepare_publication",
-        "publication_plan",
         "resolve_release_ref",
     }
     assert publish["permissions"] == {"actions": "read", "id-token": "write"}
-    assert publish["strategy"]["fail-fast"] is False
-    assert publish["strategy"]["matrix"] == (
-        "${{ fromJSON(needs.publication_plan.outputs.matrix) }}"
-    )
-    assert publish["environment"] == (
-        "${{ format('{0}{1}', inputs.target, matrix.environment_suffix) }}"
-    )
+    assert "strategy" not in publish
+    assert publish["environment"] == "${{ inputs.target }}"
     assert not any(
         str(step.get("uses", "")).startswith("actions/checkout@")
         or str(step.get("uses", "")).startswith("actions/setup-python@")
@@ -735,7 +674,7 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     )
     prepared_download = _step(publish["steps"], "Download verified publication files")
     assert prepared_download["with"] == {
-        "name": "publish-dist-${{ matrix.package }}",
+        "name": "publish-dist",
         "path": "publish-dist",
     }
     publish_tag_recheck = _step(publish["steps"], "Reconfirm immutable release tag")
@@ -762,7 +701,7 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
         "resolve_release_ref",
     }
     assert hosted_job["permissions"] == {"actions": "read", "contents": "read"}
-    assert "inputs.publication_phase != 'bootstrap'" in hosted_job["if"]
+    assert "inputs.publish == true" in hosted_job["if"]
     hosted_checkout = hosted_job["steps"][0]
     assert hosted_checkout["with"]["ref"] == (
         "${{ needs.resolve_release_ref.outputs.release_sha }}"
@@ -794,7 +733,7 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
         "verify_hosted_release",
     }
     assert published_smoke["permissions"] == {"actions": "read", "contents": "read"}
-    assert "inputs.publication_phase != 'bootstrap'" in published_smoke["if"]
+    assert "inputs.publish == true" in published_smoke["if"]
     published_checkout = published_smoke["steps"][0]
     assert published_checkout["with"]["ref"] == (
         "${{ needs.resolve_release_ref.outputs.release_sha }}"
@@ -813,7 +752,6 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     smoke = _step(published_smoke["steps"], "Install published wheels and smoke test")
     assert "requirements/workflows/pip-bootstrap.txt" in smoke["run"]
     core_install = "--no-deps --force-reinstall wheelhouse/invarlock-*.whl"
-    addin_install = "--no-deps --force-reinstall wheelhouse/invarlock_*.whl"
     assert smoke["run"].index("release-install-py313.txt") < smoke["run"].index(
         core_install
     )
@@ -824,13 +762,15 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     ):
         assert smoke["run"].index(isolation_command) < smoke["run"].index(core_install)
     assert "python -m pip check" in smoke["run"]
-    assert "CoreRegistry" in smoke["run"]
-    assert "get_runtime_provider" in smoke["run"]
-    assert "get_plugin_info" in smoke["run"]
-    assert "is_relative_to(site)" in smoke["run"]
-    assert "first-party version mismatch" in smoke["run"]
+    consumers = "scripts/release/core_wheel_consumers.py"
     assert smoke["run"].index(core_install) < smoke["run"].index(consumers)
-    assert smoke["run"].index(consumers) < smoke["run"].index(addin_install)
+
+    assert "release tag/version mismatch" in smoke["run"]
+    assert smoke["env"]["INVARLOCK_RELEASE_TAG"] == (
+        "${{ needs.resolve_release_ref.outputs.release_tag }}"
+    )
+    assert "--mode optional" in smoke["run"]
+    assert "CoreRegistry" not in smoke["run"]
 
     assert "record_testpypi_promotion" not in jobs
 
@@ -931,101 +871,98 @@ def test_release_jobs_outlive_hosted_verification_worst_case() -> None:
     assert jobs["published_install_smoke"]["timeout-minutes"] >= required_job_minutes
 
 
-def test_release_publication_plan_is_closed_and_phase_specific(tmp_path: Path) -> None:
+@pytest.mark.parametrize("target", ["testpypi", "pypi"])
+def test_release_publication_has_one_complete_path(target: str) -> None:
     workflow = _load(WORKFLOWS / "release.yml")
-    step = _step(
-        workflow["jobs"]["publication_plan"]["steps"],
-        "Resolve publication phase",
-    )
-    expected = {
-        "complete": [
-            "core",
-            "diagnostics",
-            "runtime-gguf",
-            "runtime-hf-vision-text",
-            "runtime-tensorrt-llm",
-        ],
-        "bootstrap": [
-            "core",
-            "diagnostics",
-            "runtime-gguf",
-            "runtime-hf-vision-text",
-        ],
-        "finish": ["runtime-tensorrt-llm"],
+    inputs = workflow["on"]["workflow_dispatch"]["inputs"]
+    assert set(inputs) == {
+        "publish",
+        "target",
+        "release_tag",
+        "candidate_version",
+        "candidate_run_id",
     }
-    output = tmp_path / "github-output"
-    for phase, expected_packages in expected.items():
-        output.write_text("", encoding="utf-8")
-        subprocess.run(
-            ["bash", "-c", step["run"]],
-            env={
-                **os.environ,
-                "GITHUB_OUTPUT": str(output),
-                "INVARLOCK_PUBLICATION_PHASE": phase,
-                "INVARLOCK_PUBLISH_TARGET": "pypi",
-            },
-            check=True,
+    assert inputs["target"]["options"] == ["testpypi", "pypi"]
+    jobs = workflow["jobs"]
+    path = (
+        "authorize_candidate",
+        "prepare_publication",
+        "publish",
+        "verify_hosted_release",
+        "published_install_smoke",
+        "publish_documentation",
+    )
+    previous = "resolve_release_ref"
+    for name in path:
+        job = jobs[name]
+        needs = job["needs"]
+        assert previous in ([needs] if isinstance(needs, str) else needs)
+        condition = " ".join(job["if"].split())
+        expected = (
+            "${{ github.event_name == 'workflow_dispatch' && inputs.publish == true"
         )
-        line = output.read_text(encoding="utf-8").strip()
-        assert line.startswith("matrix=")
-        matrix = json.loads(line.removeprefix("matrix="))
-        assert [entry["package"] for entry in matrix["include"]] == expected_packages
-
-    rejected = subprocess.run(
-        ["bash", "-c", step["run"]],
+        if name in {"authorize_candidate", "prepare_publication", "publish"}:
+            expected += " && inputs.release_tag != ''"
+        elif name == "publish_documentation":
+            expected += " && inputs.target == 'pypi'"
+        assert condition == expected + " }}"
+        assert "continue-on-error" not in job
+        for step in job.get("steps", []):
+            assert "continue-on-error" not in step
+            assert "if" not in step
+        previous = name
+    validate = _step(
+        jobs["authorize_candidate"]["steps"], "Validate publication inputs"
+    )
+    result = subprocess.run(
+        ["bash", "-c", validate["run"]],
         env={
             **os.environ,
-            "GITHUB_OUTPUT": str(output),
-            "INVARLOCK_PUBLICATION_PHASE": "bootstrap",
-            "INVARLOCK_PUBLISH_TARGET": "testpypi",
+            "INVARLOCK_CANDIDATE_RUN_ID": "1234",
+            "INVARLOCK_PUBLISH_TARGET": target,
+            "GITHUB_RUN_ID": "5678",
         },
         check=False,
         capture_output=True,
         text=True,
     )
-    assert rejected.returncode != 0
-    assert "only valid for production PyPI" in rejected.stderr
+    assert result.returncode == 0, result.stderr
 
 
-def test_release_stages_each_distribution_before_its_publish_job(
+@pytest.mark.parametrize("archive_count", [0, 1, 2, 3])
+def test_release_stages_only_the_complete_distribution_pair(
     tmp_path: Path,
+    archive_count: int,
 ) -> None:
     workflow = _load(WORKFLOWS / "release.yml")
     preparation = workflow["jobs"]["prepare_publication"]
     stage = _step(preparation["steps"], "Stage publish distributions")["run"]
     release_dist = tmp_path / "_release_dist"
-    addin_dist = release_dist / "addins"
-    addin_dist.mkdir(parents=True)
-
-    expected_prefixes = {
-        "core": (release_dist, "invarlock"),
-        "diagnostics": (addin_dist, "invarlock_diagnostics"),
-        "runtime-gguf": (addin_dist, "invarlock_runtime_gguf"),
-        "runtime-hf-vision-text": (
-            addin_dist,
-            "invarlock_runtime_hf_vision_text",
-        ),
-        "runtime-tensorrt-llm": (
-            addin_dist,
-            "invarlock_runtime_tensorrt_llm",
-        ),
-    }
-    for root, prefix in expected_prefixes.values():
-        (root / f"{prefix}-0.13.0-py3-none-any.whl").write_bytes(b"wheel")
-        (root / f"{prefix}-0.13.0.tar.gz").write_bytes(b"source")
-
-    for package, (_, prefix) in expected_prefixes.items():
-        subprocess.run(
-            ["bash", "-c", stage],
-            cwd=tmp_path,
-            env={**os.environ, "INVARLOCK_PACKAGE": package},
-            check=True,
-        )
-        staged = sorted(path.name for path in (tmp_path / "publish-dist").iterdir())
-        assert staged == [
-            f"{prefix}-0.13.0-py3-none-any.whl",
-            f"{prefix}-0.13.0.tar.gz",
-        ]
+    release_dist.mkdir()
+    filenames = (
+        "invarlock-0.13.0-py3-none-any.whl",
+        "invarlock-0.13.0.tar.gz",
+        "invarlock-0.12.0.tar.gz",
+    )
+    for filename in filenames[:archive_count]:
+        (release_dist / filename).write_bytes(b"distribution")
+    (release_dist / "SHA256SUMS").write_text("ledger", encoding="utf-8")
+    result = subprocess.run(
+        ["bash", "-c", stage],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if archive_count == 2:
+        assert result.returncode == 0, result.stderr
+        assert sorted(
+            path.name for path in (tmp_path / "publish-dist").iterdir()
+        ) == list(filenames[:2])
+    else:
+        assert result.returncode != 0
+        assert "expected one wheel and one source archive" in result.stderr
+        assert not list((tmp_path / "publish-dist").iterdir())
 
 
 def test_docs_publish_validates_dispatch_input_before_using_it_as_a_path() -> None:
@@ -1197,7 +1134,6 @@ def test_release_publishes_docs_only_after_verified_production() -> None:
     assert docs["permissions"] == {"contents": "write"}
     assert "inputs.publish == true" in docs["if"]
     assert "inputs.target == 'pypi'" in docs["if"]
-    assert "inputs.publication_phase != 'bootstrap'" in docs["if"]
     assert docs["with"] == {
         "docs_version": "${{ needs.resolve_release_ref.outputs.release_tag }}",
         "publish_latest": True,

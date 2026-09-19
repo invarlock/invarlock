@@ -47,11 +47,9 @@ def test_invalid_resource(tmp_path, url):
         readme.render(tmp_path, project(tmp_path, f"[Bad]({url})"))
 
 
-def test_addin_context(tmp_path):
-    addin = tmp_path / "addins/demo"
-    addin.mkdir(parents=True)
+def test_repository_context(tmp_path):
     (tmp_path / "LICENSE").write_text("license")
-    result = readme.render(tmp_path, project(addin, "[License](../../LICENSE)"))
+    result = readme.render(tmp_path, project(tmp_path, "[License](LICENSE)"))
     assert "/blob/v1.2.3/LICENSE" in result
 
 

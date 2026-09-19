@@ -8,13 +8,12 @@ import json
 import os
 from pathlib import Path
 
-from invarlock_addins.tensorrt_llm.execution import (
+from invarlock.core.runtime_provider import artifact_identity_sha256
+from invarlock.runtime_providers._tensorrt_llm_execution import (
     official_tensorrt_llm_runner_path,
 )
-from invarlock_addins.tensorrt_llm.provider import TensorRTLLMProvider
-from invarlock_addins.tensorrt_llm.session import TensorRTLLMRuntimeBindings
-
-from invarlock.core.runtime_provider import artifact_identity_sha256
+from invarlock.runtime_providers.tensorrt_llm import TensorRTLLMProvider
+from invarlock.runtime_providers.tensorrt_llm_session import TensorRTLLMRuntimeBindings
 from invarlock.runtime_security_helpers import (
     RUNTIME_IMAGE_DIGEST_ENV,
     RUNTIME_IMAGE_ENV,

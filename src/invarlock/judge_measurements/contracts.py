@@ -292,9 +292,14 @@ def _validate_inspect_plan_collection_identity(
         _fail("grader differs from approved plan")
     if plan["judge"]["model_identity"]["kind"] != "hosted_api":
         _fail("local weight execution is not qualified by this adapter")
+    provider = str(grader).partition("/")[0]
+    config = plan["judge"]["config"]
+    if provider in {"anthropic", "google"} and config["seed"] is not None:
+        _fail(f"the pinned Inspect {provider} adapter does not support seed")
+    if provider == "anthropic" and Decimal(config["top_p"]) != Decimal(1):
+        _fail("the configured Anthropic profile requires top_p=1")
     supported_efforts = _INSPECT_0_3_263_REASONING_EFFORTS.get(grader)
     if supported_efforts is not None:
-        config = plan["judge"]["config"]
         if (
             inspect_version != "0.3.263"
             or Decimal(config["temperature"]) != Decimal(1)
@@ -893,6 +898,23 @@ def _check_retained_provider_secrets(value: object) -> None:
 
 
 def _provider_completion(response: dict[str, Any]) -> object:
+    if response.get("format") == "invarlock/judge-provider-response-v1":
+        if set(response) != {
+            "format",
+            "content",
+            "model",
+            "id",
+            "finish_reason",
+            "usage",
+        } or not isinstance(response.get("content"), str):
+            _fail("retained normalized provider response has an unsupported shape")
+        content = response["content"]
+        try:
+            return parse_json_bytes(
+                content.encode("utf-8"), label="provider completion"
+            )
+        except StrictJsonError:
+            return content
     if set(response) == {"rating"}:
         return response
     choices = response.get("choices")
@@ -967,6 +989,75 @@ def _check_native_inspect_controls(
             _fail("retained Inspect provider reasoning effort differs from the request")
     elif request.get("reasoning_effort") != reasoning_effort:
         _fail("retained Inspect provider reasoning effort differs from the request")
+
+
+def _check_inspect_provider_response(
+    *, response: object, output: dict[str, Any], request: dict[str, Any]
+) -> None:
+    if not isinstance(response, dict):
+        _fail("completed retained Inspect provider response must be an object")
+    normalized_response = (
+        response.get("format") == "invarlock/judge-provider-response-v1"
+    )
+    if "service_tier" in request and response.get("service_tier") != "default":
+        _fail("retained Inspect provider response contradicts its service tier")
+    provider_completion = _provider_completion(response)
+    completion = output.get("completion")
+    if not isinstance(completion, str):
+        _fail("retained Inspect output completion must be text")
+    try:
+        projected_completion: object = parse_json_bytes(
+            completion.encode("utf-8"), label="Inspect output completion"
+        )
+    except StrictJsonError:
+        projected_completion = completion
+    if canonical_payload(provider_completion) != canonical_payload(
+        projected_completion
+    ):
+        _fail("retained Inspect provider response contradicts its completion")
+    if isinstance(response.get("model"), str) and response["model"] != output.get(
+        "model"
+    ):
+        _fail("retained Inspect provider response contradicts its resolved model")
+    if isinstance(response.get("id"), str) and response["id"] != output.get(
+        "request_id"
+    ):
+        _fail("retained Inspect provider response contradicts its request ID")
+    if normalized_response:
+        if response.get("model") != output.get("model"):
+            _fail("retained Inspect provider response contradicts its resolved model")
+        if response.get("id") != output.get("request_id"):
+            _fail("retained Inspect provider response contradicts its request ID")
+        if response.get("finish_reason") != output.get("finish_reason"):
+            _fail("retained Inspect provider response contradicts its finish reason")
+        if response.get("usage") != output.get("usage"):
+            _fail("retained Inspect provider usage contradicts its output")
+    choices = response.get("choices")
+    if isinstance(choices, list) and choices:
+        # Chat Completions and Inspect use different names for token exhaustion.
+        # Preserve the native value while checking the pinned interpretation;
+        # tool-call endings remain unsupported by this tool-free profile.
+        stop_reasons = {
+            "stop": "stop",
+            "length": "max_tokens",
+            "content_filter": "content_filter",
+        }
+        finish_reason = choices[0].get("finish_reason")
+        if (
+            not isinstance(finish_reason, str)
+            or finish_reason not in stop_reasons
+            or stop_reasons[finish_reason] != output.get("finish_reason")
+        ):
+            _fail("retained Inspect provider response contradicts its finish reason")
+    usage = response.get("usage")
+    projected_usage = output.get("usage")
+    if isinstance(usage, dict) and isinstance(projected_usage, dict):
+        input_tokens = usage.get("prompt_tokens", usage.get("input_tokens"))
+        output_tokens = usage.get("completion_tokens", usage.get("output_tokens"))
+        if input_tokens != projected_usage.get(
+            "input_tokens"
+        ) or output_tokens != projected_usage.get("output_tokens"):
+            _fail("retained Inspect provider usage contradicts its output")
 
 
 def _check_inspect_provider_projection(
@@ -1056,59 +1147,9 @@ def _check_inspect_provider_projection(
         _fail("retained Inspect provider request contains an unsupported tool choice")
     if not completed:
         return
-    response = call["response"]
-    if not isinstance(response, dict):
-        _fail("completed retained Inspect provider response must be an object")
-    if "service_tier" in request and response.get("service_tier") != "default":
-        _fail("retained Inspect provider response contradicts its service tier")
-    provider_completion = _provider_completion(response)
-    completion = output.get("completion")
-    if not isinstance(completion, str):
-        _fail("retained Inspect output completion must be text")
-    try:
-        projected_completion: object = parse_json_bytes(
-            completion.encode("utf-8"), label="Inspect output completion"
-        )
-    except StrictJsonError:
-        projected_completion = completion
-    if canonical_payload(provider_completion) != canonical_payload(
-        projected_completion
-    ):
-        _fail("retained Inspect provider response contradicts its completion")
-    if isinstance(response.get("model"), str) and response["model"] != output.get(
-        "model"
-    ):
-        _fail("retained Inspect provider response contradicts its resolved model")
-    if isinstance(response.get("id"), str) and response["id"] != output.get(
-        "request_id"
-    ):
-        _fail("retained Inspect provider response contradicts its request ID")
-    choices = response.get("choices")
-    if isinstance(choices, list) and choices:
-        # Chat Completions and Inspect use different names for token exhaustion.
-        # Preserve the native value while checking the pinned interpretation;
-        # tool-call endings remain unsupported by this tool-free profile.
-        stop_reasons = {
-            "stop": "stop",
-            "length": "max_tokens",
-            "content_filter": "content_filter",
-        }
-        finish_reason = choices[0].get("finish_reason")
-        if (
-            not isinstance(finish_reason, str)
-            or finish_reason not in stop_reasons
-            or stop_reasons[finish_reason] != output.get("finish_reason")
-        ):
-            _fail("retained Inspect provider response contradicts its finish reason")
-    usage = response.get("usage")
-    projected_usage = output.get("usage")
-    if isinstance(usage, dict) and isinstance(projected_usage, dict):
-        input_tokens = usage.get("prompt_tokens", usage.get("input_tokens"))
-        output_tokens = usage.get("completion_tokens", usage.get("output_tokens"))
-        if input_tokens != projected_usage.get(
-            "input_tokens"
-        ) or output_tokens != projected_usage.get("output_tokens"):
-            _fail("retained Inspect provider usage contradicts its output")
+    _check_inspect_provider_response(
+        response=call["response"], output=output, request=request
+    )
 
 
 def _source_trials(

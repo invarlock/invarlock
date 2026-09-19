@@ -39,10 +39,11 @@ def test_pip_cache_tracks_each_jobs_installed_locks(path: Path) -> None:
             tag = options["python-version"].replace(".", "")
             # These gates install additional locked environments through Make
             # and a shell helper; their downloads share the job's pip cache.
-            if "addins-install-smoke" in commands:
+            if "install-smoke" in commands:
                 installed.update(
                     (
                         f"requirements/workflows/release-install-py{tag}.txt",
+                        f"requirements/workflows/release-options-py{tag}.txt",
                         "requirements/workflows/pip-bootstrap.txt",
                     )
                 )
@@ -92,18 +93,23 @@ def test_docs_workflow_builds_and_lints_once_and_checks_commands() -> None:
         assert planned.count(gate) == 1, (gate, planned)
 
 
-def test_codeql_includes_all_shipped_addin_sources_without_their_tests() -> None:
+def test_codeql_includes_complete_distribution_sources_without_tests() -> None:
     config = _load(ROOT / ".github/codeql/codeql-config.yml")
     paths = [Path(path) for path in config["paths"]]
-    production = sorted(ROOT.glob("addins/*/src/**/*.py"))
-    tests = sorted(ROOT.glob("addins/*/tests/**/*.py"))
-    assert production and tests
-    assert all((ROOT / path).is_dir() for path in paths)
-    for source in production:
-        assert any(source.relative_to(ROOT).is_relative_to(path) for path in paths)
-    for source in tests:
-        assert not any(source.relative_to(ROOT).is_relative_to(path) for path in paths)
     assert {Path("src/invarlock"), Path("scripts")} <= set(paths)
+    assert all((ROOT / path).is_dir() for path in paths)
+    shipped = (
+        ROOT / "src/invarlock/diagnostics",
+        ROOT / "src/invarlock/judge_measurements",
+        ROOT / "src/invarlock/runtime_providers",
+    )
+    assert all(path.is_dir() for path in shipped)
+    assert all(
+        path.relative_to(ROOT).is_relative_to(source_root)
+        for path in shipped
+        for source_root in (Path("src/invarlock"),)
+    )
+    assert not any(Path("tests").is_relative_to(path) for path in paths)
 
 
 def test_precommit_reports_for_every_pull_request() -> None:

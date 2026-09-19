@@ -167,13 +167,7 @@ def expected_distribution_paths(version: str) -> set[str]:
 
     if _VERSION.fullmatch(version) is None:
         raise CandidateError("release version is malformed")
-    projects = (
-        ("", "invarlock"),
-        ("addins/", "invarlock_diagnostics"),
-        ("addins/", "invarlock_runtime_gguf"),
-        ("addins/", "invarlock_runtime_hf_vision_text"),
-        ("addins/", "invarlock_runtime_tensorrt_llm"),
-    )
+    projects = (("", "invarlock"),)
     return {
         path
         for directory, project in projects

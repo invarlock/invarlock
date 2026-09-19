@@ -13,9 +13,6 @@ def test_every_maintained_runtime_image_rejects_unbound_source_identity() -> Non
     for relative in (
         "runtime/Dockerfile",
         "runtime/Dockerfile.cuda",
-        "addins/gguf/runtime/Dockerfile",
-        "addins/multimodal/runtime/Dockerfile",
-        "addins/tensorrt_llm/runtime/Dockerfile",
     ):
         text = ROOT.joinpath(relative).read_text(encoding="utf-8")
         assert "INVARLOCK_SOURCE_BUNDLE_SHA256=unbound" not in text

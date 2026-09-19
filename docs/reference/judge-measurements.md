@@ -64,8 +64,10 @@ turn the result into ordinary imported-answer evidence.
 Preflight validates the rubric and full trial reservation, native artifacts and
 resources, installed collector and API environment without making calls. Native
 providers keep their existing network restrictions. Only the explicitly
-configured judge collector calls the supported hosted endpoint; credentials stay
-in `OPENAI_API_KEY`, never in request files or evidence.
+configured judge collector calls a supported hosted endpoint. The grader prefix
+selects `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY` (or
+`GEMINI_API_KEY`), or `OPENROUTER_API_KEY`; credentials never enter request
+files or evidence.
 
 `judge-work` is private and resumable. If the invocation ends with unattempted
 trials, evaluation returns an incomplete result and leaves the final evidence
@@ -216,15 +218,29 @@ The committed `examples/judge-measurements` fixture includes a separate
 `request-collect.yaml` and bounded `collection.json` so this route can be
 inspected without editing the import example.
 
-The core `invarlock.judge_collection` module exposes
+The core `invarlock.judge_measurements` module exposes
 `collect_configured` for installed execution and a lower-level `collect` API for
 callers that construct their own Inspect model. Both use the same admitted-call
 checkpoint. Installed live collection requires exactly Inspect `0.3.263`,
-OpenAI `3.13.0` and `httpx==0.28.1`. It supports the pinned Inspect Chat
-Completions integration with one attempt per trial, zero Inspect and
-provider-client retries, no tools or cache, and no inherited model settings.
+OpenAI `3.13.0`, Anthropic `1.6.0`, Google Gen AI `2.24.0`, and
+`httpx==0.28.1` and `httpx2==2.12.0`. It supports pinned Inspect integrations for `openai/`,
+`anthropic/`, `google/`, and `openrouter/` graders with one attempt per trial,
+zero collector retries, no tools or cache, and no inherited model settings.
 An admitted call without a retained result is an ambiguous timeout that cannot
 be retried. `verify` and `report` make no provider calls.
+
+Use `collect_configured` for Google's per-call clients. It fixes the endpoint to
+`https://generativelanguage.googleapis.com`, allows one SDK attempt, disables
+automatic function calling, and stops Inspect's internal malformed-function
+retry before a second request. Configured direct providers reject alternate
+service paths such as `google/vertex/...`; OpenRouter retains its routed model
+names. The pinned Google and Anthropic adapters require a null `seed` because
+they do not forward it. Anthropic requires `top_p=1` and sends temperature
+alone; models that discard temperature require approved temperature `1`.
+The configured Anthropic client also stops automatic `pause_turn` continuations
+before another request. For all four providers, raw response content, model,
+finish reason and token usage are checked against the SDK output before the
+retained response is normalized.
 
 Each available provider response ID must identify exactly one retained Inspect
 call across trials, source segments and resumed collection. Reusing a response
@@ -249,25 +265,25 @@ Install the core with its live-collection extra and use the installed command:
 
 ```bash
 python -m pip install "invarlock[judge]"
-# Supply OPENAI_API_KEY through your secret manager.
+# Supply the key selected by the grader prefix through your secret manager.
 invarlock evaluate judge-request.yaml --preflight --json
 invarlock evaluate judge-request.yaml --signing-key signer-private.pem --json
 ```
 
-The `judge` extra installs pinned Inspect, OpenAI and `httpx` SDK dependencies
-directly. Collection, scoring, retained-measurement import, verification and
-reporting are implemented in core. For local source builds, use
+The `judge` extra installs pinned Inspect, OpenAI/OpenRouter, Anthropic, Google,
+and both HTTP client SDK dependencies directly. Collection, scoring,
+retained-measurement import, verification and reporting are implemented in core.
+For local source builds, use
 `python -m pip install '.[judge]'` from the repository root. Offline import,
 verification and reporting do not require the extra.
 
 Review every call, token, cost and time cap first. The collector rejects custom
-provider URLs and reads credentials only from its environment. Remove both
-`OPENAI_BASE_URL` and `OPENAI_API_BASE`; their presence is rejected even when
-empty. Remove `OPENAI_SAFETY_IDENTIFIER` too; inherited identifier controls are
-unsupported and rejected before collection. Configured calls explicitly select
-`service_tier=default` for standard processing, and completed retained responses
-must report that tier. Historical requests without the field replay unchanged
-without acquiring a standard-tier claim. Disabled Inspect response caching does
+provider URLs and reads credentials only from its environment. Remove the
+selected provider's base-URL variables and alternate-auth controls; their
+presence is rejected even when empty. OpenAI calls explicitly select
+`service_tier=default` for standard processing. Historical OpenAI requests
+without the field replay unchanged without acquiring a standard-tier claim.
+Disabled Inspect response caching does
 not disable provider prompt caching; cost reservations must cover applicable
 cache-write charges. Missing credentials, missing or mismatched SDK dependencies, and dependency
 import failures stop collection preflight. These requirements do not apply to

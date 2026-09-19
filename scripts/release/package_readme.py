@@ -9,13 +9,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[2]
-PROJECTS = (
-    ".",
-    "addins/diagnostics",
-    "addins/gguf",
-    "addins/multimodal",
-    "addins/tensorrt_llm",
-)
+PROJECTS = (".",)
 LINK = re.compile(
     r'(?P<html>\b(?:href|src|srcset)=")(?P<url>[^"\n]+)(?P<end>")|(?P<md>!?\[[^\]\n]*\]\()(?P<target>[^)\s]+)(?P<close>\))'
 )

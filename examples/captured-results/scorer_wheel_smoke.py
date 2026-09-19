@@ -67,7 +67,15 @@ def main() -> None:
             "Install the candidate wheel and supply its invarlock executable"
         )
     environment = os.environ.copy()
-    for name in ("PYTHONPATH", "INVARLOCK_SIGNING_KEY", "OPENAI_API_KEY"):
+    for name in (
+        "PYTHONPATH",
+        "INVARLOCK_SIGNING_KEY",
+        "OPENAI_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "GOOGLE_API_KEY",
+        "GEMINI_API_KEY",
+        "OPENROUTER_API_KEY",
+    ):
         environment.pop(name, None)
     environment.update(PYTHONSAFEPATH="1", PYTHONNOUSERSITE="1")
     with tempfile.TemporaryDirectory(prefix="invarlock-three-scorer-") as directory:

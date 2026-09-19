@@ -25,6 +25,33 @@ RuntimeSideRole = TypeAliasType(  # noqa: UP040
 )
 
 
+@dataclass(frozen=True)
+class ResolvedRuntimeSide:
+    """Final caller-selected image and execution settings for one side."""
+
+    image_ref: str
+    image_digest: str
+    device: str
+    entrypoint: str
+
+
+@dataclass(frozen=True)
+class ResolvedRuntimeConfig:
+    """Complete runtime selection; construction never consults fallback sources."""
+
+    engine: str
+    engine_path: str | None
+    cpus: str
+    memory_mib: int
+    user: str
+    baseline: ResolvedRuntimeSide
+    subject: ResolvedRuntimeSide
+    sources: Mapping[str, str]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "sources", MappingProxyType(dict(self.sources)))
+
+
 class RuntimeResourceResolutionError(ValueError):
     """Raised when trusted execution resources are absent or escape their root."""
 
@@ -44,7 +71,7 @@ class RuntimeResourceResolver(Protocol):
 
 @dataclass(frozen=True)
 class ProviderResourceBinding:
-    """Trusted root and support files for one optional provider add-in."""
+    """Trusted root and support files for one optional provider."""
 
     root: Path
     support_resources: Mapping[str, str] = field(default_factory=dict)
@@ -204,6 +231,8 @@ def caller_runtime_resources_from_environment() -> CallerRuntimeResources:
 __all__ = [
     "CallerRuntimeResources",
     "ProviderResourceBinding",
+    "ResolvedRuntimeConfig",
+    "ResolvedRuntimeSide",
     "RuntimeResourceResolutionError",
     "RuntimeResourceResolver",
     "RuntimeSideRole",

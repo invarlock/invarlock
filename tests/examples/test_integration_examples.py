@@ -1247,7 +1247,7 @@ def test_runtime_image_builds_from_authenticated_source(
         repository=repository,
         build_root=build,
         container_engine="docker",
-        dockerfile="addins/example/Dockerfile",
+        dockerfile="runtime/Dockerfile",
         image_prefix="custom-example",
     )
     assert image == "sha256:" + ("d" * 64)
@@ -1256,7 +1256,7 @@ def test_runtime_image_builds_from_authenticated_source(
     build_command = next(
         item for item in commands if "authenticated_runtime_build.py" in " ".join(item)
     )
-    assert "addins/example/Dockerfile" in build_command
+    assert "runtime/Dockerfile" in build_command
     assert "custom-example:" + "c" * 12 in build_command
     assert build_command[build_command.index("--statement") + 1] == str(
         build / "runtime-build.json"
@@ -1378,7 +1378,7 @@ def test_runtime_image_authenticates_a_layered_base(
         repository=repository,
         build_root=build,
         container_engine="docker",
-        dockerfile="addins/multimodal/runtime/Dockerfile",
+        dockerfile="runtime/Dockerfile",
         authenticated_base_image=base,
     )
     command = next(

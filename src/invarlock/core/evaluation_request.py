@@ -1061,7 +1061,7 @@ def load_evaluation_request(
     """Load one strict request anchored to its file's real parent directory.
 
     The built-in resolver intentionally exposes only the canonical Hugging Face
-    provider. Optional provider add-ins must supply an explicit, authorized
+    provider. Optional providers must supply an explicit, authorized
     resolver. Callers must repeat no-follow resolution when opening returned
     paths so a later filesystem mutation cannot cross the request root.
     """

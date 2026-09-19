@@ -83,6 +83,7 @@ jobs:
             requirements/workflows/inspect-judge-tests-py313.txt
             requirements/workflows/pip-bootstrap.txt
             requirements/workflows/release-install-py313.txt
+            requirements/workflows/release-options-py313.txt
       - name: Set up uv
         uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4
         with:
@@ -119,7 +120,7 @@ jobs:
       - name: Check full-capacity signed verification
         run: python -m pytest -q 'tests/evaluation_comparison/test_capacity.py::test_full_capacity_signed_independent_recipient[50000]'
       - name: Build, install, and validate distributions
-        run: make addins-install-smoke inspect-judge-sdk-test
+        run: make install-smoke inspect-judge-sdk-test
       - name: Lint workflows
         run: |
           gopath="$(go env GOPATH)"
@@ -147,6 +148,7 @@ jobs:
             requirements/workflows/inspect-judge-tests-py312.txt
             requirements/workflows/pip-bootstrap.txt
             requirements/workflows/release-install-py312.txt
+            requirements/workflows/release-options-py312.txt
       - name: Set up uv
         uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4
         with:
@@ -158,11 +160,11 @@ jobs:
           python -m build --wheel --no-isolation
           python -m pip install --no-deps --force-reinstall dist/*.whl
       - name: Run minimum-Python tests
-        run: make test-fast addins-test PYTEST_WORKERS=auto
+        run: make test-fast runtime-test PYTEST_WORKERS=auto
       - name: Check command surface
         run: make cli-smoke-core
       - name: Build, install, and validate distributions
-        run: make addins-install-smoke inspect-judge-sdk-test
+        run: make install-smoke inspect-judge-sdk-test
 
   coverage-tests:
     if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.full) }}
@@ -171,7 +173,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [core, examples, support, addins]
+        shard: [core, examples, support, runtime]
     env:
       PYTHON: python
       PYTHONPATH: ${{ github.workspace }}/src
@@ -270,6 +272,7 @@ jobs:
             requirements/workflows/inspect-judge-tests-py313.txt
             requirements/workflows/pip-bootstrap.txt
             requirements/workflows/release-install-py313.txt
+            requirements/workflows/release-options-py313.txt
       - name: Set up uv
         uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4
         with:
@@ -300,7 +303,7 @@ jobs:
           export PATH="${gopath}/bin:$PATH"
           make workflow-lint
       - name: Build, install, and validate distributions
-        run: make addins-install-smoke inspect-judge-sdk-test
+        run: make install-smoke inspect-judge-sdk-test
 
   supply-chain:
     if: ${{ startsWith(github.ref, 'refs/tags/') }}

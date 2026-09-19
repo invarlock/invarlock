@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import os
 from pathlib import Path
 from typing import Any
 
@@ -22,7 +21,7 @@ def _input(path: Path, *, maximum: int) -> dict[str, Any]:
 
 
 async def _collect(args: argparse.Namespace) -> dict[str, Any]:
-    from invarlock.judge_collection import (
+    from invarlock.judge_measurements import (
         CollectionOptions,
         RunnerOptions,
         collect_configured,
@@ -97,10 +96,6 @@ def main() -> None:
         parser.error(
             f"measurement output must use existing non-symlink directories: {exc}"
         )
-    if not os.environ.get("OPENAI_API_KEY"):
-        parser.error("OPENAI_API_KEY must be set in the collector environment")
-    if os.environ.get("OPENAI_BASE_URL") or os.environ.get("OPENAI_API_BASE"):
-        parser.error("custom OpenAI provider URLs are outside this qualified example")
     try:
         from invarlock.filesystem.atomic_file import write_file_no_replace
         from invarlock.judge_measurements.contracts import canonical_payload

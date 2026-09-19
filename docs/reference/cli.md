@@ -97,7 +97,7 @@ the selected Docker or Podman executable and both digest-pinned images are
 already available locally. It resolves the same frozen, caller-owned per-side
 provider resources used by execution. Providers with the optional input hook
 then authenticate every selected schedule-bound external object before a worker
-or model starts. The vision-text add-in validates the content ID, regular
+or model starts. The vision-text provider validates the content ID, regular
 no-follow file, length, SHA-256, media type, safe decode, frame count,
 dimensions, and aggregate media limits. When a scorer extension is selected, preflight loads
 the explicitly authorized scorer descriptor and configuration schema, then
@@ -237,7 +237,7 @@ validation still enforces pinned local images, supported devices and
 entrypoints, resource limits, and a non-root user. Profiles cannot authorize
 network access, signing keys, or installed scorers.
 
-For each side's field, profile mode uses this precedence:
+For each side's field, all run requests use this precedence:
 
 1. Explicit side-specific command-line option.
 2. Explicit common command-line option.
@@ -248,10 +248,16 @@ For each side's field, profile mode uses this precedence:
 7. The existing default.
 
 Engine and resource fields use the applicable common steps. Without a profile,
-existing option and environment resolution stays unchanged. Image and digest
+the profile steps are omitted. Explicit common command-line options now take
+precedence over side-specific environment variables even without a profile. This
+corrects the former no-profile ordering; there is no legacy precedence mode. Image and digest
 are resolved independently: if an overridden image embeds a digest that
 conflicts with the selected separate digest, the command fails and asks you to
 update the matching value. It never silently repairs the mismatch.
+
+The engine executable is selected from the same environment snapshot as the
+settings. Later changes to `PATH` do not select a different Docker or Podman
+executable. An engine absent during resolution remains unavailable for that run.
 
 Profiles must be regular, non-symlink files of at most **16 KiB**. This is a
 configuration-file limit. Unknown fields, duplicate JSON keys, non-finite

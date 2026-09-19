@@ -61,7 +61,7 @@ def test_real_collection_environment_fails_without_loading_model(monkeypatch, fa
 @pytest.fixture
 def delegated(monkeypatch):
     real = workflow.collection_api()
-    api = ModuleType("invarlock.judge_collection")
+    api = ModuleType("invarlock.judge_measurements")
     api.CollectionOptions = real.CollectionOptions
     api.RunnerOptions = real.RunnerOptions
     api.prepare_collection = real.prepare_collection

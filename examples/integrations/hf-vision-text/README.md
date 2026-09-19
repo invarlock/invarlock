@@ -19,7 +19,7 @@ make example-hf-vision-text \
 The command downloads the immutable Qwen2-VL 2B and 7B revisions, verifies the
 previously qualified checkpoint-tree, tokenizer, and processor commitments,
 builds the canonical CUDA image and the optional
-`invarlock-runtime-hf-vision-text` layer from the exact Git commit, then runs
+`invarlock` with `vision-text` layer from the exact Git commit, then runs
 `invarlock evaluate`, `invarlock verify`, and `invarlock report`.
 The layered build publishes its base through a temporary loopback-only registry
 with an ephemeral data volume, consumes it by immutable manifest digest, and
