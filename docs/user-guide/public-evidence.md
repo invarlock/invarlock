@@ -4,7 +4,7 @@ Public evidence is a curated index of immutable `invarlock/evidence-pack-v1`
 directories and independently signed verification receipts. Every current
 entry uses a 400-record paired schedule selected from a pinned public dataset.
 The index spans the built-in Hugging Face text runtime and first-party GGUF,
-vision-text, and TensorRT-LLM runtime packages. A comparison remains
+vision-text, and TensorRT-LLM runtimes. A comparison remains
 **Evidence not yet created** until its pack and receipt pass strict verification
 and disclosure review.
 
