@@ -76,9 +76,9 @@ make verify-fast
 
 `make verify` and `make verify-fast` run independent suites concurrently with
 bounded pytest-xdist workers. Examples run once, separately from the other tests.
-`make coverage-enforce` runs disjoint groups with two workers per group;
-locally, one group runs at a time to avoid CPU contention. Pass overrides as
-Make command-line arguments when diagnosing a failure sequentially:
+`make coverage-enforce` runs up to three disjoint groups concurrently, with
+two workers per group by default. Pass overrides as Make command-line arguments
+when diagnosing a failure sequentially:
 
 ```bash
 make verify-fast VERIFY_TARGET_JOBS=1 PYTEST_WORKERS=0
@@ -95,11 +95,10 @@ listed below. Run them for the affected surface before requesting review.
 - `src/invarlock/` contains the request transaction, provider ABI, canonical
   evidence bundle, independent verifier, and report renderer. Captured records,
   comparison, and record contracts have evaluator-neutral implementation owners
-  behind the same `invarlock.engine` facade.
+  behind the same `invarlock.engine` facade. The same package contains the
+  built-in GGUF, TensorRT-LLM, Hugging Face vision-text, diagnostics and
+  judge-measurement implementations.
 - `contracts/` contains the shipped JSON contracts.
-- `src/invarlock/` contains the built-in GGUF, TensorRT-LLM, Hugging Face
-  vision-text, diagnostics and judge-measurement implementations. Provider and
-  judge SDKs are optional dependency extras.
 - `tests/` mirrors the maintained runtime, contract, evidence, CLI, and release
   surfaces.
 - `scripts/` contains repository checks, release validation, and security
@@ -109,8 +108,10 @@ listed below. Run them for the affected surface before requesting review.
 Hugging Face Transformers is the built-in reference provider. Maintained
 first-party adapters are shipped in the same wheel and implement the provider
 ABI without importing their optional execution backends during discovery or
-CLI help. Keep runtime-specific dependencies in explicit extras or runtime
-images.
+CLI help. Source runtime preparation uses dependency groups such as `hf` and
+`runtime-test`; maintained runtime images include their execution dependencies.
+The public `diagnostics`, `vision-text` and `judge` extras install optional
+feature dependencies.
 
 ## Contract changes
 
@@ -226,8 +227,8 @@ recorded comparison decisions, and independent verification.
 
 Tests must exercise production code and assert meaningful outcomes. A passing
 test that only restates fixture data is not evidence that a user journey works.
-`make dist-check` builds and validates the core, diagnostics, GGUF connector,
-Hugging Face vision-text connector, and TensorRT-LLM connector distributions.
+`make dist-check` builds and validates the single `invarlock` wheel and source
+distribution, including the built-in runtime and optional-feature modules.
 
 For runtime launcher changes, run the opt-in real-container journey with a
 working Docker or Podman engine. Commit the source being tested, create its
