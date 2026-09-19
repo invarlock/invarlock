@@ -27,6 +27,29 @@ revision, as explained in [getting started](../docs/user-guide/getting-started.m
 | Check a delivered model package | [ModelKit handoff](integrations/modelkit-handoff/README.md) | Checks that the package matches approved evidence and recipient policy |
 | Add verification to CI or a policy engine | [CI examples](ci/README.md) and [OPA/CUE example](policy-engine-interop/README.md) | Automation patterns with their supported receipt and policy boundaries |
 
+## Inspect a practical model change
+
+For a walkthrough of a completed model comparison, start with one of these
+retained comparisons. Their replay paths need no model or provider calls; the
+quantization guide also explains how to run a fresh comparison.
+
+| Change to examine | Start here | Decision shown |
+| --- | --- | --- |
+| Move a checkpoint from BF16 to a smaller GGUF for local deployment | [Qwen3.5-9B quantization](integrations/gguf-deployment/README.md#retained-results) | 212 to 219 exact matches out of 400; passes the declared deployment comparison, including a −2 percentage-point tolerance and 20% per-side floors |
+| Add a system instruction to improve output-format compliance | [K2 32B extraction prompt](judge-measurements/references/k2-32b-luna-xhigh-heldout/README.md#task-and-proposed-change) | 1,288 source units; the subject meets the allowed-degradation and absolute rubric-score requirements |
+| Replace a base checkpoint with its instruction-tuned counterpart while retaining a prose-completion workload | [Mistral 7B likelihood](captured-results/references/mistral-7b-likelihood/README.md) | 400 pairs; rejects a roughly 9.1% NLL increase against the illustrative 5% tolerance |
+
+For each result, read the actual change, observed values and policy together.
+Use the linked commands to inspect the evidence and reproduce its verification.
+A recipient supplies its own approved policy and identities before relying on
+a new comparison; the example thresholds are not defaults for every workload.
+
+The [six-case Harness fixture](captured-results/references/harness-likelihood/README.md)
+and [low-accuracy HTTP reference](hosted-service/references/mistral-7b-http/README.md)
+remain useful integration demonstrations. Use them to check measurement and
+transport behavior. Use the larger comparisons above to discuss a substantive
+model or prompt change.
+
 ## Terms used in the examples
 
 - **Baseline** is the model or configuration you compare against. **Subject** is

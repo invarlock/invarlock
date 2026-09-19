@@ -4,6 +4,16 @@ This reference retains a real HTTP capture and offline verification journey for
 two distinct full 7B checkpoints. It demonstrates the captured-service workflow,
 not qualification of an external provider or a production workload.
 
+Use it when connecting an HTTP model endpoint to evaluation and recipient
+verification. The actual change is from the base Mistral checkpoint to its
+instruction-tuned counterpart behind the same requested service alias. The
+result supports checking that the declared capture, pairing and verification
+workflow works; the low task scores do not justify deploying either service.
+Start with the retained [report](current/report.md), then follow
+[offline reproduction](#offline-reproduction-and-limits). For a substantive
+likelihood regression on the same checkpoint change, use the separate
+[Mistral NLL reference](../../../captured-results/references/mistral-7b-likelihood/README.md).
+
 ## Result and interpretation
 
 The corrected campaign made 400 requests to each deployment. All 800 requests
@@ -21,8 +31,10 @@ The observed paired change is +1 percentage point. Its paired 95% confidence
 interval is approximately [-1.444, 3.526] percentage points. The declared policy
 permits a regression of up to 2 percentage points, requires 400 pairs, and limits
 interval width to 10 percentage points. Those comparative requirements pass.
-There is no absolute quality floor in this demonstration policy. Low absolute
-scores remain visible and do not establish adequate task quality.
+There is no absolute quality floor in this demonstration policy. Its 2-point
+tolerance and 10-point precision limit illustrate comparative checks, not a
+service-specific error budget. Low absolute scores remain visible and do not
+establish adequate task quality.
 
 The service generates eight greedy tokens and returns the first whitespace-delimited
 field of its decoded continuation. Attached punctuation is preserved: `insurance`

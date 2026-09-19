@@ -21,6 +21,14 @@ Original source-file hashes and run identity bindings are recorded in
 `reference.json`. Original signed evidence remains at those references.
 The original policies produce exact-match acceptance and likelihood regression.
 
+Use the likelihood replay for an external-evaluator handoff walkthrough: the
+base-to-instruction-tuned checkpoint change raises mean NLL by about 9.1% on the
+retained prose continuations, exceeding its illustrative 5% tolerance. Langfuse
+preserves that adverse decision. The HTTP replay instead checks capture and
+transport: its 5% and 6% exact-match scores pass a comparative policy with no
+absolute quality floor. That pass is not a claim of useful task performance.
+The replay adds no new model measurements or independent cases.
+
 Likelihood values remain explicit per-record capture facts in
 `item.metadata.invarlock_likelihood`, including token counts, byte counts,
 model, tokenizer, configuration, input and reference bindings. They are never

@@ -13,6 +13,14 @@ The subject is the official instruction-tuned version of the baseline. Both see
 identical plain text, without a chat template. The comparison measures narrative
 continuation likelihood; it does not test instruction-following quality.
 
+The practical scenario is a checkpoint migration for a prose-completion
+workload: does the replacement preserve likelihood on the existing reference
+text? This result rejects the change under the declared illustrative policy.
+It does not answer whether the instruction-tuned checkpoint is a better assistant.
+Use the retained [policy](evidence/inputs/policy.json) and
+[measurement summary](reference.json) with the replay commands below to explain
+that decision.
+
 To check this result yourself, use [offline replay](#replay-with-the-core-package)
 with Python, an installed InvarLock package and matching example files. You do
 not need model weights, a GPU or Harness. The expected result is a verified
