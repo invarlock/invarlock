@@ -53,6 +53,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Label measured judge precision failures correctly and keep decision-check
+  columns visible in desktop reports without changing retained results.
 - Keep provider retries within admitted judge attempts, reject ignored settings,
   and validate reported usage before charging a collection budget.
 - Apply the resolved environment snapshot to optional runtime resource bindings.

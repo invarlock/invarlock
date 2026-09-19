@@ -249,9 +249,8 @@ def _policy_checks(
                 name=f"{name} precision",
                 observed=str(width) if width is not None else "Unavailable",
                 required=f"interval width <= {policy['maximum_interval_width']} ({role})",
-                passed=True
+                passed=(width <= Decimal(policy["maximum_interval_width"]))
                 if width is not None
-                and width <= Decimal(policy["maximum_interval_width"])
                 else None,
             )
         )

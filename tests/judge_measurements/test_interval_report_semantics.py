@@ -1,10 +1,11 @@
 """Judge chart geometry follows the bound policy without replacing its result."""
 
+import hashlib
 from html import unescape
 
 import pytest
 
-from invarlock.judge_measurements.reporting import _snapshot, _view
+from invarlock.judge_measurements.reporting import _policy_checks, _snapshot, _view
 from tests.judge_measurements.test_evidence_acceptance import _publish
 
 
@@ -85,11 +86,21 @@ def test_numeric_policy_checks_in_html_markdown_and_terminal(
         incomplete=outcome == "incomplete",
         policy_changes=changes,
     )
+    original_files = {
+        path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in publication.path.iterdir()
+        if path.is_file()
+    }
     html = tmp_path / "report.html"
     md = tmp_path / "report.md"
     result = render_judge_evidence(publication.path, html_path=html, markdown_path=md)
     cli = CliRunner().invoke(app, ["report", str(publication.path)])
     assert cli.exit_code == 0, cli.output
+    assert original_files == {
+        path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in publication.path.iterdir()
+        if path.is_file()
+    }
     retained, artifacts = _snapshot(publication.path)
     view, facts = _view(retained, artifacts)
     assert facts["analysis"] == publication.analysis_result.to_dict()
@@ -110,6 +121,16 @@ def test_numeric_policy_checks_in_html_markdown_and_terminal(
     assert checks["Independent units"].passed is (
         None if outcome in {"units", "incomplete"} else True
     )
+    for name in ("paired_effect", "subject_bound"):
+        precision = checks[f"{name} precision"]
+        if outcome == "precision":
+            assert precision.passed is False
+            assert "Not met" in unescape(result.text)
+            assert publication.analysis_result.decision == "insufficient_evidence"
+        elif outcome == "incomplete":
+            assert precision.passed is None
+        else:
+            assert precision.passed is True
     gate = checks["subject_bound"]
     assert gate.passed is (
         True if outcome == "pass" else False if outcome == "regression" else None
@@ -210,3 +231,41 @@ def test_effect_gate_reports_signed_threshold_and_recorded_outcome(
     )
     assert check.required in unescape(result.text)
     assert check.observed in unescape(result.text)
+
+
+@pytest.mark.parametrize(
+    "upper,expected", [("0.5", True), ("1", True), ("1.5", False), (None, None)]
+)
+def test_precision_status_distinguishes_known_bounds_from_missing(upper, expected):
+    analysis = {
+        "counts": {
+            "incomplete_trials": 0 if upper is not None else 1,
+            "completed_trials": 2 if upper is not None else 1,
+            "expected_trials": 2,
+            "complete_units": 1 if upper is not None else 0,
+            "scheduled_units": 1,
+        },
+        "effect_interval": (
+            {"lower": "0", "upper": upper, "mean": "0"} if upper is not None else None
+        ),
+        "gates": [
+            {
+                "name": "paired_effect",
+                "decision": "insufficient_evidence",
+                "reasons": [],
+            }
+        ],
+    }
+    policy = {
+        "decision_role": "advisory",
+        "minimum_units": 1,
+        "subject_bound": None,
+        "maximum_interval_width": "1",
+        "allowed_degradation": "1",
+        "direction": "higher",
+    }
+    checks = {check.name: check for check in _policy_checks(analysis, policy)}
+    assert checks["paired_effect precision"].passed is expected
+    assert checks["paired_effect precision"].observed == (upper or "Unavailable")
+    # Precision status never upgrades an inconclusive effect to a pass/regression.
+    assert checks["paired_effect"].passed is None
