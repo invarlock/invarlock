@@ -719,7 +719,7 @@ baseline = write_runtime_import_side(
         tasks=("text_causal",),
         metrics=("exact_match",),
         execution_modes=("in_process",),
-        required_extra="hf",
+        required_extra=None,
         required_image=None,
     ),
     execution_settings=RuntimeExecutionSettings(

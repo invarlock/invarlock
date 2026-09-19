@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import tomllib
 from importlib.metadata import EntryPoint
 from pathlib import Path
 from types import ModuleType
@@ -87,6 +88,22 @@ def test_registry_lists_builtin_runtime_provider_without_importing_backend(
         "entry_point": None,
     }
     assert not any(name.startswith("invarlock.runtime_providers") for name in imported)
+
+
+@pytest.mark.parametrize(
+    "provider_name", [spec.name for spec in builtin_plugin_specs("runtime_providers")]
+)
+def test_builtin_provider_required_extras_are_published(provider_name: str) -> None:
+    project_path = Path(__file__).resolve().parents[2] / "pyproject.toml"
+    metadata = tomllib.loads(project_path.read_text(encoding="utf-8"))
+    public_extras = metadata["project"]["optional-dependencies"]
+    provider = registry_mod.CoreRegistry().get_runtime_provider(provider_name)
+
+    required_extra = provider.capabilities().required_extra
+
+    assert required_extra is None or required_extra in public_extras, (
+        f"{provider_name} requires unpublished extra {required_extra!r}"
+    )
 
 
 def test_registry_loads_hf_reference_provider_only_on_request() -> None:

@@ -64,7 +64,7 @@ def test_hf_provider_declares_full_in_process_capabilities() -> None:
     assert capabilities.provider_name == "hf_transformers"
     assert capabilities.artifact_formats == ("hf_snapshot",)
     assert capabilities.execution_modes == ("in_process",)
-    assert capabilities.required_extra == "hf"
+    assert capabilities.required_extra is None
     assert capabilities.required_image is None
     assert capabilities.metrics == (
         "exact_match",
