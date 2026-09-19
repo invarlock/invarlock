@@ -235,6 +235,9 @@ def _policy_checks(
     if policy["subject_bound"] is not None:
         names.append("subject_bound")
     for name in names:
+        label = (
+            "Paired score change" if name == "paired_effect" else "Subject score bound"
+        )
         interval = analysis[
             "effect_interval" if name == "paired_effect" else "subject_interval"
         ]
@@ -246,7 +249,7 @@ def _policy_checks(
                 width = Decimal(interval["upper"]) - Decimal(interval["lower"])
         checks.append(
             CheckView(
-                name=f"{name} precision",
+                name=f"{label} interval width",
                 observed=str(width) if width is not None else "Unavailable",
                 required=f"interval width <= {policy['maximum_interval_width']} ({role})",
                 passed=(width <= Decimal(policy["maximum_interval_width"]))
@@ -273,7 +276,7 @@ def _policy_checks(
         }[decision]
         checks.append(
             CheckView(
-                name=name,
+                name=label,
                 observed=f"{_interval_observed(interval)}; {outcome}",
                 required=f"{requirement} ({role})",
                 passed=True
@@ -281,7 +284,10 @@ def _policy_checks(
                 else False
                 if decision == "regression"
                 else None,
-                explanation=", ".join(gate["reasons"] if gate else analysis["reasons"]),
+                explanation=", ".join(
+                    reason.replace("_", " ")
+                    for reason in (gate["reasons"] if gate else analysis["reasons"])
+                ),
             )
         )
     return tuple(checks)
@@ -308,7 +314,13 @@ def _view(
         "insufficient_evidence": f"The declared {role} bounds are not established by the available evidence.",
     }[analysis["decision"]]
     if analysis["reasons"]:
-        explanation += " " + ", ".join(analysis["reasons"])
+        explanation += (
+            " "
+            + "; ".join(
+                reason.replace("_", " ") for reason in analysis["reasons"]
+            ).capitalize()
+            + "."
+        )
     checks = _policy_checks(analysis, policy)
     # Floats are display geometry only. Decision arithmetic and exact strings are retained.
     interval = None
@@ -322,7 +334,7 @@ def _view(
             estimate=float(effect["mean"]),
             threshold=float(threshold),
             label="Paired independent-unit effect interval",
-            unit="normalized rating",
+            unit="score",
             threshold_direction="minimum"
             if policy["direction"] == "higher"
             else "maximum",
@@ -341,18 +353,29 @@ def _view(
         if required
         else "Advisory metric; fixed benchmark; equal independent-unit weights",
         decision=analysis["decision"],
-        baseline=number(float(baseline_mean))
+        baseline=number(float(baseline_mean)) + " score"
         if baseline_mean is not None
         else "Unavailable",
-        candidate=number(float(subject["mean"]))
+        candidate=number(float(subject["mean"])) + " score"
         if subject is not None
         else "Unavailable",
-        change=number(float(effect["mean"])) if effect is not None else "Unavailable",
-        count=_count_label(counts["scheduled_cases"], "case"),
+        change=number(float(effect["mean"]), signed=True) + " score"
+        if effect is not None
+        else "Unavailable",
+        count=f"{counts['complete_units']:,}",
+        count_label="Complete independent units",
+        count_detail=(
+            f"{counts['scheduled_units']:,} scheduled units; "
+            f"{counts['scheduled_cases']:,} cases; "
+            f"{counts['completed_trials']:,}/{counts['expected_trials']:,} completed trials"
+        ),
+        baseline_detail="Mean normalized rubric score",
+        candidate_detail="Mean normalized rubric score",
         explanation=explanation,
         checks=checks,
         interval=interval,
         notes=(
+            "Scores use the rubric mapped to 0 through 1; they are not percentages of correct answers. Changes and policy limits use the same score units.",
             f"{_count_label(counts['scheduled_units'], 'independent unit')}; "
             f"{counts['completed_trials']}/{counts['expected_trials']} completed "
             f"{'trial' if counts['expected_trials'] == 1 else 'trials'}.",
@@ -665,7 +688,13 @@ def _view(
         title="InvarLock bounded judge report",
         family="Bounded judge measurement evidence",
         decision=analysis["decision"],
-        summary="Comparison of repeated judgments of frozen baseline and subject answers on the declared benchmark."
+        summary=explanation
+        + (
+            f" Across {counts['complete_units']:,} complete independent units, the subject's mean rubric score was {metric.candidate}, "
+            f"compared with {metric.baseline} for the baseline, a change of {metric.change}."
+            if effect is not None and subject is not None and baseline_mean is not None
+            else " Mean scores and a paired effect are unavailable for the incomplete schedule."
+        )
         + (
             ""
             if required
@@ -720,7 +749,7 @@ def _view(
                     for rating in plan["scale"]["ratings"]
                 ),
             ),
-            ("Coverage", metric.count),
+            ("Coverage", _count_label(counts["scheduled_cases"], "case")),
         ),
         identity=tuple(native_identity)
         + tuple(
@@ -746,6 +775,17 @@ def _view(
             else (
                 "For recipient verification, republish the same retained inputs to a new evidence destination with evaluate --signing-key and the declared signer identity. Do not modify this evidence bundle.",
             )
+        )
+        + (
+            (
+                "Inspect the unmet bounds and retained answers with report --case-id before changing the model or prompt.",
+            )
+            if analysis["decision"] == "regression"
+            else (
+                "Inspect schedule completeness, independent-unit count, interval-width checks and unresolved decision bounds. Preserve this result; declare any new collection before measuring again.",
+            )
+            if analysis["decision"] == "insufficient_evidence"
+            else ()
         )
         + (
             "Use verify with an independently maintained judge recipient policy before relying on this result.",

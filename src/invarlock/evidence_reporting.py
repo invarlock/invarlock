@@ -939,6 +939,18 @@ def _comparison_acceptance(
                 comparison_value=comparison_value,
                 uncertainty=uncertainty,
             )
+            paired = report["paired_binary"]
+            for side, discordant in (
+                ("baseline", "baseline_pass_subject_fail"),
+                ("subject", "baseline_fail_subject_pass"),
+            ):
+                expected_mean = (paired["both_pass"] + paired[discordant]) / count
+                if not math.isclose(
+                    side_means[side], expected_mean, rel_tol=1e-12, abs_tol=1e-12
+                ):
+                    raise EvidenceReportError(
+                        "canonical report side means do not match paired outcome counts"
+                    )
         passed = lower >= limit
     else:
         if baseline_mean <= 0.0 or subject_mean < 0.0:
@@ -1191,6 +1203,13 @@ def _report_view(
         )
     value_scale = 100 if exact else 1
     suffix = "%" if exact else " nats / byte" if ratio else " score"
+    paired = report.get("paired_binary") if exact else None
+    baseline_matches = (
+        paired["both_pass"] + paired["baseline_pass_subject_fail"] if paired else None
+    )
+    subject_matches = (
+        paired["both_pass"] + paired["baseline_fail_subject_pass"] if paired else None
+    )
     metric = MetricView(
         name=names.get(report["metric"], report["metric"]),
         scope="All paired records",
@@ -1199,6 +1218,12 @@ def _report_view(
         candidate=number(report["subject"]["mean_score"] * value_scale) + suffix,
         change=number(comparison["value"], signed=not ratio) + " " + unit,
         count=f"{report['record_count']:,}",
+        baseline_detail=f"{baseline_matches:,} of {report['record_count']:,} matched"
+        if baseline_matches is not None
+        else "",
+        candidate_detail=f"{subject_matches:,} of {report['record_count']:,} matched"
+        if subject_matches is not None
+        else "",
         explanation="All configured checks passed."
         if not unmet
         else "Checks not met: " + ", ".join(unmet) + ".",
@@ -1214,6 +1239,15 @@ def _report_view(
             neutral=1.0 if ratio else 0.0,
         ),
         notes=tuple(notes),
+    )
+    summary += (
+        f" Across {metric.count} paired records, the subject scored {metric.candidate}, "
+        f"compared with {metric.baseline} for the baseline, "
+        + (
+            f"a subject-to-baseline ratio of {metric.change}."
+            if ratio
+            else f"a change of {metric.change}."
+        )
     )
     return ReportView(
         title="InvarLock comparison report",

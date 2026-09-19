@@ -976,6 +976,13 @@ def render_markdown(view: ReportView, *, include_details: bool = False) -> str:
             + " |",
             "",
         ]
+        for label, detail in (
+            ("Baseline", metric.baseline_detail),
+            ("Subject", metric.candidate_detail),
+            (metric.count_label, metric.count_detail),
+        ):
+            if detail:
+                lines += [f"{clean(label)}: {clean(detail)}.", ""]
         if metric.interval:
             i = metric.interval
             lines += [

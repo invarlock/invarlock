@@ -59,8 +59,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support explicit Docker and Podman selection in TensorRT preparation, including
   access to generated artifacts under rootless container engines.
 - Reject unsupported native batch sizes during preflight before model execution.
-- Label measured judge precision failures correctly and keep decision-check
+- Make report summaries show the observed comparison, distinguish judge rubric
+  scores and independent units, and retain supporting counts in Markdown and HTML.
+  Label measured judge precision failures correctly and keep decision-check
   columns visible in desktop reports without changing retained results.
+- Reject exact-match reports whose side means contradict their paired outcome
+  counts, even when the reported difference remains consistent.
 - Keep provider retries within admitted judge attempts, reject ignored settings,
   and validate reported usage before charging a collection budget.
 - Apply the resolved environment snapshot to optional runtime resource bindings.

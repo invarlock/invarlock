@@ -23,6 +23,40 @@ produce judge analysis and verification results described in
 [judge measurements](judge-measurements.md); they do not use the native
 `invarlock/comparison-report-v3` shape. All are rendered by `invarlock report`.
 
+## Reading a report for a release review
+
+Start with **What was compared**: confirm the baseline, subject, task and recorded
+configuration change. The report distinguishes model-artifact identity from a
+hosted service's reported identity, and native execution from imported records.
+Matching displayed previews do not establish equality of complete configurations.
+
+Then read **Results and requirements**. Exact-match values are accuracies; NLL
+values are nats per UTF-8 byte and a subject-to-baseline ratio; judge values are
+normalized rubric scores, not percentages of correct answers. Judge case counts,
+repeated ratings and independent units are distinct. The interval and configured
+checks determine the policy result, not the point estimate alone.
+
+| Reader | Use the report to | Keep with the handoff |
+| --- | --- | --- |
+| Evaluation engineer | Identify the changed inputs, affected metrics, missing results and unmet checks. | Original evidence, capture configuration and the example's reproduction commands. |
+| Customer or internal reviewer | Check the comparison against the expected candidate and agreed requirements. | Independently approved verification inputs and the resulting signed receipt. |
+| Release owner | See which requirements passed, failed or remain unresolved. | The intended workload, rationale for the thresholds and the organization's release decision. |
+
+A policy can correctly pass a comparison whose absolute quality is unsuitable
+for an application. Confirm that the declared requirements cover that workload,
+including an absolute quality minimum when needed. The report displays the
+recorded requirements; it does not infer a business justification for them.
+
+Use **Evidence details** for retained identities and exact values. Judge reports
+can show selected retained cases with `report --case-id`; native and captured
+reports do not provide a universal per-case debugging interface. Their source
+records remain in the evidence bundle. A useful example pairs its report with
+instructions for finding those records and replaying the comparison.
+
+**What was checked** states the operations actually performed by reporting.
+Recipient verification and organizational release approval are separate steps.
+Verifying an old package does not measure the current model or service again.
+
 ## Runtime-side report
 
 Each side has an `invarlock/runtime-side-report-v1` object:

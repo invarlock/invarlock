@@ -46,8 +46,13 @@ def test_judge_display_compacts_numbers_without_changing_retained_precision(tmp_
     retained, artifacts = _snapshot(publication.path)
     view, facts = _view(retained, artifacts)
     metric = view.metrics[0]
-    assert (metric.baseline, metric.candidate, metric.change) == ("0", "1", "1")
-    assert metric.count == "16 cases"
+    assert (metric.baseline, metric.candidate, metric.change) == (
+        "0 score",
+        "1 score",
+        "+1 score",
+    )
+    assert metric.count == "16"
+    assert metric.count_label == "Complete independent units"
     assert "16 independent units; 32/32 completed trials." in metric.notes
     assert facts["descriptive_means"]["baseline"] == "0E-15"
 
@@ -121,8 +126,8 @@ def test_numeric_policy_checks_in_html_markdown_and_terminal(
     assert checks["Independent units"].passed is (
         None if outcome in {"units", "incomplete"} else True
     )
-    for name in ("paired_effect", "subject_bound"):
-        precision = checks[f"{name} precision"]
+    for name in ("Paired score change", "Subject score bound"):
+        precision = checks[f"{name} interval width"]
         if outcome == "precision":
             assert precision.passed is False
             assert "Not met" in unescape(result.text)
@@ -131,7 +136,7 @@ def test_numeric_policy_checks_in_html_markdown_and_terminal(
             assert precision.passed is None
         else:
             assert precision.passed is True
-    gate = checks["subject_bound"]
+    gate = checks["Subject score bound"]
     assert gate.passed is (
         True if outcome == "pass" else False if outcome == "regression" else None
     )
@@ -143,13 +148,13 @@ def test_numeric_policy_checks_in_html_markdown_and_terminal(
         assert "fixed-benchmark-hoeffding-v1" in text
         assert "family confidence at least 95%" in text
         assert "alpha 0.05; comparison family size 2" in text
-        assert "subject_bound precision" in text
+        assert "Subject score bound interval width" in text
         assert gate.required in text
         assert gate.observed in text
-        assert checks["paired_effect"].required in text
-        assert checks["paired_effect"].observed in text
-        assert checks["paired_effect precision"].observed in text
-        assert checks["paired_effect precision"].required in text
+        assert checks["Paired score change"].required in text
+        assert checks["Paired score change"].observed in text
+        assert checks["Paired score change interval width"].observed in text
+        assert checks["Paired score change interval width"].required in text
         if outcome == "incomplete":
             assert "Unavailable; incomplete planned schedule" in text
         else:
@@ -169,7 +174,7 @@ def test_numeric_policy_checks_in_html_markdown_and_terminal(
     assert "family confidence at least 95%" in terminal
     assert "fixed-benchmark-hoeffding-v1" in terminal
     assert changes["subject_bound"] in terminal
-    assert "paired_effect" in terminal and "subject_bound" in terminal
+    assert "Paired score change" in terminal and "Subject score bound" in terminal
     assert (
         "inconclusive" in terminal
         if outcome not in {"pass", "regression"}
@@ -190,8 +195,8 @@ def test_unconfigured_subject_bound_remains_descriptive(tmp_path):
     retained, artifacts = _snapshot(publication.path)
     view, _ = _view(retained, artifacts)
     names = {check.name for check in view.metrics[0].checks}
-    assert "subject_bound" not in names
-    assert "subject_bound precision" not in names
+    assert "Subject score bound" not in names
+    assert "Subject score bound interval width" not in names
     assert "Subject interval (descriptive; no subject bound configured)" in unescape(
         result.text
     )
@@ -218,7 +223,7 @@ def test_effect_gate_reports_signed_threshold_and_recorded_outcome(
     result = render_judge_evidence(publication.path)
     retained, artifacts = _snapshot(publication.path)
     view, _ = _view(retained, artifacts)
-    check = next(c for c in view.metrics[0].checks if c.name == "paired_effect")
+    check = next(c for c in view.metrics[0].checks if c.name == "Paired score change")
     assert result.facts["analysis"]["decision"] == outcome
     assert (
         check.passed
@@ -265,7 +270,9 @@ def test_precision_status_distinguishes_known_bounds_from_missing(upper, expecte
         "direction": "higher",
     }
     checks = {check.name: check for check in _policy_checks(analysis, policy)}
-    assert checks["paired_effect precision"].passed is expected
-    assert checks["paired_effect precision"].observed == (upper or "Unavailable")
+    assert checks["Paired score change interval width"].passed is expected
+    assert checks["Paired score change interval width"].observed == (
+        upper or "Unavailable"
+    )
     # Precision status never upgrades an inconclusive effect to a pass/regression.
-    assert checks["paired_effect"].passed is None
+    assert checks["Paired score change"].passed is None
