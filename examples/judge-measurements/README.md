@@ -126,7 +126,7 @@ collection settings. Use a fresh evidence destination if you already ran the
 offline fixture, since both requests initially name `evidence`:
 
 ```bash
-# Supply OPENAI_API_KEY through your secret manager.
+# Supply the key selected by the grader prefix through your secret manager.
 invarlock evaluate request-collect.yaml --preflight --json
 invarlock evaluate request-collect.yaml --signing-key signer-private.pem --json
 ```
@@ -134,10 +134,12 @@ invarlock evaluate request-collect.yaml --signing-key signer-private.pem --json
 The installed command constructs the pinned model and resumes through a private
 workspace. Review its call, token, cost and timeout limits before execution.
 Missing dependencies or credentials fail preflight without a provider call.
-Installed collection requires exactly Inspect `0.3.263`, OpenAI `3.13.0` and
-`httpx==0.28.1`. Remove `OPENAI_BASE_URL` and `OPENAI_API_BASE` entirely; custom
-endpoints and empty endpoint overrides are rejected. Review the model-specific
-sampling and reasoning requirements in the [collection guide](collection.md).
+Installed collection requires exactly Inspect `0.3.263`, OpenAI `3.13.0`,
+Anthropic `1.6.0`, Google Gen AI `2.24.0`, and `httpx==0.28.1`. Use
+`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`/`GEMINI_API_KEY`, or
+`OPENROUTER_API_KEY` to match the grader prefix. Custom endpoints and empty
+endpoint overrides are rejected. Review the model-specific sampling and
+reasoning requirements in the [collection guide](collection.md).
 The optional `execution.collection.workspace` defaults to
 `<output.evidence>.judge-work`, `scorer_id` to `judge`, and
 `invocation_timeout_seconds` to 3600. Use a private, stable workspace to resume

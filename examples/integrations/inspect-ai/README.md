@@ -34,7 +34,8 @@ aggregate score into complete judge evidence.
 The core [Inspect judge collector](../../judge-measurements/collection.md)
 collects or imports complete retained calls for the shared native/captured judge
 recipe. Its live collection pins Inspect `0.3.263` and OpenAI `3.13.0`; this does
-not relabel the historical exact-match profiles below. Per-case references use
+not relabel the historical exact-match profiles below. The same collector also
+supports its pinned Anthropic, Google, and OpenRouter integrations. Per-case references use
 `prompt.reference_mode: per_case` and remain a distinct judge request field.
 Structured task inputs require an explicit text projection, with the original
 input and context retained and bound.

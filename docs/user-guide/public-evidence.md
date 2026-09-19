@@ -25,8 +25,8 @@ and disclosure review.
 | Qwen3.5 9B BF16 checkpoint and source-derived Q5_K_M GGUF | Hugging Face Transformers and GGUF/llama.cpp | 400 | Exact match |
 | Qwen3.8 27B BF16 checkpoint and source-derived Q5_K_M GGUF | Hugging Face Transformers and GGUF/llama.cpp | 400 | Exact match |
 | Ministral 3 8B BF16 checkpoint and source-derived Q5_K_M GGUF | Hugging Face Transformers and GGUF/llama.cpp | 400 | Exact match |
-| Qwen2-VL 2B and 7B vision-text checkpoints | Hugging Face vision-text add-in | 400 | Exact match |
-| Two TinyLlama 1.1B checkpoint engines | TensorRT-LLM add-in | 400 | Exact match |
+| Qwen2-VL 2B and 7B vision-text checkpoints | Hugging Face vision-text provider | 400 | Exact match |
+| Two TinyLlama 1.1B checkpoint engines | TensorRT-LLM provider | 400 | Exact match |
 
 The text suite is selected from the pinned MMLU-Pro test split and is balanced
 across 14 domains and answer choices A-J. The vision-text suite is selected

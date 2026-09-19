@@ -1,35 +1,48 @@
 # Inspect judge collection and import
 
-The core `invarlock.judge_collection` module collects bounded text judgments through the installed
+The core `invarlock.judge_measurements` module collects bounded text judgments through the installed
 `evaluate` command or a caller-supplied Inspect model, and imports its
 expanded-event projection into
 `judge-measurements-v1`. It does not import arbitrary Inspect `.eval` archives.
 
-Installed live collection requires exactly Inspect `0.3.263`, OpenAI `3.13.0`
-and `httpx==0.28.1`; retained exports from Inspect `0.3.254` also remain replayable
-offline. The projection requires one epoch and an explicit grader, and retains all scheduled slots. Missing attempts remain
+Installed live collection requires exactly Inspect `0.3.263`, OpenAI `3.13.0`,
+Anthropic `1.6.0`, Google Gen AI `2.24.0`, `httpx==0.28.1`, and
+`httpx2==2.12.0`; retained exports
+from Inspect `0.3.254` also remain replayable offline. The projection requires
+one epoch and an explicit grader, and retains all scheduled slots. Missing attempts remain
 incomplete. SDK retries, cache reuse, tools, unrecorded generation settings,
 extra request headers and arbitrary request bodies are rejected.
 
-Live collection uses the retained Chat Completions projection. The caller must
-construct the Inspect model with Chat Completions selected and both Inspect and
-provider-client retries set to zero. The model may carry only the explicit
-`responses_api=false`, `max_retries=0` and optional `service_tier=default`
-construction arguments. Other inherited model, provider or generation settings are
-rejected before a call is admitted.
+Live collection supports pinned Inspect providers selected by `openai/`,
+`anthropic/`, `google/`, or `openrouter/` grader prefixes. The collector fixes
+the generation settings and disables its retry layer; the OpenAI-compatible and
+Anthropic clients are also constructed with SDK retries disabled. Google's
+per-call clients use one SDK attempt with automatic function calling disabled;
+a guard stops Inspect's malformed-function retry before another request. Use
+`collect_configured` to install that guard and the Anthropic guard that stops
+automatic `pause_turn` continuations. Other inherited
+model, provider, or generation settings are rejected before a call is admitted.
 
 The installed native and captured `metric: judge` workflows and frozen-answer
 `judge_collect` request use `collect_configured`. It validates the pinned SDK environment,
 constructs the supported model explicitly, and closes its client on success,
-failure or cancellation. Keep `OPENAI_API_KEY` in the process environment.
-Remove `OPENAI_BASE_URL` and `OPENAI_API_BASE` entirely; even empty overrides in
-the process or explicitly supplied environment are rejected. The configured
-client uses `https://api.openai.com/v1`, Chat Completions, explicit
-`service_tier=default` and disabled model memoization. This selects standard
-processing instead of inheriting the project's tier. Remove
-`OPENAI_SAFETY_IDENTIFIER` as well; an inherited identifier would add an
-unsupported request control and is rejected before collection. Missing or
-mismatched dependencies and credentials fail preflight.
+failure or cancellation. The grader prefix selects `OPENAI_API_KEY`,
+`ANTHROPIC_API_KEY`, `GOOGLE_API_KEY` (or `GEMINI_API_KEY`), or
+`OPENROUTER_API_KEY`. Remove provider base-URL variables and alternate-auth
+controls entirely; even empty overrides in the process or explicitly supplied
+environment are rejected. Each provider uses its official endpoint with model
+memoization disabled. OpenAI additionally uses Chat Completions and explicit
+`service_tier=default`. Missing or mismatched dependencies and credentials fail
+preflight.
+
+Direct OpenAI, Anthropic and Google model names cannot select alternate cloud
+services. Google's endpoint is explicitly
+`https://generativelanguage.googleapis.com`. Google SDK recording/replay modes
+and ambient OpenAI organization/project routing are also rejected. Google and
+Anthropic plans require `seed: null` because the pinned adapters do not forward
+seeds. Anthropic requires `top_p: "1"`; the wire request sends temperature alone
+because recent models reject both sampling controls. Thinking models and newer
+models that discard temperature require approved temperature `"1"`.
 
 Offline replay accepts historical requests that omitted the tier without
 rewriting them or asserting their billing tier. An explicit tier must be
@@ -43,13 +56,13 @@ invarlock evaluate judge-request.yaml --preflight --json
 invarlock evaluate judge-request.yaml --signing-key signer-private.pem --json
 ```
 
-The core `judge` extra directly installs the pinned Inspect, OpenAI and `httpx`
-SDKs. For a source build, run
+The core `judge` extra directly installs the pinned Inspect, OpenAI/OpenRouter,
+Anthropic, Google, `httpx`, and `httpx2` SDKs. For a source build, run
 `python -m pip install '.[judge]'` from the repository root. Offline judge analysis, verification and reporting are built
 into `invarlock` and do not require the extra.
 
 Preflight checks without calling a provider. Execution uses the declared cost,
-call, token and time ceilings, the official OpenAI endpoint and a private
+call, token and time ceilings, the selected provider's official endpoint and a private
 checkpoint. It never puts the API key in the request, plan, checkpoint or retained
 output. `validate_collection_environment` exposes the same execution-free checks
 to Python callers. Native requests automatically freeze runtime answers before
@@ -70,9 +83,9 @@ in both the retained generation event and provider request. Collection rejects
 a missing or changed effort before the evidence can be accepted. Offline replay
 accepts exactly this version-bound projection for those two models; other models
 keep their existing message and sampling-control checks. This SDK projection
-support does not qualify either model's judging quality. Normalized requests
-retain the approved system message and configuration alongside the actual
-provider call.
+support does not qualify either model's judging quality. New retained requests
+preserve the approved system message and configuration in a normalized envelope;
+they do not preserve every SDK transport field.
 
 `bind_requests` creates exact request digests for a plan before independent
 approval. `render_request` uses the core renderer to separate rubric, input and answer
@@ -142,12 +155,15 @@ rejects unsupported profiles and does not repair missing judgments. The example
 README documents path and size limits and continuation into signed publication.
 
 Inspect's native `ModelCall` contains provider-specific request and response
-objects. The retained `retained-inspect-model-events-v1` source keeps the bounded
-Chat Completions request and response while the deterministic rating parser reads
-the accessible model completion. Offline verification checks the provider
-messages, model, generation controls, completion, resolved model, request ID,
+objects. The retained `retained-inspect-model-events-v1` source converts new
+calls to provider-neutral request and response envelopes while the deterministic
+rating parser reads the accessible model completion. Before normalization, each
+provider's raw response content, resolved model, finish reason and token usage
+must match the SDK output. Offline verification checks
+the messages, model, generation controls, completion, resolved model, request ID,
 finish reason and token usage against the normalized event and trial table. It
-does so without loading Inspect. As with any retained API log, these bytes
+does so without loading Inspect. Historical OpenAI wire projections remain
+replayable. As with any retained API log, these bytes
 establish what the evidence signer signed and retained; they do not independently prove
 that a provider performed the call.
 
@@ -158,7 +174,11 @@ and [`ModelCall`](https://inspect.aisi.org.uk/reference/inspect_ai.model.html#mo
 
 The release gate `make inspect-judge-sdk-test` installs the built core
 wheel through `invarlock[judge]` against the dedicated hashed dependency
-locks, runs `pip check`, and executes real SDK request/event conversion using an
-offline HTTP transport. Missing or mismatched SDK dependencies fail that gate.
+locks, runs `pip check`, and constructs each of the four configured providers
+with network access blocked. It exercises real SDK request/event conversion,
+cached-token accounting, rate-limit failures and checkpoint resume through
+offline HTTP transports, including Google's internal retry boundary. Missing
+or mismatched SDK dependencies fail that gate. These checks establish adapter
+compatibility; they make no paid API calls or judge-quality claim.
 The separate evaluator-qualification runtime retains its own historical version
 and dependency locks.

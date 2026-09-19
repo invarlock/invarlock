@@ -1,7 +1,7 @@
 # Documentation development
 
 The documentation is a tested product surface. Maintained Markdown spans the
-MkDocs site, repository entry points, first-party add-in READMEs, public
+MkDocs site, repository entry points, first-party provider documentation, public
 evidence guidance, scripts, examples, tests, and GitHub contribution templates.
 
 > **Reference**

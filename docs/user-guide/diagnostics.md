@@ -1,6 +1,6 @@
 # Optional diagnostics
 
-`invarlock-diagnostics` is a standalone first-party package for descriptive
+`invarlock[diagnostics]` is the optional feature for descriptive
 numeric observations. It is useful when a paired decision needs supporting
 engineering context. Its canonical JSON can travel inside the authenticated
 `evaluate -> verify -> report` evidence transaction while remaining outside
@@ -30,7 +30,7 @@ the acceptance calculation.
 Install it independently of the core runtime providers:
 
 ```bash
-python -m pip install invarlock-diagnostics
+python -m pip install 'invarlock[diagnostics]'
 ```
 
 The package has no provider hook or policy threshold. Its canonical JSON output
@@ -57,7 +57,7 @@ Catch `DiagnosticInputError` when a caller needs to distinguish an invalid
 investigation input from an unexpected implementation failure:
 
 ```python
-from invarlock_addins.diagnostics import DiagnosticInputError, rmt_observation
+from invarlock.diagnostics import DiagnosticInputError, rmt_observation
 
 try:
     observation = rmt_observation([[1.0], [1.0]])
@@ -74,7 +74,7 @@ one finite matrix:
 import json
 
 import numpy as np
-from invarlock_addins.diagnostics import spectral_observation
+from invarlock.diagnostics import spectral_observation
 
 matrix = np.diag([3.0, 1.0])
 observation = spectral_observation(matrix)
@@ -95,7 +95,7 @@ Marchenko--Pastur reference edges:
 
 ```python
 import numpy as np
-from invarlock_addins.diagnostics import rmt_observation
+from invarlock.diagnostics import rmt_observation
 
 samples = np.array(
     [
@@ -119,7 +119,7 @@ layers, preprocessing, and low sample counts can all dominate the result.
 sequence:
 
 ```python
-from invarlock_addins.diagnostics import variance_observation
+from invarlock.diagnostics import variance_observation
 
 observation = variance_observation([0.9, 1.0, 1.1, 1.2])
 assert observation["status"] == "observation"
@@ -154,7 +154,7 @@ field:
 ```python
 from pathlib import Path
 
-from invarlock_addins.diagnostics import (
+from invarlock.diagnostics import (
     canonical_observation_bytes,
     spectral_observation,
 )

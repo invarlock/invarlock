@@ -28,9 +28,9 @@ artifact.
 | Hugging Face causal checkpoint | Run mode | Built-in `hf_transformers` provider |
 | PEFT adapter merged into a checkpoint | Run mode | Built-in provider; [runnable PEFT journey](https://github.com/invarlock/invarlock/tree/main/examples/integrations/peft-lora) |
 | TorchAO weight-only quantization materialized as a checkpoint | Run mode | Built-in provider; [runnable TorchAO journey](https://github.com/invarlock/invarlock/tree/main/examples/integrations/torchao-int8) |
-| GGUF artifact | Run mode | Optional [`invarlock-runtime-gguf`](https://github.com/invarlock/invarlock/tree/main/addins/gguf) package; [runnable llama.cpp journey](https://github.com/invarlock/invarlock/tree/main/examples/integrations/gguf-llama-cpp) |
-| Vision-text checkpoint | Run mode | Optional [`invarlock-runtime-hf-vision-text`](https://github.com/invarlock/invarlock/tree/main/addins/multimodal) package |
-| TensorRT-LLM engine | Run mode | Optional [`invarlock-runtime-tensorrt-llm`](https://github.com/invarlock/invarlock/tree/main/addins/tensorrt_llm) package |
+| GGUF artifact | Run mode | Built-in `llama_cpp` provider; [runnable llama.cpp journey](https://github.com/invarlock/invarlock/tree/main/examples/integrations/gguf-llama-cpp) |
+| Vision-text checkpoint | Run mode | Built-in `hf_vision_text` provider |
+| TensorRT-LLM engine | Run mode | Built-in `tensorrt_llm` provider |
 | Complete InvarLock provider sidecars produced by a harness | Native import mode | Runtime-import authoring API and closed request contract; [runnable LM Evaluation Harness journey](https://github.com/invarlock/invarlock/tree/main/examples/integrations/lm-evaluation-harness) |
 | Evaluator exports or hosted endpoint captures | Captured mode | [Captured results](captured-results.md), with complete-run pins and captured assurance |
 

@@ -24,24 +24,24 @@ evaluation, bundle publication, and independent verification.
 | Artifact you need to evaluate | Provider | Packaging | Start with |
 | --- | --- | --- | --- |
 | Local Hugging Face safetensors checkpoint | `hf_transformers` | Built into `invarlock`; execution dependencies in the maintained runtime image | Run mode |
-| Local Hugging Face vision-text checkpoint | `hf_vision_text` | `invarlock-runtime-hf-vision-text` add-in | Run mode with authenticated image content store |
-| GGUF file used by `llama.cpp` | `llama_cpp` | `invarlock-runtime-gguf` add-in | Run mode after runtime inspection |
-| TensorRT-LLM engine bundle | `tensorrt_llm` | `invarlock-runtime-tensorrt-llm` add-in | Run mode after GPU-bound inspection |
-| Complete provider sidecars produced elsewhere | Provider named by the sidecars | Matching provider package must be installed | Import mode |
+| Local Hugging Face vision-text checkpoint | `hf_vision_text` | Built into `invarlock`; Pillow is in the `vision-text` extra and inference dependencies are in the runtime image | Run mode with authenticated image content store |
+| GGUF file used by `llama.cpp` | `llama_cpp` | Built into `invarlock`; native backend is in the runtime image | Run mode after runtime inspection |
+| TensorRT-LLM engine bundle | `tensorrt_llm` | Built into `invarlock`; native backend is in the runtime image | Run mode after GPU-bound inspection |
+| Complete provider sidecars produced elsewhere | Provider named by the sidecars | Matching built-in or explicitly allowed third-party provider must be available | Import mode |
 
-The text integrations declare `text_causal`; the vision-text add-in declares
+The text integrations declare `text_causal`; the vision-text provider declares
 `vision_text_generation`. All shipped integrations declare `exact_match`. The
 built-in `hf_transformers` integration also declares
 `normalized_nll_per_utf8_byte`, using teacher-forced expected-continuation
 likelihoods over the authenticated local checkpoint. When authenticated
 tokenizer contracts and paired token counts are comparable, the verifier may
 render a token-weighted perplexity ratio as interpretation only. The GGUF,
-TensorRT-LLM, and vision-text add-ins expose exact-match text collection.
+TensorRT-LLM, and vision-text providers expose exact-match text collection.
 The built-in `judge` scorer and deterministic extensions use that same
 authenticated text-output surface, then score the frozen answers separately.
 They do not require the provider to advertise a `judge` metric. Native judging
 currently requires exactly one text input part, so it cannot grade the
-vision-text add-in's image schedules.
+vision-text provider's image schedules.
 
 | Provider collection metric | Hugging Face text | Vision-text | GGUF | TensorRT-LLM | Use when |
 | --- | --- | --- | --- | --- | --- |
@@ -113,15 +113,15 @@ never a strict qualification identity.
 | Provider | Signed canary | Readiness | Evidence |
 | --- | --- | --- | --- |
 | `hf_transformers` | `make runtime-qualification-canary` | `make runtime-qualification-readiness` | `make runtime-qualification-evidence` |
-| `hf_vision_text` | `make -C addins/multimodal qualify-canary` | `make -C addins/multimodal qualify-preflight` | `make -C addins/multimodal qualify-evidence` |
-| `llama_cpp` | `make -C addins/gguf qualify-canary` | `make -C addins/gguf qualify-preflight` | `make -C addins/gguf qualify-evidence` |
-| `tensorrt_llm` | `make -C addins/tensorrt_llm qualify-canary` | `make -C addins/tensorrt_llm qualify-preflight` | `make -C addins/tensorrt_llm qualify-evidence` |
+| `hf_vision_text` | `make qualify-canary` | `make qualify-preflight` | `make qualify-evidence` |
+| `llama_cpp` | `make qualify-canary` | `make qualify-preflight` | `make qualify-evidence` |
+| `tensorrt_llm` | `make qualify-canary` | `make qualify-preflight` | `make qualify-evidence` |
 
 All four paths accept the same resource controls:
 `QUALIFICATION_DEVICE`, `QUALIFICATION_CPUS`,
 `QUALIFICATION_MEMORY_MIB`, and `QUALIFICATION_USER`. Set them once and keep
 them unchanged across canary, readiness, and evidence. The root wrapper
-requires an explicit device. The add-in wrappers have provider-appropriate
+requires an explicit device. The provider wrappers have provider-appropriate
 device defaults, but an explicit `cpu` or `cuda:<index>` keeps the execution
 contract reviewable. Vision-text additionally requires `RESOURCE_ROOT` and
 `CONTENT_STORE`; GGUF and TensorRT-LLM use the provider resource variables
@@ -274,7 +274,7 @@ qualification.
 
 The final image ID is a local OCI config identity. It can be used directly for
 local inspection, smoke, and qualification, but it is not a valid Dockerfile
-`FROM` reference. A layered runtime such as the vision-text add-in requires a
+`FROM` reference. A layered runtime such as the vision-text provider requires a
 named `repository@sha256:...` manifest reference for its base; publish or obtain
 that exact manifest through the operator's registry process before building the
 layer.
@@ -436,11 +436,11 @@ command.
 `CANDIDATE_WHEEL_MANIFEST` is a strict
 `invarlock/qualification-candidate-wheels-v1` JSON object whose `wheels` array
 contains an absolute or manifest-relative `path` and expected `sha256` for the
-core wheel and any maintained add-in wheels used by the request. Qualification
+core wheel and the selected provider runtime inputs used by the request. Qualification
 matches their package sources to the authenticated Git archive, extracts them
 privately, and executes them with an isolated interpreter bootstrap. Dependencies
 may be installed in the selected interpreter, but an older installed InvarLock
-core or maintained add-in is not used as the qualification candidate.
+core runtime is not used as the qualification candidate.
 
 The signed canary prevents image-wide fan-out after a basic image, provider, or
 end-to-end transaction failure. It does not establish that every model fits
@@ -450,21 +450,19 @@ qualification, and each model run can still fail closed.
 
 ## Hugging Face vision-text
 
-Install the optional provider into the interpreter used by the host
-qualification transaction. Its base wheel includes the Pillow dependency
-needed for execution-free media preflight:
+Install the core wheel with the vision-text extra into the interpreter used by
+the host qualification transaction:
 
 ```bash
 "$PYTHON" -m pip install \
-  /wheelhouse/Pillow-EXACT.whl \
-  /wheelhouse/invarlock_runtime_hf_vision_text-EXACT.whl
-"$PYTHON" -m invarlock_addins.multimodal.conformance
+  '/wheelhouse/invarlock-EXACT.whl[vision-text]'
+"$PYTHON" -m invarlock.runtime_providers.hf_vision_text_conformance
 ```
 
 The heavier Torch and Transformers inference dependencies belong in the
 digest-pinned runtime image, which derives and hash-checks the hardened
-Accelerate dependency during its build. The base add-in has no full inference
-extra.
+Accelerate dependency during its build. The base wheel has no full inference
+dependency set.
 
 `hf_vision_text` evaluates `vision_text_generation` schedules containing one
 `prompt` text part and one `image` content part per record. Schedule content
@@ -505,18 +503,18 @@ the decoded exact-match output. For a newly qualified model family, render a
 frozen record from the exact offline processor snapshot before GPU allocation and
 confirm the template is deterministic and binds exactly one image placeholder.
 
-Build the add-in image from the exact digest of the canonical CUDA image and
+Build the provider image from the exact digest of the canonical CUDA image and
 qualify it through `evaluate`, `verify`, and `report` on the target GPU. The
-[add-in guide](https://github.com/invarlock/invarlock/blob/main/addins/multimodal/README.md)
+[runtime provider guide](https://github.com/invarlock/invarlock/blob/main/docs/reference/runtime-providers.md)
 contains the build, content-contract, and qualification commands.
 
 ## GGUF and `llama.cpp`
 
-Install and check the optional provider:
+Install and check the built-in provider:
 
 ```bash
-"$PYTHON" -m pip install /wheelhouse/invarlock_runtime_gguf-EXACT.whl
-"$PYTHON" -m invarlock_addins.gguf.conformance
+"$PYTHON" -m pip install /wheelhouse/invarlock-EXACT.whl
+"$PYTHON" -m invarlock.runtime_providers.llama_cpp_conformance
 ```
 
 The provider authenticates the GGUF file, its structured metadata and tensor
@@ -531,8 +529,8 @@ Derive the request settings inside the exact runtime image:
 ```python
 from pathlib import Path
 
-from invarlock_addins.gguf.provider import LlamaCppProvider
-from invarlock_addins.gguf.session import LlamaCppRuntimeBindings
+from invarlock.runtime_providers.llama_cpp import LlamaCppProvider
+from invarlock.runtime_providers.llama_cpp_session import LlamaCppRuntimeBindings
 
 bindings = LlamaCppRuntimeBindings(
     gguf_path=Path("model.gguf"),
@@ -573,11 +571,11 @@ host paths in the canonical bundle.
 
 ## TensorRT-LLM
 
-Install and check the optional provider in a compatible CUDA environment:
+Install and check the built-in provider in a compatible CUDA environment:
 
 ```bash
-"$PYTHON" -m pip install /wheelhouse/invarlock_runtime_tensorrt_llm-EXACT.whl
-"$PYTHON" -m invarlock_addins.tensorrt_llm.conformance
+"$PYTHON" -m pip install /wheelhouse/invarlock-EXACT.whl
+"$PYTHON" -m invarlock.runtime_providers.tensorrt_llm_conformance
 ```
 
 The provider binds the engine tree and inventory, builder configuration,
@@ -592,8 +590,8 @@ Inspect the exact engine on the target GPU inside the pinned image:
 ```python
 from pathlib import Path
 
-from invarlock_addins.tensorrt_llm.provider import TensorRTLLMProvider
-from invarlock_addins.tensorrt_llm.session import TensorRTLLMRuntimeBindings
+from invarlock.runtime_providers.tensorrt_llm import TensorRTLLMProvider
+from invarlock.runtime_providers.tensorrt_llm_session import TensorRTLLMRuntimeBindings
 
 bindings = TensorRTLLMRuntimeBindings(
     engine_bundle_path=Path("engine"),
@@ -760,7 +758,7 @@ runtime-image identities, evidence signer, and verifier signer.
 
 | Symptom | First check |
 | --- | --- |
-| Provider is not discovered | Install the matching add-in and run its conformance command in the same environment as `invarlock`. |
+| Provider is not discovered | Install the matching optional backend dependencies and run its conformance command in the same environment as `invarlock`. |
 | Artifact identity mismatch | Re-run inspection over the exact artifact; look for changed files, metadata, tokenizer material, or request settings. |
 | Backend digest mismatch | Confirm the executable, source archive, or runner came from the pinned runtime root. |
 | Runtime image mismatch | Resolve the image reference to an immutable digest and make the reference and separate digest agree. |

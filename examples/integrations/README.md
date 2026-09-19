@@ -99,7 +99,7 @@ from a clean committed checkout. The TensorRT-LLM showcase builds its engines
 on the target H100s and authenticates the resulting engine identities; it does
 not assume that independently compiled engine bytes will be identical. The
 first-party runtime packages also expose conformance and real-model
-qualification commands beside their implementations under `addins/`.
+qualification commands beside their implementations in the core package.
 
 The GPU-backed checkpoint examples accept `--runtime-device cuda:1` when several
 accelerators are available. The three evaluator bridges use `--device cuda:1`

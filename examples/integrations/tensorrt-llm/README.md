@@ -47,8 +47,7 @@ revision, runtime image, tokenizer contract, schedule, and policy.
 ## Prepared-engine transaction
 
 Advanced users who already have qualified engines can run the lower-level
-transaction without rebuilding them. Install matching released wheels for
-`invarlock` and `invarlock-runtime-tensorrt-llm`, then prepare a new input
+transaction without rebuilding them. Install the matching released `invarlock` wheel, then prepare a new input
 directory with this fixed layout:
 
 ```text

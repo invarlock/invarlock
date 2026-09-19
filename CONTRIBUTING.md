@@ -33,7 +33,7 @@ python3.13 -m venv .venv
 source .venv/bin/activate
 python -m pip install uv==0.10.10
 python scripts/security/build_hardened_accelerate_wheel.py bootstrap
-uv sync --locked --extra dev --group runtime-test
+uv sync --locked --group dev --group runtime-test
 npm ci
 ```
 
@@ -47,11 +47,11 @@ go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
 ```
 
 The bootstrap verifies and builds the pinned hardened Accelerate wheel in
-`runtime/wheels`. Repository runtime groups use that wheel; the public tooling
-extras do not install model execution dependencies.
+`runtime/wheels`. Repository runtime groups use that wheel. Maintainer tools are installed through
+dependency groups; published extras contain only optional product features.
 
 Add Go's binary directory to `PATH`. These tools are not installed by the
-Python development extra.
+Python development dependency group.
 
 For an exact Linux x86_64 CI reproduction, create a separate Python 3.13
 environment and run:
@@ -97,18 +97,20 @@ listed below. Run them for the affected surface before requesting review.
   comparison, and record contracts have evaluator-neutral implementation owners
   behind the same `invarlock.engine` facade.
 - `contracts/` contains the shipped JSON contracts.
-- `addins/` contains the independently installable GGUF, TensorRT-LLM,
-  Hugging Face vision-text and diagnostics packages. Judge collection lives in
-  `src/invarlock/judge_collection/`; its provider SDKs are optional.
+- `src/invarlock/` contains the built-in GGUF, TensorRT-LLM, Hugging Face
+  vision-text, diagnostics and judge-measurement implementations. Provider and
+  judge SDKs are optional dependency extras.
 - `tests/` mirrors the maintained runtime, contract, evidence, CLI, and release
   surfaces.
 - `scripts/` contains repository checks, release validation, and security
   utilities used by maintainers; user-facing operations remain in the installed
   CLI.
 
-Hugging Face Transformers is the built-in reference provider. New runtime
-integrations implement the provider ABI in an optional package. Keep runtime-
-specific dependencies out of the core distribution.
+Hugging Face Transformers is the built-in reference provider. Maintained
+first-party adapters are shipped in the same wheel and implement the provider
+ABI without importing their optional execution backends during discovery or
+CLI help. Keep runtime-specific dependencies in explicit extras or runtime
+images.
 
 ## Contract changes
 
@@ -171,7 +173,7 @@ as the complete pull-request check:
 | Python behavior or example launcher | Focused failing test first, then `make verify` and the applicable coverage target |
 | Coverage across the repository | `make coverage-enforce` on Linux; CI enforces 95% combined and branch coverage, including per-file checks |
 | Documentation or public command examples | `make docs-check` and `python -m pytest tests/docs -q`; exercise the documented commands |
-| Entry points, imports, packaged schemas, or dependencies | `make addins-install-smoke`; this includes `dist-check` and isolated wheel consumers |
+| Entry points, imports, packaged schemas, or dependencies | `make install-smoke`; this includes `dist-check` and isolated wheel consumers |
 | Captured evaluation behavior | Build and install the candidate wheel, then run `python examples/captured-results/wheel_smoke.py` and `python examples/captured-results/scorer_wheel_smoke.py --fixture examples/judge-measurements` |
 | Native evaluator capture or mapping | Follow the captured-results example with explicit model, protocol, and environment inputs; verify captured outputs in a separate wheel-only recipient; the [Harness likelihood reference](examples/captured-results/references/harness-likelihood/README.md) covers real NLL capture and offline replay |
 | Evidence interpretation or verification | `make release-retained-evidence-compatibility`; retain the declared outcomes of historical evidence |

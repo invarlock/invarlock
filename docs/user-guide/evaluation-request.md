@@ -162,7 +162,7 @@ length, and SHA-256. The schedule contains no host path or URI. The selected
 provider resolves content IDs inside its separately authorized content store
 and authenticates the bytes before use. `vision_text_generation` requires role
 `image`; another canonical future task may declare its own role through its
-provider/add-in contract.
+provider contract.
 
 ## Task and structured-input contract
 
@@ -170,7 +170,7 @@ provider/add-in contract.
 canonical schedule, both provider capability declarations, both evaluation
 batches, and both receipts must agree on it. `text_causal` is the built-in
 Hugging Face task. `vision_text_generation` is implemented by the optional
-Hugging Face vision-text add-in. The contract also reserves canonical
+Hugging Face vision-text provider. The contract also reserves canonical
 `masked_language` and `text_seq2seq` identifiers so future providers can share
 the same schedule and evidence boundaries; no built-in execution path is
 assigned to those identifiers.
@@ -311,7 +311,7 @@ selectable metric and has no policy threshold, confidence interval, or verdict
 authority.
 
 The built-in HF provider supports exact-match and normalized-NLL collection for `text_causal`. The
-first-party GGUF, TensorRT-LLM, and Hugging Face vision-text add-ins currently
+built-in GGUF, TensorRT-LLM, and Hugging Face vision-text providers currently
 support exact match for their declared tasks. Import execution support remains
 provider-specific: both imported provider receipts must declare the selected
 task and collection metric. Judge and deterministic scorer extensions collect authenticated text outputs
@@ -398,7 +398,7 @@ removing, or changing a native pack-v1 observation changes the request-bound
 comparison ID and therefore creates a different signed transaction, but cannot
 alter the paired statistics or verdict for otherwise identical inputs. Any byte change
 after publication invalidates bundle integrity. Spectral, random-matrix, and
-variance summaries from `invarlock-diagnostics` use this path. The
+variance summaries from `invarlock[diagnostics]` use this path. The
 [SPDX 3.0.1 AI observation example](https://github.com/invarlock/invarlock/tree/main/examples/integrations/spdx-ai-observation)
 shows how to retain an external document, its exact source digest, validation
 status, and an artifact cross-binding without granting it acceptance authority.
