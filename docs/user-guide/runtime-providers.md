@@ -272,12 +272,15 @@ digest, normalized build arguments, requested platform and base image, and
 final immutable image ID. Retain it beside the image digest used by
 qualification.
 
-The final image ID is a local OCI config identity. It can be used directly for
-local inspection, smoke, and qualification, but it is not a valid Dockerfile
-`FROM` reference. A layered runtime such as the vision-text provider requires a
-named `repository@sha256:...` manifest reference for its base; publish or obtain
-that exact manifest through the operator's registry process before building the
-layer.
+The final image ID is the immutable local identity reported by the selected
+engine. Depending on its image store, it can be a configuration digest or a
+manifest digest; different engines can report different local IDs for the same
+image contents. Use the ID reported by the engine that will execute the image
+for local inspection, smoke, and qualification. A bare local image ID is not a
+valid Dockerfile `FROM` reference. A layered runtime such as the vision-text
+provider requires a named `repository@sha256:...` manifest reference for its base;
+publish or obtain that exact manifest through the operator's registry process
+before building the layer.
 
 The default local tag is a mutable build handle. Strict execution accepts an
 exact content-addressed local image ID or `repository@sha256:...` reference and
@@ -285,6 +288,9 @@ requires the same digest through `INVARLOCK_RUNTIME_IMAGE_DIGEST`. For portable
 public evidence, publish or obtain the pinned image through the operator's
 registry process and record its registry manifest reference; a local image ID
 identifies local bytes but does not give another verifier a fetchable runtime.
+The repository manifest digest and the local image ID are not interchangeable:
+local execution checks the engine-reported ID, while a repository reference must
+match an exact entry in that image's inspected `RepoDigests`.
 
 Select exactly one image and resolve it before qualification. For a local CPU
 image:
