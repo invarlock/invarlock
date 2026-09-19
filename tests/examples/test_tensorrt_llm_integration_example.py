@@ -1346,6 +1346,42 @@ def test_showcase_rejects_dirty_source_before_downloads(
     assert "tracked source is dirty" in capsys.readouterr().err
 
 
+@pytest.mark.parametrize(
+    "missing",
+    ["examples", "examples.integrations", "examples.integrations.bounded_command"],
+)
+def test_prepare_helper_uses_flat_mounted_runner_when_package_is_unavailable(
+    prepare_helper: Any, monkeypatch: pytest.MonkeyPatch, missing: str
+) -> None:
+    real_import = builtins.__import__
+
+    def container_import(name: str, *args: Any, **kwargs: Any) -> Any:
+        if name == "examples.integrations.bounded_command":
+            raise ModuleNotFoundError(f"No module named {missing!r}", name=missing)
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", container_import)
+    helper = _load("tensorrt_prepare_import_check", Path(prepare_helper.__file__))
+    assert helper.run_bounded_command is prepare_helper._test_flat_runner
+
+
+def test_prepare_helper_preserves_missing_runner_dependency(
+    prepare_helper: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real_import = builtins.__import__
+    failure = ModuleNotFoundError("missing runner dependency", name="invarlock")
+
+    def container_import(name: str, *args: Any, **kwargs: Any) -> Any:
+        if name == "examples.integrations.bounded_command":
+            raise failure
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", container_import)
+    with pytest.raises(ModuleNotFoundError) as error:
+        _load("tensorrt_prepare_missing_dependency", Path(prepare_helper.__file__))
+    assert error.value is failure
+
+
 def test_prepare_helper_contract_conversion_and_build(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, prepare_helper: Any
 ) -> None:
