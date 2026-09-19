@@ -4,7 +4,7 @@ Public evidence is a curated index of immutable `invarlock/evidence-pack-v1`
 directories and independently signed verification receipts. Every current
 entry uses a 400-record paired schedule selected from a pinned public dataset.
 The index spans the built-in Hugging Face text runtime and first-party GGUF,
-vision-text, and TensorRT-LLM runtime packages. A comparison remains
+vision-text, and TensorRT-LLM runtimes. A comparison remains
 **Evidence not yet created** until its pack and receipt pass strict verification
 and disclosure review.
 
@@ -25,8 +25,8 @@ and disclosure review.
 | Qwen3.5 9B BF16 checkpoint and source-derived Q5_K_M GGUF | Hugging Face Transformers and GGUF/llama.cpp | 400 | Exact match |
 | Qwen3.8 27B BF16 checkpoint and source-derived Q5_K_M GGUF | Hugging Face Transformers and GGUF/llama.cpp | 400 | Exact match |
 | Ministral 3 8B BF16 checkpoint and source-derived Q5_K_M GGUF | Hugging Face Transformers and GGUF/llama.cpp | 400 | Exact match |
-| Qwen2-VL 2B and 7B vision-text checkpoints | Hugging Face vision-text add-in | 400 | Exact match |
-| Two TinyLlama 1.1B checkpoint engines | TensorRT-LLM add-in | 400 | Exact match |
+| Qwen2-VL 2B and 7B vision-text checkpoints | Hugging Face vision-text provider | 400 | Exact match |
+| Two TinyLlama 1.1B checkpoint engines | TensorRT-LLM provider | 400 | Exact match |
 
 The text suite is selected from the pinned MMLU-Pro test split and is balanced
 across 14 domains and answer choices A-J. The vision-text suite is selected

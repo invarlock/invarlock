@@ -27,12 +27,13 @@ fi
 # an omitted or incompatible dependency fail rather than silently fetching it.
 "${JUDGE_BIN}" -m pip install --no-index "${core_wheels[0]}[judge]"
 "${JUDGE_BIN}" -m pip check
-"${JUDGE_BIN}" -c 'from pathlib import Path; from sysconfig import get_path; import invarlock, invarlock.judge_collection as judge; root=Path(get_path("purelib")).resolve(); assert all(Path(module.__file__).resolve().is_relative_to(root) for module in (invarlock, judge))'
+"${JUDGE_BIN}" -c 'from pathlib import Path; from sysconfig import get_path; import invarlock, invarlock.judge_measurements as judge; root=Path(get_path("purelib")).resolve(); assert all(Path(module.__file__).resolve().is_relative_to(root) for module in (invarlock, judge))'
 mkdir "${JUDGE_ENV}/tests"
-cp "${ROOT_DIR}/tests/judge_collection/test_live_inspect_sdk.py" "${JUDGE_ENV}/tests/"
-cp "${ROOT_DIR}/tests/judge_collection/test_configured.py" "${JUDGE_ENV}/tests/"
-cp -R "${ROOT_DIR}/tests/judge_collection/fixtures" "${JUDGE_ENV}/tests/fixtures"
+cp "${ROOT_DIR}/tests/judge_measurements/test_live_inspect_sdk.py" "${JUDGE_ENV}/tests/"
+cp "${ROOT_DIR}/tests/judge_measurements/test_configured.py" "${JUDGE_ENV}/tests/"
+cp -R "${ROOT_DIR}/tests/judge_measurements/fixtures" "${JUDGE_ENV}/tests/fixtures"
 cd "${JUDGE_ENV}"
 INVARLOCK_REQUIRE_INSPECT_SDK=1 "${JUDGE_BIN}" -m pytest -q \
   tests/test_live_inspect_sdk.py \
-  tests/test_configured.py::test_real_sdk_constructs_a_strict_model_without_http
+  tests/test_configured.py::test_real_sdk_constructs_a_strict_model_without_http \
+  tests/test_configured.py::test_real_non_openai_sdks_construct_without_http

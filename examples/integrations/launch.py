@@ -838,7 +838,7 @@ def main(argv: list[str] | None = None) -> int:
                         repository=repository,
                         build_root=vision_build,
                         container_engine=arguments.container_engine,
-                        dockerfile="addins/multimodal/runtime/Dockerfile",
+                        dockerfile="runtime/Dockerfile.hf-vision-text",
                         image_prefix="invarlock-example-hf-vision-text",
                         authenticated_base_image=published_base,
                     )

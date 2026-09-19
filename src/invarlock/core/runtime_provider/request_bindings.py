@@ -1,6 +1,6 @@
 """Closed normalized-request field contracts for first-party runtimes.
 
-These constants are intentionally torch-free and add-in-free. Runtime providers
+These constants are intentionally torch-free and provider-agnostic. Runtime providers
 use them to validate authored requests, while the independent verifier uses the
 same contracts to reconcile those requests with authenticated receipts.
 """

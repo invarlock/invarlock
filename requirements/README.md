@@ -36,23 +36,27 @@ manifest and image labels; an evaluator lock cannot silently rewrite the core
 runtime or introduce an unchecked CUDA closure.
 `release-install-py312.txt` and `release-install-py313.txt` are the
 Python-version-specific, hash-pinned dependency closures installed before the
-coordinated local release wheels. Both are compiled from
-`release-install.in`, which is the exact union of the external base
-dependencies declared by the core and five optional first-party
-distributions. That closure includes NumPy for diagnostics and Pillow for the
-vision-text host package. Heavy inference stacks in repository dependency groups and maintained runtime
-images are outside this coordinated base-install gate.
+local release wheel. Both are compiled from `release-install.in`, which is the
+exact external base dependency closure declared by `invarlock`; NumPy and
+Pillow are intentionally absent from this minimal lane.
+
+`release-options-py312.txt` and `release-options-py313.txt` separately pin the
+lightweight `diagnostics` and `vision-text` host dependencies from
+`release-options.in`. Installed-wheel smoke tests exercise that closure in a
+second disposable environment. Heavy inference stacks in repository dependency
+groups and maintained runtime images remain outside these release install
+gates.
 
 These workflow locks cover repository automation and runtime-image builds; they
-are not a substitute for each distribution's declared metadata. The release
-build validates the `invarlock`, diagnostics, GGUF connector, Hugging Face
-vision-text connector, TensorRT-LLM connector, and Inspect judge collection
-distributions separately, then installs all six wheels together against the matching Python 3.12 or
-3.13 closure in a disposable environment.
+are not a substitute for the distribution's declared metadata. The release
+build validates the one `invarlock` wheel and source archive, then exercises its
+base and optional dependency surfaces against the matching Python 3.12 or 3.13
+closure in disposable environments.
 
 The separate `inspect-judge-tests-py312.txt` and `inspect-judge-tests-py313.txt`
-locks pin the live judge SDK extra for its installed-package gate. They do not
-add provider SDKs to the base core or coordinated base-install closure.
+locks pin the live judge SDK extra for its installed-package gate, including the
+OpenAI/OpenRouter, Anthropic, and Google clients. They do not add provider SDKs
+to the base-install closure.
 
 ## Refresh
 

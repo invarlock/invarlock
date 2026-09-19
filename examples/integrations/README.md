@@ -50,7 +50,7 @@ from the native signed OCI profiles listed below.
 | [LM Evaluation Harness](lm-evaluation-harness/) | `make example-lm-evaluation-harness` | Real upstream per-record output across compact CPU and retained CUDA profiles |
 | [Inspect AI](inspect-ai/) | `make example-inspect-ai` | Native Inspect Task/scorer execution across compact CPU and retained CUDA profiles |
 | [OpenAI Evals](openai-evals/) | `make example-openai-evals` | CPU, example-owned OpenAI Evals Match adapter; no retained signed transaction |
-| [TensorRT-LLM](tensorrt-llm/) | `make example-tensorrt-llm` | Linux, Docker, two H100 GPUs, and a Qwen3-0.6B compatibility fixture for the pinned runtime |
+| [TensorRT-LLM](tensorrt-llm/) | `make example-tensorrt-llm` | Linux, Docker, two compatible CUDA GPUs, and a Qwen3-0.6B compatibility fixture for the pinned runtime |
 
 ## Before running a model example
 
@@ -96,10 +96,10 @@ outputs are never authoritative.
 
 All maintained commands obtain or create their artifacts and complete the transaction
 from a clean committed checkout. The TensorRT-LLM showcase builds its engines
-on the target H100s and authenticates the resulting engine identities; it does
+on the selected compatible GPUs and authenticates the resulting engine identities; it does
 not assume that independently compiled engine bytes will be identical. The
-first-party runtime packages also expose conformance and real-model
-qualification commands beside their implementations under `addins/`.
+first-party runtime providers also expose conformance and real-model
+qualification commands beside their implementations in the core package.
 
 The GPU-backed checkpoint examples accept `--runtime-device cuda:1` when several
 accelerators are available. The three evaluator bridges use `--device cuda:1`

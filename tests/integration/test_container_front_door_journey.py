@@ -17,6 +17,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
 from invarlock.core.checkpoint_identity import checkpoint_tree_sha256
+from invarlock.evaluation_oci import _normalized_config_id
 from invarlock.evidence_pack_contract import canonical_json_bytes
 from invarlock.evidence_pack_integrity import public_key_fingerprint
 
@@ -271,8 +272,7 @@ def test_runtime_image_host_front_door_evaluate_verify_report_and_fail_closed(
         text=True,
         timeout=30,
     )
-    image_digest = inspected.stdout.strip()
-    assert image_digest.startswith("sha256:") and len(image_digest) == 71
+    image_digest = _normalized_config_id(inspected.stdout.strip())
 
     workspace = tmp_path / "workspace"
     workspace.mkdir()
@@ -517,7 +517,12 @@ def test_runtime_image_host_front_door_evaluate_verify_report_and_fail_closed(
         ],
     )
     assert missing_digest.returncode != 0
-    assert "INVARLOCK_RUNTIME_IMAGE_DIGEST" in missing_digest.stdout
+    missing_digest_payload = json.loads(missing_digest.stdout)
+    assert missing_digest_payload["ok"] is False
+    assert any(
+        "runtime image digest is required" in error
+        for error in missing_digest_payload["errors"]
+    )
     assert not workspace.joinpath("missing-digest-evidence").exists()
 
     wrong_receipt = tmp_path / "wrong-runtime-receipt.json"

@@ -63,8 +63,8 @@ ENV HF_HUB_OFFLINE=1 \
     SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH} \
     TRANSFORMERS_OFFLINE=1
 
-# Install the canonical Hugging Face runtime and the exact wheel built from
-# this source tree. Optional providers are separate distributions and images.
+# Install the canonical Hugging Face runtime and the exact single wheel built
+# from this source tree. Native providers remain explicit runtime environments.
 RUN --mount=type=bind,from=runtime-inputs,source=/requirements,target=/mnt/requirements,ro \
     --mount=type=bind,from=public-wheel,source=/wheelhouse,target=/mnt/wheelhouse,ro \
     requirements_path="$(case "${TARGETARCH:-amd64}" in \
@@ -88,7 +88,8 @@ RUN --mount=type=bind,from=runtime-inputs,source=/requirements,target=/mnt/requi
       --no-deps \
       --no-index \
       "/opt/invarlock/artifacts/$(basename "$1")" \
-    && find /opt/invarlock /usr/local/lib/python3.12 /usr/local/bin \
+    && python -c "from invarlock.core.registry import CoreRegistry; assert {'hf_transformers', 'hf_vision_text', 'llama_cpp', 'tensorrt_llm'} <= set(CoreRegistry().list_runtime_providers())" \
+      && find /opt/invarlock /usr/local/lib/python3.12 /usr/local/bin \
       -xdev -exec touch -h -d "@${SOURCE_DATE_EPOCH}" {} +
 
 WORKDIR /work

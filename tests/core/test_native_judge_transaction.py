@@ -76,7 +76,7 @@ def _recipe(case_ids=("one", "two")):
     )
     collection = json.loads(
         (
-            Path(__file__).parents[2] / "tests/judge_collection/fixtures/export.json"
+            Path(__file__).parents[2] / "tests/judge_measurements/fixtures/export.json"
         ).read_text()
     )["collection"]
     collection["grader"] = plan["judge"]["requested_model"]
@@ -226,7 +226,7 @@ def test_import_judge_preflight_qualifies_units_without_numerical_policy(
     assert result.judge["independent_units"] == 2
     assert result.judge["planned_trials"] == 4
     assert result.sample_qualification is None
-    assert "judge_collection" in result.checks
+    assert "judge_measurements" in result.checks
     assert json.loads(result.as_json())["judge"]["collection"]["credential_available"]
     collection[1].assert_not_called()
     assert not (tmp_path / "judge-workspace").exists()

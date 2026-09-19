@@ -36,9 +36,9 @@ if TYPE_CHECKING:
 
 def collection_api() -> Any:
     """Load the core collector without importing optional provider SDKs."""
-    from invarlock import judge_collection
+    from invarlock import judge_measurements
 
-    return judge_collection
+    return judge_measurements
 
 
 def collection_preflight(configuration: dict[str, Any]) -> dict[str, Any]:

@@ -55,7 +55,7 @@ def main() -> None:
             raise ValueError("measurement output must be a new file")
         with pinned_directory(output.parent):
             pass
-        from invarlock.judge_collection import CollectionOptions, import_export
+        from invarlock.judge_measurements import CollectionOptions, import_export
 
         measurements = import_export(
             read_regular_file_bytes(

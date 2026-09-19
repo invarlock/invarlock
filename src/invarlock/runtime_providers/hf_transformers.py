@@ -1807,7 +1807,7 @@ class HFTransformersProvider:
                 "normalized_nll_per_utf8_byte",
             ),
             execution_modes=("in_process",),
-            required_extra="hf",
+            required_extra=None,
             required_image=None,
         )
 

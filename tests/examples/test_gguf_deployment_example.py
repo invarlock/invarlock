@@ -78,14 +78,14 @@ def _subject_spec(subject: Path) -> dict[str, object]:
     }
 
 
-def test_make_target_installs_the_hf_runtime_and_gguf_addin() -> None:
+def test_make_target_installs_the_hf_runtime_from_the_core_project() -> None:
     makefile = (Path(__file__).resolve().parents[2] / "Makefile").read_text(
         encoding="utf-8"
     )
     target = makefile.split("example-gguf-deployment:", 1)[1].split("\n\n", 1)[0]
 
     assert "--group hf" in target
-    assert "--with ./addins/gguf" in target
+    assert "--locked" in target
     assert "examples.integrations.gguf_deployment" in target
 
 

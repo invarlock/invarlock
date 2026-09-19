@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import tomllib
 from importlib.metadata import EntryPoint
 from pathlib import Path
 from types import ModuleType
@@ -12,7 +13,17 @@ from invarlock.core.builtin_plugin_catalog import builtin_plugin_specs
 from tests.core._support_registry import DistStub, EntryPointStub, SelectEntryPoints
 
 
-def test_builtin_runtime_provider_catalog_declares_only_canonical_hf() -> None:
+@pytest.fixture(autouse=True)
+def _clear_qualification_candidate_site(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv(registry_mod._QUALIFICATION_CANDIDATE_SITE, raising=False)
+    monkeypatch.setattr(
+        registry_mod,
+        "entry_points",
+        lambda: SelectEntryPoints(runtime_providers=[]),
+    )
+
+
+def test_builtin_runtime_provider_catalog_declares_all_first_party_providers() -> None:
     specs = builtin_plugin_specs("runtime_providers")
 
     assert [(spec.name, spec.module, spec.class_name) for spec in specs] == [
@@ -21,8 +32,23 @@ def test_builtin_runtime_provider_catalog_declares_only_canonical_hf() -> None:
             "invarlock.runtime_providers.hf_transformers",
             "HFTransformersProvider",
         ),
+        (
+            "llama_cpp",
+            "invarlock.runtime_providers.llama_cpp",
+            "LlamaCppProvider",
+        ),
+        (
+            "tensorrt_llm",
+            "invarlock.runtime_providers.tensorrt_llm",
+            "TensorRTLLMProvider",
+        ),
+        (
+            "hf_vision_text",
+            "invarlock.runtime_providers.hf_vision_text",
+            "HFVisionTextProvider",
+        ),
     ]
-    assert [spec.required_deps for spec in specs] == [()]
+    assert [spec.required_deps for spec in specs] == [()] * 4
 
 
 def test_registry_lists_builtin_runtime_provider_without_importing_backend(
@@ -45,7 +71,12 @@ def test_registry_lists_builtin_runtime_provider_without_importing_backend(
     )
     registry = registry_mod.CoreRegistry()
 
-    assert registry.list_runtime_providers() == ["hf_transformers"]
+    assert registry.list_runtime_providers() == [
+        "hf_transformers",
+        "llama_cpp",
+        "tensorrt_llm",
+        "hf_vision_text",
+    ]
     assert registry.get_plugin_info("hf_transformers", "runtime_providers") == {
         "name": "hf_transformers",
         "module": "invarlock.runtime_providers.hf_transformers",
@@ -57,6 +88,22 @@ def test_registry_lists_builtin_runtime_provider_without_importing_backend(
         "entry_point": None,
     }
     assert not any(name.startswith("invarlock.runtime_providers") for name in imported)
+
+
+@pytest.mark.parametrize(
+    "provider_name", [spec.name for spec in builtin_plugin_specs("runtime_providers")]
+)
+def test_builtin_provider_required_extras_are_published(provider_name: str) -> None:
+    project_path = Path(__file__).resolve().parents[2] / "pyproject.toml"
+    metadata = tomllib.loads(project_path.read_text(encoding="utf-8"))
+    public_extras = metadata["project"]["optional-dependencies"]
+    provider = registry_mod.CoreRegistry().get_runtime_provider(provider_name)
+
+    required_extra = provider.capabilities().required_extra
+
+    assert required_extra is None or required_extra in public_extras, (
+        f"{provider_name} requires unpublished extra {required_extra!r}"
+    )
 
 
 def test_registry_loads_hf_reference_provider_only_on_request() -> None:
@@ -115,6 +162,9 @@ def test_runtime_provider_entry_point_discovery_is_lazy(
 
     assert registry.list_runtime_providers() == [
         "hf_transformers",
+        "llama_cpp",
+        "tensorrt_llm",
+        "hf_vision_text",
         "third_party_runtime",
     ]
     assert (
@@ -123,28 +173,24 @@ def test_runtime_provider_entry_point_discovery_is_lazy(
     )
 
 
-def test_exact_first_party_addins_are_discovered_without_third_party_opt_in(
+def test_exact_first_party_entry_points_are_owned_by_core(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     providers = [
         EntryPointStub(
             name="hf_vision_text",
-            value="invarlock_addins.multimodal.provider:HFVisionTextProvider",
-            dist=DistStub(
-                "invarlock-runtime-hf-vision-text", registry_mod.INVARLOCK_VERSION
-            ),
+            value="invarlock.runtime_providers.hf_vision_text:HFVisionTextProvider",
+            dist=DistStub("invarlock", registry_mod.INVARLOCK_VERSION),
         ),
         EntryPointStub(
             name="llama_cpp",
-            value="invarlock_addins.gguf.provider:LlamaCppProvider",
-            dist=DistStub("invarlock-runtime-gguf", registry_mod.INVARLOCK_VERSION),
+            value="invarlock.runtime_providers.llama_cpp:LlamaCppProvider",
+            dist=DistStub("invarlock", registry_mod.INVARLOCK_VERSION),
         ),
         EntryPointStub(
             name="tensorrt_llm",
-            value=("invarlock_addins.tensorrt_llm.provider:TensorRTLLMProvider"),
-            dist=DistStub(
-                "invarlock-runtime-tensorrt-llm", registry_mod.INVARLOCK_VERSION
-            ),
+            value=("invarlock.runtime_providers.tensorrt_llm:TensorRTLLMProvider"),
+            dist=DistStub("invarlock", registry_mod.INVARLOCK_VERSION),
         ),
         EntryPointStub(
             name="unapproved_runtime",
@@ -163,19 +209,19 @@ def test_exact_first_party_addins_are_discovered_without_third_party_opt_in(
 
     assert registry.list_runtime_providers() == [
         "hf_transformers",
-        "hf_vision_text",
         "llama_cpp",
         "tensorrt_llm",
+        "hf_vision_text",
     ]
     assert "unapproved_runtime" not in registry.list_runtime_providers()
     for name in ("hf_vision_text", "llama_cpp", "tensorrt_llm"):
         info = registry.get_plugin_info(name, "runtime_providers")
         assert info["name"] == name
         assert info["required_deps"] == ()
-        assert info["entry_point"] == name
+        assert info["entry_point"] is None
 
 
-def test_qualification_ignores_stale_first_party_addin_entry_points(
+def test_qualification_filters_stale_core_entry_points(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -186,7 +232,7 @@ def test_qualification_ignores_stale_first_party_addin_entry_points(
 
     class LocatedDist(DistStub):
         def __init__(self, location: Path) -> None:
-            super().__init__("invarlock-runtime-gguf", registry_mod.INVARLOCK_VERSION)
+            super().__init__("invarlock", registry_mod.INVARLOCK_VERSION)
             self.location = location
 
         def locate_file(self, path: str) -> Path:
@@ -194,12 +240,12 @@ def test_qualification_ignores_stale_first_party_addin_entry_points(
 
     stale = EntryPointStub(
         name="llama_cpp",
-        value="invarlock_addins.gguf.provider:LlamaCppProvider",
+        value="invarlock.runtime_providers.llama_cpp:LlamaCppProvider",
         dist=LocatedDist(stale_site),
     )
     candidate = EntryPointStub(
         name="llama_cpp",
-        value="invarlock_addins.gguf.provider:LlamaCppProvider",
+        value="invarlock.runtime_providers.llama_cpp:LlamaCppProvider",
         dist=LocatedDist(candidate_site),
     )
     monkeypatch.setenv("INVARLOCK_QUALIFICATION_CANDIDATE_SITE", str(candidate_site))
@@ -212,8 +258,13 @@ def test_qualification_ignores_stale_first_party_addin_entry_points(
 
     registry = registry_mod.CoreRegistry()
 
-    assert registry.list_runtime_providers() == ["hf_transformers", "llama_cpp"]
-    assert registry._runtime_providers["llama_cpp"].entry_point is candidate
+    assert registry.list_runtime_providers() == [
+        "hf_transformers",
+        "llama_cpp",
+        "tensorrt_llm",
+        "hf_vision_text",
+    ]
+    assert registry._runtime_providers["llama_cpp"].entry_point is None
 
 
 @pytest.mark.parametrize(
@@ -222,7 +273,7 @@ def test_qualification_ignores_stale_first_party_addin_entry_points(
         (
             "hf_vision_text",
             "spoofed-runtime-hf-vision-text",
-            "invarlock_addins.multimodal.provider:HFVisionTextProvider",
+            "invarlock.runtime_providers.hf_vision_text:HFVisionTextProvider",
         ),
         (
             "hf_vision_text",
@@ -232,7 +283,7 @@ def test_qualification_ignores_stale_first_party_addin_entry_points(
         (
             "llama_cpp",
             "spoofed-runtime-gguf",
-            "invarlock_addins.gguf.provider:LlamaCppProvider",
+            "invarlock.runtime_providers.llama_cpp:LlamaCppProvider",
         ),
         (
             "llama_cpp",
@@ -242,7 +293,7 @@ def test_qualification_ignores_stale_first_party_addin_entry_points(
         (
             "tensorrt_llm",
             "spoofed-runtime-tensorrt-llm",
-            "invarlock_addins.tensorrt_llm.provider:TensorRTLLMProvider",
+            "invarlock.runtime_providers.tensorrt_llm:TensorRTLLMProvider",
         ),
         (
             "tensorrt_llm",
@@ -251,7 +302,7 @@ def test_qualification_ignores_stale_first_party_addin_entry_points(
         ),
     ],
 )
-def test_reserved_first_party_addin_names_reject_distribution_or_value_spoofs(
+def test_reserved_first_party_names_reject_distribution_or_value_spoofs(
     monkeypatch: pytest.MonkeyPatch,
     name: str,
     distribution: str,
@@ -269,16 +320,16 @@ def test_reserved_first_party_addin_names_reject_distribution_or_value_spoofs(
         lambda: SelectEntryPoints(runtime_providers=[entry_point]),
     )
 
-    with pytest.raises(RuntimeError, match="Invalid first-party runtime add-in"):
+    with pytest.raises(RuntimeError, match="Duplicate runtime provider name"):
         registry_mod.CoreRegistry().list_runtime_providers()
 
 
-def test_first_party_addin_version_must_match_core(
+def test_first_party_version_drift_cannot_replace_the_builtin(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     entry_point = EntryPointStub(
         name="llama_cpp",
-        value="invarlock_addins.gguf.provider:LlamaCppProvider",
+        value="invarlock.runtime_providers.llama_cpp:LlamaCppProvider",
         dist=DistStub("invarlock-runtime-gguf", "0.0.0"),
     )
     monkeypatch.setattr(registry_mod, "third_party_plugins_allowed", lambda: False)
@@ -288,7 +339,7 @@ def test_first_party_addin_version_must_match_core(
         lambda: SelectEntryPoints(runtime_providers=[entry_point]),
     )
 
-    with pytest.raises(RuntimeError, match="at version"):
+    with pytest.raises(RuntimeError, match="Duplicate runtime provider name"):
         registry_mod.CoreRegistry().list_runtime_providers()
 
 

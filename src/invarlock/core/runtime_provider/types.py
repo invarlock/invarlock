@@ -88,7 +88,7 @@ def require_runtime_task(value: object, *, field_name: str = "task") -> RuntimeT
     """Return one canonical task identifier or fail closed.
 
     The ABI reserves the identifiers in ``STANDARD_RUNTIME_TASKS`` but
-    intentionally accepts any canonical snake-case identifier. Optional add-ins
+    intentionally accepts any canonical snake-case identifier. Optional providers
     can therefore declare later modalities without an ABI or schema revision.
     """
 

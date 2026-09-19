@@ -53,6 +53,11 @@ from invarlock.report_presentation import (
 from invarlock.report_presentation import (
     render_markdown as render_report_markdown,
 )
+from invarlock.report_publication import (
+    ReportPublicationError,
+    publish_report_outputs,
+    validate_report_destinations,
+)
 
 _MAX_MANIFEST_BYTES = 256 * 1024
 _MAX_REPORT_BYTES = 64 * 1024 * 1024
@@ -1346,7 +1351,7 @@ def render_evidence(
     case_ids: tuple[str, ...] = (),
 ) -> EvidenceReportV2:
     """Render either evidence family without replay or implicit receipt discovery."""
-    from invarlock.captured_contracts import atomic_write, sha
+    from invarlock.captured_contracts import sha
     from invarlock.captured_reporting import (
         CapturedReportError,
         _load,
@@ -1415,33 +1420,7 @@ def render_evidence(
         "errors": [],
     }
     try:
-        resolved: set[Path] = set()
-        for value in requested.values():
-            destination = Path(value).absolute()
-            if destination.name in {"", ".", ".."}:
-                raise EvidenceReportError("report destination must name a regular file")
-            canonical = destination.resolve()
-            if canonical.is_relative_to(
-                evidence.resolve()
-            ) or destination.is_relative_to(evidence.absolute()):
-                raise EvidenceReportError(
-                    "report destination must remain outside the immutable evidence pack"
-                )
-            if any(
-                canonical.is_relative_to(other) or other.is_relative_to(canonical)
-                for other in resolved
-            ):
-                raise EvidenceReportError("report destinations collide")
-            resolved.add(canonical)
-            if destination.exists() or destination.is_symlink():
-                raise EvidenceReportError(
-                    f"report destination already exists: {destination}"
-                )
-            for parent in destination.parents:
-                if parent.is_symlink() or (parent.exists() and not parent.is_dir()):
-                    raise EvidenceReportError(
-                        "report destination parent must be a real directory"
-                    )
+        validate_report_destinations(requested, evidence=evidence)
         if captured:
             manifest, values, signer, _ = _load(evidence)
             view = _view(manifest, values, signer)
@@ -1450,12 +1429,8 @@ def render_evidence(
             view, manifest_digest = _render_native_evidence(evidence)
         payload["pack_manifest_digest"] = manifest_digest
         text = render_report_markdown(view, include_details=explain)
-        rendered = {}
-        if "html" in requested:
-            rendered["html"] = render_report_html(view).encode("utf-8")
-        if "markdown" in requested:
-            rendered["markdown"] = text.encode("utf-8")
-        if "junit" in requested:
+
+        def render_junit() -> bytes:
             suite = Element(
                 "testsuite",
                 name="InvarLock recorded policy checks",
@@ -1482,12 +1457,23 @@ def render_evidence(
                         else "failure",
                         message=xml_text(metric.explanation),
                     )
-            rendered["junit"] = tostring(suite, encoding="utf-8", xml_declaration=True)
-        for name, raw in rendered.items():
-            payload["failed_output"] = name
-            atomic_write(Path(requested[name]), raw)
-            payload["written_outputs"][name] = requested[name]
+            return cast(bytes, tostring(suite, encoding="utf-8", xml_declaration=True))
+
+        payload["written_outputs"] = publish_report_outputs(
+            requested,
+            {
+                "html": lambda: render_report_html(view).encode("utf-8"),
+                "markdown": lambda: text.encode("utf-8"),
+                "junit": render_junit,
+            },
+            evidence=evidence,
+        )
         payload["failed_output"] = None
+    except ReportPublicationError as exc:
+        payload["written_outputs"] = dict(exc.written_outputs)
+        payload["failed_output"] = exc.failed_output
+        payload["errors"] = [str(exc)[:1024]]
+        raise EvidenceReportError(str(exc), payload=payload) from exc
     except (OSError, ValueError, RuntimeError) as exc:
         payload["errors"] = [str(exc)[:1024]]
         raise EvidenceReportError(str(exc), payload=payload) from exc

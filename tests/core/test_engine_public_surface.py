@@ -8,11 +8,15 @@ from invarlock.evaluation_oci import (
     OciRuntimeExecutor,
     OciSideLaunch,
     OciWorkerLimits,
-    launch_from_environment,
+    launch_from_resolved_config,
 )
 from invarlock.evaluation_record_contracts.contracts import digest
 from invarlock.evaluation_records.templates import example_project
-from invarlock.evaluation_runtime import RuntimeResourceResolver
+from invarlock.evaluation_runtime import (
+    ResolvedRuntimeConfig,
+    ResolvedRuntimeSide,
+    RuntimeResourceResolver,
+)
 from invarlock.runtime_providers.hf_transformers import hf_tokenizer_contract_sha256
 
 
@@ -88,6 +92,8 @@ def test_engine_exports_only_supported_transactions_and_provider_contracts() -> 
         "RuntimeProviderCapabilities",
         "RuntimeProviderPluginIdentity",
         "RuntimeProviderReceipt",
+        "ResolvedRuntimeConfig",
+        "ResolvedRuntimeSide",
         "RuntimeResourceResolver",
         "RuntimeScoringRecord",
         "RuntimeSession",
@@ -124,7 +130,7 @@ def test_engine_exports_only_supported_transactions_and_provider_contracts() -> 
         "load_runtime_behavioral_schedule",
         "load_runtime_import_side",
         "load_trust_inputs",
-        "launch_from_environment",
+        "launch_from_resolved_config",
         "make_run",
         "normalize_captured_request",
         "prepare_local_evaluation_schedule",
@@ -154,6 +160,8 @@ def test_engine_exports_only_supported_transactions_and_provider_contracts() -> 
 def test_engine_exports_resolver_types_used_by_stable_function_signatures() -> None:
     assert engine.ProviderResolver is ProviderResolver
     assert engine.RuntimeResourceResolver is RuntimeResourceResolver
+    assert engine.ResolvedRuntimeConfig is ResolvedRuntimeConfig
+    assert engine.ResolvedRuntimeSide is ResolvedRuntimeSide
 
 
 def test_engine_exports_canonical_hf_identity_helpers() -> None:
@@ -190,5 +198,5 @@ def test_engine_exports_host_oci_orchestration_without_worker_internals() -> Non
     assert engine.OciSideLaunch is OciSideLaunch
     assert engine.OciRuntimeExecutor is OciRuntimeExecutor
     assert engine.OciWorkerLimits is OciWorkerLimits
-    assert engine.launch_from_environment is launch_from_environment
+    assert engine.launch_from_resolved_config is launch_from_resolved_config
     assert "compose_side_worker_command" not in engine.__all__

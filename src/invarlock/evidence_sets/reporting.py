@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from xml.etree.ElementTree import Element, SubElement, tostring
 
-from invarlock.captured_contracts import atomic_write, read_file, secure_directory, sha
+from invarlock.captured_contracts import read_file, secure_directory, sha
 from invarlock.captured_reporting import _load as captured_snapshot
 from invarlock.captured_reporting import _view as captured_view
 from invarlock.evidence_pack_contract import canonical_json_bytes
@@ -21,7 +21,6 @@ from invarlock.evidence_sets.contracts import (
     load_index,
     member_path,
     read_object,
-    require_external,
 )
 from invarlock.evidence_sets.verification import (
     require_deterministic_policy,
@@ -34,6 +33,11 @@ from invarlock.report_presentation import (
     render_html,
     render_markdown,
     xml_text,
+)
+from invarlock.report_publication import (
+    ReportPublicationError,
+    publish_report_outputs,
+    validate_report_destinations,
 )
 
 
@@ -222,60 +226,49 @@ def render_evidence_set(
     written: dict[str, str] = {}
     failed = None
     try:
-        destinations: set[Path] = set()
-        for value in requested.values():
-            path = Path(value).absolute()
-            require_external(path, evidence)
-            resolved = path.resolve()
-            if any(
-                resolved.is_relative_to(other) or other.is_relative_to(resolved)
-                for other in destinations
-            ):
-                raise EvidenceSetError("report destinations collide")
-            if path.exists() or path.is_symlink():
-                raise EvidenceSetError("report destination already exists")
-            for parent in path.parents:
-                if parent.is_symlink() or (parent.exists() and not parent.is_dir()):
-                    raise EvidenceSetError(
-                        "report destination parent must be a real directory"
-                    )
-            destinations.add(resolved)
+        validate_report_destinations(requested, evidence=evidence)
         view, facts, digest = build_evidence_set_view(evidence, case_ids=case_ids)
         text = render_markdown(view, include_details=explain)
-        suite = Element(
-            "testsuite",
-            name="InvarLock combined component policy",
-            tests=str(len(view.metrics)),
-            failures=str(sum(m.decision == "regression" for m in view.metrics)),
-            errors=str(
-                sum(m.decision == "insufficient_evidence" for m in view.metrics)
-            ),
-        )
-        for metric in view.metrics:
-            case = SubElement(
-                suite,
-                "testcase",
-                name=xml_text(metric.name),
-                classname="same-answer-component-conjunction-v1",
+
+        def render_junit() -> bytes:
+            suite = Element(
+                "testsuite",
+                name="InvarLock combined component policy",
+                tests=str(len(view.metrics)),
+                failures=str(sum(m.decision == "regression" for m in view.metrics)),
+                errors=str(
+                    sum(m.decision == "insufficient_evidence" for m in view.metrics)
+                ),
             )
-            if metric.decision != "pass":
-                SubElement(
-                    case,
-                    "failure" if metric.decision == "regression" else "error",
-                    message=xml_text(metric.explanation),
+            for metric in view.metrics:
+                case = SubElement(
+                    suite,
+                    "testcase",
+                    name=xml_text(metric.name),
+                    classname="same-answer-component-conjunction-v1",
                 )
-            SubElement(
-                case, "system-out"
-            ).text = "Component policy result only; recipient acceptance not performed. No joint confidence guarantee."
-        rendered = {
-            "html": render_html(view).encode(),
-            "markdown": text.encode(),
-            "junit": tostring(suite, encoding="utf-8", xml_declaration=True),
-        }
-        for name, destination in requested.items():
-            failed = name
-            atomic_write(Path(destination), rendered[name])
-            written[name] = destination
+                if metric.decision != "pass":
+                    SubElement(
+                        case,
+                        "failure" if metric.decision == "regression" else "error",
+                        message=xml_text(metric.explanation),
+                    )
+                SubElement(
+                    case, "system-out"
+                ).text = "Component policy result only; recipient acceptance not performed. No joint confidence guarantee."
+            return cast(bytes, tostring(suite, encoding="utf-8", xml_declaration=True))
+
+        written.update(
+            publish_report_outputs(
+                requested,
+                {
+                    "html": lambda: render_html(view).encode(),
+                    "markdown": lambda: text.encode(),
+                    "junit": render_junit,
+                },
+                evidence=evidence,
+            )
+        )
         return EvidenceSetReport(
             text=text,
             kind="evidence_set",
@@ -284,6 +277,21 @@ def render_evidence_set(
             written_outputs=written,
             facts=facts,
         )
+    except ReportPublicationError as exc:
+        written.update(exc.written_outputs)
+        failed = exc.failed_output
+        raise EvidenceReportError(
+            str(exc),
+            payload={
+                "format_version": "invarlock/evidence-set-report-v1",
+                "kind": "evidence_set",
+                "ok": False,
+                "errors": [str(exc)[:1024]],
+                "requested_outputs": requested,
+                "written_outputs": written,
+                "failed_output": failed,
+            },
+        ) from exc
     except (OSError, ValueError, KeyError, TypeError) as exc:
         raise EvidenceReportError(
             str(exc),
