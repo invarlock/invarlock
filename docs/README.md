@@ -141,7 +141,7 @@ provider import uses complete existing sidecars instead of rerunning answers.
 
 ![Native comparisons, captured records and frozen answers feed evaluation, followed by independent verification and reporting](assets/evaluation-verification-flow.svg)
 
-**Captured evaluation** accepts supported Inspect AI, Harness and Promptfoo
+**Captured evaluation** accepts supported Inspect AI, Harness, Promptfoo and Langfuse
 export profiles, canonical records or data prepared through the
 [Python API](reference/api-guide.md). Original per-case observations and their
 identities are required; aggregate scores cannot fill gaps. The

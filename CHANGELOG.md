@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add a maintained Langfuse experiment-export parser with explicit source and
+  item identities, scorer-specific measurements, and offline verification.
+- Add a real ModelKit handoff journey and exact GGUF file mapping inside the
+  verified package, including recipient policy and delivered-model checks.
+
 - Support explicit OpenAI, Anthropic, Google and OpenRouter judge collection
   profiles through the optional pinned SDKs, with provider-specific credentials,
   endpoint validation and offline SDK transport tests.

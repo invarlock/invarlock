@@ -23,6 +23,7 @@ revision, as explained in [getting started](../docs/user-guide/getting-started.m
 | Compare two HTTP service runs | [Hosted service](hosted-service/README.md) | New calls to an endpoint you supply, followed by offline evaluation and verification |
 | Inspect actual model comparison results | [Retained comparisons](captured-results/references/README.md) | Offline replay of routing, likelihood and HTTP results, including policy rejections |
 | Inspect a larger judge study | [Held-out judge reference](judge-measurements/references/k2-32b-luna-xhigh-heldout/README.md) | Offline replay of 10,260 retained ratings across fixed QA and extraction tasks |
+| Use Langfuse experiment results | [Langfuse handoff](integrations/langfuse/README.md) | Preserve complete experiment records for scoring and offline verification |
 | Check a delivered model package | [ModelKit handoff](integrations/modelkit-handoff/README.md) | Checks that the package matches approved evidence and recipient policy |
 | Add verification to CI or a policy engine | [CI examples](ci/README.md) and [OPA/CUE example](policy-engine-interop/README.md) | Automation patterns with their supported receipt and policy boundaries |
 

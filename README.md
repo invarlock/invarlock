@@ -187,7 +187,7 @@ preserving each check's meaning.
 ## Keep your evaluator or run the comparison here
 
 **Use existing records.** Installed parsers cover selected Inspect AI, LM
-Evaluation Harness and Promptfoo export profiles, plus canonical JSON and generic
+Evaluation Harness, Promptfoo and Langfuse export profiles, plus canonical JSON and generic
 JSONL. The [capture SDK](docs/reference/api-guide.md)
 lets other pipelines supply the required per-case facts. Structured inputs need
 an explicit text projection for judging; normalized NLL needs actual likelihood
@@ -197,8 +197,8 @@ distinguishes installed support, replay authority and retained runtime evidence
 for each declared profile.
 
 **Run a native comparison.** Hugging Face Transformers is the built-in runtime.
-Optional GGUF/llama.cpp, TensorRT-LLM and Hugging Face vision-text packages provide
-additional runtime profiles. Native run mode uses a caller-authorized,
+GGUF/llama.cpp, TensorRT-LLM and Hugging Face vision-text providers are included
+in core, with optional execution dependencies. Native run mode uses a caller-authorized,
 digest-addressed Docker or Podman image. Follow the
 [getting-started guide](docs/user-guide/getting-started.md)
 for artifact pins, runtime setup and independent verification inputs.
