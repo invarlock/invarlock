@@ -9,7 +9,6 @@ from pathlib import Path
 from typing import Any, cast
 from xml.etree.ElementTree import Element, SubElement, tostring
 
-from invarlock.captured_contracts import atomic_write
 from invarlock.engine import run_digest
 from invarlock.evaluation_record_contracts.contracts import digest as record_digest
 from invarlock.evidence_reporting import EvidenceReportError, EvidenceReportV2
@@ -29,6 +28,11 @@ from invarlock.report_presentation import (
     render_html,
     render_markdown,
     xml_text,
+)
+from invarlock.report_publication import (
+    ReportPublicationError,
+    publish_report_outputs,
+    validate_report_destinations,
 )
 
 CASE_DETAIL_LIMIT = 50
@@ -801,76 +805,65 @@ def render_judge_evidence(
     written: dict[str, str] = {}
     failed: str | None = None
     try:
-        destinations: set[Path] = set()
-        for value in requested.values():
-            destination = Path(value).absolute()
-            canonical = destination.resolve()
-            if canonical.is_relative_to(
-                Path(evidence).resolve()
-            ) or destination.is_relative_to(Path(evidence).absolute()):
-                raise EvidenceReportError(
-                    "report destination must remain outside immutable evidence"
-                )
-            if any(
-                canonical.is_relative_to(other) or other.is_relative_to(canonical)
-                for other in destinations
-            ):
-                raise EvidenceReportError("report destinations collide")
-            if destination.exists() or destination.is_symlink():
-                raise EvidenceReportError("report destination already exists")
-            for parent in destination.parents:
-                if parent.is_symlink() or (parent.exists() and not parent.is_dir()):
-                    raise EvidenceReportError(
-                        "report destination parent must be a real directory"
-                    )
-            destinations.add(canonical)
+        validate_report_destinations(requested, evidence=evidence)
         publication, artifacts = _snapshot(evidence)
         view, facts = _view(publication, artifacts, case_ids=case_ids)
         text = render_markdown(view, include_details=explain)
-        rendered = {"html": render_html(view).encode(), "markdown": text.encode()}
         required = facts["assurance"]["decision_role"] == "required"
-        suite = Element(
-            "testsuite",
-            name="InvarLock bounded judge policy",
-            tests="1",
-            failures=str(int(required and view.decision == "regression")),
-            errors=str(int(required and view.decision == "insufficient_evidence")),
-            skipped=str(int(not required)),
-        )
-        properties = SubElement(suite, "properties")
-        SubElement(
-            properties,
-            "property",
-            name="decision_role",
-            value="required" if required else "advisory",
-        )
-        SubElement(properties, "property", name="policy_decision", value=view.decision)
-        case = SubElement(
-            suite,
-            "testcase",
-            name=xml_text(view.metrics[0].name),
-            classname="bounded-judge-fixed-benchmark-v1",
-        )
-        if not required:
-            SubElement(
-                case,
-                "skipped",
-                message=f"Advisory metric: {view.decision}; required decisions are not gated.",
+
+        def render_junit() -> bytes:
+            suite = Element(
+                "testsuite",
+                name="InvarLock bounded judge policy",
+                tests="1",
+                failures=str(int(required and view.decision == "regression")),
+                errors=str(int(required and view.decision == "insufficient_evidence")),
+                skipped=str(int(not required)),
             )
-        elif view.decision != "pass":
+            properties = SubElement(suite, "properties")
             SubElement(
-                case,
-                "failure" if view.decision == "regression" else "error",
-                message=xml_text(view.metrics[0].explanation),
+                properties,
+                "property",
+                name="decision_role",
+                value="required" if required else "advisory",
             )
-        SubElement(
-            case, "system-out"
-        ).text = "Offline replay completed. Recipient signer authorization and acceptance were not performed."
-        rendered["junit"] = tostring(suite, encoding="utf-8", xml_declaration=True)
-        for name, destination_text in requested.items():
-            failed = name
-            atomic_write(Path(destination_text), rendered[name])
-            written[name] = destination_text
+            SubElement(
+                properties, "property", name="policy_decision", value=view.decision
+            )
+            case = SubElement(
+                suite,
+                "testcase",
+                name=xml_text(view.metrics[0].name),
+                classname="bounded-judge-fixed-benchmark-v1",
+            )
+            if not required:
+                SubElement(
+                    case,
+                    "skipped",
+                    message=f"Advisory metric: {view.decision}; required decisions are not gated.",
+                )
+            elif view.decision != "pass":
+                SubElement(
+                    case,
+                    "failure" if view.decision == "regression" else "error",
+                    message=xml_text(view.metrics[0].explanation),
+                )
+            SubElement(
+                case, "system-out"
+            ).text = "Offline replay completed. Recipient signer authorization and acceptance were not performed."
+            return cast(bytes, tostring(suite, encoding="utf-8", xml_declaration=True))
+
+        written.update(
+            publish_report_outputs(
+                requested,
+                {
+                    "html": lambda: render_html(view).encode(),
+                    "markdown": lambda: text.encode(),
+                    "junit": render_junit,
+                },
+                evidence=evidence,
+            )
+        )
         return JudgeEvidenceReport(
             text=text,
             kind="judge",
@@ -879,6 +872,19 @@ def render_judge_evidence(
             written_outputs=written,
             facts=facts,
         )
+    except ReportPublicationError as exc:
+        written.update(exc.written_outputs)
+        failed = exc.failed_output
+        payload = {
+            "format_version": "invarlock/judge-evidence-report-v1",
+            "kind": "judge",
+            "ok": False,
+            "errors": [str(exc)[:1024]],
+            "requested_outputs": requested,
+            "written_outputs": written,
+            "failed_output": failed,
+        }
+        raise EvidenceReportError(str(exc), payload=payload) from exc
     except (OSError, ValueError, RuntimeError) as exc:
         payload = {
             "format_version": "invarlock/judge-evidence-report-v1",
