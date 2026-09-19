@@ -40,6 +40,8 @@ from invarlock.evaluation_run import EvaluationRunResult, load_runtime_side_evid
 from invarlock.evaluation_runtime import (
     CallerRuntimeResources,
     ProviderResourceBinding,
+    ResolvedRuntimeConfig,
+    ResolvedRuntimeSide,
     RuntimeSideRole,
 )
 from invarlock.evidence_pack_contract import canonical_json_bytes
@@ -498,12 +500,6 @@ def _portable_image_ref(image_ref: str, image_digest: str, *, engine_path: str) 
     return _resolve_inspected_image(image, digest, inspection, allow_tag=True)
 
 
-def _embedded_digest(image: str) -> str:
-    if _DIGEST_RE.fullmatch(image) is not None:
-        return image
-    return image.rsplit("@", 1)[1] if "@" in image else ""
-
-
 def _engine_binary(engine: str) -> tuple[ContainerEngine, str]:
     if engine not in {"docker", "podman"}:
         raise OciEvaluationError("container engine must be docker or podman")
@@ -527,149 +523,43 @@ def _entrypoint(value: str, *, label: str) -> EntrypointProfile:
     return cast(EntrypointProfile, profile)
 
 
-def launch_from_environment(
-    *,
-    engine: str | None = None,
-    image_ref: str | None = None,
-    image_digest: str | None = None,
-    baseline_image_ref: str | None = None,
-    baseline_image_digest: str | None = None,
-    subject_image_ref: str | None = None,
-    subject_image_digest: str | None = None,
-    default_device: str | None = None,
-    baseline_device: str | None = None,
-    subject_device: str | None = None,
-    runtime_entrypoint: str | None = None,
-    baseline_entrypoint: str | None = None,
-    subject_entrypoint: str | None = None,
-    runtime_cpus: str | None = None,
-    runtime_memory_mib: int | str | None = None,
-    runtime_user: str | None = None,
-) -> OciEvaluationLaunch:
-    """Resolve common defaults and optional per-side OCI bindings."""
-
-    common_image = image_ref or os.environ.get(RUNTIME_IMAGE_ENV, "")
-    common_digest = image_digest or os.environ.get(RUNTIME_IMAGE_DIGEST_ENV, "")
-    common_device = _device(
-        default_device or os.environ.get(RUNTIME_DEVICE_ENV, "cpu"),
-        label="runtime device",
-    )
-    common_entrypoint = runtime_entrypoint or os.environ.get(
-        RUNTIME_ENTRYPOINT_ENV, "auto"
-    )
-
-    for selected_image, selected_digest, digest_variable in (
-        (
-            baseline_image_ref
-            or os.environ.get(BASELINE_RUNTIME_IMAGE_ENV)
-            or common_image,
-            baseline_image_digest
-            or os.environ.get(BASELINE_RUNTIME_IMAGE_DIGEST_ENV)
-            or common_digest,
-            BASELINE_RUNTIME_IMAGE_DIGEST_ENV,
-        ),
-        (
-            subject_image_ref
-            or os.environ.get(SUBJECT_RUNTIME_IMAGE_ENV)
-            or common_image,
-            subject_image_digest
-            or os.environ.get(SUBJECT_RUNTIME_IMAGE_DIGEST_ENV)
-            or common_digest,
-            SUBJECT_RUNTIME_IMAGE_DIGEST_ENV,
-        ),
-    ):
-        if not selected_digest and not _embedded_digest(selected_image):
-            raise OciEvaluationError(
-                "runtime image digest is required through "
-                f"{digest_variable} or {RUNTIME_IMAGE_DIGEST_ENV}"
-            )
-
-    selected_engine, engine_path = _engine_binary(
-        engine or os.environ.get(CONTAINER_ENGINE_ENV, "docker")
-    )
+def launch_from_resolved_config(config: ResolvedRuntimeConfig) -> OciEvaluationLaunch:
+    """Validate and bind a complete selection without defaults or environment reads."""
+    if not isinstance(config, ResolvedRuntimeConfig):
+        raise TypeError("runtime launch requires a ResolvedRuntimeConfig")
+    if config.engine not in {"docker", "podman"}:
+        raise OciEvaluationError("container engine must be docker or podman")
+    selected_engine = cast(ContainerEngine, config.engine)
+    engine_path = config.engine_path
+    if engine_path is None:
+        raise OciEvaluationError(f"container engine {config.engine!r} is not available")
+    if not Path(engine_path).is_absolute():
+        raise OciEvaluationError("resolved container engine path must be absolute")
 
     def side_launch(
-        *,
-        role: RuntimeSideRole,
-        explicit_image: str | None,
-        image_variable: str,
-        explicit_digest: str | None,
-        digest_variable: str,
-        explicit_device: str | None,
-        device_variable: str,
-        explicit_entrypoint: str | None,
-        entrypoint_variable: str,
+        side: ResolvedRuntimeSide, *, role: RuntimeSideRole
     ) -> OciSideLaunch:
-        selected_image = (
-            explicit_image or os.environ.get(image_variable) or common_image
-        )
-        selected_digest = (
-            explicit_digest
-            or os.environ.get(digest_variable)
-            or _embedded_digest(selected_image)
-            or common_digest
-        )
+        if not side.image_digest:
+            raise OciEvaluationError(f"{role} runtime image digest is required")
         return OciSideLaunch(
             image_ref=_portable_image_ref(
-                selected_image, selected_digest, engine_path=engine_path
+                side.image_ref, side.image_digest, engine_path=engine_path
             ),
-            image_digest=selected_digest,
-            device=_device(
-                explicit_device or os.environ.get(device_variable) or common_device,
-                label=f"{role} runtime device",
-            ),
-            entrypoint=_entrypoint(
-                explicit_entrypoint
-                or os.environ.get(entrypoint_variable)
-                or common_entrypoint,
-                label=f"{role} runtime entrypoint",
-            ),
+            image_digest=side.image_digest,
+            device=_device(side.device, label=f"{role} runtime device"),
+            entrypoint=_entrypoint(side.entrypoint, label=f"{role} runtime entrypoint"),
         )
 
     return OciEvaluationLaunch(
         engine=selected_engine,
         engine_path=engine_path,
         worker_limits=OciWorkerLimits(
-            cpus=(
-                runtime_cpus
-                if runtime_cpus is not None
-                else os.environ.get(RUNTIME_CPUS_ENV, _DEFAULT_WORKER_CPUS)
-            ),
-            memory_mib=_memory_limit_mib(
-                runtime_memory_mib
-                if runtime_memory_mib is not None
-                else os.environ.get(
-                    RUNTIME_MEMORY_MIB_ENV, str(_DEFAULT_WORKER_MEMORY_MIB)
-                )
-            ),
-            user=(
-                runtime_user
-                if runtime_user is not None
-                else os.environ.get(RUNTIME_USER_ENV, _DEFAULT_WORKER_USER)
-            ),
+            cpus=config.cpus,
+            memory_mib=config.memory_mib,
+            user=config.user,
         ),
-        baseline=side_launch(
-            role="baseline",
-            explicit_image=baseline_image_ref,
-            image_variable=BASELINE_RUNTIME_IMAGE_ENV,
-            explicit_digest=baseline_image_digest,
-            digest_variable=BASELINE_RUNTIME_IMAGE_DIGEST_ENV,
-            explicit_device=baseline_device,
-            device_variable=BASELINE_RUNTIME_DEVICE_ENV,
-            explicit_entrypoint=baseline_entrypoint,
-            entrypoint_variable=BASELINE_RUNTIME_ENTRYPOINT_ENV,
-        ),
-        subject=side_launch(
-            role="subject",
-            explicit_image=subject_image_ref,
-            image_variable=SUBJECT_RUNTIME_IMAGE_ENV,
-            explicit_digest=subject_image_digest,
-            digest_variable=SUBJECT_RUNTIME_IMAGE_DIGEST_ENV,
-            explicit_device=subject_device,
-            device_variable=SUBJECT_RUNTIME_DEVICE_ENV,
-            explicit_entrypoint=subject_entrypoint,
-            entrypoint_variable=SUBJECT_RUNTIME_ENTRYPOINT_ENV,
-        ),
+        baseline=side_launch(config.baseline, role="baseline"),
+        subject=side_launch(config.subject, role="subject"),
     )
 
 
@@ -1688,7 +1578,7 @@ __all__ = [
     "SUBJECT_RUNTIME_IMAGE_ENV",
     "compose_side_worker_command",
     "evaluation_request_execution_mode",
-    "launch_from_environment",
+    "launch_from_resolved_config",
     "preflight_oci_launch",
     "run_side_worker",
 ]
