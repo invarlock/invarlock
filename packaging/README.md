@@ -212,7 +212,9 @@ service again.
 ## Inspect real retained examples
 
 The repository includes signed evidence, receipts and replay instructions from
-actual model runs. Each reference establishes its declared workflow and scope:
+actual model runs. Start with the [practical change walkthroughs](https://github.com/invarlock/invarlock/blob/v0.16.1/examples/README.md#inspect-a-practical-model-change)
+for quantization, extraction instructions or a checkpoint replacement. Each
+reference establishes its declared workflow and scope:
 
 | Reference | Retained work |
 | --- | --- |
