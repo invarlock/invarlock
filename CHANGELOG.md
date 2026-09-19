@@ -53,8 +53,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Accept complete Podman image IDs during authenticated runtime builds while
-  retaining strict source, image and filesystem checks.
+- Accept complete Podman image IDs in authenticated builds and example workflows
+  while retaining strict source, image and filesystem checks. Temporary registry
+  cleanup also preserves image tags whose ownership has changed.
 - Support explicit Docker and Podman selection in TensorRT preparation, including
   access to generated artifacts under rootless container engines.
 - Reject unsupported native batch sizes during preflight before model execution.

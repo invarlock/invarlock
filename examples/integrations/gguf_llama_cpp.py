@@ -19,6 +19,7 @@ import yaml
 from examples.integrations import launch
 from examples.integrations.evaluator_transaction.image_cleanup import (
     OwnedImageTag,
+    normalize_image_id,
     record_owned_image_tag,
     remove_owned_image_tags,
     temporary_image_tag,
@@ -269,14 +270,7 @@ def _inspect_image_id(repository: Path, *, container_engine: str, image: str) ->
         cwd=repository,
         capture_output=True,
     )
-    image_id = completed.stdout.strip()
-    if (
-        not image_id.startswith("sha256:")
-        or len(image_id) != 71
-        or any(character not in "0123456789abcdef" for character in image_id[7:])
-    ):
-        raise RuntimeError("container inspection did not return a sha256 image ID")
-    return image_id
+    return normalize_image_id(completed.stdout)
 
 
 def _build_runtime_image(

@@ -28,6 +28,7 @@ if str(REPOSITORY) not in sys.path:
 
 from examples.integrations.evaluator_transaction.image_cleanup import (  # noqa: E402
     OwnedImageTag,
+    normalize_image_id,
     record_owned_image_tag,
     remove_owned_image_tags,
     temporary_image_tag,
@@ -295,7 +296,7 @@ def main(argv: list[str] | None = None) -> int:
             ],
             cwd=repository,
         )
-        if inspected_id != image_id:
+        if normalize_image_id(inspected_id) != image_id:
             raise RuntimeError("Harness image identity file disagrees with inspection")
         embedded_base_id = run(
             [
