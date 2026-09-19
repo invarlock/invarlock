@@ -11,14 +11,14 @@ from types import SimpleNamespace
 import pytest
 
 from invarlock.filesystem.paths import pinned_directory
-from invarlock.judge_collection import (
+from invarlock.judge_measurements import (
     CollectionOptions,
     InspectJudgeError,
     RunnerOptions,
     collect,
     render_request,
 )
-from invarlock.judge_collection import runner as live
+from invarlock.judge_measurements import runner as live
 from invarlock.judge_measurements.contracts import canonical_payload
 
 FIXTURES = Path(__file__).with_name("fixtures")
@@ -262,7 +262,7 @@ def test_live_stop_reason_reports_actual_admission_boundary(
 
     monkeypatch.setattr(live, "_call_one", call_one)
     if stop == "capacity":
-        from invarlock.judge_collection import collector as planning
+        from invarlock.judge_measurements import collector as planning
 
         # Actual live storage accounting can be stricter than the public batch
         # planner. The runner must report its own terminal admission boundary.
@@ -384,6 +384,22 @@ def test_live_collection_rejects_unsupported_execution_profile(
         (("call", "request"), None, "retain the provider request"),
         (("call", "response"), [], "response must be a JSON object"),
         (("output", "usage", "total_cost"), 0.0002, "reserved per-call amount"),
+        (("output", "usage", "total_cost"), 0.0001001, "reserved per-call amount"),
+        (("output", "usage", "total_cost"), float("nan"), "finite nonnegative"),
+        (("output", "usage", "total_cost"), -1, "finite nonnegative"),
+        (("output", "usage", "input_tokens"), 1.9, "nonnegative integers"),
+        (("output", "usage", "output_tokens"), True, "nonnegative integers"),
+        (("output", "usage", "input_tokens_cache_read"), -1, "nonnegative integers"),
+        (
+            ("output", "choices"),
+            [SimpleNamespace(), SimpleNamespace()],
+            "one completion",
+        ),
+        (
+            ("output", "choices", 0, "message"),
+            SimpleNamespace(tool_calls=["unrequested"]),
+            "contains tool calls",
+        ),
         (("config", "temperature"), 0.5, "changed generation settings"),
         (("config", "reasoning_effort"), "high", "changed generation settings"),
         (("config", "top_k"), 10, "hidden generation settings"),
@@ -394,6 +410,29 @@ def test_sdk_projection_rejects_unapproved_calls(
 ):
     _set_attribute(sdk_event, path, value)
     with pytest.raises(InspectJudgeError, match=message):
+        _project(inputs, sdk_event)
+
+
+@pytest.mark.parametrize(
+    "changed", ["model", "temperature", "reasoning_effort", "service_tier"]
+)
+def test_openai_wire_controls_are_checked_before_normalization(
+    inputs, sdk_event, changed
+):
+    grader = "openai/approved-model"
+    inputs["plan"]["judge"]["requested_model"] = grader
+    inputs["options"] = replace(inputs["options"], grader=grader)
+    sdk_event.model = grader
+    sdk_event.call.request["model"] = "approved-model"
+    if changed == "service_tier":
+        sdk_event.call.response["service_tier"] = "priority"
+    else:
+        sdk_event.call.request[changed] = {
+            "model": "changed-model",
+            "temperature": 0.5,
+            "reasoning_effort": "high",
+        }[changed]
+    with pytest.raises(InspectJudgeError, match="differs|service tier"):
         _project(inputs, sdk_event)
 
 
@@ -408,7 +447,14 @@ def test_sdk_projection_counts_cached_input_tokens_in_the_reservation(
         "output_tokens": sdk_event.output.usage.output_tokens,
     }
     assert projected["output"]["request_id"] == sdk_event.output.metadata["request_id"]
-    assert projected["call"]["response"] == sdk_event.call.response
+    assert projected["call"]["response"] == {
+        "format": "invarlock/judge-provider-response-v1",
+        "content": sdk_event.output.completion,
+        "model": sdk_event.output.model,
+        "id": sdk_event.output.metadata["request_id"],
+        "finish_reason": sdk_event.output.choices[0].stop_reason,
+        "usage": projected["output"]["usage"],
+    }
     assert projected["error"] is None
 
 
@@ -437,6 +483,8 @@ def test_failed_sdk_projection_drops_private_error_details(inputs, sdk_event, fa
     [
         ({"id": "native-id", "request_id": "fallback"}, None, "native-id"),
         ({"id": "", "request_id": "fallback"}, None, "fallback"),
+        ({"response_id": "google-id"}, None, "google-id"),
+        ({"responseId": "google-camel-id"}, None, "google-camel-id"),
         ({"id": "x" * 257}, "metadata-id", "metadata-id"),
         (None, {"request_id": "metadata-id"}, "metadata-id"),
         (None, {"request_id": ""}, None),

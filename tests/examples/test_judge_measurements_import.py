@@ -204,7 +204,7 @@ def test_missing_core_has_actionable_error(example, monkeypatch, capsys):
     original = builtins.__import__
 
     def missing(name, *args, **kwargs):
-        if name == "invarlock.judge_collection":
+        if name == "invarlock.judge_measurements":
             raise ImportError("not installed")
         return original(name, *args, **kwargs)
 

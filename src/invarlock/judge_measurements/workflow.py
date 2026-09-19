@@ -400,7 +400,7 @@ def _prepare(request: JudgeEvaluationRequest) -> tuple[dict[str, Any], dict[str,
     if request.mode == "judge_collect":
         result["collection_integration"] = {
             "package": "invarlock",
-            "api": "invarlock.judge_collection.collect_configured",
+            "api": "invarlock.judge_measurements.collect_configured",
             "execution": "installed_evaluate",
             "core_cli_execution": True,
         }

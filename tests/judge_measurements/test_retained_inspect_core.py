@@ -103,6 +103,19 @@ def native(event):
     return event["call"]
 
 
+def normalized_response(event):
+    output = event["output"]
+    event["call"]["response"] = {
+        "format": "invarlock/judge-provider-response-v1",
+        "content": output["completion"],
+        "model": output["model"],
+        "id": output["request_id"],
+        "finish_reason": output["finish_reason"],
+        "usage": copy.deepcopy(output["usage"]),
+    }
+    return event["call"]["response"]
+
+
 def test_retained_inspect_normalized_and_native_events_replay_in_core(retained):
     replay(retained)
     for record in retained[1]["records"]:
@@ -111,6 +124,17 @@ def test_retained_inspect_normalized_and_native_events_replay_in_core(retained):
             tools=None, tool_choice=None, extra_headers={"x-irid": "correlation"}
         )
     replay(retained)
+
+
+def test_provider_neutral_responses_replay_and_bind_output_metadata(retained):
+    for record in retained[1]["records"]:
+        normalized_response(record["events"][0])
+    replay(retained)
+
+    response = retained[1]["records"][0]["events"][0]["call"]["response"]
+    response["model"] = "different-model"
+    with pytest.raises(c.JudgeMeasurementContractError, match="resolved model"):
+        replay(retained)
 
 
 @pytest.mark.parametrize(

@@ -13,6 +13,7 @@ from collections import deque
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, replace
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, cast
 
@@ -26,6 +27,9 @@ from invarlock.filesystem.paths import (
 )
 from invarlock.judge_measurement_types import JudgeMeasurementPlan, JudgeMeasurements
 from invarlock.judge_measurements.contracts import (
+    JudgeMeasurementContractError,
+    _check_inspect_provider_projection,
+    _check_inspect_provider_response,
     canonical_payload,
     expected_trial_id,
     measurement_plan_digest,
@@ -327,7 +331,20 @@ def _admission_event(
 
 def _require_provider_retries_disabled(model: Any) -> None:
     api = getattr(model, "api", None)
+    if (
+        str(model).startswith("anthropic/")
+        and getattr(api, "_invarlock_single_attempt", False) is not True
+    ):
+        raise InspectJudgeError(
+            "Anthropic provider requires the configured single-attempt client"
+        )
     client = getattr(api, "client", None)
+    if client is None and str(model).startswith("google/"):
+        if getattr(api, "_invarlock_single_attempt", False) is True:
+            return
+        raise InspectJudgeError(
+            "Google provider requires the configured single-attempt client"
+        )
     if getattr(client, "max_retries", None) != 0:
         raise InspectJudgeError("the Inspect provider client must expose max_retries=0")
 
@@ -342,7 +359,8 @@ def _require_clean_model_configuration(model: Any) -> None:
             "Inspect model configuration must not contain inherited settings"
         )
     api = getattr(model, "api", None)
-    if getattr(api, "responses_api", None) is not False:
+    responses_api = getattr(api, "responses_api", None)
+    if responses_api not in (None, False):
         raise InspectJudgeError(
             "Inspect provider must explicitly use the chat-completion API"
         )
@@ -370,6 +388,8 @@ def _request_id(response: Any, output: Any) -> str | None:
     for value in (
         response.get("id") if isinstance(response, dict) else None,
         response.get("request_id") if isinstance(response, dict) else None,
+        response.get("response_id") if isinstance(response, dict) else None,
+        response.get("responseId") if isinstance(response, dict) else None,
         getattr(output, "metadata", None),
     ):
         if isinstance(value, str) and 0 < len(value) <= 256:
@@ -379,6 +399,179 @@ def _request_id(response: Any, output: Any) -> str | None:
             if isinstance(candidate, str) and 0 < len(candidate) <= 256:
                 return candidate
     return None
+
+
+def _check_openai_wire_call(
+    request: dict[str, Any], response: Any, expected_request: dict[str, Any]
+) -> None:
+    try:
+        _check_inspect_provider_projection(
+            call={"request": request, "response": response},
+            output={},
+            normalized_request=expected_request,
+            completed=False,
+            inspect_version=INSPECT_VERSION,
+        )
+    except JudgeMeasurementContractError as exc:
+        raise InspectJudgeError(str(exc)) from None
+    if isinstance(response, dict) and response.get("service_tier") not in (
+        None,
+        "default",
+    ):
+        raise InspectJudgeError(
+            "provider response contains an unsupported service tier"
+        )
+
+
+def _wire_tokens(usage: dict[str, Any], name: str, *, optional: bool = False) -> int:
+    value = usage.get(name)
+    if value is None and optional:
+        return 0
+    if type(value) is not int or value < 0:
+        raise InspectJudgeError(
+            "provider response token usage must use nonnegative integers"
+        )
+    return value
+
+
+def _anthropic_wire_response(response: dict[str, Any]) -> dict[str, Any]:
+    content = response.get("content")
+    usage = response.get("usage")
+    if (
+        response.get("role") != "assistant"
+        or not isinstance(content, list)
+        or not isinstance(usage, dict)
+    ):
+        raise InspectJudgeError("Anthropic provider response has an unsupported shape")
+    if usage.get("iterations"):
+        raise InspectJudgeError(
+            "Anthropic provider response contains unsupported iterations"
+        )
+    texts = []
+    for part in content:
+        if not isinstance(part, dict) or part.get("type") not in {
+            "text",
+            "thinking",
+            "redacted_thinking",
+        }:
+            raise InspectJudgeError(
+                "Anthropic provider response contains unsupported content"
+            )
+        if part["type"] == "text":
+            if not isinstance(part.get("text"), str):
+                raise InspectJudgeError("Anthropic provider response text is invalid")
+            texts.append(part["text"])
+    reasons = {
+        "end_turn": "stop",
+        "stop_sequence": "stop",
+        "max_tokens": "max_tokens",
+        "refusal": "content_filter",
+    }
+    if response.get("stop_reason") not in reasons:
+        raise InspectJudgeError(
+            "Anthropic provider response finish reason is unsupported"
+        )
+    return {
+        "format": "invarlock/judge-provider-response-v1",
+        "content": "\n".join(texts),
+        "model": response.get("model"),
+        "id": response.get("id"),
+        "finish_reason": reasons[response["stop_reason"]],
+        "usage": {
+            "input_tokens": _wire_tokens(usage, "input_tokens")
+            + _wire_tokens(usage, "cache_read_input_tokens", optional=True)
+            + _wire_tokens(usage, "cache_creation_input_tokens", optional=True),
+            "output_tokens": _wire_tokens(usage, "output_tokens"),
+        },
+    }
+
+
+def _google_wire_response(response: dict[str, Any]) -> dict[str, Any]:
+    candidates = response.get("candidates")
+    usage = response.get("usageMetadata")
+    if (
+        not isinstance(candidates, list)
+        or len(candidates) != 1
+        or not isinstance(candidates[0], dict)
+        or not isinstance(usage, dict)
+    ):
+        raise InspectJudgeError("Google provider response has an unsupported shape")
+    candidate = candidates[0]
+    content = candidate.get("content") or {}
+    if not isinstance(content, dict) or content.get("role") not in (None, "model"):
+        raise InspectJudgeError("Google provider response content is invalid")
+    parts = content.get("parts") or []
+    if not isinstance(parts, list):
+        raise InspectJudgeError("Google provider response content is invalid")
+    texts = []
+    for part in parts:
+        if not isinstance(part, dict) or any(
+            value is not None
+            for key, value in part.items()
+            if key not in {"text", "thought", "thoughtSignature"}
+        ):
+            raise InspectJudgeError(
+                "Google provider response contains unsupported content"
+            )
+        if part.get("text") is not None:
+            if not isinstance(part["text"], str):
+                raise InspectJudgeError("Google provider response text is invalid")
+            if part.get("thought") is not True:
+                texts.append(part["text"])
+    reasons = {
+        "STOP": "stop",
+        "MAX_TOKENS": "max_tokens",
+        "SAFETY": "content_filter",
+        "RECITATION": "content_filter",
+        "BLOCKLIST": "content_filter",
+        "PROHIBITED_CONTENT": "content_filter",
+        "SPII": "content_filter",
+    }
+    reason = candidate.get("finishReason") or "STOP"
+    if reason not in reasons:
+        raise InspectJudgeError("Google provider response finish reason is unsupported")
+    return {
+        "format": "invarlock/judge-provider-response-v1",
+        "content": "\n".join(texts),
+        "model": response.get("modelVersion"),
+        "id": response.get("responseId"),
+        "finish_reason": reasons[reason],
+        "usage": {
+            "input_tokens": _wire_tokens(usage, "promptTokenCount"),
+            "output_tokens": _wire_tokens(usage, "candidatesTokenCount", optional=True)
+            + _wire_tokens(usage, "thoughtsTokenCount", optional=True),
+        },
+    }
+
+
+def _check_wire_response(
+    response: dict[str, Any],
+    output: dict[str, Any],
+    request: dict[str, Any],
+    grader: str,
+) -> None:
+    provider = grader.partition("/")[0]
+    if provider == "anthropic":
+        response = _anthropic_wire_response(response)
+        request = {}
+    elif provider == "google":
+        response = _google_wire_response(response)
+        request = {}
+    elif provider in {"openai", "openrouter"}:
+        if not isinstance(response.get("choices"), list) or not isinstance(
+            response.get("usage"), dict
+        ):
+            raise InspectJudgeError(
+                "provider response is missing its completion or usage"
+            )
+        _wire_tokens(response["usage"], "prompt_tokens")
+        _wire_tokens(response["usage"], "completion_tokens")
+    try:
+        _check_inspect_provider_response(
+            response=response, output=output, request=request
+        )
+    except JudgeMeasurementContractError as exc:
+        raise InspectJudgeError(str(exc)) from None
 
 
 def _project_event(
@@ -423,29 +616,59 @@ def _project_event(
         raise InspectJudgeError("Inspect did not retain the provider request")
     if call_response is not None and not isinstance(call_response, dict):
         raise InspectJudgeError("Inspect provider response must be a JSON object")
+    if (
+        options.grader.startswith("openai/")
+        and failure_status is None
+        and getattr(event, "error", None) is None
+    ):
+        _check_openai_wire_call(call_request, call_response, expected_request)
     usage = getattr(output, "usage", None)
     projected_usage = None
     if usage is not None:
-        input_tokens = int(getattr(usage, "input_tokens", 0))
-        input_tokens += int(getattr(usage, "input_tokens_cache_read", 0) or 0)
-        input_tokens += int(getattr(usage, "input_tokens_cache_write", 0) or 0)
+
+        def tokens(name: str, *, optional: bool = False) -> int:
+            value = getattr(usage, name, None)
+            if value is None and optional:
+                return 0
+            if type(value) is not int or value < 0:
+                raise InspectJudgeError(
+                    "provider token usage must use nonnegative integers"
+                )
+            return value
+
+        input_tokens = tokens("input_tokens")
+        input_tokens += tokens("input_tokens_cache_read", optional=True)
+        input_tokens += tokens("input_tokens_cache_write", optional=True)
         projected_usage = {
             "input_tokens": input_tokens,
-            "output_tokens": int(getattr(usage, "output_tokens", 0)),
+            "output_tokens": tokens("output_tokens"),
         }
         total_cost = getattr(usage, "total_cost", None)
-        if (
-            total_cost is not None
-            and round(float(total_cost) * 1_000_000) > options.cost_microusd_per_call
-        ):
-            raise InspectJudgeError(
-                "provider cost exceeded the reserved per-call amount"
-            )
+        if total_cost is not None:
+            try:
+                cost = Decimal(str(total_cost)) * 1_000_000
+            except InvalidOperation:
+                raise InspectJudgeError(
+                    "provider cost must be a finite nonnegative amount"
+                ) from None
+            if not cost.is_finite() or cost < 0:
+                raise InspectJudgeError(
+                    "provider cost must be a finite nonnegative amount"
+                )
+            if cost > options.cost_microusd_per_call:
+                raise InspectJudgeError(
+                    "provider cost exceeded the reserved per-call amount"
+                )
     resolved_model = getattr(output, "model", None)
     completion = getattr(output, "completion", "")
     stop_reason = None
     choices = getattr(output, "choices", None)
     if choices:
+        if len(choices) != 1:
+            raise InspectJudgeError("Inspect model output must contain one completion")
+        message = getattr(choices[0], "message", None)
+        if getattr(message, "tool_calls", None):
+            raise InspectJudgeError("Inspect model output contains tool calls")
         stop_reason = getattr(choices[0], "stop_reason", None)
     event_error = getattr(event, "error", None)
     if failure_status is None and (
@@ -516,6 +739,28 @@ def _project_event(
         raise InspectJudgeError(
             "Inspect model event contains hidden generation settings"
         )
+    retained_response = None
+    if call_response is not None:
+        _check_wire_response(
+            call_response,
+            {
+                "completion": completion,
+                "model": resolved_model,
+                "request_id": _request_id(call_response, output),
+                "finish_reason": stop_reason,
+                "usage": projected_usage,
+            },
+            call_request,
+            options.grader,
+        )
+        retained_response = {
+            "format": "invarlock/judge-provider-response-v1",
+            "content": completion if isinstance(completion, str) else str(completion),
+            "model": resolved_model,
+            "id": _request_id(call_response, output),
+            "finish_reason": stop_reason,
+            "usage": projected_usage,
+        }
     return {
         "event": "model",
         "uuid": str(getattr(event, "uuid", None) or "missing-event-id"),
@@ -528,8 +773,12 @@ def _project_event(
         "retries": 0,
         "cache": getattr(event, "cache", None),
         "call": {
-            "request": call_request,
-            "response": call_response,
+            # Provider SDK wire shapes differ. The authenticated Inspect input,
+            # config, and output are retained in one provider-neutral envelope;
+            # raw transport objects are validated above but never become the
+            # long-lived judge contract.
+            "request": expected_request,
+            "response": retained_response,
             "error": True if error is not None else call_error,
         },
         "output": {

@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from invarlock.judge_collection import (
+from invarlock.judge_measurements import (
     CollectionOptions,
     InspectJudgeError,
     RunnerOptions,
@@ -22,7 +22,7 @@ from invarlock.judge_collection import (
     configured,
     validate_collection_environment,
 )
-from invarlock.judge_collection.runner import (
+from invarlock.judge_measurements.runner import (
     _require_clean_model_configuration,
     _require_provider_retries_disabled,
 )
@@ -38,6 +38,26 @@ def inputs(tmp_path, monkeypatch):
         "OPENAI_BASE_URL",
         "OPENAI_API_BASE",
         "OPENAI_SAFETY_IDENTIFIER",
+        "ANTHROPIC_API_KEY",
+        "ANTHROPIC_BASE_URL",
+        "ANTHROPIC_AUTH_TOKEN",
+        "GOOGLE_API_KEY",
+        "GEMINI_API_KEY",
+        "GOOGLE_BASE_URL",
+        "GOOGLE_VERTEX_BASE_URL",
+        "VERTEX_BASE_URL",
+        "GOOGLE_GENAI_USE_VERTEXAI",
+        "GOOGLE_USE_ADC",
+        "GOOGLE_APPLICATION_CREDENTIALS",
+        "VERTEX_API_KEY",
+        "OPENROUTER_API_KEY",
+        "OPENROUTER_BASE_URL",
+        "OPENAI_ORG_ID",
+        "OPENAI_PROJECT_ID",
+        "GOOGLE_GEMINI_BASE_URL",
+        "GOOGLE_GENAI_CLIENT_MODE",
+        "GOOGLE_GENAI_REPLAYS_DIRECTORY",
+        "GOOGLE_GENAI_REPLAY_ID",
     ):
         monkeypatch.delenv(name, raising=False)
     documents = {
@@ -68,7 +88,12 @@ def sdk(monkeypatch):
         max_retries=0,
         base_url="https://api.openai.com/v1/",
         close=AsyncMock(),
+        messages=SimpleNamespace(create=AsyncMock()),
     )
+
+    async def close_api():
+        await client.close()
+
     model = SimpleNamespace(
         config=config,
         model_args={
@@ -77,7 +102,11 @@ def sdk(monkeypatch):
             "service_tier": "default",
         },
         api=SimpleNamespace(
-            client=client, responses_api=False, service_tier="default", model_args={}
+            client=client,
+            responses_api=False,
+            service_tier="default",
+            model_args={},
+            aclose=close_api,
         ),
     )
     module = SimpleNamespace(
@@ -101,10 +130,12 @@ def test_preflight_metadata_is_usable_and_never_constructs_model(inputs, sdk):
         "provider": "openai",
         "base_url": "https://api.openai.com/v1",
         "service_tier": "default",
+        "credential_variable": "OPENAI_API_KEY",
         "sdk_versions": {
             "inspect-ai": "0.3.263",
             "openai": "3.13.0",
             "httpx": "0.28.1",
+            "httpx2": "2.12.0",
         },
         "credential_available": True,
     }
@@ -115,6 +146,138 @@ def test_preflight_metadata_is_usable_and_never_constructs_model(inputs, sdk):
     assert not validate_collection_environment(inputs["options"], {}, False)[
         "credential_available"
     ]
+
+
+@pytest.mark.parametrize(
+    ("provider", "credential", "distribution", "version", "base_url"),
+    [
+        (
+            "openai",
+            "OPENAI_API_KEY",
+            "openai",
+            "3.13.0",
+            "https://api.openai.com/v1",
+        ),
+        (
+            "anthropic",
+            "ANTHROPIC_API_KEY",
+            "anthropic",
+            "1.6.0",
+            "https://api.anthropic.com",
+        ),
+        (
+            "google",
+            "GOOGLE_API_KEY",
+            "google-genai",
+            "2.24.0",
+            "https://generativelanguage.googleapis.com",
+        ),
+        (
+            "openrouter",
+            "OPENROUTER_API_KEY",
+            "openai",
+            "3.13.0",
+            "https://openrouter.ai/api/v1",
+        ),
+    ],
+)
+def test_preflight_selects_credentials_and_sdk_by_grader_provider(
+    inputs, sdk, provider, credential, distribution, version, base_url
+):
+    options = replace(inputs["options"], grader=f"{provider}/approved-model")
+    metadata = validate_collection_environment(options, {credential: KEY})
+    assert metadata["provider"] == provider
+    assert metadata["credential_variable"] == credential
+    assert metadata["base_url"] == base_url
+    assert metadata["sdk_versions"] == {
+        "inspect-ai": "0.3.263",
+        "httpx": "0.28.1",
+        "httpx2": "2.12.0",
+        distribution: version,
+    }
+    assert metadata["credential_available"] is True
+    assert KEY not in json.dumps(metadata)
+    sdk[0].get_model.assert_not_called()
+
+
+def test_google_accepts_gemini_key_alias(inputs, sdk):
+    options = replace(inputs["options"], grader="google/approved-model")
+    metadata = validate_collection_environment(options, {"GEMINI_API_KEY": KEY})
+    assert metadata["credential_variable"] == "GEMINI_API_KEY"
+    assert metadata["credential_available"] is True
+
+
+@pytest.mark.parametrize(
+    "grader",
+    [
+        "google/vertex/gemini-2.5-flash",
+        "anthropic/bedrock/model",
+        "openai/azure/model",
+        "google/",
+    ],
+)
+def test_configured_collection_rejects_alternate_service_model_paths(
+    inputs, sdk, grader
+):
+    with pytest.raises(InspectJudgeError, match="direct API|supported provider"):
+        validate_collection_environment(
+            replace(inputs["options"], grader=grader), {}, False
+        )
+    sdk[0].get_model.assert_not_called()
+
+
+@pytest.mark.parametrize("provider", ["anthropic", "google"])
+def test_configured_collection_rejects_ignored_seeds_before_construction(
+    inputs, sdk, provider
+):
+    grader = f"{provider}/model"
+    inputs["plan"]["judge"].update(
+        provider=provider, requested_model=grader, approved_resolved_models=["model"]
+    )
+    inputs["plan"]["judge"]["config"]["seed"] = 42
+    inputs["options"] = replace(inputs["options"], grader=grader)
+    with pytest.raises(InspectJudgeError, match="does not support seed"):
+        asyncio.run(collect_configured(**inputs, environment={}))
+    sdk[0].get_model.assert_not_called()
+
+
+def test_anthropic_profile_rejects_combined_sampling_controls(inputs, sdk):
+    grader = "anthropic/claude-sonnet-4-5"
+    inputs["plan"]["judge"].update(
+        provider="anthropic",
+        requested_model=grader,
+        approved_resolved_models=["claude-sonnet-4-5"],
+    )
+    inputs["plan"]["judge"]["config"]["top_p"] = "0.8"
+    inputs["options"] = replace(inputs["options"], grader=grader)
+    with pytest.raises(InspectJudgeError, match="requires top_p=1"):
+        asyncio.run(collect_configured(**inputs, environment={}))
+    sdk[0].get_model.assert_not_called()
+
+
+def test_unbounded_google_client_is_rejected_before_calls():
+    class Model:
+        api = SimpleNamespace()
+
+        def __str__(self):
+            return "google/gemini-2.5-flash"
+
+    with pytest.raises(InspectJudgeError, match="single-attempt client"):
+        _require_provider_retries_disabled(Model())
+
+
+@pytest.mark.parametrize("provider", ["openai", "anthropic", "google", "openrouter"])
+def test_selected_provider_rejects_all_ambient_controls(
+    inputs, sdk, monkeypatch, provider
+):
+    options = replace(inputs["options"], grader=f"{provider}/model")
+    config = configured._PROVIDERS[provider]
+    for name in (*config.endpoint_variables, *config.forbidden_variables):
+        with monkeypatch.context() as patch:
+            patch.setenv(name, "unapproved")
+            with pytest.raises(InspectJudgeError, match="unsupported"):
+                validate_collection_environment(options, {}, False)
+    sdk[0].get_model.assert_not_called()
 
 
 @pytest.mark.parametrize("key", [None, "", "   "])
@@ -158,7 +321,7 @@ def test_safety_identifier_override_fails_before_calls(
         monkeypatch.setenv("OPENAI_SAFETY_IDENTIFIER", value)
     else:
         environment["OPENAI_SAFETY_IDENTIFIER"] = value
-    with pytest.raises(InspectJudgeError, match="safety identifier") as error:
+    with pytest.raises(InspectJudgeError, match="request controls") as error:
         asyncio.run(collect_configured(**inputs, environment=environment))
     assert "private-identifier" not in str(error.value)
     sdk[0].get_model.assert_not_called()
@@ -205,8 +368,8 @@ def test_replay_only_version_cannot_construct_live_model(inputs, sdk):
     sdk[0].get_model.assert_not_called()
 
 
-def test_preflight_rejects_non_openai_grader_and_non_boolean_override(inputs, sdk):
-    with pytest.raises(InspectJudgeError, match="OpenAI grader"):
+def test_preflight_rejects_unsupported_grader_and_non_boolean_override(inputs, sdk):
+    with pytest.raises(InspectJudgeError, match="supported provider"):
         validate_collection_environment(
             replace(inputs["options"], grader="example-judge"), {}, False
         )
@@ -261,6 +424,70 @@ def test_explicit_construction_passes_strict_checks_and_closes(
     assert os.environ["OPENAI_API_KEY"] == "wrong-inherited-key"
 
 
+@pytest.mark.parametrize(
+    ("provider", "credential", "base_url", "extra_model_args"),
+    [
+        (
+            "anthropic",
+            "ANTHROPIC_API_KEY",
+            "https://api.anthropic.com",
+            {"max_retries": 0},
+        ),
+        ("google", "GOOGLE_API_KEY", "https://generativelanguage.googleapis.com", {}),
+        (
+            "openrouter",
+            "OPENROUTER_API_KEY",
+            "https://openrouter.ai/api/v1",
+            {"responses_api": False, "max_retries": 0},
+        ),
+    ],
+)
+def test_configured_collection_constructs_selected_provider(
+    inputs,
+    sdk,
+    monkeypatch,
+    provider,
+    credential,
+    base_url,
+    extra_model_args,
+):
+    module, model, client = sdk
+    grader = f"{provider}/approved-model"
+    inputs["plan"]["judge"].update(
+        provider=provider,
+        requested_model=grader,
+        approved_resolved_models=["approved-model"],
+    )
+    inputs["options"] = replace(inputs["options"], grader=grader)
+    model.api.service_tier = None
+    client.base_url = base_url
+    if provider == "google":
+        model.api.client = None
+        model.api.base_url = base_url
+        model.api.model_client = Mock()
+    elif provider == "anthropic":
+        model.api.generate = AsyncMock()
+        model.api.is_claude_4_7_or_later = Mock(return_value=False)
+        model.api.is_using_thinking = Mock(return_value=False)
+    result = {"retained": provider}
+    monkeypatch.setattr(configured, "collect", AsyncMock(return_value=result))
+
+    assert (
+        asyncio.run(collect_configured(**inputs, environment={credential: KEY}))
+        == result
+    )
+    expected = {
+        "config": module.GenerateConfig.return_value,
+        "api_key": KEY,
+        "memoize": False,
+        **extra_model_args,
+    }
+    if base_url is not None:
+        expected["base_url"] = base_url
+    module.get_model.assert_called_once_with(grader, **expected)
+    client.close.assert_awaited_once()
+
+
 @pytest.mark.parametrize("tier", [None, "auto", "priority", "flex", "ultrafast"])
 def test_configured_tier_is_verified_before_collection(inputs, sdk, monkeypatch, tier):
     sdk[1].api.service_tier = tier
@@ -291,7 +518,7 @@ def test_endpoint_is_verified_before_collection_and_client_is_closed(
     sdk[2].base_url = "https://example.invalid/"
     collect = AsyncMock()
     monkeypatch.setattr(configured, "collect", collect)
-    with pytest.raises(InspectJudgeError, match="official OpenAI endpoint"):
+    with pytest.raises(InspectJudgeError, match="official openai endpoint"):
         asyncio.run(collect_configured(**inputs, environment={"OPENAI_API_KEY": KEY}))
     collect.assert_not_called()
     sdk[2].close.assert_awaited_once()
@@ -332,7 +559,7 @@ def test_missing_provider_client_fails_before_collection(inputs, sdk, monkeypatc
     sdk[1].api.client = None
     collect = AsyncMock()
     monkeypatch.setattr(configured, "collect", collect)
-    with pytest.raises(InspectJudgeError, match="official OpenAI endpoint"):
+    with pytest.raises(InspectJudgeError, match="official openai endpoint"):
         asyncio.run(collect_configured(**inputs, environment={"OPENAI_API_KEY": KEY}))
     collect.assert_not_called()
 
@@ -394,4 +621,55 @@ def test_real_sdk_constructs_a_strict_model_without_http(inputs, monkeypatch):
     monkeypatch.setattr(configured, "collect", collect)
     asyncio.run(collect_configured(**inputs, environment={"OPENAI_API_KEY": KEY}))
     assert models[0].api.client.is_closed()
+    network.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("provider", "grader", "credential"),
+    [
+        ("anthropic", "anthropic/claude-sonnet-4-5", "ANTHROPIC_API_KEY"),
+        ("google", "google/gemini-2.5-flash", "GOOGLE_API_KEY"),
+        ("openrouter", "openrouter/openai/gpt-4o-mini", "OPENROUTER_API_KEY"),
+    ],
+)
+def test_real_non_openai_sdks_construct_without_http(
+    inputs, monkeypatch, provider, grader, credential
+):
+    required = os.environ.get("INVARLOCK_REQUIRE_INSPECT_SDK") == "1"
+    for name, version in configured._SDK_VERSIONS.items():
+        try:
+            installed = importlib.metadata.version(name)
+        except importlib.metadata.PackageNotFoundError:
+            installed = None
+        if installed != version:
+            if required:
+                pytest.fail(f"required {name}=={version} is not installed")
+            pytest.skip("optional pinned collection SDK is not installed")
+
+    import httpx
+
+    network = AsyncMock(side_effect=AssertionError("real HTTP is forbidden"))
+    monkeypatch.setattr(httpx.AsyncHTTPTransport, "handle_async_request", network)
+    inputs["plan"]["judge"].update(
+        provider=provider,
+        requested_model=grader,
+        approved_resolved_models=[grader.split("/", 1)[1]],
+    )
+    inputs["options"] = replace(inputs["options"], grader=grader)
+    models = []
+
+    async def collect(**kwargs):
+        model = kwargs["model"]
+        models.append(model)
+        assert str(model) == grader
+        _require_clean_model_configuration(model)
+        _require_provider_retries_disabled(model)
+        return {}
+
+    monkeypatch.setattr(configured, "collect", collect)
+    asyncio.run(collect_configured(**inputs, environment={credential: KEY}))
+    assert len(models) == 1
+    client = getattr(models[0].api, "client", None)
+    if client is not None:
+        assert client.is_closed()
     network.assert_not_called()

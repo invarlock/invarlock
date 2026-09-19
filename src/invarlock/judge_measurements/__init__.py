@@ -1,4 +1,4 @@
-"""Bounded collection and SDK-free replay for one explicit Inspect profile."""
+"""Judge measurement capture, import, analysis, and reporting helpers."""
 
 from .collector import (
     INSPECT_VERSION,
