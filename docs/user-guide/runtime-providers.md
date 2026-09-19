@@ -530,6 +530,12 @@ archive for the backend. The upstream
 defines the file structure, while
 [`llama.cpp`](https://github.com/ggml-org/llama.cpp) is the native executor.
 
+This provider starts a fresh CPU process and loads the model for each record.
+An evaluation session retains authenticated file handles, not a resident model.
+Model size, prompt length and the selected CPU and prompt-batching settings
+affect total runtime. Measure a short pilot with the intended settings before
+starting a larger comparison; adding a GPU does not accelerate this CPU path.
+
 Derive the request settings inside the exact runtime image:
 
 ```python
