@@ -96,3 +96,23 @@ def test_tensorrt_image_launcher_runs_with_the_fixed_python_interpreter(
     assert result.stderr == (
         b"TensorRT-LLM runner failed closed: runner request fields are not closed\n"
     )
+    for worker_name in ("__worker__", "__mp_main__"):
+        imported = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                "import runpy,sys; path,name=sys.argv[1:]; "
+                "sys.argv=[path,'--invarlock-score-batch-v1']; "
+                "assert callable(runpy.run_path(path,run_name=name)['main'])",
+                str(launcher),
+                worker_name,
+            ],
+            input=b"",
+            capture_output=True,
+            timeout=30,
+            cwd=tmp_path,
+            env={**os.environ, "PYTHONPATH": str(ROOT / "src")},
+        )
+        assert imported.returncode == 0
+        assert imported.stdout == b""
+        assert imported.stderr == b""
