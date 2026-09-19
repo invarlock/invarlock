@@ -869,6 +869,13 @@ def _prepare_evaluation_inputs(
         raise EvaluationTransactionError(
             "captured evaluation requests must use the captured evaluation path"
         )
+    if request.execution.mode == "run":
+        for role in ("baseline", "subject"):
+            side = getattr(request.comparison, role)
+            if side.runtime.settings.get("batch_size") != 1:
+                raise EvaluationTransactionError(
+                    f"{role} strict paired execution requires batch_size=1"
+                )
     _validate_judge_workspace_inputs(request)
     artifact_digests: dict[str, str] | None = None
 

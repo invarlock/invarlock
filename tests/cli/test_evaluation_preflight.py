@@ -834,3 +834,21 @@ def test_run_preflight_contextualizes_provider_authentication_contract_errors(
 
     assert calls == 2
     assert not (tmp_path / "artifacts").exists()
+
+
+@pytest.mark.parametrize("side", ["baseline", "subject"])
+def test_run_preflight_rejects_non_strict_batch_before_reading_data(
+    tmp_path, monkeypatch, side
+):
+    request, key = _materialize_run_request(tmp_path)
+    value = yaml.safe_load(request.read_text())
+    value["comparison"][side]["runtime"]["settings"]["batch_size"] = 2
+    request.write_text(yaml.safe_dump(value))
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("invalid execution settings reached data or runtime work")
+
+    monkeypatch.setattr(evaluation_transaction, "_read_request_file", forbidden)
+    with pytest.raises(EvaluationPreflightError, match="batch_size=1"):
+        preflight_evaluation_request(request, signing_key_path=key)
+    assert not (tmp_path / "artifacts").exists()
