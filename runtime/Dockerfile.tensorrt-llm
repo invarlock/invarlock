@@ -94,12 +94,12 @@ RUN set -- /opt/invarlock/artifacts/invarlock-*.whl \
       --no-index \
       "${core_wheel}" \
     && "${vendor_python}" -c "import importlib.metadata as m; import invarlock; assert m.version('invarlock') == invarlock.__version__" \
-    && install -d -m 0755 /opt/invarlock/bin \
     && install -d -m 0555 /opt/invarlock/bin \
-    && printf '%s\n' '#!/bin/sh' 'exec python -m invarlock.runtime_providers.tensorrt_llm_runner "$@"' > /opt/invarlock/bin/tensorrt-llm-runner \
+    && printf '%s\n' '#!/opt/invarlock/bin/vendor-python' 'from invarlock.runtime_providers.tensorrt_llm_runner import main' 'raise SystemExit(main())' > /opt/invarlock/bin/tensorrt-llm-runner \
     && chmod 0555 /opt/invarlock/bin/tensorrt-llm-runner \
     && ln -s "${vendor_python}" /opt/invarlock/bin/vendor-python \
     && test -x /opt/invarlock/bin/tensorrt-llm-runner \
+    && "${vendor_python}" -c 'import subprocess,sys; result=subprocess.run([sys.executable,"/opt/invarlock/bin/tensorrt-llm-runner","--invarlock-score-v1"],input=b"{}",capture_output=True,timeout=30); assert (result.returncode,result.stdout,result.stderr) == (70,b"",b"TensorRT-LLM runner failed closed: runner request fields are not closed\n"), (result.returncode,result.stdout,result.stderr)' \
     && "${vendor_python}" -c "import sys; before=set(sys.modules); from invarlock.runtime_providers import tensorrt_llm_runner as r; loaded=set(sys.modules)-before; assert callable(r.main); assert not any(name == 'torch' or name == 'transformers' or name == 'tensorrt_llm' or name.startswith(('torch.', 'transformers.', 'tensorrt_llm.')) for name in loaded)" \
     && "${vendor_python}" -m invarlock.runtime_providers.tensorrt_llm_conformance \
     && "${vendor_python}" -m venv /opt/invarlock/cli-venv \

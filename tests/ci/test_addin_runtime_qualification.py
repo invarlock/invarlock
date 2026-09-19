@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import os
+import shlex
+import subprocess
+import sys
 from pathlib import Path
 
 from scripts import runtime_qualification
@@ -60,3 +64,35 @@ def test_runtime_build_and_qualification_targets_use_authenticated_inputs() -> N
     assert "INVARLOCK_ALLOW_NETWORK" in (
         ROOT / "scripts/runtime_qualification.py"
     ).read_text(encoding="utf-8")
+
+
+def test_tensorrt_image_launcher_runs_with_the_fixed_python_interpreter(
+    tmp_path: Path,
+) -> None:
+    dockerfile = (ROOT / "runtime/Dockerfile.tensorrt-llm").read_text(encoding="utf-8")
+    command = shlex.split(
+        next(
+            line.removesuffix("\\")
+            for line in dockerfile.splitlines()
+            if " > /opt/invarlock/bin/tensorrt-llm-runner" in line
+        )
+    )
+    offset = command.index("printf")
+    assert command[offset + 1] == "%s\\n"
+    lines = command[offset + 2 : command.index(">")]
+    assert lines[0] == "#!/opt/invarlock/bin/vendor-python"
+    launcher = tmp_path / "tensorrt-llm-runner"
+    launcher.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    result = subprocess.run(
+        [sys.executable, str(launcher), "--invarlock-score-v1"],
+        input=b"{}",
+        capture_output=True,
+        timeout=30,
+        cwd=tmp_path,
+        env={**os.environ, "PYTHONPATH": str(ROOT / "src")},
+    )
+    assert result.returncode == 70
+    assert result.stdout == b""
+    assert result.stderr == (
+        b"TensorRT-LLM runner failed closed: runner request fields are not closed\n"
+    )

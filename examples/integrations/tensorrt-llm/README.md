@@ -8,8 +8,8 @@ if you already have compatible engines and a pinned runtime image.
 
 This one-command example downloads a revision-pinned Qwen3-0.6B checkpoint,
 builds a source-authenticated TensorRT-LLM 1.2.1 runtime image, and converts it
-into BF16 and ModelOpt-calibrated FP8 single-rank H100 engines. It then
-compares them through InvarLock's public `evaluate`, `verify`, and `report`
+into BF16 and ModelOpt-calibrated FP8 single-rank engines for the selected GPUs.
+It then compares them through InvarLock's public `evaluate`, `verify`, and `report`
 commands. Both engine builds run concurrently on separate GPUs; evaluation
 also runs the baseline and subject workers concurrently.
 
@@ -20,9 +20,16 @@ does not provide a Qwen3.5 model adapter.
 
 ## Prerequisites
 
-The maintained showcase requires Linux, Docker with two visible H100 GPUs,
-network access for the pinned model downloads and runtime-image build, and
-roughly 20 GB of temporary disk space. Both engines originate from the same
+The maintained showcase requires Linux and Docker with two visible CUDA GPUs
+that support both BF16 and FP8 in the
+[pinned TensorRT-LLM 1.2.1 release](https://nvidia.github.io/TensorRT-LLM/1.2.1/legacy/reference/support-matrix.html).
+Build each engine for its selected GPU and runtime; engine portability across
+GPU architectures is not assumed.
+
+Network access is required for the pinned model downloads and runtime-image
+build, along with substantial free disk space. The pinned vendor image alone
+occupies about 55 GiB when unpacked; allow additional space for build caches, model files,
+checkpoints, and engine outputs. Both engines originate from the same
 public Apache-2.0 checkpoint and therefore share one authenticated tokenizer
 contract. The maintained 102-record schedule is also the FP8 calibration
 input. You also need Git, Make, `uv`, and the
