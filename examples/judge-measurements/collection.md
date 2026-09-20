@@ -53,8 +53,14 @@ reservations must include applicable cache-write charges.
 ```bash
 python -m pip install "invarlock[judge]"
 invarlock evaluate judge-request.yaml --preflight --json
-invarlock evaluate judge-request.yaml --signing-key signer-private.pem --json
+INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate judge-request.yaml --signing-key signer-private.pem --json
 ```
+
+The network switch applies only to that command. Configured collection checks
+the current process policy before SDK loading, model construction or call
+admission. A credential mapping passed to the Python API cannot override a
+denied policy. Preflight and retained-measurement import, verification and
+reporting remain available offline.
 
 The core `judge` extra directly installs the pinned Inspect, OpenAI/OpenRouter,
 Anthropic, Google, `httpx`, and `httpx2` SDKs. For a source build, run
@@ -111,8 +117,10 @@ and ambiguous timeouts. The live collector currently requires one attempt per
 trial; imported evidence may retain explicitly declared transport retries.
 Checkpoint reads and locking use a retained directory descriptor, and directory
 ancestry is checked through dispatch and publication. Provider failure details
-are reduced to a stable status/code and generic public message; raw exception
-messages and error-response bodies are not retained.
+retain only recognized exception types, HTTP status and approved error codes.
+Raw exception messages, error-response bodies and request identifiers from failed
+calls are not retained. An incomplete or unclear exception chain remains an
+ambiguous outcome.
 
 Retained sources are deterministically divided at whole-trial boundaries. Each
 source is at most 16 MiB, with at most 1,000 sources and 384 MiB of canonical

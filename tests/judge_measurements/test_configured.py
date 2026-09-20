@@ -13,6 +13,7 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
+from invarlock import security
 from invarlock.judge_measurements import (
     CollectionOptions,
     InspectJudgeError,
@@ -33,6 +34,9 @@ KEY = "offline-test-key"
 
 @pytest.fixture
 def inputs(tmp_path, monkeypatch):
+    # These SDK/model doubles exercise collection after admission policy passes;
+    # do not remove the real process socket guard for offline tests.
+    monkeypatch.setattr(configured, "network_policy_allows", lambda: True)
     for name in (
         "OPENAI_API_KEY",
         "OPENAI_BASE_URL",
@@ -119,6 +123,72 @@ def sdk(monkeypatch):
         configured.importlib, "import_module", Mock(return_value=module)
     )
     return module, model, client
+
+
+@pytest.mark.parametrize("environment_flag", [None, "1"])
+def test_denied_network_stops_before_sdk_loading_or_admission(
+    inputs, sdk, monkeypatch, environment_flag
+):
+    module, _, client = sdk
+    monkeypatch.setattr(
+        configured, "network_policy_allows", security.network_policy_allows
+    )
+    validate = Mock(side_effect=AssertionError("SDK validation reached"))
+    collect = AsyncMock(side_effect=AssertionError("call admission reached"))
+    monkeypatch.setattr(configured, "validate_collection_environment", validate)
+    monkeypatch.setattr(configured, "collect", collect)
+    stopped = Mock()
+    environment = {"OPENAI_API_KEY": KEY}
+    if environment_flag is not None:
+        # Credential mappings cannot override an already enforced process policy.
+        environment["INVARLOCK_ALLOW_NETWORK"] = environment_flag
+    previous = security.network_policy_allows()
+    security.enforce_network_policy(False)
+    try:
+        with pytest.raises(InspectJudgeError, match="INVARLOCK_ALLOW_NETWORK=1"):
+            asyncio.run(
+                collect_configured(**inputs, environment=environment, on_stop=stopped)
+            )
+        assert not security.network_policy_allows()
+    finally:
+        security.enforce_network_policy(previous)
+    validate.assert_not_called()
+    configured.importlib.import_module.assert_not_called()
+    module.get_model.assert_not_called()
+    client.close.assert_not_called()
+    collect.assert_not_called()
+    stopped.assert_not_called()
+    assert not inputs["runner"].checkpoint_directory.exists()
+
+
+def test_offline_preflight_and_explicit_collection_scope_preserve_policy(
+    inputs, sdk, monkeypatch
+):
+    module, _, client = sdk
+    monkeypatch.setattr(
+        configured, "network_policy_allows", security.network_policy_allows
+    )
+    collected = AsyncMock(return_value={"offline_double": True})
+    monkeypatch.setattr(configured, "collect", collected)
+    previous = security.network_policy_allows()
+    security.enforce_network_policy(False)
+    try:
+        metadata = validate_collection_environment(
+            inputs["options"], {"OPENAI_API_KEY": KEY}
+        )
+        assert metadata["credential_available"] is True
+        module.get_model.assert_not_called()
+        assert not security.network_policy_allows()
+        with security.temporarily_allow_network():
+            assert asyncio.run(
+                collect_configured(**inputs, environment={"OPENAI_API_KEY": KEY})
+            ) == {"offline_double": True}
+        assert not security.network_policy_allows()
+    finally:
+        security.enforce_network_policy(previous)
+    collected.assert_awaited_once()
+    client.close.assert_awaited_once()
+    assert not inputs["runner"].checkpoint_directory.exists()
 
 
 def test_preflight_metadata_is_usable_and_never_constructs_model(inputs, sdk):

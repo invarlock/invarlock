@@ -13,6 +13,7 @@ from decimal import Decimal
 from typing import Any
 
 from invarlock.judge_measurement_types import JudgeMeasurementPlan, JudgeMeasurements
+from invarlock.security import network_policy_allows
 
 from .collector import (
     INSPECT_VERSION,
@@ -307,6 +308,12 @@ async def collect_configured(
     on_stop: Callable[[str], None] | None = None,
 ) -> JudgeMeasurements:
     """Collect frozen judgments with pinned SDKs and an environment-only key."""
+    if not network_policy_allows():
+        raise InspectJudgeError(
+            "live judge collection requires an allowed network policy; "
+            "invoke only the collection command with INVARLOCK_ALLOW_NETWORK=1. "
+            "Preflight and retained-measurement import remain available offline"
+        )
     _check_options(plan, options)
     runner.validate()
     if plan["schedule"]["max_attempts"] != 1:

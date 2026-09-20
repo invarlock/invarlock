@@ -207,6 +207,7 @@ inputs apply only when new judge ratings are collected:
 
 | Variable | Behavior |
 | --- | --- |
+| `INVARLOCK_ALLOW_NETWORK=1` | Scope to the live collection command; a denied process policy rejects configured collection before model construction or call admission |
 | `OPENAI_API_KEY` | Credential selected by an `openai/...` grader |
 | `ANTHROPIC_API_KEY` | Credential selected by an `anthropic/...` grader |
 | `GOOGLE_API_KEY`, `GEMINI_API_KEY` | Credential aliases selected by a `google/...` grader; `GOOGLE_API_KEY` takes precedence when both are present |
