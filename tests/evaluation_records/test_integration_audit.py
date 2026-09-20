@@ -40,6 +40,43 @@ def harness_row():
     }
 
 
+def test_harness_stable_case_ids_are_explicit_and_preserve_native_positions(tmp_path):
+    row = harness_row()
+    row["doc_id"] = 0
+    row["metadata"] = {"invarlock_id": "case-one"}
+    original = copy.deepcopy(row)
+    run = export_evaluator_result(
+        "lm-evaluation-harness",
+        [row],
+        tmp_path / "native.json",
+        expected_ids=["case-one"],
+        source_version="0.4.12",
+        run_id="fresh",
+        artifact_digest="sha256:" + "a" * 64,
+    )
+    assert run["records"][0]["id"] == "case-one"
+    assert run["records"][0]["context"]["upstream_record"] == original
+    assert row == original
+    assert _harness([row])[0]["id"] == "0"
+
+
+@pytest.mark.parametrize("identifier", [True, None, [], ""])
+def test_harness_stable_case_id_must_be_valid(tmp_path, identifier):
+    row = harness_row()
+    row["metadata"] = {"invarlock_id": identifier}
+    with pytest.raises(EvaluationRecordsError):
+        export_evaluator_result(
+            "lm-evaluation-harness",
+            [row],
+            tmp_path / "native.json",
+            expected_ids=["case-one"],
+            source_version="0.4.12",
+            run_id="fresh",
+            artifact_digest="sha256:" + "a" * 64,
+        )
+    assert not (tmp_path / "native.json").exists()
+
+
 def promptfoo_row():
     return {
         "testIdx": 0,

@@ -115,7 +115,7 @@ def _records(
     if evaluator == "inspect-ai":
         return _inspect(payload, allow_native_score_values=True)
     if evaluator == "lm-evaluation-harness":
-        return _harness(_rows(payload, "Harness samples"))
+        return _harness(_rows(payload, "Harness samples"), allow_stable_ids=True)
     if evaluator == "promptfoo":
         return _promptfoo(_rows(payload, "Promptfoo results"))
     if evaluator == "langfuse":

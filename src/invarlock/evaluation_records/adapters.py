@@ -227,7 +227,9 @@ def _identifier(value: Any) -> str:
     return str(value)
 
 
-def _harness(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _harness(
+    rows: list[dict[str, Any]], *, allow_stable_ids: bool = False
+) -> list[dict[str, Any]]:
     result = []
     for row in rows:
         if any(
@@ -244,6 +246,12 @@ def _harness(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             and key not in ("doc_id",)
         }
         metadata = _native_object(row.get("metadata"), "metadata")
+        # The native doc_id is the dataset position, not necessarily the user's
+        # independently planned case ID. Only the dedicated export profile opts
+        # into an explicit stable-ID mapping; historical parser identities stay fixed.
+        record_id = _identifier(row["doc_id"])
+        if allow_stable_ids and "invarlock_id" in metadata:
+            record_id = _identifier(metadata["invarlock_id"])
         facts = (
             metadata.get("invarlock_likelihood") if isinstance(metadata, dict) else None
         )
@@ -300,7 +308,7 @@ def _harness(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         result.append(
             _with_capture_facts(
                 {
-                    "id": _identifier(row["doc_id"]),
+                    "id": record_id,
                     "input": row["doc"],
                     "context": {"arguments": row["arguments"]},
                     "expected": row["target"],
