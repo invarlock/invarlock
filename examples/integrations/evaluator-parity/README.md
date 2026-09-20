@@ -6,6 +6,10 @@ dictionaries. With `--native-captures`, it consumes hash-bound JSON files create
 separately by actual SDK serializers. The recipient itself calls no evaluator
 SDK, model, judge service or container. Neither route claims fresh model execution.
 
+The separate [live campaign](../evaluator-live/README.md) executes framework
+callbacks against a persistent model worker and checks the actual captures.
+Its qualification remains separate from these retained contract replays.
+
 Every scorer runs with both direct native JSON (`evaluator-native-json`) and the
 optional InvarLock export envelope (`evaluator-json`): 114 installed journeys.
 Direct JSON lets the evaluator write its result in its own environment and the
@@ -34,6 +38,8 @@ These journeys authenticate the pinned archives, reconstruct the exact original
 plan and policy, then run preflight, signed evaluation, independent verification
 and reporting. Changed measurements must be rejected. They make no new model or
 judge calls. The pilot's inconclusive result remains unchanged.
+The replay subprocesses discard any inherited network permission and block
+outbound connections, including during preflight and evaluation.
 
 To retain these real journeys locally:
 

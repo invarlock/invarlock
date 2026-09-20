@@ -26,11 +26,19 @@ def pilot():
 
 @pytest.mark.parametrize("reference", ["heldout", "pilot"])
 def test_complete_real_campaign_replays_and_preserves_original_outcome(
-    tmp_path, reference
+    tmp_path, reference, monkeypatch
 ):
     # Coverage runs the helper in-process; every command still uses the actual
     # CLI in an isolated subprocess with network blocked. The installed gate
     # separately enforces a clean core-only wheel interpreter via main().
+    monkeypatch.setenv("INVARLOCK_ALLOW_NETWORK", "1")
+    original_run = subprocess.run
+
+    def offline_run(*args, **kwargs):
+        assert "INVARLOCK_ALLOW_NETWORK" not in kwargs["env"]
+        return original_run(*args, **kwargs)
+
+    monkeypatch.setattr(REAL.subprocess, "run", offline_run)
     result = REAL.journey(tmp_path, reference, sys.executable)
     assert result["workflow"] == "grounded_qa"
     assert result["cases"] == REAL.REFERENCES[reference]["cases"]

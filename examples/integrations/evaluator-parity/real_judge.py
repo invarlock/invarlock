@@ -232,6 +232,7 @@ def journey(output, reference, python):
     environment = dict(os.environ)
     environment.pop("PYTHONPATH", None)
     environment.pop("INVARLOCK_SIGNING_KEY", None)
+    environment.pop("INVARLOCK_ALLOW_NETWORK", None)
     commands = []
 
     def command(*args, allowed=(0,)):
