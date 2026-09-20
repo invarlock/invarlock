@@ -450,8 +450,9 @@ def collect(
     return common.decode(process.stdout.encode())
 
 
-def verify(root, admission_sha256, ident):
+def verify(root, admission_sha256, ident, *, input_loader=None):
     """Replay newly collected evidence against pre-call pins in the offline recipient."""
+    from invarlock.evaluation_records.identity import evaluated_subject_digest
     from invarlock.evaluation_records.io import run_digest
     from invarlock.judge_measurements.analysis import (
         analyze_measurements,
@@ -459,7 +460,7 @@ def verify(root, admission_sha256, ident):
     )
     from invarlock.judge_measurements.evidence import DECISION_SCOPE, object_sha256
 
-    _, entry, values, _ = entry_inputs(root, admission_sha256, ident)
+    _, entry, values, _ = (input_loader or entry_inputs)(root, admission_sha256, ident)
     directory = Path(root) / ident
     measurements, _ = read(directory / "evidence/measurements.json")
     analysis = analyze_measurements(
@@ -472,7 +473,7 @@ def verify(root, admission_sha256, ident):
     trust = {
         "format": "invarlock/judge-measurement-recipient-policy-v1",
         "decision_scope": DECISION_SCOPE,
-        "intended_subject": values["subject_run"]["artifact_digest"],
+        "intended_subject": evaluated_subject_digest(values["subject_run"]),
         "required_metric_name": values["analysis_policy"]["metric_name"],
         "trusted_signer": {
             "identity": SIGNER,
