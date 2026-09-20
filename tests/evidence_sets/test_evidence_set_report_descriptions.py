@@ -26,7 +26,14 @@ def test_opening_names_both_component_outcomes_without_changing_them(
         return replace(
             view,
             decision=deterministic,
-            metrics=tuple(replace(m, decision=deterministic) for m in view.metrics),
+            metrics=tuple(
+                replace(
+                    m,
+                    decision=deterministic,
+                    explanation="Retained deterministic explanation.",
+                )
+                for m in view.metrics
+            ),
         )
 
     def judged(*args, **kwargs):
@@ -34,7 +41,10 @@ def test_opening_names_both_component_outcomes_without_changing_them(
         return replace(
             view,
             decision=judge,
-            metrics=tuple(replace(m, decision=judge) for m in view.metrics),
+            metrics=tuple(
+                replace(m, decision=judge, explanation="Retained judge explanation.")
+                for m in view.metrics
+            ),
         ), facts
 
     monkeypatch.setattr(reporting, "captured_view", captured)
@@ -91,3 +101,14 @@ def test_shared_context_shown_once_without_hiding_different_component_values(
     assert any(name == "Judge provider" for name, _ in view.context)
     assert "recipient-owned key" in dict(view.assurance)["Deterministic signature"]
     assert "Signature present" in dict(view.assurance)["Judge signature"]
+
+
+def test_real_incomplete_judging_explains_the_cause_before_component_charts(tmp_path):
+    root, _ = fixture(tmp_path, incomplete=True)
+    view, facts, _ = reporting.build_evidence_set_view(root)
+    assert view.decision == "insufficient_evidence"
+    assert facts["component_decisions"]["deterministic"] == "pass"
+    assert "Judge finding for" in view.summary
+    assert "Only" in view.summary
+    assert "planned ratings completed" in view.summary
+    assert "paired comparison could not be calculated" in view.summary

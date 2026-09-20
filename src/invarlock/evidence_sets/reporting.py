@@ -160,6 +160,23 @@ def build_evidence_set_view(
         },
         "judge": judge_facts["judge"],
     }
+    causes = []
+    for label, component in (("Deterministic", first), ("Judge", second)):
+        if component.decision == "pass":
+            continue
+        affected = next(
+            (
+                metric
+                for metric in component.metrics
+                if metric.decision == component.decision
+            ),
+            None,
+        )
+        if affected is not None and affected.explanation:
+            causes.append(
+                f"{label} finding for {affected.display_name} ({affected.display_scope}): {affected.explanation}"
+            )
+    findings = " ".join(causes)
     view = ReportView(
         title="InvarLock combined comparison report",
         family="Deterministic and bounded judge evidence",
@@ -167,7 +184,8 @@ def build_evidence_set_view(
         summary=(
             f"Deterministic comparison: {decision_label(first.decision).lower()}. "
             f"Judge comparison: {decision_label(second.decision).lower()}. "
-            "Both components must satisfy their recorded policies for the combined result to pass. "
+            + (findings + " " if findings else "")
+            + "Both components must satisfy their recorded policies for the combined result to pass. "
             "They compare the same frozen baseline and subject answers using separate statistical methods."
         ),
         metrics=metrics,
