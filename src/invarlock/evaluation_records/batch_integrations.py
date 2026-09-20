@@ -147,13 +147,28 @@ def _error(value: Any) -> str | None:
     raise EvaluationRecordsError("native error requires a nonempty message")
 
 
+def _same_json(left: Any, right: Any) -> bool:
+    """Compare JSON values without Python's bool/integer equivalence."""
+    if type(left) is not type(right):
+        return False
+    if isinstance(left, dict):
+        return left.keys() == right.keys() and all(
+            _same_json(left[key], right[key]) for key in left
+        )
+    if isinstance(left, list):
+        return len(left) == len(right) and all(
+            _same_json(a, b) for a, b in zip(left, right, strict=True)
+        )
+    return left == right
+
+
 def _alias(value: Mapping[str, Any], names: tuple[str, ...], label: str) -> Any:
     """Select equivalent source fields only when their recorded values agree."""
     present = [(name, value[name]) for name in names if name in value]
     if not present:
         return None
     selected = present[0][1]
-    if any(item != selected for _, item in present[1:]):
+    if any(not _same_json(item, selected) for _, item in present[1:]):
         raise EvaluationRecordsError(f"{label} aliases conflict")
     return selected
 
@@ -196,7 +211,9 @@ def _record(
     for owner in (native, metadata if isinstance(metadata, dict) else {}):
         for key in ("likelihood", "invarlock_likelihood"):
             if key in owner:
-                if "likelihood" in record and record["likelihood"] != owner[key]:
+                if "likelihood" in record and not _same_json(
+                    record["likelihood"], owner[key]
+                ):
                     raise EvaluationRecordsError(
                         "conflicting explicit likelihood evidence"
                     )
@@ -275,7 +292,9 @@ def _azure(value: Any) -> list[dict[str, Any]]:
     records = []
     for row in _table(report.get("rows")):
         if "inputs.metadata" in row:
-            if "metadata" in row and row["metadata"] != row["inputs.metadata"]:
+            if "metadata" in row and not _same_json(
+                row["metadata"], row["inputs.metadata"]
+            ):
                 raise EvaluationRecordsError(
                     "Azure capture metadata conflicts with inputs.metadata"
                 )
@@ -495,7 +514,7 @@ def _garak(value: Any) -> list[dict[str, Any]]:
         history = histories.setdefault(ident, [])
         if history and (
             history[-1]["status"] >= status
-            or history[-1].get("prompt") != row.get("prompt")
+            or not _same_json(history[-1].get("prompt"), row.get("prompt"))
         ):
             raise EvaluationRecordsError(
                 "Garak attempt history is ambiguous or conflicts"
@@ -570,8 +589,8 @@ def _garak(value: Any) -> list[dict[str, Any]]:
             )
         for record in records:
             case = by_native[record["id"]]
-            if case["input"] != record["input"] or (
-                "output" in case and case["output"] != record["output"]
+            if not _same_json(case["input"], record["input"]) or (
+                "output" in case and not _same_json(case["output"], record["output"])
             ):
                 raise EvaluationRecordsError(
                     "Garak source case conflicts with actual attempt input/output"
@@ -596,7 +615,7 @@ def _garak(value: Any) -> list[dict[str, Any]]:
             if (
                 "likelihood" in captured
                 and "likelihood" in record
-                and captured["likelihood"] != record["likelihood"]
+                and not _same_json(captured["likelihood"], record["likelihood"])
             ):
                 raise EvaluationRecordsError(
                     "Garak source likelihood conflicts with attempt"
@@ -662,13 +681,13 @@ def _openai(value: Any) -> list[dict[str, Any]]:
         if (
             "prompt" in sampling
             and "prompt" in match
-            and sampling["prompt"] != match["prompt"]
+            and not _same_json(sampling["prompt"], match["prompt"])
         ):
             raise EvaluationRecordsError("OpenAI Evals prompt aliases conflict")
         if (
             "sampled" in sampling
             and "sampled" in match
-            and sampling["sampled"] != match["sampled"]
+            and not _same_json(sampling["sampled"], match["sampled"])
         ):
             raise EvaluationRecordsError("OpenAI Evals sampled outputs conflict")
         if "sampled" not in sampling and "sampled" not in match and not errors:
@@ -696,7 +715,9 @@ def _openai(value: Any) -> list[dict[str, Any]]:
                 metadata = event["data"]["metadata"]
                 if metadata is not None:
                     _obj(metadata, "OpenAI Evals capture metadata")
-                if "metadata" in native and native["metadata"] != metadata:
+                if "metadata" in native and not _same_json(
+                    native["metadata"], metadata
+                ):
                     raise EvaluationRecordsError(
                         "OpenAI Evals conflicting capture metadata"
                     )
@@ -704,9 +725,8 @@ def _openai(value: Any) -> list[dict[str, Any]]:
         # Only explicitly complete likelihood evidence is promoted; cond_logp remains context.
         for event in case_events:
             if "likelihood" in event["data"]:
-                if (
-                    "likelihood" in native
-                    and native["likelihood"] != event["data"]["likelihood"]
+                if "likelihood" in native and not _same_json(
+                    native["likelihood"], event["data"]["likelihood"]
                 ):
                     raise EvaluationRecordsError(
                         "OpenAI Evals conflicting likelihood evidence"
@@ -755,7 +775,7 @@ def _trulens(value: Any) -> list[dict[str, Any]]:
     for row in rows:
         row = dict(row)
         if "meta" in row:
-            if "metadata" in row and row["metadata"] != row["meta"]:
+            if "metadata" in row and not _same_json(row["metadata"], row["meta"]):
                 raise EvaluationRecordsError(
                     "TruLens meta conflicts with supplied metadata"
                 )

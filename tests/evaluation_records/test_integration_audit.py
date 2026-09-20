@@ -354,6 +354,19 @@ def test_garak_likelihood_only_completion_does_not_invent_generation_failure(
                 ]
             },
         ),
+        (
+            "azure-ai-evaluation",
+            {
+                "rows": [
+                    {
+                        "inputs.record_id": "a",
+                        "inputs.response": "answer",
+                        "metadata": {"flag": True},
+                        "inputs.metadata": {"flag": 1},
+                    }
+                ]
+            },
+        ),
         ("azure-ai-evaluation", {"rows": [{"inputs.record_id": "a"}]}),
         ("mlflow", {"rows": {"columns": ["record_id", "prediction"], "data": [["a"]]}}),
         (
@@ -618,7 +631,7 @@ def test_batch_ambiguous_sources_and_malformed_native_details_are_rejected(
 )
 def test_batch_aliases_and_role_mappings_must_be_unambiguous(evaluator, payload):
     with pytest.raises(
-        EvaluationRecordsError, match="aliases conflict|different source column"
+        EvaluationRecordsError, match="conflict|different source column"
     ):
         export_records(evaluator, payload)
 
