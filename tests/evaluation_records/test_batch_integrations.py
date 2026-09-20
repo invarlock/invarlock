@@ -22,6 +22,79 @@ class Metric:
     reason: str = "native rationale"
 
 
+def test_garak_single_text_sdk_messages_preserve_original_native_context():
+    message = {
+        "text": "question",
+        "lang": None,
+        "data_path": None,
+        "data_type": None,
+        "data_checksum": None,
+        "notes": {},
+    }
+    attempt = {
+        "uuid": "native",
+        "status": 2,
+        "prompt": {"turns": [{"role": "user", "content": message}], "notes": {}},
+        "outputs": [{**message, "text": "answer"}],
+    }
+    source = {
+        "native_id": "native:0",
+        "id": "original",
+        "input": "question",
+        "output": "answer",
+        "expected": "answer",
+        "metadata": {"slice": "sdk"},
+    }
+    row = export_records("garak", {"attempts": [attempt], "source_cases": [source]})[0]
+    assert (row["id"], row["input"], row["output"], row["expected"]) == (
+        "original",
+        "question",
+        "answer",
+        "answer",
+    )
+    assert row["context"]["upstream_record"]["prompt"] == attempt["prompt"]
+    assert row["context"]["upstream_record"]["outputs"] == attempt["outputs"]
+    assert row["context"]["source_case"] == source
+
+
+@pytest.mark.parametrize(
+    "fault", ["multiple", "system", "attachment", "extra", "nontext"]
+)
+def test_garak_ambiguous_sdk_message_cannot_be_joined_to_plain_text(fault):
+    message = {"text": "question"}
+    prompt = {"turns": [{"role": "user", "content": message}]}
+    if fault == "multiple":
+        prompt["turns"].append({"role": "assistant", "content": {"text": "earlier"}})
+    elif fault == "system":
+        prompt["turns"][0]["role"] = "system"
+    elif fault == "attachment":
+        message["data_path"] = "retained-image.png"
+    elif fault == "extra":
+        message["unknown"] = "retained-field"
+    else:
+        message["text"] = None
+    attempt = {"uuid": "native", "status": 2, "prompt": prompt, "outputs": ["answer"]}
+    # Structured prompts remain available for an explicit projection; no implicit
+    # selection drops other messages, attachments, or unknown model inputs.
+    row = export_records("garak", {"attempts": [attempt]})[0]
+    assert row["input"] == prompt
+    with pytest.raises(EvaluationRecordsError, match="conflicts with actual attempt"):
+        export_records(
+            "garak",
+            {
+                "attempts": [attempt],
+                "source_cases": [
+                    {
+                        "native_id": "native:0",
+                        "id": "original",
+                        "input": "question",
+                        "expected": "answer",
+                    }
+                ],
+            },
+        )
+
+
 @dataclasses.dataclass
 class ReportCase:
     name: str
@@ -723,6 +796,9 @@ def test_installed_sdk_native_objects_offline(provider, monkeypatch, tmp_path):
     elif provider == "mlflow":
         import pandas as pd
         from mlflow.models import EvaluationResult
+        from mlflow.models.evaluation.artifacts import JsonEvaluationArtifact
+
+        from tests.evaluation_records.sdk_batch_roundtrip import roundtrip
 
         result = EvaluationResult(metrics={"accuracy": 1.0}, artifacts={})
         value = {
@@ -731,6 +807,23 @@ def test_installed_sdk_native_objects_offline(provider, monkeypatch, tmp_path):
                 [{"record_id": "a", "input": "q", "prediction": "yes", "target": "yes"}]
             ),
         }
+        capture = serialize_results(provider, value)
+        roundtrip(provider, capture, tmp_path=tmp_path / "artifact-roundtrip")
+        load_content = JsonEvaluationArtifact._load_content_from_file
+
+        def altered_artifact(self, path):
+            content = load_content(self, path)
+            content[0]["prediction"] = "changed after SDK save"
+            return content
+
+        # This must fail only after the actual SDK reload, proving the handoff
+        # uses artifact bytes rather than the original in-memory prediction table.
+        with monkeypatch.context() as patch:
+            patch.setattr(
+                JsonEvaluationArtifact, "_load_content_from_file", altered_artifact
+            )
+            with pytest.raises(AssertionError, match="SDK changed a field output"):
+                roundtrip(provider, capture, tmp_path=tmp_path / "altered-artifact")
     elif provider == "garak":
         from garak.attempt import Attempt
 

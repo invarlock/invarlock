@@ -398,6 +398,36 @@ def _scored_table(value: Any, evaluator: str) -> list[dict[str, Any]]:
     return records
 
 
+def _garak_text(value: Any, *, prompt: bool = False) -> Any:
+    """Select the SDK's unambiguous text field without flattening conversations."""
+    if prompt and isinstance(value, dict) and set(value) <= {"turns", "notes"}:
+        turns = value.get("turns")
+        if (
+            isinstance(turns, list)
+            and len(turns) == 1
+            and isinstance(turns[0], dict)
+            and turns[0].get("role") == "user"
+            and set(turns[0]) <= {"role", "content"}
+        ):
+            selected = _garak_text(turns[0].get("content"))
+            if isinstance(selected, str):
+                return selected
+        return value
+    if (
+        isinstance(value, dict)
+        and "text" in value
+        and set(value)
+        <= {"text", "lang", "data_path", "data_type", "data_checksum", "notes"}
+        and isinstance(value["text"], str)
+        and all(
+            value.get(key) is None
+            for key in ("data_path", "data_type", "data_checksum")
+        )
+    ):
+        return value["text"]
+    return value
+
+
 def _garak(value: Any) -> list[dict[str, Any]]:
     value = _obj(value, "Garak export")
     entries = value.get("attempts", value.get("entries"))
@@ -450,7 +480,7 @@ def _garak(value: Any) -> list[dict[str, Any]]:
                     "Garak detector scores and outputs are misaligned"
                 )
         for index in range(max(1, len(outputs))):
-            output = outputs[index] if outputs else None
+            output = _garak_text(outputs[index]) if outputs else None
             error = row.get("error")
             likelihood_only = any(
                 key in row for key in ("likelihood", "invarlock_likelihood")
@@ -479,7 +509,7 @@ def _garak(value: Any) -> list[dict[str, Any]]:
                 _record(
                     native,
                     ident=f"{ident}:{index}",
-                    input_value=row["prompt"],
+                    input_value=_garak_text(row["prompt"], prompt=True),
                     output=output,
                     scores=scores,
                     error=error,
