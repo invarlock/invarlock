@@ -96,6 +96,14 @@ logs, preflight results, source inventories and resource observations.
 `exact-match.zip` and `normalized-nll.zip` contain the original signed evidence,
 public trust inputs, verification receipts and reports.
 
+[execution-summary.json](execution-summary.json) records the available host,
+process, recipient and provider-usage observations. It distinguishes parallel
+process-time sums from billed host time and marks recipient and judge elapsed
+time as unavailable rather than deriving them from file timestamps. The Luna
+amount is a token-rate estimate, not a provider invoice. Host and process values
+were copied from controller output before termination; the operational logs are
+not part of the public reference and those values are not replay verified.
+
 The public archives omit private process-launch admissions, credentials, private
 keys, model weights and environment/cache trees. Original model/task admissions
 are preserved. Member hashes distinguish the unchanged original evidence from

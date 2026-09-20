@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import re
 import tempfile
 from collections import Counter
 from pathlib import Path
@@ -164,7 +165,7 @@ def check_lifecycle(entry: Path, pack: dict, measured: dict) -> None:
     )
 
 
-def verify_pack(entry: Path, pack: dict) -> dict:
+def verify_pack(entry: Path, pack: dict, report_root: Path | None = None) -> dict:
     from invarlock.judge_measurements.acceptance import (
         replay_signed_judge_verification_receipt,
     )
@@ -235,7 +236,22 @@ def verify_pack(entry: Path, pack: dict) -> dict:
         all(result[key] == value for key, value in pack["expected"].items()),
         "Original signed receipt or evidence replay differs: " + pack["id"],
     )
-    return {"id": pack["id"], "verification": result}
+    rendered = None
+    if report_root is not None:
+        from invarlock.judge_measurements.reporting import render_judge_evidence
+
+        destination = report_root / pack["id"]
+        destination.mkdir(parents=True, exist_ok=False)
+        report = render_judge_evidence(
+            entry / "evidence",
+            html_path=destination / "report.html",
+            markdown_path=destination / "report.md",
+            junit_path=destination / "report.xml",
+            explain=True,
+        )
+        require(not report.errors, "Current report rendering failed: " + pack["id"])
+        rendered = destination.relative_to(report_root.parent).as_posix()
+    return {"id": pack["id"], "verification": result, "current_report": rendered}
 
 
 def verify_capture_bindings(
@@ -301,7 +317,10 @@ def replay(
     require(
         len({pack["id"] for pack in reference["packs"]}) == len(reference["packs"])
         and all(
-            pack["directory"] == "judge/" + pack["id"] for pack in reference["packs"]
+            isinstance(pack["id"], str)
+            and re.fullmatch(r"[a-z0-9-]{1,128}", pack["id"])
+            and pack["directory"] == "judge/" + pack["id"]
+            for pack in reference["packs"]
         ),
         "Duplicate or invalid pack identity.",
     )
@@ -329,8 +348,11 @@ def replay(
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(raw)
     verify_capture_bindings(output, reference, companions, root)
+    report_root = output / "current-reports"
+    report_root.mkdir()
     results = [
-        verify_pack(output / pack["directory"], pack) for pack in reference["packs"]
+        verify_pack(output / pack["directory"], pack, report_root)
+        for pack in reference["packs"]
     ]
     require(
         dict(Counter(row["verification"]["decision"] for row in results))

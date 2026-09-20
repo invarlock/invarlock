@@ -47,9 +47,8 @@ def test_all_real_judge_packs_replay_with_original_insufficient_decisions(
     tmp_path, retained, monkeypatch
 ):
     monkeypatch.setattr(REPLAY, "read_reference", lambda *_args: retained)
-    report = REPLAY.replay(
-        tmp_path / "replay", directory=DIRECTORY, require_installed=False
-    )
+    replay_root = tmp_path / "replay"
+    report = REPLAY.replay(replay_root, directory=DIRECTORY, require_installed=False)
     assert report["original_receipts_replayed"] == 24
     assert report["counts"] == {
         "attempt_status": {"completed": 1288},
@@ -65,6 +64,24 @@ def test_all_real_judge_packs_replay_with_original_insufficient_decisions(
         assert value["authenticated"] and value["verified"] and value["replayed"]
         assert not value["accepted"]
         assert value["decision"] == "insufficient_evidence"
+        report_root = replay_root / result["current_report"]
+        assert {path.name for path in report_root.iterdir()} == {
+            "report.html",
+            "report.md",
+            "report.xml",
+        }
+    for evaluator in ("inspect-ai", "lm-evaluation-harness", "promptfoo", "langfuse"):
+        for route in ("envelope", "native-json"):
+            report_html = (
+                replay_root
+                / "current-reports"
+                / f"local-primary-{evaluator}-{route}"
+                / "report.html"
+            ).read_text()
+            assert "mistralai/Mistral-7B-v0.1" in report_html
+            assert "mistralai/Mistral-7B-Instruct-v0.1" in report_html
+            assert "27d67f1b5f57dc0953326b2601d68371d40ea8da" in report_html
+            assert "ec5deb64f2c6e6fa90c1abf74a91d5c93a9669ca" in report_html
 
 
 def test_catalog_pins_companion_profiles_and_private_exclusions(retained):
@@ -83,7 +100,8 @@ def test_catalog_pins_companion_profiles_and_private_exclusions(retained):
     for name, raw in members.items():
         assert not name.endswith((".pem", ".safetensors", ".gguf", ".pickle"))
         assert not Path(name).name.startswith("admission-")
-        assert b"-----BEGIN PRIVATE KEY-----" not in raw
+        private_key_marker = b"-----BEGIN " + b"PRIVATE KEY-----"
+        assert private_key_marker not in raw
     packs = catalog["reference"]["packs"]
     assert sum(pack["group"] == "http-primary" for pack in packs) == 8
     assert sum(bool(pack["lifecycle"]) for pack in packs) == 4
@@ -277,7 +295,9 @@ def test_original_sdk_capture_must_reproduce_canonical_frozen_judge_run(
         path.write_bytes(raw)
 
 
-@pytest.mark.parametrize("change", ["identity", "counts", "lifecycle", "decisions"])
+@pytest.mark.parametrize(
+    "change", ["identity", "unsafe_identity", "counts", "lifecycle", "decisions"]
+)
 def test_replay_orchestration_refuses_changed_campaign_claims(
     tmp_path, retained, monkeypatch, change
 ):
@@ -285,6 +305,8 @@ def test_replay_orchestration_refuses_changed_campaign_claims(
     reference = catalog["reference"]
     if change == "identity":
         reference["packs"][0]["directory"] = "different"
+    elif change == "unsafe_identity":
+        reference["packs"][0].update(id="../escape", directory="judge/../escape")
     elif change == "counts":
         reference["counts"]["retained_attempts"] = 0
     elif change == "lifecycle":
@@ -296,7 +318,9 @@ def test_replay_orchestration_refuses_changed_campaign_claims(
     monkeypatch.setattr(
         REPLAY,
         "verify_pack",
-        lambda _entry, pack: {"verification": {"decision": "insufficient_evidence"}},
+        lambda _entry, pack, *_args: {
+            "verification": {"decision": "insufficient_evidence"}
+        },
     )
     with pytest.raises(ValueError):
         REPLAY.replay(tmp_path / "replay", directory=DIRECTORY, require_installed=False)

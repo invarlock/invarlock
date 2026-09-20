@@ -53,7 +53,11 @@ without evaluator SDKs or API credentials:
 The output directory must be new. Replay blocks network access and makes no
 model or judge calls. Temporary reconstruction keys are newly generated locally,
 removed with the temporary directory, and do not replace any retained signature.
-The report records all 24 original receipt verification results.
+The replay summary records all 24 original receipt verification results. It also
+renders current HTML, Markdown and JUnit reports under `current-reports/` from the
+unchanged evidence. These derived reports use the installed renderer, so display
+improvements do not rewrite the original signed evidence or archived historical
+reports.
 
 The archives preserve original plans, runs, policies, normalized SDK events,
 measurements, signed evidence, public trust inputs, receipts and reports.

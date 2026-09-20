@@ -1,0 +1,57 @@
+{
+  "format": "invarlock/priority-workflow-execution-summary-v1",
+  "scope": "Operational observations from the retained qualification campaign; process durations overlap and must not be added to infer host runtime.",
+  "observation_provenance": "Host and process values were copied from controller and /usr/bin/time output before the host was terminated. Those operational logs are not part of this public reference, so these values are contextual observations rather than replay-verified evidence.",
+  "model_collection": {
+    "host": {
+      "gpu_count": 2,
+      "gpu_model": "NVIDIA RTX PRO 6000 Blackwell",
+      "gpu_memory_gib_each": 96,
+      "logical_cpu_count": 60,
+      "system_memory_gib": 176
+    },
+    "requests": 576,
+    "host_elapsed_seconds_from_boot_to_capture_complete": 1008,
+    "host_rate_usd_per_hour": 1.86,
+    "estimated_host_cost_through_capture_complete_usd": 0.5208,
+    "process_observations": {
+      "setup_and_freeze_processes": 32,
+      "setup_and_freeze_elapsed_sum_seconds": 82.56,
+      "sdk_capture_processes": 16,
+      "sdk_capture_elapsed_sum_seconds": 281.65,
+      "longest_sdk_capture_seconds": 39.06,
+      "model_worker_processes": 4,
+      "model_worker_elapsed_sum_seconds": 385.06,
+      "longest_model_worker_seconds": 173.96,
+      "largest_recorded_worker_maximum_resident_kib": 15265184
+    },
+    "timing_note": "The host elapsed value uses the conservative billing clock from host boot. Process durations are /usr/bin/time observations and overlap because captures ran concurrently. Transfer and decommission latency after capture completion are excluded."
+  },
+  "independent_recipient": {
+    "em_nll_journeys": 32,
+    "verified_journeys": 32,
+    "elapsed_seconds": null,
+    "memory_bytes": null,
+    "measurement_status": "Dedicated recipient elapsed-time and memory instrumentation was not retained. File modification times are not used as substitutes."
+  },
+  "judge_collection": {
+    "provider": "openai",
+    "requested_model": "openai/gpt-5.6-luna",
+    "approved_resolved_model": "gpt-5.6-luna",
+    "reasoning_effort": "xhigh",
+    "maximum_output_tokens_per_call": 25000,
+    "admitted_calls": 1288,
+    "completed_ratings": 1288,
+    "provider_errors": 0,
+    "input_tokens": 412056,
+    "output_tokens": 269759,
+    "standard_rate_estimate_usd": 0.406122,
+    "provider_invoice_usd": null,
+    "elapsed_seconds": null,
+    "measurement_status": "Provider usage was retained, but a single campaign wall-clock duration and provider invoice were not. The estimate uses the then-reviewed uncached standard token rates and is not a bill."
+  },
+  "source_bindings": {
+    "capture_archive_sha256": "sha256:f0cc24c07ea81306efae3146176e28b1416b427df1730fff3d1eba3497be9cd5",
+    "judge_catalog_sha256": "sha256:acf24e0284ee078d0a4eaabd8fef659b873569b873d7f7a7dc278edccb2ad298"
+  }
+}

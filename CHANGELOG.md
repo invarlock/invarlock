@@ -104,7 +104,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   precision and score requirements without repeating verdict headings; identify
   advisory and combined outcomes and use each captured interval's recorded level.
   Label measured judge precision failures correctly and keep decision-check
-  columns visible in desktop reports without changing retained results.
+  columns visible in desktop reports without changing retained results. Show
+  capture-bound model identities and multiple recorded datasets when available,
+  rejecting contradictions with attributed artifacts or legacy identity fields.
 - Reject exact-match reports whose side means contradict their paired outcome
   counts, even when the reported difference remains consistent. Reject captured
   reports whose recorded pass contradicts an available displayed requirement.

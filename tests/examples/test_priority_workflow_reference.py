@@ -20,6 +20,49 @@ REPLAY = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(REPLAY)
 
 
+def test_execution_summary_preserves_measured_scope_and_missing_values():
+    summary = json.loads((REFERENCE / "execution-summary.json").read_bytes())
+    assert summary["format"] == "invarlock/priority-workflow-execution-summary-v1"
+    assert "not part of this public reference" in summary["observation_provenance"]
+    collection = summary["model_collection"]
+    assert collection["requests"] == 576
+    assert collection["host_elapsed_seconds_from_boot_to_capture_complete"] == 1008
+    assert collection["process_observations"]["sdk_capture_processes"] == 16
+    assert collection["process_observations"]["model_worker_processes"] == 4
+    recipient = summary["independent_recipient"]
+    assert set(recipient) == {
+        "em_nll_journeys",
+        "verified_journeys",
+        "elapsed_seconds",
+        "memory_bytes",
+        "measurement_status",
+    }
+    assert (recipient["em_nll_journeys"], recipient["verified_journeys"]) == (32, 32)
+    assert recipient["elapsed_seconds"] is None and recipient["memory_bytes"] is None
+    assert "not retained" in recipient["measurement_status"]
+    judge = summary["judge_collection"]
+    assert (
+        judge["admitted_calls"],
+        judge["completed_ratings"],
+        judge["provider_errors"],
+    ) == (
+        1288,
+        1288,
+        0,
+    )
+    assert (
+        judge["requested_model"],
+        judge["approved_resolved_model"],
+        judge["reasoning_effort"],
+        judge["maximum_output_tokens_per_call"],
+    ) == ("openai/gpt-5.6-luna", "gpt-5.6-luna", "xhigh", 25000)
+    assert judge["provider_invoice_usd"] is None and judge["elapsed_seconds"] is None
+    assert summary["source_bindings"] == {
+        "capture_archive_sha256": "sha256:" + REPLAY.ARCHIVES["captures.zip"],
+        "judge_catalog_sha256": "sha256:acf24e0284ee078d0a4eaabd8fef659b873569b873d7f7a7dc278edccb2ad298",
+    }
+
+
 @pytest.fixture(scope="module")
 def retained():
     return REPLAY.read_reference(REFERENCE)
@@ -81,7 +124,8 @@ def test_catalog_pins_profiles_and_original_failures(retained):
         assert not (
             name.startswith("capture/supervision/") and name.endswith("/admission.json")
         )
-        assert b"-----BEGIN PRIVATE KEY-----" not in raw
+        private_key_marker = b"-----BEGIN " + b"PRIVATE KEY-----"
+        assert private_key_marker not in raw
 
 
 def test_altered_archive_rejected_before_extracting(tmp_path):
