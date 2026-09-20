@@ -114,17 +114,89 @@ def _key(path):
     return public_key_fingerprint(key.public_key())
 
 
-def export_pair(output, evaluator, scorer, *, input_format="envelope"):
+def read_native_captures(directory, evaluator, scorer, version):
+    """Read a closed capture manifest and exactly the two hash-bound JSON files."""
+    from invarlock.captured_contracts import read_file
+    from invarlock.evaluation_record_contracts.contracts import MAX_INPUT_BYTES
+    from invarlock.evidence_pack_json import parse_json_bytes
+
+    directory = Path(directory)
+    if directory.is_symlink() or not directory.is_dir():
+        raise ValueError("native capture path must be a real directory")
+    raw_manifest = read_file(directory / "origin.json", 65536)
+    manifest = parse_json_bytes(raw_manifest, label="native capture manifest")
+    if not isinstance(manifest, dict) or set(manifest) != {
+        "format",
+        "evaluator",
+        "source_version",
+        "scorer",
+        "files",
+        "provenance",
+    }:
+        raise ValueError("native capture manifest has invalid fields")
+    if (
+        manifest["format"] != "invarlock/evaluator-native-captures-v1"
+        or manifest["evaluator"] != evaluator
+        or manifest["source_version"] != version
+        or manifest["scorer"] != scorer
+        or not isinstance(manifest["provenance"], dict)
+        or not manifest["provenance"]
+    ):
+        raise ValueError("native capture manifest identity or provenance is invalid")
+    if not isinstance(manifest["files"], dict) or set(manifest["files"]) != {
+        "baseline",
+        "subject",
+    }:
+        raise ValueError("native capture manifest must bind both source files")
+    raw_sources = {}
+    for side in ("baseline", "subject"):
+        binding = manifest["files"][side]
+        if not isinstance(binding, dict) or set(binding) != {"sha256"}:
+            raise ValueError("native capture file binding has invalid fields")
+        raw = read_file(directory / f"{side}.json", MAX_INPUT_BYTES)
+        if binding["sha256"] != "sha256:" + hashlib.sha256(raw).hexdigest():
+            raise ValueError(f"native capture {side} digest mismatch")
+        raw_sources[side] = raw
+    return manifest, raw_manifest, raw_sources
+
+
+def export_pair(
+    output, evaluator, scorer, *, input_format="envelope", native_captures=None
+):
     from invarlock.engine import export_evaluator_result
     from invarlock.evaluation_records.adapters import load_run
+    from invarlock.evidence_pack_json import parse_json_bytes
 
     originals, policy, origin = retained(scorer)
     version = profiles()[evaluator]
+    supplied = None
+    if native_captures is not None:
+        manifest, raw_manifest, supplied = read_native_captures(
+            native_captures, evaluator, scorer, version
+        )
+        (output / "capture-origin.json").write_bytes(raw_manifest)
+        for side, raw in supplied.items():
+            (output / f"capture-{side}.json").write_bytes(raw)
+        origin["native_captures"] = {
+            "manifest": "capture-origin.json",
+            "manifest_sha256": "sha256:" + hashlib.sha256(raw_manifest).hexdigest(),
+            "provenance": manifest["provenance"],
+        }
+        origin["scope"] = (
+            "Supplied native captures of synthetic answers; judge ratings are constructed, not observed."
+            if scorer == "judge"
+            else "Supplied native captures of retained Mistral measurements; no fresh model execution."
+        )
     sources, runs = [], []
     projection = {
-        "lm-evaluation-harness": "/context/arguments/0/0",
-        "promptfoo": "/context/prompt",
+        "lm-evaluation-harness": {
+            "kind": "json-pointer",
+            "pointer": "/context/arguments/0/0",
+        },
+        "promptfoo": {"kind": "json-pointer", "pointer": "/context/prompt"},
     }.get(evaluator)
+    if supplied is not None and "input_projection" in manifest["provenance"]:
+        projection = manifest["provenance"]["input_projection"]
     for side, original in zip(("baseline", "subject"), originals, strict=True):
         path = output / f"{side}.json"
         options = {
@@ -134,13 +206,14 @@ def export_pair(output, evaluator, scorer, *, input_format="envelope"):
         }
         if "service_identity" in original:
             options["service_identity"] = original["service_identity"]
-        if projection:
-            options["input_projection"] = {
-                "kind": "json-pointer",
-                "pointer": projection,
-            }
-        native_payload = SHAPES.payload(
-            evaluator, original["records"], version, run_id=options["run_id"]
+        if projection is not None:
+            options["input_projection"] = projection
+        native_payload = (
+            SHAPES.payload(
+                evaluator, original["records"], version, run_id=options["run_id"]
+            )
+            if supplied is None
+            else parse_json_bytes(supplied[side], label=f"native {side} capture")
         )
         adapter = {
             "envelope": "evaluator-json",
@@ -155,11 +228,20 @@ def export_pair(output, evaluator, scorer, *, input_format="envelope"):
         if input_format == "native-json":
             # The capture process only writes its native JSON; core normalization and
             # trust preparation happen in the separate recipient environment.
-            if evaluator == "langfuse":
-                native_payload = native_payload["result"]
-            write(path, native_payload)
+            if supplied is not None:
+                path.write_bytes(supplied[side])
+            else:
+                if evaluator == "langfuse":
+                    native_payload = native_payload["result"]
+                write(path, native_payload)
             run = load_run(path, **{k: v for k, v in source.items() if k != "path"})
         else:
+            if supplied is not None and evaluator == "langfuse":
+                native_payload = {
+                    "format": "invarlock/langfuse-export-v1",
+                    "sdk_version": version,
+                    "result": native_payload,
+                }
             run = export_evaluator_result(
                 evaluator,
                 native_payload,
@@ -277,12 +359,18 @@ def synthetic_measurements(plan, runs):
     }
 
 
-def prepare(output, evaluator, scorer, *, input_format="envelope"):
+def prepare(
+    output, evaluator, scorer, *, input_format="envelope", native_captures=None
+):
     from invarlock.engine import captured_request_digest, normalize_captured_request
     from invarlock.evaluation_records.io import run_digest
 
     sources, runs, policy, origin = export_pair(
-        output, evaluator, scorer, input_format=input_format
+        output,
+        evaluator,
+        scorer,
+        input_format=input_format,
+        native_captures=native_captures,
     )
     fingerprint = _key(output / "signer.pem")
     _key(output / "verifier.pem")
@@ -390,8 +478,16 @@ def installed_identity(python):
     )
 
 
-def journey(output, evaluator, scorer, python, *, input_format="envelope"):
-    runs, origin = prepare(output, evaluator, scorer, input_format=input_format)
+def journey(
+    output, evaluator, scorer, python, *, input_format="envelope", native_captures=None
+):
+    runs, origin = prepare(
+        output,
+        evaluator,
+        scorer,
+        input_format=input_format,
+        native_captures=native_captures,
+    )
     environment = dict(os.environ)
     environment.pop("PYTHONPATH", None)
     environment.pop("INVARLOCK_SIGNING_KEY", None)
@@ -414,6 +510,16 @@ def journey(output, evaluator, scorer, python, *, input_format="envelope"):
 
     status = 7 if scorer == "normalized_nll" else 0
     decision = "regression" if status else "pass"
+    preflight = command(
+        "evaluate",
+        "request.json",
+        "--preflight",
+        "--signing-key",
+        "signer.pem",
+        "--json",
+    )
+    assert preflight["ok"] and not (output / "evidence").exists()
+    write(output / "preflight.json", preflight)
     evaluated = command(
         "evaluate",
         "request.json",
@@ -511,6 +617,7 @@ def main():
     parser.add_argument("--evaluator", choices=profiles(), required=True)
     parser.add_argument("--scorer", choices=SCORERS, required=True)
     parser.add_argument("--input-format", choices=INPUT_FORMATS, default="envelope")
+    parser.add_argument("--native-captures", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--recipient-python", type=Path, required=True)
     args = parser.parse_args()
@@ -523,6 +630,7 @@ def main():
         args.scorer,
         args.recipient_python.absolute(),
         input_format=args.input_format,
+        native_captures=args.native_captures,
     )
     print(json.dumps({**result, "recipient": identity}, indent=2))
 
