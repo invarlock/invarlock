@@ -131,7 +131,9 @@ def rebind_harness_metadata(metadata, case, cases, document):
     return value
 
 
-def check_record(record, result, case, evaluator, version, *, cases=None):
+def check_record(
+    record, result, case, evaluator, version, *, cases=None, service_identity=None
+):
     """Recipient-side check of normalized facts against the raw task ledger."""
     bound = bind_result(result, case, evaluator, version)
     retained = record["context"].get("input_projection")
@@ -142,6 +144,10 @@ def check_record(record, result, case, evaluator, version, *, cases=None):
             bound["metadata"], case, cases if cases is not None else [case], document
         )
         expected_input = document
+    if service_identity is not None and "invarlock_likelihood" in bound["metadata"]:
+        bound["metadata"]["invarlock_likelihood"] = common.module(
+            "http_service"
+        ).hosted_facts(bound["metadata"]["invarlock_likelihood"], service_identity)
     if (
         record["id"] != case["id"]
         or record["input"] != case["input"]

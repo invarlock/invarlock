@@ -266,6 +266,12 @@ def capture(directory, protocol, role, evaluator):
         common.module("recovery").verify_capture(
             directory, manifest, protocol, role, evaluator, results, originals
         )
+    if "http_services" in protocol:
+        common.module("http_service").verify_capture(
+            directory, manifest, protocol, role, evaluator, results, originals, read
+        )
+    elif "service_identity" in manifest or (directory / "http").exists():
+        raise ValueError("HTTP observations require an independently declared service")
     return native, originals, results
 
 
@@ -349,6 +355,12 @@ def prepare(
             "run_id": run_id,
             "artifact_digest": protocol["models"][role]["artifact_digest"],
         }
+        service_identity = None
+        if "http_services" in protocol:
+            service_identity = common.decode(originals["capture.json"])[
+                "service_identity"
+            ]
+            source.update(artifact_digest=None, service_identity=service_identity)
         if bindings.projection(evaluator):
             source["input_projection"] = bindings.projection(evaluator)
         path = output / f"{role}.json"
@@ -382,7 +394,13 @@ def prepare(
         for case in protocol["cases"]:
             row, result = indexed[case["id"]], results[case["id"]]
             bound = bindings.check_record(
-                row, result, case, evaluator, version, cases=protocol["cases"]
+                row,
+                result,
+                case,
+                evaluator,
+                version,
+                cases=protocol["cases"],
+                service_identity=service_identity,
             )
             if any(
                 not contains(row, name, value)

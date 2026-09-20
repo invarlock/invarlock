@@ -146,15 +146,28 @@ class TaskClient:
         request_id = digest(request).removeprefix("sha256:")
         # Admission precedes the call. An interrupted attempt is not silently retried.
         write(self.output / (request_id + ".request.json"), request)
+        raw = self.exchange(request)
+        if not raw.endswith(b"\n") or len(raw) > MAX_MESSAGE:
+            raise ValueError("model task returned an incomplete or oversized response")
+        result = decode(raw)
+        self.validate_response(result, request)
+        row = result["result"]
+        write(self.output / (request_id + ".response.json"), result)
+        self.results[case_id] = deepcopy(row)
+        return deepcopy(row)
+
+    def exchange(self, request):
+        """Exchange one request; alternate example transports retain this admission."""
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as channel:
             channel.settimeout(180)
             channel.connect(self.path)
             channel.sendall(encoded(request))
             with channel.makefile("rb") as stream:
                 raw = stream.readline(MAX_MESSAGE + 1)
-        if not raw.endswith(b"\n") or len(raw) > MAX_MESSAGE:
-            raise ValueError("model task returned an incomplete or oversized response")
-        result = decode(raw)
+        return raw
+
+    @staticmethod
+    def validate_response(result, request):
         if (
             not isinstance(result, dict)
             or set(result) != {"request", "result"}
@@ -179,9 +192,6 @@ class TaskClient:
             )
         ):
             raise ValueError("model task returned invalid observations")
-        write(self.output / (request_id + ".response.json"), result)
-        self.results[case_id] = deepcopy(row)
-        return deepcopy(row)
 
     def complete(self):
         with self._lock:

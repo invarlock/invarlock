@@ -41,8 +41,10 @@ GROUPS = {
 }
 
 
-def local_environment(evaluator):
-    common.module("network").configure(evaluator)
+def local_environment(evaluator, *, http_endpoint=None):
+    common.module("network").configure(
+        evaluator, **({"http_endpoint": http_endpoint} if http_endpoint else {})
+    )
 
 
 def capture(
@@ -58,6 +60,11 @@ def capture(
 ):
     if evaluator not in protocol["evaluators"] or role not in {"baseline", "subject"}:
         raise ValueError("evaluator or role is outside the admitted campaign")
+    if "http_services" in protocol:
+        if socket_path is not None:
+            raise ValueError("HTTP capture uses the protocol endpoint; omit --socket")
+    elif socket_path is None:
+        raise ValueError("local capture requires --socket")
     if set(protocol["versions"]) != set(protocol["evaluators"]):
         raise ValueError("every admitted evaluator requires a version pin")
     expected = common.versions()[evaluator]
@@ -91,19 +98,33 @@ def capture(
         recovery = recovery_module.Recovery(
             recover_from, worker_ledger, protocol, role, evaluator, recovery_sha256
         )
-    local_environment(evaluator)
+    http = common.module("http_service") if "http_services" in protocol else None
+    if http and recovery:
+        raise ValueError("HTTP captures cannot reuse Unix transport recoveries")
+    http_service = http.service(protocol, role) if http else None
+    if http:
+        local_environment(
+            evaluator, http_endpoint=http.endpoint(http_service["endpoint"])
+        )
+    else:
+        local_environment(evaluator)
     group = next(name for name, entries in GROUPS.items() if evaluator in entries)
     output = Path(output)
     output.mkdir(mode=0o700, parents=True, exist_ok=False)
     worker_protocol = {**protocol, "role": role}
-    client = recovery_module.TaskClient if recovery else common.TaskClient
+    client = (
+        http.TaskClient
+        if http
+        else (recovery_module.TaskClient if recovery else common.TaskClient)
+    )
     task = client(
-        socket_path,
+        http_service["endpoint"] if http else socket_path,
         evaluator,
         common.digest(worker_protocol),
         protocol["cases"],
         output / "tasks",
         **({"recovery": recovery} if recovery else {}),
+        **({"protocol": protocol, "role": role} if http else {}),
     )
     if recovery:
         recovery.stage(output)
@@ -119,6 +140,10 @@ def capture(
 
         payload = driver.run(evaluator, protocol["cases"], model_task, workdir)
         results = task.complete()
+        if http:
+            common.write(output / "native-original.json", payload)
+            descriptor = task.identity()
+            payload = http.bind_native(payload, descriptor)
         common.write(output / "native.json", payload)
     except Exception as exc:
         common.write(
@@ -138,6 +163,8 @@ def capture(
     }
     if recovery:
         paths["recovery"] = common.HERE / "recovery.py"
+    if http:
+        paths["http_service"] = common.HERE / "http_service.py"
     manifest = {
         "format": "invarlock/live-evaluator-capture-v1",
         "status": "captured",
@@ -162,6 +189,11 @@ def capture(
             "admission_sha256": recovery.digest,
             **recovery.proposal,
         }
+    if http:
+        manifest["service_identity"] = descriptor
+        manifest["native_original_sha256"] = http.sha(
+            (output / "native-original.json").read_bytes()
+        )
     common.write(output / "capture.json", manifest)
     return manifest
 
@@ -172,7 +204,9 @@ def main():
     parser.add_argument("--protocol-sha256", required=True)
     parser.add_argument("--role", choices=("baseline", "subject"), required=True)
     parser.add_argument("--evaluator", choices=common.versions(), required=True)
-    parser.add_argument("--socket", type=Path, required=True)
+    parser.add_argument(
+        "--socket", type=Path, help="private model socket for local captures"
+    )
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--recover-from", type=Path)
     parser.add_argument("--worker-ledger", type=Path)

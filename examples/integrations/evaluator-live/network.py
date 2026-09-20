@@ -28,10 +28,15 @@ ENVIRONMENT = {
 }
 
 
-def audit(evaluator, event, args):
+def audit(evaluator, event, args, *, http_endpoint=None):
     """Reject outbound internet sockets before their operation executes."""
     if event in {"socket.getaddrinfo", "socket.gethostbyname", "socket.gethostbyaddr"}:
-        if evaluator != "promptfoo" or args[0] not in LOOPBACK:
+        admitted_http = (
+            event == "socket.getaddrinfo"
+            and http_endpoint is not None
+            and args[:2] == http_endpoint
+        )
+        if not admitted_http and (evaluator != "promptfoo" or args[0] not in LOOPBACK):
             raise RuntimeError("live SDK capture forbids external name resolution")
         return
     if event not in {
@@ -43,6 +48,13 @@ def audit(evaluator, event, args):
         return
     channel, address = args[:2]
     if channel.family == socket.AF_UNIX:
+        return
+    if (
+        http_endpoint is not None
+        and event == "socket.connect"
+        and channel.family == socket.AF_INET
+        and address == http_endpoint
+    ):
         return
     if address is None and event == "socket.sendmsg":
         address = channel.getpeername()
@@ -56,7 +68,17 @@ def audit(evaluator, event, args):
     raise RuntimeError("live SDK capture permits only its local callback transport")
 
 
-def configure(evaluator):
+def configure(evaluator, *, http_endpoint=None):
     """Install permanent process-local checks before importing optional SDKs."""
     os.environ.update(ENVIRONMENT)
-    sys.addaudithook(lambda event, args: audit(evaluator, event, args))
+    if http_endpoint is not None and (
+        not isinstance(http_endpoint, tuple)
+        or len(http_endpoint) != 2
+        or http_endpoint[0] != "127.0.0.1"
+        or type(http_endpoint[1]) is not int
+        or not 1024 <= http_endpoint[1] <= 65535
+    ):
+        raise ValueError("HTTP permission requires an exact loopback port")
+    sys.addaudithook(
+        lambda event, args: audit(evaluator, event, args, http_endpoint=http_endpoint)
+    )
