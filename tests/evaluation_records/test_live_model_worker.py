@@ -295,6 +295,83 @@ def test_private_socket_modes_and_no_overwrite(tmp_path):
             WORKER.private_socket(path)
 
 
+@pytest.mark.parametrize("remote_code", [False, True])
+def test_inventory_rejects_pinned_tokenizer_remote_code(tmp_path, remote_code):
+    contents = {
+        "config.json": {
+            "model_type": "mistral",
+            "architectures": ["MistralForCausalLM"],
+        },
+        "tokenizer_config.json": (
+            {"auto_map": {"AutoTokenizer": "custom.Tokenizer"}}
+            if remote_code
+            else {"tokenizer_class": "LlamaTokenizer"}
+        ),
+    }
+    facts = []
+    for name, value in contents.items():
+        raw = COMMON.encoded(value)
+        (tmp_path / name).write_bytes(raw)
+        facts.append(
+            {
+                "path": name,
+                "byte_size": len(raw),
+                "sha256": "sha256:" + hashlib.sha256(raw).hexdigest(),
+            }
+        )
+    # A matching file digest authenticates bytes, but does not permit custom code.
+    if remote_code:
+        with pytest.raises(ValueError, match="tokenizer remote code"):
+            WORKER.inventory(tmp_path, {"files": facts})
+    else:
+        assert WORKER.inventory(tmp_path, {"files": facts}) == facts
+
+
+def test_private_socket_creates_private_parent_and_rejects_oversized_path():
+    import tempfile
+
+    with tempfile.TemporaryDirectory(prefix="worker-new-") as directory:
+        parent = Path(directory) / "new"
+        path = parent / "model.sock"
+        with WORKER.private_socket(path):
+            assert stat.S_IMODE(parent.stat().st_mode) == 0o700
+            assert stat.S_IMODE(path.stat().st_mode) == 0o600
+        path.unlink()
+        oversized = Path(directory) / ("x" * 101) / "model.sock"
+        with pytest.raises(ValueError, match="portable byte limit"):
+            WORKER.private_socket(oversized)
+        assert not oversized.parent.exists()
+
+
+@pytest.mark.parametrize("failure", ["bind", "listen"])
+def test_private_socket_closes_channel_on_setup_failure(monkeypatch, failure):
+    import tempfile
+
+    calls = []
+
+    def bind(path):
+        calls.append("bind")
+        if failure == "bind":
+            raise OSError("synthetic bind failure")
+        Path(path).touch()
+
+    def listen(backlog):
+        assert backlog == 1
+        calls.append("listen")
+        raise OSError("synthetic listen failure")
+
+    channel = SimpleNamespace(
+        bind=bind, listen=listen, close=lambda: calls.append("close")
+    )
+    monkeypatch.setattr(WORKER.socket, "socket", lambda *args: channel)
+    with tempfile.TemporaryDirectory(prefix="worker-fail-") as directory:
+        with pytest.raises(OSError, match=f"synthetic {failure} failure"):
+            WORKER.private_socket(Path(directory) / "model.sock")
+    assert calls == (
+        ["bind", "close"] if failure == "bind" else ["bind", "listen", "close"]
+    )
+
+
 def test_preflight_requires_explicit_mode_and_never_loads_model(tmp_path, monkeypatch):
     value = protocol()
     protocol_path = tmp_path / "protocol.json"
