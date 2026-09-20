@@ -223,7 +223,7 @@ def test_nll_summary_describes_ratio_without_calling_it_a_delta(scope):
     )
     assert "a subject-to-baseline ratio of 0.75" in summary
     assert "The 95% interval for the ratio runs from" in summary
-    assert "at or below 1.1 ratio" in summary
+    assert "at or below 1.1." in summary
     assert "a change of 0.75" not in summary
     assert ("within the west slice" in summary) is (scope == "west")
 
@@ -305,3 +305,78 @@ def test_multi_summary_names_first_failed_check_without_ranking_metric_units():
     assert record_reporting._captured_summary((passing, passing)).startswith(
         "2 metric / scope results: 2 passed"
     )
+
+
+@pytest.mark.parametrize(
+    "scores,maximum,expected",
+    [
+        (
+            (-4.4, -4.4),
+            1.05,
+            "The observed NLL ratio exceeded the policy limit. Lower NLL is better.",
+        ),
+        (
+            (-2, -6),
+            1.05,
+            "The observed NLL ratio was within the policy limit, but its uncertainty interval extended beyond it.",
+        ),
+        (
+            (-3.6, -3.6),
+            0.8,
+            "The observed NLL ratio exceeded the policy limit. Lower NLL is better.",
+        ),
+    ],
+)
+def test_nll_opening_explains_failed_bound_instead_of_repeating_status(
+    scores, maximum, expected
+):
+    from invarlock.evaluation_comparison.comparison import compare_runs
+    from tests.evaluation_comparison.test_likelihood import policy, row, run
+
+    configured = policy()
+    configured["metrics"][0]["ratio_max"] = maximum
+    comparison = compare_runs(
+        run([row("a"), row("b")]),
+        run([row("a", scores[0]), row("b", scores[1])]),
+        configured,
+    )
+    before = deepcopy(comparison)
+    metrics = record_reporting._metric_views(
+        comparison, {"nll": configured["metrics"][0]}
+    )
+    assert metrics[0].decision == "regression"
+    summary = record_reporting._captured_summary(metrics, comparison)
+    assert summary.startswith(expected)
+    assert "The policy was not met" not in summary
+    assert "subject-to-baseline ratio of" in summary
+    assert comparison == before
+
+
+@pytest.mark.parametrize(
+    "direction,estimate",
+    [("minimum", -3), ("minimum", 1), ("maximum", 3), ("maximum", -1)],
+)
+def test_scalar_opening_respects_direction_and_does_not_call_every_failure_a_loss(
+    direction, estimate
+):
+    from dataclasses import replace
+
+    from invarlock.report_presentation import CheckView, IntervalView
+
+    _, comparison, _ = binary_comparison()
+    base = record_reporting._metric_views(comparison, {})[0]
+    interval = IntervalView(
+        -4, 4, estimate, 0, "Interval", "score", threshold_direction=direction
+    )
+    metric = replace(
+        base,
+        decision="regression",
+        interval=interval,
+        checks=(CheckView("Allowed change", "bound", "limit", False),),
+    )
+    opening = record_reporting._captured_opening(metric)
+    within = estimate >= 0 if direction == "minimum" else estimate <= 0
+    assert ("within the policy limit" in opening) == within
+    assert ("outside the range" in opening) != within
+    assert "loss" not in opening
+    assert "The policy was not met" not in opening

@@ -778,6 +778,43 @@ def _view(comparison: dict[str, Any], evidence: CapturedSnapshot | None) -> Repo
     return _assemble_view(comparison, inputs, manifest, signer)
 
 
+def _captured_opening(metric: MetricView) -> str:
+    """Explain a failed comparison bound without repeating the verdict heading."""
+    if metric.decision == "pass":
+        return "This result met every recorded policy requirement."
+    interval = metric.interval
+    failed_bound = next(
+        (
+            check
+            for check in metric.checks
+            if check.name in {"Allowed change", "Maximum NLL ratio"}
+            and check.passed is False
+        ),
+        None,
+    )
+    if (
+        metric.decision != "regression"
+        or failed_bound is None
+        or interval is None
+        or interval.threshold is None
+        or interval.threshold_direction not in {"minimum", "maximum"}
+    ):
+        return metric.explanation
+    label = "NLL ratio" if failed_bound.name == "Maximum NLL ratio" else "change"
+    within = (
+        interval.estimate >= interval.threshold
+        if interval.threshold_direction == "minimum"
+        else interval.estimate <= interval.threshold
+    )
+    if within:
+        return f"The observed {label} was within the policy limit, but its uncertainty interval extended beyond it."
+    return (
+        "The observed NLL ratio exceeded the policy limit. Lower NLL is better."
+        if label == "NLL ratio"
+        else "The observed change was outside the range allowed by the policy."
+    )
+
+
 def _captured_summary(
     metrics: tuple[MetricView, ...], comparison: dict[str, Any] | None = None
 ) -> str:
@@ -827,11 +864,7 @@ def _captured_summary(
         if recorded is not None
         else metric.interval is not None and metric.interval.neutral == 1
     )
-    parts = [
-        "This result met every recorded policy requirement."
-        if metric.decision == "pass"
-        else metric.explanation
-    ]
+    parts = [_captured_opening(metric)]
     scope = (
         "" if metric.scope == "overall" else f" within the {metric.display_scope} slice"
     )
@@ -889,6 +922,8 @@ def _captured_summary(
             parts.append(f"The policy requires at least {minimum} included pairs.")
         elif check.name in {"Allowed change", "Maximum NLL ratio"}:
             relation, value = check.required.split(" ", 1)
+            if check.name == "Maximum NLL ratio":
+                value = value.removesuffix(" ratio")
             parts.append(
                 "The policy requires the interval to stay "
                 + ("at or above " if relation == ">=" else "at or below ")
