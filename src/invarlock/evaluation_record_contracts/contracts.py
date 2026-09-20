@@ -164,6 +164,7 @@ def _validator(name: str) -> Draft202012Validator:
                 "case_set": "evaluation_case_set.schema.json",
                 "policy": "comparison_policy.schema.json",
                 "comparison": "multi_metric_comparison.schema.json",
+                "evaluator_export": "evaluator_export.schema.json",
             }[name],
         )
         .read_bytes(),

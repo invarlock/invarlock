@@ -183,6 +183,19 @@ def test_real_hosted_dataset_item_retains_public_sdk_fields(tmp_path, sdk, expor
     )
     assert run["records"][0]["id"] == "hosted-item"
     assert run["records"][0]["output"] == "Answer"
+    from invarlock.engine import export_evaluator_result
+
+    core = export_evaluator_result(
+        "langfuse",
+        result,
+        tmp_path / "core-export.json",
+        expected_ids=["hosted-item"],
+        source_version="4.14.1",
+        run_id=result.run_name,
+        artifact_digest="sha256:" + "a" * 64,
+    )
+    assert core["records"] == run["records"]
+    assert core["source_digest"] != run["source_digest"]
 
 
 @pytest.mark.parametrize("mutation", ["duplicate", "missing", "conflict", "object"])

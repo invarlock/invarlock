@@ -138,7 +138,9 @@
             "inspect-json",
             "lm-eval-samples",
             "promptfoo-jsonl",
-            "langfuse-json"
+            "langfuse-json",
+            "evaluator-json",
+            "evaluator-native-json"
           ]
         },
         "run_digest": {

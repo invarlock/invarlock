@@ -8,12 +8,14 @@ from __future__ import annotations
 
 import math
 from collections.abc import Mapping
+from importlib import import_module
 from typing import Any
 
 from invarlock.evaluation_record_contracts.contracts import (
     MAX_RECORDS,
     EvaluationRecordsError,
 )
+from invarlock.evaluation_records.capture_facts import merge_capture_scores
 
 _HOSTED_TEXT_FIELDS = {
     "source_trace_id",
@@ -24,6 +26,93 @@ _HOSTED_TEXT_FIELDS = {
     "updated_at",
 }
 _HOSTED_FIELDS = _HOSTED_TEXT_FIELDS | {"status", "media_references"}
+
+
+def serialize_experiment_result(result: Any, version: str) -> dict[str, Any]:
+    """Read public SDK fields at capture time; recipients need only the JSON."""
+    if isinstance(result, dict):
+        return result
+    from importlib.metadata import version as installed_version
+
+    dataset_item_type = import_module("langfuse.api").DatasetItem
+    experiment_type = import_module("langfuse.experiment").ExperimentResult
+
+    if not isinstance(result, experiment_type):
+        raise EvaluationRecordsError("Langfuse requires an ExperimentResult or export")
+    if installed_version("langfuse") != version:
+        raise EvaluationRecordsError(
+            "Langfuse source version differs from installed SDK"
+        )
+
+    def evaluation(value: Any) -> dict[str, Any]:
+        return {
+            key: getattr(value, key)
+            for key in (
+                "name",
+                "value",
+                "comment",
+                "metadata",
+                "data_type",
+                "config_id",
+            )
+        }
+
+    def item(value: Any) -> dict[str, Any]:
+        if isinstance(value, dict):
+            return value
+        if not isinstance(value, dataset_item_type):
+            raise EvaluationRecordsError("Langfuse item requires a dict or DatasetItem")
+        captured = {
+            key: getattr(value, key)
+            for key in (
+                "id",
+                "input",
+                "expected_output",
+                "metadata",
+                "source_trace_id",
+                "source_observation_id",
+                "dataset_id",
+                "dataset_name",
+            )
+        }
+        captured["status"] = value.status.value
+        for key in ("created_at", "updated_at"):
+            captured[key] = getattr(value, key).isoformat()
+        captured["media_references"] = [
+            media.model_dump(mode="json") for media in value.media_references
+        ]
+        return captured
+
+    if not 1 <= len(result.item_results) <= MAX_RECORDS:
+        raise EvaluationRecordsError("Langfuse requires bounded nonempty item results")
+    return {
+        "format": "invarlock/langfuse-export-v1",
+        "sdk_version": version,
+        "result": {
+            **{
+                key: getattr(result, key)
+                for key in (
+                    "name",
+                    "run_name",
+                    "description",
+                    "experiment_id",
+                    "dataset_run_id",
+                    "dataset_run_url",
+                )
+            },
+            "item_results": [
+                {
+                    "item": item(row.item),
+                    "output": row.output,
+                    "evaluations": [evaluation(value) for value in row.evaluations],
+                    "trace_id": row.trace_id,
+                    "dataset_run_id": row.dataset_run_id,
+                }
+                for row in result.item_results
+            ],
+            "run_evaluations": [evaluation(value) for value in result.run_evaluations],
+        },
+    }
 
 
 def _object(
@@ -208,7 +297,9 @@ def parse_langfuse_export(
             "expected": item.get("expected_output"),
             "output": native["output"],
             "error": error,
-            "scores": _evaluations(native["evaluations"]),
+            "scores": merge_capture_scores(
+                _evaluations(native["evaluations"]), metadata
+            ),
             "metadata": {
                 key: val
                 for key, val in metadata.items()
