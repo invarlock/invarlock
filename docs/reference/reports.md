@@ -35,8 +35,9 @@ A multi-metric opening summarizes all scopes and identifies an adverse or
 unresolved result without ranking unlike metrics by their numeric values.
 
 These are explanations of the retained decision, not additional verdicts.
-Evidence that fails authentication or replay is rejected before an authenticated
-comparison report can be produced.
+The report states which checks it performed; some report workflows authenticate
+retained records without replaying the comparison. Independent recipient
+verification remains a separate step.
 
 Then check **What was compared**: confirm the baseline, subject, task and recorded
 configuration change. The report distinguishes model-artifact identity from a
