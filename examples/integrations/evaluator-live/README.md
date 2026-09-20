@@ -290,7 +290,7 @@ The proposed extension consists of four 64-case local primary comparisons
 (1,024 calls across both routes), four eight-case HTTP primary comparisons
 (128), Langfuse's original eight-case reference-free and repetition controls
 (128), and four two-call budget controls (8). The budget controls deliberately
-leave 184 trials unadmitted. Those incomplete controls are not model-quality
+leave 184 trials without call admission. Those incomplete controls are not model-quality
 references. Freezing this proposal does not perform or authorize collection:
 
 ```bash
