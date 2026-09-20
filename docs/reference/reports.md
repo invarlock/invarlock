@@ -41,7 +41,9 @@ the explanation. Browser-tab titles include the recorded outcome.
 These are explanations of the retained decision, not additional verdicts.
 The report states which checks it performed; some report workflows authenticate
 retained records without replaying the comparison. Independent recipient
-verification remains a separate step.
+verification remains a separate step. A captured report that records a pass
+while an available displayed requirement fails is rejected as inconsistent;
+this check does not replay scoring.
 
 Then check **What was compared**: confirm the baseline, subject, task and recorded
 configuration change. The report distinguishes model-artifact identity from a

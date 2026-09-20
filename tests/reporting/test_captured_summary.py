@@ -97,6 +97,7 @@ def test_match_counts_require_complete_binary_mean_with_exact_integer_arithmetic
     )
     if mutation == "missing":
         metric["missing_ids"] = ["case-missing"]
+        metric["decision"] = "insufficient_evidence"
     elif mutation == "nonbinary":
         metric["kind"] = "recorded"
     elif mutation == "aggregation":
@@ -172,6 +173,8 @@ def test_count_sublabels_preserve_included_and_usable_pairs_and_policy_scope(
     _, comparison, policy = binary_comparison()
     metric = comparison["metrics"][0]
     metric["missing_ids"] = ["one-missing"] if missing else []
+    if missing:
+        metric["decision"] = "insufficient_evidence"
     count = metric["count"]
     configured = (
         {item["name"]: item for item in policy["metrics"]} if with_policy else {}

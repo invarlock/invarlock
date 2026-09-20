@@ -675,6 +675,10 @@ def _metric_views(
                     None,
                 )
             )
+        if m["decision"] == "pass" and any(check.passed is False for check in checks):
+            raise EvaluationRecordsError(
+                "captured recorded pass contradicts a displayed policy requirement"
+            )
         explanation = (
             "The policy thresholds are unavailable in this report; the retained decision has not been independently replayed."
             if policy is None

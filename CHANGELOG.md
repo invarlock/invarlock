@@ -73,7 +73,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Label measured judge precision failures correctly and keep decision-check
   columns visible in desktop reports without changing retained results.
 - Reject exact-match reports whose side means contradict their paired outcome
-  counts, even when the reported difference remains consistent.
+  counts, even when the reported difference remains consistent. Reject captured
+  reports whose recorded pass contradicts an available displayed requirement.
 - Keep provider retries within admitted judge attempts, reject ignored settings,
   and validate reported usage before charging a collection budget.
 - Apply the resolved environment snapshot to optional runtime resource bindings.
