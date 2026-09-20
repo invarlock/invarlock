@@ -310,9 +310,9 @@ def _view(
     role = policy["decision_role"]
     required = role == "required"
     explanation = {
-        "pass": f"All declared {role} bounds are satisfied.",
-        "regression": f"At least one declared {role} bound is violated.",
-        "insufficient_evidence": f"The declared {role} bounds are not established by the available evidence.",
+        "pass": f"The judge comparison met every {role} policy requirement.",
+        "regression": f"The judge comparison did not meet at least one {role} policy requirement.",
+        "insufficient_evidence": f"The available evidence does not establish that the judge comparison meets every {role} policy requirement.",
     }[analysis["decision"]]
     if analysis["reasons"]:
         explanation += (

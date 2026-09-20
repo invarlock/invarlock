@@ -1122,6 +1122,48 @@ def _native_report_context(
     return tuple(context), changes
 
 
+def _native_policy_summary(
+    report: dict[str, Any], checks: tuple[CheckView, ...]
+) -> str:
+    """Explain the recorded gate without treating a bound failure as degradation."""
+    if report["verdict"] == "pass":
+        return "The comparison met every recorded policy requirement."
+    comparison = report["comparison"]
+    value = comparison["value"]
+    if not checks[0].passed:
+        if comparison["kind"] == "exact_match_delta_pp":
+            minimum = comparison["minimum"]
+            if minimum <= value < 0:
+                return (
+                    "The observed loss was within the allowance, but a loss greater than "
+                    + number(-minimum)
+                    + " percentage points could not be ruled out."
+                )
+            if minimum <= 0 <= value:
+                return "The observed score did not decline, but a loss beyond the policy allowance could not be ruled out."
+            if value < minimum <= 0:
+                return "The observed loss exceeded the policy allowance."
+            return "The comparison did not establish the improvement required by the policy."
+        if comparison["kind"] == "normalized_nll_ratio":
+            return (
+                "The observed subject-to-baseline NLL ratio was within the limit, but its uncertainty interval extended beyond it."
+                if value <= comparison["maximum"]
+                else "The observed subject-to-baseline NLL ratio exceeded the policy limit."
+            )
+        return (
+            "The comparison did not establish the score change required by the policy."
+        )
+    explanations = {
+        "Record count": "There were too few paired records to meet the policy requirement.",
+        "Interval width": "The uncertainty interval was wider than the policy permits.",
+        "Baseline accuracy": "The baseline accuracy was below the required minimum.",
+        "Candidate accuracy": "The subject accuracy was below the required minimum.",
+    }
+    return next(
+        explanations[check.name] for check in checks[1:] if check.passed is False
+    )
+
+
 def _report_view(
     report: dict[str, Any],
     *,
@@ -1139,13 +1181,7 @@ def _report_view(
     ratio = kind == "normalized_nll_ratio"
     checks = tuple(CheckView(**check) for check in core_policy_checks(report))
     unmet = [check.name for check in checks if not check.passed]
-    summary = (
-        "Every configured check passed for this paired evaluation. Independent recipient acceptance is a separate step."
-        if report["verdict"] == "pass"
-        else "This evaluation did not meet its recorded policy. Checks not met: "
-        + ", ".join(unmet)
-        + "."
-    )
+    summary = _native_policy_summary(report, checks)
     label = (
         "Paired 95% confidence interval"
         if uncertainty["scope"] == "paired_binary_outcomes"
@@ -1260,12 +1296,18 @@ def _report_view(
         notes=tuple(notes),
     )
     summary += (
-        f" Across {metric.count} paired records, the subject scored {metric.candidate}, "
-        f"compared with {metric.baseline} for the baseline, "
-        + (
-            f"a subject-to-baseline ratio of {number(comparison['value'])}."
-            if ratio
-            else f"a change of {metric.change}."
+        f" The subject matched the expected answer in {subject_matches:,} of {metric.count} cases, "
+        f"compared with {baseline_matches:,} for the baseline. "
+        f"Accuracy changed from {metric.baseline} to {metric.candidate}, a change of {metric.change}."
+        if exact
+        else (
+            f" Across {metric.count} paired records, the subject scored {metric.candidate}, "
+            f"compared with {metric.baseline} for the baseline, "
+            + (
+                f"a subject-to-baseline ratio of {number(comparison['value'])}."
+                if ratio
+                else f"a change of {metric.change}."
+            )
         )
     )
     return ReportView(

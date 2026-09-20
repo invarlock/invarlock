@@ -25,7 +25,20 @@ produce judge analysis and verification results described in
 
 ## Reading a report for a release review
 
-Start with **What was compared**: confirm the baseline, subject, task and recorded
+The opening states the recorded policy result before the chart. A pass means
+the configured requirements were met. A failed bound can mean the observed
+change exceeded the allowance or that uncertainty prevented establishing the
+required result. Too few records, a wide interval or an unmet absolute score
+requirement can also prevent a pass. Judge reports distinguish adverse results
+from insufficient evidence; advisory results do not authorize a required gate.
+A multi-metric opening summarizes all scopes and identifies an adverse or
+unresolved result without ranking unlike metrics by their numeric values.
+
+These are explanations of the retained decision, not additional verdicts.
+Evidence that fails authentication or replay is rejected before an authenticated
+comparison report can be produced.
+
+Then check **What was compared**: confirm the baseline, subject, task and recorded
 configuration change. The report distinguishes model-artifact identity from a
 hosted service's reported identity, and native execution from imported records.
 Matching displayed previews do not establish equality of complete configurations.

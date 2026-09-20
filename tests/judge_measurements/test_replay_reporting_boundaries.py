@@ -147,10 +147,15 @@ def test_reports_preserve_decision_and_role_without_gating_advisory_metrics(
         assert suite.get("errors") == str(int(outcome == "insufficient_evidence"))
         assert suite.get("skipped") == "0" and case.find("skipped") is None
     if outcome == "regression":
-        assert f"At least one declared {role} bound is violated." in result.text
+        assert (
+            f"The judge comparison did not meet at least one {role} policy requirement."
+            in result.text
+        )
         assert "bounds are satisfied" not in result.text
         if role == "required":
-            assert "bound is violated" in case.find("failure").get("message")
+            assert "did not meet at least one required policy requirement" in case.find(
+                "failure"
+            ).get("message")
 
 
 @pytest.mark.parametrize("signed", [True, False])

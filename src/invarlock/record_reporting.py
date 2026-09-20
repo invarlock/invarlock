@@ -827,7 +827,11 @@ def _captured_summary(
         if recorded is not None
         else metric.interval is not None and metric.interval.neutral == 1
     )
-    parts = [] if metric.decision == "pass" else [metric.explanation]
+    parts = [
+        "This result met every recorded policy requirement."
+        if metric.decision == "pass"
+        else metric.explanation
+    ]
     scope = (
         "" if metric.scope == "overall" else f" within the {metric.display_scope} slice"
     )
