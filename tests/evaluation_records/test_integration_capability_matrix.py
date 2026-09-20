@@ -100,3 +100,81 @@ def test_every_adapter_preserves_capabilities_and_identity_across_routes(
         assert capabilities["judge"]["usable_count"] == 1
         assert capabilities["exact_match"]["usable_count"] == int(has_reference)
         assert capabilities["normalized_nll_per_utf8_byte"]["usable_count"] == 0
+
+
+@pytest.mark.parametrize("evaluator", EVALUATORS)
+def test_every_adapter_retains_hosted_likelihood_and_rejects_identity_rebinding(
+    tmp_path, evaluator
+):
+    from invarlock.engine import EvaluationRecordsError, compare_runs, run_digest
+    from invarlock.evaluation_record_contracts.contracts import digest
+    from tests.evaluation_comparison.test_likelihood import policy, row
+
+    descriptor = identity()
+    records = [row("one"), row("two", -6.0)]
+    for record in records:
+        record["metadata"] = {"slice": "unicode"}
+        record["likelihood"].update(
+            artifact_digest=None,
+            service_identity_digest=digest(descriptor),
+            configuration_digest=descriptor["configuration_digest"],
+        )
+    payload = SHAPES.payload(evaluator, records, "test", run_id="hosted")
+    options = {
+        "run_id": "hosted",
+        "artifact_digest": None,
+        "service_identity": descriptor,
+        "input_projection": {
+            "lm-evaluation-harness": {
+                "kind": "json-pointer",
+                "pointer": "/context/arguments/0/0",
+            },
+            "promptfoo": {"kind": "json-pointer", "pointer": "/context/prompt"},
+        }.get(evaluator),
+    }
+    envelope = tmp_path / "envelope.json"
+    export_evaluator_result(
+        evaluator,
+        payload,
+        envelope,
+        expected_ids=["one", "two"],
+        source_version="test",
+        **options,
+    )
+    raw = tmp_path / "native.json"
+    raw.write_text(
+        json.dumps(payload["result"] if evaluator == "langfuse" else payload)
+    )
+    approved = policy()
+    approved["metrics"][0]["configuration"]["configuration_digest"] = descriptor[
+        "configuration_digest"
+    ]
+    digests = []
+    for path, adapter in ((envelope, "evaluator-json"), (raw, "evaluator-native-json")):
+        run = load_run(
+            path,
+            adapter=adapter,
+            source={"name": evaluator, "version": "test"},
+            **options,
+        )
+        digests.append(run_digest(run))
+        assert (
+            evaluator_input_capabilities(run)["normalized_nll_per_utf8_byte"][
+                "usable_count"
+            ]
+            == 2
+        )
+        assert [record["likelihood"]["logprob_sum"] for record in run["records"]] == [
+            -4.0,
+            -6.0,
+        ]
+        assert compare_runs(run, run, approved)["decision"] == "pass"
+        changed = {**descriptor, "deployment": "different-deployment"}
+        with pytest.raises(EvaluationRecordsError):
+            load_run(
+                path,
+                adapter=adapter,
+                source={"name": evaluator, "version": "test"},
+                **{**options, "service_identity": changed},
+            )
+    assert digests[0] != digests[1]

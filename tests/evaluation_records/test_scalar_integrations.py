@@ -529,6 +529,96 @@ def test_structured_outputs_are_preserved_without_text_coercion(evaluator, outpu
     assert capabilities["exact_match"]["usable_count"] == 0
 
 
+@pytest.mark.parametrize("evaluator", EVALUATORS)
+def test_mixed_failures_keep_projection_bindings_through_both_import_routes(
+    evaluator, tmp_path
+):
+    from invarlock.engine import (
+        evaluator_input_capabilities,
+        export_evaluator_result,
+        load_run,
+    )
+    from invarlock.evaluator_capture import verify_input_projection
+
+    input_container, input_field, output_container, output_field = {
+        "deepeval": ("test_case", "input", "test_case", "actual_output"),
+        "ragas": ("sample", "user_input", "sample", "response"),
+        "lighteval": ("doc", "query", "model_response", "text"),
+        "hugging-face-evaluate": (None, "input", None, "predictions"),
+        "autoevals": (None, "input", None, "output"),
+        "openevals": (None, "inputs", None, "outputs"),
+        "arize-phoenix-evals": ("record", "input", "record", "output"),
+        "opik": ("dataset_item", "input", "dataset_item", "output"),
+    }[evaluator]
+    entries = []
+    for ident, output, error in (
+        ("complete", "Answer", None),
+        ("failed", None, "Generation failed"),
+        ("partial", "Partial answer", "Generation interrupted"),
+    ):
+        entry = native_entry(evaluator)
+        entry.update(id=ident, error=error)
+        del entry["metric_result"]
+        (entry[input_container] if input_container else entry)[input_field] = {
+            "text": "Question?",
+            "original_flag": True,
+        }
+        (entry[output_container] if output_container else entry)[output_field] = (
+            [output] if output_field in ("text", "predictions") else output
+        )
+        entries.append(entry)
+    original = copy.deepcopy(entries)
+    options = {
+        "run_id": "mixed",
+        "artifact_digest": "sha256:" + "a" * 64,
+        "input_projection": {"kind": "json-pointer", "pointer": "/input/text"},
+    }
+    envelope = tmp_path / "export.json"
+    exported = export_evaluator_result(
+        evaluator,
+        entries,
+        envelope,
+        expected_ids=["complete", "failed", "partial"],
+        source_version="test",
+        **options,
+    )
+    raw = tmp_path / "native.json"
+    raw.write_text(json.dumps(entries))
+    assert entries == original
+    for adapter, path in (
+        ("evaluator-json", envelope),
+        ("evaluator-native-json", raw),
+    ):
+        imported = load_run(
+            path,
+            adapter=adapter,
+            source={"name": evaluator, "version": "test"},
+            **options,
+        )
+        assert imported["records"] == exported["records"]
+        records = imported["records"]
+        assert [row["id"] for row in records] == ["complete", "failed", "partial"]
+        assert [row["output"] for row in records] == ["Answer", None, "Partial answer"]
+        assert [row["error"] for row in records] == [
+            None,
+            "Generation failed",
+            "Generation interrupted",
+        ]
+        for row, native in zip(records, entries, strict=True):
+            assert row["input"] == "Question?"
+            assert row["context"]["upstream_record"] == native
+            verify_input_projection(row)
+        capabilities = evaluator_input_capabilities(imported)
+        for scorer in ("exact_match", "judge"):
+            assert capabilities[scorer]["usable_count"] == 1
+            assert capabilities[scorer]["unavailable_ids"] == ["failed", "partial"]
+        forged = copy.deepcopy(records[1])
+        # Python considers True == 1, but the retained JSON binding must not.
+        forged["context"]["input_projection"]["source"]["input"]["original_flag"] = 1
+        with pytest.raises(EvaluationRecordsError, match="projection"):
+            verify_input_projection(forged)
+
+
 @pytest.mark.parametrize(
     "fault",
     [
