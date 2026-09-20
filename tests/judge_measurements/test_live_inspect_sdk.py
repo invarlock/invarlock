@@ -7,6 +7,7 @@ import copy
 import importlib.metadata
 import json
 import os
+import socket
 from dataclasses import asdict, replace
 from pathlib import Path
 
@@ -92,6 +93,18 @@ def test_configured_provider_wire_collection_replays_without_network(
 
     async def forbid_network(*args, **kwargs):
         raise AssertionError("SDK qualification attempted a real network request")
+
+    def forbid_socket(*args, **kwargs):
+        pytest.fail("SDK qualification attempted a real socket request")
+
+    # Exercise the real configured scope without granting actual connectivity.
+    # These socket/transport blockers do not consult its ContextVar permission.
+    for name in ("connect", "connect_ex", "sendto", "sendmsg"):
+        if hasattr(socket.socket, name):
+            monkeypatch.setattr(socket.socket, name, forbid_socket)
+    monkeypatch.setattr(socket, "create_connection", forbid_socket)
+    monkeypatch.setattr(socket, "getaddrinfo", forbid_socket)
+    monkeypatch.setenv("INVARLOCK_ALLOW_JUDGE_NETWORK", "1")
 
     monkeypatch.setattr(
         httpx.AsyncHTTPTransport, "handle_async_request", forbid_network
