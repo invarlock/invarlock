@@ -2,7 +2,7 @@
 
 **Recorded policy result: Policy not met**
 
-This evaluation did not meet its recorded policy. Checks not met: Paired lower bound. Across 128 paired records, the subject scored 72.66%, compared with 73.44% for the baseline, a change of -0.7812 pp.
+The observed loss was within the allowance, but a loss greater than 2 percentage points could not be ruled out. The subject matched the expected answer in 93 of 128 cases, compared with 94 for the baseline. Accuracy changed from 73.44% to 72.66%, a change of -0.7812 pp.
 
 ## What was compared
 
