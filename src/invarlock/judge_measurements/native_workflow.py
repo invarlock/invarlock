@@ -6,7 +6,6 @@ import asyncio
 import base64
 import fcntl
 import hashlib
-import importlib
 import os
 import stat
 from collections.abc import Callable, Iterator
@@ -16,7 +15,6 @@ from typing import TYPE_CHECKING, Any
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from invarlock import __version__
 from invarlock.captured_contracts import read_file
 from invarlock.evidence_pack_contract import EvidenceObservation, RuntimeSideEvidence
 from invarlock.evidence_pack_json import parse_json_bytes
@@ -37,14 +35,10 @@ if TYPE_CHECKING:
 
 
 def collection_api() -> Any:
-    """Load only the installed, optional collector through its fixed entry point."""
-    try:
-        return importlib.import_module("invarlock_addins.inspect_judge")
-    except ImportError:
-        raise JudgeWorkflowError(
-            f'Install with: python -m pip install "invarlock[judge]=={__version__}" '
-            "to collect judge measurements"
-        ) from None
+    """Load the core collector without importing optional provider SDKs."""
+    from invarlock import judge_measurements
+
+    return judge_measurements
 
 
 def collection_preflight(configuration: dict[str, Any]) -> dict[str, Any]:

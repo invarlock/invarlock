@@ -1,7 +1,7 @@
 # Documentation development
 
 The documentation is a tested product surface. Maintained Markdown spans the
-MkDocs site, repository entry points, first-party add-in READMEs, public
+MkDocs site, repository entry points, first-party provider documentation, public
 evidence guidance, scripts, examples, tests, and GitHub contribution templates.
 
 > **Reference**
@@ -20,7 +20,6 @@ evidence guidance, scripts, examples, tests, and GitHub contribution templates.
 | `make docs` | Strict static-site build | None after dependencies are installed |
 | `make docs-serve` | Local server on `127.0.0.1:8000` | None for local navigation |
 | `make docs-live-fast` | CLI surface smoke plus the documentation gate | None after dependencies are installed |
-| `make docs-live` | Maintained full documentation alias | Same as `docs-live-fast` |
 
 `docs-check` validates every maintained repository Markdown file selected by
 the Makefile, not only `docs/**/*.md`. Generated, cached, vendored, dependency,

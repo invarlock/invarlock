@@ -16,6 +16,7 @@ import pytest
 import yaml
 
 import invarlock.evaluation_oci as evaluation_oci
+from invarlock.cli.runtime_profile import resolve_runtime_profile
 from invarlock.core.evaluation_request import (
     ArtifactRequest,
     ComparisonRequest,
@@ -36,7 +37,7 @@ from invarlock.evaluation_oci import (
     _workers_may_run_parallel,
     compose_side_worker_command,
     evaluation_request_execution_mode,
-    launch_from_environment,
+    launch_from_resolved_config,
     preflight_oci_launch,
 )
 from invarlock.evaluation_run import load_runtime_side_evidence
@@ -198,7 +199,9 @@ def test_preflight_inspects_pinned_images_without_starting_containers(
         )
 
     monkeypatch.setattr(evaluation_oci, "_inspect_local_image", inspect_image)
-    monkeypatch.setattr(evaluation_oci.shutil, "which", lambda name: f"/bin/{name}")
+    monkeypatch.setattr(
+        evaluation_oci.shutil, "which", lambda name, **_kwargs: f"/bin/{name}"
+    )
     monkeypatch.setattr(
         evaluation_oci.subprocess,
         "run",
@@ -301,7 +304,9 @@ def test_execution_mode_dispatch_uses_strict_bounded_yaml(tmp_path: Path) -> Non
 def test_launch_has_ergonomic_same_image_default_and_independent_overrides(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(evaluation_oci.shutil, "which", lambda name: f"/bin/{name}")
+    monkeypatch.setattr(
+        evaluation_oci.shutil, "which", lambda name, **_kwargs: f"/bin/{name}"
+    )
     monkeypatch.setattr(
         evaluation_oci,
         "_inspect_local_image",
@@ -311,22 +316,34 @@ def test_launch_has_ergonomic_same_image_default_and_independent_overrides(
             config_id=(_SUBJECT_CONFIG_ID if "trt" in image else _BASELINE_CONFIG_ID),
         ),
     )
-    common = launch_from_environment(
-        engine="docker",
-        image_ref="registry.example/runtime:local",
-        image_digest=_BASELINE_DIGEST,
+    common = launch_from_resolved_config(
+        resolve_runtime_profile(
+            None,
+            explicit={
+                "container_engine": "docker",
+                "runtime_image": "registry.example/runtime:local",
+                "runtime_image_digest": _BASELINE_DIGEST,
+            },
+            environment={},
+        )
     )
     assert common.baseline.image_ref == common.subject.image_ref
     assert common.baseline.image_digest == common.subject.image_digest
 
-    split = launch_from_environment(
-        engine="podman",
-        image_ref="registry.example/hf:local",
-        image_digest=_BASELINE_DIGEST,
-        subject_image_ref="registry.example/trt:local",
-        subject_image_digest=_SUBJECT_DIGEST,
-        baseline_device="cpu",
-        subject_device="cuda:2",
+    split = launch_from_resolved_config(
+        resolve_runtime_profile(
+            None,
+            explicit={
+                "container_engine": "podman",
+                "runtime_image": "registry.example/hf:local",
+                "runtime_image_digest": _BASELINE_DIGEST,
+                "subject_runtime_image": "registry.example/trt:local",
+                "subject_runtime_image_digest": _SUBJECT_DIGEST,
+                "baseline_runtime_device": "cpu",
+                "subject_runtime_device": "cuda:2",
+            },
+            environment={},
+        )
     )
     assert split.baseline.image_digest == _BASELINE_DIGEST
     assert split.subject.image_digest == _SUBJECT_DIGEST
@@ -334,29 +351,49 @@ def test_launch_has_ergonomic_same_image_default_and_independent_overrides(
     assert split.subject.image_ref == f"registry.example/trt@{_SUBJECT_DIGEST}"
     assert split.subject.device == "cuda:2"
 
-    bounded = launch_from_environment(
-        engine="docker",
-        image_ref="registry.example/hf:local",
-        image_digest=_BASELINE_DIGEST,
-        runtime_cpus="7.5",
-        runtime_memory_mib="16384",
-        runtime_user="12001:12001",
+    bounded = launch_from_resolved_config(
+        resolve_runtime_profile(
+            None,
+            explicit={
+                "container_engine": "docker",
+                "runtime_image": "registry.example/hf:local",
+                "runtime_image_digest": _BASELINE_DIGEST,
+                "runtime_cpus": "7.5",
+                "runtime_memory_mib": "16384",
+                "runtime_user": "12001:12001",
+            },
+            environment={},
+        )
     )
     assert bounded.worker_limits == OciWorkerLimits(
         cpus="7.5", memory_mib=16384, user="12001:12001"
     )
 
-    embedded_side = launch_from_environment(
-        engine="docker",
-        image_ref="registry.example/hf:local",
-        image_digest=_BASELINE_DIGEST,
-        subject_image_ref=f"registry.example/trt@{_SUBJECT_DIGEST}",
+    embedded_side = launch_from_resolved_config(
+        resolve_runtime_profile(
+            None,
+            explicit={
+                "container_engine": "docker",
+                "runtime_image": "registry.example/hf:local",
+                "runtime_image_digest": _BASELINE_DIGEST,
+                "subject_runtime_image": f"registry.example/trt@{_SUBJECT_DIGEST}",
+                "subject_runtime_image_digest": _SUBJECT_DIGEST,
+            },
+            environment={},
+        )
     )
     assert embedded_side.subject.image_digest == _SUBJECT_DIGEST
 
     with pytest.raises(OciEvaluationError, match="digest"):
-        launch_from_environment(
-            engine="docker", image_ref="registry.example/runtime:latest"
+        launch_from_resolved_config(
+            resolve_runtime_profile(
+                None,
+                explicit={
+                    "container_engine": "docker",
+                    "runtime_image": "registry.example/runtime:latest",
+                },
+                environment={},
+            )
         )
 
     monkeypatch.setattr(
@@ -367,10 +404,16 @@ def test_launch_has_ergonomic_same_image_default_and_independent_overrides(
         ),
     )
     with pytest.raises(OciEvaluationError, match="supplied repository manifest"):
-        launch_from_environment(
-            engine="docker",
-            image_ref="registry.example/runtime:local",
-            image_digest=_BASELINE_DIGEST,
+        launch_from_resolved_config(
+            resolve_runtime_profile(
+                None,
+                explicit={
+                    "container_engine": "docker",
+                    "runtime_image": "registry.example/runtime:local",
+                    "runtime_image_digest": _BASELINE_DIGEST,
+                },
+                environment={},
+            )
         )
 
 
@@ -384,10 +427,12 @@ def test_launch_has_ergonomic_same_image_default_and_independent_overrides(
 )
 def test_launch_rejects_explicit_empty_worker_limit_overrides(
     monkeypatch: pytest.MonkeyPatch,
-    override: dict[str, object],
+    override: dict[str, str],
     message: str,
 ) -> None:
-    monkeypatch.setattr(evaluation_oci.shutil, "which", lambda name: f"/bin/{name}")
+    monkeypatch.setattr(
+        evaluation_oci.shutil, "which", lambda name, **_kwargs: f"/bin/{name}"
+    )
     monkeypatch.setattr(
         evaluation_oci,
         "_inspect_local_image",
@@ -397,28 +442,26 @@ def test_launch_rejects_explicit_empty_worker_limit_overrides(
     )
 
     with pytest.raises(OciEvaluationError, match=message):
-        launch_from_environment(
-            engine="docker",
-            image_ref="registry.example/runtime:local",
-            image_digest=_BASELINE_DIGEST,
-            **override,  # type: ignore[arg-type]
+        launch_from_resolved_config(
+            resolve_runtime_profile(
+                None,
+                explicit={
+                    "container_engine": "docker",
+                    "runtime_image": "registry.example/runtime:local",
+                    "runtime_image_digest": _BASELINE_DIGEST,
+                    **override,
+                },
+                environment={},
+            )
         )
 
 
-@pytest.mark.parametrize(
-    ("variable", "message"),
-    [
-        (evaluation_oci.RUNTIME_CPUS_ENV, "runtime CPU limit"),
-        (evaluation_oci.RUNTIME_MEMORY_MIB_ENV, "runtime memory limit"),
-        (evaluation_oci.RUNTIME_USER_ENV, "runtime user"),
-    ],
-)
-def test_launch_rejects_empty_worker_limit_environment_values(
+def test_launch_ignores_live_worker_limit_environment_values(
     monkeypatch: pytest.MonkeyPatch,
-    variable: str,
-    message: str,
 ) -> None:
-    monkeypatch.setattr(evaluation_oci.shutil, "which", lambda name: f"/bin/{name}")
+    monkeypatch.setattr(
+        evaluation_oci.shutil, "which", lambda name, **_kwargs: f"/bin/{name}"
+    )
     monkeypatch.setattr(
         evaluation_oci,
         "_inspect_local_image",
@@ -426,14 +469,24 @@ def test_launch_rejects_empty_worker_limit_environment_values(
             image, _BASELINE_DIGEST, config_id=_BASELINE_CONFIG_ID
         ),
     )
-    monkeypatch.setenv(variable, "")
+    monkeypatch.setenv(evaluation_oci.RUNTIME_CPUS_ENV, "")
+    monkeypatch.setenv(evaluation_oci.RUNTIME_MEMORY_MIB_ENV, "")
+    monkeypatch.setenv(evaluation_oci.RUNTIME_USER_ENV, "")
 
-    with pytest.raises(OciEvaluationError, match=message):
-        launch_from_environment(
-            engine="docker",
-            image_ref="registry.example/runtime:local",
-            image_digest=_BASELINE_DIGEST,
+    launch = launch_from_resolved_config(
+        resolve_runtime_profile(
+            None,
+            explicit={
+                "container_engine": "docker",
+                "runtime_image": "registry.example/runtime:local",
+                "runtime_image_digest": _BASELINE_DIGEST,
+            },
+            environment={},
         )
+    )
+    assert launch.worker_limits == OciWorkerLimits(
+        cpus="4", memory_mib=65536, user="65532:65532"
+    )
 
 
 @pytest.mark.parametrize(
@@ -562,12 +615,20 @@ def test_local_config_id_mode_is_explicit_and_preflight_returns_declared_digest(
         "_inspect_local_image",
         lambda _engine, _image: _inspection(config_id=_BASELINE_CONFIG_ID),
     )
-    monkeypatch.setattr(evaluation_oci.shutil, "which", lambda name: f"/bin/{name}")
+    monkeypatch.setattr(
+        evaluation_oci.shutil, "which", lambda name, **_kwargs: f"/bin/{name}"
+    )
 
-    launch = launch_from_environment(
-        engine="docker",
-        image_ref=_BASELINE_CONFIG_ID,
-        image_digest=_BASELINE_CONFIG_ID,
+    launch = launch_from_resolved_config(
+        resolve_runtime_profile(
+            None,
+            explicit={
+                "container_engine": "docker",
+                "runtime_image": _BASELINE_CONFIG_ID,
+                "runtime_image_digest": _BASELINE_CONFIG_ID,
+            },
+            environment={},
+        )
     )
 
     assert launch.baseline.image_ref == _BASELINE_CONFIG_ID

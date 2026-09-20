@@ -26,7 +26,7 @@ Omitting the mode or setting it to `none` preserves the original request bytes.
 
 You need Python 3.12 or newer, two local model snapshots, Docker or Podman, a
 digest-pinned native runtime image, a supported judge account and an Ed25519
-evidence-signing key. Use core, collector and example files from the same source
+evidence-signing key. Use core and example files from the same source
 revision. The [getting-started guide](../../docs/user-guide/getting-started.md)
 explains model identities, image preparation and key separation.
 
@@ -37,16 +37,17 @@ python -m pip install "invarlock[judge]"
 ```
 
 Use the example files matching the installed release. For a local source build,
-install both packages from the same repository root with
-`python -m pip install '.[judge]' 'addins/inspect_judge[inspect]'`.
+install from the same repository root with
+`python -m pip install '.[judge]'`.
 Offline judge import, verification and reporting need only the core package.
 
-Installed collection requires exactly Inspect `0.3.263`, OpenAI `3.13.0` and
-`httpx==0.28.1`, supplied by the extra. It uses the official OpenAI Chat Completions
-endpoint. Remove `OPENAI_BASE_URL` and `OPENAI_API_BASE` from the environment;
-even empty overrides are rejected. The starter explicitly selects temperature
-`1` and reasoning effort `none` for `openai/gpt-5.6-sol`. Keep those controls
-consistent with the approved plan and collection configuration.
+Installed collection requires exactly Inspect `0.3.263`, OpenAI `3.13.0`,
+Anthropic `1.6.0`, Google Gen AI `2.24.0`, and `httpx==0.28.1`, supplied by the
+extra. The grader prefix selects the official OpenAI, Anthropic, Google, or
+OpenRouter endpoint; provider base-URL overrides are rejected. The starter
+explicitly selects temperature `1` and reasoning effort `none` for
+`openai/gpt-5.6-sol`. Keep those controls consistent with the approved plan and
+collection configuration.
 
 Copy this directory to a private workspace. Replace the baseline and subject
 artifact identities, immutable revisions, checkpoint and tokenizer digests in
@@ -59,7 +60,9 @@ scale, independent units, repetition count, decision thresholds, and call, token
 cost and timeout limits are explicit. Its cost reservations are safety ceilings,
 not a price quote. Confirm the approved resolved model identity for your account.
 Update the dataset SHA-256 in `request.yaml` whenever the exact case file changes.
-Keep the API key in `OPENAI_API_KEY`, supplied through your secret manager.
+Supply the key selected by the grader prefix through your secret manager:
+`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`/`GEMINI_API_KEY`, or
+`OPENROUTER_API_KEY`. The judge code does not persist provider credentials.
 
 Prepare these files before running the commands:
 

@@ -26,7 +26,6 @@ def example(tmp_path, monkeypatch):
         "analysis_policy.json",
     ):
         shutil.copyfile(EXAMPLE / name, tmp_path / name)
-    monkeypatch.syspath_prepend(str(ROOT / "addins/inspect_judge/src"))
     spec = importlib.util.spec_from_file_location("judge_import_example", SCRIPT)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -201,11 +200,11 @@ def test_incomplete_export_preserves_missing_trials(example, monkeypatch, capsys
     assert "incomplete" in capsys.readouterr().out
 
 
-def test_missing_addin_has_actionable_error(example, monkeypatch, capsys):
+def test_missing_core_has_actionable_error(example, monkeypatch, capsys):
     original = builtins.__import__
 
     def missing(name, *args, **kwargs):
-        if name == "invarlock_addins.inspect_judge":
+        if name == "invarlock.judge_measurements":
             raise ImportError("not installed")
         return original(name, *args, **kwargs)
 
@@ -213,9 +212,7 @@ def test_missing_addin_has_actionable_error(example, monkeypatch, capsys):
     with pytest.raises(SystemExit) as error:
         invoke(example, monkeypatch)
     assert error.value.code == 2
-    assert (
-        "requires matching core and inspect_judge packages" in capsys.readouterr().err
-    )
+    assert "requires the invarlock core package" in capsys.readouterr().err
 
 
 def test_explicit_export_and_output_are_required(example, monkeypatch, capsys):

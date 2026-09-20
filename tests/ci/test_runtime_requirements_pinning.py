@@ -40,6 +40,19 @@ def _hashed_requirement_version(path: Path, package_name: str) -> str:
     return matches[0]
 
 
+def _group_requirements(groups: dict[str, list[object]], name: str) -> list[str]:
+    requirements: list[str] = []
+    for item in groups[name]:
+        if isinstance(item, str):
+            requirements.append(item)
+        else:
+            assert isinstance(item, dict)
+            included = item.get("include-group")
+            assert isinstance(included, str)
+            requirements.extend(_group_requirements(groups, included))
+    return requirements
+
+
 def test_refresh_pinned_requirements_generates_canonical_runtime_locks() -> None:
     text = REFRESH_SCRIPT.read_text(encoding="utf-8")
 
@@ -73,12 +86,11 @@ def test_refresh_pinned_requirements_generates_canonical_runtime_locks() -> None
 
 def test_type_checker_version_is_identical_in_local_and_workflow_locks() -> None:
     project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    optional = project["project"]["optional-dependencies"]
+    groups = project["dependency-groups"]
     declared = {
         requirement.removeprefix("mypy==")
-        for group in ("dev", "ci")
-        for requirement in optional[group]
-        if requirement.startswith("mypy==")
+        for requirement in groups["lint"]
+        if isinstance(requirement, str) and requirement.startswith("mypy==")
     }
     assert len(declared) == 1
 
@@ -96,12 +108,11 @@ def test_type_checker_version_is_identical_in_local_and_workflow_locks() -> None
 
 def test_ruff_version_is_identical_in_local_ci_and_precommit_surfaces() -> None:
     project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    optional = project["project"]["optional-dependencies"]
+    groups = project["dependency-groups"]
     declared = {
         requirement.removeprefix("ruff==")
-        for group in ("dev", "ci")
-        for requirement in optional[group]
-        if requirement.startswith("ruff==")
+        for requirement in groups["lint"]
+        if isinstance(requirement, str) and requirement.startswith("ruff==")
     }
     assert len(declared) == 1
 
@@ -131,12 +142,12 @@ def test_ruff_version_is_identical_in_local_ci_and_precommit_surfaces() -> None:
     (
         ("core-py312.txt", (), ()),
         ("hf-py313.txt", (), ("hf",)),
-        ("ci-hf-py312.txt", ("ci",), ("runtime-test",)),
-        ("ci-hf-py313.txt", ("ci",), ("runtime-test",)),
-        ("docs-ci-py313.txt", ("docs-ci",), ()),
-        ("precommit-ci-py313.txt", ("precommit-ci",), ()),
-        ("release-security-py313.txt", ("release-ci", "security-ci"), ()),
-        ("security-ci-py313.txt", ("security-ci",), ()),
+        ("ci-hf-py312.txt", (), ("runtime-test", "ci")),
+        ("ci-hf-py313.txt", (), ("runtime-test", "ci")),
+        ("docs-ci-py313.txt", (), ("docs",)),
+        ("precommit-ci-py313.txt", (), ("precommit",)),
+        ("release-security-py313.txt", (), ("release", "security")),
+        ("security-ci-py313.txt", (), ("security",)),
     ),
 )
 def test_workflow_locks_satisfy_every_declared_direct_requirement(
@@ -148,8 +159,14 @@ def test_workflow_locks_satisfy_every_declared_direct_requirement(
     project = metadata["project"]
     requirements = list(project["dependencies"])
     optional = project["optional-dependencies"]
+    groups = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))[
+        "dependency-groups"
+    ]
     for extra_name in extra_names:
-        requirements.extend(optional[extra_name])
+        if extra_name in optional:
+            requirements.extend(optional[extra_name])
+        elif extra_name in groups:
+            requirements.extend(_group_requirements(groups, extra_name))
 
     pending_groups = list(group_names)
     resolved_groups: set[str] = set()
@@ -191,14 +208,28 @@ def test_refresh_surface_excludes_retired_runtime_profiles() -> None:
         assert marker not in text
 
 
+def test_refresh_uses_dependency_groups_for_maintainer_tooling() -> None:
+    text = REFRESH_SCRIPT.read_text(encoding="utf-8")
+
+    assert "--extra ci" not in text
+    assert text.count("--group ci") == 2
+    for path in (
+        ROOT / "CONTRIBUTING.md",
+        ROOT / "examples/qualification/k2-horizon/README.md",
+    ):
+        guide = path.read_text(encoding="utf-8")
+        assert "--extra dev" not in guide
+        assert "--extra ci" not in guide
+
+
 def test_docs_lock_excludes_the_model_runtime_test_stack() -> None:
     text = REFRESH_SCRIPT.read_text(encoding="utf-8")
     docs_compile = text.split(
         'compile_pyproject "${WORKFLOW_DIR}/docs-ci-py313.txt"', 1
     )[1].split("\n\n", 1)[0]
 
-    assert "--extra docs-ci" in docs_compile
-    assert "--extra ci" not in docs_compile
+    assert "--group docs" in docs_compile
+    assert "--group ci" not in docs_compile
 
     lock = (WORKFLOW_REQUIREMENTS / "docs-ci-py313.txt").read_text(encoding="utf-8")
     assert "linkchecker==" in lock

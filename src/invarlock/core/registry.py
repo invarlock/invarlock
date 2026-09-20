@@ -6,12 +6,11 @@ import importlib
 import importlib.util
 import os
 import re
-from collections.abc import Iterable
 from dataclasses import dataclass
 from importlib.metadata import EntryPoint, PackageNotFoundError, entry_points
 from importlib.metadata import version as metadata_version
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 from invarlock import __version__ as INVARLOCK_VERSION
 from invarlock.runtime_security import third_party_plugins_allowed
@@ -23,20 +22,6 @@ __all__ = ["CoreRegistry", "PluginInfo", "get_registry"]
 _DISCOVERY_ERRORS = (AttributeError, ImportError, RuntimeError, TypeError, ValueError)
 _LOAD_ERRORS = (AttributeError, ImportError, RuntimeError, TypeError, ValueError)
 _NAME_RE = re.compile(r"[a-z][a-z0-9_]{0,63}\Z")
-_FIRST_PARTY_RUNTIME_ADDINS = {
-    "hf_vision_text": (
-        "invarlock-runtime-hf-vision-text",
-        "invarlock_addins.multimodal.provider:HFVisionTextProvider",
-    ),
-    "llama_cpp": (
-        "invarlock-runtime-gguf",
-        "invarlock_addins.gguf.provider:LlamaCppProvider",
-    ),
-    "tensorrt_llm": (
-        "invarlock-runtime-tensorrt-llm",
-        "invarlock_addins.tensorrt_llm.provider:TensorRTLLMProvider",
-    ),
-}
 _QUALIFICATION_CANDIDATE_SITE = "INVARLOCK_QUALIFICATION_CANDIDATE_SITE"
 
 
@@ -55,18 +40,7 @@ class PluginInfo:
 
 
 def _select_entry_points(eps: Any) -> list[EntryPoint]:
-    selected: Iterable[EntryPoint]
-    if hasattr(eps, "select"):
-        selected = cast(
-            "Iterable[EntryPoint]",
-            eps.select(group="invarlock.runtime_providers"),
-        )
-    else:
-        selected = cast(
-            "Iterable[EntryPoint]",
-            eps.get("invarlock.runtime_providers", []),
-        )
-    return list(selected)
+    return list(eps.select(group="invarlock.runtime_providers"))
 
 
 def _normalized_distribution_name(value: str) -> str:
@@ -120,29 +94,6 @@ def _is_shipped_entry_point(entry_point: EntryPoint) -> bool:
     )
 
 
-def _is_approved_first_party_addin(entry_point: EntryPoint) -> bool:
-    expected = _FIRST_PARTY_RUNTIME_ADDINS.get(entry_point.name)
-    if expected is None:
-        return False
-    dist = getattr(entry_point, "dist", None)
-    dist_name = getattr(dist, "name", None)
-    dist_version = getattr(dist, "version", None)
-    value = getattr(entry_point, "value", None)
-    expected_distribution, expected_value = expected
-    if (
-        not isinstance(dist_name, str)
-        or _normalized_distribution_name(dist_name) != expected_distribution
-        or dist_version != INVARLOCK_VERSION
-        or value != expected_value
-    ):
-        raise RuntimeError(
-            "Invalid first-party runtime add-in entry point: "
-            f"{entry_point.name!r} must come from {expected_distribution!r} "
-            f"at version {INVARLOCK_VERSION!r} and resolve to {expected_value!r}"
-        )
-    return True
-
-
 class CoreRegistry:
     """Discover and instantiate runtime providers without importing backends."""
 
@@ -162,17 +113,20 @@ class CoreRegistry:
             allow_third_party = third_party_plugins_allowed()
             candidate_site = _qualification_candidate_site()
             for entry_point in candidates:
-                if (
-                    candidate_site is not None
-                    and entry_point.name in _FIRST_PARTY_RUNTIME_ADDINS
-                    and not _entry_point_is_from(
-                        entry_point,
-                        candidate_site=candidate_site,
-                    )
+                if candidate_site is not None and not _entry_point_is_from(
+                    entry_point,
+                    candidate_site=candidate_site,
                 ):
                     continue
-                first_party = _is_approved_first_party_addin(entry_point)
-                if first_party or allow_third_party:
+                if _is_shipped_entry_point(entry_point):
+                    self._register_entry_point(entry_point)
+                elif entry_point.name in {
+                    spec.name for spec in builtin_plugin_specs("runtime_providers")
+                }:
+                    raise RuntimeError(
+                        f"Duplicate runtime provider name: {entry_point.name}"
+                    )
+                elif allow_third_party:
                     self._register_entry_point(entry_point)
         except _DISCOVERY_ERRORS as error:
             raise RuntimeError(f"Runtime-provider discovery failed: {error}") from error

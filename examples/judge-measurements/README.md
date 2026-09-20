@@ -57,7 +57,7 @@ Captured `invarlock/evaluation-request-v2` requests can select
 `comparison.metric: judge` and the same `invarlock/native-judge-policy-v1` recipe
 used by the native starter. InvarLock derives the finalized plan and analysis
 policy from the frozen case records. Use `comparison.judge.measurements` for
-retained measurements, or omit it to collect through the installed add-in.
+retained measurements, or omit it to collect through the core collector.
 The [captured-results guide](../../docs/user-guide/captured-results.md#judge-captured-answers)
 shows the complete route and explicit text projection for structured exports.
 This directory's v3 requests instead take an already finalized plan and analysis
@@ -74,14 +74,13 @@ caller-owned collection without requiring Inspect.
 
 ## Import expanded Inspect events offline
 
-The optional add-in imports the closed `invarlock/inspect-judge-export-v1`
+The core collector imports the closed `invarlock/inspect-judge-export-v1`
 projection, including the expanded model events and provider request/response
 fields. It does not accept arbitrary Inspect `.eval` archives or summary scores.
-Install the matching packages from the repository root, without the SDK extra:
+Install core from the repository root, without the SDK extra:
 
 ```bash
 python -m pip install .
-python -m pip install addins/inspect_judge
 ```
 
 From the copied example directory, exercise the synthetic expanded-event fixture:
@@ -115,11 +114,11 @@ bindings fail before publication.
 `request-collect.yaml` selects installed collection for already frozen answers.
 The committed `example-judge` identity is synthetic and cannot make live calls.
 For real collection, freeze an approved supported hosted judge and matching
-collection settings. Install matching core and collector packages from the
-repository root:
+collection settings. Install core with the collection SDKs from the repository
+root:
 
 ```bash
-python -m pip install ".[judge]" "addins/inspect_judge[inspect]"
+python -m pip install ".[judge]"
 ```
 
 Then return to the prepared workspace with the updated plan, policy and
@@ -127,7 +126,7 @@ collection settings. Use a fresh evidence destination if you already ran the
 offline fixture, since both requests initially name `evidence`:
 
 ```bash
-# Supply OPENAI_API_KEY through your secret manager.
+# Supply the key selected by the grader prefix through your secret manager.
 invarlock evaluate request-collect.yaml --preflight --json
 invarlock evaluate request-collect.yaml --signing-key signer-private.pem --json
 ```
@@ -135,10 +134,12 @@ invarlock evaluate request-collect.yaml --signing-key signer-private.pem --json
 The installed command constructs the pinned model and resumes through a private
 workspace. Review its call, token, cost and timeout limits before execution.
 Missing dependencies or credentials fail preflight without a provider call.
-Installed collection requires exactly Inspect `0.3.263`, OpenAI `3.13.0` and
-`httpx==0.28.1`. Remove `OPENAI_BASE_URL` and `OPENAI_API_BASE` entirely; custom
-endpoints and empty endpoint overrides are rejected. Review the model-specific
-sampling and reasoning requirements in the [add-in guide](../../addins/inspect_judge/README.md).
+Installed collection requires exactly Inspect `0.3.263`, OpenAI `3.13.0`,
+Anthropic `1.6.0`, Google Gen AI `2.24.0`, and `httpx==0.28.1`. Use
+`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`/`GEMINI_API_KEY`, or
+`OPENROUTER_API_KEY` to match the grader prefix. Custom endpoints and empty
+endpoint overrides are rejected. Review the model-specific sampling and
+reasoning requirements in the [collection guide](collection.md).
 The optional `execution.collection.workspace` defaults to
 `<output.evidence>.judge-work`, `scorer_id` to `judge`, and
 `invocation_timeout_seconds` to 3600. Use a private, stable workspace to resume

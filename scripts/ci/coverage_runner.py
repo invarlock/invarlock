@@ -14,11 +14,13 @@ from tempfile import TemporaryDirectory
 
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG = ROOT / "scripts/ci/coverage.coveragerc"
-SHARDS = ("core", "examples", "support", "addins")
+SHARDS = ("core", "examples", "support", "runtime")
 FAST_MARKERS = "not integration and not slow and not manual and not gpu"
-ADDIN_TESTS = tuple(
-    f"addins/{name}/tests"
-    for name in ("diagnostics", "gguf", "multimodal", "tensorrt_llm", "inspect_judge")
+RUNTIME_TESTS = (
+    "tests/diagnostics",
+    "tests/runtime",
+    "tests/runtime_providers",
+    "tests/judge_measurements",
 )
 SUPPORT_TESTS = (
     "tests/ci/test_coverage_branch_rate.py",
@@ -57,6 +59,7 @@ SUPPORT_TESTS = (
     "tests/scripts/test_runtime_qualification.py",
     "tests/scripts/test_runtime_qualification_edges.py",
     "tests/scripts/test_runtime_qualification_security.py",
+    "tests/runtime/test_tensorrt_llm_canary_preflight.py",
     "tests/scripts/test_sync_packaged_contracts.py",
     "tests/scripts/test_sync_packaged_public_evidence.py",
     "tests/scripts/test_tagged_release_candidate.py",
@@ -72,14 +75,22 @@ def selection(shard: str) -> list[str]:
             "-m",
             FAST_MARKERS,
             "--ignore=tests/examples",
+            *(f"--ignore={path}" for path in RUNTIME_TESTS),
             *(f"--ignore={path}" for path in SUPPORT_TESTS),
         ]
     if shard == "examples":
         return ["tests/examples"]
     if shard == "support":
         return list(SUPPORT_TESTS)
-    if shard == "addins":
-        return list(ADDIN_TESTS)
+    if shard == "runtime":
+        return [
+            *RUNTIME_TESTS,
+            *(
+                f"--ignore={path}"
+                for path in SUPPORT_TESTS
+                if any(path.startswith(f"{root}/") for root in RUNTIME_TESTS)
+            ),
+        ]
     raise ValueError(f"unknown coverage shard: {shard}")
 
 
@@ -172,15 +183,24 @@ def run(shard: str, artifact_dir: Path, workers: int) -> int:
     env = dict(os.environ)
     env["COVERAGE_FILE"] = str(data)
     env["INVARLOCK_COVERAGE_INVENTORY"] = str(inventory)
-    addin_sources = ()
-    if shard == "addins":
-        addin_sources = tuple(str(Path(path).parent / "src") for path in ADDIN_TESTS)
-    elif shard == "support":
-        addin_sources = ("addins/tensorrt_llm/src",)
+    # The coverage plugins are loaded explicitly below so the shard environment
+    # is deterministic. Entry-point autoload would register them a second time
+    # in a clean environment and can also admit unrelated ambient plugins.
+    env["PYTEST_DISABLE_PLUGIN_AUTOLOAD"] = "1"
     env["PYTHONPATH"] = os.pathsep.join(
-        str(ROOT / path) for path in ("scripts/ci", "src", ".", *addin_sources)
+        str(ROOT / path) for path in ("scripts/ci", "src", ".")
     )
-    command = [sys.executable, "-m", "pytest", "-p", "coverage_runner"]
+    command = [
+        sys.executable,
+        "-m",
+        "pytest",
+        "-p",
+        "coverage_runner",
+        "-p",
+        "pytest_cov.plugin",
+        "-p",
+        "xdist.plugin",
+    ]
     if workers:
         command.extend(["-n", str(workers)])
     command.extend(
@@ -225,7 +245,9 @@ def combine(artifact_dir: Path, output: Path) -> None:
     identity = source_identity()
     manifests = sorted(artifact_dir.glob("*/manifest.json"))
     if {path.parent.name for path in manifests} != set(SHARDS):
-        raise ValueError("coverage requires exactly core, examples, support and addins")
+        raise ValueError(
+            "coverage requires exactly core, examples, support and runtime"
+        )
     seen: set[str] = set()
     data_paths = []
     for manifest in manifests:

@@ -1212,7 +1212,7 @@ def test_artifact_totals_ignore_open_or_untyped_entries() -> None:
     ) == (3, 40)
 
 
-def test_local_entry_reports_pack_format_anchor_and_rendered_signer_drift(
+def test_local_entry_reports_pack_format_anchor_and_rendered_manifest_drift(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1228,7 +1228,7 @@ def test_local_entry_reports_pack_format_anchor_and_rendered_signer_drift(
     monkeypatch.setattr(
         module,
         "render_evidence",
-        lambda _pack: SimpleNamespace(evidence_signer="sha256:" + "9" * 64),
+        lambda _pack: SimpleNamespace(pack_manifest_digest="sha256:" + "9" * 64),
     )
     errors: list[str] = []
 
@@ -1237,7 +1237,7 @@ def test_local_entry_reports_pack_format_anchor_and_rendered_signer_drift(
     joined = "\n".join(errors)
     assert "only the canonical invarlock/evidence-pack-v1" in joined
     assert "baseline anchor does not bind the pack manifest" in joined
-    assert "does not match the verified pack signer" in joined
+    assert "does not match the verified pack manifest" in joined
 
 
 def test_local_entry_rejects_missing_pack_before_receipt_processing(

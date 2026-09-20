@@ -61,7 +61,7 @@ command. The Make targets below are entry points, not complete invocations.
 | [GGUF with llama.cpp](integrations/gguf-llama-cpp/README.md) | `make example-gguf-llama-cpp` | Qwen3.5-0.8B Q8 and a Q5 derivative |
 | [BF16-to-GGUF deployment](integrations/gguf-deployment/README.md) | `make example-gguf-deployment` | Selected 8B, 9B and 27B models across Transformers BF16 and llama.cpp Q5_K_M |
 | [LM Evaluation Harness](integrations/lm-evaluation-harness/README.md) | `make example-lm-evaluation-harness` | Imports per-case model results; does not rely on the evaluator's aggregate score |
-| [TensorRT-LLM](integrations/tensorrt-llm/README.md) | `make example-tensorrt-llm` | Qwen3-0.6B BF16 and calibrated FP8 engines on two H100 GPUs |
+| [TensorRT-LLM](integrations/tensorrt-llm/README.md) | `make example-tensorrt-llm` | Qwen3-0.6B BF16 and calibrated FP8 engines on two compatible CUDA GPUs |
 | [Offline evidence handoff](integrations/README.md) | `make example-evidence-handoff` | Included paired records, policy rejection and file-tampering rejection; no model or GPU |
 
 Completed transactions write a signed evidence pack, a verifier receipt and an

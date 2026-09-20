@@ -446,10 +446,8 @@ file must be outside the evidence pack. Rendering preserves every bundle byte.
 `--json` emits a rendering result object, including the HTML path when requested;
 it does not turn the report into an independent acceptance receipt.
 
-Native default/HTML-only CLI calls retain the exact
-`invarlock/evidence-report-v1` result (`ok`, `pack_manifest_digest`, and `html`,
-which is `null` when not requested). All captured report calls, and native calls
-requesting Markdown or JUnit, return `invarlock/evidence-report-v2`:
+Native and captured report calls return `invarlock/evidence-report-v2` for every
+output selection, including console-only and HTML-only rendering:
 
 ```json
 {

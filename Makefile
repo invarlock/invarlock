@@ -27,19 +27,20 @@ RUNTIME_BUILD_STATEMENT ?=
 SOURCE_BUNDLE_OUTPUT ?=
 QUALIFICATION_DEVICE ?=
 SECURITY_ARTIFACT_DIR ?= artifacts/supply-chain
-SECURITY_RUN ?= uv run --isolated --locked --extra security-ci
-DIST_RUN ?= uv run --isolated --locked --extra release-ci
+SECURITY_RUN ?= uv run --isolated --locked --group security
+DIST_RUN ?= uv run --isolated --locked --group release
 RELEASE_PREFLIGHT_ARGS ?=
 EXAMPLE_ARGS ?=
-ADDINS_SMOKE_PYTHON_TAG := $(shell $(PYTHON) -c 'import sys; print(f"{sys.version_info.major}{sys.version_info.minor}")')
-ADDINS_SMOKE_RELEASE_LOCK ?= requirements/workflows/release-install-py$(ADDINS_SMOKE_PYTHON_TAG).txt
+RELEASE_INSTALL_PYTHON_TAG := $(shell $(PYTHON) -c 'import sys; print(f"{sys.version_info.major}{sys.version_info.minor}")')
+RELEASE_INSTALL_RELEASE_LOCK ?= requirements/workflows/release-install-py$(RELEASE_INSTALL_PYTHON_TAG).txt
+RELEASE_INSTALL_OPTIONAL_LOCK ?= requirements/workflows/release-options-py$(RELEASE_INSTALL_PYTHON_TAG).txt
 COVERAGE_CORE_FILE ?= $(CURDIR)/.coverage.core
-COVERAGE_ADDINS_FILE ?= $(CURDIR)/.coverage.addins
+COVERAGE_RUNTIME_FILE ?= $(CURDIR)/.coverage.runtime
 COVERAGE_QUALIFICATION_FILE ?= $(CURDIR)/.coverage.qualification
 COVERAGE_RELEASE_FILE ?= $(CURDIR)/.coverage.release
 COVERAGE_EXAMPLES_FILE ?= $(CURDIR)/.coverage.examples
 COVERAGE_MAINTENANCE_FILE ?= $(CURDIR)/.coverage.maintenance
-COVERAGE_TARGET_JOBS ?= 1
+COVERAGE_TARGET_JOBS ?= 3
 VERIFY_TARGET_JOBS ?= 3
 
 MYPY_TYPED_SURFACE := \
@@ -71,20 +72,20 @@ RELEASE_EXAMPLE_COVERAGE_FILES := \
 	examples/hosted-service/journey.py \
 	examples/hosted-service/agent_outcomes.py
 
-.PHONY: help install dev-install lock-sync test test-fast test-parallel test-integration addins-test
-.PHONY: coverage coverage-addins coverage-qualification coverage-release coverage-examples coverage-maintenance coverage-enforce coverage-enforce-parallel
-.PHONY: coverage-report coverage-core-report coverage-addins-report coverage-qualification-report coverage-release-report coverage-examples-report coverage-maintenance-report coverage-linux-check
-.PHONY: coverage-collect-core coverage-collect-examples coverage-collect-support coverage-collect-addins verify-checks
-.PHONY: compatibility-test trust-smoke trust-boundary-demo example-evidence-handoff example-acceptance-handoff example-quickstart example-hf-transformers example-hf-vision-text example-peft-lora
+.PHONY: help install dev-install lock-sync test test-fast test-parallel test-integration runtime-test
+.PHONY: coverage coverage-runtime coverage-qualification coverage-release coverage-examples coverage-maintenance coverage-enforce coverage-enforce-parallel
+.PHONY: coverage-report coverage-core-report coverage-runtime-report coverage-qualification-report coverage-release-report coverage-examples-report coverage-maintenance-report coverage-linux-check
+.PHONY: coverage-collect-core coverage-collect-examples coverage-collect-support coverage-collect-runtime verify-checks
+.PHONY: compatibility-test trust-smoke example-evidence-handoff example-acceptance-handoff example-quickstart example-hf-transformers example-hf-vision-text example-peft-lora
 .PHONY: evaluator-qualification evaluator-replayable-imports evaluator-upstream-qualification evaluator-replayable-corpus evaluator-docs-matrix-check evaluator-scalar-semantics
 .PHONY: evaluator-inspect-semantics evaluator-batch-semantics
 .PHONY: acceptance-policy-interop
 .PHONY: example-torchao-int8 example-gguf-llama-cpp example-gguf-deployment example-spdx-ai-observation example-lm-evaluation-harness example-inspect-ai example-openai-evals example-tensorrt-llm example-tensorrt-llm-prepared
 .PHONY: lint typecheck mypy-typed-surface format verify verify-fast verify-ruff
-.PHONY: cli-smoke-core hf-provider-smoke local-hf-capture-smoke local-hf-capture-smoke-locked
-.PHONY: actionlint workflow-lint docs docs-ci docs-serve docs-check docs-live-fast docs-live
-.PHONY: docs-lint docs-lint-markdown docs-lint-spell docs-lint-public-text docs-lint-strict docs-check-build docs-check-links
-.PHONY: security supply-chain-security cve-audit dist-check addins-install-smoke quickstart-wheel-smoke packaging-smoke-minimal packaging-smoke-front-door
+.PHONY: cli-smoke-core hf-provider-smoke hf-provider-smoke-locked
+.PHONY: workflow-lint docs docs-serve docs-check docs-live-fast
+.PHONY: docs-lint docs-lint-markdown docs-lint-spell docs-lint-public-text
+.PHONY: security supply-chain-security cve-audit dist-check install-smoke packaging-smoke-front-door
 .PHONY: runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-image-cuda129
 .PHONY: runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman runtime-smoke-cuda129 container-front-door-smoke
 .PHONY: qualification-source-bundle runtime-qualification-canary runtime-qualification-readiness runtime-qualification-evidence
@@ -101,7 +102,7 @@ install:  ## Install the core package
 
 dev-install: runtime-wheelhouse  ## Install development and runtime test dependencies
 	$(MAKE) ensure-python
-	uv sync --locked --extra dev --group runtime-test
+	uv sync --locked --group dev --group runtime-test
 
 .PHONY: runtime-wheelhouse
 runtime-wheelhouse:  ## Build and verify the pinned hardened Accelerate wheel
@@ -130,10 +131,10 @@ test-integration:  ## Run integration tests
 	$(MAKE) ensure-python
 	PYTHONPATH=src $(PYTEST) -q -m integration tests/integration
 
-addins-test:  ## Test every first-party optional package
-	PYTHONPATH=src:addins/diagnostics/src:addins/gguf/src:addins/multimodal/src:addins/tensorrt_llm/src:addins/inspect_judge/src \
+runtime-test:  ## Test the consolidated runtime and optional-feature modules
+	PYTHONPATH=src \
 		$(PYTEST) $(PYTEST_WORKER_ARGS) -q \
-		addins/diagnostics/tests addins/gguf/tests addins/multimodal/tests addins/tensorrt_llm/tests addins/inspect_judge/tests
+		tests/diagnostics tests/runtime tests/runtime_providers tests/judge_measurements
 
 test-%:  ## Run one tests/<name> directory
 	$(MAKE) ensure-python
@@ -150,61 +151,45 @@ coverage:  ## Run the fast suite with statement-and-branch coverage
 	$(MAKE) coverage-core-report
 
 coverage-core-report:  ## Enforce retained core coverage measurements
-	COVERAGE_FILE=$(COVERAGE_CORE_FILE) $(PYTHON) -m coverage report --rcfile=pyproject.toml --include='src/invarlock/*' --omit='*/tests/*,*/test_*,*/__init__.py' --fail-under=95
-	COVERAGE_FILE=$(COVERAGE_CORE_FILE) $(PYTHON) -m coverage xml --rcfile=pyproject.toml --include='src/invarlock/*' --omit='*/tests/*,*/test_*,*/__init__.py' -o reports/cov.xml --fail-under=95
+	COVERAGE_FILE=$(COVERAGE_CORE_FILE) $(PYTHON) -m coverage report --rcfile=pyproject.toml --include='src/invarlock/*' --omit='*/tests/*,*/test_*,*/__init__.py,src/invarlock/diagnostics/*,src/invarlock/runtime_providers/*,src/invarlock/judge_measurements/*' --fail-under=95
+	COVERAGE_FILE=$(COVERAGE_CORE_FILE) $(PYTHON) -m coverage xml --rcfile=pyproject.toml --include='src/invarlock/*' --omit='*/tests/*,*/test_*,*/__init__.py,src/invarlock/diagnostics/*,src/invarlock/runtime_providers/*,src/invarlock/judge_measurements/*' -o reports/cov.xml --fail-under=95
 	$(MAKE) coverage-check-files
 
 .PHONY: coverage-check-files
 coverage-check-files:  ## Enforce per-file thresholds against collected core coverage
-	@$(PYTHON) -c 'from pathlib import Path; print("\n".join(str(path) for path in sorted(Path("src/invarlock").rglob("*.py")) if path.name != "__init__.py"))' | \
+	@$(PYTHON) -c 'from pathlib import Path; roots = (Path("src/invarlock/diagnostics"), Path("src/invarlock/runtime_providers"), Path("src/invarlock/judge_measurements")); print("\n".join(str(path) for path in sorted(Path("src/invarlock").rglob("*.py")) if path.name != "__init__.py" and not any(path.is_relative_to(root) for root in roots)))' | \
 		while IFS= read -r source; do \
 			COVERAGE_FILE=$(COVERAGE_CORE_FILE) $(PYTHON) -m coverage report --include="$$source" --fail-under=95 || exit $$?; \
 		done
 
 coverage-linux-check:
 	@test "$$(uname -s)" = Linux || { \
-		echo "the complete add-in coverage gate requires Linux descriptor execution" >&2; \
+		echo "the complete runtime coverage gate requires Linux descriptor execution" >&2; \
 		exit 2; \
 	}
 
-coverage-addins: coverage-linux-check  ## Enforce branch-aware coverage for optional packages
-	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) $(PYTHON) -m coverage erase
-	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) PYTHONPATH=src:addins/diagnostics/src:addins/gguf/src:addins/multimodal/src:addins/tensorrt_llm/src:addins/inspect_judge/src:. \
+coverage-runtime: coverage-linux-check  ## Enforce branch-aware coverage for consolidated runtime and feature modules
+	COVERAGE_FILE=$(COVERAGE_RUNTIME_FILE) $(PYTHON) -m coverage erase
+	COVERAGE_FILE=$(COVERAGE_RUNTIME_FILE) PYTHONPATH=src:. \
 		$(PYTEST) $(PYTEST_WORKER_ARGS) -q \
-		addins/diagnostics/tests addins/gguf/tests addins/multimodal/tests addins/tensorrt_llm/tests addins/inspect_judge/tests \
-		--cov --cov-config=scripts/addins.coveragerc \
+		tests/diagnostics tests/runtime tests/runtime_providers tests/judge_measurements \
+		--cov --cov-config=scripts/runtime.coveragerc \
 		--cov-branch --cov-report=term-missing \
-		--cov-report=xml:reports/addins-cov.xml \
+		--cov-report=xml:reports/runtime-cov.xml \
 		--cov-fail-under=95
-	$(MAKE) coverage-addins-report
+	$(MAKE) coverage-runtime-report
 
-coverage-addins-report:  ## Enforce retained addins coverage measurements
-	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) $(PYTHON) -m coverage report --rcfile=scripts/addins.coveragerc --include='addins/*' --omit='addins/*/tests/*' --fail-under=95
-	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) $(PYTHON) -m coverage xml --rcfile=scripts/addins.coveragerc --include='addins/*' --omit='addins/*/tests/*' -o reports/addins-cov.xml --fail-under=95
-	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) $(PYTHON) -m coverage report \
-		--include='addins/diagnostics/src/*' \
-		--fail-under=95
-	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) $(PYTHON) -m coverage report \
-		--include='addins/gguf/src/*' \
-		--fail-under=95
-	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) $(PYTHON) -m coverage report \
-		--include='addins/multimodal/src/*' \
-		--fail-under=95
-	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) $(PYTHON) -m coverage report \
-		--include='addins/tensorrt_llm/src/*' \
-		--fail-under=95
-	COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) $(PYTHON) -m coverage report \
-		--include='addins/inspect_judge/src/*' \
-		--fail-under=95
-	@git ls-files 'addins/*/src/**/*.py' | \
-		grep -v '/__init__.py$$' | \
+coverage-runtime-report:  ## Enforce retained consolidated runtime coverage measurements
+	COVERAGE_FILE=$(COVERAGE_RUNTIME_FILE) $(PYTHON) -m coverage report --rcfile=scripts/runtime.coveragerc --include='src/invarlock/diagnostics/*,src/invarlock/runtime_providers/*,src/invarlock/judge_measurements/*' --omit='*/__init__.py' --fail-under=95
+	COVERAGE_FILE=$(COVERAGE_RUNTIME_FILE) $(PYTHON) -m coverage xml --rcfile=scripts/runtime.coveragerc --include='src/invarlock/diagnostics/*,src/invarlock/runtime_providers/*,src/invarlock/judge_measurements/*' --omit='*/__init__.py' -o reports/runtime-cov.xml --fail-under=95
+	@find src/invarlock/diagnostics src/invarlock/runtime_providers src/invarlock/judge_measurements -name '*.py' -not -name '__init__.py' -print | \
 		while IFS= read -r source; do \
-			COVERAGE_FILE=$(COVERAGE_ADDINS_FILE) $(PYTHON) -m coverage report --include="$$source" --fail-under=95 || exit $$?; \
+			COVERAGE_FILE=$(COVERAGE_RUNTIME_FILE) $(PYTHON) -m coverage report --rcfile=scripts/runtime.coveragerc --include="$$source" --fail-under=95 || exit $$?; \
 		done
 
 coverage-qualification:  ## Enforce branch-aware coverage for qualification tooling
 	COVERAGE_FILE=$(COVERAGE_QUALIFICATION_FILE) $(PYTHON) -m coverage erase
-	COVERAGE_FILE=$(COVERAGE_QUALIFICATION_FILE) PYTHONPATH=src:addins/tensorrt_llm/src $(PYTEST) $(PYTEST_WORKER_ARGS) -q \
+	COVERAGE_FILE=$(COVERAGE_QUALIFICATION_FILE) PYTHONPATH=src $(PYTEST) $(PYTEST_WORKER_ARGS) -q \
 		tests/scripts/test_runtime_qualification.py \
 		tests/scripts/test_runtime_qualification_edges.py \
 		tests/scripts/test_runtime_qualification_security.py \
@@ -214,7 +199,7 @@ coverage-qualification:  ## Enforce branch-aware coverage for qualification tool
 		tests/scripts/test_qualification_render_preflight.py \
 		tests/scripts/test_qualification_source.py \
 		tests/scripts/test_authenticated_runtime_build.py \
-		addins/tensorrt_llm/tests/test_tensorrt_llm_canary_preflight.py \
+		tests/runtime/test_tensorrt_llm_canary_preflight.py \
 		--cov --cov-config=scripts/qualification.coveragerc --cov-branch \
 		--cov-report=term-missing \
 		--cov-report=xml:reports/qualification-cov.xml \
@@ -352,20 +337,20 @@ coverage-maintenance-report:  ## Enforce retained maintenance coverage measureme
 
 coverage-enforce: PYTEST_WORKERS = 2
 coverage-enforce: coverage-linux-check  ## Run disjoint coverage suites and enforce every domain
-	$(MAKE) -j $(COVERAGE_TARGET_JOBS) coverage-collect-core coverage-collect-examples coverage-collect-support coverage-collect-addins PYTEST_WORKERS=$(PYTEST_WORKERS)
+	$(MAKE) -j $(COVERAGE_TARGET_JOBS) coverage-collect-core coverage-collect-examples coverage-collect-support coverage-collect-runtime PYTEST_WORKERS=$(PYTEST_WORKERS)
 	$(MAKE) coverage-report
 
-coverage-collect-core coverage-collect-examples coverage-collect-support coverage-collect-addins: coverage-collect-%: coverage-linux-check
+coverage-collect-core coverage-collect-examples coverage-collect-support coverage-collect-runtime: coverage-collect-%: coverage-linux-check
 	$(PYTHON) scripts/ci/coverage_runner.py run $* --artifact-dir "$(COVERAGE_ARTIFACT_DIR)" --workers $(PYTEST_WORKERS)
 
 coverage-report: coverage-linux-check  ## Combine all successful shards and enforce unchanged coverage requirements
 	$(PYTHON) scripts/ci/coverage_runner.py combine "$(COVERAGE_ARTIFACT_DIR)" --output "$(COVERAGE_COMBINED_FILE)"
-	$(MAKE) coverage-core-report coverage-addins-report coverage-qualification-report coverage-release-report coverage-examples-report coverage-maintenance-report \
-		COVERAGE_CORE_FILE="$(COVERAGE_COMBINED_FILE)" COVERAGE_ADDINS_FILE="$(COVERAGE_COMBINED_FILE)" \
+	$(MAKE) coverage-core-report coverage-runtime-report coverage-qualification-report coverage-release-report coverage-examples-report coverage-maintenance-report \
+		COVERAGE_CORE_FILE="$(COVERAGE_COMBINED_FILE)" COVERAGE_RUNTIME_FILE="$(COVERAGE_COMBINED_FILE)" \
 		COVERAGE_QUALIFICATION_FILE="$(COVERAGE_COMBINED_FILE)" COVERAGE_RELEASE_FILE="$(COVERAGE_COMBINED_FILE)" \
 		COVERAGE_EXAMPLES_FILE="$(COVERAGE_COMBINED_FILE)" COVERAGE_MAINTENANCE_FILE="$(COVERAGE_COMBINED_FILE)"
 	$(PYTHON) scripts/checks/check_coverage_branch_rate.py \
-		reports/cov.xml reports/addins-cov.xml \
+		reports/cov.xml reports/runtime-cov.xml \
 		reports/qualification-cov.xml reports/release-cov.xml \
 		reports/examples-cov.xml reports/maintenance-cov.xml --minimum 95 \
 		--class-exemptions reports/examples-cov.xml examples \
@@ -381,10 +366,8 @@ trust-smoke:  ## Exercise pack tamper rejection and signed receipt verification
 compatibility-test:  ## Replay the permanent v0.13 compatibility corpus
 	PYTHONPATH=src $(PYTEST) -q tests/compatibility
 
-trust-boundary-demo:  ## Run the isolated evidence-signing/verifier example transaction
+example-evidence-handoff:  ## Run signed acceptance, rejection, and tamper handoff
 	PYTHONPATH=src $(PYTHON) examples/run_trust_boundary_demo.py
-
-example-evidence-handoff: trust-boundary-demo  ## Run signed acceptance, rejection, and tamper handoff
 
 example-acceptance-handoff:  ## Run the service-free acceptance handoff
 	PYTHONPATH=src:. $(PYTHON) examples/run_acceptance_handoff.py
@@ -455,8 +438,7 @@ example-hf-transformers: runtime-wheelhouse  ## Run a real one-command Hugging F
 		-m examples.integrations.launch hf-transformers $(EXAMPLE_ARGS)
 
 example-hf-vision-text: runtime-wheelhouse  ## Compare two pinned Qwen2-VL checkpoints on an authenticated image fixture
-	PYTHONPATH=src:addins/multimodal/src uv run --isolated --locked --group hf \
-		--with ./addins/multimodal python \
+	PYTHONPATH=src uv run --isolated --locked --group hf \
 		-m examples.integrations.launch hf-vision-text $(EXAMPLE_ARGS)
 
 example-peft-lora: runtime-wheelhouse  ## Train and merge with PEFT, then evaluate, verify, and report
@@ -468,12 +450,11 @@ example-torchao-int8: runtime-wheelhouse  ## Quantize with TorchAO, then evaluat
 		-m examples.integrations.launch torchao-int8 $(EXAMPLE_ARGS)
 
 example-gguf-llama-cpp:  ## Compare two pinned GGUF quantizations with llama.cpp
-	PYTHONPATH=src:addins/gguf/src uv run --isolated --locked --with . \
-		--with ./addins/gguf python -m examples.integrations.gguf_llama_cpp $(EXAMPLE_ARGS)
+	PYTHONPATH=src uv run --isolated --locked --with . \
+		python -m examples.integrations.gguf_llama_cpp $(EXAMPLE_ARGS)
 
 example-gguf-deployment: runtime-wheelhouse  ## Compare a pinned BF16 profile with a source-derived Q5_K_M GGUF
-	PYTHONPATH=src:addins/gguf/src uv run --isolated --locked --group hf \
-		--with ./addins/gguf python -m examples.integrations.gguf_deployment $(EXAMPLE_ARGS)
+	PYTHONPATH=src uv run --isolated --locked --group hf python -m examples.integrations.gguf_deployment $(EXAMPLE_ARGS)
 
 example-spdx-ai-observation:  ## Check the bounded SPDX 3.0.1 AI observation fixture
 	PYTHONPATH=src:. $(PYTHON) -m examples.integrations.spdx_ai_observation --check
@@ -491,8 +472,8 @@ example-openai-evals: runtime-wheelhouse  ## Run OpenAI Evals through the signed
 		examples/integrations/openai-evals/launch.py $(EXAMPLE_ARGS)
 
 example-tensorrt-llm: runtime-wheelhouse  ## Compare BF16 and calibrated FP8 Qwen3 TensorRT-LLM engines
-	PYTHONPATH=src:addins/tensorrt_llm/src:. uv run --isolated --locked --group hf \
-		--with . --with ./addins/tensorrt_llm python \
+	PYTHONPATH=src:. uv run --isolated --locked --group hf \
+		--with . python \
 		examples/integrations/tensorrt-llm/showcase.py $(EXAMPLE_ARGS)
 
 example-tensorrt-llm-prepared:  ## Compare caller-prepared TensorRT-LLM engines
@@ -500,8 +481,7 @@ example-tensorrt-llm-prepared:  ## Compare caller-prepared TensorRT-LLM engines
 		echo 'set EXAMPLE_ARGS to the immutable image, prepared inputs, and locators' >&2; \
 		exit 2; \
 	}
-	PYTHONPATH=src:addins/tensorrt_llm/src uv run --isolated --locked --with . \
-		--with ./addins/tensorrt_llm python \
+	PYTHONPATH=src uv run --isolated --locked --with . python \
 		examples/integrations/tensorrt-llm/run.py $(EXAMPLE_ARGS)
 
 ##@ Static analysis
@@ -509,17 +489,15 @@ lint: verify-ruff typecheck  ## Run Ruff and mypy
 
 verify-ruff:  ## Check Python lint and formatting
 	$(MAKE) ensure-ruff
-	$(RUFF) check src tests scripts addins examples
-	$(RUFF) format --check src tests scripts addins examples
+	$(RUFF) check src tests scripts examples
+	$(RUFF) format --check src tests scripts examples
 
 typecheck:  ## Type-check the core package
 	$(MAKE) ensure-mypy
 	$(MYPY) src/invarlock
-	PYTHONPATH=src:addins/diagnostics/src $(MYPY) -p invarlock_addins.diagnostics
-	PYTHONPATH=src:addins/gguf/src $(MYPY) -p invarlock_addins.gguf
-	PYTHONPATH=src:addins/multimodal/src $(MYPY) -p invarlock_addins.multimodal
-	PYTHONPATH=src:addins/tensorrt_llm/src $(MYPY) -p invarlock_addins.tensorrt_llm
-	PYTHONPATH=src:addins/inspect_judge/src $(MYPY) -p invarlock_addins.inspect_judge
+	PYTHONPATH=src $(MYPY) -p invarlock.diagnostics
+	PYTHONPATH=src $(MYPY) -p invarlock.runtime_providers
+	PYTHONPATH=src $(MYPY) -p invarlock.judge_measurements
 
 mypy-typed-surface:  ## Type-check the public transaction and evidence surface
 	$(MAKE) ensure-mypy
@@ -527,8 +505,8 @@ mypy-typed-surface:  ## Type-check the public transaction and evidence surface
 
 format:  ## Format Python sources and tests
 	$(MAKE) ensure-ruff
-	$(RUFF) format src tests scripts addins examples
-	$(RUFF) check --fix src tests scripts addins examples
+	$(RUFF) format src tests scripts examples
+	$(RUFF) check --fix src tests scripts examples
 
 ##@ Product smoke
 cli-smoke-core:  ## Check the evaluate, verify, and report command surface
@@ -544,10 +522,8 @@ hf-provider-smoke:  ## Exercise the canonical built-in Hugging Face provider
 		tests/runtime_providers/test_hf_transformers_strict.py \
 		tests/cli/test_import_journey.py
 
-local-hf-pipeline-smoke: hf-provider-smoke  ## CI alias for the built-in provider smoke
-
-local-hf-pipeline-smoke-locked: runtime-wheelhouse  ## Run the built-in provider smoke in the locked environment
-	uv run --isolated --locked --group runtime-test --extra ci $(MAKE) hf-provider-smoke
+hf-provider-smoke-locked: runtime-wheelhouse  ## Run the built-in provider smoke in the locked environment
+	uv run --isolated --locked --group runtime-test --group ci $(MAKE) hf-provider-smoke
 
 container-front-door-smoke: runtime-image  ## Run the host-to-container evaluation smoke
 	INVARLOCK_RUN_CONTAINER_SMOKE=1 INVARLOCK_CONTAINER_ENGINE=$(CONTAINER_ENGINE) \
@@ -640,8 +616,8 @@ verify: PYTEST_WORKERS = 2
 verify:  ## Run repository, product, docs, and contract gates in parallel by default
 	$(MAKE) repo-cruft-check
 	$(MAKE) -j $(VERIFY_TARGET_JOBS) \
-		public-evidence-audit contracts-check test addins-test \
-		cli-smoke-core lint docs-check-build \
+		public-evidence-audit contracts-check test runtime-test \
+		cli-smoke-core lint docs-check \
 		PYTEST_WORKERS=$(PYTEST_WORKERS) TEST_EXCLUDES=--ignore=tests/examples
 	$(MAKE) examples-check PYTEST_WORKERS=$(PYTEST_WORKERS)
 
@@ -649,7 +625,7 @@ verify-fast: PYTEST_WORKERS = 2
 verify-fast:  ## Run local gates in parallel without network, GPU, or downloads
 	$(MAKE) repo-cruft-check
 	$(MAKE) -j $(VERIFY_TARGET_JOBS) \
-		public-evidence-audit contracts-check test-fast addins-test \
+		public-evidence-audit contracts-check test-fast runtime-test \
 		cli-smoke-core lint \
 		PYTEST_WORKERS=$(PYTEST_WORKERS) TEST_EXCLUDES=--ignore=tests/examples
 	$(MAKE) examples-check PYTEST_WORKERS=$(PYTEST_WORKERS)
@@ -681,28 +657,18 @@ examples-check:  ## Test the maintained one-command integration journeys
 docs:  ## Build documentation strictly
 	$(MKDOCS) build --strict
 
-docs-ci: docs-check-build  ## Run documentation CI
-
 docs-serve:  ## Serve documentation locally
 	$(MKDOCS) serve -a 127.0.0.1:8000
 
-docs-check: docs-check-build  ## Run documentation validation
+docs-live-fast: cli-smoke-core docs-check  ## Check documented command surface and docs build
 
-docs-live-fast: cli-smoke-core docs-check-build  ## Check documented command surface and docs build
-
-docs-live: docs-live-fast  ## Run the maintained documentation checks
-
-docs-check-build: evaluator-docs-matrix-check docs-lint-strict  ## Lint and build documentation
+docs-check: evaluator-docs-matrix-check docs-lint  ## Lint and build documentation
 	$(MKDOCS) build --strict
 
 evaluator-docs-matrix-check:  ## Reject evaluator documentation drift
 	$(PYTHON) examples/evaluator-qualification/render_docs_matrix.py --check
 
-docs-check-links: docs-check-build  ## Link checking is part of the strict MkDocs build
-
 docs-lint: docs-lint-markdown docs-lint-spell docs-lint-public-text  ## Run documentation linters and public-text checks
-
-docs-lint-strict: docs-lint  ## Strict documentation lint alias
 
 docs-lint-markdown:  ## Run markdownlint-cli2
 	@git ls-files -z -- ':(icase,glob)**/*.md' | xargs -0 npx --no-install markdownlint-cli2 --
@@ -714,11 +680,9 @@ docs-lint-public-text:  ## Reject private operational details and process-only w
 	$(PYTHON) scripts/checks/check_public_text.py
 
 ##@ Packaging and security
-actionlint:  ## Lint GitHub Actions workflows
+workflow-lint:  ## Lint GitHub Actions workflows
 	@command -v actionlint >/dev/null 2>&1 || { echo "actionlint is required" >&2; exit 1; }
 	actionlint .github/workflows/*.yml
-
-workflow-lint: actionlint  ## Run workflow linting
 
 security: supply-chain-security cve-audit  ## Run supply-chain security gates
 
@@ -733,56 +697,46 @@ cve-audit: runtime-wheelhouse  ## Audit locked dependencies against OSV
 		--out-json "$(SECURITY_ARTIFACT_DIR)/cve-audit.json" \
 		--out-md "$(SECURITY_ARTIFACT_DIR)/cve-audit.md"
 
-dist-check: package-readmes-check  ## Build and validate the core and first-party add-in distributions
-	rm -rf build dist src/*.egg-info addins/*/build addins/*/src/*.egg-info
+dist-check: package-readmes-check  ## Build and validate the single first-party distribution
+	rm -rf build dist src/*.egg-info
 	$(DIST_RUN) python -m build --no-isolation
-	$(DIST_RUN) python -m build --no-isolation --outdir dist/addins addins/diagnostics
-	$(DIST_RUN) python -m build --no-isolation --outdir dist/addins addins/gguf
-	$(DIST_RUN) python -m build --no-isolation --outdir dist/addins addins/multimodal
-	$(DIST_RUN) python -m build --no-isolation --outdir dist/addins addins/tensorrt_llm
-	$(DIST_RUN) python -m build --no-isolation --outdir dist/addins addins/inspect_judge
 	$(DIST_RUN) python -m twine check dist/*.whl dist/*.tar.gz
-	$(DIST_RUN) python -m twine check dist/addins/*
 	$(DIST_RUN) python scripts/release/first_party_distribution_validation.py \
-		--repo-root . --core-dist-dir dist --addin-dist-dir dist/addins
+		--repo-root . --core-dist-dir dist
 	$(DIST_RUN) python scripts/release/package_rendering.py
 
 .PHONY: inspect-judge-sdk-test
 inspect-judge-sdk-test: dist-check  ## Resolve the optional judge SDK extra and replay real SDK events offline
 	PYTHON=$(PYTHON) bash scripts/inspect_judge_sdk_gate.sh
 
-addins-install-smoke: dist-check  ## Install and discover all six wheels in a disposable environment
-	@test -f $(ADDINS_SMOKE_RELEASE_LOCK) || { echo "No coordinated release lock for $(PYTHON); expected $(ADDINS_SMOKE_RELEASE_LOCK)" >&2; exit 2; }
+install-smoke: dist-check  ## Install and discover the wheel outside the source checkout
+	@test -f $(RELEASE_INSTALL_RELEASE_LOCK) || { echo "No release lock for $(PYTHON); expected $(RELEASE_INSTALL_RELEASE_LOCK)" >&2; exit 2; }
+	@test -f $(RELEASE_INSTALL_OPTIONAL_LOCK) || { echo "No optional release lock for $(PYTHON); expected $(RELEASE_INSTALL_OPTIONAL_LOCK)" >&2; exit 2; }
 	@set -eu; \
-		smoke_venv="$$(mktemp -d "$${TMPDIR:-/tmp}/invarlock-addins-smoke.XXXXXX")"; \
-		cleanup_smoke_venv() { rm -rf "$$smoke_venv"; }; \
+		smoke_venv="$$(mktemp -d "$${TMPDIR:-/tmp}/invarlock-install-smoke.XXXXXX")"; \
+		optional_venv="$$(mktemp -d "$${TMPDIR:-/tmp}/invarlock-optional-smoke.XXXXXX")"; \
+		cleanup_smoke_venv() { rm -rf "$$smoke_venv" "$$optional_venv"; }; \
 		trap cleanup_smoke_venv EXIT; \
 		trap 'exit 129' HUP; \
 		trap 'exit 130' INT; \
 		trap 'exit 143' TERM; \
 		$(PYTHON) -m venv "$$smoke_venv"; \
 		"$$smoke_venv/bin/python" -m pip install --require-hashes -r requirements/workflows/pip-bootstrap.txt; \
-		"$$smoke_venv/bin/python" -m pip install --require-hashes -r $(ADDINS_SMOKE_RELEASE_LOCK); \
+		"$$smoke_venv/bin/python" -m pip install --require-hashes -r $(RELEASE_INSTALL_RELEASE_LOCK); \
 		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -m pip install --no-deps --force-reinstall dist/*.whl; \
 		"$$smoke_venv/bin/python" -m pip check; \
 		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" scripts/release/core_wheel_consumers.py \
 			--cli "$$smoke_venv/bin/invarlock"; \
-		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -m pip install --no-deps --force-reinstall dist/addins/*.whl; \
-		"$$smoke_venv/bin/python" -m pip check; \
-		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -m invarlock_addins.gguf.conformance; \
-		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -m invarlock_addins.multimodal.conformance; \
-		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -m invarlock_addins.tensorrt_llm.conformance; \
-		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -c "from pathlib import Path; import invarlock; import sysconfig; site = Path(sysconfig.get_path('purelib')).resolve(); assert Path(invarlock.__file__).resolve().is_relative_to(site)"; \
-		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -c "from invarlock_addins.diagnostics import spectral_observation; assert spectral_observation([[1.0]])['status'] == 'observation'"; \
-		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -c "from importlib.metadata import version; from pathlib import Path; from sysconfig import get_path; import sys; import invarlock; import invarlock_addins.inspect_judge as judge; assert version('invarlock-inspect-judge') == judge.__version__ == invarlock.__version__; assert Path(judge.__file__).resolve().is_relative_to(Path(get_path('purelib')).resolve()); assert callable(judge.import_export) and callable(judge.prepare_collection); assert 'inspect_ai' not in sys.modules"; \
-		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -c "from importlib.metadata import entry_points; assert {'hf_vision_text', 'llama_cpp', 'tensorrt_llm'} <= {item.name for item in entry_points(group='invarlock.runtime_providers')}"; \
-		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$smoke_venv/bin/python" -c "from importlib import import_module; from pathlib import Path; import sysconfig; from invarlock import __version__; from invarlock.core.registry import CoreRegistry; from invarlock.core.runtime_provider import INVARLOCK_RUNTIME_PROVIDER_ABI; registry = CoreRegistry(); expected = {'hf_vision_text': 'invarlock-runtime-hf-vision-text', 'llama_cpp': 'invarlock-runtime-gguf', 'tensorrt_llm': 'invarlock-runtime-tensorrt-llm'}; providers = {name: registry.get_runtime_provider(name) for name in expected}; assert all(provider.name == name and provider.abi_version == INVARLOCK_RUNTIME_PROVIDER_ABI for name, provider in providers.items()); assert all(registry.get_plugin_info(name, 'runtime_providers')['package'] == package and registry.get_plugin_info(name, 'runtime_providers')['version'] == __version__ and registry.get_plugin_info(name, 'runtime_providers')['entry_point'] == name for name, package in expected.items()); site = Path(sysconfig.get_path('purelib')).resolve(); assert all(Path(import_module(provider.__class__.__module__).__file__).resolve().is_relative_to(site) for provider in providers.values())"
+		$(PYTHON) -m venv "$$optional_venv"; \
+		"$$optional_venv/bin/python" -m pip install --require-hashes -r requirements/workflows/pip-bootstrap.txt; \
+		"$$optional_venv/bin/python" -m pip install --require-hashes -r $(RELEASE_INSTALL_RELEASE_LOCK); \
+		"$$optional_venv/bin/python" -m pip install --require-hashes -r $(RELEASE_INSTALL_OPTIONAL_LOCK); \
+		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$optional_venv/bin/python" -m pip install --no-deps --force-reinstall dist/*.whl; \
+		"$$optional_venv/bin/python" -m pip check; \
+		PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH= "$$optional_venv/bin/python" scripts/release/core_wheel_consumers.py \
+			--mode optional --cli "$$optional_venv/bin/invarlock"
 
-quickstart-wheel-smoke: addins-install-smoke  ## Run the five-minute flow from built wheels
-
-packaging-smoke-minimal: addins-install-smoke  ## Validate distributable artifacts
-
-packaging-smoke-front-door: addins-install-smoke cli-smoke-core  ## Validate artifacts and CLI entry point
+packaging-smoke-front-door: install-smoke cli-smoke-core  ## Validate artifacts and CLI entry point
 
 release-preflight: package-readmes-check  ## Validate a clean exact release checkout and distributions
 	@test -n "$(RELEASE_PREFLIGHT_ARGS)" || { echo "RELEASE_PREFLIGHT_ARGS is required" >&2; exit 2; }
@@ -896,8 +850,7 @@ pre-commit-install:  ## Install configured pre-commit hooks
 	$(PYTHON) -m pre_commit install
 
 clean:  ## Remove build and Python cache artifacts
-	rm -rf build dist *.egg-info src/*.egg-info .pytest_cache .mypy_cache .ruff_cache .addins-smoke-site .addins-smoke-venv
-	rm -rf addins/*/build addins/*/.pytest_cache addins/*/.mypy_cache addins/*/src/*.egg-info
+	rm -rf build dist *.egg-info src/*.egg-info .pytest_cache .mypy_cache .ruff_cache .install-smoke-site .install-smoke-venv
 	find . -type d -name __pycache__ ! -path './.git/*' -exec rm -rf {} +
 	find . -type f \( -name '*.pyc' -o -name '.DS_Store' -o -name '._*' \) ! -path './.git/*' -delete
 

@@ -45,12 +45,14 @@ evidence and recorded-score semantics are described in [evaluation records](eval
 ## Transactions
 
 ```python
+import os
 from pathlib import Path
 
+from invarlock.cli.runtime_profile import resolve_runtime_profile
 from invarlock.engine import (
     OciRuntimeExecutor,
     evaluate_request_file,
-    launch_from_environment,
+    launch_from_resolved_config,
     render_evidence,
     verify_evidence,
     verify_signed_verification_receipt,
@@ -68,7 +70,21 @@ schedule_digest = "sha256:" + "7" * 64
 evaluation = evaluate_request_file(
     Path("request.yaml"),
     signing_key_path=Path("keys/evidence-signer.pem"),
-    runtime_executor=OciRuntimeExecutor(launch_from_environment()),
+    runtime_executor=OciRuntimeExecutor(
+        launch_from_resolved_config(
+            resolve_runtime_profile(
+                None,
+                explicit={
+                    "container_engine": "docker",
+                    "baseline_runtime_image": "registry.example/baseline:local",
+                    "baseline_runtime_image_digest": "sha256:" + "1" * 64,
+                    "subject_runtime_image": "registry.example/subject:local",
+                    "subject_runtime_image_digest": "sha256:" + "2" * 64,
+                },
+                environment=dict(os.environ),
+            )
+        )
+    ),
     runtime_image_digests={
         "baseline": "sha256:" + "1" * 64,
         "subject": "sha256:" + "2" * 64,
@@ -124,7 +140,6 @@ The result types are:
 | `EvaluationPreflightResult` | `execution_mode`, `output`, input digests, providers, checks, `as_json()` |
 | `EvaluationTransactionResult` | `evidence_path`, `comparison_id`, `pack_manifest_digest`, optional `policy_verdict`, `as_json()` |
 | `EvidenceVerification` | `evidence_path`, `payload`, `receipt_path`, `summary`, `as_json()` |
-| `EvidenceReport` | `text`, `html_path`, `evidence_signer`, `pack_manifest_digest`, `observations` |
 | `EvidenceReportV2` | `text`, `kind`, `pack_manifest_digest`, `requested_outputs`, `written_outputs`, `failed_output`, `errors`, `as_json()` |
 | `CapturedEvaluationPreflightResult` | `requested_authentication`, run/policy/request digests, record/scope counts, required/allowed draws, `output`, `checks`, `as_json()` |
 | `CapturedEvaluationTransactionResult` | `evidence_path`, `comparison_id`, run/policy/request/manifest digests, `authentication`, `policy_verdict`, `as_json()` |
@@ -135,7 +150,7 @@ The result types are:
 `EvaluationTransactionResult.policy_verdict` is optional presentation metadata
 from publication. It is not added to `as_json()` and does not establish
 recipient acceptance. Use independent verification for that decision.
-`EvidenceReport.text` is Markdown presentation content; console and HTML
+`EvidenceReportV2.text` is Markdown presentation content; console and HTML
 layouts are not stable parsing interfaces. Use canonical evidence and verifier
 payloads for automation.
 
@@ -271,7 +286,7 @@ render_evidence(
     markdown_path: Path | None = None,
     junit_path: Path | None = None,
     case_ids: tuple[str, ...] = (),
-) -> EvidenceReport | EvidenceReportV2
+) -> EvidenceReportV2
 ```
 
 Native deterministic requests return native results. Native judge evaluation
@@ -374,7 +389,7 @@ The loader returns an immutable native `EvaluationRequest` or
 `CapturedEvaluationRequest` whose paths are resolved
 beneath the request root. Its default provider resolver exposes only the
 built-in Hugging Face provider. `evaluate_request_file` uses the core registry,
-which also discovers installed first-party add-ins.
+which also discovers the maintained built-in providers.
 
 Loading validates structure and path confinement; the evaluation transaction
 repeats no-follow reads at the point of use to detect later filesystem changes.
@@ -382,7 +397,7 @@ repeats no-follow reads at the point of use to detect later filesystem changes.
 ## Host-coordinated OCI evaluations
 
 The stable facade exports `OciEvaluationLaunch`, `OciSideLaunch`,
-`OciRuntimeExecutor`, and `launch_from_environment`. The public CLI constructs
+`OciRuntimeExecutor`, and `launch_from_resolved_config`. The public CLI constructs
 this executor for every run-mode request. The host prepares the schedule,
 launches one independently pinned worker per side, validates both closed side
 results, and keeps the evidence-signing key outside the workers.
@@ -433,10 +448,14 @@ exposes a device but does not make a CPU-only image CUDA-capable; use the x86_64
 image built from `runtime/Dockerfile.cuda` for canonical CUDA Hugging Face
 execution.
 
-`launch_from_environment` resolves the common and per-side image, digest,
-device, entrypoint, and common worker-limit variables documented in [Environment
-variables](environment.md). Explicit function arguments take precedence over
-environment values.
+`launch_from_resolved_config` accepts one `ResolvedRuntimeConfig` from
+`invarlock.evaluation_runtime`, with complete baseline/subject settings and
+resource limits, including the engine executable selected from the supplied
+`PATH` snapshot. `resolve_runtime_profile` produces that immutable typed value
+for profile and no-profile callers. The constructor accepts no raw setting
+keywords and applies no fallback defaults. Environment and profile precedence belong to the CLI
+resolver, so later environment changes cannot alter the launch or its recorded
+provenance.
 
 ## Direct executed evaluations and caller resources
 
@@ -537,7 +556,7 @@ The most commonly embedded ABI values have these stable constructor fields:
 | `RuntimeArtifactResources` | absolute `root`, relative `primary_artifact`, `support_resources`, `device_kind`, `container_image_digest` | Root and every resource are checked without following links; device is `cpu` or `cuda`; digest is required |
 | `RuntimeExecutionContext` | `strict`, `allow_network`, `container_image_digest`, `device_kind` | `artifact_identity_sha256`, opaque `provider_state`, scorer, and close callback default to `None` |
 | `EvaluationInputPart` | `kind`, canonical `role`, bare `sha256` | Text parts carry `text`; content parts carry `content_id`, `media_type`, and `byte_length` |
-| `EvaluationRecord` | `record_id`, first `input_text`, bare `input_sha256` | `expected_output=None`; `input_parts=()` retains the provider-construction compatibility path |
+| `EvaluationRecord` | `record_id`, first-text projection `input_text`, canonical bare `input_sha256`, nonempty canonical `input_parts` | Only `expected_output` is optional, defaulting to `None`; text and digest must match the ordered input parts |
 | `EvaluationBatch` | bare `schedule_sha256`, nonempty tuple of `records` | `metric="exact_match"`; `task="text_causal"`; record IDs must be unique |
 | `RuntimeProviderCapabilities` | provider, artifacts, tasks, metrics, modes, required extra/image | Format and ABI fields are fixed by the type |
 | `ScoringObservation` | provider, artifact digest, schedule digest, nonempty records, aggregate-source digest | Record IDs must be unique; format is fixed |

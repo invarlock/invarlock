@@ -184,8 +184,30 @@ def _materialize_request(
             "split": "validation",
         },
         records=[
-            {"record_id": "one", "input_text": "Return A", "expected_output": "A"},
-            {"record_id": "two", "input_text": "Return B", "expected_output": "B"},
+            {
+                "record_id": "one",
+                "input_parts": [
+                    {
+                        "kind": "text",
+                        "role": "prompt",
+                        "text": "Return A",
+                        "sha256": hashlib.sha256(b"Return A").hexdigest(),
+                    }
+                ],
+                "expected_output": "A",
+            },
+            {
+                "record_id": "two",
+                "input_parts": [
+                    {
+                        "kind": "text",
+                        "role": "prompt",
+                        "text": "Return B",
+                        "sha256": hashlib.sha256(b"Return B").hexdigest(),
+                    }
+                ],
+                "expected_output": "B",
+            },
         ],
     )
     schedule_path = tmp_path / "inputs/schedule.json"

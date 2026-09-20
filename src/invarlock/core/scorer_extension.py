@@ -668,9 +668,7 @@ class _LoadedScorer:
 
 
 def _select_scorer_entry_points(values: Any) -> list[EntryPoint]:
-    if hasattr(values, "select"):
-        return list(values.select(group=SCORER_EXTENSION_ENTRY_POINT_GROUP))
-    return list(values.get(SCORER_EXTENSION_ENTRY_POINT_GROUP, []))
+    return list(values.select(group=SCORER_EXTENSION_ENTRY_POINT_GROUP))
 
 
 class ScorerExtensionRegistry:

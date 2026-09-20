@@ -1,4 +1,4 @@
-"""Table-driven catalog for the single built-in runtime provider."""
+"""Table-driven catalog for the first-party runtime providers."""
 
 from __future__ import annotations
 
@@ -23,6 +23,21 @@ BUILTIN_RUNTIME_PROVIDERS = (
         # Identity and import-mode verification stay available in the base
         # distribution; execution imports the optional backend lazily.
         required_deps=(),
+    ),
+    BuiltinPluginSpec(
+        name="llama_cpp",
+        module="invarlock.runtime_providers.llama_cpp",
+        class_name="LlamaCppProvider",
+    ),
+    BuiltinPluginSpec(
+        name="tensorrt_llm",
+        module="invarlock.runtime_providers.tensorrt_llm",
+        class_name="TensorRTLLMProvider",
+    ),
+    BuiltinPluginSpec(
+        name="hf_vision_text",
+        module="invarlock.runtime_providers.hf_vision_text",
+        class_name="HFVisionTextProvider",
     ),
 )
 

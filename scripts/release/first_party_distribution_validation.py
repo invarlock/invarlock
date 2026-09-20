@@ -7,10 +7,7 @@ import argparse
 import json
 import os
 import re
-import tarfile
-import zipfile
 from dataclasses import dataclass
-from email.parser import BytesParser
 from pathlib import Path
 
 try:
@@ -27,14 +24,6 @@ except ImportError:  # pragma: no cover - direct script execution
         read_distribution_project,
         validate_distribution_pair,
     )
-
-_ADDIN_PROJECTS = {
-    "diagnostics": "invarlock_addins/diagnostics",
-    "gguf": "invarlock_addins/gguf",
-    "multimodal": "invarlock_addins/multimodal",
-    "tensorrt_llm": "invarlock_addins/tensorrt_llm",
-    "inspect_judge": "invarlock_addins/inspect_judge",
-}
 
 
 @dataclass(frozen=True)
@@ -88,8 +77,10 @@ def _validate_artifact_directory(
     wheels = [path for path in entries if path.name.endswith(".whl")]
     sdists = [path for path in entries if path.name.endswith(".tar.gz")]
     if len(wheels) != expected_pairs or len(sdists) != expected_pairs:
+        pair_label = "one" if expected_pairs == 1 else str(expected_pairs)
+        plural = "" if expected_pairs == 1 else "s"
         raise ReleasePreflightError(
-            f"{label} must contain {expected_pairs} wheel/sdist pair(s)"
+            f"{label} must contain {pair_label} wheel/sdist pair{plural}"
         )
     return resolved
 
@@ -115,87 +106,13 @@ def _artifact_pair(*, dist_dir: Path, distribution_name: str) -> tuple[Path, Pat
     return wheels[0], sdists[0]
 
 
-def _validate_addin_license(
-    spec: DistributionValidationSpec, *, repo_root: Path, wheel: Path, sdist: Path
-) -> None:
-    """All independently installable add-ins carry the repository license."""
-    source = spec.project_root / "LICENSE"
-    expected = (repo_root / "LICENSE").read_bytes()
-    if source.is_symlink() or not source.is_file() or source.read_bytes() != expected:
-        raise ReleasePreflightError("add-in license text differs from the repository")
-    try:
-        with zipfile.ZipFile(wheel) as archive:
-            metadata = BytesParser().parsebytes(
-                archive.read(f"{spec.dist_info_root}/METADATA")
-            )
-            if (
-                archive.read(f"{spec.dist_info_root}/licenses/LICENSE") != expected
-                or metadata.get_all("License-File") != ["LICENSE"]
-                or metadata.get_all("License-Expression") != ["Apache-2.0"]
-            ):
-                raise ReleasePreflightError(
-                    "add-in wheel license or license metadata differs"
-                )
-        with tarfile.open(sdist) as archive:
-            # The preceding distribution-pair validation checks supplemental
-            # file type and exact source bytes; also require the license entry.
-            archive.getmember(f"{spec.sdist_root}/LICENSE")
-    except KeyError as exc:
-        raise ReleasePreflightError(
-            "add-in distribution is missing license text"
-        ) from exc
-
-
-def validate_first_party_addin_distributions(
-    *, repo_root: Path, expected_version: str, dist_dir: Path
-) -> list[FirstPartyDistribution]:
-    dist_dir = _validate_artifact_directory(
-        dist_dir,
-        expected_pairs=len(_ADDIN_PROJECTS),
-        label="first-party add-in distribution directory",
-    )
-    results: list[FirstPartyDistribution] = []
-    for project, package_path in _ADDIN_PROJECTS.items():
-        project_root = repo_root / "addins" / project
-        name, version = read_distribution_project(project_root)
-        if version != expected_version:
-            raise ReleasePreflightError(
-                f"{project} add-in version does not match the release"
-            )
-        wheel, sdist = _artifact_pair(dist_dir=dist_dir, distribution_name=name)
-        spec = DistributionValidationSpec(
-            project_root=project_root,
-            distribution_name=name,
-            version=version,
-            package_path=package_path,
-        )
-        validate_distribution_pair(
-            spec,
-            wheel=wheel,
-            sdist=sdist,
-        )
-        _validate_addin_license(spec, repo_root=repo_root, wheel=wheel, sdist=sdist)
-        results.append(
-            FirstPartyDistribution(
-                project=project,
-                distribution=name,
-                version=version,
-                wheel=wheel.name,
-                sdist=sdist.name,
-            )
-        )
-    return results
-
-
 def validate_first_party_distributions(
     *,
     repo_root: Path,
     expected_version: str,
     core_dist_dir: Path,
-    addin_dist_dir: Path,
 ) -> list[FirstPartyDistribution]:
-    """Validate the core and every maintained first-party add-in pair."""
-
+    """Validate the one maintained core wheel/sdist pair."""
     core_dist_dir = _validate_artifact_directory(
         core_dist_dir,
         expected_pairs=1,
@@ -224,15 +141,6 @@ def validate_first_party_distributions(
             sdist=sdist.name,
         )
     ]
-    results.extend(
-        validate_first_party_addin_distributions(
-            repo_root=repo_root,
-            expected_version=expected_version,
-            dist_dir=addin_dist_dir,
-        )
-    )
-    if len({result.distribution for result in results}) != len(results):
-        raise ReleasePreflightError("first-party distribution names must be unique")
     return results
 
 
@@ -241,13 +149,6 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--repo-root", type=Path, default=Path.cwd())
     parser.add_argument("--expected-version")
     parser.add_argument("--core-dist-dir", type=Path, default=Path("dist"))
-    parser.add_argument(
-        "--addin-dist-dir",
-        "--dist-dir",
-        dest="addin_dist_dir",
-        type=Path,
-        default=Path("dist/addins"),
-    )
     arguments = parser.parse_args(argv)
     repo_root = _real_directory(arguments.repo_root, label="release checkout")
     try:
@@ -256,11 +157,6 @@ def main(argv: list[str] | None = None) -> int:
             arguments.core_dist_dir,
             label="core distribution directory",
         )
-        addin_dist_dir = _contained_distribution_directory(
-            repo_root,
-            arguments.addin_dist_dir,
-            label="first-party add-in distribution directory",
-        )
         expected_version = (
             arguments.expected_version or read_distribution_project(repo_root)[1]
         )
@@ -268,7 +164,6 @@ def main(argv: list[str] | None = None) -> int:
             repo_root=repo_root,
             expected_version=expected_version,
             core_dist_dir=core_dist_dir,
-            addin_dist_dir=addin_dist_dir,
         )
     except ReleasePreflightError as exc:
         parser.error(str(exc))

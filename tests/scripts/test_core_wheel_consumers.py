@@ -26,8 +26,14 @@ def test_stages_and_runs_all_consumers_with_clean_imports(monkeypatch, failure_i
         assert env["PYTHONSAFEPATH"] == env["PYTHONNOUSERSITE"] == "1"
         assert check is True
         assert command[0] == sys.executable
-        if command[1] == "-c":
-            assert "sysconfig.get_path('purelib')" in command[2]
+        if command[1] == "-I":
+            assert command[2:] == [
+                str(Path(consumers.__file__).resolve()),
+                "--mode",
+                "check-core",
+                "--cli",
+                "/candidate/bin/invarlock",
+            ]
         else:
             assert (cwd / command[1]).is_file()
         if command[1] == "scorer-wheel-smoke.py":
@@ -53,7 +59,7 @@ def test_stages_and_runs_all_consumers_with_clean_imports(monkeypatch, failure_i
     if failure_index is None:
         consumers.run_consumers("invarlock")
         assert [command[1] for command, _ in calls] == [
-            "-c",
+            "-I",
             "run.py",
             "captured-wheel-smoke.py",
             "judge/wheel_smoke.py",
@@ -72,6 +78,63 @@ def test_missing_cli_fails_before_staging(monkeypatch):
     monkeypatch.setattr(consumers.shutil, "which", lambda _: None)
     with pytest.raises(RuntimeError, match="Install the candidate wheel"):
         consumers.run_consumers("missing")
+
+
+def test_missing_optional_cli_fails_before_staging(monkeypatch):
+    monkeypatch.setattr(consumers.shutil, "which", lambda _: None)
+    with pytest.raises(RuntimeError, match="Install the candidate wheel"):
+        consumers.run_optional_consumers("missing")
+
+
+def test_optional_consumers_run_from_clean_installed_environment(monkeypatch):
+    monkeypatch.setenv("PYTHONPATH", str(consumers.ROOT / "src"))
+    monkeypatch.setenv("PYTHONSAFEPATH", "0")
+    monkeypatch.setattr(consumers.shutil, "which", lambda _: "/candidate/bin/invarlock")
+    calls = []
+
+    def run(command, *, cwd, env, check):
+        calls.append((command, cwd))
+        assert command[0] == sys.executable
+        assert not cwd.is_relative_to(consumers.ROOT)
+        assert "PYTHONPATH" not in env
+        assert env["PYTHONSAFEPATH"] == env["PYTHONNOUSERSITE"] == "1"
+        assert check is True
+
+    monkeypatch.setattr(consumers.subprocess, "run", run)
+    consumers.run_optional_consumers("invarlock")
+
+    assert len(calls) == 3
+    assert "import PIL, numpy, invarlock" in calls[0][0][2]
+    assert "spectral_observation" in calls[1][0][2]
+    assert calls[2][0][1:] == (
+        "-m",
+        "invarlock.runtime_providers.hf_vision_text_conformance",
+    )
+    assert all(not cwd.exists() for _, cwd in calls)
+
+
+@pytest.mark.parametrize("failure_kind", [None, "spectral", "rmt", "variance"])
+def test_optional_probe_exercises_each_diagnostic(monkeypatch, failure_kind):
+    import invarlock.diagnostics as diagnostics
+
+    monkeypatch.setattr(consumers.shutil, "which", lambda _: "/candidate/bin/invarlock")
+    commands = []
+    monkeypatch.setattr(
+        consumers.subprocess, "run", lambda command, **kwargs: commands.append(command)
+    )
+    consumers.run_optional_consumers("invarlock")
+    if failure_kind is not None:
+        original = getattr(diagnostics, f"{failure_kind}_observation")
+
+        def incorrect(values):
+            return {**original(values), "status": "incorrect"}
+
+        monkeypatch.setattr(diagnostics, f"{failure_kind}_observation", incorrect)
+    if failure_kind is None:
+        exec(commands[1][2], {})
+    else:
+        with pytest.raises(AssertionError):
+            exec(commands[1][2], {})
 
 
 def test_checkout_temporary_directory_rejected(monkeypatch, tmp_path):
@@ -97,6 +160,32 @@ def test_main_passes_cli(monkeypatch):
     monkeypatch.setattr(consumers.signal, "signal", lambda *_: None)
     monkeypatch.setattr(sys, "argv", ["consumers", "--cli", "/candidate/bin/invarlock"])
     monkeypatch.setattr(consumers, "run_consumers", observed.append)
+    consumers.main()
+    assert observed == ["/candidate/bin/invarlock"]
+
+
+def test_main_routes_optional_mode(monkeypatch):
+    observed = []
+    monkeypatch.setattr(consumers.signal, "signal", lambda *_: None)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["consumers", "--mode", "optional", "--cli", "/candidate/bin/invarlock"],
+    )
+    monkeypatch.setattr(consumers, "run_optional_consumers", observed.append)
+    consumers.main()
+    assert observed == ["/candidate/bin/invarlock"]
+
+
+def test_main_routes_core_boundary_mode(monkeypatch):
+    observed = []
+    monkeypatch.setattr(consumers.signal, "signal", lambda *_: None)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["consumers", "--mode", "check-core", "--cli", "/candidate/bin/invarlock"],
+    )
+    monkeypatch.setattr(consumers, "check_core_install", observed.append)
     consumers.main()
     assert observed == ["/candidate/bin/invarlock"]
 
@@ -145,3 +234,135 @@ def test_signal_handler_exits_for_context_cleanup(signum):
     with pytest.raises(SystemExit) as error:
         consumers.exit_on_signal(signum, None)
     assert error.value.code == 128 + signum
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        None,
+        "version",
+        "numpy",
+        "PIL",
+        "judge_origin",
+        "provider_origin",
+        "provider_name",
+        "provider_abi",
+        "provider_package",
+        "provider_version",
+        "entry_point",
+        "missing_entry",
+        "optional_import",
+    ],
+)
+def test_core_boundary_rejects_corrupted_installed_surface(monkeypatch, failure):
+    import importlib.metadata
+    import importlib.util
+    import sysconfig
+    from types import SimpleNamespace
+
+    import invarlock
+    import invarlock.judge_measurements as judge
+    from invarlock.core.registry import CoreRegistry
+
+    site = Path(invarlock.__file__).resolve().parent.parent
+    monkeypatch.setattr(sysconfig, "get_path", lambda _name: str(site))
+    original_version = importlib.metadata.version
+    monkeypatch.setattr(
+        importlib.metadata,
+        "version",
+        lambda name: (
+            ("incorrect" if failure == "version" else invarlock.__version__)
+            if name == "invarlock"
+            else original_version(name)
+        ),
+    )
+    names = ["hf_transformers", "hf_vision_text", "llama_cpp", "tensorrt_llm"]
+    monkeypatch.setattr(
+        importlib.metadata,
+        "distribution",
+        lambda _name: SimpleNamespace(
+            entry_points=[
+                SimpleNamespace(name=name, group="invarlock.runtime_providers")
+                for name in (names[1:] if failure == "missing_entry" else names)
+            ]
+        ),
+    )
+    original_find_spec = importlib.util.find_spec
+    monkeypatch.setattr(
+        importlib.util,
+        "find_spec",
+        lambda name: (
+            (object() if failure == name else None)
+            if name in {"numpy", "PIL"}
+            else original_find_spec(name)
+        ),
+    )
+    for optional in (
+        "torch",
+        "transformers",
+        "llama_cpp",
+        "tensorrt_llm",
+        "inspect_ai",
+        "openai",
+    ):
+        monkeypatch.delitem(sys.modules, optional, raising=False)
+    if failure == "optional_import":
+        monkeypatch.setitem(sys.modules, "inspect_ai", SimpleNamespace())
+    if failure == "judge_origin":
+        monkeypatch.setattr(judge, "__file__", "/outside/judge.py")
+    original_provider = CoreRegistry.get_runtime_provider
+
+    def provider(registry, name):
+        value = original_provider(registry, name)
+        if failure == "provider_name":
+            monkeypatch.setattr(value, "name", "incorrect")
+        elif failure == "provider_abi":
+            monkeypatch.setattr(value, "abi_version", "incorrect")
+        elif failure == "provider_origin":
+            monkeypatch.setattr(
+                sys.modules[value.__class__.__module__],
+                "__file__",
+                "/outside/provider.py",
+            )
+        return value
+
+    monkeypatch.setattr(CoreRegistry, "get_runtime_provider", provider)
+    original_info = CoreRegistry.get_plugin_info
+
+    def info(registry, name, kind):
+        value = original_info(registry, name, kind)
+        if failure in {"provider_package", "provider_version", "entry_point"}:
+            field = {
+                "provider_package": "package",
+                "provider_version": "version",
+                "entry_point": "entry_point",
+            }[failure]
+            value = {**value, field: "incorrect"}
+        return value
+
+    monkeypatch.setattr(CoreRegistry, "get_plugin_info", info)
+    commands = []
+    monkeypatch.setattr(
+        consumers.subprocess, "run", lambda command, **_kwargs: commands.append(command)
+    )
+    if failure is not None:
+        with pytest.raises(AssertionError):
+            consumers.check_core_install("/candidate/bin/invarlock")
+        assert commands == []
+    else:
+        consumers.check_core_install("/candidate/bin/invarlock")
+        assert commands == [
+            ["/candidate/bin/invarlock", "--help"],
+            [
+                sys.executable,
+                "-I",
+                "-m",
+                "invarlock.runtime_providers.llama_cpp_conformance",
+            ],
+            [
+                sys.executable,
+                "-I",
+                "-m",
+                "invarlock.runtime_providers.tensorrt_llm_conformance",
+            ],
+        ]

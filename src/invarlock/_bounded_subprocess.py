@@ -1,4 +1,4 @@
-"""Shared bounded subprocess communication for native runtime add-ins."""
+"""Shared bounded subprocess communication for native runtime providers."""
 
 from __future__ import annotations
 

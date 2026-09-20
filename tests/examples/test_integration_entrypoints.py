@@ -53,7 +53,6 @@ def test_tensorrt_entrypoints_start_as_direct_scripts(entrypoint: str) -> None:
     environment["PYTHONPATH"] = os.pathsep.join(
         (
             str(ROOT / "src"),
-            str(ROOT / "addins/tensorrt_llm/src"),
             str(ROOT),
         )
     )

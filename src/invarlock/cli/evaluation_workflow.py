@@ -13,8 +13,9 @@ if TYPE_CHECKING:  # pragma: no cover - imports exist only for static analysis
         CapturedEvaluationPreflightResult,
         CapturedEvaluationTransactionResult,
     )
-    from invarlock.cli.runtime_profile import ResolvedRuntimeProfile, RuntimeProfile
+    from invarlock.cli.runtime_profile import RuntimeProfile
     from invarlock.evaluation_oci import OciEvaluationLaunch
+    from invarlock.evaluation_runtime import ResolvedRuntimeConfig
     from invarlock.evaluation_transaction import (
         EvaluationPreflightResult,
         EvaluationTransactionResult,
@@ -107,7 +108,7 @@ class EvaluationOutcome:
     result: EvaluationResult
     request_mode: RequestMode
     profile: RuntimeProfile | None = None
-    profile_context: ResolvedRuntimeProfile | None = None
+    profile_context: ResolvedRuntimeConfig | None = None
     launch: OciEvaluationLaunch | None = None
 
 
@@ -136,7 +137,7 @@ def execute_evaluation(
     from invarlock.core.scorer_extension import ScorerExtensionRegistry
     from invarlock.evaluation_oci import (
         OciRuntimeExecutor,
-        launch_from_environment,
+        launch_from_resolved_config,
         preflight_oci_launch,
     )
     from invarlock.evaluation_transaction import (
@@ -290,8 +291,10 @@ def execute_evaluation(
 
     profile = None
     profile_context = None
+    environment_snapshot = dict(os.environ if environment is None else environment)
     if options.runtime_profile is not None:
         profile = load_runtime_profile(options.runtime_profile)
+    if loaded_mode == "run":
         explicit = {
             name: value
             for name, value in options.runtime_strings().items()
@@ -300,34 +303,15 @@ def execute_evaluation(
         profile_context = resolve_runtime_profile(
             profile,
             explicit=explicit,
-            environment=dict(os.environ if environment is None else environment),
+            environment=environment_snapshot,
         )
 
     launch = None
     runtime_executor = None
     if loaded_mode == "run":
-        if profile_context is not None:
-            launch = launch_from_environment(**profile_context.arguments)
-        else:
-            launch = launch_from_environment(
-                engine=options.container_engine,
-                image_ref=options.runtime_image,
-                image_digest=options.runtime_image_digest,
-                baseline_image_ref=options.baseline_runtime_image,
-                baseline_image_digest=options.baseline_runtime_image_digest,
-                subject_image_ref=options.subject_runtime_image,
-                subject_image_digest=options.subject_runtime_image_digest,
-                default_device=options.runtime_device,
-                baseline_device=options.baseline_runtime_device,
-                subject_device=options.subject_runtime_device,
-                runtime_entrypoint=options.runtime_entrypoint,
-                baseline_entrypoint=options.baseline_runtime_entrypoint,
-                subject_entrypoint=options.subject_runtime_entrypoint,
-                runtime_cpus=options.runtime_cpus,
-                runtime_memory_mib=options.runtime_memory_mib,
-                runtime_user=options.runtime_user,
-            )
-        runtime_executor = OciRuntimeExecutor(launch)
+        assert profile_context is not None
+        launch = launch_from_resolved_config(profile_context)
+        runtime_executor = OciRuntimeExecutor(launch, environment=environment_snapshot)
     runtime_digests = preflight_oci_launch(launch) if launch else None
     runtime_result: (
         EvaluationPreflightResult | EvaluationTransactionResult | JudgeWorkflowResult

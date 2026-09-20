@@ -263,12 +263,18 @@ elif arguments[:3] == ["-m", "invarlock", "report"]:
         else {PACK_DIGEST!r}
     )
     print(json.dumps({{
-        "format_version": "invarlock/evidence-report-v1",
-        "html": (
-            str(report.with_name("other-report.html"))
-            if control.get("binding_mutation") == "report_destination"
-            else str(report)
-        ),
+        "format_version": "invarlock/evidence-report-v2",
+        "kind": "runtime",
+        "requested_outputs": {{"html": str(report)}},
+        "written_outputs": {{
+            "html": (
+                str(report.with_name("other-report.html"))
+                if control.get("binding_mutation") == "report_destination"
+                else str(report)
+            ),
+        }},
+        "failed_output": None,
+        "errors": [],
         "ok": True,
         "pack_manifest_digest": report_pack,
     }}))
@@ -1142,6 +1148,48 @@ def test_preflight_rejects_container_engine_mutation(tmp_path: Path) -> None:
     assert failure["stage"] == "preflight"
     assert failure["errors"] == ["container engine changed after configuration"]
     assert not paths["summary"].exists()
+
+
+def test_qualification_accepts_actual_retained_native_report(tmp_path: Path) -> None:
+    from invarlock.evidence_reporting import render_evidence
+
+    evidence = ROOT / "public_evidence/evidence/mistral-7b-weight-scale-hf/evidence"
+    before = {
+        path.relative_to(evidence): path.read_bytes()
+        for path in evidence.rglob("*")
+        if path.is_file()
+    }
+    destination = tmp_path / "report.html"
+    result = render_evidence(evidence, html_path=destination)
+    rendered = runtime_qualification._successful_json(
+        subprocess.CompletedProcess([], 0, stdout=result.as_json(), stderr=""),
+        stage="report",
+        expected_format="invarlock/evidence-report-v2",
+    )
+    pack_digest = "sha256:" + hashlib.sha256(before[Path("manifest.json")]).hexdigest()
+    runtime_qualification._verify_report_binding(
+        rendered, pack_digest=pack_digest, report=destination
+    )
+    assert destination.is_file()
+    assert before == {
+        path.relative_to(evidence): path.read_bytes()
+        for path in evidence.rglob("*")
+        if path.is_file()
+    }
+    for field, changed in (
+        ("kind", "captured"),
+        ("pack_manifest_digest", "sha256:" + "0" * 64),
+        ("requested_outputs", {}),
+        ("written_outputs", {}),
+        ("failed_output", "html"),
+        ("errors", ["write failed"]),
+    ):
+        with pytest.raises(runtime_qualification.QualificationError):
+            runtime_qualification._verify_report_binding(
+                {**rendered, field: changed},
+                pack_digest=pack_digest,
+                report=destination,
+            )
 
 
 def test_run_rejects_a_renderer_pack_substitution(tmp_path: Path) -> None:

@@ -18,7 +18,7 @@ def test_verify_composes_the_maintained_gates() -> None:
         "test",
         "cli-smoke-core",
         "lint",
-        "docs-check-build",
+        "docs-check",
     ):
         assert target in block
 

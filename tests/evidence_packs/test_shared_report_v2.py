@@ -1,7 +1,8 @@
-"""V2 output accounting on both evidence families, with unchanged native v1."""
+"""V2 output accounting on both evidence families, with one shared result contract."""
 
 import json
 from itertools import permutations
+from pathlib import Path
 from unittest.mock import Mock
 from xml.etree.ElementTree import fromstring
 
@@ -24,18 +25,23 @@ def _pack(tmp_path, captured):
 
 
 @pytest.mark.parametrize("captured", [False, True])
-def test_shared_report_outputs_and_native_v1_matrix(tmp_path, captured):
+def test_shared_report_outputs_matrix(tmp_path, captured):
     pack = _pack(tmp_path, captured)
     before = {
         p.relative_to(pack): p.read_bytes() for p in pack.rglob("*") if p.is_file()
     }
     default = engine.render_evidence(pack)
-    assert isinstance(
-        default, engine.EvidenceReportV2 if captured else engine.EvidenceReport
+    assert isinstance(default, engine.EvidenceReportV2)
+    assert default.requested_outputs == default.written_outputs == {}
+    assert json.loads(default.as_json())["kind"] == (
+        "captured" if captured else "runtime"
     )
     html = engine.render_evidence(pack, html_path=tmp_path / "only.html")
-    assert isinstance(
-        html, engine.EvidenceReportV2 if captured else engine.EvidenceReport
+    assert isinstance(html, engine.EvidenceReportV2)
+    assert (
+        html.requested_outputs
+        == html.written_outputs
+        == {"html": str(tmp_path / "only.html")}
     )
     paths = {
         "html": tmp_path / "report.html",
@@ -69,6 +75,34 @@ def test_shared_report_outputs_and_native_v1_matrix(tmp_path, captured):
     assert json.loads(cli.stdout)["written_outputs"] == {
         "markdown": str(tmp_path / "cli.md")
     }
+
+
+@pytest.mark.parametrize("captured", [False, True])
+@pytest.mark.parametrize("output", [None, "html"])
+def test_cli_default_and_html_share_output_contract(tmp_path, captured, output):
+    pack = _pack(tmp_path, captured)
+    before = {
+        p.relative_to(pack): p.read_bytes() for p in pack.rglob("*") if p.is_file()
+    }
+    destination = tmp_path / "report.html"
+    options = ["--html", str(destination)] if output else []
+    result = CliRunner().invoke(app, ["report", str(pack), *options, "--json"])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.stdout)
+    assert payload == {
+        "format_version": "invarlock/evidence-report-v2",
+        "kind": "captured" if captured else "runtime",
+        "ok": True,
+        "pack_manifest_digest": engine.render_evidence(pack).pack_manifest_digest,
+        "requested_outputs": {"html": str(destination)} if output else {},
+        "written_outputs": {"html": str(destination)} if output else {},
+        "failed_output": None,
+        "errors": [],
+    }
+    assert before == {
+        p.relative_to(pack): p.read_bytes() for p in pack.rglob("*") if p.is_file()
+    }
+    assert destination.exists() == bool(output)
 
 
 @pytest.mark.parametrize("captured", [False, True])
@@ -133,6 +167,39 @@ def test_second_output_failure_keeps_first_and_stops_publication(
     assert (tmp_path / "out.html").is_file()
     assert not (tmp_path / "out.md").exists()
     assert not (tmp_path / "out.xml").exists()
+
+
+@pytest.mark.parametrize("captured", [False, True])
+@pytest.mark.parametrize("output", ["html", "markdown", "junit"])
+def test_single_output_write_failure_preserves_exit_code_two(
+    tmp_path, monkeypatch, captured, output
+):
+    pack = _pack(tmp_path, captured)
+
+    def fail_write(_path, _raw):
+        raise OSError("destination unavailable")
+
+    monkeypatch.setattr(captured_contracts, "atomic_write", fail_write)
+    with pytest.raises(
+        engine.EvidenceReportError, match="destination unavailable"
+    ) as caught:
+        engine.render_evidence(pack, **{f"{output}_path": tmp_path / "out"})
+    assert caught.value.exit_code == 2
+    assert caught.value.failed_output == output
+    assert caught.value.written_outputs == {}
+
+
+def test_v2_written_outputs_preserves_caller_path_spelling(tmp_path, monkeypatch):
+    pack = _pack(tmp_path, False)
+    monkeypatch.chdir(tmp_path)
+
+    result = engine.render_evidence(pack, html_path=Path("out.html"))
+
+    assert result.requested_outputs == result.written_outputs == {"html": "out.html"}
+    assert (
+        Path(result.written_outputs["html"]).read_text().startswith("<!doctype html>")
+    )
+    assert not hasattr(result, "html_path")
 
 
 def test_malformed_captured_payload_cannot_reach_view_or_native_fallback(

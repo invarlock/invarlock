@@ -80,7 +80,6 @@ def _forbid_presentation(monkeypatch):
                 "_report_view",
                 "render_report_html",
                 "render_report_markdown",
-                "_write_html_no_clobber",
             ),
         ),
     ):

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 import pytest
 
 from invarlock.core.runtime_provider import (
     EvaluationBatch,
+    EvaluationInputPart,
     EvaluationRecord,
     ModelRuntimeSpec,
     RuntimeBackendIdentity,
@@ -14,6 +16,7 @@ from invarlock.core.runtime_provider import (
     RuntimeScoringRecord,
     ScoringObservation,
     artifact_identity_sha256,
+    evaluation_input_parts_sha256,
 )
 from invarlock.core.runtime_provider.types import JSONScalar
 from invarlock.runtime_providers import hf_transformers
@@ -23,6 +26,17 @@ _IMAGE_DIGEST = "sha256:" + "2" * 64
 _REAL_BACKEND_IDENTITY = hf_transformers._installed_backend_identity
 _REAL_DEVICE_FACTS = hf_transformers._observed_device_facts
 _REAL_STRICT_EXECUTION_BINDING = hf_transformers._require_strict_execution_binding
+
+
+def _text_parts(text: str) -> tuple[EvaluationInputPart, ...]:
+    return (
+        EvaluationInputPart(
+            kind="text",
+            role="prompt",
+            text=text,
+            sha256=hashlib.sha256(text.encode("utf-8")).hexdigest(),
+        ),
+    )
 
 
 def _save_safetensors(path: Path, *keys: str) -> None:
@@ -115,7 +129,8 @@ def _batch() -> EvaluationBatch:
             EvaluationRecord(
                 record_id="sample-1",
                 input_text="hello",
-                input_sha256="d" * 64,
+                input_parts=_text_parts("hello"),
+                input_sha256=evaluation_input_parts_sha256(_text_parts("hello")),
                 expected_output="world",
             ),
         ),
@@ -140,7 +155,7 @@ def _observation(
         records=(
             RuntimeScoringRecord(
                 record_id="sample-1",
-                input_sha256="d" * 64,
+                input_sha256=batch.records[0].input_sha256,
                 status="ok",
                 output_text="world",
                 output_sha256="f" * 64,

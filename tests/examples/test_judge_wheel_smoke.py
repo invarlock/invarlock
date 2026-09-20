@@ -36,7 +36,16 @@ def transport(monkeypatch, module, fault=None):
     def run(command, *, cwd, env, capture_output, text, check):
         assert not cwd.is_relative_to(ROOT)
         assert (
-            not {"PYTHONPATH", "INVARLOCK_SIGNING_KEY", "OPENAI_API_KEY"} & env.keys()
+            not {
+                "PYTHONPATH",
+                "INVARLOCK_SIGNING_KEY",
+                "OPENAI_API_KEY",
+                "ANTHROPIC_API_KEY",
+                "GOOGLE_API_KEY",
+                "GEMINI_API_KEY",
+                "OPENROUTER_API_KEY",
+            }
+            & env.keys()
         )
         assert capture_output and text and not check
         with monkeypatch.context() as context:
@@ -68,9 +77,7 @@ def test_core_judge_consumer_preserves_inconclusive_result_and_rejects_bad_pins(
     assert not roots[0].exists()
 
 
-@pytest.mark.parametrize(
-    "module_name", ["inspect_ai", "openai", "invarlock_addins.inspect_judge"]
-)
+@pytest.mark.parametrize("module_name", ["inspect_ai", "openai"])
 def test_rehearsal_refuses_optional_sdk_install_or_import(monkeypatch, module_name):
     module = load_module()
     monkeypatch.setattr(
@@ -118,19 +125,12 @@ def test_rehearsal_detects_broken_recipient_or_report(monkeypatch, fault):
     assert not roots[0].exists()
 
 
-def test_release_smokes_run_judge_before_addins():
+def test_release_resolves_the_optional_judge_sdk_from_the_core_wheel():
     make = (ROOT / "Makefile").read_text()
-    assert make.index("scripts/release/core_wheel_consumers.py") < make.index(
-        "pip install --no-deps --force-reinstall dist/addins/*.whl"
+    assert "inspect-judge-sdk-test: dist-check" in make
+    assert (
+        'core_wheels=("${ROOT_DIR}"/dist/invarlock-*.whl)'
+        in (ROOT / "scripts/inspect_judge_sdk_gate.sh").read_text()
     )
     workflow = (ROOT / ".github/workflows/release.yml").read_text()
-    for title, install in (
-        ("Install smoke from wheel", "dist/addins/*.whl"),
-        ("Install published wheels and smoke test", "wheelhouse/invarlock_*.whl"),
-    ):
-        section = workflow.split(f"- name: {title}", 1)[1].split("\n      - name:", 1)[
-            0
-        ]
-        assert section.index("scripts/release/core_wheel_consumers.py") < section.index(
-            install
-        )
+    assert "bash scripts/inspect_judge_sdk_gate.sh" in workflow

@@ -9,11 +9,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Support explicit OpenAI, Anthropic, Google and OpenRouter judge collection
+  profiles through the optional pinned SDKs, with provider-specific credentials,
+  endpoint validation and offline SDK transport tests.
+
 ### Changed
+
+- Move judge collection into the core package. The `invarlock[judge]` extra now
+  installs the pinned provider SDKs directly; collection imports use
+  `invarlock.judge_measurements`.
+- Consolidate diagnostics and all maintained runtime providers into the
+  `invarlock` distribution. Optional dependencies are exposed through the
+  `diagnostics`, `vision-text`, and `judge` extras. Hugging Face inference
+  dependencies remain in authenticated runtime images and the repository `hf`
+  dependency group.
+- Return the shared `invarlock/evidence-report-v2` result for native reports in
+  every output format, including terminal and HTML. Output destinations are
+  recorded in `requested_outputs` and `written_outputs`.
+- Require structured runtime input parts and complete Harness capture provenance.
+  Direct Python callers must supply the canonical input parts instead of relying
+  on the former text-only constructor behavior.
+
+- Move contributor, CI, documentation, build and security tools into reusable
+  dependency groups, separate from published product extras.
+- Resolve runtime options once using an immutable environment snapshot. Explicit
+  command options take precedence over environment settings with or without a
+  profile, including conflicts between common options and side-specific values.
+- Share report destination validation and publication bookkeeping across evidence
+  families, while rendering only requested outputs and preserving their contracts.
+- Use one authenticated release publication path for the core artifact pair.
 
 ### Removed
 
+- Remove the separate first-party add-in distributions and the old judge import
+  namespace. Release builds now contain one wheel and one source archive.
+- Remove obsolete Python entry-point discovery fallbacks, the unused signed-receipt
+  alias and the old native report result class. No forwarding aliases are provided.
+
 ### Fixed
+
+- Keep provider retries within admitted judge attempts, reject ignored settings,
+  and validate reported usage before charging a collection budget.
+- Apply the resolved environment snapshot to optional runtime resource bindings.
+- Update AnyIO to 4.14.2 in affected CI and runtime locks to address TLS hostname
+  validation and process-pool blocking advisories.
+- Update the documentation dependency SoupSieve to 2.9.2 to address selector
+  parsing denial-of-service advisories.
 
 ## [0.16.1] - 2026-09-16
 

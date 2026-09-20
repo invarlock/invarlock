@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import stat
 from pathlib import Path
@@ -46,7 +47,14 @@ def _job(tmp_path: Path) -> tuple[Path, dict[str, object]]:
                 records=[
                     {
                         "record_id": "record/1",
-                        "input_text": "Return A",
+                        "input_parts": [
+                            {
+                                "kind": "text",
+                                "role": "prompt",
+                                "text": "Return A",
+                                "sha256": hashlib.sha256(b"Return A").hexdigest(),
+                            }
+                        ],
                         "expected_output": "A",
                     }
                 ],
@@ -160,7 +168,14 @@ def test_worker_input_preflight_rejects_before_model_preparation(
         records=[
             {
                 "record_id": "record/1",
-                "input_text": "Return A",
+                "input_parts": [
+                    {
+                        "kind": "text",
+                        "role": "prompt",
+                        "text": "Return A",
+                        "sha256": hashlib.sha256(b"Return A").hexdigest(),
+                    }
+                ],
                 "expected_output": "A",
             }
         ],
@@ -213,7 +228,14 @@ def test_worker_scores_the_exact_schedule_snapshot_validated_before_model_load(
             records=[
                 {
                     "record_id": record_id,
-                    "input_text": "Return A",
+                    "input_parts": [
+                        {
+                            "kind": "text",
+                            "role": "prompt",
+                            "text": "Return A",
+                            "sha256": hashlib.sha256(b"Return A").hexdigest(),
+                        }
+                    ],
                     "expected_output": "A",
                 }
             ],

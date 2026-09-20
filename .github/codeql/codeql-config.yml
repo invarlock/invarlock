@@ -3,11 +3,6 @@ name: InvarLock CodeQL configuration
 paths:
   - src/invarlock
   - scripts
-  - addins/diagnostics/src
-  - addins/gguf/src
-  - addins/inspect_judge/src
-  - addins/multimodal/src
-  - addins/tensorrt_llm/src
 
 query-filters:
   - exclude:

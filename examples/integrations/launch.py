@@ -61,31 +61,14 @@ try:
 except ModuleNotFoundError as exc:  # pragma: no cover - flat-script compatibility
     if not exc.name or not exc.name.startswith("examples"):
         raise
-    try:
-        from evaluator_transaction.build_attestation import (
-            EvaluatorBuildAttestationError,
-            load_evaluator_build_attestation,
-            make_evaluator_build_attestation,
-            sign_evaluator_build_attestation,
-            verify_evaluator_build_attestation,
-            write_evaluator_build_attestation,
-        )
-    except (
-        ModuleNotFoundError
-    ) as nested_exc:  # pragma: no cover - flat-script compatibility
-        if nested_exc.name not in {
-            "evaluator_transaction",
-            "evaluator_transaction.build_attestation",
-        }:
-            raise
-        from evaluator_transaction import (  # type: ignore[no-redef]
-            EvaluatorBuildAttestationError,
-            load_evaluator_build_attestation,
-            make_evaluator_build_attestation,
-            sign_evaluator_build_attestation,
-            verify_evaluator_build_attestation,
-            write_evaluator_build_attestation,
-        )
+    from evaluator_transaction.build_attestation import (  # type: ignore[no-redef]
+        EvaluatorBuildAttestationError,
+        load_evaluator_build_attestation,
+        make_evaluator_build_attestation,
+        sign_evaluator_build_attestation,
+        verify_evaluator_build_attestation,
+        write_evaluator_build_attestation,
+    )
 
 
 _INTEGRATIONS = (
@@ -855,7 +838,7 @@ def main(argv: list[str] | None = None) -> int:
                         repository=repository,
                         build_root=vision_build,
                         container_engine=arguments.container_engine,
-                        dockerfile="addins/multimodal/runtime/Dockerfile",
+                        dockerfile="runtime/Dockerfile.hf-vision-text",
                         image_prefix="invarlock-example-hf-vision-text",
                         authenticated_base_image=published_base,
                     )

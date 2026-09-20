@@ -178,17 +178,17 @@ The base package includes the HF text provider and can authenticate its local
 snapshot identity for import mode without Torch or Transformers. Run-mode
 execution requires the maintained HF runtime image; host-side model preparation
 uses the [source runtime setup](runtime-providers.md#hugging-face-transformers).
-GGUF, TensorRT-LLM, and Hugging Face
-vision-text providers are separate first-party add-ins and must be installed
-and qualified in their required runtimes. A
+GGUF, TensorRT-LLM, and Hugging Face vision-text providers are also built into
+the core distribution. Their execution backends must be prepared and qualified
+in the required runtime images. A
 request naming an undiscoverable provider fails before evidence publication.
 
-Run the add-in's conformance entry point in the same Python environment:
+Run the provider's conformance entry point in the same Python environment:
 
 ```bash
-invarlock-gguf-conformance
-invarlock-tensorrt-llm-conformance
-invarlock-hf-vision-text-conformance
+python -m invarlock.runtime_providers.llama_cpp_conformance
+python -m invarlock.runtime_providers.tensorrt_llm_conformance
+python -m invarlock.runtime_providers.hf_vision_text_conformance
 ```
 
 If the command is missing, compare `python -m pip --version`, `which
@@ -396,7 +396,7 @@ render stale evidence after a failed evaluation publication.
 Collect the smallest non-sensitive reproduction that preserves the failing
 contract:
 
-- InvarLock and first-party add-in versions;
+- InvarLock package and provider ABI versions;
 - the command name and structured error text;
 - request shape with private locators and content redacted consistently;
 - which boundary failed and whether any output was published;

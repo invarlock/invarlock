@@ -90,7 +90,7 @@ from invarlock.evaluation_oci import (
     OciRuntimeExecutor,
     OciSideLaunch,
     OciWorkerLimits,
-    launch_from_environment,
+    launch_from_resolved_config,
 )
 from invarlock.evaluation_record_contracts.contracts import MAX_RECORDS as _MAX_RECORDS
 from invarlock.evaluation_record_contracts.contracts import (
@@ -110,7 +110,11 @@ from invarlock.evaluation_records.identity import (
     validate_service_identity,
 )
 from invarlock.evaluation_records.io import physical_file_digest, run_digest, write_run
-from invarlock.evaluation_runtime import RuntimeResourceResolver
+from invarlock.evaluation_runtime import (
+    ResolvedRuntimeConfig,
+    ResolvedRuntimeSide,
+    RuntimeResourceResolver,
+)
 from invarlock.evaluation_transaction import (
     EvaluationPreflightError,
     EvaluationPreflightResult,
@@ -140,7 +144,6 @@ from invarlock.evidence_receipt import (
     verify_signed_verification_receipt,
 )
 from invarlock.evidence_reporting import (
-    EvidenceReport,
     EvidenceReportError,
     EvidenceReportV2,
     render_evidence,
@@ -285,7 +288,6 @@ __all__ = [
     "EvidencePackStatus",
     "EvidenceObservation",
     "EvidenceReceiptError",
-    "EvidenceReport",
     "EvidenceReportError",
     "EvidenceVerification",
     "EvidenceVerificationError",
@@ -321,6 +323,8 @@ __all__ = [
     "RuntimeProviderCapabilities",
     "RuntimeProviderPluginIdentity",
     "RuntimeProviderReceipt",
+    "ResolvedRuntimeConfig",
+    "ResolvedRuntimeSide",
     "RuntimeResourceResolver",
     "RuntimeScoringRecord",
     "RuntimeSession",
@@ -353,7 +357,7 @@ __all__ = [
     "load_runtime_behavioral_schedule",
     "load_runtime_import_side",
     "load_trust_inputs",
-    "launch_from_environment",
+    "launch_from_resolved_config",
     "make_run",
     "digest",
     "evaluated_subject_digest",

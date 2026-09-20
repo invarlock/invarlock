@@ -37,8 +37,7 @@ that job's `cache-dependency-path`.
 
 ## Security and release
 
-- `codeql.yml` analyzes core code, maintained scripts and all five shipped
-  add-in source trees.
+- `codeql.yml` analyzes the complete core distribution and maintained scripts.
 - `supply-chain-pr.yml` audits the core and Hugging Face install surfaces and
   scans the pull-request delta for secrets.
 - `scorecards.yml` publishes OpenSSF Scorecard results.
@@ -51,17 +50,16 @@ that job's `cache-dependency-path`.
   disabled and a candidate version exercises the Linux release gates without
   creating or moving a tag.
 
-The release workflow builds, validates, attests, and publishes six Python
-distributions: `invarlock`, `invarlock-diagnostics`,
-`invarlock-runtime-gguf`, `invarlock-runtime-hf-vision-text`,
-`invarlock-runtime-tensorrt-llm`, and `invarlock-inspect-judge`. The optional
-packages live under `addins/`; their provider-specific runtime dependencies
-stay outside the core wheel.
+The release workflow builds, validates, attests, and publishes one Python
+distribution: `invarlock`. Judge collection, diagnostics, and all maintained
+runtime providers are in core; optional dependencies are installed through the
+`judge`, `diagnostics`, `vision-text`, and `hf` extras. Provider-specific native
+runtime dependencies stay outside the base wheel.
 Candidate and published core wheels use `scripts/release/core_wheel_consumers.py`,
 the same consumer suite as local installed-wheel validation. It stages quickstart,
 captured, judge, three-scorer and retained approval journeys outside the checkout
 and checks signing, independent verification, reports and rejection exit codes
-before the optional packages are installed.
+without installing optional dependency extras.
 
 ## Local checks
 

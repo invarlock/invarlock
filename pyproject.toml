@@ -43,81 +43,79 @@ Issues = "https://github.com/invarlock/invarlock/issues"
 Changelog = "https://github.com/invarlock/invarlock/blob/v0.16.1/CHANGELOG.md"
 
 [project.optional-dependencies]
-# Live judge collection; analysis, import, verification and reporting stay in core.
-judge = ["invarlock-inspect-judge[inspect]==0.16.1"]
+# Optional user-facing runtime and evidence features. Maintainer tooling lives
+# in dependency groups below and is never published as an extra.
+diagnostics = ["numpy>=1.24"]
+vision-text = ["pillow>=11.3,<13"]
+judge = [
+  "inspect-ai==0.3.263",
+  "openai==3.13.0",
+  "anthropic==1.6.0",
+  "google-genai==2.24.0",
+  "httpx==0.28.1",
+  "httpx2==2.12.0",
+]
 
-# Development dependencies
-dev = [
+[dependency-groups]
+test = [
   "pytest>=9.1.1",
   "pytest-cov>=7.1.0",
   "pytest-xdist>=3.6",
-  "pillow>=11.3,<13",
+  "hypothesis>=6.98",
+]
+
+lint = [
   "ruff==0.16.7",
   "mypy==2.3.1",
   "types-jsonschema>=4.26",
-  "hypothesis>=6.98",
-  "pre-commit>=4.6.1",
-  "markdown>=3.10.2",
-  "markdown-it-py>=4.0.0",
-  "mkdocs>=1.5",
-  "mkdocs-material>=9.7.7",
-  "mkdocs-mermaid2-plugin>=1.2.3",
-  "pymdown-extensions>=11.0.0",
-  "build>=0.10.0",
-  "wheel>=0.48.0",
-  "twine>=4.0.0",
-  "readme-renderer[md]==45.0",
 ]
-
-ci = [
-  "setuptools>=83.0.0",
-  "pytest>=9.1.1",
-  "pytest-cov>=7.1.0",
-  "pytest-xdist>=3.6",
-  "pillow>=11.3,<13",
-  "hypothesis>=6.98",
-  "ruff==0.16.7",
-  "mypy==2.3.1",
-  "types-jsonschema>=4.26",
-  "build>=0.10.0",
-  "markdown>=3.10.2",
-  "markdown-it-py>=4.0.0",
-  "wheel>=0.48.0",
-  "twine>=4.0.0",
-  "readme-renderer[md]==45.0",
-]
-
-docs-ci = [
+docs = [
   "linkchecker>=10.6.0",
   "mkdocs>=1.5",
   "mkdocs-material>=9.7.7",
   "mkdocs-mermaid2-plugin>=1.2.3",
   "pymdown-extensions>=11.0.0",
 ]
-
-precommit-ci = [
-  "pre-commit>=4.6.1",
-]
-
-release-ci = [
-  "build>=0.10.0",
+build = [
   "setuptools>=83.0.0",
-  "wheel==0.48.0",
+  "build>=0.10.0",
+  "wheel>=0.48.0",
+  "twine>=4.0.0",
+]
+release = [
+  "setuptools>=83.0.0",
+  "build>=0.10.0",
+  "wheel>=0.48.0",
   "twine>=4.0.0",
   "readme-renderer[md]==45.0",
   "cyclonedx-bom>=4.1",
 ]
-
-security-ci = [
+security = [
   "pip>=26.2",
   "pip-audit>=2.8",
   "msgpack>=1.2.1",
   "cyclonedx-bom>=4.1",
 ]
 
+precommit = ["pre-commit>=4.6.1"]
+dev = [
+  { include-group = "test" },
+  { include-group = "lint" },
+  { include-group = "docs" },
+  { include-group = "build" },
+  { include-group = "precommit" },
+]
+ci = [
+  { include-group = "test" },
+  { include-group = "lint" },
+  { include-group = "docs" },
+  { include-group = "build" },
+  { include-group = "release" },
+  "pillow>=11.3,<13",
+]
+
 # Runtime preparation is source-bound and uses the verified generated wheelhouse.
 # Public extras cannot supply this local runtime wheel.
-[dependency-groups]
 hf = [
   "accelerate==1.14.0+invarlock.1",
   "torch>=2.11.0,!=2.12.0",
@@ -128,28 +126,27 @@ hf = [
   "tiktoken>=0.9.0",
 ]
 runtime-test = [
-  {include-group = "hf"},
+  { include-group = "hf" },
   "peft==0.20.0",
   "torchao==0.18.0",
 ]
 example-peft = [
-  {include-group = "hf"},
+  { include-group = "hf" },
   "peft==0.20.0",
 ]
 example-torchao = [
-  {include-group = "hf"},
+  { include-group = "hf" },
   "torchao==0.18.0",
 ]
 
 [tool.uv]
 find-links = ["runtime/wheels"]
 
-# Resolve coordinated source builds without depending on a published release.
-[tool.uv.sources]
-invarlock-inspect-judge = { path = "addins/inspect_judge" }
-
 [project.entry-points."invarlock.runtime_providers"]
 hf_transformers = "invarlock.runtime_providers.hf_transformers:HFTransformersProvider"
+llama_cpp = "invarlock.runtime_providers.llama_cpp:LlamaCppProvider"
+tensorrt_llm = "invarlock.runtime_providers.tensorrt_llm:TensorRTLLMProvider"
+hf_vision_text = "invarlock.runtime_providers.hf_vision_text:HFVisionTextProvider"
 
 # Console scripts
 [project.scripts]

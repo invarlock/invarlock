@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import re
+import shutil
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
+from invarlock.evaluation_runtime import ResolvedRuntimeConfig, ResolvedRuntimeSide
 from invarlock.evidence_pack_json import (
     StrictJsonError,
     parse_json_bytes,
@@ -29,12 +32,6 @@ class RuntimeProfile:
     runtime: dict[str, str]
     baseline: dict[str, str]
     subject: dict[str, str]
-
-
-@dataclass(frozen=True)
-class ResolvedRuntimeProfile:
-    arguments: dict[str, str]
-    sources: dict[str, str]
 
 
 def load_runtime_profile(path: Path) -> RuntimeProfile:
@@ -87,14 +84,16 @@ def load_runtime_profile(path: Path) -> RuntimeProfile:
 
 
 def resolve_runtime_profile(
-    profile: RuntimeProfile,
+    profile: RuntimeProfile | None,
     *,
     explicit: Mapping[str, str],
     environment: Mapping[str, str],
-) -> ResolvedRuntimeProfile:
-    """Resolve profile mode; callers without a profile keep their old resolver path."""
-    from invarlock.evaluation_oci import OciWorkerLimits
+) -> ResolvedRuntimeConfig:
+    """Resolve profile and no-profile inputs into one immutable runtime selection."""
+    from invarlock.evaluation_oci import OciWorkerLimits, _memory_limit_mib
 
+    explicit = dict(explicit)
+    environment = dict(environment)
     limits = OciWorkerLimits()
     defaults = {
         "engine": "docker",
@@ -106,13 +105,12 @@ def resolve_runtime_profile(
         "image": "",
         "image_digest": "",
     }
-    # Every side setting is materialized below. Do not let the legacy resolver
-    # validate an unused common environment fallback ahead of those settings.
-    arguments: dict[str, str] = {
-        "default_device": "cpu",
-        "runtime_entrypoint": "auto",
-    }
     sources: dict[str, str] = {}
+    profile_runtime = dict(profile.runtime) if profile is not None else {}
+    profile_sides = {
+        "baseline": dict(profile.baseline) if profile is not None else {},
+        "subject": dict(profile.subject) if profile is not None else {},
+    }
 
     def select(field: str, side: str | None = None) -> str:
         common_name = "container_engine" if field == "engine" else "runtime_" + field
@@ -130,9 +128,12 @@ def resolve_runtime_profile(
         )
         if side:
             candidates.append(
-                (getattr(profile, side).get(field), f"profile.{side}.{field}")
+                (
+                    profile_sides[side].get(field),
+                    f"profile.{side}.{field}",
+                )
             )
-        candidates.append((profile.runtime.get(field), f"profile.runtime.{field}"))
+        candidates.append((profile_runtime.get(field), f"profile.runtime.{field}"))
         if side:
             key = "INVARLOCK_" + side.upper() + "_RUNTIME_" + field.upper()
             candidates.append((environment.get(key), key))
@@ -140,37 +141,43 @@ def resolve_runtime_profile(
             [(environment.get(env_name), env_name), (defaults[field], "default")]
         )
         for value, origin in candidates:
-            if value is not None and (value or origin == "default"):
+            if value is not None:
                 sources[f"{side or 'runtime'}.{field}"] = origin
                 return value
         raise AssertionError("every runtime field has a default")
 
-    for field, argument in [
-        ("engine", "engine"),
-        ("cpus", "runtime_cpus"),
-        ("memory_mib", "runtime_memory_mib"),
-        ("user", "runtime_user"),
-    ]:
-        arguments[argument] = select(field)
-    for side in ("baseline", "subject"):
-        for field, suffix in [
-            ("image", "image_ref"),
-            ("image_digest", "image_digest"),
-            ("device", "device"),
-            ("entrypoint", "entrypoint"),
-        ]:
-            arguments[side + "_" + suffix] = select(field, side)
-        image = arguments[side + "_image_ref"]
-        digest = arguments[side + "_image_digest"]
-        embedded = re.search(r"@(sha256:[0-9a-f]{64})$", image)
+    def resolve_side(side: str) -> ResolvedRuntimeSide:
+        image = select("image", side)
+        digest = select("image_digest", side)
+        embedded = re.search(r"(?:^|@)(sha256:[0-9a-f]{64})$", image)
         if embedded:
             if digest and digest != embedded.group(1):
                 raise RuntimeProfileError(
                     f"{side} runtime image and digest conflict: update the matching --{side}-runtime-image-digest or the profile digest; no override was repaired"
                 )
-            if not digest:
-                arguments[side + "_image_digest"] = embedded.group(1)
+            if not digest and sources[side + ".image_digest"] == "default":
+                digest = embedded.group(1)
                 sources[side + ".image_digest"] = (
                     sources[side + ".image"] + " (embedded digest)"
                 )
-    return ResolvedRuntimeProfile(arguments, sources)
+        return ResolvedRuntimeSide(
+            image_ref=image,
+            image_digest=digest,
+            device=select("device", side),
+            entrypoint=select("entrypoint", side),
+        )
+
+    engine = select("engine")
+    executable = shutil.which(engine, path=environment.get("PATH", os.defpath))
+    engine_path = str(Path(executable).resolve()) if executable is not None else None
+    sources["runtime.engine_path"] = "PATH" if "PATH" in environment else "default"
+    return ResolvedRuntimeConfig(
+        engine=engine,
+        engine_path=engine_path,
+        cpus=select("cpus"),
+        memory_mib=_memory_limit_mib(select("memory_mib")),
+        user=select("user"),
+        baseline=resolve_side("baseline"),
+        subject=resolve_side("subject"),
+        sources=sources,
+    )

@@ -87,18 +87,14 @@ def test_verify_hosted_distributions_accepts_exact_build_bytes(
     )
 
 
-def test_verify_hosted_distributions_accepts_authenticated_project_subset(
+def test_verify_hosted_distributions_accepts_explicit_project_selection(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     target = "pypi"
     ledger, ledger_digest, metadata, downloads = _release_fixture(
         tmp_path, target=target
     )
-    selected = verifier.PROJECTS[:-1]
-    tensorrt_metadata = (
-        f"{verifier.API_ROOTS[target]}/{verifier.PROJECTS[-1]}/1.2.3/json"
-    )
-    metadata.pop(tensorrt_metadata)
+    selected = verifier.PROJECTS
     _install_fake_network(
         monkeypatch,
         metadata=metadata,
@@ -595,6 +591,5 @@ def test_hosted_project_rejects_malformed_metadata_and_insecure_urls(
         )
 
 
-def test_hosted_project_inventory_includes_the_inspect_judge_pair() -> None:
-    assert "invarlock-inspect-judge" in verifier.PROJECTS
-    assert len(verifier.PROJECTS) == 6
+def test_hosted_project_inventory_contains_only_consolidated_distribution() -> None:
+    assert verifier.PROJECTS == ("invarlock",)
