@@ -23,6 +23,12 @@ produce judge analysis and verification results described in
 [judge measurements](judge-measurements.md); they do not use the native
 `invarlock/comparison-report-v3` shape. All are rendered by `invarlock report`.
 
+## Report appearance
+
+HTML reports use a light palette regardless of the browser or operating system
+color preference, keeping the transition from the website consistent. Reports
+have no theme control or stored theme preference. Printing also uses light colors.
+
 ## Reading a report for a release review
 
 The heading names the recorded policy result; the opening explains what led
