@@ -28,15 +28,17 @@ their declared exact-match profiles; they are not evidence for every new metric.
 
 ## Capture for exact match, likelihood and judge scoring
 
-The installed `invarlock.engine.export_evaluator_result` helper has dedicated
-native mappings for all 19 ecosystems below. Export native SDK cases, reports,
-prediction tables or attempts, then import them with `adapter: evaluator-json`.
+Dedicated native mappings cover all 19 ecosystems below. Export supported JSON
+cases, reports, prediction tables or attempts from your existing environment,
+then import them with `adapter: evaluator-native-json`. The optional installed
+`invarlock.engine.export_evaluator_result` helper prepares a common envelope for
+`adapter: evaluator-json` when SDK/core dependencies permit co-installation.
 Every profile uses the same captured `evaluate`, independent `verify` and
 `report` flow, with per-case metadata slices and attributed numeric metrics when
 supplied. Recipients need no evaluator SDK or account. The
 [native shape recipes](https://github.com/invarlock/invarlock/blob/main/examples/evaluator-qualification/maintained/CAPTURE.md#dedicated-native-shapes)
 and [public API example](evaluation-records.md#dedicated-evaluator-exports)
-describe the producer boundary. Canonical JSON, generic JSONL and the existing
+describe the capture boundary. Canonical JSON, generic JSONL and the existing
 Inspect, Harness, Promptfoo and Langfuse parser names remain available.
 
 Three kinds of evidence have different scopes. Tests that place retained model

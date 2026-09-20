@@ -76,10 +76,10 @@ external parser also binds the original file bytes through `source_digest`.
 
 For an existing pipeline, save its native cases or results as JSON and use
 `adapter: evaluator-native-json` in the captured request. Dedicated mappings
-cover all 19 maintained ecosystems. The producer keeps its current evaluator
-environment; evaluation, verification and reporting run in a separate core
-InvarLock environment without the upstream SDK. No common export envelope or SDK-side InvarLock installation
-is required; the file follows its evaluator's documented JSON profile.
+cover all 19 maintained ecosystems. Your pipeline keeps its current evaluator environment;
+evaluation, verification and reporting run in a separate core InvarLock
+environment without the upstream SDK. No common export envelope or SDK-side
+InvarLock installation is required; the file follows its evaluator's documented JSON profile.
 
 For example, use Ragas's own explicit serializer after retaining your
 `SingleTurnSample` objects and their planned IDs:
@@ -141,7 +141,7 @@ an `invarlock/evaluator-export-v1` envelope consumed with
 hosted models pass `artifact_digest=None, service_identity=identity`.
 Both adapters use the same source-specific mapping and downstream scorers.
 
-Keep the pinned MLflow 3.14.0 producer in a separate environment: it requires
+Keep pinned MLflow 3.14.0 in a separate environment: it requires
 `cryptography<49`, while core InvarLock requires `cryptography>=50`. Export the
 original prediction table as JSON and use `evaluator-native-json`; no core
 dependency change is needed. SDK serializer smoke tests run from source with

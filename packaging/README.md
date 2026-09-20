@@ -180,15 +180,20 @@ preserving each check's meaning.
 
 ## Keep your evaluator or run the comparison here
 
-**Use existing records.** The public `invarlock.engine.export_evaluator_result`
-helper has dedicated mappings for all 19 evaluators in the maintained shortlist.
-Export your native cases or results once, then use `adapter: evaluator-json` with
-the same `evaluate`, `verify` and `report` commands. Recipients need no evaluator
-SDK or account. The [capture guide](https://github.com/invarlock/invarlock/blob/v0.16.1/docs/reference/evaluation-records.md#dedicated-evaluator-exports)
+**Use existing records.** Dedicated profiles cover all 19 evaluators in the
+maintained shortlist. Export supported native JSON from your existing environment,
+then select `adapter: evaluator-native-json` in InvarLock. No InvarLock installation
+is needed in the evaluator environment, and recipients need no evaluator SDK or
+account. If you prefer a Python helper, `invarlock.engine.export_evaluator_result`
+prepares a complete export for `adapter: evaluator-json`. Both routes use the same
+`evaluate`, `verify` and `report` commands.
+
+The [capture guide](https://github.com/invarlock/invarlock/blob/v0.16.1/docs/reference/evaluation-records.md#dedicated-evaluator-exports)
 covers source shapes, complete case IDs, custom numeric metrics and metadata
 slices. Exact match needs answers and references; normalized NLL needs actual
 continuation measurements; judging needs task/answer text and complete judge
-measurements. Structured inputs can use an explicit text projection.
+measurements. An aggregate score cannot substitute for the required per-case
+records. Structured inputs can use an explicit text projection.
 The [qualification matrix](https://github.com/invarlock/invarlock/blob/v0.16.1/docs/reference/evaluator-qualification.md)
 distinguishes installed support, replay authority and retained runtime evidence
 for each declared profile.

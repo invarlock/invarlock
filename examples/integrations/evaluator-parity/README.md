@@ -8,7 +8,7 @@ export contracts; they are not evidence of a new upstream SDK execution.
 Every scorer runs with both direct native JSON (`evaluator-native-json`) and the
 optional InvarLock export envelope (`evaluator-json`): 114 installed journeys.
 Direct JSON lets the evaluator write its result in its own environment and the
-recipient import it separately. The producer does not need InvarLock or its
+recipient import it separately. The capture process does not need InvarLock or its
 dependencies installed. The recipient supplies the source name and version,
 run identity, model or service identity, and independently prepared trust inputs.
 Both paths bind the exact source bytes and preserve the same recorded outcomes.
@@ -25,7 +25,7 @@ The real input origins and file hashes come from the
 [retained Langfuse reference](../../captured-results/references/langfuse/README.md).
 Their original policies and outcomes remain unchanged. Each profile preserves
 record IDs, prompts, references, outputs, slice tags and numerical likelihood
-facts. The copied likelihood source field identifies the new export producer. For
+facts. The copied likelihood source field identifies the new export source. For
 Harness and Promptfoo, its input digest binds the native structured input before
 text projection. Original unchanged likelihood facts remain in native metadata;
 original source files and hashes remain in `origin.json`. These are transformed

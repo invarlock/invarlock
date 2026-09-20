@@ -78,7 +78,7 @@ as JSON using the [native source recipes](https://github.com/invarlock/invarlock
 Point baseline and subject at those files with `adapter: evaluator-native-json`,
 the actual evaluator name/version, run ID, and model or hosted-service identity.
 All 19 profiles use the same policy, evaluation, verification and reporting flow.
-The producer needs no InvarLock installation or common export envelope; the recipient
+The capture process needs no InvarLock installation or common export envelope; the recipient
 needs only core InvarLock. Pin the independently reviewed case set in policy so
 missing cases cannot disappear from both sides. The
 [onboarding example](../reference/evaluation-records.md#dedicated-evaluator-exports)
@@ -87,7 +87,7 @@ shows raw JSON capture and the request source.
 If your SDK's dependencies are compatible with core InvarLock, the optional
 `invarlock.engine.export_evaluator_result` convenience API accepts SDK objects,
 checks the independent planned IDs, and writes an envelope for
-`adapter: evaluator-json`. Keep MLflow 3.14.0 in a separate producer environment
+`adapter: evaluator-json`. Keep MLflow 3.14.0 in a separate evaluator environment
 because its cryptography dependency conflicts with core InvarLock; use the raw
 JSON route. `capture_evaluator_run` remains available for explicitly mapped
 canonical records, and `evaluator_input_capabilities` reports missing facts
