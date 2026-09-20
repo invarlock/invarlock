@@ -41,7 +41,7 @@ and [public API example](evaluation-records.md#dedicated-evaluator-exports)
 describe the capture boundary. Canonical JSON, generic JSONL and the existing
 Inspect, Harness, Promptfoo and Langfuse parser names remain available.
 
-Three kinds of evidence have different scopes. Tests that place retained model
+The evidence sources have different scopes. Tests that place retained model
 answers and likelihoods, plus synthetic complete judge-call fixtures, into each
 native shape exercise the
 shared export/import, scoring and recipient flow; they do not establish that
@@ -55,6 +55,16 @@ exports and two observation-only profiles: MLflow aggregate results and Garak
 detector summaries. Their identities and authority do not change. New native
 MLflow prediction-table and Garak attempt capture paths require the actual rows;
 the historical summaries cannot supply them.
+
+The [fresh Mistral 7B sentinel](https://github.com/invarlock/invarlock/blob/main/examples/integrations/evaluator-live/references/mistral-7b-sentinel/README.md)
+executes both models through all 19 maintained profiles, retaining 304 model
+executions and 114 scorer/import journeys. Eight fixed cases cover narrative
+continuation, answerable questions and unanswerable questions. Its 992 usable
+judge ratings were collected against those retained answers; the original 32
+blocked attempts remain separate. Independent recipients authenticate and replay
+the resulting comparisons. These small-sample integration checks preserve policy
+failures and insufficient-evidence outcomes; they do not establish production
+model quality, hosted storage support or arbitrary evaluator configurations.
 
 InvarLock owns the selected scorer. Exact match requires string answers and
 references. Judge requires task and answer text plus a declared recipe and

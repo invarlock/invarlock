@@ -8,7 +8,9 @@ SDK, model, judge service or container. Neither route claims fresh model executi
 
 The separate [live campaign](../evaluator-live/README.md) executes framework
 callbacks against a persistent model worker and checks the actual captures.
-Its qualification remains separate from these retained contract replays.
+Its [retained two-model sentinel](../evaluator-live/references/mistral-7b-sentinel/README.md)
+qualifies the declared 114 scorer/import journeys separately from these contract
+replays.
 
 Every scorer runs with both direct native JSON (`evaluator-native-json`) and the
 optional InvarLock export envelope (`evaluator-json`): 114 installed journeys.

@@ -274,9 +274,11 @@ Native judging requires exactly one text input part per record; image/content
 inputs are rejected. Run mode first collects authenticated answers through the
 provider's text-output surface and freezes the runtime capture. Import mode
 authenticates complete provider sidecars bound to the same judge policy. Both then collect ratings
-through the separately installed collector. Preflight validates prerequisites
+through the built-in collector, using the optional `invarlock[judge]` dependencies. Preflight validates prerequisites
 and complete reservations without model or judge calls. The model workers remain
-network-disabled; judge collection has its own explicit authorization and limits.
+network-disabled. Set `INVARLOCK_ALLOW_JUDGE_NETWORK=1` only for the evaluation
+command to authorize the bounded judge phase; preflight and offline replay need
+no network permission. Judge collection retains its own call and cost limits.
 
 The private judge workspace supports resuming admitted trials against the same
 frozen answers. Changed models, data, rubric, policy or runtime identities need

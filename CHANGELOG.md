@@ -21,7 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Add actual SDK callback tests and a bounded fresh-execution campaign with
   preserved task ledgers, explicit likelihood capture bindings and independently
   installed recipients. Fresh model/provider qualification remains separate
-  from controlled-callback tests and retained replays.
+  from controlled-callback tests and retained replays. Retain the Mistral 7B
+  sentinel across all 19 profiles and 114 scorer/import journeys, including
+  original blocked judge attempts and independently replayable results.
 
 - Retain signed Docker and Podman CUDA execution references for native scorers,
   TensorRT-LLM and vision-text, with compact offline replay and frozen provenance.
@@ -68,6 +70,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   alias and the old native report result class. No forwarding aliases are provided.
 
 ### Fixed
+
+- Scope explicitly authorized judge network access to collection, preserving
+  native execution isolation and restoring the guard after failures or cancellation.
 
 - Accept complete Podman image IDs in authenticated builds and example workflows
   while retaining strict source, image and filesystem checks. Temporary registry

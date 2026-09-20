@@ -3,8 +3,11 @@
 This campaign checks whether an evaluator can run a real model task, retain its
 original results, and deliver them to a separately installed InvarLock recipient.
 It covers the 19 maintained profiles and the three native scorers.
-**Fresh qualification is incomplete until the actual model captures, judge
-measurements and recipient results have been collected and reviewed.**
+The [retained Mistral 7B sentinel](references/mistral-7b-sentinel/README.md)
+contains 304 fresh model executions and all 114 scorer/import journeys. It retains
+992 usable judge ratings, the original 32 blocked attempts, and independently
+verified outcomes. This establishes the declared integration profile, not model
+quality or support for every configuration of an evaluator.
 
 SDK tests execute real framework callbacks with controlled task results. They
 test integration code without charging a provider or loading a model. The
@@ -104,7 +107,7 @@ timer alone cannot interrupt a stalled native GPU call.
 
 Use separate, pinned SDK environments. The normal locks are in
 `examples/evaluator-qualification/locks/`. LightEval also needs this example's
-`locks/lighteval.txt` for compatible xxhash. Promptfoo uses the verified npm archive;
+`locks/lighteval.txt` for a compatible `xxhash` version. Promptfoo uses the verified npm archive;
 LightEval requires checksum-verified NLTK resources staged before execution.
 `scripts/evaluator_sdk_gate.sh` demonstrates setup and tests it without model calls.
 
@@ -121,7 +124,7 @@ run inside an application that invokes the worker; they are not model servers.
 This local profile does not qualify hosted experiment storage, remote dataset
 APIs or arbitrary framework configurations.
 
-Requests are journaled before inference. Lost responses and interrupted captures
+Requests are recorded in the execution journal before inference. Lost responses and interrupted captures
 remain incomplete and cannot silently rerun. Preserve failed attempt directories.
 A changed protocol requires new captures.
 
