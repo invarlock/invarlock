@@ -242,6 +242,14 @@ run_workflow_locks() {
       --custom-compile-command "scripts/security/refresh_pinned_requirements.sh --write --group workflows"
   done
 
+  for langfuse_python in 3.12 3.13; do
+    compile_pyproject "${WORKFLOW_DIR}/langfuse-sdk-tests-py${langfuse_python/./}.txt" \
+      "${WORKFLOW_DIR}/langfuse-sdk-tests.in" \
+      --constraint "${WORKFLOW_DIR}/inspect-judge-tests-py${langfuse_python/./}.txt" \
+      --python-version "${langfuse_python}" \
+      --custom-compile-command "scripts/security/refresh_pinned_requirements.sh --write --group workflows"
+  done
+
   compile_req_platform \
     "${WORKFLOW_DIR}/inspect-ai-runtime.in" \
     "${WORKFLOW_DIR}/inspect-ai-runtime-py312.txt" \

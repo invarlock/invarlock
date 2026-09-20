@@ -16,12 +16,36 @@ For the commands, go to [retained files and replay](#retained-files-and-replay).
 For interpretation, read each effect interval together with its allowed
 degradation and the absolute subject-score requirement below.
 
+## Task and proposed change
+
+The practical change is a system instruction for stricter output-format
+compliance on the same `IFM/K2-Horizon-32B` checkpoint, revision
+`466db5f23c8a7c96b0b320b688612ee6f4446a35`. Baseline receives the user task alone.
+Subject adds a system instruction to follow the task and its format exactly,
+without extra commentary, Markdown fences or additional fields. The user text,
+checkpoint and native generation settings stay the same.
+
+Grounded QA asks for a supported source span or `NO_ANSWER` from supplied context.
+Extraction asks for directly mentioned slot/value pairs from the current user
+utterance, returned as a raw JSON array or `[]`. These are useful components of
+context-based answering and structured-data pipelines. The
+[frozen-answer reference](../k2-32b/README.md) retains the original task text,
+answers and change mappings.
+
+The result supports accepting this prompt change under the declared fixed
+benchmark policies. It does not establish that the change improves quality or
+meets a different application's requirements. Start with extraction for a
+concrete example of schema-based extraction; use QA to explore context support and
+answerability.
+
 ## Results and interpretation
 
 | Measure | Grounded QA | Extraction |
 | --- | ---: | ---: |
 | Complete ratings | 2,532/2,532 | 7,728/7,728 |
 | Independent source units | 422 | 1,288 |
+| Mean baseline score | 0.79581 | 0.89454 |
+| Mean subject score | 0.82267 | 0.90386 |
 | Mean subject-minus-baseline score | +0.02686 | +0.00932 |
 | Paired effect interval | −0.12823 to +0.18195 | −0.07946 to +0.09809 |
 | Allowed degradation | 0.15 | 0.10 |
@@ -29,9 +53,16 @@ degradation and the absolute subject-score requirement below.
 | Required subject lower bound | 0.60 | 0.60 |
 | Policy result | Pass | Pass |
 
-Scores use the bounded rubric scale, not exact-match accuracy. The frozen
-Hoeffding analysis uses alpha 0.05 and comparison-family size four. Repetitions
-within answers do not increase the independent unit count. The paired intervals
+The rubric assigns 0 for incorrect, 0.5 for partially correct and 1 for correct.
+Its mean is not exact-match accuracy. The allowed degradation is an absolute
+change on that scale; the 0.60 requirement applies to the lower bound on mean
+subject score. Maximum interval widths are 0.32 for QA and 0.18 for extraction.
+These thresholds were chosen as fixed benchmark requirements before collection;
+they are not application-specific error budgets. Choose requirements suited to
+your intended use before collecting a new comparison.
+
+The frozen Hoeffding analysis uses alpha 0.05 and comparison-family size four.
+Repetitions within answers do not increase the independent unit count. The paired intervals
 include zero; passing the allowed-degradation gate does not prove improvement.
 The result applies to the fixed benchmark under the declared independence and
 judging assumptions, not representative production traffic.

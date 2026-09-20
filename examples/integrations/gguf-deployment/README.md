@@ -127,7 +127,7 @@ Read the report's per-side accuracy and interval checks before interpreting a
 pass. The result covers this frozen 400-record schedule and policy. It does not
 mean the two runtime formats return identical text for arbitrary prompts.
 
-Already inspected local images can be supplied by immutable config ID:
+Already inspected local images can be supplied by their engine-reported immutable image ID:
 
 ```bash
 make example-gguf-deployment EXAMPLE_ARGS="\

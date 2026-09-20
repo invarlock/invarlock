@@ -20,11 +20,37 @@ does not provide a Qwen3.5 model adapter.
 
 ## Prerequisites
 
-The maintained showcase requires Linux and Docker with two visible CUDA GPUs
+The maintained showcase requires Linux and Docker or Podman with two visible CUDA GPUs
 that support both BF16 and FP8 in the
 [pinned TensorRT-LLM 1.2.1 release](https://nvidia.github.io/TensorRT-LLM/1.2.1/legacy/reference/support-matrix.html).
 Build each engine for its selected GPU and runtime; engine portability across
-GPU architectures is not assumed.
+GPU architectures is not assumed. Docker requires NVIDIA Container Toolkit
+configured for `--gpus device=INDEX`. Podman requires NVIDIA CDI devices
+configured for `--device nvidia.com/gpu=INDEX`. CDI (Container Device Interface)
+is how Podman exposes the selected GPU to the container. Rootless Podman builds
+use `--userns=keep-id` so the unprivileged build user can write the private work
+directory. Podman also uses `relabel=shared` on that example-created writable
+build directory. The shared SELinux container label follows generated engines
+when they move into the resource directory, allowing subsequent inspection and
+evaluation containers to read them. The build work directory retains its private
+filesystem permissions. Read-only model, helper, and prepared-engine sources
+are not relabeled. On an
+SELinux host, the operator must provide container-readable labels on those
+sources; SELinux enforcement remains enabled. Use a local Linux engine for this
+GPU workflow.
+
+Both entry points accept `--container-engine docker|podman`; the default is
+`INVARLOCK_CONTAINER_ENGINE`, or `docker` when unset. The selected engine is used
+for image preparation, engine builds, inspection, preflight, and evaluation.
+Append `--container-engine podman` to either command's `EXAMPLE_ARGS` value to
+select Podman. An unavailable engine or missing GPU device fails the command;
+there is no fallback to another engine or to CPU execution. Both engines retain
+the offline inspection and evaluation boundary, immutable image binding,
+unprivileged runtime user, dropped capabilities, and privilege-escalation ban.
+
+Command and failure-path tests cover both engines. They do not qualify actual
+GPU execution under Podman; that requires running this complete workflow with
+the intended Linux host, CDI configuration, GPU, and immutable runtime image.
 
 Network access is required for the pinned model downloads and runtime-image
 build, along with substantial free disk space. The pinned vendor image alone

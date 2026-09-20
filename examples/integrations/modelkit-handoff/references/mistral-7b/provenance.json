@@ -1,0 +1,467 @@
+{
+  "archive": {
+    "bytes": 137128,
+    "expanded_bytes": 350827,
+    "file_count": 68,
+    "sha256": "bd8d73d8ad01ede51f36939ecf956a605893d763e074fd3a2a82d3d802cc9348"
+  },
+  "collection": {
+    "compressed_bytes": 258641,
+    "file_count": 400,
+    "public_reference_is_subset": true,
+    "sha256": "015dc59ff056f45c3a44c7316ac12db3a30ad265c5250e8a24836bd7a75203e3"
+  },
+  "dataset": {
+    "curated_input_path": "examples/integrations/evaluator_transaction/lambada_qwen35_deployment_400.jsonl",
+    "curated_input_sha256": "e4a0e431b8b64130cbbf6e8fb3ed7b5769744d18ca6499d2088f2e1b3fb36dda",
+    "eligible_records": 194,
+    "selected_ids": [
+      "lambada-openai-1877",
+      "lambada-openai-4390",
+      "lambada-openai-2701",
+      "lambada-openai-2748",
+      "lambada-openai-1481",
+      "lambada-openai-4166",
+      "lambada-openai-4799",
+      "lambada-openai-3314",
+      "lambada-openai-5027",
+      "lambada-openai-4422",
+      "lambada-openai-2131",
+      "lambada-openai-4401",
+      "lambada-openai-4865",
+      "lambada-openai-5143",
+      "lambada-openai-4811",
+      "lambada-openai-2293",
+      "lambada-openai-1165",
+      "lambada-openai-2780",
+      "lambada-openai-3323",
+      "lambada-openai-3880",
+      "lambada-openai-0576",
+      "lambada-openai-4591",
+      "lambada-openai-2224",
+      "lambada-openai-1729",
+      "lambada-openai-4580",
+      "lambada-openai-4541",
+      "lambada-openai-2094",
+      "lambada-openai-3633",
+      "lambada-openai-2083",
+      "lambada-openai-0851",
+      "lambada-openai-0866",
+      "lambada-openai-3618",
+      "lambada-openai-3333",
+      "lambada-openai-4919",
+      "lambada-openai-2237",
+      "lambada-openai-4987",
+      "lambada-openai-2469",
+      "lambada-openai-3129",
+      "lambada-openai-3167",
+      "lambada-openai-2923",
+      "lambada-openai-3681",
+      "lambada-openai-3496",
+      "lambada-openai-4897",
+      "lambada-openai-0229",
+      "lambada-openai-1827",
+      "lambada-openai-5009",
+      "lambada-openai-3709",
+      "lambada-openai-4375",
+      "lambada-openai-2524",
+      "lambada-openai-3693",
+      "lambada-openai-1595",
+      "lambada-openai-4486",
+      "lambada-openai-5113",
+      "lambada-openai-3799",
+      "lambada-openai-2500",
+      "lambada-openai-3104",
+      "lambada-openai-2179",
+      "lambada-openai-2884",
+      "lambada-openai-3515",
+      "lambada-openai-0165",
+      "lambada-openai-1343",
+      "lambada-openai-0321",
+      "lambada-openai-4334",
+      "lambada-openai-2475",
+      "lambada-openai-4409",
+      "lambada-openai-0361",
+      "lambada-openai-4784",
+      "lambada-openai-1130",
+      "lambada-openai-5072",
+      "lambada-openai-0832",
+      "lambada-openai-2418",
+      "lambada-openai-2331",
+      "lambada-openai-2559",
+      "lambada-openai-2052",
+      "lambada-openai-0803",
+      "lambada-openai-3303",
+      "lambada-openai-0283",
+      "lambada-openai-4623",
+      "lambada-openai-2956",
+      "lambada-openai-0508",
+      "lambada-openai-1351",
+      "lambada-openai-4074",
+      "lambada-openai-5054",
+      "lambada-openai-4078",
+      "lambada-openai-2198",
+      "lambada-openai-1306",
+      "lambada-openai-3046",
+      "lambada-openai-0051",
+      "lambada-openai-4200",
+      "lambada-openai-1369",
+      "lambada-openai-2717",
+      "lambada-openai-2270",
+      "lambada-openai-2698",
+      "lambada-openai-3952",
+      "lambada-openai-3439",
+      "lambada-openai-2786",
+      "lambada-openai-2553",
+      "lambada-openai-2378",
+      "lambada-openai-2619",
+      "lambada-openai-4406",
+      "lambada-openai-1233",
+      "lambada-openai-2528",
+      "lambada-openai-2770",
+      "lambada-openai-3938",
+      "lambada-openai-0720",
+      "lambada-openai-1920",
+      "lambada-openai-1064",
+      "lambada-openai-1088",
+      "lambada-openai-1954",
+      "lambada-openai-4034",
+      "lambada-openai-4953",
+      "lambada-openai-3274",
+      "lambada-openai-1380",
+      "lambada-openai-3021",
+      "lambada-openai-4243",
+      "lambada-openai-3097",
+      "lambada-openai-1425",
+      "lambada-openai-3324",
+      "lambada-openai-0761",
+      "lambada-openai-4869",
+      "lambada-openai-4957",
+      "lambada-openai-4385",
+      "lambada-openai-2468",
+      "lambada-openai-2924",
+      "lambada-openai-0573",
+      "lambada-openai-3648",
+      "lambada-openai-1560",
+      "lambada-openai-0944"
+    ],
+    "selected_sha256": "5b8a38c5f60b52df4f6562261f3c1b01bf497ed2d92f9244ffa0d63a59324731",
+    "selection": "first 128 by SHA256 of invarlock-modelkit-mistral-7b-v1: plus record ID, after prompt <=96 Mistral tokens and lossless one-token target with BOS prefix",
+    "source_repository": "EleutherAI/lambada_openai",
+    "source_revision": "900124bf3b8235c6daf21033af9948b3f07346c4",
+    "tokenizer_revision": "27d67f1b5f57dc0953326b2601d68371d40ea8da"
+  },
+  "delivery": {
+    "kit": {
+      "archive_sha256": "c95ab7cfe1a57fcb37101454ff1d5b2783781a72cbbb4016018a701c892bf26f",
+      "binary_sha256": "c4608a5da14e2c391c4b8efde681284b4bae2e041965af0b7bbdfc703a3b411b",
+      "release": "https://github.com/kitops-ml/kitops/releases/tag/v1.15.0",
+      "version": "Version: 1.15.0\nCommit: 6b8162ae5da4d46f1d2af2beb43e7fb077f052f4\nBuilt: 2026-06-23T22:29:43Z\nGo version: go1.25.7\n"
+    },
+    "original_result_sha256": "cda958412cbeafb521276768d01758cadaee45da73ab1bbf2cdf5e847219c2b3",
+    "packages": {
+      "baseline": {
+        "original": "sha256:6b335b27fb77f2c71e43a0d9afcfec5512508489598d546465b76b1f14f0877d",
+        "repacked": "sha256:b90d666d573e0dbad5843a1bc29b9b8d6fcec8092544d4f86225f74759ae495d",
+        "tag": "example.invalid/modelkit/baseline:review"
+      },
+      "subject": {
+        "original": "sha256:3dc03aced5137c61d12b8e09763fd2e954ac2a64fa27de17d34ebc3bc362eca7",
+        "repacked": "sha256:984ee7ae0011d8e37a7d2fc93251a3e47e8026e38f0f47633b6796445de84bf4",
+        "tag": "example.invalid/modelkit/subject:review"
+      }
+    },
+    "public_result_normalization": "Absolute recipient directory in the missing-package diagnostic replaced with recipient/; all original bytes retained in the full local collection.",
+    "raw_output_equal": true,
+    "raw_output_sha256": "84d4aa3a07e5b68ffa748e47d605ac83393067655ab862f8804717b69418a557",
+    "recipient_accepted": false,
+    "scenario_exit_codes": {
+      "altered_evidence": 2,
+      "candidate_changed": 2,
+      "missing_package": 2,
+      "repacked_same_contents": 1,
+      "revoked_signer": 1,
+      "wrong_runtime": 2
+    }
+  },
+  "execution": {
+    "cpu_brand": "AMD EPYC 9654 96-Core Processor",
+    "logical_vcpus": 32,
+    "physical_core_allocation": "Not established by virtual topology",
+    "platform": "Linux x86_64",
+    "runtime_build": {
+      "base_image": null,
+      "build_arguments": {
+        "LLAMA_CPP_APT_SNAPSHOT": "20260701T000000Z",
+        "LLAMA_CPP_BUILD_JOBS": "8",
+        "SOURCE_DATE_EPOCH": "1789852810"
+      },
+      "dockerfile": {
+        "path": "runtime/Dockerfile.gguf",
+        "sha256": "sha256:0472a7b3257b87ac067fe12365da4491737e292705049cb39b9bb42758de7f9f"
+      },
+      "format_version": "invarlock/runtime-image-build-v1",
+      "image": "invarlock-modelkit-gguf:59d9bbc048d1",
+      "ok": true,
+      "platform": null,
+      "runtime_image_id": "sha256:de52a76a677adb92d2c8f96c142c2b9ac4876222f06aebffffd603686f66bc1b",
+      "source_bundle_sha256": "sha256:733c4658c072a20543a6a6562f6bfc34330112ddae263576b690b17ed2615994",
+      "source_commit": "59d9bbc048d1fe10083e912b32912445cb7bb974"
+    },
+    "runtime_cpu_limit_per_side": 10,
+    "runtime_memory_mib_per_side": 24576,
+    "runtime_threads_per_side": 10,
+    "source_commit": "59d9bbc048d1fe10083e912b32912445cb7bb974",
+    "virtualization": "KVM",
+    "wheel_filename": "invarlock-0.16.1-py3-none-any.whl",
+    "wheel_sha256": "f7663dd4a177e9497146461805a386e09e8fd696f57fb377acfd5f7664cc788e"
+  },
+  "format": "invarlock/modelkit-reference-provenance-v1",
+  "image_transport": {
+    "archive_bytes": 105559040,
+    "archive_sha256": "70b840062ac5b8a9721968e92a9a7d77921d0ab2467a5ccfe1eade22bf527b0c",
+    "layers": [
+      {
+        "bytes": 29775500,
+        "diff_id": "sha256:188c9b34dfbe022075d01fc4f5a305412909ef97de440783c15043e68e1b1913",
+        "digest": "sha256:ec781dee3f4719c2ca0dd9e73cb1d4ed834ed1a406495eb6e44b6dfaad5d1f8f"
+      },
+      {
+        "bytes": 1293078,
+        "diff_id": "sha256:1c107a897b02ca7ece069bfef2339f4e02f95f12dbb025da7305fcbe2b626f34",
+        "digest": "sha256:b1a20e2fae4cdafe596f3275baf250182347549a39d648abbad68a25f2e151fd"
+      },
+      {
+        "bytes": 12113023,
+        "diff_id": "sha256:481070cf8ce5b1834cf16a80eec044aced637a96ef8cd1e3c193947e2ff5cbd9",
+        "digest": "sha256:a6d1911b36ac5b384a54e9197335acdf0ebb0a06910b25b67b9afd054cdc2eb7"
+      },
+      {
+        "bytes": 249,
+        "diff_id": "sha256:addf8d91bd2117a572c640e2bd2e0d15c7adf862773498ca0aea234b7a32528e",
+        "digest": "sha256:e3c59d77c03efd793b736fb93c9b3c578eb84a62458c148b6974323225d030c2"
+      },
+      {
+        "bytes": 152004,
+        "diff_id": "sha256:c2ea5642fb5060f6ade884870a0f6a1349970b094c013bc4d788964bc9f82fcb",
+        "digest": "sha256:452fec7e26b6c0cc080d23c679cfcdc154148a669fef2b78fbe1dab70316f5e0"
+      },
+      {
+        "bytes": 13188,
+        "diff_id": "sha256:76af615f12061e60e35270bcf3e4a23e73ae2e349ee9877dc6bca7a74725db9f",
+        "digest": "sha256:fa4a0d66c2ccc411cb4c4fd40aac5686cffe72eeb72544a7f102cf24fcb82ce7"
+      },
+      {
+        "bytes": 563979,
+        "diff_id": "sha256:3eb0ec374a4018a16ac55bd2b4635e4b182b92a0a9ebef1aca19aafd4391756f",
+        "digest": "sha256:087d068a1e364b8f4edfc0453d43ebfd73fe90ecffe546507f44c09c1e6b3b28"
+      },
+      {
+        "bytes": 3395003,
+        "diff_id": "sha256:bc4fdd463e33becfc0b4dae6d294d9fcc48585f20d79d0e6846f1b139045ddd8",
+        "digest": "sha256:3d1682332988226e3cd5745848eba0aa4247ad6585c18f679ee14599d05df391"
+      },
+      {
+        "bytes": 2175855,
+        "diff_id": "sha256:3fe25ff29f9e47d2e94233105d683feace320c67e28824c9d3934096e3f34d2b",
+        "digest": "sha256:f99f2daf305e243fe259cd140401950112c33e06b0a0a064427947fab786edcc"
+      },
+      {
+        "bytes": 35250288,
+        "diff_id": "sha256:3c2f9236a48dd0f98fa3976d27338f0eccf129ffc6c81df4d88b11c1c41a76b5",
+        "digest": "sha256:3a37aef312ef9f92f84c7cb43c4542ba273a8e487bed4f28a1fa17d5487c7c1d"
+      },
+      {
+        "bytes": 20795411,
+        "diff_id": "sha256:bc19ce6822d49d388c91504a03e8664db86ee5e56c61ef664487906bc16787db",
+        "digest": "sha256:022ba2653c1ee0a21164ffc571fa69d4c694240d99ad25514f8a92edfe5e5183"
+      },
+      {
+        "bytes": 32,
+        "diff_id": "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+        "digest": "sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1"
+      }
+    ],
+    "manifest_reference": "localhost/invarlock-modelkit-gguf@sha256:de52a76a677adb92d2c8f96c142c2b9ac4876222f06aebffffd603686f66bc1b",
+    "podman_execution_id": "sha256:6039290c3581efc3239f1f6c553427a748b41fda547be2fac37339019a4c057c",
+    "raw_transport_record_sha256": "69b48522e412e6280bc770610bcba9c4db8604ac2d171d39e80be86380e7240e",
+    "recorded_checks": {
+      "docker_podman_configurations_and_layers_identical": true,
+      "fresh_inspections_before_delivered_model_load": true,
+      "manifest_addressed_podman_reference_resolved": true,
+      "source_manifest_configuration_and_all_layers_authenticated": true
+    },
+    "rootfs_diff_ids": [
+      "sha256:188c9b34dfbe022075d01fc4f5a305412909ef97de440783c15043e68e1b1913",
+      "sha256:1c107a897b02ca7ece069bfef2339f4e02f95f12dbb025da7305fcbe2b626f34",
+      "sha256:481070cf8ce5b1834cf16a80eec044aced637a96ef8cd1e3c193947e2ff5cbd9",
+      "sha256:addf8d91bd2117a572c640e2bd2e0d15c7adf862773498ca0aea234b7a32528e",
+      "sha256:c2ea5642fb5060f6ade884870a0f6a1349970b094c013bc4d788964bc9f82fcb",
+      "sha256:76af615f12061e60e35270bcf3e4a23e73ae2e349ee9877dc6bca7a74725db9f",
+      "sha256:3eb0ec374a4018a16ac55bd2b4635e4b182b92a0a9ebef1aca19aafd4391756f",
+      "sha256:bc4fdd463e33becfc0b4dae6d294d9fcc48585f20d79d0e6846f1b139045ddd8",
+      "sha256:3fe25ff29f9e47d2e94233105d683feace320c67e28824c9d3934096e3f34d2b",
+      "sha256:3c2f9236a48dd0f98fa3976d27338f0eccf129ffc6c81df4d88b11c1c41a76b5",
+      "sha256:bc19ce6822d49d388c91504a03e8664db86ee5e56c61ef664487906bc16787db",
+      "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef"
+    ],
+    "scope": "Same image configuration and filesystem layers; engine-specific immutable identity retained",
+    "source_commit": "59d9bbc048d1fe10083e912b32912445cb7bb974",
+    "source_execution_id": "sha256:de52a76a677adb92d2c8f96c142c2b9ac4876222f06aebffffd603686f66bc1b",
+    "source_id_kind": "manifest"
+  },
+  "models": {
+    "baseline": {
+      "bytes": 14484732000,
+      "conversion_reproduced_exactly": true,
+      "name": "Mistral-7B-v0.1 BF16 GGUF",
+      "repository": "mistralai/Mistral-7B-v0.1",
+      "revision": "27d67f1b5f57dc0953326b2601d68371d40ea8da",
+      "sha256": "9c35a363920c201c1eeffa8354b6bbd527131ebe9af98603b0836ba1d6b46e54"
+    },
+    "lineage_limit": "Publisher identifies Mistral-7B-v0.1 as source; external quantization process is not attested.",
+    "subject": {
+      "bytes": 4368438912,
+      "file": "mistral-7b-v0.1.Q4_K_M.gguf",
+      "repository": "TheBloke/Mistral-7B-v0.1-GGUF",
+      "revision": "d4ae605152c8de0d6570cf624c083fa57dd0d551",
+      "sha256": "ce6253d2e91adea0c35924b38411b0434fa18fcb90c52980ce68187dbcbbe40c"
+    }
+  },
+  "policy": {
+    "resolved_policy": {
+      "metrics": {
+        "exact_match": {
+          "delta_min_pp": -2.0,
+          "maximum_interval_width_pp": 20.0,
+          "minimum_record_count": 128
+        }
+      }
+    }
+  },
+  "render": {
+    "evidence_unchanged": true,
+    "html_sha256": "703b4f55821ae2cca5aa82ca4b979460e3aa2a9e50b93b0b7383a149f99a820e",
+    "markdown_sha256": "798238f57d5d8694c7c5e0cc5c145dd5af5578d95ba558ee1a33cf27dd74cbb2",
+    "render_environment": "source checkout",
+    "renderer_source": "7d52f3d076c15898dfd7489d9928d29c8997139e"
+  },
+  "result": {
+    "baseline": {
+      "mean_score": 0.734375
+    },
+    "comparison": {
+      "kind": "exact_match_delta_pp",
+      "minimum": -2.0,
+      "value": -0.78125
+    },
+    "comparison_id": "comparison-ce6a526bd381400914497f6753311853",
+    "format": "invarlock/comparison-report-v3",
+    "metric": "exact_match",
+    "paired_binary": {
+      "baseline_fail_subject_pass": 1,
+      "baseline_pass_subject_fail": 2,
+      "both_fail": 33,
+      "both_pass": 92,
+      "discordant_pairs": 3,
+      "effect_size_confidence_interval": {
+        "confidence_level": 0.95,
+        "lower_pp": -4.103358977439544,
+        "method": "newcombe_hybrid_score_paired_v2",
+        "upper_pp": 2.496798091086728
+      },
+      "effect_size_pp": -0.78125,
+      "mcnemar_exact_two_sided_p_value": 1.0
+    },
+    "policy_digest": "sha256:0146dae121af096268aaf0ee7a38979621ebc7694f89c86292b8ace09dcc3a97",
+    "record_count": 128,
+    "sample_qualification": {
+      "interval_width": {
+        "maximum": 20.0,
+        "observed": 6.600157068526272,
+        "passed": true,
+        "unit": "percentage_points"
+      },
+      "passed": true,
+      "record_count": {
+        "minimum": 128,
+        "observed": 128,
+        "passed": true
+      }
+    },
+    "subject": {
+      "mean_score": 0.7265625
+    },
+    "uncertainty": {
+      "interval_mass": 0.95,
+      "lower": -4.103358977439544,
+      "method": "newcombe_hybrid_score_paired_v2",
+      "scope": "paired_binary_outcomes",
+      "upper": 2.496798091086728
+    },
+    "verdict": "fail"
+  },
+  "retained_attempts": [
+    {
+      "file": "earlier-attempts/canonical-preflight.json",
+      "sha256": "faadd762cd51f8977d9f58d1a51e3a787944a9b74addaeefd2d3df60f2626a65"
+    },
+    {
+      "file": "earlier-attempts/local-native-evaluate.json",
+      "sha256": "120ec2f9092cf9452ac8370a13e50a3192d207af2bd73e873c504c723f968d8f"
+    },
+    {
+      "file": "earlier-attempts/local-native-status.json",
+      "sha256": "ebc6e97d713a5588ab83dac6453f95f2d7afffae30e98b6c2d7b60c89900028f"
+    },
+    {
+      "file": "earlier-attempts/receipt-postprocessing.json",
+      "sha256": "54dd711cdbfb0ef91fba010f6ca7323dcd42c83ff587daf0d48409700ef1c0d8"
+    },
+    {
+      "file": "earlier-attempts/receipt-replay-diagnosis.json",
+      "sha256": "a1faed8890b24a0f048faf4ab6bfe7bf389dddc5079a2c2283fa75118d736d55"
+    }
+  ],
+  "scope": "Historical native comparison plus observed real package delivery; policy rejection preserved",
+  "technical_anchors": {
+    "artifact_digests": {
+      "baseline": "sha256:c75775bf99bdb446b21c4e58e3ce005bf77ae77f3ab8a50cdc07f8a996c48e64",
+      "subject": "sha256:bc021c6963f9c876fe4bc13d97757d87dfd44d6b0c4907eaa9bcce083eb2fa44"
+    },
+    "evidence_signer_fingerprint": "sha256:5efd93380192003afc02362e5cc244b1108fb24f4c227637c2c626929e34b8d1",
+    "request_digest": "sha256:0ed1e691f65f03d010f01dc4fce7feb5cd5e8ffd05b7ecf6cd1da6f989f2681c",
+    "runtime_digests": {
+      "baseline": "sha256:de52a76a677adb92d2c8f96c142c2b9ac4876222f06aebffffd603686f66bc1b",
+      "subject": "sha256:de52a76a677adb92d2c8f96c142c2b9ac4876222f06aebffffd603686f66bc1b"
+    },
+    "schedule_digest": "sha256:1237faa42048f2d5c21bd9c7d7e72c25059747a181dd837de56fcd399dd82881"
+  },
+  "timestamp_recovery": {
+    "evaluation_completed_at": "2026-09-20T00:19:45.065675+00:00",
+    "evaluation_completion_time_source": "Original evaluate command log filesystem timestamp, written immediately after subprocess return",
+    "receipt_sha256": "b590536c20508d4c5c67b131cd236ea880260bf01402ac5672ab4635b7859c5b",
+    "trust_profile_digest": "sha256:28f61c68bd5b7f42073b7078933e8dcc169ba642cd4b8e49aab9c8d0ff374265"
+  },
+  "timings": {
+    "independent_image_preparation_seconds": 4.341614617998857,
+    "native_capture_seconds": 7072.457766068,
+    "podman_recipient_and_smoke_seconds": 166.29979909400026,
+    "real_kit_with_docker_smoke_seconds": 1171.634804248999,
+    "recipient_checks_seconds": {
+      "altered-evidence-request": 143.38895994900122,
+      "before-inference": 142.36980554899856,
+      "candidate-changed": 96.64354979400014,
+      "missing-package": 97.21673036600077,
+      "recipient-decision": 142.29127873699872,
+      "repacked": 144.94818495899926,
+      "revoked-signer": 142.9189687170001,
+      "wrong-runtime": 143.14385046400093
+    }
+  },
+  "verifier": {
+    "identity": "modelkit-reference-verifier",
+    "signing_key_fingerprint": "sha256:015fe76688a62f3ff40491b835a9c46907224bbe0a3ddaaf07fdb3e7de8e4fcc",
+    "trust_profile_digest": "sha256:28f61c68bd5b7f42073b7078933e8dcc169ba642cd4b8e49aab9c8d0ff374265"
+  }
+}

@@ -12,6 +12,18 @@ answers supported by supplied context; extraction concerns requested slot
 values. The 480 ratings come from only 80 cases across both workflows, so the
 rating count should not be read as the independent sample size.
 
+The answers compare the same K2 32B checkpoint with and without an added
+system instruction for exact task and output-format compliance. See the
+[completed prompt comparison](../k2-32b-luna-xhigh-heldout/README.md#task-and-proposed-change)
+for the change and its larger, separately collected result.
+
+This pilot tests the judging workflow and rubric on a small frozen schedule.
+Its policy is advisory, allows degradation of 1 across the entire 0–1 rubric
+scale, and sets no absolute subject-score floor. Those choices do not form a
+production release gate. The useful decision here is that complete ratings
+still do not meet the declared precision requirement. Keep this outcome when
+planning a separate study with requirements suited to the intended use.
+
 ## What is retained
 
 [reference.zip](reference.zip) is a deterministic archive with sorted members,

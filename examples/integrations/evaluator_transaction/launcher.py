@@ -32,6 +32,7 @@ if str(REPOSITORY) not in sys.path:
 try:
     from examples.integrations.evaluator_transaction.image_cleanup import (
         OwnedImageTag,
+        normalize_image_id,
         record_owned_image_tag,
         remove_owned_image_tags,
         temporary_image_tag,
@@ -41,6 +42,7 @@ except ModuleNotFoundError as exc:  # pragma: no cover - flat-script compatibili
         raise
     from evaluator_transaction.image_cleanup import (  # type: ignore[no-redef]
         OwnedImageTag,
+        normalize_image_id,
         record_owned_image_tag,
         remove_owned_image_tags,
         temporary_image_tag,
@@ -273,7 +275,7 @@ def _build_image(
     inspected_id = run(
         [engine, "image", "inspect", "--format", "{{.Id}}", image_id], cwd=repository
     )
-    if inspected_id != image_id:
+    if normalize_image_id(inspected_id) != image_id:
         raise RuntimeError("evaluator image identity file disagrees with inspection")
     embedded_base = run(
         [

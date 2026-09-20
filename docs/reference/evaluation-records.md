@@ -59,7 +59,7 @@ including provenance and all records, not just its model or schedule. Do not
 substitute a raw export checksum for a complete-run pin.
 
 `load_run` supports `invarlock`, `jsonl`, `inspect-json`, `lm-eval-samples`, and
-`promptfoo-jsonl`. These adapters normalize recorded outputs, never register a
+`promptfoo-jsonl`, and `langfuse-json`. These adapters normalize recorded outputs, never register a
 runtime provider or import execution authority. Original upstream bytes and
 their `source_digest` remain unchanged. A canonical `invarlock` run supplies its
 own metadata; external adapters require explicit source, run ID and artifact
@@ -68,6 +68,23 @@ are used. External captured request sources accept `artifact_digest: null`
 with the complete `service_identity` descriptor. Canonical `adapter: invarlock`
 runs carry their own descriptor and reject source identity overrides. The
 external parser also binds the original file bytes through `source_digest`.
+
+## Langfuse experiments
+
+`langfuse-json` imports the explicit `invarlock/langfuse-export-v1` capture
+produced from a Langfuse Python experiment. It does not parse arbitrary dashboard
+exports. The maintained exporter uses `langfuse==4.14.1`; the installed parser,
+verification and reporting need no Langfuse SDK, account or network access.
+
+Preserve a stable item ID and the complete independently selected case list.
+The exporter rejects missing or duplicate results instead of accepting only
+successful tasks. Structured inputs require an explicit text projection for
+judge scoring. Exact match needs original answers and references; NLL requires
+explicit continuation measurements; judging requires a recipe and complete
+judge measurements. Numeric Langfuse scores alone do not establish those facts.
+
+Follow the [Langfuse handoff example](https://github.com/invarlock/invarlock/blob/main/examples/integrations/langfuse/README.md)
+for capture, source identities, failed records and scorer-specific requirements.
 
 ## Hosted service identity
 

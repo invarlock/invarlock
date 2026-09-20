@@ -57,6 +57,14 @@ def test_pip_cache_tracks_each_jobs_installed_locks(path: Path) -> None:
                         "requirements/workflows/pip-bootstrap.txt",
                     )
                 )
+            if "langfuse-sdk-test" in commands.split():
+                installed.update(
+                    (
+                        f"requirements/workflows/langfuse-sdk-tests-py{tag}.txt",
+                        f"requirements/workflows/release-install-py{tag}.txt",
+                        "requirements/workflows/pip-bootstrap.txt",
+                    )
+                )
             cached = options.get("cache-dependency-path", "").splitlines()
             assert installed, (path.name, name)
             assert set(cached) == installed, (path.name, name)

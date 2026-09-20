@@ -312,6 +312,7 @@ def _record(name, runtime, command, result, **observations):
     root.mkdir(parents=True, exist_ok=True)
     payload = {
         "case": name,
+        "engine_name": runtime.engine,
         "image_id": runtime.baseline.image_digest,
         "source_commit": os.environ.get("RUNTIME_SOURCE_COMMIT"),
         "source_bundle_sha256": os.environ.get("RUNTIME_SOURCE_BUNDLE_SHA256"),

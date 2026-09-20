@@ -12,10 +12,20 @@ from pathlib import Path
 
 try:
     from examples.integrations.bounded_command import run_bounded_command
+    from examples.integrations.evaluator_transaction.image_cleanup import (
+        OwnedImageTag,
+        normalize_image_id,
+        remove_owned_image_tags,
+    )
 except ModuleNotFoundError as exc:  # pragma: no cover - flat-script compatibility
     if not exc.name or not exc.name.startswith("examples"):
         raise
     from bounded_command import run_bounded_command  # type: ignore[no-redef]
+    from evaluator_transaction.image_cleanup import (  # type: ignore[no-redef]
+        OwnedImageTag,
+        normalize_image_id,
+        remove_owned_image_tags,
+    )
 
 _COMMAND_TIMEOUT_SECONDS = 10 * 60
 _COMMAND_OUTPUT_LIMIT = 4 * 1024 * 1024
@@ -84,6 +94,7 @@ def published_local_image(
     volume_created = False
     container_created = False
     published_tag: str | None = None
+    owned_image_tag: OwnedImageTag | None = None
     try:
         created_volume = _run(
             [container_engine, "volume", "create", volume],
@@ -136,6 +147,7 @@ def published_local_image(
             f"{endpoint}/{repository_name}:{image_digest.removeprefix('sha256:')[:12]}"
         )
         _run([container_engine, "image", "tag", image, published_tag], cwd=repository)
+        owned_image_tag = OwnedImageTag(published_tag, image_digest)
         push = [container_engine, "push"]
         if container_engine == "podman":
             push.append("--tls-verify=false")
@@ -154,7 +166,7 @@ def published_local_image(
             capture_output=True,
         ).stdout.strip()
         observed_id, separator, raw_digests = inspected.partition(" ")
-        if not separator or observed_id != image_digest:
+        if not separator or normalize_image_id(observed_id) != image_digest:
             raise RuntimeError("published registry image changed identity")
         try:
             digests = json.loads(raw_digests)
@@ -174,10 +186,18 @@ def published_local_image(
             raise RuntimeError("published registry image lacks one canonical digest")
         yield candidates[0]
     finally:
-        if published_tag is not None:
-            _cleanup_command(
-                [container_engine, "image", "remove", published_tag], cwd=repository
-            )
+        if owned_image_tag is not None:
+            try:
+                remove_owned_image_tags(
+                    lambda command, *, cwd: (
+                        _run(command, cwd=cwd, capture_output=True).stdout
+                    ),
+                    container_engine,
+                    repository,
+                    [owned_image_tag],
+                )
+            except (OSError, RuntimeError):
+                pass
         if container_created:
             _cleanup_command(
                 [container_engine, "container", "rm", "--force", container],

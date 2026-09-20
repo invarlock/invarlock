@@ -137,7 +137,8 @@
             "jsonl",
             "inspect-json",
             "lm-eval-samples",
-            "promptfoo-jsonl"
+            "promptfoo-jsonl",
+            "langfuse-json"
           ]
         },
         "run_digest": {

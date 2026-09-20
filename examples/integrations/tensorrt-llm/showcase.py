@@ -12,7 +12,7 @@ import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from huggingface_hub import snapshot_download
 from transformers import AutoTokenizer
@@ -23,6 +23,7 @@ from examples.integrations.trust_material import (
     load_external_key,
     validate_new_trust_root,
 )
+from invarlock.evaluation_oci import ContainerEngine, _gpu_arguments
 from invarlock.evidence_pack_contract import canonical_json_bytes
 
 _MODEL = (
@@ -96,7 +97,9 @@ def _container_build(
     image: str,
     container_engine: str,
 ) -> None:
-    if not device.isdigit():
+    if container_engine not in {"docker", "podman"}:
+        raise ValueError("container engine must be docker or podman")
+    if not device.isascii() or not device.isdigit():
         raise ValueError("GPU device indices must be nonnegative integers")
     destination = paths.resources / f"{role}-engine"
     if os.path.lexists(destination):
@@ -114,14 +117,18 @@ def _container_build(
         os.chown(role_work, runtime_uid, runtime_gid)
     runtime_identity = str(runtime_uid)
     runtime_user = f"{runtime_uid}:{runtime_gid}"
+    # Generated engines move to resources for later containers to read.
+    # Share their container label; never relabel caller-owned inputs.
+    work_mount = f"type=bind,src={role_work},dst=/work"
+    if container_engine == "podman":
+        work_mount += ",relabel=shared"
     command = [
         container_engine,
         "run",
         "--rm",
         "--network",
         "none",
-        "--gpus",
-        f"device={device}",
+        *_gpu_arguments(cast(ContainerEngine, container_engine), f"cuda:{device}"),
         "--pull=never",
         "--cap-drop=ALL",
         "--security-opt",
@@ -143,7 +150,7 @@ def _container_build(
         "--mount",
         f"type=bind,src={paths.models / 'qwen3-0.6b'},dst=/model,readonly",
         "--mount",
-        f"type=bind,src={role_work},dst=/work",
+        work_mount,
         "--mount",
         f"type=bind,src={helper},dst=/example/prepare.py,readonly",
         "--mount",
@@ -163,6 +170,9 @@ def _container_build(
         "--quantization",
         _VARIANTS[role],
     ]
+    if container_engine == "podman" and os.geteuid() != 0:
+        # Keep the caller-owned private work mount writable under rootless Podman.
+        command.insert(2, "--userns=keep-id")
     if role == "subject":
         records = Path(__file__).with_name("records.json").resolve(strict=True)
         command[command.index("--entrypoint") : command.index("--entrypoint")] = [
@@ -255,6 +265,8 @@ def _run_transaction(
     command = [
         sys.executable,
         str(Path(__file__).with_name("run.py")),
+        "--container-engine",
+        container_engine,
         "--runtime-image",
         image,
         "--resource-root",
@@ -288,7 +300,11 @@ def _run_transaction(
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workspace", type=Path)
-    parser.add_argument("--container-engine", choices=("docker",), default="docker")
+    parser.add_argument(
+        "--container-engine",
+        choices=("docker", "podman"),
+        default=os.environ.get("INVARLOCK_CONTAINER_ENGINE", "docker"),
+    )
     parser.add_argument("--baseline-device", default="0")
     parser.add_argument("--subject-device", default="1")
     parser.add_argument("--evidence-signing-key", type=Path)
@@ -296,6 +312,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--trust-root", type=Path)
     arguments = parser.parse_args(argv)
     try:
+        if arguments.container_engine not in {"docker", "podman"}:
+            raise ValueError("container engine must be docker or podman")
         if arguments.baseline_device == arguments.subject_device:
             raise ValueError("the showcase requires two distinct GPU indices")
         _require_committed_checkout(Path(__file__).resolve().parents[3])

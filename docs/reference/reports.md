@@ -29,6 +29,103 @@ HTML reports use a light palette regardless of the browser or operating system
 color preference, keeping the transition from the website consistent. Reports
 have no theme control or stored theme preference. Printing also uses light colors.
 
+## Reading a report for a release review
+
+The heading names the recorded policy result; the opening explains what led
+to it before the chart. A passing description identifies the satisfied interval
+requirements instead of repeating the heading. A failed bound can mean the observed
+change exceeded the allowance or that uncertainty prevented establishing the
+required result. Too few records, a wide interval or an unmet absolute score
+requirement can also prevent a pass. Judge reports distinguish adverse results
+from insufficient evidence; advisory results do not authorize a required gate.
+A multi-metric opening summarizes all scopes and explains an adverse or
+unresolved result without ranking unlike metrics by their numeric values.
+Combined evidence reports name both required component outcomes. Advisory
+judge reports identify their advisory role in the title and at the start of
+the explanation. Browser-tab titles include the recorded outcome.
+
+These are explanations of the retained decision, not additional verdicts.
+The report states which checks it performed; some report workflows authenticate
+retained records without replaying the comparison. Independent recipient
+verification remains a separate step. A captured report that records a pass
+while an available displayed requirement fails is rejected as inconsistent;
+this check does not replay scoring.
+
+Then check **What was compared**: confirm the baseline, subject, task and recorded
+configuration change. The report distinguishes model-artifact identity from a
+hosted service's reported identity, and native execution from imported records.
+Matching displayed previews do not establish equality of complete configurations.
+
+Then read **Results and requirements**. Exact-match values are accuracies; NLL
+values are nats per UTF-8 byte and a subject-to-baseline ratio; judge values are
+normalized rubric scores, not percentages of correct answers. Judge case counts,
+repeated ratings and independent units are distinct. The interval and configured
+checks determine the policy result, not the point estimate alone.
+
+| Reader | Use the report to | Keep with the handoff |
+| --- | --- | --- |
+| Evaluation engineer | Identify the changed inputs, affected metrics, missing results and unmet checks. | Original evidence, capture configuration and the example's reproduction commands. |
+| Customer or internal reviewer | Check the comparison against the expected candidate and agreed requirements. | Independently approved verification inputs and the resulting signed receipt. |
+| Release owner | See which requirements passed, failed or remain unresolved. | The intended workload, rationale for the thresholds and the organization's release decision. |
+| Integration partner | Connect the compared model artifact to the package being delivered. | The ModelKit mapping, recipient-owned artifact and package expectations, and the separate delivery-check result. |
+
+A policy can correctly pass a comparison whose absolute quality is unsuitable
+for an application. Confirm that the declared requirements cover that workload,
+including an absolute quality minimum when needed. The report displays the
+recorded requirements; it does not infer a business justification for them.
+
+Use **Evidence details** for retained identities and exact values. Judge reports
+can show selected retained cases with `report --case-id`; native and captured
+reports do not provide a universal per-case debugging interface. Their source
+records remain in the evidence bundle. A useful example pairs its report with
+instructions for finding those records and replaying the comparison.
+
+**What was checked** states the operations actually performed by reporting.
+Recipient verification and organizational release approval are separate steps.
+Verifying an old package does not measure the current model or service again.
+
+Metric and scope headings use readable labels for identifier-style names, such
+as `grounded_qa-judge-quality` becoming **Grounded QA judge quality**. The original
+identifiers for these formatted labels remain in **Recorded metric and scope
+identifiers**. Display formatting does not change grouping, verification inputs
+or existing JUnit identifiers.
+
+## Where the interval comes from
+
+**How this interval was calculated** explains the retained method and sample
+structure beside the chart. The marker is the observed comparison; the bar spans
+the recorded interval. A lower-bound requirement tests the left endpoint against
+the minimum, while an upper-bound requirement tests the right endpoint against
+the maximum. Other configured checks, such as completeness, sample count and
+precision, still apply.
+
+- **Exact match:** Baseline and subject answer the same cases. The Newcombe
+  hybrid score method uses paired successes and failures for a nominal 95%
+  confidence interval on their accuracy difference. Native reports also show the
+  four paired outcome counts. A change of 2 percentage points means, for example,
+  70% to 72% accuracy; it is not a 2% relative change. The confidence level is not
+  an answer-correctness rate or the fraction of model runs that exceed the
+  policy limit. The observed change can be within the allowance while its
+  interval fails the bound requirement; this does not establish a loss larger
+  than that allowance.
+- **NLL and other resampled scores:** The declared percentile method resamples
+  paired records together within the fixed schedule. Native reports retain
+  2,048 resamples; captured reports show their recorded count. The interval
+  describes the central recorded proportion of the resampling distribution for
+  the mean ratio or score change. It is not a population confidence interval.
+- **Judge scores:** Repeated ratings are averaged within cases, then cases within
+  declared independent units; units have equal weight. Two-sided Hoeffding bounds
+  use the bounded rating scale and independent-unit count. The report shows the
+  actual alpha error budget and its allocation across the declared comparison
+  family. More repetitions do not add independent units. Changes use normalized
+  rubric score points, not accuracy percentage points.
+
+These methods do not establish that the selected cases represent production
+traffic. A worse observed score describes the measured run. A policy rejection
+alone does not establish worse performance beyond those cases; an interval may
+simply fail to rule out a decline larger than the allowed margin. Reporting
+explains the recorded decision without recalculating it from rounded chart values.
+
 ## Runtime-side report
 
 Each side has an `invarlock/runtime-side-report-v1` object:

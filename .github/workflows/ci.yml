@@ -81,6 +81,7 @@ jobs:
           cache-dependency-path: |
             requirements/workflows/ci-hf-py313.txt
             requirements/workflows/inspect-judge-tests-py313.txt
+            requirements/workflows/langfuse-sdk-tests-py313.txt
             requirements/workflows/pip-bootstrap.txt
             requirements/workflows/release-install-py313.txt
             requirements/workflows/release-options-py313.txt
@@ -120,7 +121,7 @@ jobs:
       - name: Check full-capacity signed verification
         run: python -m pytest -q 'tests/evaluation_comparison/test_capacity.py::test_full_capacity_signed_independent_recipient[50000]'
       - name: Build, install, and validate distributions
-        run: make install-smoke inspect-judge-sdk-test
+        run: make install-smoke inspect-judge-sdk-test langfuse-sdk-test
       - name: Lint workflows
         run: |
           gopath="$(go env GOPATH)"
@@ -146,6 +147,7 @@ jobs:
           cache-dependency-path: |
             requirements/workflows/ci-hf-py312.txt
             requirements/workflows/inspect-judge-tests-py312.txt
+            requirements/workflows/langfuse-sdk-tests-py312.txt
             requirements/workflows/pip-bootstrap.txt
             requirements/workflows/release-install-py312.txt
             requirements/workflows/release-options-py312.txt
@@ -164,7 +166,7 @@ jobs:
       - name: Check command surface
         run: make cli-smoke-core
       - name: Build, install, and validate distributions
-        run: make install-smoke inspect-judge-sdk-test
+        run: make install-smoke inspect-judge-sdk-test langfuse-sdk-test
 
   coverage-tests:
     if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.full) }}
@@ -189,6 +191,7 @@ jobs:
           cache-dependency-path: |
             requirements/workflows/ci-hf-py313.txt
             requirements/workflows/inspect-judge-tests-py313.txt
+            requirements/workflows/langfuse-sdk-tests-py313.txt
       - name: Install dependencies
         run: |
           python scripts/security/build_hardened_accelerate_wheel.py bootstrap
@@ -200,8 +203,14 @@ jobs:
         run: |
           python -m pip install --require-hashes -r requirements/workflows/inspect-judge-tests-py313.txt
           python -m pip check
+      - name: Install examples coverage SDK dependencies
+        if: ${{ matrix.shard == 'examples' }}
+        run: |
+          python -m pip install --require-hashes -r requirements/workflows/langfuse-sdk-tests-py313.txt
+          python -m pip check
       - name: Collect disjoint test coverage
         env:
+          INVARLOCK_REQUIRE_LANGFUSE_SDK: ${{ matrix.shard == 'examples' && '1' || '0' }}
           INVARLOCK_REQUIRE_INSPECT_SDK: ${{ matrix.shard == 'runtime' && '1' || '0' }}
         run: make coverage-collect-${{ matrix.shard }} PYTEST_WORKERS=2
       - name: Retain coverage and test timings
@@ -279,6 +288,7 @@ jobs:
             requirements/workflows/ci-hf-py313.txt
             requirements/workflows/docs-ci-py313.txt
             requirements/workflows/inspect-judge-tests-py313.txt
+            requirements/workflows/langfuse-sdk-tests-py313.txt
             requirements/workflows/pip-bootstrap.txt
             requirements/workflows/release-install-py313.txt
             requirements/workflows/release-options-py313.txt
@@ -308,9 +318,14 @@ jobs:
         run: |
           python -m pip install --require-hashes -r requirements/workflows/inspect-judge-tests-py313.txt
           python -m pip check
+      - name: Install examples coverage SDK dependencies
+        run: |
+          python -m pip install --require-hashes -r requirements/workflows/langfuse-sdk-tests-py313.txt
+          python -m pip check
       - name: Run complete repository gates
         env:
           INVARLOCK_REQUIRE_INSPECT_SDK: "1"
+          INVARLOCK_REQUIRE_LANGFUSE_SDK: "1"
         run: make verify
       - name: Lint workflows
         run: |
@@ -318,7 +333,7 @@ jobs:
           export PATH="${gopath}/bin:$PATH"
           make workflow-lint
       - name: Build, install, and validate distributions
-        run: make install-smoke inspect-judge-sdk-test
+        run: make install-smoke inspect-judge-sdk-test langfuse-sdk-test
 
   supply-chain:
     if: ${{ startsWith(github.ref, 'refs/tags/') }}

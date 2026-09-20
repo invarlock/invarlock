@@ -1061,8 +1061,9 @@ def test_complete_rejects_changed_prepared_identity(
         )
 
 
+@pytest.mark.parametrize("inspection_prefix", ["sha256:", ""])
 def test_launcher_runs_workers_in_restricted_inspected_image(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, inspection_prefix: str
 ) -> None:
     module = _launcher_module()
     from examples.integrations import launch as shared_launch
@@ -1151,10 +1152,12 @@ def test_launcher_runs_workers_in_restricted_inspected_image(
                     base_config if command[-1] == base_id else child_config
                 )
             if command[4] == "{{.Id}}" and not command[-1].startswith("sha256:"):
-                return base_id if "example-runtime" in command[-1] else final_id
+                return inspection_prefix + (
+                    base_id if "example-runtime" in command[-1] else final_id
+                ).removeprefix("sha256:")
             if "org.invarlock.example.base-image-id" in " ".join(command):
                 return base_id
-            return final_id
+            return inspection_prefix + final_id.removeprefix("sha256:")
         if "model_inputs.py" in " ".join(command):
             prepared = tmp_path / "journey/prepared"
             for role in ("baseline", "subject"):

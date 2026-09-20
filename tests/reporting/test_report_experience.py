@@ -93,7 +93,7 @@ def test_missing_count_is_not_observed_count_and_preview_stays_bounded():
     view = _view(pack_json(value, "report"), value)
     metric = view.metrics[0]
     assert metric.count == "0"
-    assert "More evidence is needed" in metric.explanation
+    assert "missing a baseline or subject result" in metric.explanation
     assert "The policy was not met" not in metric.explanation
     assert "0 metric / scope results did not meet" not in view.summary
     assert metric.baseline == metric.candidate == "Unavailable"
@@ -129,7 +129,7 @@ def test_improving_candidate_below_floor_is_not_explained_as_deterioration():
     assert checks["Subject minimum"].observed == "87.5%"
     assert checks["Subject minimum"].required == ">= 90%"
     assert checks["Subject minimum"].passed is False
-    assert "Subject minimum" in metric.explanation
+    assert "observed score is below the required minimum" in metric.explanation
     assert "deteriorat" not in metric.explanation.lower()
 
 

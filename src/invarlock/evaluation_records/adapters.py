@@ -16,7 +16,14 @@ from invarlock.evaluation_record_contracts.contracts import (
 from invarlock.evaluator_capture import capture_evaluator_run
 from invarlock.evidence_pack_json import parse_json_bytes
 
-ADAPTERS = ("invarlock", "jsonl", "inspect-json", "lm-eval-samples", "promptfoo-jsonl")
+ADAPTERS = (
+    "invarlock",
+    "jsonl",
+    "inspect-json",
+    "lm-eval-samples",
+    "promptfoo-jsonl",
+    "langfuse-json",
+)
 
 
 def _rows(value: Any, label: str) -> list[dict[str, Any]]:
@@ -342,7 +349,12 @@ def _parse_run_bytes(
                         "canonical run identities cannot be overridden at import"
                     )
                 return cast(dict[str, Any], value)
-            records = _inspect(value)
+            if adapter == "langfuse-json":
+                from invarlock.evaluation_records.langfuse import parse_langfuse_export
+
+                records = parse_langfuse_export(value, source=source, run_id=run_id)
+            else:
+                records = _inspect(value)
         if (
             source is None
             or run_id is None
