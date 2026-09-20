@@ -159,6 +159,8 @@ def _image_metadata(
         )
     payload = _inspect_payload(completed.stdout)
     identity = payload.get("Id", payload.get("id"))
+    if isinstance(identity, str) and re.fullmatch(r"[0-9a-f]{64}", identity):
+        identity = "sha256:" + identity
     if not isinstance(identity, str) or _DIGEST.fullmatch(identity) is None:
         raise SystemExit("container image inspection is missing its image identity")
     build_identities = {identity}

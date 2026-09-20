@@ -29,7 +29,7 @@ their declared exact-match profiles; they are not evidence for every new metric.
 ## Capture for exact match, likelihood and judge scoring
 
 The installed `load_run` parsers support canonical JSON, generic JSONL,
-`inspect-json`, `lm-eval-samples` and `promptfoo-jsonl`. Other workflows can map
+`inspect-json`, `lm-eval-samples`, `promptfoo-jsonl` and `langfuse-json`. Other workflows can map
 original per-case facts through `invarlock.engine.capture_evaluator_run` and
 inspect `evaluator_input_capabilities`. These are captured-input interfaces,
 separate from qualification and the example-owned signed OCI bridges.

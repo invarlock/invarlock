@@ -1,0 +1,215 @@
+{
+  "format": "invarlock/langfuse-reference-v1",
+  "sdk_version": "4.14.1",
+  "execution": "offline Langfuse SDK experiments replaying retained model measurements; no new model or judge calls",
+  "sources": {
+    "exact_match-baseline.json": {
+      "path": "examples/hosted-service/references/mistral-7b-http/evidence/records/baseline.json",
+      "sha256": "sha256:4bb9fc6111f6448a9af2d57b512c7ec47dade8676a8e49319eccc3a02680a1ef"
+    },
+    "exact_match-subject.json": {
+      "path": "examples/hosted-service/references/mistral-7b-http/evidence/records/subject.json",
+      "sha256": "sha256:bab9cb53705840bd91ee67c4fbdbe9d599967ac9dca9d09c18a6820660ef7679"
+    },
+    "normalized_nll-baseline.json": {
+      "path": "examples/captured-results/references/mistral-7b-likelihood/evidence/records/baseline.json",
+      "sha256": "sha256:257b27bea9017e8ff6a422ccbbc752ba783b253e719a5aedfe4ca467ff5c2b4d"
+    },
+    "normalized_nll-subject.json": {
+      "path": "examples/captured-results/references/mistral-7b-likelihood/evidence/records/subject.json",
+      "sha256": "sha256:8f6b8a296f01ae50bb31f4ae956ad2e085e0f15118a18af661c3675538bcad12"
+    }
+  },
+  "exports": {
+    "exact_match-baseline.json": {
+      "run_id": "retained-mistral-7b-exact_match-baseline - 2026-09-19T20:12:23.618576Z",
+      "record_count": 400,
+      "sha256": "sha256:3f194c9aefa998985ae69e5928fd5a706e1e774624170bcfd61cd1bfb478a1c7",
+      "artifact_digest": null,
+      "service_identity": {
+        "configuration": {
+          "endpoint": "http://127.0.0.1:63521/v1/chat/completions",
+          "environment": {
+            "checkpoint_loading_source_digest": "sha256:4cc9ef6047ade6b6c7f0ba326700e82c804e29d7b14d6f79d144a11d02964e9c",
+            "earlier_engineering_attempt": {
+              "baseline_capture_sha256": "sha256:978378eb3cf9208b06e80eb44cfa36769dc6d6177028c56422cc18e3fddb643e",
+              "call_count": 400,
+              "case_policy_and_model_settings_changed": false,
+              "protocol_sha256": "sha256:25c0e9362d583bd7d8316134177e3b9497194c6969ad160bd3cdaf4cf81853f0",
+              "reason": "Collector admission, secret handling, timing replay and source-reported revision handling corrected before subject collection.",
+              "status": "retained_without_comparison"
+            },
+            "local_service_deployments": {
+              "baseline": {
+                "artifact_digest": "sha256:c8e5d83cef2df1fa38f189fbbaab100571622addb05bb812fcc324cadbf099ec",
+                "id": "mistralai/Mistral-7B-v0.1",
+                "revision": "27d67f1b5f57dc0953326b2601d68371d40ea8da",
+                "tokenizer_digest": "sha256:11539bde3507db70de31a5931152d0907f24972b41b17468b3ea0f4d9fa70299"
+              },
+              "subject": {
+                "artifact_digest": "sha256:301a07d113d1964b69f497b54a8bc32a44f3b8ce0899e03e74809fa660c04067",
+                "id": "mistralai/Mistral-7B-Instruct-v0.1",
+                "revision": "ec5deb64f2c6e6fa90c1abf74a91d5c93a9669ca",
+                "tokenizer_digest": "sha256:bef458384298d886e4e30ac9262f18d7cfc14adf71b2643a2935237b7bd3f7c1"
+              }
+            },
+            "output_projection": "first whitespace-delimited word of the generated continuation; raw continuation and tokens retained in the response",
+            "qualification_scope": "real-local-http-service-integration",
+            "reference_projection": "strip leading and trailing whitespace from the original final-word reference",
+            "request_rendering": "empty system message; literal user content without a chat template or BOS token",
+            "runtime": {
+              "async_weight_loading": false,
+              "attention": "eager",
+              "deterministic_algorithms": true,
+              "device": "mps",
+              "generation": "greedy",
+              "generation_kv_cache": true,
+              "local_checkpoint_files_only": true,
+              "maximum_context_tokens": 512,
+              "maximum_new_tokens": 8,
+              "maximum_role_wall_seconds": 7200,
+              "mps_memory_fraction": 0.6,
+              "remote_code": false,
+              "seed": 0,
+              "torch_threads": 4,
+              "truncation": false,
+              "weight_dtype": "float16"
+            },
+            "service_source_digest": "sha256:78be7440a77769dbbe3e1044b2e0a7535fb9f91cef2796813f7073abf7177515",
+            "source_case_count": 400,
+            "source_dataset_digest": "sha256:e4a0e431b8b64130cbbf6e8fb3ed7b5769744d18ca6499d2088f2e1b3fb36dda",
+            "source_selection": "unchanged existing 400-case length-stratified Qwen-eligible source order"
+          },
+          "limits": {
+            "max_calls": 400,
+            "max_response_bytes": 16384,
+            "max_total_output_tokens": 3200,
+            "max_wall_seconds": 7200,
+            "timeout_seconds": 30
+          },
+          "max_tokens": 8,
+          "system_prompt": "",
+          "temperature": 0
+        },
+        "configuration_digest": "sha256:4fe448370c813dfd8f15050afcffea58197f2b920c5c12d27f13814a575d6f68",
+        "deployment": "reference-baseline",
+        "exposed_revision": null,
+        "harness": {
+          "name": "invarlock-http-capture",
+          "source_digest": "sha256:c411e2eb3997a9bea1fb0e085a54078e94396e76af8df32f070e9595b2ff2b9a",
+          "version": "1"
+        },
+        "kind": "hosted_service",
+        "observation_window": {
+          "ended_at": "2026-09-13T10:29:35.627560Z",
+          "started_at": "2026-09-13T10:22:21.402677Z"
+        },
+        "observed_model": "mistralai/Mistral-7B-v0.1",
+        "provider": "local-mistral-reference",
+        "requested_model": "mistral-requalification",
+        "service": "mistral-requalification"
+      }
+    },
+    "exact_match-subject.json": {
+      "run_id": "retained-mistral-7b-exact_match-subject - 2026-09-19T20:12:23.791681Z",
+      "record_count": 400,
+      "sha256": "sha256:687f4348df6a0b9b4b969ae23c5b8c6f61fa77c3a49ce8772981f571314932d9",
+      "artifact_digest": null,
+      "service_identity": {
+        "configuration": {
+          "endpoint": "http://127.0.0.1:63521/v1/chat/completions",
+          "environment": {
+            "checkpoint_loading_source_digest": "sha256:4cc9ef6047ade6b6c7f0ba326700e82c804e29d7b14d6f79d144a11d02964e9c",
+            "earlier_engineering_attempt": {
+              "baseline_capture_sha256": "sha256:978378eb3cf9208b06e80eb44cfa36769dc6d6177028c56422cc18e3fddb643e",
+              "call_count": 400,
+              "case_policy_and_model_settings_changed": false,
+              "protocol_sha256": "sha256:25c0e9362d583bd7d8316134177e3b9497194c6969ad160bd3cdaf4cf81853f0",
+              "reason": "Collector admission, secret handling, timing replay and source-reported revision handling corrected before subject collection.",
+              "status": "retained_without_comparison"
+            },
+            "local_service_deployments": {
+              "baseline": {
+                "artifact_digest": "sha256:c8e5d83cef2df1fa38f189fbbaab100571622addb05bb812fcc324cadbf099ec",
+                "id": "mistralai/Mistral-7B-v0.1",
+                "revision": "27d67f1b5f57dc0953326b2601d68371d40ea8da",
+                "tokenizer_digest": "sha256:11539bde3507db70de31a5931152d0907f24972b41b17468b3ea0f4d9fa70299"
+              },
+              "subject": {
+                "artifact_digest": "sha256:301a07d113d1964b69f497b54a8bc32a44f3b8ce0899e03e74809fa660c04067",
+                "id": "mistralai/Mistral-7B-Instruct-v0.1",
+                "revision": "ec5deb64f2c6e6fa90c1abf74a91d5c93a9669ca",
+                "tokenizer_digest": "sha256:bef458384298d886e4e30ac9262f18d7cfc14adf71b2643a2935237b7bd3f7c1"
+              }
+            },
+            "output_projection": "first whitespace-delimited word of the generated continuation; raw continuation and tokens retained in the response",
+            "qualification_scope": "real-local-http-service-integration",
+            "reference_projection": "strip leading and trailing whitespace from the original final-word reference",
+            "request_rendering": "empty system message; literal user content without a chat template or BOS token",
+            "runtime": {
+              "async_weight_loading": false,
+              "attention": "eager",
+              "deterministic_algorithms": true,
+              "device": "mps",
+              "generation": "greedy",
+              "generation_kv_cache": true,
+              "local_checkpoint_files_only": true,
+              "maximum_context_tokens": 512,
+              "maximum_new_tokens": 8,
+              "maximum_role_wall_seconds": 7200,
+              "mps_memory_fraction": 0.6,
+              "remote_code": false,
+              "seed": 0,
+              "torch_threads": 4,
+              "truncation": false,
+              "weight_dtype": "float16"
+            },
+            "service_source_digest": "sha256:78be7440a77769dbbe3e1044b2e0a7535fb9f91cef2796813f7073abf7177515",
+            "source_case_count": 400,
+            "source_dataset_digest": "sha256:e4a0e431b8b64130cbbf6e8fb3ed7b5769744d18ca6499d2088f2e1b3fb36dda",
+            "source_selection": "unchanged existing 400-case length-stratified Qwen-eligible source order"
+          },
+          "limits": {
+            "max_calls": 400,
+            "max_response_bytes": 16384,
+            "max_total_output_tokens": 3200,
+            "max_wall_seconds": 7200,
+            "timeout_seconds": 30
+          },
+          "max_tokens": 8,
+          "system_prompt": "",
+          "temperature": 0
+        },
+        "configuration_digest": "sha256:4fe448370c813dfd8f15050afcffea58197f2b920c5c12d27f13814a575d6f68",
+        "deployment": "reference-subject",
+        "exposed_revision": null,
+        "harness": {
+          "name": "invarlock-http-capture",
+          "source_digest": "sha256:c411e2eb3997a9bea1fb0e085a54078e94396e76af8df32f070e9595b2ff2b9a",
+          "version": "1"
+        },
+        "kind": "hosted_service",
+        "observation_window": {
+          "ended_at": "2026-09-13T10:38:54.046204Z",
+          "started_at": "2026-09-13T10:32:18.931698Z"
+        },
+        "observed_model": "mistralai/Mistral-7B-Instruct-v0.1",
+        "provider": "local-mistral-reference",
+        "requested_model": "mistral-requalification",
+        "service": "mistral-requalification"
+      }
+    },
+    "normalized_nll-baseline.json": {
+      "run_id": "retained-mistral-7b-normalized_nll-baseline - 2026-09-19T20:12:24.040150Z",
+      "record_count": 400,
+      "sha256": "sha256:099af4d2dc3afeac6bbb3daaf80838a499159030dea0caad7ffe41125c37864c",
+      "artifact_digest": "sha256:c8e5d83cef2df1fa38f189fbbaab100571622addb05bb812fcc324cadbf099ec"
+    },
+    "normalized_nll-subject.json": {
+      "run_id": "retained-mistral-7b-normalized_nll-subject - 2026-09-19T20:12:24.296934Z",
+      "record_count": 400,
+      "sha256": "sha256:b660c7bb2311d6b02988f97bec8d0a72c00bdb3910a9ea09b990c42bf273fb58",
+      "artifact_digest": "sha256:301a07d113d1964b69f497b54a8bc32a44f3b8ce0899e03e74809fa660c04067"
+    }
+  }
+}

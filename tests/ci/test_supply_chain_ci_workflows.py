@@ -121,7 +121,7 @@ def test_hf_installed_audit_binds_reviewed_locks_and_preserves_report() -> None:
 
 def test_container_front_door_authenticates_its_runtime_source_bundle() -> None:
     workflow = _load(WORKFLOWS / "container-front-door-smoke.yml")
-    steps = workflow["jobs"]["smoke"]["steps"]
+    steps = workflow["jobs"]["engine-smoke"]["steps"]
     authentication = _step(steps, "Authenticate runtime source")["run"]
 
     assert "scripts/qualification_source.py create" in authentication

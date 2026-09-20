@@ -123,7 +123,7 @@ def test_closed_report_renderer_explains_side_accuracy_qualification() -> None:
 
     assert "| Baseline accuracy | 100% | &gt;= 50% | Passed |" in markdown
     assert "| Candidate accuracy | 0% | &gt;= 50% | Not met |" in markdown
-    assert "Checks not met: Candidate accuracy" in markdown
+    assert "The subject accuracy was below the required minimum." in markdown
 
 
 @pytest.mark.parametrize(

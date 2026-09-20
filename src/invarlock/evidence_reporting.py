@@ -939,6 +939,18 @@ def _comparison_acceptance(
                 comparison_value=comparison_value,
                 uncertainty=uncertainty,
             )
+            paired = report["paired_binary"]
+            for side, discordant in (
+                ("baseline", "baseline_pass_subject_fail"),
+                ("subject", "baseline_fail_subject_pass"),
+            ):
+                expected_mean = (paired["both_pass"] + paired[discordant]) / count
+                if not math.isclose(
+                    side_means[side], expected_mean, rel_tol=1e-12, abs_tol=1e-12
+                ):
+                    raise EvidenceReportError(
+                        "canonical report side means do not match paired outcome counts"
+                    )
         passed = lower >= limit
     else:
         if baseline_mean <= 0.0 or subject_mean < 0.0:
@@ -1105,9 +1117,51 @@ def _native_report_context(
     changes = (
         "Baseline and candidate have the same authenticated artifact digest."
         if baseline == subject
-        else "Baseline and candidate have different authenticated artifact digests; the evidence does not identify a transformation procedure.",
+        else "Baseline and candidate have different authenticated artifact digests. These digests alone do not establish how the candidate was produced.",
     )
     return tuple(context), changes
+
+
+def _native_policy_summary(
+    report: dict[str, Any], checks: tuple[CheckView, ...]
+) -> str:
+    """Explain the recorded gate without treating a bound failure as degradation."""
+    if report["verdict"] == "pass":
+        return "The uncertainty interval is within the required range, and the other configured checks passed."
+    comparison = report["comparison"]
+    value = comparison["value"]
+    if not checks[0].passed:
+        if comparison["kind"] == "exact_match_delta_pp":
+            minimum = comparison["minimum"]
+            if minimum <= value < 0:
+                return (
+                    "The observed loss was within the allowance, but a loss greater than "
+                    + number(-minimum)
+                    + " percentage points could not be ruled out."
+                )
+            if minimum <= 0 <= value:
+                return "The observed score did not decline, but a loss beyond the policy allowance could not be ruled out."
+            if value < minimum <= 0:
+                return "The observed loss exceeded the policy allowance."
+            return "The comparison did not establish the improvement required by the policy."
+        if comparison["kind"] == "normalized_nll_ratio":
+            return (
+                "The observed subject-to-baseline NLL ratio was within the limit, but its uncertainty interval extended beyond it."
+                if value <= comparison["maximum"]
+                else "The observed subject-to-baseline NLL ratio exceeded the policy limit."
+            )
+        return (
+            "The comparison did not establish the score change required by the policy."
+        )
+    explanations = {
+        "Record count": "There were too few paired records to meet the policy requirement.",
+        "Interval width": "The uncertainty interval was wider than the policy permits.",
+        "Baseline accuracy": "The baseline accuracy was below the required minimum.",
+        "Candidate accuracy": "The subject accuracy was below the required minimum.",
+    }
+    return next(
+        explanations[check.name] for check in checks[1:] if check.passed is False
+    )
 
 
 def _report_view(
@@ -1126,14 +1180,7 @@ def _report_view(
     exact = kind == "exact_match_delta_pp"
     ratio = kind == "normalized_nll_ratio"
     checks = tuple(CheckView(**check) for check in core_policy_checks(report))
-    unmet = [check.name for check in checks if not check.passed]
-    summary = (
-        "Every configured check passed for this paired evaluation. Independent recipient acceptance is a separate step."
-        if report["verdict"] == "pass"
-        else "This evaluation did not meet its recorded policy. Checks not met: "
-        + ", ".join(unmet)
-        + "."
-    )
+    summary = _native_policy_summary(report, checks)
     label = (
         "Paired 95% confidence interval"
         if uncertainty["scope"] == "paired_binary_outcomes"
@@ -1191,6 +1238,30 @@ def _report_view(
         )
     value_scale = 100 if exact else 1
     suffix = "%" if exact else " nats / byte" if ratio else " score"
+    paired = report.get("paired_binary") if exact else None
+    baseline_matches = (
+        paired["both_pass"] + paired["baseline_pass_subject_fail"] if paired else None
+    )
+    subject_matches = (
+        paired["both_pass"] + paired["baseline_fail_subject_pass"] if paired else None
+    )
+    basis: tuple[str, ...]
+    if exact:
+        assert paired is not None
+        basis = (
+            f"Baseline and subject are paired on the same {report['record_count']:,} cases. Newcombe hybrid score uses their paired match outcomes to form a nominal 95% confidence interval for the accuracy change.",
+            f"Both matched: {paired['both_pass']:,}; baseline only: {paired['baseline_pass_subject_fail']:,}; subject only: {paired['baseline_fail_subject_pass']:,}; neither matched: {paired['both_fail']:,}.",
+            "Change is subject accuracy minus baseline accuracy in percentage points, not relative percent change. The 95% confidence level describes the interval method, not the share of correct answers.",
+            "This exact-match method uses a fixed 95% confidence level; the allowed-loss threshold is a separate policy choice. Under suitable sampling and independent-pair assumptions, the method aims for intervals to cover the underlying accuracy difference in about 95% of repeated studies. This is not the probability that the subject exceeds the allowed loss, and these cases are not automatically representative of production.",
+        )
+    else:
+        basis = (
+            f"The declared percentile method resamples the same {report['record_count']:,} paired records with replacement, keeping each baseline and subject result together. Its retained resampling count is {uncertainty['replicates']:,}.",
+            "The interval covers the central 95% of the paired resampling distribution for the subject-to-baseline mean NLL ratio. Each side's NLL uses nats per expected UTF-8 byte."
+            if ratio
+            else "The interval covers the central 95% of the paired resampling distribution for subject-minus-baseline mean score change, in the displayed change units.",
+            "This describes resampling of the fixed recorded schedule; it is not a population confidence interval or a claim that the sample represents production traffic.",
+        )
     metric = MetricView(
         name=names.get(report["metric"], report["metric"]),
         scope="All paired records",
@@ -1199,9 +1270,13 @@ def _report_view(
         candidate=number(report["subject"]["mean_score"] * value_scale) + suffix,
         change=number(comparison["value"], signed=not ratio) + " " + unit,
         count=f"{report['record_count']:,}",
-        explanation="All configured checks passed."
-        if not unmet
-        else "Checks not met: " + ", ".join(unmet) + ".",
+        baseline_detail=f"{baseline_matches:,} of {report['record_count']:,} matched"
+        if baseline_matches is not None
+        else "",
+        candidate_detail=f"{subject_matches:,} of {report['record_count']:,} matched"
+        if subject_matches is not None
+        else "",
+        explanation=summary,
         checks=checks,
         interval=IntervalView(
             lower=uncertainty["lower"],
@@ -1212,8 +1287,25 @@ def _report_view(
             unit=unit,
             threshold_direction="maximum" if ratio else "minimum",
             neutral=1.0 if ratio else 0.0,
+            method="Newcombe hybrid score" if exact else "Paired percentile resampling",
+            basis=basis,
         ),
         notes=tuple(notes),
+    )
+    summary += (
+        f" The subject matched the expected answer in {subject_matches:,} of {metric.count} cases, "
+        f"compared with {baseline_matches:,} for the baseline. "
+        f"Accuracy changed from {metric.baseline} to {metric.candidate}, a change of {metric.change}."
+        if exact
+        else (
+            f" Across {metric.count} paired records, the subject scored {metric.candidate}, "
+            f"compared with {metric.baseline} for the baseline, "
+            + (
+                f"a subject-to-baseline ratio of {number(comparison['value'])}."
+                if ratio
+                else f"a change of {metric.change}."
+            )
+        )
     )
     return ReportView(
         title="InvarLock comparison report",

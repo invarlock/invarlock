@@ -77,6 +77,21 @@ Strict evidence execution further requires a real offline container and
 | `tensorrt_llm` | `invarlock` | `tensorrt_llm_engine` | `exact_match` | `container` | `cuda` in an authenticated side worker |
 | `hf_vision_text` | `invarlock` | `hf_snapshot` | `exact_match` | `container` | `cuda` in an authenticated side worker |
 
+The retained [container engine execution reference](https://github.com/invarlock/invarlock/blob/main/examples/qualification/container-engines/README.md)
+provides signed packs and offline replay for these observed configurations:
+
+| Executed path | Docker 29.8.1 | Rootful Podman 5.7.0 | Scope |
+| --- | --- | --- | --- |
+| HF exact match, normalized NLL and native judge capture | CUDA passed | CUDA passed | Three unchanged scorer tests per engine; judge measurements are fixed offline fixtures |
+| TensorRT-LLM BF16/FP8 comparison | Passed | Passed | Same prepared engines, 102 records and unchanged policy |
+| HF vision-text 2B/7B comparison | Passed | Passed | Same checkpoints, four tutorial cases and permissive policy |
+
+These results bind source `59d9bbc048d1fe10083e912b32912445cb7bb974`, its
+recorded wheel and image digests, and one H100 host. They establish execution
+and signed replay within that scope, not general model quality, rootless GPU
+support, or qualification of another source revision. Docker GPU selection and
+Podman CDI device selection are explicit; there is no silent engine fallback.
+
 The built-in HF scorer computes log-probability facts by teacher-forcing a
 target token sequence that must decode as the exact schedule `expected_output`
 when appended to the prompt tokens. Boundary-unstable encodings fail closed.

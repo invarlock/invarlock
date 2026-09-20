@@ -2,12 +2,24 @@
 
 from __future__ import annotations
 
+import re
 import secrets
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
 CommandRunner = Callable[..., str]
+
+
+def normalize_image_id(value: str) -> str:
+    """Normalize a complete engine-reported SHA256 without changing its identity."""
+
+    value = value.strip()
+    if re.fullmatch(r"[0-9a-f]{64}", value):
+        return "sha256:" + value
+    if re.fullmatch(r"sha256:[0-9a-f]{64}", value):
+        return value
+    raise RuntimeError("container inspection did not return a sha256 image ID")
 
 
 @dataclass(frozen=True)
@@ -40,7 +52,7 @@ def record_owned_image_tag(
         )
     except RuntimeError as exc:
         raise RuntimeError(f"temporary image tag was not created: {tag}") from exc
-    if observed.strip() != image_id:
+    if normalize_image_id(observed) != image_id:
         raise RuntimeError(
             f"temporary image tag does not name the image built by this invocation: {tag}"
         )
@@ -72,7 +84,8 @@ def remove_owned_image_tags(
             observed = run(
                 [engine, "image", "inspect", "--format", "{{.Id}}", owned.tag],
                 cwd=repository,
-            ).strip()
+            )
+            observed = normalize_image_id(observed)
         except RuntimeError as exc:
             diagnostic = str(exc)
             if any(
@@ -99,6 +112,7 @@ def remove_owned_image_tags(
 
 __all__ = [
     "OwnedImageTag",
+    "normalize_image_id",
     "record_owned_image_tag",
     "remove_owned_image_tags",
     "temporary_image_tag",

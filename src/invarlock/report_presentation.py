@@ -200,6 +200,43 @@ class IntervalView:
     threshold_direction: str | None = None
     neutral: float | None = None
     method: str = ""
+    basis: tuple[str, ...] = ()
+
+
+def display_label(value: str) -> str:
+    """Present metric/scope identifiers only; leave authored text unchanged."""
+    prefix = ""
+    for component in ("Deterministic · ", "Judge · "):
+        if value.startswith(component):
+            prefix, value = component, value[len(component) :]
+            break
+    acronyms = {
+        "qa": "QA",
+        "nll": "NLL",
+        "utf8": "UTF-8",
+        "utf-8": "UTF-8",
+        "f1": "F1",
+        "api": "API",
+        "http": "HTTP",
+    }
+    if value.lower() in acronyms:
+        return prefix + acronyms[value.lower()]
+    tokens = re.split(r"[_-]", value)
+    if len(tokens) < 2 or any(
+        re.fullmatch(r"[A-Za-z0-9]+", token) is None for token in tokens
+    ):
+        return prefix + value
+    words = []
+    index = 0
+    while index < len(tokens):
+        word = tokens[index]
+        if word.lower() == "utf" and tokens[index + 1 : index + 2] == ["8"]:
+            word = "utf8"
+            index += 1
+        words.append(acronyms.get(word.lower(), word))
+        index += 1
+    words[0] = words[0][0].upper() + words[0][1:]
+    return prefix + " ".join(words)
 
 
 @dataclass(frozen=True)
@@ -220,6 +257,14 @@ class MetricView:
     count_detail: str = ""
     count_label: str = "Observed pairs"
 
+    @property
+    def display_name(self) -> str:
+        return display_label(self.name)
+
+    @property
+    def display_scope(self) -> str:
+        return display_label(self.scope)
+
 
 @dataclass(frozen=True)
 class ReportView:
@@ -237,6 +282,23 @@ class ReportView:
     technical: dict[str, Any] = field(default_factory=dict)
     context: tuple[tuple[str, str], ...] = ()
     changes: tuple[str, ...] = ()
+
+
+def _metric_identifier_details(view: ReportView) -> tuple[tuple[str, Any], ...]:
+    identifiers = [
+        {
+            "result": index,
+            "metric": metric.name,
+            "scope": metric.scope,
+            "display_metric": metric.display_name,
+            "display_scope": metric.display_scope,
+        }
+        for index, metric in enumerate(view.metrics, 1)
+        if metric.display_name != metric.name or metric.display_scope != metric.scope
+    ]
+    return (
+        (("Recorded metric and scope identifiers", identifiers),) if identifiers else ()
+    )
 
 
 def decision_label(value: str) -> str:
@@ -289,6 +351,58 @@ def _interval_summary(view: IntervalView, *, compact: bool = False) -> str:
     lower = number(view.lower, signed=view.neutral == 0)
     upper = number(view.upper, signed=view.neutral == 0)
     return f"{label}: {lower} to {upper} {view.unit}".strip()
+
+
+def _interval_reading(view: IntervalView) -> tuple[tuple[str, str], ...]:
+    """Explain geometry and endpoint rules without recalculating a verdict."""
+    change = "The marker shows the observed change between subject and baseline."
+    if view.unit == "pp":
+        change += " A change in percentage points (pp) is the subject percentage minus the baseline percentage."
+    elif view.unit == "ratio":
+        change += " A ratio divides the subject value by the baseline value; 1 means no change."
+    reading = [
+        ("Change", change),
+        (
+            "Interval",
+            "The bar shows uncertainty around that change. Its left endpoint is the lower bound; its right endpoint is the upper bound. The interval level does not tell you how often model runs would pass or fail the policy.",
+        ),
+    ]
+    if view.threshold is not None and view.threshold_direction in {
+        "minimum",
+        "maximum",
+    }:
+        reading.append(
+            (
+                "Policy rule",
+                "The paired lower bound (left endpoint) must be at least the policy minimum. The whole interval must lie on the allowed side of the threshold for this bound check to pass."
+                if view.threshold_direction == "minimum"
+                else "The upper bound (right endpoint) must be at most the policy maximum. The whole interval must lie on the allowed side of the threshold for this bound check to pass.",
+            )
+        )
+    if view.neutral is not None:
+        reading.append(
+            (
+                "No change",
+                "The dashed line marks no change. An interval crossing it includes changes in either direction. A worse observed score describes this run; policy rejection alone does not prove worse performance beyond these cases.",
+            )
+        )
+    return tuple(reading)
+
+
+def _interval_reading_html(view: IntervalView) -> str:
+    result = '<div class="interval-reading"><h4>How to read this comparison</h4><dl>'
+    result += "".join(
+        f"<dt>{escape(label)}</dt><dd>{escape(text)}</dd>"
+        for label, text in _interval_reading(view)
+    )
+    result += "</dl></div>"
+    if view.basis:
+        result += (
+            '<details class="interval-basis"><summary>How this interval was calculated</summary><div class="detail-content">'
+            + "".join(f"<p>{escape(text)}</p>" for text in view.basis)
+            + "</div></details>"
+        )
+    return result
 
 
 def _interval(view: IntervalView) -> str:
@@ -473,7 +587,8 @@ h1,h2,h3,h4,p{margin-top:0}h1{font-size:36px;line-height:1.15;letter-spacing:-.0
 .value{padding:12px;border-right:1px solid var(--line);min-width:0}.value:last-child{border:0}.value dt{font-size:13px;color:var(--muted)}.value dd{margin:4px 0 0;font-size:26px;font-weight:650;line-height:1.2;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .value small{display:block;margin-top:5px;font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--muted);letter-spacing:0}.interval{margin:22px 0}.interval svg{display:block;width:100%;height:auto}.interval figcaption{overflow-wrap:anywhere;font-size:13px;color:var(--muted);margin-top:8px}.axis{stroke:var(--line);stroke-width:2}.range{stroke:var(--range);stroke-width:7;stroke-linecap:round}.estimate{fill:var(--paper);stroke:var(--range);stroke-width:3}.threshold{stroke:var(--red);stroke-width:2}.neutral{stroke:var(--neutral);stroke-width:1.5;stroke-dasharray:3 4}.allowed{fill:var(--allowed)}.tick{stroke:var(--neutral);stroke-width:1.5}.legend{display:block;margin-top:4px}.chart-annotations{height:24px;position:relative;font-size:12px;font-variant-numeric:tabular-nums}.chart-label{position:absolute;max-width:72%;overflow-wrap:anywhere}.chart-label.middle{transform:translateX(-50%)}.chart-label.end{transform:translateX(-100%)}.limit-label{top:0;color:var(--red)}.interval-plot{position:relative}.interval-bounds{position:absolute;inset:0;pointer-events:none;font-size:12px;font-variant-numeric:tabular-nums}.bound-label{bottom:calc(47.222222% + 10px);line-height:1.2;font-weight:650}.chart-key{display:inline-block;margin-right:18px}.chart-key i,.legend i{display:inline-block;margin-right:7px;vertical-align:middle}.estimate-key{width:10px;height:10px;border:2px solid var(--range);border-radius:50%}.interval-key{width:16px;border-top:3px solid var(--range)}.neutral-key{width:16px;border-top:2px dashed var(--neutral)}.threshold-key{height:12px;border-left:2px solid var(--red)}.axis-labels{position:relative;height:22px;font-size:13px;font-variant-numeric:tabular-nums;color:var(--muted)}.axis-labels span{position:absolute;transform:translateX(-50%);white-space:nowrap}
 .scroll{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:14px;margin-top:16px}caption{text-align:left;font-weight:650;padding:0 0 8px}th{text-align:left;color:var(--muted);font-size:13px;font-weight:650}th,td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}th:first-child,td:first-child{padding-left:0}td:last-child,th:last-child{padding-right:0}tbody tr:last-child td,tbody tr:last-child th{border-bottom:0}
-.check-label{display:none}.context-heading{font-size:14px;margin:14px 0 8px}.checks-table td{white-space:nowrap}.checks-table th[scope="row"]{width:48%}.check-detail{display:block;font-size:13px;font-weight:400;margin-top:4px;color:var(--muted)}.check-fail{color:var(--red);font-weight:650}.check-pass{color:var(--teal)}.check-unknown{color:var(--amber)}.notes{font-size:13px;color:var(--muted);padding-left:20px;margin-bottom:0}.notes li+li{margin-top:6px}
+.interval-reading{margin:18px 0;font-size:14px}.interval-reading h4{font-size:14px;margin:0 0 10px}.interval-reading dl{display:grid;grid-template-columns:100px minmax(0,1fr);gap:10px 16px;margin:0}.interval-reading dt{font-weight:650}.interval-reading dd{margin:0;color:var(--muted)}.interval-basis{margin:16px 0}.interval-basis p{font-size:14px;line-height:1.6}@media(max-width:600px){.interval-reading dl{grid-template-columns:1fr;gap:5px}.interval-reading dd+dt{margin-top:8px}}
+.check-label{display:none}.context-heading{font-size:14px;margin:14px 0 8px}.checks-table td{white-space:normal;overflow-wrap:anywhere}.checks-table td:last-child{white-space:nowrap;overflow-wrap:normal}.checks-table th[scope="row"]{width:48%}.check-detail{display:block;font-size:13px;font-weight:400;margin-top:4px;color:var(--muted)}.check-fail{color:var(--red);font-weight:650}.check-pass{color:var(--teal)}.check-unknown{color:var(--amber)}.notes{font-size:13px;color:var(--muted);padding-left:20px;margin-bottom:0}.notes li+li{margin-top:6px}
 .columns{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:24px}.panel dl{margin:0}.panel dt{font-size:13px;font-weight:650;margin-top:10px}.panel dt:first-child{margin-top:0}.panel dd{margin:3px 0 0;color:var(--muted);font-size:14px;overflow-wrap:anywhere}.panel ol,.panel ul{padding-left:20px;font-size:14px;margin:0}.panel li+li{margin-top:8px}
 .limits{color:var(--muted);font-size:14px;margin:24px 0}.limits h2{font-size:18px;margin-bottom:8px}.limits li+li{margin-top:6px}
 details{border:1px solid var(--line);border-radius:8px;background:var(--paper);margin:10px 0}summary{overflow-wrap:anywhere;padding:14px 18px;font-size:14px;font-weight:650;cursor:pointer}details .detail-content{padding:0 18px 18px}pre{font:13px/1.6 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere;background:#f5f8fa;border-radius:6px;padding:14px;max-height:480px;overflow:auto}code{overflow-wrap:anywhere}.footer{color:var(--muted);font-size:13px;margin-top:26px;border-top:1px solid var(--line);padding-top:16px}
@@ -509,7 +624,7 @@ def _results_overview(metrics: tuple[MetricView, ...]) -> str:
             else "Check details unavailable"
         )
         parts.append(
-            f'<tr><th scope="row"><a href="#metric-result-{index}">{escape(metric.name)}<span class="scope">{escape(metric.scope)}</span></a></th>'
+            f'<tr><th scope="row"><a href="#metric-result-{index}">{escape(metric.display_name)}<span class="scope">{escape(metric.display_scope)}</span></a></th>'
             + f'<td><span class="badge {_tone(metric.decision)}">{escape(decision_label(metric.decision))}</span></td>'
             + "".join(
                 f"<td>{escape(value)}</td>"
@@ -718,7 +833,7 @@ def _summary_html(view: ReportView) -> str:
     if len(view.metrics) != 1:
         return escape(view.summary)
     metric = view.metrics[0]
-    values = {metric.name, metric.baseline, metric.candidate, metric.change}
+    values = {metric.display_name, metric.baseline, metric.candidate, metric.change}
     if metric.interval:
         values.update(
             number(value)
@@ -757,7 +872,7 @@ def render_html(view: ReportView) -> str:
         '<!doctype html><html lang="en"><head><meta charset="utf-8">',
         '<meta name="viewport" content="width=device-width,initial-scale=1">',
         f"<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none';{script_policy}\">",
-        f"<title>{e(view.title)}</title><style>{_CSS}</style></head><body><main>",
+        f"<title>{e(decision_label(view.decision))} · {e(view.title)}</title><style>{_CSS}</style></head><body><main>",
         f'<header class="brand">{_BRAND_MARK} InvarLock<span class="family">{e(view.family)}</span></header>',
         f'<section class="hero {_tone(view.decision)}" aria-labelledby="decision"><div class="verdict"><p class="eyebrow">Recorded policy result</p><h1 id="decision">{e(decision_label(view.decision))}</h1><p class="decision-summary">{_summary_html(view)}</p>',
     ]
@@ -792,7 +907,7 @@ def render_html(view: ReportView) -> str:
             parts.append(
                 '<div class="metric-controls"><nav class="metric-navigation" aria-label="Metric results">'
                 + "".join(
-                    f'<a href="#metric-group-{index}">{e(name)} <span>{len(group)} scope result{"s" if len(group) != 1 else ""}</span></a>'
+                    f'<a href="#metric-group-{index}">{e(display_label(name))} <span>{len(group)} scope result{"s" if len(group) != 1 else ""}</span></a>'
                     for index, (name, group) in enumerate(groups.items(), 1)
                 )
                 + '</nav><button class="metric-display-toggle" type="button" hidden>Show all metrics</button></div>'
@@ -804,18 +919,18 @@ def render_html(view: ReportView) -> str:
     for group_index, (metric_name, group) in enumerate(groups.items(), 1):
         if multiple_results:
             parts.append(
-                f'<section id="metric-panel-{group_index}" class="metric-group" aria-labelledby="metric-group-{group_index}"><div class="section-heading"><h3 id="metric-group-{group_index}" tabindex="-1">{e(metric_name)}</h3><a href="#results-overview-heading">Back to overview</a></div>'
+                f'<section id="metric-panel-{group_index}" class="metric-group" aria-labelledby="metric-group-{group_index}"><div class="section-heading"><h3 id="metric-group-{group_index}" tabindex="-1">{e(display_label(metric_name))}</h3><a href="#results-overview-heading">Back to overview</a></div>'
             )
         for result_index, metric in group:
             heading = (
-                f"<h4>{e(metric.scope)}</h4>"
+                f"<h4>{e(metric.display_scope)}</h4>"
                 if multiple_results
-                else f"<h3>{e(metric.name)}</h3>"
+                else f"<h3>{e(metric.display_name)}</h3>"
             )
             context = (
-                f"Metric: {e(metric.name)}"
+                f"Metric: {e(metric.display_name)}"
                 if multiple_results
-                else f"Scope: {e(metric.scope)}"
+                else f"Scope: {e(metric.display_scope)}"
             )
             parts.append(
                 f'<section id="metric-result-{result_index}" tabindex="-1" class="metric {_tone(metric.decision)}"><div class="metric-heading"><div>{heading}<p class="scope">{context}</p></div><span class="badge">{e(decision_label(metric.decision))}</span></div><p class="metric-explanation">{e(metric.explanation)}</p><dl class="values">'
@@ -838,6 +953,7 @@ def render_html(view: ReportView) -> str:
             parts.append("</dl>")
             if metric.interval:
                 parts.append(_interval(metric.interval))
+                parts.append(_interval_reading_html(metric.interval))
             parts.append(
                 '<div class="scroll" tabindex="0" role="region" aria-label="Decision checks"><table class="checks-table"><caption>Decision checks</caption><thead><tr><th scope="col">Check</th><th scope="col">Observed</th><th scope="col">Required</th><th scope="col">Result</th></tr></thead><tbody>'
             )
@@ -885,7 +1001,11 @@ def render_html(view: ReportView) -> str:
             f"<dt>{e(k)}</dt><dd><code>{e(v)}</code></dd>" for k, v in view.identity
         )
         parts.append("</dl></div></details>")
-    for heading, data in (*view.details, ("Exact comparison data", view.technical)):
+    for heading, data in (
+        *_metric_identifier_details(view),
+        *view.details,
+        ("Exact comparison data", view.technical),
+    ):
         parts.append(
             f'<details><summary>{e(heading)}</summary><div class="detail-content">{_detail_content(data)}</div></details>'
         )
@@ -902,7 +1022,7 @@ def render_html(view: ReportView) -> str:
                 and isinstance(preview.get("text"), str)
             ):
                 parts.append(
-                    f'<details><summary>{e(str(item.get("name", "Metric")))} configuration preview</summary><div class="detail-content">{_detail_content(preview)}</div></details>'
+                    f'<details><summary>{e(display_label(str(item.get("name", "Metric"))))} configuration preview</summary><div class="detail-content">{_detail_content(preview)}</div></details>'
                 )
     parts.append(
         '<footer class="footer">InvarLock · Evidence report. Displayed values may be rounded; exact values are preserved in the evidence bundle. This report is not an independent acceptance receipt.</footer></main></body></html>\n'
@@ -960,7 +1080,7 @@ def render_markdown(view: ReportView, *, include_details: bool = False) -> str:
     for metric in view.metrics:
         lines += [
             "",
-            f"## {clean(metric.name)}: {clean(metric.scope)}",
+            f"## {clean(metric.display_name)}: {clean(metric.display_scope)}",
             "",
             f"**{decision_label(metric.decision)}**. {clean(metric.explanation)}",
             "",
@@ -976,13 +1096,30 @@ def render_markdown(view: ReportView, *, include_details: bool = False) -> str:
             + " |",
             "",
         ]
+        for label, detail in (
+            ("Baseline", metric.baseline_detail),
+            ("Subject", metric.candidate_detail),
+            (metric.count_label, metric.count_detail),
+        ):
+            if detail:
+                lines += [f"{clean(label)}: {clean(detail)}.", ""]
         if metric.interval:
             i = metric.interval
             lines += [
-                f"{clean(i.label)}: [{number(i.lower)}, {number(i.upper)}] {clean(i.unit)}.",
+                f"{clean(_interval_label(i))}: [{number(i.lower)}, {number(i.upper)}] {clean(i.unit)}.",
+                "",
+                "### How to read this comparison",
                 "",
             ]
+            for label, explanation in _interval_reading(i):
+                lines += [f"**{clean(label)}:** {clean(explanation)}", ""]
+            if i.basis:
+                lines += ["### How this interval was calculated", ""]
+                for paragraph in i.basis:
+                    lines += [clean(paragraph), ""]
         lines += [
+            "### Decision checks",
+            "",
             "| Check | Observed | Required | Result |",
             "| --- | --- | --- | --- |",
         ]
@@ -1000,22 +1137,24 @@ def render_markdown(view: ReportView, *, include_details: bool = False) -> str:
     lines.extend(f"- {clean(s)}" for s in view.limitations)
     lines += ["", "## Evidence identities", ""]
     lines.extend(f"- **{clean(k)}:** {clean(v)}" for k, v in view.identity)
+    details = _metric_identifier_details(view)
     if include_details:
-        for heading, data in (*view.details, ("Exact comparison data", view.technical)):
-            lines += [
-                "",
-                f"## {clean(heading)}",
-                "",
-                "```json",
-                visible_controls(
-                    json.dumps(
-                        data,
-                        ensure_ascii=False,
-                        indent=2,
-                        sort_keys=True,
-                        allow_nan=False,
-                    )
-                ).replace("`", "\\u0060"),
-                "```",
-            ]
+        details += (*view.details, ("Exact comparison data", view.technical))
+    for heading, data in details:
+        lines += [
+            "",
+            f"## {clean(heading)}",
+            "",
+            "```json",
+            visible_controls(
+                json.dumps(
+                    data,
+                    ensure_ascii=False,
+                    indent=2,
+                    sort_keys=True,
+                    allow_nan=False,
+                )
+            ).replace("`", "\\u0060"),
+            "```",
+        ]
     return "\n".join(lines) + "\n"

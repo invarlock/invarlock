@@ -78,7 +78,7 @@ python examples/evaluator-qualification/maintained/capture.py matrix
 ## Use an installed export parser
 
 The installed `load_run` API and captured request sources support `invarlock`,
-`jsonl`, `inspect-json`, `lm-eval-samples` and `promptfoo-jsonl`. These parsers
+`jsonl`, `inspect-json`, `lm-eval-samples`, `promptfoo-jsonl` and `langfuse-json`. These parsers
 normalize their declared per-case export shapes; they do not run an evaluator or
 qualify an arbitrary source. The `capture.py` paths below additionally support
 explicit record mapping and retained qualification joins for the full shortlist.

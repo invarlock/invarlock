@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Retain signed Docker and Podman CUDA execution references for native scorers,
+  TensorRT-LLM and vision-text, with compact offline replay and frozen provenance.
+- Add a maintained Langfuse experiment-export parser with explicit source and
+  item identities, scorer-specific measurements, and offline verification.
+- Add a real ModelKit handoff journey and exact GGUF file mapping inside the
+  verified package, including recipient policy and delivered-model checks.
+
 - Support explicit OpenAI, Anthropic, Google and OpenRouter judge collection
   profiles through the optional pinned SDKs, with provider-specific credentials,
   endpoint validation and offline SDK transport tests.
@@ -48,6 +55,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Accept complete Podman image IDs in authenticated builds and example workflows
+  while retaining strict source, image and filesystem checks. Temporary registry
+  cleanup also preserves image tags whose ownership has changed.
+- Support explicit Docker and Podman selection in TensorRT preparation, including
+  access to generated artifacts under rootless container engines.
+- Reject unsupported native batch sizes during preflight before model execution.
+- Make report summaries show the observed comparison, distinguish judge rubric
+  scores and independent units, and retain supporting counts in Markdown and HTML.
+  Present metric and scope names as readable labels while retaining exact
+  identifiers in technical details and machine outputs. Explain interval methods,
+  paired outcomes, percentage points and the endpoint checked by each policy.
+  Lead with the recorded outcome, distinguishing passing requirements, observed
+  losses and uncertainty that prevents a pass. Explain missing results, count,
+  precision and score requirements without repeating verdict headings; identify
+  advisory and combined outcomes and use each captured interval's recorded level.
+  Label measured judge precision failures correctly and keep decision-check
+  columns visible in desktop reports without changing retained results.
+- Reject exact-match reports whose side means contradict their paired outcome
+  counts, even when the reported difference remains consistent. Reject captured
+  reports whose recorded pass contradicts an available displayed requirement.
 - Keep provider retries within admitted judge attempts, reject ignored settings,
   and validate reported usage before charging a collection budget.
 - Apply the resolved environment snapshot to optional runtime resource bindings.

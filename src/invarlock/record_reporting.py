@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+from dataclasses import replace
 from typing import Any, cast
 from xml.etree.ElementTree import Element, SubElement, tostring
 
@@ -566,13 +567,42 @@ def _metric_views(
                 if policy
                 else None
             )
+            confidence = number(interval["mass"] * 100)
             label = (
-                "95% paired-schedule ratio resampling interval"
+                f"{confidence}% paired-schedule ratio resampling interval"
                 if likelihood
-                else "Paired 95% confidence interval"
+                else f"Paired {confidence}% confidence interval"
                 if binary
-                else "95% paired-schedule resampling interval"
+                else f"{confidence}% paired-schedule resampling interval"
             )
+            basis: tuple[str, ...]
+            if interval["method"] in {
+                "newcombe_hybrid_score_paired_v1",
+                "newcombe_hybrid_score_paired_v2",
+            }:
+                basis = (
+                    f"Baseline and subject are paired on the same {complete:,} cases in this scope. Newcombe hybrid score uses their paired match outcomes to form a nominal {number(interval['mass'] * 100)}% confidence interval for the accuracy change.",
+                    "Change is subject accuracy minus baseline accuracy in percentage points, not relative percent change. The confidence level describes the interval method, not the share of correct answers."
+                    if percentage
+                    else "Change is subject score minus baseline score in the displayed score units, not relative percent change. The confidence level describes the interval method, not the share of correct answers.",
+                    "Each metric and scope has its own interval; these intervals do not provide a simultaneous confidence guarantee across all results or establish a representative production sample.",
+                )
+            elif interval["method"] in {
+                "paired_mean_shake256_percentile_v1",
+                "paired_percentile_bootstrap_sha256_v1",
+            }:
+                basis = (
+                    f"The declared percentile method resamples the same {complete:,} paired records in this scope with replacement, keeping each baseline and subject result together. Its retained resampling count is {interval['replicates']:,}.",
+                    f"The central {number(interval['mass'] * 100)}% of that distribution describes the subject-to-baseline mean NLL ratio. Each side's NLL uses nats per expected UTF-8 byte."
+                    if likelihood
+                    else f"The central {number(interval['mass'] * 100)}% of that distribution describes subject-minus-baseline mean score change in {display_unit} units.",
+                    "This is a fixed-schedule resampling interval, not a population confidence interval. Separate metric and scope intervals do not give a simultaneous confidence guarantee or establish a representative production sample.",
+                )
+            else:
+                basis = (
+                    f"Retained interval method: {interval['method']}.",
+                    "The report supplies these endpoints; a calculation explanation is unavailable for this method.",
+                )
             visual = IntervalView(
                 interval["lower"] * scale,
                 interval["upper"] * scale,
@@ -587,7 +617,10 @@ def _metric_views(
                 method={
                     "newcombe_hybrid_score_paired_v1": "Newcombe hybrid score",
                     "newcombe_hybrid_score_paired_v2": "Newcombe hybrid score",
+                    "paired_mean_shake256_percentile_v1": "Paired percentile resampling",
+                    "paired_percentile_bootstrap_sha256_v1": "Paired percentile resampling",
                 }.get(interval.get("method", ""), ""),
+                basis=basis,
             )
             if policy:
                 bound = interval["lower" if higher else "upper"]
@@ -642,19 +675,14 @@ def _metric_views(
                     None,
                 )
             )
-        unmet = [c.name for c in checks if c.passed is False]
-        explanation = (
-            "All configured checks passed."
-            if m["decision"] == "pass"
-            else (
-                "More evidence is needed: "
-                + (", ".join(unmet) if unmet else "; ".join(m["reasons"]))
-                + "."
-                if m["decision"] == "insufficient_evidence"
-                else "The policy was not met: "
-                + (", ".join(unmet) if unmet else "; ".join(m["reasons"]))
-                + "."
+        if m["decision"] == "pass" and any(check.passed is False for check in checks):
+            raise EvaluationRecordsError(
+                "captured recorded pass contradicts a displayed policy requirement"
             )
+        explanation = (
+            "The policy thresholds are unavailable in this report; the retained decision has not been independently replayed."
+            if policy is None
+            else "The retained comparison does not include an explanation for this result."
         )
         notes = [
             "Higher values are better."
@@ -674,8 +702,6 @@ def _metric_views(
             )
         if binary and policy is not None and "subject_minimum" not in policy:
             notes.append("No absolute minimum score is required by this policy.")
-        if m["reasons"]:
-            notes.append("Recorded reasons: " + "; ".join(m["reasons"]))
         if policy is None:
             notes.append(
                 "Requirements are unavailable in this comparison-only view. The original decision is displayed without independent replay."
@@ -712,6 +738,7 @@ def _metric_views(
                 notes=tuple(notes),
             )
         )
+        metrics[-1] = replace(metrics[-1], explanation=_captured_opening(metrics[-1]))
     # Bring actionable findings first; original order and exact values remain in evidence.
     metrics.sort(
         key=lambda m: {"regression": 0, "insufficient_evidence": 1, "pass": 2}[
@@ -746,6 +773,63 @@ def _view(comparison: dict[str, Any], evidence: CapturedSnapshot | None) -> Repo
     return _assemble_view(comparison, inputs, manifest, signer)
 
 
+def _captured_opening(metric: MetricView) -> str:
+    """Explain the recorded outcome using available, unrounded policy facts."""
+    interval = metric.interval
+    fallback = (
+        metric.explanation or "No explanation was supplied for this recorded result."
+    )
+    if metric.decision == "pass":
+        return (
+            "The uncertainty interval is within the required range, and the other configured checks passed."
+            if interval is not None and interval.threshold is not None
+            else fallback
+        )
+    failures = [check for check in metric.checks if check.passed is False]
+    bound = next(
+        (
+            check
+            for check in failures
+            if check.name in {"Allowed change", "Maximum NLL ratio"}
+        ),
+        None,
+    )
+    explanations = {
+        "Complete paired results": "Some included cases are missing a baseline or subject result.",
+        "Included pair count": "There are fewer paired records than the policy requires.",
+        "Interval width": "The uncertainty interval is wider than the policy permits.",
+        "Subject minimum": "The subject's observed score is below the required minimum.",
+        "Subject maximum": "The subject's observed score is above the permitted maximum.",
+    }
+    if (
+        metric.decision == "regression"
+        and bound is not None
+        and interval is not None
+        and interval.threshold is not None
+        and interval.threshold_direction in {"minimum", "maximum"}
+    ):
+        label = "NLL ratio" if bound.name == "Maximum NLL ratio" else "change"
+        within = (
+            interval.estimate >= interval.threshold
+            if interval.threshold_direction == "minimum"
+            else interval.estimate <= interval.threshold
+        )
+        if within:
+            lead = f"The observed {label} was within the policy limit, but its uncertainty interval extended beyond it."
+        else:
+            lead = (
+                "The observed NLL ratio exceeded the policy limit. Lower NLL is better."
+                if label == "NLL ratio"
+                else "The observed change was outside the range allowed by the policy."
+            )
+        others = [explanations[c.name] for c in failures if c.name in explanations]
+        return " ".join([lead, *others])
+    return (
+        " ".join(explanations[c.name] for c in failures if c.name in explanations)
+        or fallback
+    )
+
+
 def _captured_summary(
     metrics: tuple[MetricView, ...], comparison: dict[str, Any] | None = None
 ) -> str:
@@ -755,7 +839,7 @@ def _captured_summary(
         passed = len(metrics) - failed - insufficient
         overview = (
             f"{len(metrics):,} metric / scope results: {passed:,} passed, "
-            f"{failed:,} did not meet policy, and {insufficient:,} need more evidence. "
+            f"{failed:,} did not meet policy, and {insufficient:,} {'needs' if insufficient == 1 else 'need'} more evidence. "
             "Each result applies to its recorded scope; overlapping slice counts must not be added together."
         )
         # Different metrics have different units; lead with the first adverse
@@ -767,16 +851,10 @@ def _captured_summary(
             )
         if focus is None:
             return overview
-        outcome = (
-            "did not meet policy"
-            if focus.decision == "regression"
-            else "needs more evidence"
+        return (
+            f"{focus.display_name} ({focus.display_scope}): {_captured_opening(focus)} "
+            + overview
         )
-        lead = f"{focus.name} ({focus.scope}) {outcome}"
-        check = next((c for c in focus.checks if c.passed is False), None)
-        if check is not None:
-            lead += f": the {check.name} check recorded {check.observed} against a requirement of {check.required}"
-        return lead + ". " + overview
     metric = metrics[0]
     recorded = (
         next(
@@ -795,12 +873,14 @@ def _captured_summary(
         if recorded is not None
         else metric.interval is not None and metric.interval.neutral == 1
     )
-    parts = [] if metric.decision == "pass" else [metric.explanation]
-    scope = "" if metric.scope == "overall" else f" within the {metric.scope} slice"
+    parts = [_captured_opening(metric)]
+    scope = (
+        "" if metric.scope == "overall" else f" within the {metric.display_scope} slice"
+    )
     pairs = "pair" if metric.count == "1" else "pairs"
     if metric.baseline != "Unavailable" and metric.candidate != "Unavailable":
         sentence = (
-            f"Across {metric.count} usable {pairs}{scope}, the subject's {metric.name} "
+            f"Across {metric.count} usable {pairs}{scope}, the subject's {metric.display_name} "
             f"was {metric.candidate}, compared with {metric.baseline} for the baseline"
         )
         if metric.change != "Unavailable":
@@ -824,7 +904,7 @@ def _captured_summary(
         )
         verb = "are" if unavailable == "Baseline and subject scores" else "is"
         parts.append(
-            f"{unavailable} for {metric.name} {verb} unavailable across {metric.count} usable {pairs}{scope}."
+            f"{unavailable} for {metric.display_name} {verb} unavailable across {metric.count} usable {pairs}{scope}."
         )
     if recorded is not None and recorded["missing_ids"]:
         missing = len(recorded["missing_ids"])
@@ -835,7 +915,12 @@ def _captured_summary(
     if metric.interval is not None:
         interval = metric.interval
         parts.append(
-            f"The 95% interval for the {'ratio' if likelihood else 'change'} runs from "
+            (
+                f"The {number(recorded['interval']['mass'] * 100)}% interval"
+                if recorded is not None and recorded["interval"] is not None
+                else "The uncertainty interval"
+            )
+            + f" for the {'ratio' if likelihood else 'change'} runs from "
             f"{number(interval.lower)} to {number(interval.upper)}"
             + ("." if likelihood else f" {interval.unit}.")
         )
@@ -851,6 +936,8 @@ def _captured_summary(
             parts.append(f"The policy requires at least {minimum} included pairs.")
         elif check.name in {"Allowed change", "Maximum NLL ratio"}:
             relation, value = check.required.split(" ", 1)
+            if check.name == "Maximum NLL ratio":
+                value = value.removesuffix(" ratio")
             parts.append(
                 "The policy requires the interval to stay "
                 + ("at or above " if relation == ">=" else "at or below ")

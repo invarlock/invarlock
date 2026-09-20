@@ -340,6 +340,18 @@ def test_containerd_manifest_identity_is_bound_to_the_recorded_config_digest(
     )
 
 
+def test_build_accepts_complete_bare_podman_inspection_identity(
+    harness: BuildHarness,
+) -> None:
+    statement = harness.root / "build-statement.json"
+    completed = harness.run(
+        [*harness.command(), "--statement", str(statement)],
+        environment=harness.environment(overrides={"FAKE_INSPECT_IMAGE_ID": "c" * 64}),
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(statement.read_text())["runtime_image_id"] == "sha256:" + "c" * 64
+
+
 def test_build_statement_is_no_clobber(harness: BuildHarness) -> None:
     statement = harness.root / "build-statement.json"
     statement.write_text("caller-owned\n", encoding="utf-8")
@@ -811,6 +823,30 @@ def _inspect_payload(**updates: object) -> dict[str, object]:
 @pytest.mark.parametrize(
     ("payload", "message"),
     (
+        (
+            _inspect_payload(
+                Id="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            ),
+            "missing its image identity",
+        ),
+        (
+            _inspect_payload(
+                Id="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            ),
+            "missing its image identity",
+        ),
+        (
+            _inspect_payload(
+                Id="gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg"
+            ),
+            "missing its image identity",
+        ),
+        (
+            _inspect_payload(
+                Id="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+            ),
+            "missing its image identity",
+        ),
         (_inspect_payload(Descriptor="bad"), "invalid descriptor"),
         (
             _inspect_payload(Descriptor={"digest": "sha256:" + "b" * 64}),

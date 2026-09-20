@@ -603,3 +603,18 @@ def test_render_html_rejects_symlinked_output_parent(tmp_path: Path) -> None:
     with pytest.raises(EvidenceReportError, match="parent must be a real directory"):
         render_evidence(evidence, html_path=linked_parent / "report.html")
     assert not (real_parent / "report.html").exists()
+
+
+@pytest.mark.parametrize("delta", [-0.25, -0.1])
+def test_authenticated_report_rejects_shifted_side_means_with_unchanged_delta(
+    tmp_path, delta
+):
+    report = _report()
+    report["baseline"]["mean_score"] += delta
+    report["subject"]["mean_score"] += delta
+    # Both means still imply the original +50 pp change, but contradict the counts.
+    evidence, _ = _evidence(tmp_path, report_payload=report)
+    destination = tmp_path / "report.html"
+    with pytest.raises(EvidenceReportError, match="side means.*paired outcome"):
+        render_evidence(evidence, html_path=destination)
+    assert not destination.exists()

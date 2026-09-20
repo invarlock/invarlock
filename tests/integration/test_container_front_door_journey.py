@@ -1,9 +1,17 @@
+"""Tiny-model OCI hardware plumbing; separate real-model runs qualify quality.
+
+INVARLOCK_RUNTIME_DEVICE explicitly selects cpu (default), cuda, or cuda:index.
+The checkpoint is authored on CPU; production provider execution moves its
+actual tensors to the requested device and retains independently checked facts.
+"""
+
 from __future__ import annotations
 
 import hashlib
 import importlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -32,6 +40,34 @@ def _module(name: str) -> ModuleType:
         return importlib.import_module(name)
     except ImportError as exc:  # pragma: no cover - exercised by the opt-in target
         pytest.fail(f"container smoke fixture requires {name}: {exc}")
+
+
+def _runtime_device() -> str:
+    device = os.environ.get("INVARLOCK_RUNTIME_DEVICE", "cpu")
+    if re.fullmatch(r"cpu|cuda(?::[0-9]+)?", device) is None:
+        raise ValueError("INVARLOCK_RUNTIME_DEVICE must be cpu, cuda, or cuda:index")
+    return device
+
+
+def _assert_runtime_device(
+    manifest_bytes: bytes, receipt_bytes: bytes, *, device: str, image_digest: str
+) -> dict[str, object]:
+    """Check original provider observations, bound by the runtime manifest."""
+    manifest = json.loads(manifest_bytes)
+    receipt = json.loads(receipt_bytes)
+    assert manifest["execution_mode"] == "container"
+    assert manifest["outer_container"]["image_digest"] == image_digest
+    assert manifest["runtime_provider"]["receipt"]["sha256"] == (
+        hashlib.sha256(receipt_bytes).hexdigest()
+    )
+    assert receipt["plugin"]["name"] == "hf_transformers"
+    facts = receipt["device"]
+    assert facts["device_kind"] == device.split(":", 1)[0]
+    assert facts["device_name"]
+    if device.startswith("cuda"):
+        assert re.fullmatch(r"[0-9]+\.[0-9]+", facts["compute_capability"] or "")
+        assert "CPU" not in facts["device_name"]
+    return facts
 
 
 def _private_key(path: Path) -> tuple[Path, str]:
@@ -66,7 +102,7 @@ def _run_child(
         "-e",
         "INVARLOCK_CONTAINER_EXECUTION=1",
         "-e",
-        "INVARLOCK_RUNTIME_DEVICE=cpu",
+        f"INVARLOCK_RUNTIME_DEVICE={_runtime_device()}",
     ]
     if image_digest is not None:
         command.extend(
@@ -115,7 +151,9 @@ def _run_host(
     )
 
 
-def _tiny_checkpoint(workspace: Path) -> tuple[Path, str, str]:
+def _tiny_checkpoint(
+    workspace: Path, *, metric: str = "exact_match"
+) -> tuple[Path, str, str]:
     torch = _module("torch")
     tokenizers = _module("tokenizers")
     transformers = _module("transformers")
@@ -154,7 +192,11 @@ def _tiny_checkpoint(workspace: Path) -> tuple[Path, str, str]:
     backend = tokenizers.Tokenizer(
         tokenizers.models.WordLevel(vocabulary, unk_token="<unk>")
     )
-    backend.pre_tokenizer = tokenizers.pre_tokenizers.Whitespace()
+    backend.pre_tokenizer = (
+        tokenizers.pre_tokenizers.WhitespaceSplit()
+        if metric == "normalized_nll_per_utf8_byte"
+        else tokenizers.pre_tokenizers.Whitespace()
+    )
     tokenizer = transformers.PreTrainedTokenizerFast(
         tokenizer_object=backend,
         bos_token="<bos>",
@@ -177,13 +219,22 @@ def _request(
     tokenizer_digest: str,
     output: str,
     provider: str = "hf_transformers",
+    metric: str = "exact_match",
 ) -> Path:
     inputs = workspace / "inputs"
     inputs.mkdir(exist_ok=True)
-    dataset_bytes = (
-        b'{"id":"tiny-1","prompt":"token-1 token-2 token-3",'
-        b'"expected":"not-the-random-model-output"}\n'
+    expected = (
+        " token-4 token-5"
+        if metric == "normalized_nll_per_utf8_byte"
+        else "not-the-random-model-output"
     )
+    dataset_bytes = (
+        json.dumps(
+            {"id": "tiny-1", "prompt": "token-1 token-2 token-3", "expected": expected},
+            separators=(",", ":"),
+        )
+        + "\n"
+    ).encode("utf-8")
     inputs.joinpath("records.jsonl").write_bytes(dataset_bytes)
     inputs.joinpath("policy.json").write_bytes(
         canonical_json_bytes(
@@ -192,7 +243,13 @@ def _request(
                     # This one-record fixture qualifies transaction plumbing,
                     # not an effect-size claim. Real published qualification
                     # uses the authenticated 400-record suites.
-                    "metrics": {"exact_match": {"delta_min_pp": -100.0}}
+                    "metrics": {
+                        metric: (
+                            {"delta_min_pp": -100.0}
+                            if metric == "exact_match"
+                            else {"ratio_max": 1.1}
+                        )
+                    }
                 }
             }
         )
@@ -211,7 +268,9 @@ def _request(
                     "batch_size": 1,
                     "checkpoint_tree_sha256": checkpoint_digest,
                     "context_length": 12,
-                    "max_output_tokens": 1,
+                    "max_output_tokens": 2
+                    if metric == "normalized_nll_per_utf8_byte"
+                    else 1,
                     "offline": True,
                     "seed": 19,
                     "timeout_seconds": 30,
@@ -237,7 +296,7 @@ def _request(
             },
             "policy": "inputs/policy.json",
             "task": "text_causal",
-            "metric": "exact_match",
+            "metric": metric,
         },
         "execution": {"mode": "run"},
         "output": {"evidence": output},
@@ -256,8 +315,10 @@ def _assert_ok(result: subprocess.CompletedProcess[str]) -> dict[str, object]:
     return payload
 
 
+@pytest.mark.parametrize("metric", ["exact_match", "normalized_nll_per_utf8_byte"])
 def test_runtime_image_host_front_door_evaluate_verify_report_and_fail_closed(
     tmp_path: Path,
+    metric: str,
 ) -> None:
     if os.environ.get("INVARLOCK_CONTAINER_SMOKE_INSTALLED_WHEEL") == "1":
         package = _module("invarlock")
@@ -273,6 +334,7 @@ def test_runtime_image_host_front_door_evaluate_verify_report_and_fail_closed(
         timeout=30,
     )
     image_digest = _normalized_config_id(inspected.stdout.strip())
+    device = _runtime_device()
 
     workspace = tmp_path / "workspace"
     workspace.mkdir()
@@ -288,7 +350,9 @@ def test_runtime_image_host_front_door_evaluate_verify_report_and_fail_closed(
     for retired in ("audit", "catalog", "doctor", "evidence-pack"):
         assert retired not in help_result.stdout
 
-    _checkpoint, checkpoint_digest, tokenizer_digest = _tiny_checkpoint(workspace)
+    _checkpoint, checkpoint_digest, tokenizer_digest = _tiny_checkpoint(
+        workspace, metric=metric
+    )
     evidence_signer_key, evidence_signer_fingerprint = _private_key(
         key_root / "evidence-signer.pem"
     )
@@ -298,6 +362,7 @@ def test_runtime_image_host_front_door_evaluate_verify_report_and_fail_closed(
         checkpoint_digest=checkpoint_digest,
         tokenizer_digest=tokenizer_digest,
         output="evidence",
+        metric=metric,
     )
     evaluated = _run_host(
         [
@@ -309,6 +374,8 @@ def test_runtime_image_host_front_door_evaluate_verify_report_and_fail_closed(
             engine,
             "--runtime-image",
             image_digest,
+            "--runtime-device",
+            device,
             "--json",
         ],
     )
@@ -316,6 +383,15 @@ def test_runtime_image_host_front_door_evaluate_verify_report_and_fail_closed(
     evidence = workspace / "evidence"
     assert evaluated_payload["evidence"] == str(evidence)
     assert evidence.is_dir()
+    for role in ("baseline", "subject"):
+        _assert_runtime_device(
+            (evidence / "providers" / role / "runtime.manifest.json").read_bytes(),
+            (
+                evidence / "providers" / role / "runtime-provider.receipt.json"
+            ).read_bytes(),
+            device=device,
+            image_digest=image_digest,
+        )
     input_anchors = {
         role: json.loads(
             (evidence / "inputs" / f"{role}.json").read_text(encoding="utf-8")
@@ -393,6 +469,7 @@ def test_runtime_image_host_front_door_evaluate_verify_report_and_fail_closed(
             checkpoint_digest=checkpoint_digest,
             tokenizer_digest=tokenizer_digest,
             output="qualification-lane-evidence",
+            metric=metric,
         )
         lane_evidence = workspace / "qualification-lane-evidence"
         lane_receipt = tmp_path / "qualification-lane-receipt.json"
@@ -447,7 +524,7 @@ def test_runtime_image_host_front_door_evaluate_verify_report_and_fail_closed(
                 "--container-engine",
                 engine,
                 "--runtime-device",
-                "cpu",
+                device,
                 "--runtime-cpus",
                 "2",
                 "--runtime-memory-mib",
@@ -466,11 +543,11 @@ def test_runtime_image_host_front_door_evaluate_verify_report_and_fail_closed(
         assert lane_payload["canary"]["compatibility"] == {
             "acceptance": {
                 "kind": "builtin_metric",
-                "metric": "exact_match",
+                "metric": metric,
             },
             "device_classes": {
-                "baseline": "cpu",
-                "subject": "cpu",
+                "baseline": device.split(":", 1)[0],
+                "subject": device.split(":", 1)[0],
             },
             "providers": {
                 "baseline": "hf_transformers",
@@ -502,6 +579,7 @@ def test_runtime_image_host_front_door_evaluate_verify_report_and_fail_closed(
         checkpoint_digest=checkpoint_digest,
         tokenizer_digest=tokenizer_digest,
         output="missing-digest-evidence",
+        metric=metric,
     )
     missing_digest = _run_host(
         [
@@ -512,7 +590,7 @@ def test_runtime_image_host_front_door_evaluate_verify_report_and_fail_closed(
             "--container-engine",
             engine,
             "--runtime-image",
-            image,
+            "invarlock-runtime:missing-digest-negative",
             "--json",
         ],
     )
@@ -564,6 +642,7 @@ def test_runtime_image_host_front_door_evaluate_verify_report_and_fail_closed(
         tokenizer_digest=tokenizer_digest,
         output="unavailable-provider-evidence",
         provider="unavailable_provider",
+        metric=metric,
     )
     unavailable = _run_host(
         [
@@ -575,6 +654,8 @@ def test_runtime_image_host_front_door_evaluate_verify_report_and_fail_closed(
             engine,
             "--runtime-image",
             image_digest,
+            "--runtime-device",
+            device,
             "--json",
         ],
     )
