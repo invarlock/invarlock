@@ -13,7 +13,7 @@ as JSON using the source-specific profiles below. Set
 `adapter: evaluator-native-json` in the captured request, alongside the actual
 source name/version, run ID, and artifact or hosted-service identity. All 19
 profiles share the same captured `evaluate`, `verify` and `report` flow. The
-producer needs no InvarLock installation or common export envelope; the recipient
+evaluator environment needs no InvarLock installation or common export envelope; the recipient
 needs only core InvarLock, with no evaluator SDK or account.
 
 For example, serialize the original DeepEval test cases with the SDK's own
@@ -22,7 +22,8 @@ explicit serializer:
 ```python
 import json
 
-rows = [{"id": case_id, "test_case": test_case.model_dump(mode="json")}
+rows = [{"id": case_id, "test_case": test_case.model_dump(mode="json"),
+         "metadata": test_case.metadata or {}}
         for case_id, test_case in captured_test_cases]
 if [row["id"] for row in rows] != planned_ids:
     raise ValueError("capture differs from the complete planned schedule")
@@ -32,8 +33,11 @@ with open("subject-native.json", "x", encoding="utf-8") as stream:
 
 `captured_test_cases` contains original `LLMTestCase` objects and stable IDs;
 `planned_ids` is the complete schedule frozen before execution, including
-failures. Capture the baseline with the same IDs, inputs, references and case
-metadata. Pin the independently reviewed `expected_case_set_digest` in policy,
+failures. The outer `metadata` preserves case slices, explicit numeric scores
+and likelihood facts; metadata inside `test_case` remains native context. For a
+failed task, retain its planned row with `actual_output=None` and set the outer
+`error` to the captured failure message. Do not omit the row or invent an answer.
+Capture the baseline with the same IDs, inputs, references and case metadata. Pin the independently reviewed `expected_case_set_digest` in policy,
 and approved complete-run digests when required. See the
 [raw source declaration](../../../docs/reference/evaluation-records.md#dedicated-evaluator-exports)
 and [captured workflow](../../../docs/user-guide/captured-results.md).
@@ -47,7 +51,7 @@ from invarlock.engine import export_evaluator_result, evaluator_input_capabiliti
 
 run = export_evaluator_result(
     "deepeval",
-    [{"id": case_id, "test_case": test_case}
+    [{"id": case_id, "test_case": test_case, "metadata": test_case.metadata or {}}
      for case_id, test_case in captured_test_cases],
     "subject-export.json",
     expected_ids=planned_ids,
@@ -67,20 +71,20 @@ scorers. SDK serializer smoke tests execute from source with minimal test
 dependencies; they do not prove SDK/core co-installation.
 
 MLflow 3.14.0 requires `cryptography<49`, which conflicts with core InvarLock's
-`cryptography>=50`. Keep that pinned producer separate, export its original
+`cryptography>=50`. Keep that pinned evaluator environment separate, export its original
 prediction table as JSON, and import with `evaluator-native-json`. There is no
 need to change either environment's dependencies for this handoff.
 
 ## Dedicated native shapes
 
 The raw JSON file follows the named profile below. Convert listed SDK objects
-with their explicit field serializers in the producer environment. With
+with their explicit field serializers in the evaluator environment. With
 compatible co-installation, those SDK objects can instead be passed as the
 Python exporter's `result` argument. Scalar entries carry a caller-owned `id`; their `metric_result` is
 optional. Capture original outputs without running an upstream metric when
 InvarLock will score them. If supplied, the native metric result is preserved and
 validated. Arbitrary SDK objects and ambiguous multiple responses require an
-explicit mapping or selection by the producer. Reference fields may be omitted
+explicit mapping or selection by the capture process. Reference fields may be omitted
 for reference-free judge tasks where the SDK profile permits them. LightEval
 retains its explicit choices/gold-index profile. Missing references make exact
 match and NLL unavailable; they do not require a fabricated gold answer. JSON
@@ -133,15 +137,87 @@ result = {"attempts": actual_attempts, "source_cases": source_cases}
 Provide every generation, including errors, and preserve the exact original
 prompt. Attack targets and detector scores are not answer references. Use a
 reviewed `expected: null` for a reference-free judge task. Attempt history and
-its completion state remain in context. For a separate Langfuse producer, serialize the public ExperimentResult fields
-as a bare JSON object. `dataclasses.asdict(result)` works for local experiments
-whose dataset items already contain JSON values. Hosted dataset-item objects
-need their SDK serializer with Python field names and ISO-formatted dates; do
-not silently rename fields or convert arbitrary objects to text. The raw adapter
-uses the explicitly declared request source version. With compatible
-co-installation, the Python exporter accepts ExperimentResult directly and
-retains its existing envelope format. The [Langfuse example](../../integrations/langfuse/README.md)
-describes dataset item identities and explicit failure capture.
+its completion state remain in context.
+
+## Capture a Langfuse experiment as JSON
+
+Langfuse 4.14.1 uses ordinary result classes. Copy their public fields explicitly;
+this recipe needs only the SDK and Python's standard library. Supply the actual
+ExperimentResult as `result` and the complete independently planned `planned_ids`.
+It accepts local dictionary items and hosted DatasetItem objects, preserving
+metadata, evaluations, trace IDs and dataset fields.
+
+```python
+import json
+from langfuse.api import DatasetItem
+
+
+def capture_evaluation(value):
+    return {key: getattr(value, key) for key in (
+        "name", "value", "comment", "metadata", "data_type", "config_id"
+    )}
+
+
+def capture_item(value):
+    if isinstance(value, dict):
+        return dict(value)
+    if not isinstance(value, DatasetItem):
+        raise TypeError("expected a local item dictionary or DatasetItem")
+    item = {key: getattr(value, key) for key in (
+        "id", "input", "expected_output", "metadata", "source_trace_id",
+        "source_observation_id", "dataset_id", "dataset_name"
+    )}
+    item["status"] = value.status.value
+    for key in ("created_at", "updated_at"):
+        item[key] = getattr(value, key).isoformat()
+    item["media_references"] = [
+        media.model_dump(mode="json") for media in value.media_references
+    ]
+    return item
+
+
+native = {key: getattr(result, key) for key in (
+    "name", "run_name", "description", "experiment_id",
+    "dataset_run_id", "dataset_run_url"
+)}
+native["item_results"] = [{
+    "item": capture_item(row.item),
+    "output": row.output,
+    "evaluations": [capture_evaluation(value) for value in row.evaluations],
+    "trace_id": row.trace_id,
+    "dataset_run_id": row.dataset_run_id,
+} for row in result.item_results]
+native["run_evaluations"] = [
+    capture_evaluation(value) for value in result.run_evaluations
+]
+ids = []
+for row in native["item_results"]:
+    item = row["item"]
+    local_id = (item.get("metadata") or {}).get("invarlock_id")
+    hosted_id = item.get("id")
+    if local_id is not None and hosted_id is not None and local_id != hosted_id:
+        raise ValueError("conflicting local and hosted item IDs")
+    identity = hosted_id if hosted_id is not None else local_id
+    if not isinstance(identity, str) or not identity.strip():
+        raise ValueError("every item requires a stable ID")
+    ids.append(identity)
+if (not planned_ids or len(planned_ids) != len(set(planned_ids))
+        or len(ids) != len(set(ids)) or set(ids) != set(planned_ids)):
+    raise ValueError("capture differs from the complete planned schedule")
+with open("langfuse-native.json", "x", encoding="utf-8") as stream:
+    json.dump(native, stream, ensure_ascii=False, allow_nan=False)
+```
+
+Use `adapter: evaluator-native-json`, `source: {name: langfuse, version: "4.14.1"}`
+and the actual `result.run_name` as the request's `run_id`. Keep the whole
+planned schedule: Langfuse may omit failed tasks from `item_results`. Capture
+failures in your task wrapper with null output and
+`item.metadata.invarlock_error`, or complete the missing capture before export.
+The ID check rejects omitted results. Hosted item dates use ISO text and Python
+field names, avoiding the API aliases used by generic SDK dumps. With compatible
+co-installation, the common Python exporter accepts ExperimentResult directly.
+The [Langfuse example](../../integrations/langfuse/README.md) explains identities
+and failure capture in the complete handoff.
 
 ## Metrics, slices and scorer facts
 
@@ -335,7 +411,7 @@ shared scorers and recipient verification/reporting. It adapts retained model
 answers and likelihoods with explicit source bindings, and uses synthetic
 complete judge-call fixtures. It does not claim that each SDK produced new
 model or judge measurements. Separate pinned SDK smoke tests use actual native
-objects and local evaluator calls to check the producer boundary. Neither kind
+objects and local evaluator calls to check the capture interface. Neither kind
 of test is a new model-quality campaign or a replacement for the historical
 qualification matrix.
 

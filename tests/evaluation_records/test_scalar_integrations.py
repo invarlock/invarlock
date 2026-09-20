@@ -6,6 +6,7 @@ import copy
 import importlib.metadata
 import json
 import os
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -263,6 +264,7 @@ def test_pinned_sdk_objects(evaluator, monkeypatch, tmp_path):
         entry["test_case"] = LLMTestCase(**entry["test_case"])
         entry["metric_result"] = ExactMatchMetric()
         entry["metric_result"].measure(entry["test_case"])
+        _documented_deepeval_raw_capture(entry["test_case"], tmp_path, monkeypatch)
     elif evaluator == "ragas":
         import asyncio
 
@@ -524,3 +526,91 @@ def test_empty_or_unsupported_metric_lists(evaluator):
     entry["metric_result"] = []
     with pytest.raises(EvaluationRecordsError):
         export_records(evaluator, [entry])
+
+
+def _documented_deepeval_raw_capture(test_case, tmp_path, monkeypatch):
+    from invarlock.evaluation_record_contracts.contracts import digest
+    from invarlock.evaluation_records.adapters import load_run
+
+    document = (
+        Path(__file__).resolve().parents[2]
+        / "examples/evaluator-qualification/maintained/CAPTURE.md"
+    )
+    blocks = [
+        part.split("```", 1)[0]
+        for part in document.read_text().split("```python\n")[1:]
+    ]
+    test_case.metadata = {
+        "category": "documented-slice",
+        "invarlock_scores": {"quality": 0.75},
+        "invarlock_likelihood": {
+            "basis": "reference_continuation",
+            "logprob_sum": -0.5,
+            "token_count": 1,
+            "utf8_byte_count": len(test_case.expected_output.encode("utf-8")),
+            "input_digest": digest(test_case.input),
+            "reference_digest": digest(test_case.expected_output),
+            "artifact_digest": "sha256:" + "a" * 64,
+            "configuration_digest": digest("documented-configuration"),
+            "tokenizer_digest": digest("documented-tokenizer"),
+            "source": {"name": "deepeval", "version": "4.1.3"},
+        },
+    }
+    monkeypatch.chdir(tmp_path)
+    namespace = {
+        "captured_test_cases": [("case-1", test_case)],
+        "planned_ids": ["case-1"],
+    }
+    exec(compile(blocks[0], str(document), "exec"), namespace)
+    path = tmp_path / "subject-native.json"
+    captured = json.loads(path.read_text())
+    assert captured[0]["metadata"] == test_case.metadata
+    run = load_run(
+        path,
+        adapter="evaluator-native-json",
+        source={"name": "deepeval", "version": "4.1.3"},
+        run_id="documented",
+        artifact_digest="sha256:" + "a" * 64,
+    )
+    assert run["records"][0]["metadata"] == {"category": "documented-slice"}
+    assert run["records"][0]["scores"] == {"quality": 0.75}
+    assert run["records"][0]["likelihood"] == test_case.metadata["invarlock_likelihood"]
+    # Independent scheduled membership is checked by the actual documented code.
+    path.unlink()
+    namespace["planned_ids"] = ["case-1", "missing"]
+    with pytest.raises(ValueError, match="complete planned schedule"):
+        exec(compile(blocks[0], str(document), "exec"), namespace)
+    assert not path.exists()
+    return blocks[1], document, test_case
+
+
+def test_documented_deepeval_python_capture(tmp_path, monkeypatch):
+    pytest.importorskip("deepeval")
+    if importlib.metadata.version("deepeval") != "4.1.3":
+        pytest.skip("requires pinned deepeval==4.1.3")
+    from deepeval.test_case import LLMTestCase
+
+    from invarlock.evaluation_records.adapters import load_run
+
+    test_case = LLMTestCase(
+        input="Question?", actual_output="Answer", expected_output="Answer"
+    )
+    code, document, test_case = _documented_deepeval_raw_capture(
+        test_case, tmp_path, monkeypatch
+    )
+    namespace = {
+        "captured_test_cases": [("case-1", test_case)],
+        "planned_ids": ["case-1"],
+        "model_artifact_digest": "sha256:" + "a" * 64,
+    }
+    exec(compile(code, str(document), "exec"), namespace)
+    run = load_run(
+        tmp_path / "subject-export.json",
+        adapter="evaluator-json",
+        source={"name": "deepeval", "version": "4.1.3"},
+        run_id="subject-campaign",
+        artifact_digest="sha256:" + "a" * 64,
+    )
+    assert run["records"][0]["metadata"] == {"category": "documented-slice"}
+    assert run["records"][0]["scores"] == {"quality": 0.75}
+    assert run["records"][0]["likelihood"] == test_case.metadata["invarlock_likelihood"]
