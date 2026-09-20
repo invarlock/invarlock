@@ -23,6 +23,15 @@ produce judge analysis and verification results described in
 [judge measurements](judge-measurements.md); they do not use the native
 `invarlock/comparison-report-v3` shape. All are rendered by `invarlock report`.
 
+## Report appearance
+
+HTML reports open in light mode by default. The **Dark mode** button records an
+explicit choice for reports on the same browser origin. Reports do not switch
+based on the operating system theme. Documentation preferences remain separate.
+Without JavaScript, reports stay light and all evidence remains readable. If
+browser storage is unavailable, the button still works for the current page.
+Printing always uses the light palette and hides the theme control.
+
 ## Runtime-side report
 
 Each side has an `invarlock/runtime-side-report-v1` object:

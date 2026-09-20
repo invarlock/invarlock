@@ -15,6 +15,8 @@ from dataclasses import dataclass, field
 from html import escape as html_escape
 from typing import Any
 
+from invarlock.report_theme import apply_report_theme
+
 _DISPLAY_CONTROL_RE = re.compile(
     r"[\x00-\x08\x0b-\x1f\x7f-\x9f\u061c\u200e\u200f\u2028\u2029\u202a-\u202e\u2066-\u2069]"
 )
@@ -911,7 +913,7 @@ def render_html(view: ReportView) -> str:
         parts[-1] = parts[-1].replace(
             "</body>", f"<script>{_METRIC_TABS_SCRIPT}</script></body>"
         )
-    return "".join(parts)
+    return apply_report_theme("".join(parts))
 
 
 def render_markdown(view: ReportView, *, include_details: bool = False) -> str:

@@ -184,7 +184,7 @@ def test_report_escapes_external_labels_and_omits_large_run_payloads():
     result = render_html(pack_json(value, "report"), evidence=value)
     parsed = Tags()
     parsed.feed(result)
-    assert "img" not in parsed.tags and "script" not in parsed.tags
+    assert "img" not in parsed.tags and parsed.tags.count("script") == 1
     assert not any(
         name in {"src", "href", "onerror", "onload"} for name, _ in parsed.attributes
     )
@@ -461,7 +461,7 @@ def test_multi_metric_navigation_escapes_labels_and_authorizes_only_fixed_script
     html = render_html(pack_json(value, "report"), evidence=value)
     parsed = Tags()
     parsed.feed(html)
-    assert parsed.tags.count("script") == 1 and "img" not in parsed.tags
+    assert parsed.tags.count("script") == 2 and "img" not in parsed.tags
     ids = [value for name, value in parsed.attributes if name == "id"]
     assert len(ids) == len(set(ids))
     links = [value for name, value in parsed.attributes if name == "href"]
@@ -490,7 +490,7 @@ def test_multi_metric_navigation_escapes_labels_and_authorizes_only_fixed_script
         for name, value in parsed.attributes
         if name == "content" and "default-src" in value
     )
-    assert f"script-src 'sha256-{digest}'" in csp
+    assert f"'sha256-{digest}'" in csp
     assert "script-src 'unsafe-inline'" not in csp
     assert "unsafe-eval" not in csp
     assert attack not in script
@@ -508,13 +508,14 @@ def test_single_metric_uses_simple_detail_without_navigation():
     assert "Decision checks" in html
 
 
-def test_multiple_scopes_of_one_metric_need_no_tabs_or_script():
+def test_multiple_scopes_of_one_metric_need_no_tabs_script():
     baseline, candidate, policy = example_project("classification")
     policy["metrics"] = policy["metrics"][:1]
     value = build_pack(baseline, candidate, policy)
     html = render_html(pack_json(value, "report"), evidence=value)
     assert 'class="results-overview"' in html
     assert 'class="metric-navigation"' not in html
-    assert "<script" not in html
+    assert html.count("<script") == 1
+    assert 'id="report-theme-script"' in html
     assert html.count('id="metric-result-') == 2
     assert "overall" in html and "exceptions" in html

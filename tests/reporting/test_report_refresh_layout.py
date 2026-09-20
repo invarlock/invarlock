@@ -447,8 +447,8 @@ def test_checks_have_mobile_labels_and_dark_theme_is_screen_only():
         assert f'data-label="{label}"' in html
         assert f'aria-hidden="true">{label}</span>' in html
     assert "min-width:540px" not in _CSS
-    assert "@media screen and (prefers-color-scheme:dark)" in _CSS
-    assert _CSS.index("prefers-color-scheme:dark") < _CSS.index("@media print")
+    assert "prefers-color-scheme" not in html
+    assert html.index('data-report-theme="dark"') < html.index("@media print")
     assert "default-src 'none'" in html
 
 
