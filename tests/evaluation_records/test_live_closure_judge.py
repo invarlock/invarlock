@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import importlib.util
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -475,3 +476,99 @@ def test_reviewed_new_campaign_ceiling_and_price_cannot_be_raised_or_understated
     spec[field] = value
     with pytest.raises(ValueError, match="explicit campaign limits"):
         LIVE.validate_spec(spec)
+
+
+@pytest.mark.parametrize("evaluator", sorted(LIVE.EVALUATORS))
+@pytest.mark.parametrize("route", ["envelope", "native-json"])
+def test_real_loopback_hosted_capture_freezes_and_verifies_judge_subject(
+    tmp_path, monkeypatch, evaluator, route
+):
+    """Real HTTP transports test-only observations; judge answers stay synthetic."""
+    import asyncio
+
+    from typer.testing import CliRunner
+
+    from invarlock.cli.app import app
+    from invarlock.evaluation_records.identity import evaluated_subject_digest
+    from invarlock.judge_measurements import CollectionOptions, RunnerOptions
+    from invarlock.judge_measurements.evidence import publish_judge_evidence
+    from tests.evaluation_records import test_live_http_service as http_fixture
+
+    original_fixture = http_fixture.FIXTURE.fixture
+    monkeypatch.setattr(
+        http_fixture.FIXTURE,
+        "fixture",
+        lambda *args, **kwargs: original_fixture(
+            *args, metadata={"source_cluster_id": "synthetic-http-unit"}, **kwargs
+        ),
+    )
+    protocol, _, args = http_fixture.captured(tmp_path, monkeypatch, evaluator)
+    index = tmp_path / "hosted-index.json"
+    COMMON.write(
+        index, {evaluator: {"baseline": str(args[2]), "subject": str(args[3])}}
+    )
+    spec = {
+        "format": LIVE.FORMAT,
+        "maximum_calls": 1288,
+        "maximum_cost_microusd": 40_185_600,
+        "cost_microusd_per_call": 31200,
+        "groups": [
+            {
+                "id": "hosted",
+                "protocol": str(args[0]),
+                "protocol_sha256": args[1],
+                "captures": str(index),
+                "evaluators": [evaluator],
+                "routes": [route],
+                "case_count": len(protocol["cases"]),
+                "profile": "primary",
+                "admitted_calls": None,
+            }
+        ],
+    }
+    specification_path = tmp_path / "hosted-specification.json"
+    COMMON.write(specification_path, spec)
+    root = tmp_path / "hosted-campaign"
+    ledger = LIVE.freeze(specification_path, root)
+    pin, ident = COMMON.digest(ledger), ledger["entries"][0]["id"]
+    _, _, values, _ = LIVE.entry_inputs(root, pin, ident)
+    assert values["subject_run"]["artifact_digest"] is None
+    assert values["subject_run"]["service_identity"]
+    measurement_collector(monkeypatch)
+    import invarlock.judge_measurements as api
+
+    measured = asyncio.run(
+        api.collect_configured(
+            values["plan"],
+            CollectionOptions(**values["recipe"]["collection"]),
+            RunnerOptions(root / "unused", **values["recipe"]["runner"]),
+            values["baseline_run"],
+            values["subject_run"],
+            on_stop=lambda _: None,
+        )
+    )
+    publish_judge_evidence(
+        root / ident / "evidence",
+        plan=values["plan"],
+        measurements=measured,
+        baseline_run=values["baseline_run"],
+        subject_run=values["subject_run"],
+        analysis_policy=values["analysis_policy"],
+        signing_key=root / ident / "signer.pem",
+        signer_identity=LIVE.BASE.SIGNER,
+    )
+
+    def local_cli(directory, *arguments, allowed=(0,), **kwargs):
+        with monkeypatch.context() as patch:
+            patch.chdir(directory)
+            result = CliRunner().invoke(app, list(arguments))
+        assert result.exit_code in allowed, result.output
+        return json.loads(result.stdout)
+
+    monkeypatch.setattr(LIVE.BASE, "cli", local_cli)
+    verified = LIVE.verify(root, pin, ident)
+    assert verified["authenticated"] and verified["verified"] and verified["replayed"]
+    assert verified["intended_subject"] == evaluated_subject_digest(
+        values["subject_run"]
+    )
+    assert verified["decision"] == "insufficient_evidence"
