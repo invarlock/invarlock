@@ -20,7 +20,11 @@ case "$SDK_NAME" in
     SDK_TEST="tests/evaluation_records/test_original_sdk_capture.py::test_pinned_original_sdk_serialization[$SDK_NAME]" ;;
   *) echo "Choose a supported evaluator from the integration guide." >&2; exit 2 ;;
 esac
-SDK_TESTS=("$SDK_TEST")
+SDK_TESTS=("$SDK_TEST" "tests/evaluation_records/test_sdk_installed_handoff.py")
+case "$SDK_NAME" in
+  deepeval|ragas|lighteval|hugging-face-evaluate|autoevals|openevals|arize-phoenix-evals|opik)
+    SDK_TESTS+=("tests/evaluation_records/test_sdk_scalar_roundtrip.py") ;;
+esac
 SDK_RECIPE_DEPS=(--with pytest==9.1.1 --with jsonschema==4.26.0)
 SDK_TEMP="$(mktemp -d)"
 trap 'rm -rf "$SDK_TEMP"' EXIT
@@ -38,6 +42,23 @@ export PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
 export INVARLOCK_REQUIRE_EVALUATOR_SDK="$SDK_NAME"
 export HF_HUB_OFFLINE=1 HF_DATASETS_OFFLINE=1
 export DEEPEVAL_TELEMETRY_OPT_OUT=YES RAGAS_DO_NOT_TRACK=true OPIK_TRACK_DISABLE=true OTEL_SDK_DISABLED=true
+# SDK serialization and recipient verification run in different environments.
+# A caller may supply an already installed candidate; otherwise install the
+# current built wheel into a fresh hash-locked core-only environment.
+if [ -z "${INVARLOCK_EVALUATOR_PARITY_PYTHON:-}" ]; then
+  shopt -s nullglob
+  SDK_WHEELS=("$SDK_ROOT"/dist/invarlock-*.whl)
+  if [ "${#SDK_WHEELS[@]}" -ne 1 ]; then
+    echo "Build exactly one candidate wheel with make dist-check first." >&2
+    exit 2
+  fi
+  uv venv --python 3.12 "$SDK_TEMP/recipient"
+  uv pip install --python "$SDK_TEMP/recipient/bin/python" --require-hashes \
+    -r "$SDK_ROOT/requirements/workflows/release-install-py312.txt"
+  uv pip install --python "$SDK_TEMP/recipient/bin/python" --no-deps "${SDK_WHEELS[0]}"
+  uv pip check --python "$SDK_TEMP/recipient/bin/python"
+  export INVARLOCK_EVALUATOR_PARITY_PYTHON="$SDK_TEMP/recipient/bin/python"
+fi
 SDK_LOCK="$SDK_ROOT/examples/evaluator-qualification/locks/$SDK_NAME.txt"
 test -f "$SDK_LOCK"
 # The top-level SDK versions are pinned by the maintained evaluator inventory.

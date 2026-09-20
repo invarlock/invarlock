@@ -718,7 +718,7 @@ langfuse-sdk-test: dist-check  ## Qualify real Langfuse exports and SDK-free ins
 evaluator-parity-test: dist-check  ## Replay all 19 dedicated profiles through an installed core recipient
 	PYTHON=$(PYTHON) bash scripts/evaluator_parity_gate.sh
 
-evaluator-sdk-test:  ## Exercise one installed evaluator SDK without model or service calls
+evaluator-sdk-test: dist-check  ## Pass actual evaluator SDK exports through an installed recipient
 	bash scripts/evaluator_sdk_gate.sh "$(EVALUATOR)"
 
 install-smoke: dist-check  ## Install and discover the wheel outside the source checkout

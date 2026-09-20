@@ -8,8 +8,11 @@ on:
       - 'src/invarlock/evaluation_record_contracts/**'
       - 'tests/evaluation_records/**'
       - 'tests/examples/test_langfuse_export.py'
+      - 'tests/integration/test_evaluator_parity.py'
+      - 'examples/integrations/evaluator-parity/**'
       - 'examples/evaluator-qualification/maintained/CAPTURE.md'
       - 'examples/evaluator-qualification/locks/**'
+      - 'examples/evaluator-qualification/matrix.json'
       - 'scripts/evaluator_sdk_gate.sh'
       - '.github/workflows/evaluator-sdk.yml'
   workflow_dispatch:
