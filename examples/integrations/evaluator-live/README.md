@@ -198,3 +198,126 @@ the original SDK export, execution ledger, recipient outcome, reports and
 rejection tests. Record setup and execution time separately. Preserve adverse
 outcomes. A row is qualified only after its real capture, scorer measurements
 and independent recipient checks exist. Controlled callbacks alone cannot close it.
+
+## Controlled HTTP task service
+
+The priority Inspect, Harness, Promptfoo and Langfuse callbacks can use a real
+loopback HTTP boundary before reaching the private model worker. This example's
+`/v1/tasks` endpoint returns generation and reference-continuation likelihood.
+It is a controlled HTTP task service, not an OpenAI-compatible API or qualification
+of a third-party cloud provider. The separate
+[HTTP completion example](../../hosted-service/README.md) covers the
+OpenAI-compatible completion profile and its stated scoring limits.
+
+Before admitting this profile, add `http_services.baseline` and
+`http_services.subject` to the frozen protocol. Each declaration must contain
+`provider`, `service`, `deployment`, `requested_model`, `endpoint` and
+`helper_sha256`. Use distinct endpoints such as
+`http://127.0.0.1:18081/v1/tasks` and `http://127.0.0.1:18082/v1/tasks`; the helper
+rejects DNS names, non-loopback addresses, redirects and alternate paths. Pin the
+physical SHA-256 of `http_service.py` after reviewing the source. Recompute and
+independently approve the complete protocol digest before starting workers.
+
+Start the ordinary model worker with that protocol, then start the HTTP bridge:
+
+```bash
+python examples/integrations/evaluator-live/http_service.py \
+  --protocol /path/to/http-protocol.json \
+  --protocol-sha256 sha256:REVIEWED_DIGEST --role baseline \
+  --socket /private/path/baseline.sock --output /path/to/new-http-baseline
+```
+
+Run both the worker and bridge under the external `supervise.py` process-group
+deadline described above. The bridge additionally applies a whole-process alarm
+that interrupts slow HTTP reads and worker waits. Repeat for the subject, then
+run the ordinary capture command in each admitted SDK environment. Presence of
+`http_services` selects the declared HTTP endpoint. Omit `--socket` from the
+HTTP capture command; local captures still require their private socket. Python capture network permission is
+limited to the exact endpoint, alongside Promptfoo's existing local callback
+bridge permission.
+
+The request carries the exact frozen task text, reference and configuration.
+References are used for continuation likelihood; they are not appended to the
+model's generation prompt. The server checks these values before invoking the
+worker, then returns model identity and configuration from the actual worker
+result. HTTP bodies and observed timing remain separate from the unchanged
+artifact-bound task results. Interrupted or lost responses cannot silently repeat
+an admitted task.
+
+The complete observation window becomes known only after capture. Therefore the
+helper retains the original SDK JSON as `native-original.json`, records its byte
+digest, and explicitly derives `native.json` with hosted NLL identity bindings.
+The derivation preserves numerical likelihoods and original artifact facts. Its
+canonical run has `artifact_digest: null` and a `service_identity` descriptor;
+the descriptor's digest identifies the observed service, never hidden weights.
+The independent recipient rechecks HTTP requests and responses against every
+original task, recomputes the observed window and exact export derivation, and
+then runs the existing scorer and judge-plan workflows offline. No historical
+capture or judge measurement can be relabeled as a fresh HTTP execution.
+
+## Extended four-evaluator judge campaign
+
+`closure_judge.py` freezes a separate campaign for Inspect, Harness, Promptfoo
+and Langfuse. It preserves the original sentinel's plans and limits. Build and
+install the current core wheel in both the provider and recipient environments
+before using the new batch stop/resume control.
+
+Prepare a JSON specification with `format: invarlock/live-judge-campaign-v2`,
+`maximum_calls`, `maximum_cost_microusd`, `cost_microusd_per_call: 31200`, and a
+`groups` list. The helper caps this specific campaign at 1,288 admitted calls and
+40,185,600 microdollars ($40.1856); these are campaign reservations, not core
+InvarLock limits or estimates of the bill. Lower caps are allowed if the schedule
+fits. Each group has exactly these fields:
+
+| Field | Required value |
+| --- | --- |
+| `id` | Unique lowercase letters, digits and hyphens, at most 48 characters |
+| `protocol`, `protocol_sha256` | Protocol path and its independently checked canonical digest |
+| `captures` | JSON index mapping evaluator names to original `baseline` and `subject` capture directories |
+| `evaluators` | Selected names from `inspect-ai`, `lm-evaluation-harness`, `promptfoo`, `langfuse` |
+| `routes` | `envelope`, `native-json`, or both |
+| `case_count` | Exact complete case count in this group's protocol |
+| `profile` | `primary`, `reference-free`, `repeat-control`, or `budget-control` |
+| `admitted_calls` | `null`, except an explicit smaller positive call cap for `budget-control` |
+
+Primary judging uses per-case references and one rating per side/case.
+Reference-free judging uses one rating without references; repeat-control uses
+three ratings with references. Budget-control uses a separate reference-free
+three-rating plan with a smaller admission limit, deliberately retaining an
+incomplete outcome. Repetitions never increase the independent case count.
+
+The proposed extension consists of four 64-case local primary comparisons
+(1,024 calls across both routes), four eight-case HTTP primary comparisons
+(128), Langfuse's original eight-case reference-free and repetition controls
+(128), and four two-call budget controls (8). The budget controls deliberately
+leave 184 trials unadmitted. Those incomplete controls are not model-quality
+references. Freezing this proposal does not perform or authorize collection:
+
+```bash
+/path/to/recipient/bin/python -I examples/integrations/evaluator-live/closure_judge.py freeze \
+  --specification /path/to/specification.json --output /path/to/new-campaign
+```
+
+Review the resulting plans, original inputs and aggregate reservation. After
+collection is authorized, pass the printed admission digest and an entry ID from
+its manifest to the provider environment:
+
+```bash
+/path/to/provider/bin/python -I examples/integrations/evaluator-live/closure_judge.py collect \
+  --root /path/to/new-campaign --admission-sha256 sha256:REVIEWED_DIGEST \
+  --entry local-primary-inspect-ai-envelope \
+  --recipient-python /path/to/recipient/bin/python \
+  --execute-collection --stop-after-batches 1
+```
+
+Use the same command with `--resume`, omitting `--stop-after-batches`, to finish
+that entry. The pause occurs after a batch is durably retained and adds no calls
+to its original schedule. Earlier attempts and reservations remain charged.
+Completed collections and budget-exhausted controls produce signed evidence;
+verification and reporting run in the separate offline recipient. If only that
+recipient step fails after publication, `--resume` retries the recipient step
+without collecting again. An already verified entry refuses further collection.
+
+Keep fresh execution status separate from these implementation instructions.
+Only retained results and their independent replay close the corresponding
+qualification rows.

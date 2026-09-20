@@ -27,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   from controlled-callback tests and retained replays. Retain the Mistral 7B
   sentinel across all 19 profiles and 114 scorer/import journeys, including
   original blocked judge attempts and independently replayable results.
+  Add controlled HTTP task capture with original response retention, service-bound
+  likelihood replay, and separately bounded extended judge campaigns.
 
 - Retain signed Docker and Podman CUDA execution references for native scorers,
   TensorRT-LLM and vision-text, with compact offline replay and frozen provenance.

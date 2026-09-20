@@ -26,6 +26,8 @@ EXAMPLE_TESTS = (
     "tests/evaluation_records/test_live_harness_capture.py",
     "tests/evaluation_records/test_live_harness_serialization_recovery.py",
     "tests/evaluation_records/test_live_judge.py",
+    "tests/evaluation_records/test_live_closure_judge.py",
+    "tests/evaluation_records/test_live_http_service.py",
     "tests/evaluation_records/test_live_lighteval_resources.py",
     "tests/evaluation_records/test_live_model_worker.py",
     "tests/evaluation_records/test_live_network.py",
