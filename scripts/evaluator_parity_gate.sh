@@ -27,6 +27,10 @@ PARITY_RECIPIENT="${PARITY_TEMP}/recipient/bin/python"
 "${PARITY_RECIPIENT}" -m pip install --no-index "${parity_wheels[0]}"
 "${PARITY_RECIPIENT}" -m pip check
 cd "${PARITY_TEMP}"
+"${PARITY_RECIPIENT}" -I \
+  "${ROOT_DIR}/examples/integrations/evaluator-parity/real_judge.py" \
+  --recipient-python "${PARITY_RECIPIENT}" \
+  --output "${PARITY_TEMP}/retained-judge"
 INVARLOCK_EVALUATOR_PARITY_PYTHON="${PARITY_RECIPIENT}" \
   "${PARITY_PYTHON}" -m pytest -q \
   "${ROOT_DIR}/tests/integration/test_evaluator_parity.py" \
