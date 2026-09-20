@@ -12,7 +12,9 @@ import subprocess
 import sys
 import tempfile
 import threading
+from contextlib import contextmanager, nullcontext
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -54,26 +56,48 @@ from pathlib import Path
 sys.path.insert(0, sys.argv[1])
 import common, bindings
 recipient = common.module("recipient")
+common.module("network").configure("judge-recipient")
 identity = recipient.installed_identity()
-from invarlock.engine import load_run
+from invarlock.engine import export_evaluator_result, load_run
 capture = Path(sys.argv[2])
 protocol = common.read(capture / "protocol.json")
 manifest = common.read(capture / "capture.json")
 evaluator = manifest["evaluator"]
 payload = common.read(capture / "native.json", limit=128*1024*1024)
+service_identity = manifest.get("service_identity")
+if service_identity is not None:
+    frozen_protocol = {key:value for key,value in protocol.items() if key != "role"}
+    recipient.capture(capture, frozen_protocol, "baseline", evaluator)
 run = load_run(capture / "native.json", adapter="evaluator-native-json",
     source={"name":evaluator,"version":manifest["version"]},
     run_id=payload["run_name"] if evaluator == "langfuse" else "synthetic-cli-contract",
-    artifact_digest=protocol["models"]["baseline"]["artifact_digest"],
+    artifact_digest=None if service_identity else protocol["models"]["baseline"]["artifact_digest"],
+    service_identity=service_identity,
     input_projection=bindings.projection(evaluator))
 case = protocol["cases"][0]
 response = common.read(next((capture / "tasks").glob("*.response.json")))
 record = run["records"][0]
-bindings.check_record(record,response["result"],case,evaluator,manifest["version"])
+bindings.check_record(record,response["result"],case,evaluator,manifest["version"],
+    service_identity=service_identity)
 bound = bindings.bind_result(response["result"],case,evaluator,manifest["version"])
 for name in ("invarlock_model_execution","invarlock_capture_binding"):
     assert recipient.contains(record,name,bound["metadata"][name])
-print(json.dumps({"run":run,"recipient":identity}))
+routes = ["evaluator-native-json"]
+if service_identity is not None:
+    envelope = capture.parent / "recipient-envelope.json"
+    native = {"format":"invarlock/langfuse-export-v1", "sdk_version":manifest["version"],
+        "result":payload} if evaluator == "langfuse" else payload
+    options = dict(run_id=run["run_id"], artifact_digest=None,
+        service_identity=service_identity, input_projection=bindings.projection(evaluator))
+    exported = export_evaluator_result(evaluator,native,envelope,
+        expected_ids=[case["id"]],source_version=manifest["version"],**options)
+    imported = load_run(envelope,adapter="evaluator-json",
+        source={"name":evaluator,"version":manifest["version"]},**options)
+    assert imported == exported
+    assert imported["records"] == run["records"]
+    assert imported["service_identity"] == run["service_identity"]
+    routes.append("evaluator-json")
+print(json.dumps({"run":run,"recipient":identity,"routes":routes}))
 """
 
 
@@ -131,8 +155,53 @@ def _environment(directory):
     return environment
 
 
+@contextmanager
+def _http_gateway(protocol, address, directory):
+    from invarlock.security import temporarily_allow_network
+
+    with patch.dict(sys.modules, {"common": COMMON}):
+        http = COMMON.module("http_service")
+    with temporarily_allow_network():
+        gateway, _ = http.make_server(
+            protocol, "baseline", address, directory / "gateway"
+        )
+    failures = []
+    stop = threading.Event()
+
+    def serve():
+        try:
+            with temporarily_allow_network():
+                while not stop.is_set():
+                    gateway.handle_request()
+        except Exception as exc:
+            failures.append(exc)
+
+    with gateway:
+        thread = threading.Thread(target=serve, daemon=True)
+        thread.start()
+        try:
+            yield
+        finally:
+            stop.set()
+            thread.join(timeout=15)
+        assert not thread.is_alive(), "HTTP gateway did not stop"
+        assert not failures
+
+
 @pytest.mark.parametrize("evaluator", PINS)
 def test_actual_capture_cli_sdk_guard_and_installed_recipient(evaluator, tmp_path):
+    _capture_cli(evaluator, tmp_path, http=False)
+
+
+@pytest.mark.parametrize(
+    "evaluator", ["lm-evaluation-harness", "inspect-ai", "promptfoo", "langfuse"]
+)
+def test_actual_http_capture_cli_sdk_guard_and_installed_recipient(evaluator, tmp_path):
+    """Real SDK + HTTP transport, synthetic model facts, separate core recipient."""
+    _capture_cli(evaluator, tmp_path, http=True)
+
+
+def _capture_cli(evaluator, tmp_path, *, http):
     recipient_python = _selected(evaluator)
     directory = tmp_path.resolve()
     case = {
@@ -155,6 +224,26 @@ def test_actual_capture_cli_sdk_guard_and_installed_recipient(evaluator, tmp_pat
         "versions": {evaluator: PINS[evaluator]},
         "test_scope": "synthetic task server, no model execution",
     }
+    if http:
+        from invarlock.security import temporarily_allow_network
+
+        with temporarily_allow_network(), socket.socket() as channel:
+            channel.bind(("127.0.0.1", 0))
+            port = channel.getsockname()[1]
+        model.update(id="synthetic-cli-model", revision="synthetic-revision")
+        configuration["max_length"] = 512
+        protocol["limits"] = {"max_requests": 1, "max_seconds": 180}
+        protocol["http_services"] = {
+            "baseline": {
+                "provider": "local-test",
+                "service": "synthetic-cli-http",
+                "deployment": "baseline",
+                "endpoint": f"http://127.0.0.1:{port}/v1/tasks",
+                "requested_model": "synthetic-cli-alias",
+                "helper_sha256": "sha256:"
+                + hashlib.sha256((HERE / "http_service.py").read_bytes()).hexdigest(),
+            }
+        }
     COMMON.write(directory / "protocol.json", protocol)
     request = {
         "evaluator": evaluator,
@@ -183,6 +272,18 @@ def test_actual_capture_cli_sdk_guard_and_installed_recipient(evaluator, tmp_pat
         "likelihood_result": [-2.5, False],
         "test_scope": "synthetic observation, no model called",
     }
+    if http:
+        execution.update(
+            generation_parameters={"until": [], "max_gen_toks": 32, "do_sample": False},
+            tokenization={
+                "context_token_ids": [1],
+                "continuation_token_ids": [2],
+                "joined_token_ids": [1, 2],
+                "decoded_context": case["input"],
+                "decoded_continuation": case["expected"],
+                "decoded_joined": case["input"] + case["expected"],
+            },
+        )
     result = {
         "output": "alpha",
         "metadata": {
@@ -227,32 +328,36 @@ def test_actual_capture_cli_sdk_guard_and_installed_recipient(evaluator, tmp_pat
             server = threading.Thread(target=serve, daemon=True)
             server.start()
             try:
-                process = subprocess.run(
-                    [
-                        sys.executable,
-                        "-I",
-                        "-c",
-                        SDK_CLI,
-                        str(HERE / "capture.py"),
-                        "--protocol",
-                        str(directory / "protocol.json"),
-                        "--protocol-sha256",
-                        COMMON.digest(protocol),
-                        "--role",
-                        "baseline",
-                        "--evaluator",
-                        evaluator,
-                        "--socket",
-                        address,
-                        "--output",
-                        str(directory / "capture"),
-                    ],
-                    cwd=directory,
-                    env=_environment(directory),
-                    capture_output=True,
-                    text=True,
-                    timeout=180,
-                )
+                with (
+                    _http_gateway(protocol, address, directory)
+                    if http
+                    else nullcontext()
+                ):
+                    process = subprocess.run(
+                        [
+                            sys.executable,
+                            "-I",
+                            "-c",
+                            SDK_CLI,
+                            str(HERE / "capture.py"),
+                            "--protocol",
+                            str(directory / "protocol.json"),
+                            "--protocol-sha256",
+                            COMMON.digest(protocol),
+                            "--role",
+                            "baseline",
+                            "--evaluator",
+                            evaluator,
+                            *([] if http else ["--socket", address]),
+                            "--output",
+                            str(directory / "capture"),
+                        ],
+                        cwd=directory,
+                        env=_environment(directory),
+                        capture_output=True,
+                        text=True,
+                        timeout=180,
+                    )
             finally:
                 stop.set()
                 server.join(timeout=12)
@@ -299,3 +404,20 @@ def test_actual_capture_cli_sdk_guard_and_installed_recipient(evaluator, tmp_pat
     assert row["likelihood"]["token_count"] == original["token_count"]
     assert row["likelihood"]["utf8_byte_count"] == original["utf8_byte_count"]
     assert canonical["recipient"]["sdk_modules_absent"]
+    if http:
+        assert canonical["routes"] == ["evaluator-native-json", "evaluator-json"]
+        descriptor = manifest["service_identity"]
+        assert canonical["run"]["artifact_digest"] is None
+        assert canonical["run"]["service_identity"] == descriptor
+        assert descriptor["observed_model"] == model["id"]
+        assert descriptor["exposed_revision"] == model["revision"]
+        assert row["likelihood"]["artifact_digest"] is None
+        assert row["likelihood"]["service_identity_digest"] == COMMON.digest(descriptor)
+        assert (
+            COMMON.read(ledger[0])["result"]["metadata"]["invarlock_likelihood"]
+            == original
+        )
+        assert "http_service" in manifest["driver_files"]
+        assert (capture / "native-original.json").is_file()
+        assert len(list((capture / "http").glob("*.request.json"))) == 1
+        assert len(list((capture / "http").glob("*.response.json"))) == 1

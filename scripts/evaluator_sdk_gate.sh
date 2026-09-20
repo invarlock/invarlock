@@ -23,6 +23,10 @@ esac
 SDK_TESTS=("$SDK_TEST" "tests/evaluation_records/test_sdk_installed_handoff.py")
 SDK_TESTS+=("tests/evaluation_records/test_live_capture_cli.py::test_actual_capture_cli_sdk_guard_and_installed_recipient[$SDK_NAME]")
 case "$SDK_NAME" in
+  lm-evaluation-harness|inspect-ai|promptfoo|langfuse)
+    SDK_TESTS+=("tests/evaluation_records/test_live_capture_cli.py::test_actual_http_capture_cli_sdk_guard_and_installed_recipient[$SDK_NAME]") ;;
+esac
+case "$SDK_NAME" in
   lm-evaluation-harness|inspect-ai|promptfoo|lighteval|garak|openai-evals|langfuse)
     for SDK_LIVE_TEST in \
       test_actual_framework_drives_callback_and_writes_native_export \
