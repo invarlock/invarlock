@@ -24,7 +24,7 @@ Workflow YAML is linted with `make workflow-lint`.
 - `evaluator-sdk.yml` checks the 19 pinned evaluator SDK capture profiles without
   model or service calls. Its separate environments run only for capture-related
   changes or an explicit dispatch. The ordinary distribution jobs also exercise
-  all 57 evaluator/scorer journeys in an SDK-free installed recipient.
+  all 114 evaluator/scorer/import-route journeys in an SDK-free installed recipient.
 
 Python dependency caches use each job's installed workflow locks as their keys.
 When adding an installation step or locked environment, include its lockfile in
@@ -77,7 +77,7 @@ make evaluator-parity-test
 make evaluator-sdk-test EVALUATOR=ragas
 ```
 
-The SDK probes use the maintained evaluator package pins in isolated producer
+The SDK probes use the maintained evaluator package pins in isolated evaluator
 environments. These pins do not lock every transitive SDK dependency. The
 installed recipient gate uses the hash-locked core dependency set. SDK serializer
 tests establish compatibility with the exercised source shape; they do not

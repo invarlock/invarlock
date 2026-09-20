@@ -216,7 +216,7 @@ jobs:
       - name: Collect disjoint test coverage
         env:
           INVARLOCK_REQUIRE_LANGFUSE_SDK: ${{ matrix.shard == 'examples' && '1' || '0' }}
-          INVARLOCK_REQUIRE_INSPECT_SDK: ${{ matrix.shard == 'runtime' && '1' || '0' }}
+          INVARLOCK_REQUIRE_INSPECT_SDK: ${{ (matrix.shard == 'runtime' || matrix.shard == 'examples') && '1' || '0' }}
         run: make coverage-collect-${{ matrix.shard }} PYTEST_WORKERS=2
       - name: Retain coverage and test timings
         if: ${{ always() }}

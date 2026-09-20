@@ -7,6 +7,8 @@ on:
       - 'src/invarlock/evaluator_capture.py'
       - 'src/invarlock/evaluation_record_contracts/**'
       - 'tests/evaluation_records/**'
+      - 'tests/examples/test_langfuse_export.py'
+      - 'examples/evaluator-qualification/maintained/CAPTURE.md'
       - 'examples/evaluator-qualification/locks/**'
       - 'scripts/evaluator_sdk_gate.sh'
       - '.github/workflows/evaluator-sdk.yml'

@@ -65,17 +65,23 @@ def test_actual_langfuse_bad_capture_does_not_publish(tmp_path, sdk, fault):
 
 
 def test_actual_inspect_log_uses_core_entrypoint(tmp_path):
-    required = os.environ.get("INVARLOCK_REQUIRE_EVALUATOR_SDK") in ("1", "inspect-ai")
+    qualification = os.environ.get("INVARLOCK_REQUIRE_EVALUATOR_SDK") in (
+        "1",
+        "inspect-ai",
+    )
+    required = qualification or os.environ.get("INVARLOCK_REQUIRE_INSPECT_SDK") == "1"
+    # The retained evaluator profile and runtime SDK gates have separate pins.
+    supported = ("0.3.254",) if qualification else ("0.3.254", "0.3.263")
     try:
         version = importlib.metadata.version("inspect-ai")
     except importlib.metadata.PackageNotFoundError:
         if required:
-            pytest.fail("required inspect-ai==0.3.254 SDK is missing")
+            pytest.fail("required Inspect AI SDK is missing")
         pytest.skip("optional Inspect AI SDK is not installed")
-    if version != "0.3.254":
+    if version not in supported:
         if required:
-            pytest.fail(f"required inspect-ai==0.3.254, found {version}")
-        pytest.skip("requires pinned inspect-ai==0.3.254")
+            pytest.fail(f"required Inspect AI version in {supported}, found {version}")
+        pytest.skip(f"requires pinned Inspect AI version in {supported}")
     from inspect_ai.log import EvalConfig, EvalDataset, EvalLog, EvalSpec
 
     data = json.loads(

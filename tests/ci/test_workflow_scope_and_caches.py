@@ -158,8 +158,18 @@ def test_runtime_coverage_requires_pinned_sdk_tests_in_its_measured_interpreter(
         if "pip install" in step.get("run", "")
         and "inspect-judge-tests-py313.txt" in step["run"]
     ]
-    assert len(sdk_steps) == 1
-    install = sdk_steps[0]
+    assert len(sdk_steps) == 2
+    install = next(
+        step for step in sdk_steps if step["if"] == "${{ matrix.shard == 'runtime' }}"
+    )
+    examples = next(
+        step for step in sdk_steps if step["if"] == "${{ matrix.shard == 'examples' }}"
+    )
+    assert (
+        "--require-hashes -r requirements/workflows/langfuse-sdk-tests-py313.txt"
+        in examples["run"]
+    )
+    assert examples["run"].strip().endswith("python -m pip check")
     assert install["if"] == "${{ matrix.shard == 'runtime' }}"
     assert "python -m pip install --require-hashes -r " in install["run"]
     assert install["run"].strip().endswith("python -m pip check")
@@ -167,8 +177,9 @@ def test_runtime_coverage_requires_pinned_sdk_tests_in_its_measured_interpreter(
         step for step in steps if "make coverage-collect-" in step.get("run", "")
     )
     assert steps.index(install) < steps.index(collect)
+    assert steps.index(examples) < steps.index(collect)
     assert collect["env"]["INVARLOCK_REQUIRE_INSPECT_SDK"] == (
-        "${{ matrix.shard == 'runtime' && '1' || '0' }}"
+        "${{ (matrix.shard == 'runtime' || matrix.shard == 'examples') && '1' || '0' }}"
     )
     assert "INVARLOCK_REQUIRE_INSPECT_SDK" not in jobs["coverage"].get("env", {})
 

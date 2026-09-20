@@ -153,7 +153,7 @@ def export_pair(output, evaluator, scorer, *, input_format="envelope"):
             **{key: value for key, value in options.items() if key != "source_version"},
         }
         if input_format == "native-json":
-            # The producer only writes its native JSON; core normalization and
+            # The capture process only writes its native JSON; core normalization and
             # trust preparation happen in the separate recipient environment.
             if evaluator == "langfuse":
                 native_payload = native_payload["result"]

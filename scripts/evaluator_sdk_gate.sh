@@ -20,6 +20,18 @@ case "$SDK_NAME" in
     SDK_TEST="tests/evaluation_records/test_original_sdk_capture.py::test_pinned_original_sdk_serialization[$SDK_NAME]" ;;
   *) echo "Choose a supported evaluator from the integration guide." >&2; exit 2 ;;
 esac
+SDK_TESTS=("$SDK_TEST")
+SDK_RECIPE_DEPS=(--with pytest==9.1.1 --with jsonschema==4.26.0)
+SDK_TEMP="$(mktemp -d)"
+trap 'rm -rf "$SDK_TEMP"' EXIT
+if [ "$SDK_NAME" = "deepeval" ]; then
+  SDK_TESTS+=("tests/evaluation_records/test_scalar_integrations.py::test_documented_deepeval_python_capture")
+  # Literal recipes import captured-file verification and request parsing.
+  # Pin those dependencies only; this remains a source-level recipe check.
+  SDK_RECIPE_DEPS+=(--with cryptography==50.0.0 --with pyyaml==6.0.3)
+elif [ "$SDK_NAME" = "langfuse" ]; then
+  SDK_TESTS+=("tests/examples/test_langfuse_export.py::test_documented_langfuse_native_recipe")
+fi
 cd "$SDK_ROOT"
 export PYTHONPATH="$SDK_ROOT/src"
 export PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
@@ -32,10 +44,8 @@ test -f "$SDK_LOCK"
 # These isolated test environments are not dependencies of the distributed core.
 if [ "$SDK_NAME" = "promptfoo" ]; then
   # The maintained npm lock pins the package archive's SHA-512 and SHA-1.
-  # Install verified bytes into a disposable producer environment only.
+  # Install verified bytes into a disposable evaluator environment only.
   if [ -z "${INVARLOCK_PROMPTFOO_PACKAGE:-}" ]; then
-    SDK_TEMP="$(mktemp -d)"
-    trap 'rm -rf "$SDK_TEMP"' EXIT
     SDK_PACKAGE="$(node -e 'const fs=require("fs"); const line=fs.readFileSync(process.argv[1],"utf8").split("\n").find(x=>x.startsWith("package=")); if(!line)throw Error("missing package pin"); process.stdout.write(line.slice(8));' "$SDK_LOCK")"
     npm pack "$SDK_PACKAGE" --json --pack-destination "$SDK_TEMP" > "$SDK_TEMP/archive.json"
     SDK_ARCHIVE="$(node -e '
@@ -53,18 +63,18 @@ if [ "$SDK_NAME" = "promptfoo" ]; then
   uv run --no-project --isolated --python 3.12 \
     --with-requirements "$SDK_ROOT/requirements/workflows/core-py312.txt" \
     --with pytest==9.1.1 \
-    python -m pytest -q -o addopts='' "$SDK_TEST"
+    python -m pytest -q -o addopts='' --basetemp "$SDK_TEMP/pytest" "${SDK_TESTS[@]}"
 elif [ "${SDK_SERIALIZER_ONLY:-0}" = "1" ]; then
   # Probe native SDK serialization from source only. This is deliberately not
-  # a core/SDK co-installation test: producer and recipient may be separate.
+  # a core/SDK co-installation test: capture process and recipient may be separate.
   uv run --no-project --isolated --python 3.12 \
     --with-requirements "$SDK_LOCK" \
-    --with pytest==9.1.1 --with jsonschema==4.26.0 \
-    python -m pytest -q -o addopts='' "$SDK_TEST"
+    "${SDK_RECIPE_DEPS[@]}" \
+    python -m pytest -q -o addopts='' --basetemp "$SDK_TEMP/pytest" "${SDK_TESTS[@]}"
 else
   uv run --no-project --isolated --python 3.12 \
     --with-requirements "$SDK_LOCK" \
     --with-requirements "$SDK_ROOT/requirements/workflows/core-py312.txt" \
     --with pytest==9.1.1 \
-    python -m pytest -q -o addopts='' "$SDK_TEST"
+    python -m pytest -q -o addopts='' --basetemp "$SDK_TEMP/pytest" "${SDK_TESTS[@]}"
 fi
