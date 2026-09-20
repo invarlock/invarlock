@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Allow Python judge collectors to stop after completed, durably retained batches
+  and resume the same plan without resetting call or budget accounting.
+
 - Add dedicated native export mappings for all 19 maintained evaluator
   ecosystems through direct `evaluator-native-json` imports or the optional
   `engine.export_evaluator_result` helper and `evaluator-json` envelope. Include
@@ -70,6 +73,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   alias and the old native report result class. No forwarding aliases are provided.
 
 ### Fixed
+
+- Accept reference-free LightEval generative records without inventing gold
+  answers, preserving judge availability and explicit missing-reference limits
+  for exact match and normalized NLL across both import routes.
 
 - Scope explicitly authorized judge network access to collection, preserving
   native execution isolation and restoring the guard after failures or cancellation.

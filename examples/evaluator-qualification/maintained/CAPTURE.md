@@ -17,9 +17,12 @@ evaluator environment needs no InvarLock installation or common export envelope;
 needs only core InvarLock, with no evaluator SDK or account.
 
 Implementation tests exercise pinned SDK exports and actual task callbacks.
-The separate [live campaign](../../integrations/evaluator-live/README.md) tracks
-fresh model execution, likelihood measurement and plan-bound judge collection.
-Its pending qualification must not be inferred from a passing serialization test.
+The retained [live sentinel](../../integrations/evaluator-live/references/mistral-7b-sentinel/README.md)
+completes eight-case, two-model comparisons for all 19 profiles through both import
+routes and all three scorers. Its scope is the recorded local task profile.
+Reference-free judging, repeated ratings and collection lifecycle checks have
+separate qualification scope; passing an SDK serialization test does not establish
+those live workflows or arbitrary framework configurations.
 
 For example, serialize the original DeepEval test cases with the SDK's own
 explicit serializer:
@@ -91,7 +94,8 @@ InvarLock will score them. If supplied, the native metric result is preserved an
 validated. Arbitrary SDK objects and ambiguous multiple responses require an
 explicit mapping or selection by the capture process. Reference fields may be omitted
 for reference-free judge tasks where the SDK profile permits them. LightEval
-retains its explicit choices/gold-index profile. Missing references make exact
+generative tasks use `choices: []` and `gold_index: 0`; tasks with references use
+nonempty text choices and valid gold indices. Missing references make exact
 match and NLL unavailable; they do not require a fabricated gold answer. JSON
 outputs remain structured for compatible policies; text-only scorers report
 those cases as unavailable rather than implicitly converting them to text.

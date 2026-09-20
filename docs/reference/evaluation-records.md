@@ -302,10 +302,14 @@ the comparison is the ratio of subject and baseline means, with the same paired
 resampling method as native NLL. Interval width is measured in ratio units.
 Reference and configuration bindings and the declared tokenizer identities are
 checked before scoring. Replay does not execute the model or tokenizer, so their
-measurement claims remain source assertions. The separate
-[real Harness likelihood reference](https://github.com/invarlock/invarlock/blob/main/examples/captured-results/references/harness-likelihood/README.md)
-retains six same-model CPU pairs; synthetic contract tests and historical
-exact-match qualifications do not establish other native likelihood profiles.
+measurement claims remain source assertions. The
+[retained Mistral 7B sentinel](https://github.com/invarlock/invarlock/blob/main/examples/integrations/evaluator-live/references/mistral-7b-sentinel/README.md)
+contains fresh generation and reference-likelihood measurements across all 19
+maintained evaluator profiles, both import routes and two model artifacts. The
+[Harness likelihood reference](https://github.com/invarlock/invarlock/blob/main/examples/captured-results/references/harness-likelihood/README.md)
+is a smaller six-pair, same-model CPU control. Each reference qualifies its
+recorded profile; synthetic contract tests and exact-match results alone do not
+establish likelihood measurement support.
 
 Judge selection uses the separate judge recipe and retained measurement contract
 through the same captured request. It does not reinterpret a `recorded` scalar
