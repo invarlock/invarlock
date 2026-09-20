@@ -114,7 +114,7 @@ and cannot safely substitute for one another.
 | --- | --- | --- |
 | Adapter support | `maintained_adapter` or an external adapter | Whether this repository maintains the source-specific runner, dependency lock, and upstream entry point; support grants no replay authority |
 | Replay authority | `deterministic_per_record` or `observation_only` | Whether complete ordered facts can be independently recomputed and imported, or only retained as authenticated context |
-| Signed-journey maturity | Retained with a named corpus and record count, or `None retained` | Whether a model-running, signed `evaluate` → `verify` → `report` OCI transaction has completed and been retained as release evidence |
+| Signed OCI-journey maturity | Retained with a named corpus and record count, or `None retained` | Whether a model-running, signed `evaluate` → `verify` → `report` OCI transaction has completed and been retained as release evidence |
 
 The stable qualification-result contract continues to emit
 `outcome: qualified_for_import` with `authority: verdict_authority` for an
@@ -375,7 +375,7 @@ new signed transactions.
 
 ### Application evaluation SDKs
 
-| Upstream evaluator | Pinned version | Executed upstream entry point | Adapter support | Replay authority | Retained signed transactions |
+| Upstream evaluator | Pinned version | Executed upstream entry point | Adapter support | Replay authority | Retained signed OCI transactions |
 | --- | --- | --- | --- | --- | --- |
 | Promptfoo | `promptfoo@0.121.19` | `promptfoo eval` | Maintained | Independently replayable (102 shared outputs) | None retained |
 | DeepEval | `deepeval==4.1.3` | `deepeval.metrics.ExactMatchMetric.measure` | Maintained | Independently replayable (102 shared outputs) | None retained |
@@ -387,7 +387,7 @@ new signed transactions.
 
 ### Benchmark harnesses
 
-| Upstream evaluator | Pinned version | Executed upstream entry point | Adapter support | Replay authority | Retained signed transactions |
+| Upstream evaluator | Pinned version | Executed upstream entry point | Adapter support | Replay authority | Retained signed OCI transactions |
 | --- | --- | --- | --- | --- | --- |
 | LM Evaluation Harness | `lm-eval==0.4.12` | `lm_eval.api.metrics.exact_match_hf_evaluate` | Maintained | Independently replayable (102 shared outputs) | Retained (2 signed transactions, 400 records each) |
 | Inspect AI | `inspect-ai==0.3.254` | `inspect_ai.scorer.match` | Maintained | Independently replayable (102 shared outputs) | Retained (2 signed transactions, 400 records each) |
@@ -396,7 +396,7 @@ new signed transactions.
 
 ### Evaluation and observability platforms
 
-| Upstream evaluator | Pinned version | Executed upstream entry point | Adapter support | Replay authority | Retained signed transactions |
+| Upstream evaluator | Pinned version | Executed upstream entry point | Adapter support | Replay authority | Retained signed OCI transactions |
 | --- | --- | --- | --- | --- | --- |
 | MLflow Model Evaluation | `mlflow==3.14.0` | `mlflow.models.evaluate` | Maintained | Observation-only: aggregate only | None retained |
 | Arize Phoenix Evals | `arize-phoenix-evals==3.3.0` | `phoenix.evals.metrics.exact_match` | Maintained | Independently replayable (102 shared outputs) | None retained |
@@ -407,13 +407,13 @@ new signed transactions.
 
 ### General metric libraries
 
-| Upstream evaluator | Pinned version | Executed upstream entry point | Adapter support | Replay authority | Retained signed transactions |
+| Upstream evaluator | Pinned version | Executed upstream entry point | Adapter support | Replay authority | Retained signed OCI transactions |
 | --- | --- | --- | --- | --- | --- |
 | Hugging Face Evaluate | `evaluate==0.4.6` | `evaluate.load('exact_match').compute` | Maintained | Independently replayable (102 shared outputs) | None retained |
 
 ### Security and red-team evaluators
 
-| Upstream evaluator | Pinned version | Executed upstream entry point | Adapter support | Replay authority | Retained signed transactions |
+| Upstream evaluator | Pinned version | Executed upstream entry point | Adapter support | Replay authority | Retained signed OCI transactions |
 | --- | --- | --- | --- | --- | --- |
 | Garak | `garak==0.15.1` | `python -m garak` | Maintained | Observation-only: unsupported replay semantics | None retained |
 <!-- evaluator-matrix:end -->

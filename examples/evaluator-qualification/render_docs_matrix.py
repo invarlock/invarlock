@@ -105,7 +105,7 @@ def render() -> str:
                 "",
                 "| Upstream evaluator | Pinned version | Executed upstream entry "
                 "point | Adapter support | Replay authority | "
-                "Retained signed transactions |",
+                "Retained signed OCI transactions |",
                 "| --- | --- | --- | --- | --- | --- |",
             ]
         )
