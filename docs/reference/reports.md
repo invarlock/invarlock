@@ -25,12 +25,9 @@ produce judge analysis and verification results described in
 
 ## Report appearance
 
-HTML reports open in light mode by default. The **Dark mode** button records an
-explicit choice for reports on the same browser origin. Reports do not switch
-based on the operating system theme. Documentation preferences remain separate.
-Without JavaScript, reports stay light and all evidence remains readable. If
-browser storage is unavailable, the button still works for the current page.
-Printing always uses the light palette and hides the theme control.
+HTML reports use a light palette regardless of the browser or operating system
+color preference, keeping the transition from the website consistent. Reports
+have no theme control or stored theme preference. Printing also uses light colors.
 
 ## Runtime-side report
 
