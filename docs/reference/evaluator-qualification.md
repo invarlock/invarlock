@@ -28,19 +28,28 @@ their declared exact-match profiles; they are not evidence for every new metric.
 
 ## Capture for exact match, likelihood and judge scoring
 
-The installed `load_run` parsers support canonical JSON, generic JSONL,
-`inspect-json`, `lm-eval-samples`, `promptfoo-jsonl` and `langfuse-json`. Other workflows can map
-original per-case facts through `invarlock.engine.capture_evaluator_run` and
-inspect `evaluator_input_capabilities`. These are captured-input interfaces,
-separate from qualification and the example-owned signed OCI bridges.
+The installed `invarlock.engine.export_evaluator_result` helper has dedicated
+native mappings for all 19 ecosystems below. Export native SDK cases, reports,
+prediction tables or attempts, then import them with `adapter: evaluator-json`.
+Every profile uses the same captured `evaluate`, independent `verify` and
+`report` flow, with per-case metadata slices and attributed numeric metrics when
+supplied. Recipients need no evaluator SDK or account. The
+[native shape recipes](https://github.com/invarlock/invarlock/blob/main/examples/evaluator-qualification/maintained/CAPTURE.md#dedicated-native-shapes)
+and [public API example](evaluation-records.md#dedicated-evaluator-exports)
+describe the producer boundary. Canonical JSON, generic JSONL and the existing
+Inspect, Harness, Promptfoo and Langfuse parser names remain available.
 
-The [maintained capture helper](https://github.com/invarlock/invarlock/blob/main/examples/evaluator-qualification/maintained/CAPTURE.md)
-covers all 19 ecosystems through explicit canonical records. It can also join
-17 retained deterministic exports to their original cases and independent
-schedule. MLflow aggregate observations and Garak detector summaries cannot
-supply original per-case predictions, references or likelihoods; those workflows
-must capture the actual records separately. Historical matrix identities and
-authority remain unchanged.
+Three kinds of evidence have different scopes. Tests that place retained model
+answers and likelihoods, plus synthetic complete judge-call fixtures, into each
+native shape exercise the
+shared export/import, scoring and recipient flow; they do not establish that
+each SDK measured those facts. Pinned SDK smoke tests exercise actual upstream
+data objects and local evaluator calls without a new model campaign. The
+historical qualification matrix retains its original 17 per-case deterministic
+exports and two observation-only profiles: MLflow aggregate results and Garak
+detector summaries. Their identities and authority do not change. New native
+MLflow prediction-table and Garak attempt capture paths require the actual rows;
+the historical summaries cannot supply them.
 
 InvarLock owns the selected scorer. Exact match requires string answers and
 references. Judge requires task and answer text plus a declared recipe and
@@ -51,12 +60,15 @@ Normalized NLL requires typed reference-continuation log probabilities, byte and
 token counts, and bound source, artifact, configuration and tokenizer identities.
 Naming an evaluator cannot supply these facts.
 
-The separate [Harness likelihood reference](https://github.com/invarlock/invarlock/blob/main/examples/captured-results/references/harness-likelihood/README.md)
-retains real unmodified Harness `0.4.12` `HFLM` measurements on six authored
-same-model CPU pairs, followed by signed evaluation and independent replay.
-It establishes that likelihood compatibility profile. Synthetic canonical NLL
-tests exercise the shared contract across the shortlist; neither those tests nor
-the retained exact-match matrix qualify all 19 native likelihood or judge paths.
+The [Mistral 7B likelihood reference](https://github.com/invarlock/invarlock/blob/main/examples/captured-results/references/mistral-7b-likelihood/README.md)
+retains actual baseline-to-Instruct measurements for 400 paired narrative
+continuations, both model identities, and signed evaluation and independent
+recipient replay. The smaller [Harness likelihood control](https://github.com/invarlock/invarlock/blob/main/examples/captured-results/references/harness-likelihood/README.md)
+retains the earlier six same-model CPU pairs. Both establish their declared
+measurement profiles. The 19-profile contract replays adapt retained facts and
+source bindings into each native shape to test the shared interface; they do
+not claim new SDK likelihood measurements. Their synthetic complete judge calls
+exercise recipe and replay contracts, not a newly measured judge campaign.
 
 ## Three independent status axes
 

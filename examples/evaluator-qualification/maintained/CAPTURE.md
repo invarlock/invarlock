@@ -5,58 +5,165 @@
 >
 > **Audience:** Evaluator users who already retain model inputs and outputs.
 >
-> **Prerequisites:** An installed InvarLock wheel, its matching example checkout,
-> original per-case data and the evaluated model's artifact digest.
+> **Prerequisites:** Core InvarLock in the recipient environment, the matching
+> example checkout, original per-case data and the evaluated model's identity.
 
-`capture.py` uses the public `capture_evaluator_run` SDK, also exported by
-`invarlock.engine`. It captures
-existing case facts; InvarLock owns subsequent scoring. Naming an evaluator does
-not execute that package or transfer its scoring authority. Capability output
-reports which records have the required facts, rather than claiming a completed
-judge execution or model-likelihood measurement.
+Keep your existing evaluator environment and save its original cases or results
+as JSON using the source-specific profiles below. Set
+`adapter: evaluator-native-json` in the captured request, alongside the actual
+source name/version, run ID, and artifact or hosted-service identity. All 19
+profiles share the same captured `evaluate`, `verify` and `report` flow. The
+producer needs no InvarLock installation or common export envelope; the recipient
+needs only core InvarLock, with no evaluator SDK or account.
 
-Use `qualification` when you have the original cases plus a complete retained
-qualification package. Use `records` when you can map your own workflow's cases
-directly. Both write one canonical run JSON file and print input-capability
-counts. Neither command publishes an evidence pack or makes an acceptance
-decision. Capture a baseline and a subject, then pass both to the
-[captured comparison workflow](../../captured-results/README.md).
+For example, serialize the original DeepEval test cases with the SDK's own
+explicit serializer:
 
-The helper is a script in this checkout, not an installed CLI. Run it from the
-repository root with the Python interpreter that has the matching InvarLock
-wheel installed. No evaluator SDK, container, model execution or provider call
-is needed to capture facts already on disk.
+```python
+import json
 
-## Shortlist coverage
+rows = [{"id": case_id, "test_case": test_case.model_dump(mode="json")}
+        for case_id, test_case in captured_test_cases]
+if [row["id"] for row in rows] != planned_ids:
+    raise ValueError("capture differs from the complete planned schedule")
+with open("subject-native.json", "x", encoding="utf-8") as stream:
+    json.dump(rows, stream, ensure_ascii=False, allow_nan=False)
+```
 
-The qualification path joins original case text to a retained per-case export and
-its independent schedule. It checks profile, schedule, export and raw-output
-bindings, source identities, record order, input/reference digests and literal
-outputs. It retains the original profile identity and source digests in each
-record's context. Historical runners, profiles and qualification results remain
-separate from this new capture.
+`captured_test_cases` contains original `LLMTestCase` objects and stable IDs;
+`planned_ids` is the complete schedule frozen before execution, including
+failures. Capture the baseline with the same IDs, inputs, references and case
+metadata. Pin the independently reviewed `expected_case_set_digest` in policy,
+and approved complete-run digests when required. See the
+[raw source declaration](../../../docs/reference/evaluation-records.md#dedicated-evaluator-exports)
+and [captured workflow](../../../docs/user-guide/captured-results.md).
 
-| Ecosystem | Retained qualification capture | Existing workflow capture |
+When evaluator and InvarLock dependency requirements are compatible, the
+convenience API accepts the SDK objects directly:
+
+```python
+from importlib.metadata import version
+from invarlock.engine import export_evaluator_result, evaluator_input_capabilities
+
+run = export_evaluator_result(
+    "deepeval",
+    [{"id": case_id, "test_case": test_case}
+     for case_id, test_case in captured_test_cases],
+    "subject-export.json",
+    expected_ids=planned_ids,
+    source_version=version("deepeval"),
+    run_id="subject-campaign",
+    artifact_digest=model_artifact_digest,
+)
+print(evaluator_input_capabilities(run))
+```
+
+This API checks complete membership, refuses existing output paths, and writes
+an `invarlock/evaluator-export-v1` envelope for `adapter: evaluator-json`.
+Use the same source/run/model identities. Hosted calls use
+`artifact_digest=None, service_identity=identity` with a complete descriptor.
+Both routes reconstruct the same native facts and use the same downstream
+scorers. SDK serializer smoke tests execute from source with minimal test
+dependencies; they do not prove SDK/core co-installation.
+
+MLflow 3.14.0 requires `cryptography<49`, which conflicts with core InvarLock's
+`cryptography>=50`. Keep that pinned producer separate, export its original
+prediction table as JSON, and import with `evaluator-native-json`. There is no
+need to change either environment's dependencies for this handoff.
+
+## Dedicated native shapes
+
+The raw JSON file follows the named profile below. Convert listed SDK objects
+with their explicit field serializers in the producer environment. With
+compatible co-installation, those SDK objects can instead be passed as the
+Python exporter's `result` argument. Scalar entries carry a caller-owned `id`; their `metric_result` is
+optional. Capture original outputs without running an upstream metric when
+InvarLock will score them. If supplied, the native metric result is preserved and
+validated. Arbitrary SDK objects and ambiguous multiple responses require an
+explicit mapping or selection by the producer. Reference fields may be omitted
+for reference-free judge tasks where the SDK profile permits them. LightEval
+retains its explicit choices/gold-index profile. Missing references make exact
+match and NLL unavailable; they do not require a fabricated gold answer. JSON
+outputs remain structured for compatible policies; text-only scorers report
+those cases as unavailable rather than implicitly converting them to text.
+
+| Evaluator key | Native `result` profile | Pairing and reference fields |
 | --- | --- | --- |
-| LM Evaluation Harness | Per-case export plus original cases | Canonical records |
-| Inspect AI | Per-case export plus original cases | Canonical records |
-| Promptfoo | Per-case export plus original cases | Canonical records |
-| DeepEval | Per-case export plus original cases | Canonical records |
-| Ragas | Per-case export plus original cases | Canonical records |
-| LightEval | Per-case export plus original cases | Canonical records |
-| Hugging Face Evaluate | Per-case export plus original cases | Canonical records |
-| Pydantic Evals | Per-case export plus original cases | Canonical records |
-| Braintrust AutoEvals | Per-case export plus original cases | Canonical records |
-| OpenEvals | Per-case export plus original cases | Canonical records |
-| MLflow Model Evaluation | Aggregate observation only | Original per-case prediction table |
-| Garak | Detector observation only | Explicit reviewed per-attempt case capture |
-| OpenAI Evals | Per-case export plus original cases | Canonical records |
-| Arize Phoenix Evals | Per-case export plus original cases | Canonical records |
-| Langfuse | Per-case export plus original cases | Canonical records |
-| Opik | Per-case export plus original cases | Canonical records |
-| Azure AI Evaluation | Per-case export plus original cases | Canonical records |
-| Evidently | Per-case export plus original cases | Canonical records |
-| TruLens | Per-case export plus original cases | Canonical records |
+| `lm-evaluation-harness` | List of `--log_samples` rows: `doc`, `arguments`, `target`, `filtered_resps` | `doc_id`; target is the original reference; select one completion |
+| `inspect-ai` | EvalLog SDK object or JSON log, `version: 1` or `2`, `status: success`, `samples` | Sample `id`, `input`, `target`, `output.choices`; one epoch and completion |
+| `promptfoo` | List of full result rows containing `testCase`, rendered `prompt`, `response` | `testCase.metadata.invarlock_id` and `invarlock_expected`; runtime failures remain errors |
+| `deepeval` | List of `{id, test_case: LLMTestCase}` | `input`, `actual_output`, `expected_output`; optional measured metric or MetricsData |
+| `ragas` | List of `{id, sample: SingleTurnSample}` | `user_input`, `response`, `reference`; optional MetricResult |
+| `lighteval` | List of `{id, doc: Doc, model_response: ModelResponse}` | `query`, `choices`, `gold_index`, one raw `text` response; optional sample metric |
+| `hugging-face-evaluate` | List of `{id, input, predictions: [output], references: [reference]}` | Singleton per-case batches; optional `compute()` metric dictionary |
+| `pydantic-evals` | EvaluationReport or `{cases: [...], failures: [...]}` | Case `name`, `inputs`, `output`, `expected_output`; preserve failure `error_message` |
+| `autoevals` | List of `{id, input, output, expected}` | Original arguments; optional native Score in `metric_result` |
+| `openevals` | List of `{id, inputs, outputs, reference_outputs}` | Original arguments; optional EvaluatorResult or list in `metric_result` |
+| `mlflow` | EvaluationResult with `tables.eval_results_table`, or `{prediction_table: rows, metrics: {...}}` | `record_id`, `input`, `prediction`, `target`; explicit `columns` can rename fields |
+| `garak` | `{attempts: [Attempt, ...], source_cases: [...]}` or report `entries` | Native `uuid:generation_index`; independently join planned IDs and references with `source_cases` |
+| `openai-evals` | `{events: [...]}` from the recorder | Join events by `sample_id`; actual prompt/sampled output; optional match expected value |
+| `arize-phoenix-evals` | List of `{id, record: {input, output, expected}}` | Original evaluation arguments; optional Score or list in `metric_result` |
+| `langfuse` | Bare ExperimentResult JSON fields: `name`, `run_name`, `item_results`, `run_evaluations`, and captured experiment/dataset fields | Hosted dataset item ID or local `metadata.invarlock_id`; see the dedicated handoff example |
+| `opik` | List of `{id, dataset_item: {input, output, reference}}` | Original dataset fields; optional ScoreResult or list in `metric_result` |
+| `azure-ai-evaluation` | Native `evaluate()` result containing `rows` | `inputs.record_id`, `inputs.query`, `inputs.response`, `inputs.ground_truth`; `inputs.id`, `inputs.input`, `outputs.response` aliases supported |
+| `evidently` | Dataset/DataFrame or `{rows: [...], score_columns: [...]}` | `record_id`, `input`, `output`, `reference`; explicit `columns` can rename fields |
+| `trulens` | `(records_dataframe, feedback_columns)` or `{records: [...], feedback_results: [...]}` | `record_id`, `main_input`, `main_output`, `ground_truth`; feedback joined by record ID |
+
+For table profiles, `columns` maps the canonical roles `id`, `input`, `output`
+and `expected` to your actual column names. MLflow also recognizes
+`predictions`/`targets`. Retain source tables and per-case errors alongside
+aggregate results; a summary table cannot reconstruct omitted predictions.
+For TruLens model records, `meta` carries case metadata and native FeedbackResult
+objects can be supplied separately. For Azure rows, `inputs.metadata` carries case metadata; native numeric
+`outputs.<evaluator>.<metric>` fields remain attributed per-case observations.
+
+Garak source cases explicitly join each generation to the planned task:
+
+```python
+source_cases = [{
+    "native_id": f"{attempt_uuid}:0",
+    "id": planned_case_id,
+    "input": original_prompt,
+    "expected": reviewed_reference,
+    "metadata": {"category": "reviewed-task"},
+}]
+result = {"attempts": actual_attempts, "source_cases": source_cases}
+```
+
+Provide every generation, including errors, and preserve the exact original
+prompt. Attack targets and detector scores are not answer references. Use a
+reviewed `expected: null` for a reference-free judge task. Attempt history and
+its completion state remain in context. For a separate Langfuse producer, serialize the public ExperimentResult fields
+as a bare JSON object. `dataclasses.asdict(result)` works for local experiments
+whose dataset items already contain JSON values. Hosted dataset-item objects
+need their SDK serializer with Python field names and ISO-formatted dates; do
+not silently rename fields or convert arbitrary objects to text. The raw adapter
+uses the explicitly declared request source version. With compatible
+co-installation, the Python exporter accepts ExperimentResult directly and
+retains its existing envelope format. The [Langfuse example](../../integrations/langfuse/README.md)
+describes dataset item identities and explicit failure capture.
+
+## Metrics, slices and scorer facts
+
+Per-case string metadata supplies slices. Scalar wrappers carry `metadata` beside
+`id`; batch profiles retain row metadata, and TruLens maps `meta`. The native
+profiles above retain their declared per-case numeric metrics. Additional explicit
+`metadata.invarlock_scores` can select named finite numeric observations;
+conflicting values are rejected. For table metrics, use `score_columns`, or
+TruLens `feedback_columns`, to select the original columns. Keep aggregate scores
+in their native summary context.
+
+To compare numeric observations, pass the reviewed `score_provenance` to the
+exporter and select a `recorded` policy with matching `accepted_provenance`.
+This verifies attribution and paired arithmetic; the evaluator name does not
+authenticate the original scoring process. Exact match, NLL and judge scoring
+keep their own fact requirements and do not reinterpret numeric scores.
+
+Pass actual typed reference-continuation facts in
+`metadata.invarlock_likelihood`. A likelihood-only case may retain a null output;
+never invent generated text. Structured inputs can use the exporter's
+`input_projection={"kind": "json-pointer", "pointer": "/input/question"}`.
+This retains the original source and the exact text selection for replay.
 
 Every canonical path has the same fact requirements. Exact match requires a
 string output and reference. Judge input requires original input/output text and
@@ -69,25 +176,30 @@ likelihood facts. The retained qualification exports contain no such likelihoods
 MLflow aggregate accuracy and Garak detector counts cannot supply missing rows,
 references or log probabilities.
 
-Print the machine-readable matrix with:
+## Historical qualification capture
+
+The checkout's `capture.py` helper remains available for explicit canonical
+records and retained qualification joins. Its `qualification` path checks the
+original cases, independent schedule, profile, raw output and export bindings.
+The historical shortlist contains 17 per-case deterministic exports, plus
+MLflow aggregate observations and Garak detector summaries. Those two historical
+summaries cannot supply native prediction rows or attempts. The new dedicated
+profiles above capture the original per-case facts from current workflows.
 
 ```bash
 python examples/evaluator-qualification/maintained/capture.py matrix
 ```
 
-## Use an installed export parser
-
-The installed `load_run` API and captured request sources support `invarlock`,
-`jsonl`, `inspect-json`, `lm-eval-samples`, `promptfoo-jsonl` and `langfuse-json`. These parsers
-normalize their declared per-case export shapes; they do not run an evaluator or
-qualify an arbitrary source. The `capture.py` paths below additionally support
-explicit record mapping and retained qualification joins for the full shortlist.
+This helper writes canonical runs and prints input capabilities; it is a
+checkout script, not an installed CLI or an evidence acceptance decision.
+Use `adapter: invarlock` for its canonical output. The common native exporter
+instead writes files consumed with `adapter: evaluator-json`.
 
 For a captured request, set `comparison.metric` to `exact_match`,
 `normalized_nll_per_utf8_byte` or `judge`. Exact match and NLL must agree with the
-single metric in the comparison policy. Judge uses its own recipe and full
-retained-call contract, with an optional configured collector. Omitting the
-selector keeps ordinary multi-metric comparison behavior.
+single metric in the comparison policy. Judge uses its own recipe and complete
+retained-call contract. Omitting the selector keeps ordinary multi-metric
+comparison behavior.
 
 ## Capture a retained per-case export
 
@@ -218,14 +330,25 @@ native export layout or a runtime that cannot supply the requested measurement.
 For an unsupported layout, explicitly map the original records with the SDK;
 mapping cannot recover outputs or likelihoods absent from the source data.
 
-The canonical NLL contract tests use synthetic likelihood facts. The separate
-[Harness likelihood reference](../../captured-results/references/harness-likelihood/README.md)
-retains a real six-pair CPU measurement and installed signed journey, including
-the exact context and reference continuation, log-probability sum, token/byte
-counts, tokenizer, configuration and model pins. Its same-model conformance
-result establishes that declared integration profile, not model quality or
-likelihood qualification across the whole matrix. A generation-only export is
-insufficient; that does not mean its evaluator cannot measure likelihoods.
+Native-shaped retained replay exercises all 19 export/import paths with the
+shared scorers and recipient verification/reporting. It adapts retained model
+answers and likelihoods with explicit source bindings, and uses synthetic
+complete judge-call fixtures. It does not claim that each SDK produced new
+model or judge measurements. Separate pinned SDK smoke tests use actual native
+objects and local evaluator calls to check the producer boundary. Neither kind
+of test is a new model-quality campaign or a replacement for the historical
+qualification matrix.
+
+The [Mistral 7B likelihood reference](../../captured-results/references/mistral-7b-likelihood/README.md)
+retains actual baseline-to-Instruct measurements for 400 paired narrative
+continuations and a signed captured handoff. The earlier
+[Harness likelihood control](../../captured-results/references/harness-likelihood/README.md)
+retains six same-model CPU pairs. Both preserve the context, continuation,
+log-probability sum, token/byte counts, tokenizer, configuration and model pins.
+Their measured scope remains specific to those runs. Additional synthetic NLL
+contract tests cover edge cases; none of these replays qualifies likelihood
+measurement across all 19 SDKs. A generation-only export remains insufficient
+for NLL, even if the upstream evaluator can measure likelihoods separately.
 
 The judge tests likewise establish replay and integration behavior rather than
 a new hosted quality result. Existing retained qualification observations and

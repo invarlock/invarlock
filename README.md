@@ -186,12 +186,15 @@ preserving each check's meaning.
 
 ## Keep your evaluator or run the comparison here
 
-**Use existing records.** Installed parsers cover selected Inspect AI, LM
-Evaluation Harness, Promptfoo and Langfuse export profiles, plus canonical JSON and generic
-JSONL. The [capture SDK](docs/reference/api-guide.md)
-lets other pipelines supply the required per-case facts. Structured inputs need
-an explicit text projection for judging; normalized NLL needs actual likelihood
-measurements. An aggregate score cannot substitute for missing observations.
+**Use existing records.** The public `invarlock.engine.export_evaluator_result`
+helper has dedicated mappings for all 19 evaluators in the maintained shortlist.
+Export your native cases or results once, then use `adapter: evaluator-json` with
+the same `evaluate`, `verify` and `report` commands. Recipients need no evaluator
+SDK or account. The [capture guide](docs/reference/evaluation-records.md#dedicated-evaluator-exports)
+covers source shapes, complete case IDs, custom numeric metrics and metadata
+slices. Exact match needs answers and references; normalized NLL needs actual
+continuation measurements; judging needs task/answer text and complete judge
+measurements. Structured inputs can use an explicit text projection.
 The [qualification matrix](docs/reference/evaluator-qualification.md)
 distinguishes installed support, replay authority and retained runtime evidence
 for each declared profile.

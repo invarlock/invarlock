@@ -20,13 +20,17 @@ or part of InvarLock's installed evaluator-neutral API. Each signed evaluator
 launcher also removes the exact temporary base and child image tags it created
 after the journey, including when a retained workspace is requested.
 
-For an evaluator workflow that already runs elsewhere, use the separate
-[captured-results journey](../captured-results/README.md). Installed parsers
-accept selected Inspect, Harness and Promptfoo export shapes; the public
-`capture_evaluator_run` SDK accepts explicitly mapped records from any evaluator.
-The [shortlist capture helper](../evaluator-qualification/maintained/CAPTURE.md)
-preserves original cases and distinguishes capture support from historical
-qualification.
+For an evaluator workflow that already runs elsewhere, use
+`invarlock.engine.export_evaluator_result` and `adapter: evaluator-json` in the
+[captured-results journey](../captured-results/README.md). Dedicated mappings
+cover all 19 maintained ecosystems through the same export, evaluation,
+verification and reporting interface. The
+[native shape recipes](../evaluator-qualification/maintained/CAPTURE.md#dedicated-native-shapes)
+show SDK objects, result tables and per-case wrappers. Preserve independently
+planned IDs, actual model/source identities and metadata slices; optional
+numeric metrics require explicit recorded-score provenance. The recipient needs
+no evaluator SDK or account. `capture_evaluator_run` remains the public route
+for explicitly mapped canonical records.
 
 Captured comparisons can select InvarLock exact match, normalized NLL or judge
 scoring when the required facts are available. Explicit projections preserve

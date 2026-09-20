@@ -21,6 +21,10 @@ Workflow YAML is linted with `make workflow-lint`.
   changes to shell scripts, TOML files and dependency locks.
 - `repo-hygiene.yml` rejects generated artifacts and oversized files. Obsolete
   runs are cancelled; only the checks that inspect a change's history fetch it.
+- `evaluator-sdk.yml` checks the 19 pinned evaluator SDK capture profiles without
+  model or service calls. Its separate environments run only for capture-related
+  changes or an explicit dispatch. The ordinary distribution jobs also exercise
+  all 57 evaluator/scorer journeys in an SDK-free installed recipient.
 
 Python dependency caches use each job's installed workflow locks as their keys.
 When adding an installation step or locked environment, include its lockfile in
@@ -69,7 +73,15 @@ make workflow-lint
 make docs-check
 make security
 make dist-check
+make evaluator-parity-test
+make evaluator-sdk-test EVALUATOR=ragas
 ```
+
+The SDK probes use the maintained evaluator package pins in isolated producer
+environments. These pins do not lock every transitive SDK dependency. The
+installed recipient gate uses the hash-locked core dependency set. SDK serializer
+tests establish compatibility with the exercised source shape; they do not
+establish new model or service measurements.
 
 The container journey is opt-in because it builds an image from authenticated
 committed source. Create the archive with `scripts/qualification_source.py`
