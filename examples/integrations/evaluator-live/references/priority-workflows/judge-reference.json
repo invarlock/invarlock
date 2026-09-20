@@ -1,0 +1,1936 @@
+{
+  "archives": [
+    {
+      "bytes": 10479868,
+      "expanded_bytes": 119227771,
+      "members": 1692,
+      "path": "judge-01.zip",
+      "sha256": "sha256:af20744eb808bb6f02134e5dc9f1dd0891814dfaf4a814deccadadae229aea57"
+    },
+    {
+      "bytes": 762026,
+      "expanded_bytes": 7294026,
+      "members": 171,
+      "path": "judge-02.zip",
+      "sha256": "sha256:d876bf96e9a838c12e13b6286dd35151e1aaff19c8b8ec59d1fb544539f5f024"
+    }
+  ],
+  "format": "invarlock/priority-judge-catalog-v1",
+  "manifest_sha256": "sha256:314fba032166ebaadab2109feaff268c1530d9f7f89aa5aaae6e99e95697e24c",
+  "reference": {
+    "companions": {
+      "priority": {
+        "bytes": 10286564,
+        "expanded_bytes": 68689951,
+        "members": 2977,
+        "path": "captures.zip",
+        "sha256": "sha256:f0cc24c07ea81306efae3146176e28b1416b427df1730fff3d1eba3497be9cd5"
+      },
+      "sentinel": {
+        "bytes": 10250121,
+        "expanded_bytes": 61469476,
+        "members": 3661,
+        "path": "../mistral-7b-sentinel/captures.zip",
+        "sha256": "sha256:ad3573797f9fe6d9ff69f2016e4b1c70d96b9388cc82ceb22e39eda1d2b90e27"
+      }
+    },
+    "counts": {
+      "attempt_status": {
+        "completed": 1288
+      },
+      "decisions": {
+        "insufficient_evidence": 24
+      },
+      "lifecycle_entries": 4,
+      "packs": 24,
+      "planned_trials": 1472,
+      "retained_attempts": 1288,
+      "unadmitted_trials": 184
+    },
+    "excluded": "Private keys, credentials, model weights, caches, execution admission bodies, controller files and home/config directories are not distributed.",
+    "format": "invarlock/priority-judge-reference-v1",
+    "packs": [
+      {
+        "capture_links": [
+          {
+            "companion": "priority",
+            "directory": "capture/captures/local/baseline/inspect-ai",
+            "files": {
+              "capture.json": {
+                "bytes": 2415,
+                "sha256": "sha256:677a9e65a811fd5ef9eee5ad6d875a4d3a3d43dbe700b29c724aad31af20fdbc"
+              },
+              "native.json": {
+                "bytes": 1605329,
+                "sha256": "sha256:baf6fe07b6ac3d751a2e7400b322f37aafef937e142737c92b681887fc7ecf7b"
+              },
+              "protocol.json": {
+                "bytes": 81452,
+                "sha256": "sha256:78512347e5a53bebdd78293349ed66a97ef5796f44f6b6112f1783beed1f6353"
+              }
+            },
+            "role": "baseline"
+          },
+          {
+            "companion": "priority",
+            "directory": "capture/captures/local/subject/inspect-ai",
+            "files": {
+              "capture.json": {
+                "bytes": 2423,
+                "sha256": "sha256:d856e0b48a0ef203c2041d8e107f3c965724a4e5cbe6f83dbc3fbc784753c48d"
+              },
+              "native.json": {
+                "bytes": 1577829,
+                "sha256": "sha256:a2bb3f797d1f5eea2da5ede5c4e12582d7d85290acacd84c6e1def48afaa0f42"
+              },
+              "protocol.json": {
+                "bytes": 81451,
+                "sha256": "sha256:fd8364f7e1ef8dcef8041fa01f4e4f283f4dbe76a182ac4dc72d4da8a71c6c80"
+              }
+            },
+            "role": "subject"
+          }
+        ],
+        "case_count": 64,
+        "directory": "judge/local-primary-inspect-ai-envelope",
+        "evaluator": "inspect-ai",
+        "event_sources": [
+          {
+            "member": "judge/local-primary-inspect-ai-envelope/sources/events-1.json",
+            "sha256": "sha256:994253438d167efce73cb820b0d607087899ec108f3e62786cc540f7b52ac9ab",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "b040a2fe92d42f582fce1111bcee42c79093ef5be9dda7c7d60e4f5baefbead8",
+          "intended_subject": "sha256:301a07d113d1964b69f497b54a8bc32a44f3b8ce0899e03e74809fa660c04067",
+          "recipient_policy_sha256": "b455694aaa35e1483edef62c4001d0ceb6f69e031e6af2055ffc0084eb9a143c",
+          "replayed": true,
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:a424dd96b9f13d6d153635554e470bf1a08fc416fdd4f7551fc148dd20218be2",
+          "verified": true
+        },
+        "group": "local-primary",
+        "id": "local-primary-inspect-ai-envelope",
+        "lifecycle": null,
+        "plan_sha256": "sha256:df412e9d23b39dcd33434310330182953421dc6db57b10164a2498bee72975fe",
+        "planned_trials": 128,
+        "reference_mode": "per_case",
+        "repetitions": 1,
+        "retained_attempts": 128,
+        "route": "envelope",
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:2e64568242c00748559ea172a647f3b73751a54b200ba4b108c4c55e919e9fec"
+        }
+      },
+      {
+        "capture_links": [
+          {
+            "companion": "priority",
+            "directory": "capture/captures/local/baseline/inspect-ai",
+            "files": {
+              "capture.json": {
+                "bytes": 2415,
+                "sha256": "sha256:677a9e65a811fd5ef9eee5ad6d875a4d3a3d43dbe700b29c724aad31af20fdbc"
+              },
+              "native.json": {
+                "bytes": 1605329,
+                "sha256": "sha256:baf6fe07b6ac3d751a2e7400b322f37aafef937e142737c92b681887fc7ecf7b"
+              },
+              "protocol.json": {
+                "bytes": 81452,
+                "sha256": "sha256:78512347e5a53bebdd78293349ed66a97ef5796f44f6b6112f1783beed1f6353"
+              }
+            },
+            "role": "baseline"
+          },
+          {
+            "companion": "priority",
+            "directory": "capture/captures/local/subject/inspect-ai",
+            "files": {
+              "capture.json": {
+                "bytes": 2423,
+                "sha256": "sha256:d856e0b48a0ef203c2041d8e107f3c965724a4e5cbe6f83dbc3fbc784753c48d"
+              },
+              "native.json": {
+                "bytes": 1577829,
+                "sha256": "sha256:a2bb3f797d1f5eea2da5ede5c4e12582d7d85290acacd84c6e1def48afaa0f42"
+              },
+              "protocol.json": {
+                "bytes": 81451,
+                "sha256": "sha256:fd8364f7e1ef8dcef8041fa01f4e4f283f4dbe76a182ac4dc72d4da8a71c6c80"
+              }
+            },
+            "role": "subject"
+          }
+        ],
+        "case_count": 64,
+        "directory": "judge/local-primary-inspect-ai-native-json",
+        "evaluator": "inspect-ai",
+        "event_sources": [
+          {
+            "member": "judge/local-primary-inspect-ai-native-json/sources/events-1.json",
+            "sha256": "sha256:08f5168003419c0119e47eef029a82f74d50ba69b70fbcf81b2efe01d14919ac",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "26369a6f85846c83849ecfdf6e20bde48bfa9432abca02268d9b445190a93a14",
+          "intended_subject": "sha256:301a07d113d1964b69f497b54a8bc32a44f3b8ce0899e03e74809fa660c04067",
+          "recipient_policy_sha256": "7ba51e005cc7fe87ab3a30c24b88a6f0d01a11990f2ac1673ec0da530f990691",
+          "replayed": true,
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:fc9534fe5ba719bfe960c1aa8eb795fd381285b61e519183ad52b18af349b362",
+          "verified": true
+        },
+        "group": "local-primary",
+        "id": "local-primary-inspect-ai-native-json",
+        "lifecycle": {
+          "checked_initial_members": [
+            "judge/local-primary-inspect-ai-native-json/lifecycle/collection.json",
+            "judge/local-primary-inspect-ai-native-json/checkpoints/result-trial-16b88be021d441edccc1d7915701ad7f2255b542055fedf08de199796bcecdf2-01.json",
+            "judge/local-primary-inspect-ai-native-json/checkpoints/result-trial-5458ed8c34ef8f5fb28c171e4e01d7cac7ce4486bfe93e9282318fd2a7a70655-01.json"
+          ],
+          "directory": "judge/local-primary-inspect-ai-native-json/lifecycle",
+          "scope": "Original unsigned stop/resume observations, partial measurements, and directly checked unchanged result/header bytes. Admission bodies are excluded; their opaque hashes remain in the original observations. This is not external timing attestation."
+        },
+        "plan_sha256": "sha256:c7f3d9d370ab4d1b97482f1424b39e10a7134b0c6417170151308ca746e936fe",
+        "planned_trials": 128,
+        "reference_mode": "per_case",
+        "repetitions": 1,
+        "retained_attempts": 128,
+        "route": "native-json",
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:773539022c9f7fb2996684426540113903e55da62e10c7d93e2d443729a052ae"
+        }
+      },
+      {
+        "capture_links": [
+          {
+            "companion": "priority",
+            "directory": "capture/captures/local/baseline/lm-evaluation-harness",
+            "files": {
+              "capture.json": {
+                "bytes": 2424,
+                "sha256": "sha256:48fe01c36ae296cee2b09aae83365c46c6035977fc5e2d5b5c868ff1e36ca94e"
+              },
+              "native.json": {
+                "bytes": 815196,
+                "sha256": "sha256:1726a4447a288476a8789357492746a9ebafa3057a01e09ec95f0466d0700095"
+              },
+              "protocol.json": {
+                "bytes": 81452,
+                "sha256": "sha256:78512347e5a53bebdd78293349ed66a97ef5796f44f6b6112f1783beed1f6353"
+              }
+            },
+            "role": "baseline"
+          },
+          {
+            "companion": "priority",
+            "directory": "capture/captures/local/subject/lm-evaluation-harness",
+            "files": {
+              "capture.json": {
+                "bytes": 2434,
+                "sha256": "sha256:cf0daeb03ff6066711bb15b0d62f980bd8b1e55fd0f880ca9e630933dda74594"
+              },
+              "native.json": {
+                "bytes": 804960,
+                "sha256": "sha256:c5b6205b425749acf397f9572345edb599daf0f701a080c8c2073520d1d71e16"
+              },
+              "protocol.json": {
+                "bytes": 81451,
+                "sha256": "sha256:fd8364f7e1ef8dcef8041fa01f4e4f283f4dbe76a182ac4dc72d4da8a71c6c80"
+              }
+            },
+            "role": "subject"
+          }
+        ],
+        "case_count": 64,
+        "directory": "judge/local-primary-lm-evaluation-harness-envelope",
+        "evaluator": "lm-evaluation-harness",
+        "event_sources": [
+          {
+            "member": "judge/local-primary-lm-evaluation-harness-envelope/sources/events-1.json",
+            "sha256": "sha256:929a61a80afbc2adb47d8ccaf2272d252734d6bb92b7c1c4e233c2ad89d0f0a1",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "8381b45a6f34faae7be89b08f1666deed14c641df0a6eea60e98d7ac6e6a29c6",
+          "intended_subject": "sha256:301a07d113d1964b69f497b54a8bc32a44f3b8ce0899e03e74809fa660c04067",
+          "recipient_policy_sha256": "c8d59efebaea6b827e0b5e4924b3ed2359b5fe6a0b61a2810bc7dee390ff94ae",
+          "replayed": true,
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:b633686c6db8eb4ba4fd207b9a856ad2a28b357c22ab6165292f7b8d08cfde23",
+          "verified": true
+        },
+        "group": "local-primary",
+        "id": "local-primary-lm-evaluation-harness-envelope",
+        "lifecycle": null,
+        "plan_sha256": "sha256:d46f8f95f999bbd6a6c840751b6fa7dd554138850ac248900977930a68af2078",
+        "planned_trials": 128,
+        "reference_mode": "per_case",
+        "repetitions": 1,
+        "retained_attempts": 128,
+        "route": "envelope",
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:5871623fa8bb709f947d78b9edd542182aaf3598d99e28595ad716f7a773bb4b"
+        }
+      },
+      {
+        "capture_links": [
+          {
+            "companion": "priority",
+            "directory": "capture/captures/local/baseline/lm-evaluation-harness",
+            "files": {
+              "capture.json": {
+                "bytes": 2424,
+                "sha256": "sha256:48fe01c36ae296cee2b09aae83365c46c6035977fc5e2d5b5c868ff1e36ca94e"
+              },
+              "native.json": {
+                "bytes": 815196,
+                "sha256": "sha256:1726a4447a288476a8789357492746a9ebafa3057a01e09ec95f0466d0700095"
+              },
+              "protocol.json": {
+                "bytes": 81452,
+                "sha256": "sha256:78512347e5a53bebdd78293349ed66a97ef5796f44f6b6112f1783beed1f6353"
+              }
+            },
+            "role": "baseline"
+          },
+          {
+            "companion": "priority",
+            "directory": "capture/captures/local/subject/lm-evaluation-harness",
+            "files": {
+              "capture.json": {
+                "bytes": 2434,
+                "sha256": "sha256:cf0daeb03ff6066711bb15b0d62f980bd8b1e55fd0f880ca9e630933dda74594"
+              },
+              "native.json": {
+                "bytes": 804960,
+                "sha256": "sha256:c5b6205b425749acf397f9572345edb599daf0f701a080c8c2073520d1d71e16"
+              },
+              "protocol.json": {
+                "bytes": 81451,
+                "sha256": "sha256:fd8364f7e1ef8dcef8041fa01f4e4f283f4dbe76a182ac4dc72d4da8a71c6c80"
+              }
+            },
+            "role": "subject"
+          }
+        ],
+        "case_count": 64,
+        "directory": "judge/local-primary-lm-evaluation-harness-native-json",
+        "evaluator": "lm-evaluation-harness",
+        "event_sources": [
+          {
+            "member": "judge/local-primary-lm-evaluation-harness-native-json/sources/events-1.json",
+            "sha256": "sha256:55f2dcaa8f88ba71eab0f2dd01f117a52bc995fbab6d5a8e16fd1e37bae6987c",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "32cf31c4524ac5ef659adb107ed006c7b2dab4319113144f925875bcabf061a2",
+          "intended_subject": "sha256:301a07d113d1964b69f497b54a8bc32a44f3b8ce0899e03e74809fa660c04067",
+          "recipient_policy_sha256": "ad4240489870b6aa3ea9ec293d2a56973ca1847218d675b4aa80a02061abf1bf",
+          "replayed": true,
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:331dfcb977b9e0b2e362ac8692de717b8ca17061e5ba1c3a0cf8b8ef19b32498",
+          "verified": true
+        },
+        "group": "local-primary",
+        "id": "local-primary-lm-evaluation-harness-native-json",
+        "lifecycle": {
+          "checked_initial_members": [
+            "judge/local-primary-lm-evaluation-harness-native-json/lifecycle/collection.json",
+            "judge/local-primary-lm-evaluation-harness-native-json/checkpoints/result-trial-12337280c17ed0d19f2ac84be5a38f92d62ed86f993ee0ec626b3a92fa421e04-01.json",
+            "judge/local-primary-lm-evaluation-harness-native-json/checkpoints/result-trial-43c81af0a5d611866bcf539ca12f69a3b14544d35e442b2f5a9ee477d7b99d7a-01.json"
+          ],
+          "directory": "judge/local-primary-lm-evaluation-harness-native-json/lifecycle",
+          "scope": "Original unsigned stop/resume observations, partial measurements, and directly checked unchanged result/header bytes. Admission bodies are excluded; their opaque hashes remain in the original observations. This is not external timing attestation."
+        },
+        "plan_sha256": "sha256:3f0f81a99fd736ce82d4ecc801d24cc602066a7025a911dc78ab6dd69b937b20",
+        "planned_trials": 128,
+        "reference_mode": "per_case",
+        "repetitions": 1,
+        "retained_attempts": 128,
+        "route": "native-json",
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:681b435b30ae18b3d2032baff074ec83b4c6f3ca9f5d998feb7d66974d39654e"
+        }
+      },
+      {
+        "capture_links": [
+          {
+            "companion": "priority",
+            "directory": "capture/captures/local/baseline/promptfoo",
+            "files": {
+              "capture.json": {
+                "bytes": 2415,
+                "sha256": "sha256:409d0e36e5c7d52a409570e49984c8904e1f0c038a956bb8819ce97c5065eb78"
+              },
+              "native.json": {
+                "bytes": 2043970,
+                "sha256": "sha256:8ec6b93f89a7ae2ec0c27cfd0bd36e0a843753c8fe9e9070036ee940a76977c1"
+              },
+              "protocol.json": {
+                "bytes": 81452,
+                "sha256": "sha256:78512347e5a53bebdd78293349ed66a97ef5796f44f6b6112f1783beed1f6353"
+              }
+            },
+            "role": "baseline"
+          },
+          {
+            "companion": "priority",
+            "directory": "capture/captures/local/subject/promptfoo",
+            "files": {
+              "capture.json": {
+                "bytes": 2424,
+                "sha256": "sha256:99fdcc2f8f817217f8baf0b7fcb8636187ede10207a4683789d5147d34ac5b00"
+              },
+              "native.json": {
+                "bytes": 2018573,
+                "sha256": "sha256:212b38bb12871575c0fe4d2588b6f896f3cc4eb4c570e962769c6dbb612cc882"
+              },
+              "protocol.json": {
+                "bytes": 81451,
+                "sha256": "sha256:fd8364f7e1ef8dcef8041fa01f4e4f283f4dbe76a182ac4dc72d4da8a71c6c80"
+              }
+            },
+            "role": "subject"
+          }
+        ],
+        "case_count": 64,
+        "directory": "judge/local-primary-promptfoo-envelope",
+        "evaluator": "promptfoo",
+        "event_sources": [
+          {
+            "member": "judge/local-primary-promptfoo-envelope/sources/events-1.json",
+            "sha256": "sha256:a9dc5579d4c7752f3629eb4648b3b16682223f26da02294d4590a5e63021b0cf",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "beb6a236d914a305bbd7b1eade381c84cf98896c419253fa78f50ff14c8bbb64",
+          "intended_subject": "sha256:301a07d113d1964b69f497b54a8bc32a44f3b8ce0899e03e74809fa660c04067",
+          "recipient_policy_sha256": "5b644e862a13c272bc1d584fccef3bedfd53c5db3f0664f94e0d116c502679ec",
+          "replayed": true,
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:21e9b36a90eb27ccf52fcacad8ff6ee7e467bca22fdac6512c83462c8d28e494",
+          "verified": true
+        },
+        "group": "local-primary",
+        "id": "local-primary-promptfoo-envelope",
+        "lifecycle": null,
+        "plan_sha256": "sha256:5037075e12cd9fc4c737a6a2f192935e0d303bac399a1e18b8246e7e65e5fbcb",
+        "planned_trials": 128,
+        "reference_mode": "per_case",
+        "repetitions": 1,
+        "retained_attempts": 128,
+        "route": "envelope",
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:2d7e509bfede1e69f2cc4e83962fcac124836708c852b7ba1d7f875441092ca8"
+        }
+      },
+      {
+        "capture_links": [
+          {
+            "companion": "priority",
+            "directory": "capture/captures/local/baseline/promptfoo",
+            "files": {
+              "capture.json": {
+                "bytes": 2415,
+                "sha256": "sha256:409d0e36e5c7d52a409570e49984c8904e1f0c038a956bb8819ce97c5065eb78"
+              },
+              "native.json": {
+                "bytes": 2043970,
+                "sha256": "sha256:8ec6b93f89a7ae2ec0c27cfd0bd36e0a843753c8fe9e9070036ee940a76977c1"
+              },
+              "protocol.json": {
+                "bytes": 81452,
+                "sha256": "sha256:78512347e5a53bebdd78293349ed66a97ef5796f44f6b6112f1783beed1f6353"
+              }
+            },
+            "role": "baseline"
+          },
+          {
+            "companion": "priority",
+            "directory": "capture/captures/local/subject/promptfoo",
+            "files": {
+              "capture.json": {
+                "bytes": 2424,
+                "sha256": "sha256:99fdcc2f8f817217f8baf0b7fcb8636187ede10207a4683789d5147d34ac5b00"
+              },
+              "native.json": {
+                "bytes": 2018573,
+                "sha256": "sha256:212b38bb12871575c0fe4d2588b6f896f3cc4eb4c570e962769c6dbb612cc882"
+              },
+              "protocol.json": {
+                "bytes": 81451,
+                "sha256": "sha256:fd8364f7e1ef8dcef8041fa01f4e4f283f4dbe76a182ac4dc72d4da8a71c6c80"
+              }
+            },
+            "role": "subject"
+          }
+        ],
+        "case_count": 64,
+        "directory": "judge/local-primary-promptfoo-native-json",
+        "evaluator": "promptfoo",
+        "event_sources": [
+          {
+            "member": "judge/local-primary-promptfoo-native-json/sources/events-1.json",
+            "sha256": "sha256:44e445028dd600b18a04e5142af9fd39bd0ffc073569dec80a318c109e775670",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "4cc2b80b802282cadca5a268049e97bfe7b1fe3ed58e1cfcd493014201a407a2",
+          "intended_subject": "sha256:301a07d113d1964b69f497b54a8bc32a44f3b8ce0899e03e74809fa660c04067",
+          "recipient_policy_sha256": "f6ffc6764a90077c872a927afa8aa8c63fbea28b4f903ecc65e7133da0309052",
+          "replayed": true,
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:5ab093d10cf6fb78edda52966331395efd1f28fd02b44cfda44e0a3efedf95c8",
+          "verified": true
+        },
+        "group": "local-primary",
+        "id": "local-primary-promptfoo-native-json",
+        "lifecycle": {
+          "checked_initial_members": [
+            "judge/local-primary-promptfoo-native-json/lifecycle/collection.json",
+            "judge/local-primary-promptfoo-native-json/checkpoints/result-trial-2691ae7d5ed6bce311952c539fa8d59bb927eb5b86c4a48c2b8d5cd7915acefb-01.json",
+            "judge/local-primary-promptfoo-native-json/checkpoints/result-trial-5d34ab05bb079d740e599dbf564abf3a35cafb415993f6b2f246a838dedb9524-01.json"
+          ],
+          "directory": "judge/local-primary-promptfoo-native-json/lifecycle",
+          "scope": "Original unsigned stop/resume observations, partial measurements, and directly checked unchanged result/header bytes. Admission bodies are excluded; their opaque hashes remain in the original observations. This is not external timing attestation."
+        },
+        "plan_sha256": "sha256:753aad4715a2ea7242f8e69ced8d83468248c591c4f6e900496dd61d73574b58",
+        "planned_trials": 128,
+        "reference_mode": "per_case",
+        "repetitions": 1,
+        "retained_attempts": 128,
+        "route": "native-json",
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:3f45fa984a88bb81f4df5f0b7909a96658b6fe48ae0587c3206836dd0fff7dab"
+        }
+      },
+      {
+        "capture_links": [
+          {
+            "companion": "priority",
+            "directory": "capture/captures/local/baseline/langfuse",
+            "files": {
+              "capture.json": {
+                "bytes": 2412,
+                "sha256": "sha256:e74eeac716a3e6f07f55326bb7b22ab1cace0a3742c60913790af8d226e2d695"
+              },
+              "native.json": {
+                "bytes": 651461,
+                "sha256": "sha256:341f84c68465f46af12e0f2db1373f9d9f9ea5c291a71ddb6996cbe77c2bd968"
+              },
+              "protocol.json": {
+                "bytes": 81452,
+                "sha256": "sha256:78512347e5a53bebdd78293349ed66a97ef5796f44f6b6112f1783beed1f6353"
+              }
+            },
+            "role": "baseline"
+          },
+          {
+            "companion": "priority",
+            "directory": "capture/captures/local/subject/langfuse",
+            "files": {
+              "capture.json": {
+                "bytes": 2421,
+                "sha256": "sha256:775df96d663f06d98c9ca490cf4ea9152a7b578ecd82942124adb3e1879f5537"
+              },
+              "native.json": {
+                "bytes": 643951,
+                "sha256": "sha256:78d283614023afde7ba7b9b7efc1843abccf44a3ff507c25f48e6a19a0a49179"
+              },
+              "protocol.json": {
+                "bytes": 81451,
+                "sha256": "sha256:fd8364f7e1ef8dcef8041fa01f4e4f283f4dbe76a182ac4dc72d4da8a71c6c80"
+              }
+            },
+            "role": "subject"
+          }
+        ],
+        "case_count": 64,
+        "directory": "judge/local-primary-langfuse-envelope",
+        "evaluator": "langfuse",
+        "event_sources": [
+          {
+            "member": "judge/local-primary-langfuse-envelope/sources/events-1.json",
+            "sha256": "sha256:ed40f797769cc26c568f210918414bc4987b59f7e510aa451b72dcac8a5d8207",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "fdf516d9cc7215f2d9b8eb1af1e8f7bfb40c67bfc9c1df27e59b2f7d83914e41",
+          "intended_subject": "sha256:301a07d113d1964b69f497b54a8bc32a44f3b8ce0899e03e74809fa660c04067",
+          "recipient_policy_sha256": "58b02b34d77f4cc0b92aa9af496ee1ab1142a3fd3ce1edd326ddcca18ad530de",
+          "replayed": true,
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:2928d2fd771aace5c69dd93cf6cc401a8b13519d150e80dc5da8db552d7280c9",
+          "verified": true
+        },
+        "group": "local-primary",
+        "id": "local-primary-langfuse-envelope",
+        "lifecycle": null,
+        "plan_sha256": "sha256:1dc3a230f87db808ef1667307442b973695b34ed6696c6b396662ecd80d8ff77",
+        "planned_trials": 128,
+        "reference_mode": "per_case",
+        "repetitions": 1,
+        "retained_attempts": 128,
+        "route": "envelope",
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:e78c7c71226bb0702f6bc700c45c16f73df474218b773dc9d89ee94054f82b3d"
+        }
+      },
+      {
+        "capture_links": [
+          {
+            "companion": "priority",
+            "directory": "capture/captures/local/baseline/langfuse",
+            "files": {
+              "capture.json": {
+                "bytes": 2412,
+                "sha256": "sha256:e74eeac716a3e6f07f55326bb7b22ab1cace0a3742c60913790af8d226e2d695"
+              },
+              "native.json": {
+                "bytes": 651461,
+                "sha256": "sha256:341f84c68465f46af12e0f2db1373f9d9f9ea5c291a71ddb6996cbe77c2bd968"
+              },
+              "protocol.json": {
+                "bytes": 81452,
+                "sha256": "sha256:78512347e5a53bebdd78293349ed66a97ef5796f44f6b6112f1783beed1f6353"
+              }
+            },
+            "role": "baseline"
+          },
+          {
+            "companion": "priority",
+            "directory": "capture/captures/local/subject/langfuse",
+            "files": {
+              "capture.json": {
+                "bytes": 2421,
+                "sha256": "sha256:775df96d663f06d98c9ca490cf4ea9152a7b578ecd82942124adb3e1879f5537"
+              },
+              "native.json": {
+                "bytes": 643951,
+                "sha256": "sha256:78d283614023afde7ba7b9b7efc1843abccf44a3ff507c25f48e6a19a0a49179"
+              },
+              "protocol.json": {
+                "bytes": 81451,
+                "sha256": "sha256:fd8364f7e1ef8dcef8041fa01f4e4f283f4dbe76a182ac4dc72d4da8a71c6c80"
+              }
+            },
+            "role": "subject"
+          }
+        ],
+        "case_count": 64,
+        "directory": "judge/local-primary-langfuse-native-json",
+        "evaluator": "langfuse",
+        "event_sources": [
+          {
+            "member": "judge/local-primary-langfuse-native-json/sources/events-1.json",
+            "sha256": "sha256:53c31bfa509eb3415e35abb613ae1d4b644340d8cc0b0ffce070307aded6f54a",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "84ab8fcf0cb4fa8818ec9477f2d462acaef0e6d152f89d2deef15eb5febc0164",
+          "intended_subject": "sha256:301a07d113d1964b69f497b54a8bc32a44f3b8ce0899e03e74809fa660c04067",
+          "recipient_policy_sha256": "85aa8e3c8512963b53e37ace37579d26216f05b348ca09066e003bfa1285eb0b",
+          "replayed": true,
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:76121db9cc96a6b078b2067da61d02ce46f596bab0e4606d5371f9fb77f1d5ce",
+          "verified": true
+        },
+        "group": "local-primary",
+        "id": "local-primary-langfuse-native-json",
+        "lifecycle": {
+          "checked_initial_members": [
+            "judge/local-primary-langfuse-native-json/lifecycle/collection.json",
+            "judge/local-primary-langfuse-native-json/checkpoints/result-trial-091f8cd305a0aa91c3ecda7d62f54e1767d7699cca5af1f13aae2a8edbb28c3a-01.json",
+            "judge/local-primary-langfuse-native-json/checkpoints/result-trial-2a579a4ca501ec64f6acfb96047ed82242bedb6a5ad634870a351dd44105a7b1-01.json"
+          ],
+          "directory": "judge/local-primary-langfuse-native-json/lifecycle",
+          "scope": "Original unsigned stop/resume observations, partial measurements, and directly checked unchanged result/header bytes. Admission bodies are excluded; their opaque hashes remain in the original observations. This is not external timing attestation."
+        },
+        "plan_sha256": "sha256:658462023ab59df1ca88aa0d70329acb16413a5c64a38a8a18b17f826bbb5813",
+        "planned_trials": 128,
+        "reference_mode": "per_case",
+        "repetitions": 1,
+        "retained_attempts": 128,
+        "route": "native-json",
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:df212f762f1658e583927b84448ecf9f86752abf3d96d385c320fd64ed290b29"
+        }
+      },
+      {
+        "capture_links": [
+          {
+            "companion": "priority",
+            "directory": "capture/captures/http/baseline/inspect-ai",
+            "files": {
+              "capture.json": {
+                "bytes": 3847,
+                "sha256": "sha256:958ae7d2660f8c0481797693f809a8b80028e176d96cdbb3e983bbc3157a6d29"
+              },
+              "native.json": {
+                "bytes": 221604,
+                "sha256": "sha256:e25f794d3cf0790c41c96071e23270c2e23333443201a4a326b1440d48c0031a"
+              },
+              "protocol.json": {
+                "bytes": 16582,
+                "sha256": "sha256:fbf420336d54c322531f03fa666ec2570b945bc08dce265a90a5211695a901bc"
+              }
+            },
+            "role": "baseline"
+          },
+          {
+            "companion": "priority",
+            "directory": "capture/captures/http/subject/inspect-ai",
+            "files": {
+              "capture.json": {
+                "bytes": 3872,
+                "sha256": "sha256:93450ccb04f14753d7835cb827a430359859170fffcdc59e780df332eb034adc"
+              },
+              "native.json": {
+                "bytes": 218237,
+                "sha256": "sha256:09ac63069e413177a16dbec0378c54f8f93c69e614003a527da678017403d969"
+              },
+              "protocol.json": {
+                "bytes": 16581,
+                "sha256": "sha256:c2859c329f6385c3cda4e867ba033dc4ad8e2c90ccaffa4417accb38d3a10706"
+              }
+            },
+            "role": "subject"
+          }
+        ],
+        "case_count": 8,
+        "directory": "judge/http-primary-inspect-ai-envelope",
+        "evaluator": "inspect-ai",
+        "event_sources": [
+          {
+            "member": "judge/http-primary-inspect-ai-envelope/sources/events-1.json",
+            "sha256": "sha256:9c6f85132655ea48fc71efb213f56129322a8fa8dc5453f90be6fe374074d6c6",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "a032fd79ccc4e0f33c0b73a5ed896aa72197515ce9e169c4968cb79deaed2d08",
+          "intended_subject": "sha256:8eb85e824e52512688a3af15d72650921c066612a9e2a8991314ab53ba5399b7",
+          "recipient_policy_sha256": "f6ca2a2178f80e494be90dc492589d9c06a0565b2ef8767efa60fcb57ddb3c3c",
+          "replayed": true,
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:2e33af5ef929dc2e2ded33ebea930b60d5fc24adfa988c7071ca1afff0d3f4e4",
+          "verified": true
+        },
+        "group": "http-primary",
+        "id": "http-primary-inspect-ai-envelope",
+        "lifecycle": null,
+        "plan_sha256": "sha256:06e37f162b67cf29605d6bc63a7e059531388eb2fd5c6f1fb749cc8ec65a881d",
+        "planned_trials": 16,
+        "reference_mode": "per_case",
+        "repetitions": 1,
+        "retained_attempts": 16,
+        "route": "envelope",
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:960c270397717355224c9f4c0c09618fb5c72a9735013d39a7ea91a286f22f8a"
+        }
+      },
+      {
+        "capture_links": [
+          {
+            "companion": "priority",
+            "directory": "capture/captures/http/baseline/inspect-ai",
+            "files": {
+              "capture.json": {
+                "bytes": 3847,
+                "sha256": "sha256:958ae7d2660f8c0481797693f809a8b80028e176d96cdbb3e983bbc3157a6d29"
+              },
+              "native.json": {
+                "bytes": 221604,
+                "sha256": "sha256:e25f794d3cf0790c41c96071e23270c2e23333443201a4a326b1440d48c0031a"
+              },
+              "protocol.json": {
+                "bytes": 16582,
+                "sha256": "sha256:fbf420336d54c322531f03fa666ec2570b945bc08dce265a90a5211695a901bc"
+              }
+            },
+            "role": "baseline"
+          },
+          {
+            "companion": "priority",
+            "directory": "capture/captures/http/subject/inspect-ai",
+            "files": {
+              "capture.json": {
+                "bytes": 3872,
+                "sha256": "sha256:93450ccb04f14753d7835cb827a430359859170fffcdc59e780df332eb034adc"
+              },
+              "native.json": {
+                "bytes": 218237,
+                "sha256": "sha256:09ac63069e413177a16dbec0378c54f8f93c69e614003a527da678017403d969"
+              },
+              "protocol.json": {
+                "bytes": 16581,
+                "sha256": "sha256:c2859c329f6385c3cda4e867ba033dc4ad8e2c90ccaffa4417accb38d3a10706"
+              }
+            },
+            "role": "subject"
+          }
+        ],
+        "case_count": 8,
+        "directory": "judge/http-primary-inspect-ai-native-json",
+        "evaluator": "inspect-ai",
+        "event_sources": [
+          {
+            "member": "judge/http-primary-inspect-ai-native-json/sources/events-1.json",
+            "sha256": "sha256:fd880f50fad15e4128778d245561e39ad44c0aaa7e51adaf772b93ba12de65b8",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "99eb49df1a22944a8835e67ea29213cc4c49873bcfb71d4bfa7ce86c8c796f08",
+          "intended_subject": "sha256:8eb85e824e52512688a3af15d72650921c066612a9e2a8991314ab53ba5399b7",
+          "recipient_policy_sha256": "197524ec53e85f60d183491e5847a34f8922dc8eac440e1b5a224c18ab478414",
+          "replayed": true,
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:c3681ba084a6d3f4c9e05adfeaee13f1231f0769549dc50f91c461e58d9f55f5",
+          "verified": true
+        },
+        "group": "http-primary",
+        "id": "http-primary-inspect-ai-native-json",
+        "lifecycle": null,
+        "plan_sha256": "sha256:13534539748572af6a97cbfb72aefac72938c24d1a8e30d27f05f405bb91155d",
+        "planned_trials": 16,
+        "reference_mode": "per_case",
+        "repetitions": 1,
+        "retained_attempts": 16,
+        "route": "native-json",
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:684748826c364416ae15a4239bf0c97a4504661deab260684435d7a854c57a37"
+        }
+      },
+      {
+        "capture_links": [
+          {
+            "companion": "priority",
+            "directory": "capture/captures/http/baseline/lm-evaluation-harness",
+            "files": {
+              "capture.json": {
+                "bytes": 3857,
+                "sha256": "sha256:2e68d761c8bbf074a07db5a15380efff1f58c3ccf69895d6ab5b5710f40a5acb"
+              },
+              "native.json": {
+                "bytes": 120663,
+                "sha256": "sha256:77da7c371c26305dfff57ccd174652cfa311fedd1865ddb13e9d83354ce1cb76"
+              },
+              "protocol.json": {
+                "bytes": 16582,
+                "sha256": "sha256:fbf420336d54c322531f03fa666ec2570b945bc08dce265a90a5211695a901bc"
+              }
+            },
+            "role": "baseline"
+          },
+          {
+            "companion": "priority",
+            "directory": "capture/captures/http/subject/lm-evaluation-harness",
+            "files": {
+              "capture.json": {
+                "bytes": 3883,
+                "sha256": "sha256:8a6f33b4be137353ba4bd4ea08fa2d49328c488d07e0398960db5d6161d623af"
+              },
+              "native.json": {
+                "bytes": 119501,
+                "sha256": "sha256:2097e1db02c09e19a4add410619f62acb3142699b60605fa7ab890ea0adff666"
+              },
+              "protocol.json": {
+                "bytes": 16581,
+                "sha256": "sha256:c2859c329f6385c3cda4e867ba033dc4ad8e2c90ccaffa4417accb38d3a10706"
+              }
+            },
+            "role": "subject"
+          }
+        ],
+        "case_count": 8,
+        "directory": "judge/http-primary-lm-evaluation-harness-envelope",
+        "evaluator": "lm-evaluation-harness",
+        "event_sources": [
+          {
+            "member": "judge/http-primary-lm-evaluation-harness-envelope/sources/events-1.json",
+            "sha256": "sha256:037931e7149ef3f39f16521750b88e9cce9cc8628c3247ce8dd15be3272fb2a4",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "0f868e88ef1660ff17af2fb0a454f98d430755943e77e571baa82c77a60b1f3a",
+          "intended_subject": "sha256:87a455ce41c3b347113223166e61c5f6e89c4990089ac69231c9a928515d3c34",
+          "recipient_policy_sha256": "4207b11f8d77c2db9ed2aaa9129cbdac8eb5c87b6122cd639136b30065406e2f",
+          "replayed": true,
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:1fad791bbe463f2b9de73d63ff196e837a3bdb8207d7f167152eed33fb53d004",
+          "verified": true
+        },
+        "group": "http-primary",
+        "id": "http-primary-lm-evaluation-harness-envelope",
+        "lifecycle": null,
+        "plan_sha256": "sha256:ec62b799e563c4a6ae009b1a717e5f904a42877c2980dbd4ecbf3fb8b128eb35",
+        "planned_trials": 16,
+        "reference_mode": "per_case",
+        "repetitions": 1,
+        "retained_attempts": 16,
+        "route": "envelope",
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:b77534bdd48b63276c2372d37cfbb9998bf7f9623c9bea29d86ff5a1bfe78e4f"
+        }
+      },
+      {
+        "capture_links": [
+          {
+            "companion": "priority",
+            "directory": "capture/captures/http/baseline/lm-evaluation-harness",
+            "files": {
+              "capture.json": {
+                "bytes": 3857,
+                "sha256": "sha256:2e68d761c8bbf074a07db5a15380efff1f58c3ccf69895d6ab5b5710f40a5acb"
+              },
+              "native.json": {
+                "bytes": 120663,
+                "sha256": "sha256:77da7c371c26305dfff57ccd174652cfa311fedd1865ddb13e9d83354ce1cb76"
+              },
+              "protocol.json": {
+                "bytes": 16582,
+                "sha256": "sha256:fbf420336d54c322531f03fa666ec2570b945bc08dce265a90a5211695a901bc"
+              }
+            },
+            "role": "baseline"
+          },
+          {
+            "companion": "priority",
+            "directory": "capture/captures/http/subject/lm-evaluation-harness",
+            "files": {
+              "capture.json": {
+                "bytes": 3883,
+                "sha256": "sha256:8a6f33b4be137353ba4bd4ea08fa2d49328c488d07e0398960db5d6161d623af"
+              },
+              "native.json": {
+                "bytes": 119501,
+                "sha256": "sha256:2097e1db02c09e19a4add410619f62acb3142699b60605fa7ab890ea0adff666"
+              },
+              "protocol.json": {
+                "bytes": 16581,
+                "sha256": "sha256:c2859c329f6385c3cda4e867ba033dc4ad8e2c90ccaffa4417accb38d3a10706"
+              }
+            },
+            "role": "subject"
+          }
+        ],
+        "case_count": 8,
+        "directory": "judge/http-primary-lm-evaluation-harness-native-json",
+        "evaluator": "lm-evaluation-harness",
+        "event_sources": [
+          {
+            "member": "judge/http-primary-lm-evaluation-harness-native-json/sources/events-1.json",
+            "sha256": "sha256:eb158a38bd3d056f78c6a9a06e374cd78b11f82013472238729dd002ff525259",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "67a851c899de3fda04062b320771e9b27dd90e43e00dbf9a8dbeb7bb3170893d",
+          "intended_subject": "sha256:87a455ce41c3b347113223166e61c5f6e89c4990089ac69231c9a928515d3c34",
+          "recipient_policy_sha256": "e2be2a24700e84d8a905aa616894a4e866f33176ba4d435c6a63494a690694e1",
+          "replayed": true,
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:cf00dd0b0b02dcdd1187aa4237d0765ead16839051ba61dbf001f46745ffa0d0",
+          "verified": true
+        },
+        "group": "http-primary",
+        "id": "http-primary-lm-evaluation-harness-native-json",
+        "lifecycle": null,
+        "plan_sha256": "sha256:a1fc1c270268434cf2d2ef9adaf114d0c570a512f7f5eaa6cf5eb38d0732aa2a",
+        "planned_trials": 16,
+        "reference_mode": "per_case",
+        "repetitions": 1,
+        "retained_attempts": 16,
+        "route": "native-json",
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:ae2ba5ec6d056d01cb038f3c23951dd720cb6d232c8d3ad40e0ba293d832a8ca"
+        }
+      },
+      {
+        "capture_links": [
+          {
+            "companion": "priority",
+            "directory": "capture/captures/http/baseline/promptfoo",
+            "files": {
+              "capture.json": {
+                "bytes": 3847,
+                "sha256": "sha256:88f348dec7a73df5168c396902d2f328fa35db4414548404bbc49daf1db7804b"
+              },
+              "native.json": {
+                "bytes": 309693,
+                "sha256": "sha256:fef53528214dc0c72053e79b122b16decd804339b34e1852d7e27755b047d8b7"
+              },
+              "protocol.json": {
+                "bytes": 16582,
+                "sha256": "sha256:fbf420336d54c322531f03fa666ec2570b945bc08dce265a90a5211695a901bc"
+              }
+            },
+            "role": "baseline"
+          },
+          {
+            "companion": "priority",
+            "directory": "capture/captures/http/subject/promptfoo",
+            "files": {
+              "capture.json": {
+                "bytes": 3870,
+                "sha256": "sha256:822ac95b17cf982e183beb77b4038043a11c746037b85efe905c3adeef66fbdc"
+              },
+              "native.json": {
+                "bytes": 306759,
+                "sha256": "sha256:4a98760dfee5c01e1e2cf1edc230811a9eb49c90a0b12c19df4f788f5769e9c4"
+              },
+              "protocol.json": {
+                "bytes": 16581,
+                "sha256": "sha256:c2859c329f6385c3cda4e867ba033dc4ad8e2c90ccaffa4417accb38d3a10706"
+              }
+            },
+            "role": "subject"
+          }
+        ],
+        "case_count": 8,
+        "directory": "judge/http-primary-promptfoo-envelope",
+        "evaluator": "promptfoo",
+        "event_sources": [
+          {
+            "member": "judge/http-primary-promptfoo-envelope/sources/events-1.json",
+            "sha256": "sha256:e1b092b79b01991608ead2cdff2899a40461a195dd6988a6e2d36819aa2a59b4",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "929204f09b87be62bd7c326412f5715540dbee8c4196df78b226b4524b5538f9",
+          "intended_subject": "sha256:f994514583e9bda2cea66fb4be896630bf3fe3db046cf89ceb019ab80948fee3",
+          "recipient_policy_sha256": "0836ac4f5cd839a1d82f53a3c9e4348920af643ec67e1cb8a0c3efb177bbd815",
+          "replayed": true,
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:7f4549ac3d927c5e2bc9d45dfd7585a28de40741a4b9c3aa1aa5dbb14711ab90",
+          "verified": true
+        },
+        "group": "http-primary",
+        "id": "http-primary-promptfoo-envelope",
+        "lifecycle": null,
+        "plan_sha256": "sha256:ce2e24b2f75fef5ee3500b842abea81e7383d9b5f0836ce4f5effeafc33c294c",
+        "planned_trials": 16,
+        "reference_mode": "per_case",
+        "repetitions": 1,
+        "retained_attempts": 16,
+        "route": "envelope",
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:663cf7196a1d2c4950e961a100035a2d1736d634b6c6eaf7d4d153054916360c"
+        }
+      },
+      {
+        "capture_links": [
+          {
+            "companion": "priority",
+            "directory": "capture/captures/http/baseline/promptfoo",
+            "files": {
+              "capture.json": {
+                "bytes": 3847,
+                "sha256": "sha256:88f348dec7a73df5168c396902d2f328fa35db4414548404bbc49daf1db7804b"
+              },
+              "native.json": {
+                "bytes": 309693,
+                "sha256": "sha256:fef53528214dc0c72053e79b122b16decd804339b34e1852d7e27755b047d8b7"
+              },
+              "protocol.json": {
+                "bytes": 16582,
+                "sha256": "sha256:fbf420336d54c322531f03fa666ec2570b945bc08dce265a90a5211695a901bc"
+              }
+            },
+            "role": "baseline"
+          },
+          {
+            "companion": "priority",
+            "directory": "capture/captures/http/subject/promptfoo",
+            "files": {
+              "capture.json": {
+                "bytes": 3870,
+                "sha256": "sha256:822ac95b17cf982e183beb77b4038043a11c746037b85efe905c3adeef66fbdc"
+              },
+              "native.json": {
+                "bytes": 306759,
+                "sha256": "sha256:4a98760dfee5c01e1e2cf1edc230811a9eb49c90a0b12c19df4f788f5769e9c4"
+              },
+              "protocol.json": {
+                "bytes": 16581,
+                "sha256": "sha256:c2859c329f6385c3cda4e867ba033dc4ad8e2c90ccaffa4417accb38d3a10706"
+              }
+            },
+            "role": "subject"
+          }
+        ],
+        "case_count": 8,
+        "directory": "judge/http-primary-promptfoo-native-json",
+        "evaluator": "promptfoo",
+        "event_sources": [
+          {
+            "member": "judge/http-primary-promptfoo-native-json/sources/events-1.json",
+            "sha256": "sha256:7dd6949b25f3ab76a6af77f041e1a7f7ed18645ce1b39df88892a617caaa8f6c",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "b6f16e7d507c409b1013e18fa953e8b9577019bd6c59127d6c625f4b5f06e730",
+          "intended_subject": "sha256:f994514583e9bda2cea66fb4be896630bf3fe3db046cf89ceb019ab80948fee3",
+          "recipient_policy_sha256": "5d4b07ea353b43f0b1b6fa900fc32705289a7cbfec936be82b429da5c61aaf98",
+          "replayed": true,
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:fac8f6f1a86066409147aa31ac87b7f5558f8303cc114b63e8d6ef2ad29c593c",
+          "verified": true
+        },
+        "group": "http-primary",
+        "id": "http-primary-promptfoo-native-json",
+        "lifecycle": null,
+        "plan_sha256": "sha256:cb739efda31f2368e65040b3fa685f1a4e5aefac5d417281d4e9670a121ecef4",
+        "planned_trials": 16,
+        "reference_mode": "per_case",
+        "repetitions": 1,
+        "retained_attempts": 16,
+        "route": "native-json",
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:fd862a668e9bf7faf8ed9c87ab2a35ec10778552e2cc3e40e06a3b18f2b82340"
+        }
+      },
+      {
+        "capture_links": [
+          {
+            "companion": "priority",
+            "directory": "capture/captures/http/baseline/langfuse",
+            "files": {
+              "capture.json": {
+                "bytes": 3844,
+                "sha256": "sha256:553ceed5a77ebd95a21bab07b7749177365915be6a10d3035fdddc2cb99f14f9"
+              },
+              "native.json": {
+                "bytes": 99424,
+                "sha256": "sha256:5dd482ebcc871ca129d8ad738940af449b03f12f437743951b6d5c0aa3b6587d"
+              },
+              "protocol.json": {
+                "bytes": 16582,
+                "sha256": "sha256:fbf420336d54c322531f03fa666ec2570b945bc08dce265a90a5211695a901bc"
+              }
+            },
+            "role": "baseline"
+          },
+          {
+            "companion": "priority",
+            "directory": "capture/captures/http/subject/langfuse",
+            "files": {
+              "capture.json": {
+                "bytes": 3868,
+                "sha256": "sha256:9b3f2ea1159d80950bb44ceb0d1a350a14a93c6dc4738708cc7be4a79bdbb8b7"
+              },
+              "native.json": {
+                "bytes": 98608,
+                "sha256": "sha256:c78465d86242e1720db57765926e59ee364743325f5674d4e576e1f3f3e3dd48"
+              },
+              "protocol.json": {
+                "bytes": 16581,
+                "sha256": "sha256:c2859c329f6385c3cda4e867ba033dc4ad8e2c90ccaffa4417accb38d3a10706"
+              }
+            },
+            "role": "subject"
+          }
+        ],
+        "case_count": 8,
+        "directory": "judge/http-primary-langfuse-envelope",
+        "evaluator": "langfuse",
+        "event_sources": [
+          {
+            "member": "judge/http-primary-langfuse-envelope/sources/events-1.json",
+            "sha256": "sha256:548e43d6824a0ebff27e95505fbfb42e87e62baeacf9ce065b5666fb109b90fb",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "f27087370baa217f39acdc9ae01b9633fe20dd699cc21f0468239b15baad087d",
+          "intended_subject": "sha256:4fe6e72990026a9b0913c467162c5a285ec9d991ab453e1dc8911492ad2512a9",
+          "recipient_policy_sha256": "adfe7de5fe021471309fad22959df5a3cd522c37c806f88908c9ac096f34d5de",
+          "replayed": true,
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:c7263e52ed3832974da0ee2948eafd387e4cdfe71ae2206b8b49676ec33573b1",
+          "verified": true
+        },
+        "group": "http-primary",
+        "id": "http-primary-langfuse-envelope",
+        "lifecycle": null,
+        "plan_sha256": "sha256:1a004e5e40228c59b5c4ad936fcd2eedffbb0cb607745f18e0df85c4d0f12540",
+        "planned_trials": 16,
+        "reference_mode": "per_case",
+        "repetitions": 1,
+        "retained_attempts": 16,
+        "route": "envelope",
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:3067e53fbeaa1b49bc16fbaabccf60f4dd45645c28ee9cbb6b2429d7ce0e3d56"
+        }
+      },
+      {
+        "capture_links": [
+          {
+            "companion": "priority",
+            "directory": "capture/captures/http/baseline/langfuse",
+            "files": {
+              "capture.json": {
+                "bytes": 3844,
+                "sha256": "sha256:553ceed5a77ebd95a21bab07b7749177365915be6a10d3035fdddc2cb99f14f9"
+              },
+              "native.json": {
+                "bytes": 99424,
+                "sha256": "sha256:5dd482ebcc871ca129d8ad738940af449b03f12f437743951b6d5c0aa3b6587d"
+              },
+              "protocol.json": {
+                "bytes": 16582,
+                "sha256": "sha256:fbf420336d54c322531f03fa666ec2570b945bc08dce265a90a5211695a901bc"
+              }
+            },
+            "role": "baseline"
+          },
+          {
+            "companion": "priority",
+            "directory": "capture/captures/http/subject/langfuse",
+            "files": {
+              "capture.json": {
+                "bytes": 3868,
+                "sha256": "sha256:9b3f2ea1159d80950bb44ceb0d1a350a14a93c6dc4738708cc7be4a79bdbb8b7"
+              },
+              "native.json": {
+                "bytes": 98608,
+                "sha256": "sha256:c78465d86242e1720db57765926e59ee364743325f5674d4e576e1f3f3e3dd48"
+              },
+              "protocol.json": {
+                "bytes": 16581,
+                "sha256": "sha256:c2859c329f6385c3cda4e867ba033dc4ad8e2c90ccaffa4417accb38d3a10706"
+              }
+            },
+            "role": "subject"
+          }
+        ],
+        "case_count": 8,
+        "directory": "judge/http-primary-langfuse-native-json",
+        "evaluator": "langfuse",
+        "event_sources": [
+          {
+            "member": "judge/http-primary-langfuse-native-json/sources/events-1.json",
+            "sha256": "sha256:9bba60dde9e0483a3be1c01625360fc0995962a9e22d63eef629d1fac75901ee",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "11893523cf94979c1d02830e36670f97736932d05de0eb18bc58b7536bcf2a6b",
+          "intended_subject": "sha256:4fe6e72990026a9b0913c467162c5a285ec9d991ab453e1dc8911492ad2512a9",
+          "recipient_policy_sha256": "fda01928560f0e457640357f2ffea1d37314304d22a7816f17b249723ba808f3",
+          "replayed": true,
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:8b462f72292e0157a7ac1bb6036855f0cefe208b30f57789c65e5a4855378109",
+          "verified": true
+        },
+        "group": "http-primary",
+        "id": "http-primary-langfuse-native-json",
+        "lifecycle": null,
+        "plan_sha256": "sha256:4a8c37d2fb53657f09b90e435f65bc005bb8876fae6d46a5aa68243acaf712cc",
+        "planned_trials": 16,
+        "reference_mode": "per_case",
+        "repetitions": 1,
+        "retained_attempts": 16,
+        "route": "native-json",
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:e0d77237215256aa2147012ea6712bc5998e93a7688acd19298b66a87ad74e91"
+        }
+      },
+      {
+        "capture_links": [
+          {
+            "companion": "sentinel",
+            "directory": "original/captures-sentinel-after-lighteval/baseline/langfuse/capture",
+            "files": {
+              "capture.json": {
+                "bytes": 2406,
+                "sha256": "sha256:d93b7fd2721e8c9c7692e8b83c7b6d24fd3c0b08b7d19f1c5046e9660df1bc56"
+              },
+              "native.json": {
+                "bytes": 83526,
+                "sha256": "sha256:4bacebbd2115554ee066644865b5ccb20067de4f6200cd1d562cb8cb1dbbb323"
+              },
+              "protocol.json": {
+                "bytes": 16532,
+                "sha256": "sha256:630d70a383eb254eb1628f8e3147267253872670d238d216f8f1c70161be302d"
+              }
+            },
+            "role": "baseline"
+          },
+          {
+            "companion": "sentinel",
+            "directory": "original/captures-sentinel-after-lighteval/subject/langfuse/capture",
+            "files": {
+              "capture.json": {
+                "bytes": 2420,
+                "sha256": "sha256:0e75eede79f10a84010079a222012f49314c46ff2902f2c1ac15f41758707615"
+              },
+              "native.json": {
+                "bytes": 82572,
+                "sha256": "sha256:d53960503dc9899f4aede005a11bf67a03d3c0feeb59e178de419430be0ed82f"
+              },
+              "protocol.json": {
+                "bytes": 16531,
+                "sha256": "sha256:5ec8fb1a61380e73c28b49712e646361c48997271c7b5bf8229a98305cd82b31"
+              }
+            },
+            "role": "subject"
+          }
+        ],
+        "case_count": 8,
+        "directory": "judge/langfuse-reference-free-langfuse-envelope",
+        "evaluator": "langfuse",
+        "event_sources": [
+          {
+            "member": "judge/langfuse-reference-free-langfuse-envelope/sources/events-1.json",
+            "sha256": "sha256:362383efa3ccc5654737e804d82791ef75a453e60282ef876739cf71fd045df3",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "22b7686800856e1d42bc116d28c3ee980e1000a5fd39e5798e4ad959ea6bca82",
+          "intended_subject": "sha256:301a07d113d1964b69f497b54a8bc32a44f3b8ce0899e03e74809fa660c04067",
+          "recipient_policy_sha256": "5fb6a86e26b7b90b9aac33f977f3bb4cd2f7edebdb2154ffdb3e0364af410caa",
+          "replayed": true,
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:3fa144a91516e8b3eda77a05bb0ed5ffe1bdfc03e8c2d31a573f2e7af84b8661",
+          "verified": true
+        },
+        "group": "langfuse-reference-free",
+        "id": "langfuse-reference-free-langfuse-envelope",
+        "lifecycle": null,
+        "plan_sha256": "sha256:a958c68bd5f5c3d0e72c277d1aef0123cf2e13e71de1d0555c04c62bb9c34f1e",
+        "planned_trials": 16,
+        "reference_mode": "none",
+        "repetitions": 1,
+        "retained_attempts": 16,
+        "route": "envelope",
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:4ec62b182e09103c612075ba00bc7da85d09336f6a858d0d0b8da969534a7361"
+        }
+      },
+      {
+        "capture_links": [
+          {
+            "companion": "sentinel",
+            "directory": "original/captures-sentinel-after-lighteval/baseline/langfuse/capture",
+            "files": {
+              "capture.json": {
+                "bytes": 2406,
+                "sha256": "sha256:d93b7fd2721e8c9c7692e8b83c7b6d24fd3c0b08b7d19f1c5046e9660df1bc56"
+              },
+              "native.json": {
+                "bytes": 83526,
+                "sha256": "sha256:4bacebbd2115554ee066644865b5ccb20067de4f6200cd1d562cb8cb1dbbb323"
+              },
+              "protocol.json": {
+                "bytes": 16532,
+                "sha256": "sha256:630d70a383eb254eb1628f8e3147267253872670d238d216f8f1c70161be302d"
+              }
+            },
+            "role": "baseline"
+          },
+          {
+            "companion": "sentinel",
+            "directory": "original/captures-sentinel-after-lighteval/subject/langfuse/capture",
+            "files": {
+              "capture.json": {
+                "bytes": 2420,
+                "sha256": "sha256:0e75eede79f10a84010079a222012f49314c46ff2902f2c1ac15f41758707615"
+              },
+              "native.json": {
+                "bytes": 82572,
+                "sha256": "sha256:d53960503dc9899f4aede005a11bf67a03d3c0feeb59e178de419430be0ed82f"
+              },
+              "protocol.json": {
+                "bytes": 16531,
+                "sha256": "sha256:5ec8fb1a61380e73c28b49712e646361c48997271c7b5bf8229a98305cd82b31"
+              }
+            },
+            "role": "subject"
+          }
+        ],
+        "case_count": 8,
+        "directory": "judge/langfuse-reference-free-langfuse-native-json",
+        "evaluator": "langfuse",
+        "event_sources": [
+          {
+            "member": "judge/langfuse-reference-free-langfuse-native-json/sources/events-1.json",
+            "sha256": "sha256:a7aec93cb6e8eb69571c9574651d87d0ae2958057d9222818bb20c6072f75b33",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "78933b9d2048d95cfb19ceeffd85e8954334abc363194b085d34be62c7952dd5",
+          "intended_subject": "sha256:301a07d113d1964b69f497b54a8bc32a44f3b8ce0899e03e74809fa660c04067",
+          "recipient_policy_sha256": "1f8adc0dd9046e8d6347e1e296a502089de641098ee30d77f407beeec6fa22b0",
+          "replayed": true,
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:7b7854fadb0062667352978203929b30eec274e4da726c57ba15f62aa8474e09",
+          "verified": true
+        },
+        "group": "langfuse-reference-free",
+        "id": "langfuse-reference-free-langfuse-native-json",
+        "lifecycle": null,
+        "plan_sha256": "sha256:73601eadc831beff97d4b00697bea98aa17c6632d4b2e12f7c43622d1f48655c",
+        "planned_trials": 16,
+        "reference_mode": "none",
+        "repetitions": 1,
+        "retained_attempts": 16,
+        "route": "native-json",
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:4214c78dddb34380e804d4b8d922a6cd665cb260b3bc12396ed75e0b2d351470"
+        }
+      },
+      {
+        "capture_links": [
+          {
+            "companion": "sentinel",
+            "directory": "original/captures-sentinel-after-lighteval/baseline/langfuse/capture",
+            "files": {
+              "capture.json": {
+                "bytes": 2406,
+                "sha256": "sha256:d93b7fd2721e8c9c7692e8b83c7b6d24fd3c0b08b7d19f1c5046e9660df1bc56"
+              },
+              "native.json": {
+                "bytes": 83526,
+                "sha256": "sha256:4bacebbd2115554ee066644865b5ccb20067de4f6200cd1d562cb8cb1dbbb323"
+              },
+              "protocol.json": {
+                "bytes": 16532,
+                "sha256": "sha256:630d70a383eb254eb1628f8e3147267253872670d238d216f8f1c70161be302d"
+              }
+            },
+            "role": "baseline"
+          },
+          {
+            "companion": "sentinel",
+            "directory": "original/captures-sentinel-after-lighteval/subject/langfuse/capture",
+            "files": {
+              "capture.json": {
+                "bytes": 2420,
+                "sha256": "sha256:0e75eede79f10a84010079a222012f49314c46ff2902f2c1ac15f41758707615"
+              },
+              "native.json": {
+                "bytes": 82572,
+                "sha256": "sha256:d53960503dc9899f4aede005a11bf67a03d3c0feeb59e178de419430be0ed82f"
+              },
+              "protocol.json": {
+                "bytes": 16531,
+                "sha256": "sha256:5ec8fb1a61380e73c28b49712e646361c48997271c7b5bf8229a98305cd82b31"
+              }
+            },
+            "role": "subject"
+          }
+        ],
+        "case_count": 8,
+        "directory": "judge/langfuse-repeat-control-langfuse-envelope",
+        "evaluator": "langfuse",
+        "event_sources": [
+          {
+            "member": "judge/langfuse-repeat-control-langfuse-envelope/sources/events-1.json",
+            "sha256": "sha256:88af1c4e6c808c2900078e8d0759512bcabf86751dde7f7cc0a496c94c13869d",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "b5c3c4081542733b8cd19fbb2e1e3e76f9152c99dd57023258bbf63620f0470a",
+          "intended_subject": "sha256:301a07d113d1964b69f497b54a8bc32a44f3b8ce0899e03e74809fa660c04067",
+          "recipient_policy_sha256": "ba7c528ff08fcf3e33ff543523e9c6289f4916a9592aeda3109096974e5c84f9",
+          "replayed": true,
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:59502ae5b5d74925c7f6479b49934903548fa5671892ac511591a056ef7c437e",
+          "verified": true
+        },
+        "group": "langfuse-repeat-control",
+        "id": "langfuse-repeat-control-langfuse-envelope",
+        "lifecycle": null,
+        "plan_sha256": "sha256:34efd750f3d9710f05400bc647a7fb7e44907d4aadd6d848b87c5fdaf87a08e4",
+        "planned_trials": 48,
+        "reference_mode": "per_case",
+        "repetitions": 3,
+        "retained_attempts": 48,
+        "route": "envelope",
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:5144997ada4d2676754181c3f8ec96f6939f95596c207827739d4ef303245dd0"
+        }
+      },
+      {
+        "capture_links": [
+          {
+            "companion": "sentinel",
+            "directory": "original/captures-sentinel-after-lighteval/baseline/langfuse/capture",
+            "files": {
+              "capture.json": {
+                "bytes": 2406,
+                "sha256": "sha256:d93b7fd2721e8c9c7692e8b83c7b6d24fd3c0b08b7d19f1c5046e9660df1bc56"
+              },
+              "native.json": {
+                "bytes": 83526,
+                "sha256": "sha256:4bacebbd2115554ee066644865b5ccb20067de4f6200cd1d562cb8cb1dbbb323"
+              },
+              "protocol.json": {
+                "bytes": 16532,
+                "sha256": "sha256:630d70a383eb254eb1628f8e3147267253872670d238d216f8f1c70161be302d"
+              }
+            },
+            "role": "baseline"
+          },
+          {
+            "companion": "sentinel",
+            "directory": "original/captures-sentinel-after-lighteval/subject/langfuse/capture",
+            "files": {
+              "capture.json": {
+                "bytes": 2420,
+                "sha256": "sha256:0e75eede79f10a84010079a222012f49314c46ff2902f2c1ac15f41758707615"
+              },
+              "native.json": {
+                "bytes": 82572,
+                "sha256": "sha256:d53960503dc9899f4aede005a11bf67a03d3c0feeb59e178de419430be0ed82f"
+              },
+              "protocol.json": {
+                "bytes": 16531,
+                "sha256": "sha256:5ec8fb1a61380e73c28b49712e646361c48997271c7b5bf8229a98305cd82b31"
+              }
+            },
+            "role": "subject"
+          }
+        ],
+        "case_count": 8,
+        "directory": "judge/langfuse-repeat-control-langfuse-native-json",
+        "evaluator": "langfuse",
+        "event_sources": [
+          {
+            "member": "judge/langfuse-repeat-control-langfuse-native-json/sources/events-1.json",
+            "sha256": "sha256:61c9f7ab974ca1895a39d7db65cc20509e2a42729ea4f4e5bde8368562578e8e",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "26da62952a6cecdf102ce9ef469fce3a5883270bf800d85cd0897f0a75e80441",
+          "intended_subject": "sha256:301a07d113d1964b69f497b54a8bc32a44f3b8ce0899e03e74809fa660c04067",
+          "recipient_policy_sha256": "5f6c58e97d6f119f4f985e6d982d81abb96e512f442f8bc7bd9a0a73aa13798f",
+          "replayed": true,
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:d75b2d3e5416b9c40689b64aef24a81eeca2de5e4a5ae9fd8875cfb4d8f24f59",
+          "verified": true
+        },
+        "group": "langfuse-repeat-control",
+        "id": "langfuse-repeat-control-langfuse-native-json",
+        "lifecycle": null,
+        "plan_sha256": "sha256:7ea73e5a985abc7dc5203bbf93d27b8a196caf5444b751c8b8077396cfc86b33",
+        "planned_trials": 48,
+        "reference_mode": "per_case",
+        "repetitions": 3,
+        "retained_attempts": 48,
+        "route": "native-json",
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:48f52fcb53d2b6467fa8418dbff4849fe73fb0a5f74cf71ebc07238008735d6d"
+        }
+      },
+      {
+        "capture_links": [
+          {
+            "companion": "sentinel",
+            "directory": "original/captures-sentinel-main/baseline/inspect-ai/capture",
+            "files": {
+              "capture.json": {
+                "bytes": 2412,
+                "sha256": "sha256:766964c4e43524c25d56074802e59d9bbf3bfbdabb80529373a9df5df91035e5"
+              },
+              "native.json": {
+                "bytes": 205709,
+                "sha256": "sha256:958492d2b810020656507997df23abe150b384931e54ceddccf76dc5cc4207ff"
+              },
+              "protocol.json": {
+                "bytes": 16532,
+                "sha256": "sha256:630d70a383eb254eb1628f8e3147267253872670d238d216f8f1c70161be302d"
+              }
+            },
+            "role": "baseline"
+          },
+          {
+            "companion": "sentinel",
+            "directory": "original/captures-sentinel-main/subject/inspect-ai/capture",
+            "files": {
+              "capture.json": {
+                "bytes": 2423,
+                "sha256": "sha256:2b8c5d74682741160d20179f6cad30307bd72c64916835129e1d9c5c373b2e67"
+              },
+              "native.json": {
+                "bytes": 202186,
+                "sha256": "sha256:ed82189e63c6de1bdce256ba045518d3a4c2dde5199f51bdf0ee110d4e9e6029"
+              },
+              "protocol.json": {
+                "bytes": 16531,
+                "sha256": "sha256:5ec8fb1a61380e73c28b49712e646361c48997271c7b5bf8229a98305cd82b31"
+              }
+            },
+            "role": "subject"
+          }
+        ],
+        "case_count": 8,
+        "directory": "judge/budget-controls-inspect-ai-native-json",
+        "evaluator": "inspect-ai",
+        "event_sources": [
+          {
+            "member": "judge/budget-controls-inspect-ai-native-json/sources/events-1.json",
+            "sha256": "sha256:37ede1f18471fe23b10c8196f349fba5234b5fa39f69417dc3a30065b2dde179",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "0ae9c1c48e1d54442682e98bb6cb7f718ce66670e6e6327c35ba885425e3ba8d",
+          "intended_subject": "sha256:301a07d113d1964b69f497b54a8bc32a44f3b8ce0899e03e74809fa660c04067",
+          "recipient_policy_sha256": "1649078f0f4aeda6cae7ccbdfa2f6c259cc02150b2d071179a4f8f4ca329b37f",
+          "replayed": true,
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:afae48d1eda568209a458e617a0afec044a3f8b79620a35ae3458bcac4f0a48b",
+          "verified": true
+        },
+        "group": "budget-controls",
+        "id": "budget-controls-inspect-ai-native-json",
+        "lifecycle": null,
+        "plan_sha256": "sha256:70b97dfb3a1c292378ff28aed6d933d23ac29e021a18ff499d1938041f0bf6be",
+        "planned_trials": 48,
+        "reference_mode": "none",
+        "repetitions": 3,
+        "retained_attempts": 2,
+        "route": "native-json",
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:f0c51dad77d6973144919f43d35a31448a591b118d571223e65b8ec2c9c6a717"
+        }
+      },
+      {
+        "capture_links": [
+          {
+            "companion": "sentinel",
+            "directory": "recovery/harness/baseline",
+            "files": {
+              "capture.json": {
+                "bytes": 2523,
+                "sha256": "sha256:9d17681541b4363084896b6f30f1c926511d31cfae85ecbfedd2183f16b78a34"
+              },
+              "native.json": {
+                "bytes": 104661,
+                "sha256": "sha256:e1ef7790158089df78b8c911d60bb1413df4d2a4e9c29e173e462e20a1e00f1a"
+              },
+              "protocol.json": {
+                "bytes": 16532,
+                "sha256": "sha256:630d70a383eb254eb1628f8e3147267253872670d238d216f8f1c70161be302d"
+              }
+            },
+            "role": "baseline"
+          },
+          {
+            "companion": "sentinel",
+            "directory": "recovery/harness/subject",
+            "files": {
+              "capture.json": {
+                "bytes": 2531,
+                "sha256": "sha256:f0c7f2fdc5629fcdc1932b4de52454a1468429d93925a4604d068e751d5cd624"
+              },
+              "native.json": {
+                "bytes": 103361,
+                "sha256": "sha256:390276c3e54b3b9e9e8cf01d73d55f31a43c94df608797663ae01a6cba3aa90e"
+              },
+              "protocol.json": {
+                "bytes": 16531,
+                "sha256": "sha256:5ec8fb1a61380e73c28b49712e646361c48997271c7b5bf8229a98305cd82b31"
+              }
+            },
+            "role": "subject"
+          }
+        ],
+        "case_count": 8,
+        "directory": "judge/budget-controls-lm-evaluation-harness-native-json",
+        "evaluator": "lm-evaluation-harness",
+        "event_sources": [
+          {
+            "member": "judge/budget-controls-lm-evaluation-harness-native-json/sources/events-1.json",
+            "sha256": "sha256:4bf12d884525a94851fab61e2135f97cefaf4e6e0ff2aa2874d003a7062a0730",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "75bd91db7f7b2b70df78632137bfc1594eac1846c5cf44f9814035127c15b1f8",
+          "intended_subject": "sha256:301a07d113d1964b69f497b54a8bc32a44f3b8ce0899e03e74809fa660c04067",
+          "recipient_policy_sha256": "3459f40611a5b5676aabd43131ec3a4ce5979dede31e1b374b4eb1e3689469ea",
+          "replayed": true,
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:adb6d59d466c7704fbd83ddda0046456b1316d0c59ef3f9767f1b992b71d83bb",
+          "verified": true
+        },
+        "group": "budget-controls",
+        "id": "budget-controls-lm-evaluation-harness-native-json",
+        "lifecycle": null,
+        "plan_sha256": "sha256:00bae1f4790a7ee7cd18732a4a223c525d4a132b54c2a01940d86de37fbfcc30",
+        "planned_trials": 48,
+        "reference_mode": "none",
+        "repetitions": 3,
+        "retained_attempts": 2,
+        "route": "native-json",
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:49b153e512feb41565a9fa48512589946067c07ca6f1bf4953061655f8cb8ec4"
+        }
+      },
+      {
+        "capture_links": [
+          {
+            "companion": "sentinel",
+            "directory": "original/captures-sentinel-final/baseline/promptfoo/capture",
+            "files": {
+              "capture.json": {
+                "bytes": 2414,
+                "sha256": "sha256:bc0dc41b337047cf1a29e8e62bf602fb13fd81913769b9ed70531e36b4297214"
+              },
+              "native.json": {
+                "bytes": 261927,
+                "sha256": "sha256:12c22489090ac9896a89effbfeb4691f4626dbbee6ccd5b03dc4c0dc1fc02774"
+              },
+              "protocol.json": {
+                "bytes": 16532,
+                "sha256": "sha256:630d70a383eb254eb1628f8e3147267253872670d238d216f8f1c70161be302d"
+              }
+            },
+            "role": "baseline"
+          },
+          {
+            "companion": "sentinel",
+            "directory": "original/captures-sentinel-final/subject/promptfoo/capture",
+            "files": {
+              "capture.json": {
+                "bytes": 2422,
+                "sha256": "sha256:2e24005976d8be608b4ebff01d7dcad1b6c9ea766e40a4df0646b55c388e6678"
+              },
+              "native.json": {
+                "bytes": 258579,
+                "sha256": "sha256:409afd1f7ebe87cabbab82cbf682611dfa32628e3963fb9491eb11606be2d0ab"
+              },
+              "protocol.json": {
+                "bytes": 16531,
+                "sha256": "sha256:5ec8fb1a61380e73c28b49712e646361c48997271c7b5bf8229a98305cd82b31"
+              }
+            },
+            "role": "subject"
+          }
+        ],
+        "case_count": 8,
+        "directory": "judge/budget-controls-promptfoo-native-json",
+        "evaluator": "promptfoo",
+        "event_sources": [
+          {
+            "member": "judge/budget-controls-promptfoo-native-json/sources/events-1.json",
+            "sha256": "sha256:ce05604acbf380699f40b58a6a3e13b93b0e70d66cf27e6d014af4d586d90182",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "d5207fb4606d2bfce93959dff3ee19af993d09cf06ebc3ae763cda00452cf6aa",
+          "intended_subject": "sha256:301a07d113d1964b69f497b54a8bc32a44f3b8ce0899e03e74809fa660c04067",
+          "recipient_policy_sha256": "5b391a0adbc06e0d606e28ffa1fe7e713d0fa3fe0aba937c8839eabda7251fee",
+          "replayed": true,
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:c969396cf1dc7cb5109c3d4631706089a4fe3546a46a29a0c204367b69eb5279",
+          "verified": true
+        },
+        "group": "budget-controls",
+        "id": "budget-controls-promptfoo-native-json",
+        "lifecycle": null,
+        "plan_sha256": "sha256:124f73e788b424523a748d0d573bfe5ac1ea3b83ff7627dfdec64400af63315a",
+        "planned_trials": 48,
+        "reference_mode": "none",
+        "repetitions": 3,
+        "retained_attempts": 2,
+        "route": "native-json",
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:f509da996fff51cf76a55cb7c12c331847e660f3e09512dc716a53ad55407d41"
+        }
+      },
+      {
+        "capture_links": [
+          {
+            "companion": "sentinel",
+            "directory": "original/captures-sentinel-after-lighteval/baseline/langfuse/capture",
+            "files": {
+              "capture.json": {
+                "bytes": 2406,
+                "sha256": "sha256:d93b7fd2721e8c9c7692e8b83c7b6d24fd3c0b08b7d19f1c5046e9660df1bc56"
+              },
+              "native.json": {
+                "bytes": 83526,
+                "sha256": "sha256:4bacebbd2115554ee066644865b5ccb20067de4f6200cd1d562cb8cb1dbbb323"
+              },
+              "protocol.json": {
+                "bytes": 16532,
+                "sha256": "sha256:630d70a383eb254eb1628f8e3147267253872670d238d216f8f1c70161be302d"
+              }
+            },
+            "role": "baseline"
+          },
+          {
+            "companion": "sentinel",
+            "directory": "original/captures-sentinel-after-lighteval/subject/langfuse/capture",
+            "files": {
+              "capture.json": {
+                "bytes": 2420,
+                "sha256": "sha256:0e75eede79f10a84010079a222012f49314c46ff2902f2c1ac15f41758707615"
+              },
+              "native.json": {
+                "bytes": 82572,
+                "sha256": "sha256:d53960503dc9899f4aede005a11bf67a03d3c0feeb59e178de419430be0ed82f"
+              },
+              "protocol.json": {
+                "bytes": 16531,
+                "sha256": "sha256:5ec8fb1a61380e73c28b49712e646361c48997271c7b5bf8229a98305cd82b31"
+              }
+            },
+            "role": "subject"
+          }
+        ],
+        "case_count": 8,
+        "directory": "judge/budget-controls-langfuse-native-json",
+        "evaluator": "langfuse",
+        "event_sources": [
+          {
+            "member": "judge/budget-controls-langfuse-native-json/sources/events-1.json",
+            "sha256": "sha256:0588e26c07f2a62947dc7870dbd55ee3dcda6f91078200c16ea9e4df893021ac",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "3bff74452b7d9745b66fe1854a4b193cba02270823d559a32d2008cef60bc0f8",
+          "intended_subject": "sha256:301a07d113d1964b69f497b54a8bc32a44f3b8ce0899e03e74809fa660c04067",
+          "recipient_policy_sha256": "37ab287a906dc762d679e0055c690809a8a458f725f7c5743d405f81e5eca42d",
+          "replayed": true,
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:bdca9c2ea2c08e076714d07cd5d1b6fbc66d30de5afdaa1b084028d6700ab6d2",
+          "verified": true
+        },
+        "group": "budget-controls",
+        "id": "budget-controls-langfuse-native-json",
+        "lifecycle": null,
+        "plan_sha256": "sha256:95066e9a8f8b9321d15a34ff857c3af917ebca793cc18f0373dceb9db0b44c48",
+        "planned_trials": 48,
+        "reference_mode": "none",
+        "repetitions": 3,
+        "retained_attempts": 2,
+        "route": "native-json",
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:6e379e40f54d0bfed072f313c4743eb0fb440af859c61b71f1f3d050e4ef6945"
+        }
+      }
+    ],
+    "scope": "Four evaluator workflows with fresh 64-case local and 8-case controlled HTTP primary measurements; additional new judge controls use retained 8-case model captures. Original failed/incomplete outcomes remain unchanged."
+  }
+}

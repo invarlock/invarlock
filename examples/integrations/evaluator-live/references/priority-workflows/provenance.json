@@ -1,0 +1,378 @@
+{
+  "capture_member_prefix": "capture/",
+  "excluded": "Model weights, private keys, credentials, environment/cache trees and private process admissions.",
+  "format": "invarlock/priority-reference-provenance-v1",
+  "historical_trust": "Catalog anchors authenticate the retained workflow; they do not constitute a new recipient approval.",
+  "omitted_original_members": [
+    {
+      "bytes": 901,
+      "original_path": "supervision/accelerate-build/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:107d8cad19faf0e0e82918fab0ec7abfb741a64ddabe9985bc3eb059f3d5b60d"
+    },
+    {
+      "bytes": 1267,
+      "original_path": "supervision/capture-http-baseline-inspect-ai/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:973f0ba5a2c55a48391f21fe3e74353ed4ecf149297272e39f23a679060df2ce"
+    },
+    {
+      "bytes": 1253,
+      "original_path": "supervision/capture-http-baseline-langfuse/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:160e34850de8bbd2e297c3ae8609ce4c94ad2cd0b4eecd4bf1fb29823b9eff5c"
+    },
+    {
+      "bytes": 1344,
+      "original_path": "supervision/capture-http-baseline-lm-evaluation-harness/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:eb25d5645555e48121433c89b2c2976cbc7cdf94a6574fc24f726e8d96e6d0e6"
+    },
+    {
+      "bytes": 1260,
+      "original_path": "supervision/capture-http-baseline-promptfoo/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:6bc8d4b119d7d2cc99b4b062814059f52040ceebc5be2447393505b8514c57df"
+    },
+    {
+      "bytes": 1261,
+      "original_path": "supervision/capture-http-subject-inspect-ai/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:07a14a423dff41b3ba8913917e69ad0e5f33eaa14ad68dfb69030a4f89c4faf8"
+    },
+    {
+      "bytes": 1247,
+      "original_path": "supervision/capture-http-subject-langfuse/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:fc9e6711b52faf1993e9e1ae00fc234d2c4147d4bc95e169be7691a1a0f95a7c"
+    },
+    {
+      "bytes": 1338,
+      "original_path": "supervision/capture-http-subject-lm-evaluation-harness/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:bffca42a6d4c1c00ea383ab01337dec19af9134df1921c80b0140a9d54deed0b"
+    },
+    {
+      "bytes": 1254,
+      "original_path": "supervision/capture-http-subject-promptfoo/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:8c392d59cf64427cce4ffb47a77a3d801581a2fd815c4a56dadea20c31e1d1b4"
+    },
+    {
+      "bytes": 1335,
+      "original_path": "supervision/capture-local-baseline-inspect-ai/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:1e4874e5237a69ca1e98d341a90aa1c3e7ee9eca13ac8c3db89349c290a5d98f"
+    },
+    {
+      "bytes": 1321,
+      "original_path": "supervision/capture-local-baseline-langfuse/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:ab91c318c8c6ed5df8cdd6f192d53965b010d9c04bc328e510853064daee7293"
+    },
+    {
+      "bytes": 1412,
+      "original_path": "supervision/capture-local-baseline-lm-evaluation-harness/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:208f672b617bdec08486b966187ff8813bb345148d1aa2156fccc29172eae3b3"
+    },
+    {
+      "bytes": 1328,
+      "original_path": "supervision/capture-local-baseline-promptfoo/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:3acd02ec36c47af4aba81dae4e5bc923bffd7c7df0953f8a52f889e6748ea337"
+    },
+    {
+      "bytes": 1328,
+      "original_path": "supervision/capture-local-subject-inspect-ai/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:a6e7de8cac9cd2f483f423933ea6048eb04df9b0d4713e3e9dea5f2ca624f204"
+    },
+    {
+      "bytes": 1314,
+      "original_path": "supervision/capture-local-subject-langfuse/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:ca7c57c6169db49660bcadc6d9ed77b4149f82e369fde71c4259d7db74f820d9"
+    },
+    {
+      "bytes": 1405,
+      "original_path": "supervision/capture-local-subject-lm-evaluation-harness/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:1863667772743b31e0a75d948c7ba0503fb18753f600311f36ee671dc63f2fc4"
+    },
+    {
+      "bytes": 1321,
+      "original_path": "supervision/capture-local-subject-promptfoo/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:b9e6ff777bd867797088147ce83697dd1107a10185645fc93792db3279e63c6a"
+    },
+    {
+      "bytes": 832,
+      "original_path": "supervision/freeze-normalization/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:22dd76f06e065c7569eb82e027e5102c2c5c379ca664988c353dd993a1698e93"
+    },
+    {
+      "bytes": 812,
+      "original_path": "supervision/inspect-ai-check/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:acb89c21ccc4a04d5a48ef39b61d36ece56f869335ab57695f45c3fa9aa76731"
+    },
+    {
+      "bytes": 808,
+      "original_path": "supervision/inspect-ai-create/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:2eca035646f7eba8fa1e9097a42389e516a41942790bdae2e2927b4218d18beb"
+    },
+    {
+      "bytes": 884,
+      "original_path": "supervision/inspect-ai-install/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:4df9013aa617b86a5ccc7d2f872dd232d497b2886c5897b4823c589cd2d70a5a"
+    },
+    {
+      "bytes": 829,
+      "original_path": "supervision/inspect-ai-inventory/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:38c4e17faeff185bb4d4d40c7f31ed9b7bbe49ad83f0d6874b64379c03442530"
+    },
+    {
+      "bytes": 857,
+      "original_path": "supervision/inspect-ai-ready/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:970c986087c0c8efa8a4bc21d9d676ece01ba2e83031d69379f67b8ea3ec6ccc"
+    },
+    {
+      "bytes": 802,
+      "original_path": "supervision/langfuse-check/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:f5cf65172fd1b732f55580b40c2cfce4217d6a122a5ca922e19eaf3635b4313d"
+    },
+    {
+      "bytes": 798,
+      "original_path": "supervision/langfuse-create/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:646eda73ae27791129c8300f6e2b0d9602b42ce56d6e6ed367df6b67e7990f16"
+    },
+    {
+      "bytes": 872,
+      "original_path": "supervision/langfuse-install/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:70c6bdc785a3020c4133bcaa33624a89a0a8e9a33ba72a22b54eea77afd5ea57"
+    },
+    {
+      "bytes": 819,
+      "original_path": "supervision/langfuse-inventory/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:8d923df5c2c9cf0dd7b0a7aa8b77a0b4e370cb3469a04b5086203c30e600d962"
+    },
+    {
+      "bytes": 845,
+      "original_path": "supervision/langfuse-ready/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:382ae11ea2065c8ff565e2824db877333103e1713046eaa7d90668c70a0b27b1"
+    },
+    {
+      "bytes": 867,
+      "original_path": "supervision/lm-evaluation-harness-check/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:a67f953fcb9d7efc3ccb103c077e0d83a87ee3d4bc85163d89075d44d1d84db4"
+    },
+    {
+      "bytes": 863,
+      "original_path": "supervision/lm-evaluation-harness-create/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:dbbccc463b2182723bac4dea2e00f6fb4b30a7d25aaa7ed118e5b2b316d7d9ec"
+    },
+    {
+      "bytes": 950,
+      "original_path": "supervision/lm-evaluation-harness-install/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:15d8cb123aebc6028c379cce5f00c4dd373dd6e380f8054a2952ed6193f610f4"
+    },
+    {
+      "bytes": 884,
+      "original_path": "supervision/lm-evaluation-harness-inventory/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:e77969564a6dbc65b1dfec6d6e9f756b6a0e30d38c093bdbd1aab22118dce5bd"
+    },
+    {
+      "bytes": 923,
+      "original_path": "supervision/lm-evaluation-harness-ready/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:1c911855ee60c16ce93b6c518d70e930de98c578c61e7467516371acf8687078"
+    },
+    {
+      "bytes": 941,
+      "original_path": "supervision/node-download/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:90d1c6a5fac3e63f61cacb505ff9c1200f99e4e960625c445bf39aba285b780b"
+    },
+    {
+      "bytes": 771,
+      "original_path": "supervision/node-unpack/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:c7445ebcf9d235e2af72e5ecb41ee7ce6ad462082c893485dc68c2621a3581f8"
+    },
+    {
+      "bytes": 1230,
+      "original_path": "supervision/preflight-http-baseline/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:875006f0ac2ab9fb6052c68f0b078f210b341d362ad237d9330991e26ac95de4"
+    },
+    {
+      "bytes": 1222,
+      "original_path": "supervision/preflight-http-subject/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:6175332eb7583d423d9487ee8114fe0a2b1edf38eadd4de2266eb79e9937b078"
+    },
+    {
+      "bytes": 1232,
+      "original_path": "supervision/preflight-local-baseline/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:6c5943139ffef8be030c96bfc0e33062b1085447d09c17d2aecda27515007610"
+    },
+    {
+      "bytes": 1224,
+      "original_path": "supervision/preflight-local-subject/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:888025a18772317b91710442d9ac78bcdf65fd2388a962b63f9c8d3dc7a5d7ea"
+    },
+    {
+      "bytes": 879,
+      "original_path": "supervision/promptfoo-install/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:eae371102afd2d4e25d1d8854b831cd45d352eb5786306aadfdef5600c3f5a30"
+    },
+    {
+      "bytes": 796,
+      "original_path": "supervision/promptfoo-inventory/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:bf026456ad260f1178c6070a6346811ec863a06b8182e60ace95c8cdfdd4dd2a"
+    },
+    {
+      "bytes": 840,
+      "original_path": "supervision/promptfoo-pack/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:8e37a0555f2f832a1546bf154883c7e60f1bfd52a4b76d643dee161f051c7d20"
+    },
+    {
+      "bytes": 803,
+      "original_path": "supervision/promptfoo-python/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:3e70925f37e40a35924a241c2df3808dd9a58c3a798379dd8fa4eb1db07930a0"
+    },
+    {
+      "bytes": 851,
+      "original_path": "supervision/promptfoo-ready/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:b90d38cd0b808a69d1588d28ecd5f69a77d04cb57fe46f7ef511b4ff17f6f518"
+    },
+    {
+      "bytes": 747,
+      "original_path": "supervision/python-setup/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:cfa7ced470c6b10d3380acc9a8ac04941e1d8fee8bde56a69712b95d7750ccee"
+    },
+    {
+      "bytes": 812,
+      "original_path": "supervision/runtime-check-final/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:6f57da8ee46e1f02baf724547fd0d0138e85317ed627874727670bf96b921ba8"
+    },
+    {
+      "bytes": 784,
+      "original_path": "supervision/runtime-create/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:1606d643e4e001fa68bdcdbb11f818860a8b35500f6244998aafc5a6d2673b74"
+    },
+    {
+      "bytes": 929,
+      "original_path": "supervision/runtime-install-pypi/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:350458387c466158e2a3979ff7aeb50cbe7bc3131c301b1eedeb84a7744994f7"
+    },
+    {
+      "bytes": 970,
+      "original_path": "supervision/runtime-install/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:e2ea14b4941eb53c659127c20a138daa5fe9623a0751d6f8ee1293a5b85455f9"
+    },
+    {
+      "bytes": 829,
+      "original_path": "supervision/runtime-inventory-final/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:85c97acd771a5135d16db249775f9cc6f0db1dc8aa7cafeb92633bd81b1e205a"
+    },
+    {
+      "bytes": 854,
+      "original_path": "supervision/runtime-ready-final/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:1b1caf2e2bc29dfba54da489986e47476dd64b3ffb705965cb4d35b0afc94035"
+    },
+    {
+      "bytes": 899,
+      "original_path": "supervision/runtime-torch-install/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:6ef12542d4d1366df68592db52cb4affbb9d29b8d83c6c9d6a4fe3e33e0161e7"
+    },
+    {
+      "bytes": 1139,
+      "original_path": "supervision/service-http-baseline/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:f0f2a653530b9c0f7b719eb4813dbc47dcf3f79fd5a37724e22112d6a5b6fbf5"
+    },
+    {
+      "bytes": 1132,
+      "original_path": "supervision/service-http-subject/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:8de394f9fbe4c71400cd9bc208e0070c4583511daf2a977b062c1fc95c46c8c8"
+    },
+    {
+      "bytes": 1234,
+      "original_path": "supervision/worker-http-baseline/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:1a18c49c4e8c8817c7d07721e3fa26a031097a01039b9d30227603eb4826f090"
+    },
+    {
+      "bytes": 1226,
+      "original_path": "supervision/worker-http-subject/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:b77eec762bb942e59a99e85a608b68b2373d9ac9c149992b4c9dd8e49d3a6d2d"
+    },
+    {
+      "bytes": 1242,
+      "original_path": "supervision/worker-local-baseline/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:c4739b7a884c65b5fb4e80acd181a668c026fe8d277c67fdb297307ed81e2d3e"
+    },
+    {
+      "bytes": 1234,
+      "original_path": "supervision/worker-local-subject/admission.json",
+      "reason": "private process launch admission; model/task journals retained",
+      "sha256": "sha256:a20e89c0440baa27e03b85842ff23eb3302afef6382cfc0ac9c99d34bd52d10d"
+    }
+  ],
+  "original_capture_archive": {
+    "bytes": 12602762,
+    "sha256": "586e91c41e88a5add15438b30035dc0266478c9891cfc05d344cfe47945b319e"
+  },
+  "original_collection_manifest": "capture/collection-manifest.json",
+  "original_recipient_summary_sha256": "d5b518762946b54643d0bb579d74c47225f37d3c1cba943da1d5ae2fc9c14426",
+  "retention": "All retained original files copied byte-for-byte; signed evidence and receipts unchanged.",
+  "source_profiles": {
+    "http": {
+      "cases_per_role": 8,
+      "endpoint_profile": "/v1/tasks generation plus reference likelihood; not OpenAI-compatible or third-party cloud",
+      "kind": "controlled_http_task_service",
+      "protocol": "capture/inputs/http-8-protocol.json",
+      "protocol_sha256": "f1d319f8627de1013afd8b5c6f6d99792abbac80b1e5d8dc84e9d4840eff3b70"
+    },
+    "local": {
+      "cases_per_role": 64,
+      "kind": "local_artifact",
+      "protocol": "capture/inputs/local-64-protocol.json",
+      "protocol_sha256": "d0caf0bac2d400eb5f9bb008de79d3eefe37a21d1ad14224df89a94c227746fe"
+    }
+  }
+}

@@ -66,6 +66,16 @@ the resulting comparisons. These small-sample integration checks preserve policy
 failures and insufficient-evidence outcomes; they do not establish production
 model quality, hosted storage support or arbitrary evaluator configurations.
 
+The [priority workflow reference](https://github.com/invarlock/invarlock/blob/main/examples/integrations/evaluator-live/references/priority-workflows/README.md)
+extends Inspect, Harness, Promptfoo and Langfuse with 64-case local comparisons
+and eight-case controlled HTTP-service comparisons. Its 576 model executions
+support 32 independently verified exact-match/NLL comparisons and 24 judge
+comparisons, including reference-free, repetition and budget controls. All 1,288
+admitted judge calls produced usable ratings; four stop/resume checks preserved
+the original checkpoint bytes. The HTTP profile qualifies the declared task
+service, not arbitrary cloud APIs or hosted evaluator storage. Policy rejections
+and insufficient-evidence outcomes remain visible in the retained references.
+
 InvarLock owns the selected scorer. Exact match requires string answers and
 references. Judge requires task and answer text plus a declared recipe and
 complete retained judge calls; a scalar rating is insufficient. Structured task

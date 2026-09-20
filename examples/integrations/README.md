@@ -49,6 +49,12 @@ replayable results for all three scorers. The smaller
 retains six same-model CPU pairs. Both are separate from the native signed OCI
 profiles listed below.
 
+The [priority workflow reference](evaluator-live/references/priority-workflows/README.md)
+adds 64-case local comparisons, controlled HTTP-service comparisons and live judge
+stop/resume and budget checks for Inspect, Harness, Promptfoo and Langfuse. It
+preserves policy rejections and insufficient-evidence outcomes alongside the
+independently verified results.
+
 | Integration | Command | Execution |
 | --- | --- | --- |
 | [Hugging Face Transformers](hf-transformers/) | `make example-hf-transformers` | Qwen3.5-0.8B checkpoint and an explicit behavioral derivative |

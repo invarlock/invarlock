@@ -29,6 +29,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   original blocked judge attempts and independently replayable results.
   Add controlled HTTP task capture with original response retention, service-bound
   likelihood replay, and separately bounded extended judge campaigns.
+  Retain deeper Inspect, Harness, Promptfoo and Langfuse qualification with 576
+  fresh model executions, 32 verified exact-match/NLL comparisons, 1,288 usable
+  judge ratings and 24 verified judge comparisons. Include live stop/resume and
+  budget controls without replacing policy rejections or insufficient evidence
+  with favorable results.
 
 - Retain signed Docker and Podman CUDA execution references for native scorers,
   TensorRT-LLM and vision-text, with compact offline replay and frozen provenance.

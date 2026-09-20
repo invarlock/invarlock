@@ -9,6 +9,15 @@ contains 304 fresh model executions and all 114 scorer/import journeys. It retai
 verified outcomes. This establishes the declared integration profile, not model
 quality or support for every configuration of an evaluator.
 
+The [priority workflow reference](references/priority-workflows/README.md) adds
+64-case local and eight-case controlled HTTP comparisons for Inspect, Harness,
+Promptfoo and Langfuse. It retains 576 fresh model executions, 32 verified
+exact-match/NLL comparisons and
+[24 verified judge comparisons](references/priority-workflows/judge-README.md).
+All 1,288 judge ratings were usable. Four live stop/resume checks preserved the
+original checkpoint bytes; bounded controls retained their incomplete outcomes.
+These are integration qualifications, not favorable model-quality results.
+
 SDK tests execute real framework callbacks with controlled task results. They
 test integration code without charging a provider or loading a model. The
 [export parity example](../evaluator-parity/README.md) separately checks retained
@@ -27,6 +36,8 @@ measurements. Neither substitutes for fresh model and judge execution.
 | `supervise.py` | Apply an external process-group deadline |
 | `recovery.py`, `recover_harness.py` | Recover explicitly supported interrupted captures without changing original results |
 | `judge.py` | Freeze a bounded judging schedule, collect authorized measurements and verify them offline |
+| `http_service.py` | Capture a controlled HTTP task service with explicit service identity and reference-likelihood bindings |
+| `closure_judge.py` | Freeze and execute the deeper comparison and lifecycle qualification schedule |
 
 The model pair is Mistral 7B base and Mistral 7B Instruct, using the exact revisions
 and file inventories in the maintained
@@ -286,12 +297,12 @@ three ratings with references. Budget-control uses a separate reference-free
 three-rating plan with a smaller admission limit, deliberately retaining an
 incomplete outcome. Repetitions never increase the independent case count.
 
-The proposed extension consists of four 64-case local primary comparisons
+The retained extension uses four 64-case local primary comparisons
 (1,024 calls across both routes), four eight-case HTTP primary comparisons
 (128), Langfuse's original eight-case reference-free and repetition controls
 (128), and four two-call budget controls (8). The budget controls deliberately
 leave 184 trials without call admission. Those incomplete controls are not model-quality
-references. Freezing this proposal does not perform or authorize collection:
+references. Freezing a new proposal does not perform or authorize collection:
 
 ```bash
 /path/to/recipient/bin/python -I examples/integrations/evaluator-live/closure_judge.py freeze \
