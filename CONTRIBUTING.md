@@ -226,7 +226,7 @@ The complete coverage gate requires Linux descriptor execution. On another
 operating system, run the relevant portable target such as `make
 coverage-examples`, and report the full Linux result from CI separately.
 CI collects Python 3.13 coverage in separate core, examples, support-tooling and
-add-in jobs. Each test belongs to one group. The required `coverage` gate combines
+runtime jobs. Each test belongs to one group. The required `coverage` gate combines
 all four successful measurements and enforces the existing domain, per-file and
 aggregate branch thresholds. Missing, failed or mismatched measurements cannot
 pass. Test timing reports are retained with each group's coverage data.

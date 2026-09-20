@@ -444,6 +444,19 @@ def test_garak_likelihood_only_completion_does_not_invent_generation_failure(
                 ]
             },
         ),
+        (
+            "trulens",
+            {
+                "records": [
+                    {
+                        "record_id": "a",
+                        "main_input": "q",
+                        "main_error": "provider timeout",
+                        "error": "different failure",
+                    }
+                ]
+            },
+        ),
     ],
 )
 def test_batch_ambiguous_sources_and_malformed_native_details_are_rejected(
@@ -451,6 +464,204 @@ def test_batch_ambiguous_sources_and_malformed_native_details_are_rejected(
 ):
     with pytest.raises(EvaluationRecordsError):
         export_records(evaluator, payload)
+
+
+@pytest.mark.parametrize(
+    ("evaluator", "payload"),
+    [
+        (
+            "azure-ai-evaluation",
+            {
+                "rows": [
+                    {
+                        "inputs.record_id": "a",
+                        "inputs.id": "other",
+                        "inputs.response": "answer",
+                    }
+                ]
+            },
+        ),
+        (
+            "azure-ai-evaluation",
+            {
+                "rows": [
+                    {
+                        "inputs.record_id": "a",
+                        "inputs.query": "question",
+                        "inputs.input": "other question",
+                        "inputs.response": "answer",
+                    }
+                ]
+            },
+        ),
+        (
+            "azure-ai-evaluation",
+            {
+                "rows": [
+                    {
+                        "inputs.record_id": "a",
+                        "inputs.response": "answer",
+                        "outputs.response": "other answer",
+                    }
+                ]
+            },
+        ),
+        (
+            "mlflow",
+            {
+                "prediction_table": [
+                    {"record_id": "a", "input": "q", "prediction": "a"}
+                ],
+                "rows": [{"record_id": "a", "input": "q", "prediction": "b"}],
+            },
+        ),
+        (
+            "mlflow",
+            {
+                "prediction_table": [
+                    {
+                        "record_id": "a",
+                        "input": "q",
+                        "prediction": "a",
+                        "predictions": "b",
+                    }
+                ]
+            },
+        ),
+        (
+            "mlflow",
+            {
+                "prediction_table": [
+                    {
+                        "record_id": "a",
+                        "input": "q",
+                        "prediction": "a",
+                        "target": "a",
+                        "targets": "b",
+                    }
+                ]
+            },
+        ),
+        (
+            "evidently",
+            {
+                "dataset": [{"record_id": "a", "output": "a"}],
+                "rows": [{"record_id": "a", "output": "b"}],
+            },
+        ),
+        (
+            "evidently",
+            {
+                "rows": [{"record_id": "a", "output": "a"}],
+                "columns": {"expected": "output"},
+            },
+        ),
+        (
+            "garak",
+            {
+                "attempts": [
+                    {"uuid": "a", "status": 2, "prompt": "q", "outputs": ["a"]}
+                ],
+                "entries": [
+                    {"uuid": "a", "status": 2, "prompt": "q", "outputs": ["b"]}
+                ],
+            },
+        ),
+        (
+            "openai-evals",
+            {
+                "events": [
+                    {
+                        "sample_id": "a",
+                        "type": "sampling",
+                        "data": {"prompt": "q", "sampled": "a"},
+                    },
+                    {
+                        "sample_id": "a",
+                        "type": "match",
+                        "data": {
+                            "prompt": "other",
+                            "sampled": "a",
+                            "correct": True,
+                        },
+                    },
+                ]
+            },
+        ),
+        (
+            "trulens",
+            {
+                "records": [
+                    {
+                        "record_id": "a",
+                        "main_input": "q",
+                        "input": "other",
+                        "main_output": "a",
+                    }
+                ]
+            },
+        ),
+        (
+            "trulens",
+            {
+                "records": [
+                    {
+                        "record_id": "a",
+                        "main_input": "q",
+                        "main_output": "a",
+                        "output": "other",
+                    }
+                ]
+            },
+        ),
+    ],
+)
+def test_batch_aliases_and_role_mappings_must_be_unambiguous(evaluator, payload):
+    with pytest.raises(
+        EvaluationRecordsError, match="aliases conflict|different source column"
+    ):
+        export_records(evaluator, payload)
+
+
+@pytest.mark.parametrize(
+    ("evaluator", "payload"),
+    [
+        (
+            "azure-ai-evaluation",
+            {
+                "rows": [
+                    {
+                        "inputs.record_id": "a",
+                        "inputs.id": "a",
+                        "inputs.query": "q",
+                        "inputs.input": "q",
+                        "inputs.response": "a",
+                        "outputs.response": "a",
+                    }
+                ]
+            },
+        ),
+        (
+            "trulens",
+            {
+                "records": [
+                    {
+                        "record_id": "a",
+                        "main_input": "q",
+                        "input": "q",
+                        "main_output": "a",
+                        "output": "a",
+                    }
+                ]
+            },
+        ),
+    ],
+)
+def test_equal_batch_aliases_remain_usable(evaluator, payload):
+    record = export_records(evaluator, payload)[0]
+    assert record["id"] == "a"
+    assert record["input"] == "q"
+    assert record["output"] == "a"
 
 
 @pytest.mark.parametrize(

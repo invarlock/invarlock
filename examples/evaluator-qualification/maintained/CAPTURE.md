@@ -124,8 +124,11 @@ those cases as unavailable rather than implicitly converting them to text.
 
 For table profiles, `columns` maps the canonical roles `id`, `input`, `output`
 and `expected` to your actual column names. MLflow also recognizes
-`predictions`/`targets`. Retain source tables and per-case errors alongside
-aggregate results; a summary table cannot reconstruct omitted predictions.
+`predictions`/`targets`, and TruLens recognizes `input`/`output` in addition to
+its `main_input`/`main_output` fields. When a native export contains more than
+one supported name for the same field or table, their values must agree.
+Retain source tables and per-case errors alongside aggregate results; a summary
+table cannot reconstruct omitted predictions.
 For TruLens model records, `meta` carries case metadata and native FeedbackResult
 objects can be supplied separately. For Azure rows, `inputs.metadata` carries case metadata; native numeric
 `outputs.<evaluator>.<metric>` fields remain attributed per-case observations.

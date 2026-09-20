@@ -147,6 +147,17 @@ def _error(value: Any) -> str | None:
     raise EvaluationRecordsError("native error requires a nonempty message")
 
 
+def _alias(value: Mapping[str, Any], names: tuple[str, ...], label: str) -> Any:
+    """Select equivalent source fields only when their recorded values agree."""
+    present = [(name, value[name]) for name in names if name in value]
+    if not present:
+        return None
+    selected = present[0][1]
+    if any(item != selected for _, item in present[1:]):
+        raise EvaluationRecordsError(f"{label} aliases conflict")
+    return selected
+
+
 def _record(
     native: dict[str, Any],
     *,
@@ -295,10 +306,22 @@ def _azure(value: Any) -> list[dict[str, Any]]:
         records.append(
             _record(
                 row,
-                ident=row.get("inputs.record_id", row.get("inputs.id")),
-                input_value=row.get("inputs.query", row.get("inputs.input")),
+                ident=_alias(
+                    row,
+                    ("inputs.record_id", "inputs.id"),
+                    "Azure record identity",
+                ),
+                input_value=_alias(
+                    row,
+                    ("inputs.query", "inputs.input"),
+                    "Azure input",
+                ),
                 expected=row.get("inputs.ground_truth"),
-                output=row.get("outputs.response", row.get("inputs.response")),
+                output=_alias(
+                    row,
+                    ("outputs.response", "inputs.response"),
+                    "Azure response",
+                ),
                 scores=scores,
                 error=error,
                 summary=summary,
@@ -313,17 +336,28 @@ def _columns(report: dict[str, Any], defaults: dict[str, str]) -> dict[str, str]
         not isinstance(value, str) or not value for value in columns.values()
     ):
         raise EvaluationRecordsError("unsupported table column mapping")
-    return {**defaults, **columns}
+    resolved = {**defaults, **columns}
+    if len(set(resolved.values())) != len(resolved):
+        raise EvaluationRecordsError(
+            "table column mapping must use a different source column for each role"
+        )
+    return resolved
 
 
 def _scored_table(value: Any, evaluator: str) -> list[dict[str, Any]]:
     report = _obj(value, "scored table export")
     if evaluator == "mlflow":
-        source = report.get("prediction_table", report.get("rows"))
-        if source is None:
-            source = _obj(report.get("tables", {}), "MLflow tables").get(
-                "eval_results_table"
+        tables = _obj(report.get("tables", {}), "MLflow tables")
+        sources = {
+            key: item
+            for key, item in (
+                ("prediction_table", report.get("prediction_table")),
+                ("rows", report.get("rows")),
+                ("tables.eval_results_table", tables.get("eval_results_table")),
             )
+            if item is not None
+        }
+        source = _alias(sources, tuple(sources), "MLflow prediction table")
         defaults = {
             "id": "record_id",
             "input": "input",
@@ -331,7 +365,7 @@ def _scored_table(value: Any, evaluator: str) -> list[dict[str, Any]]:
             "output": "prediction",
         }
     else:
-        source = report.get("dataset", report.get("rows"))
+        source = _alias(report, ("dataset", "rows"), "Evidently dataset")
         defaults = {
             "id": "record_id",
             "input": "input",
@@ -359,9 +393,11 @@ def _scored_table(value: Any, evaluator: str) -> list[dict[str, Any]]:
         output_key = columns["output"]
         # MLflow's standard LLM table uses plural predictions and targets.
         if "output" not in report.get("columns", {}) and evaluator == "mlflow":
+            _alias(row, ("prediction", "predictions"), "MLflow prediction")
             output_key = "predictions" if "predictions" in row else output_key
         expected_key = columns["expected"]
         if "expected" not in report.get("columns", {}) and evaluator == "mlflow":
+            _alias(row, ("target", "targets"), "MLflow target")
             expected_key = "targets" if "targets" in row else expected_key
         if output_key not in row and not row.get("error"):
             raise EvaluationRecordsError(
@@ -430,7 +466,7 @@ def _garak_text(value: Any, *, prompt: bool = False) -> Any:
 
 def _garak(value: Any) -> list[dict[str, Any]]:
     value = _obj(value, "Garak export")
-    entries = value.get("attempts", value.get("entries"))
+    entries = _alias(value, ("attempts", "entries"), "Garak attempt collection")
     summary = {
         key: item
         for key, item in value.items()
@@ -624,6 +660,12 @@ def _openai(value: Any) -> list[dict[str, Any]]:
         sampling = samplings[0] if samplings else {}
         match = matches[0] if matches else {}
         if (
+            "prompt" in sampling
+            and "prompt" in match
+            and sampling["prompt"] != match["prompt"]
+        ):
+            raise EvaluationRecordsError("OpenAI Evals prompt aliases conflict")
+        if (
             "sampled" in sampling
             and "sampled" in match
             and sampling["sampled"] != match["sampled"]
@@ -728,11 +770,13 @@ def _trulens(value: Any) -> list[dict[str, Any]]:
                 )
                 + external_feedback[row["record_id"]]
             )
+        _alias(row, ("main_input", "input"), "TruLens input")
+        _alias(row, ("main_output", "output"), "TruLens output")
         model_record = "main_input" in row or "main_output" in row
         input_key, output_key = (
             ("main_input", "main_output") if model_record else ("input", "output")
         )
-        error = row.get("main_error", row.get("error"))
+        error = _alias(row, ("main_error", "error"), "TruLens error")
         if input_key not in row or (output_key not in row and error is None):
             raise EvaluationRecordsError("TruLens record lacks captured input/output")
         scores = {}

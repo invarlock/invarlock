@@ -402,7 +402,19 @@ def test_unusable_worker_identity_is_hidden_or_rejected(kind):
         record_reporting._captured_context(runs)
 
 
-@pytest.mark.parametrize("contradiction", ["artifact", "shallow", "nested"])
+@pytest.mark.parametrize(
+    "contradiction",
+    [
+        "artifact",
+        "shallow",
+        "partial-model-id",
+        "mixed-model-id",
+        "partial-revision",
+        "invalid-model-id",
+        "invalid-revision",
+        "nested",
+    ],
+)
 def test_bound_worker_identity_rejects_conflicting_sources(contradiction):
     runs = inputs()
     identity = {
@@ -422,6 +434,18 @@ def test_bound_worker_identity_rejects_conflicting_sources(contradiction):
     elif contradiction == "shallow":
         for row in runs["subject"]["records"]:
             row["context"]["model_id"] = "publisher/other"
+    elif contradiction == "partial-model-id":
+        runs["subject"]["records"][0]["context"]["model_id"] = "publisher/other"
+    elif contradiction == "mixed-model-id":
+        for row in runs["subject"]["records"]:
+            row["context"]["model_id"] = identity["id"]
+        runs["subject"]["records"][-1]["context"]["model_id"] = "publisher/other"
+    elif contradiction == "partial-revision":
+        runs["subject"]["records"][-1]["context"]["model_revision"] = "c" * 40
+    elif contradiction == "invalid-model-id":
+        runs["subject"]["records"][-1]["context"]["model_id"] = 42
+    elif contradiction == "invalid-revision":
+        runs["subject"]["records"][-1]["context"]["model_revision"] = ""
     else:
         runs["subject"]["records"][-1]["context"]["upstream_record"]["metadata"][
             "invarlock_model_execution"

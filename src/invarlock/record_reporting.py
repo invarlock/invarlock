@@ -220,9 +220,15 @@ def _recorded_model_identity(
     if artifact != identity["artifact_digest"]:
         raise ValueError("recorded model identity contradicts the attributed artifact")
     for key, legacy in (("id", "model_id"), ("revision", "model_revision")):
-        shallow, _ = _common_context(records, legacy)
-        if shallow is not None and shallow != identity[key]:
-            raise ValueError("recorded model identity contradicts shallow context")
+        for record in records:
+            context = record.get("context")
+            if not isinstance(context, dict) or legacy not in context:
+                continue
+            shallow = context[legacy]
+            if not isinstance(shallow, str) or not shallow.strip():
+                raise ValueError("recorded model identity has invalid shallow context")
+            if shallow != identity[key]:
+                raise ValueError("recorded model identity contradicts shallow context")
     return identity if len(present) == len(records) else None
 
 
