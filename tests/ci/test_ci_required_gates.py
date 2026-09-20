@@ -131,6 +131,29 @@ def test_ci_has_no_retired_product_workflows_or_jobs() -> None:
     assert [marker for marker in retired if marker in text] == []
 
 
+def test_evaluator_sdk_gate_tracks_shared_capture_and_scorer_dependencies() -> None:
+    workflow = _load(".github/workflows/evaluator-sdk.yml")
+    paths = set(workflow["on"]["pull_request"]["paths"])
+    required = {
+        "src/invarlock/evaluation_records/**",
+        "src/invarlock/evaluation_record_contracts/**",
+        "src/invarlock/evaluation_comparison/**",
+        "src/invarlock/judge_measurements/**",
+        "src/invarlock/captured_*.py",
+        "src/invarlock/record_reporting.py",
+        "src/invarlock/report_presentation.py",
+        "src/invarlock/engine.py",
+        "src/invarlock/cli/**",
+        "contracts/evaluator_export.schema.json",
+        "contracts/normalized_captured_request.schema.json",
+        "contracts/evaluation_request_v2.schema.json",
+        "requirements/workflows/core-py312.txt",
+        "requirements/workflows/release-install-py312.txt",
+        "pyproject.toml",
+    }
+    assert required <= paths
+
+
 def test_docs_ci_reports_for_every_pull_request_and_scopes_pushes() -> None:
     workflow = _load(".github/workflows/docs-ci.yml")
     docs = workflow["jobs"]["docs"]

@@ -23,9 +23,11 @@ Workflow YAML is linted with `make workflow-lint`.
   runs are cancelled; only the checks that inspect a change's history fetch it.
 - `evaluator-sdk.yml` passes actual exports from 19 pinned evaluator SDKs through
   separate SDK-free installed recipients, exercising all three scorers and both
-  import routes without model or service calls. Its jobs run only for capture or
-  recipe changes, or an explicit dispatch. The ordinary distribution jobs also
-  exercise all 114 native-shape evaluator/scorer/import-route journeys.
+  import routes without model or service calls. Its jobs run for capture and
+  recipe changes and for shared scorer, report, contract or recipient-dependency
+  changes that can affect these journeys, or by explicit dispatch. The ordinary
+  distribution jobs also exercise all 114 native-shape
+  evaluator/scorer/import-route journeys.
 
 Python dependency caches use each job's installed workflow locks as their keys.
 When adding an installation step or locked environment, include its lockfile in
