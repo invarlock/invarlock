@@ -30,6 +30,7 @@ from invarlock.judge_measurements.reporting import _snapshot as judge_snapshot
 from invarlock.judge_measurements.reporting import _view as judge_view
 from invarlock.report_presentation import (
     ReportView,
+    decision_label,
     render_html,
     render_markdown,
     xml_text,
@@ -116,7 +117,7 @@ def build_evidence_set_view(
             name=f"Deterministic · {metric.name}",
             notes=(
                 *metric.notes,
-                "Captured component: original cases; marginal component intervals.",
+                "Original cases; each interval applies to this component only.",
             ),
         )
         for metric in first.metrics
@@ -126,8 +127,8 @@ def build_evidence_set_view(
     )
     assurance = (
         (
-            "Deterministic authentication",
-            "Signed manifest verified."
+            "Deterministic signature",
+            "Signed manifest verified; no recipient-owned key was supplied."
             if manifest["authentication"] == "signed"
             else "Unsigned local evidence.",
         ),
@@ -136,7 +137,7 @@ def build_evidence_set_view(
             "Not performed by report; recorded component result shown.",
         ),
         (
-            "Judge authentication",
+            "Judge signature",
             "Signature present; recipient authorization not performed."
             if publication.envelope["signature"] is not None
             else "Unsigned local evidence.",
@@ -160,14 +161,19 @@ def build_evidence_set_view(
         "judge": judge_facts["judge"],
     }
     view = ReportView(
-        title="InvarLock comparison report",
+        title="InvarLock combined comparison report",
         family="Deterministic and bounded judge evidence",
         decision=decision,
-        summary="Both required components compare the same frozen baseline and subject answers. Each component retains its own statistical method and acceptance requirements.",
+        summary=(
+            f"Deterministic comparison: {decision_label(first.decision).lower()}. "
+            f"Judge comparison: {decision_label(second.decision).lower()}. "
+            "Both components must satisfy their recorded policies for the combined result to pass. "
+            "They compare the same frozen baseline and subject answers using separate statistical methods."
+        ),
         metrics=metrics,
         assurance=assurance,
         subjects=first.subjects,
-        context=(*first.context, *second.context),
+        context=tuple(dict.fromkeys((*first.context, *second.context))),
         changes=first.changes,
         identity=(
             ("Evidence set", sha(raw)),
@@ -184,10 +190,10 @@ def build_evidence_set_view(
             ),
         ),
         next_steps=(
-            "Verify the evidence set with an independently maintained composition recipient policy before accepting the combined result.",
+            "Before accepting the combined result, verify both components with your own evidence-set recipient policy and trust inputs.",
         ),
         limitations=(
-            "The combined decision is a conjunction of component decisions. It provides no joint confidence guarantee.",
+            "Both required components must pass. Their separate intervals provide no joint confidence guarantee.",
             "Deterministic metrics count original cases. Judge repetitions do not increase that count or the number of independent units.",
             *first.limitations,
             *second.limitations,

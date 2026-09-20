@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+from dataclasses import replace
 from typing import Any, cast
 from xml.etree.ElementTree import Element, SubElement, tostring
 
@@ -674,19 +675,10 @@ def _metric_views(
                     None,
                 )
             )
-        unmet = [c.name for c in checks if c.passed is False]
         explanation = (
-            "All configured checks passed."
-            if m["decision"] == "pass"
-            else (
-                "More evidence is needed: "
-                + (", ".join(unmet) if unmet else "; ".join(m["reasons"]))
-                + "."
-                if m["decision"] == "insufficient_evidence"
-                else "The policy was not met: "
-                + (", ".join(unmet) if unmet else "; ".join(m["reasons"]))
-                + "."
-            )
+            "The policy thresholds are unavailable in this report; the retained decision has not been independently replayed."
+            if policy is None
+            else "The retained comparison does not include an explanation for this result."
         )
         notes = [
             "Higher values are better."
@@ -706,8 +698,6 @@ def _metric_views(
             )
         if binary and policy is not None and "subject_minimum" not in policy:
             notes.append("No absolute minimum score is required by this policy.")
-        if m["reasons"]:
-            notes.append("Recorded reasons: " + "; ".join(m["reasons"]))
         if policy is None:
             notes.append(
                 "Requirements are unavailable in this comparison-only view. The original decision is displayed without independent replay."
@@ -744,6 +734,7 @@ def _metric_views(
                 notes=tuple(notes),
             )
         )
+        metrics[-1] = replace(metrics[-1], explanation=_captured_opening(metrics[-1]))
     # Bring actionable findings first; original order and exact values remain in evidence.
     metrics.sort(
         key=lambda m: {"regression": 0, "insufficient_evidence": 1, "pass": 2}[
@@ -779,39 +770,59 @@ def _view(comparison: dict[str, Any], evidence: CapturedSnapshot | None) -> Repo
 
 
 def _captured_opening(metric: MetricView) -> str:
-    """Explain a failed comparison bound without repeating the verdict heading."""
-    if metric.decision == "pass":
-        return "This result met every recorded policy requirement."
+    """Explain the recorded outcome using available, unrounded policy facts."""
     interval = metric.interval
-    failed_bound = next(
+    fallback = (
+        metric.explanation or "No explanation was supplied for this recorded result."
+    )
+    if metric.decision == "pass":
+        return (
+            "The uncertainty interval is within the required range, and the other configured checks passed."
+            if interval is not None and interval.threshold is not None
+            else fallback
+        )
+    failures = [check for check in metric.checks if check.passed is False]
+    bound = next(
         (
             check
-            for check in metric.checks
+            for check in failures
             if check.name in {"Allowed change", "Maximum NLL ratio"}
-            and check.passed is False
         ),
         None,
     )
+    explanations = {
+        "Complete paired results": "Some included cases are missing a baseline or subject result.",
+        "Included pair count": "There are fewer paired records than the policy requires.",
+        "Interval width": "The uncertainty interval is wider than the policy permits.",
+        "Subject minimum": "The subject's observed score is below the required minimum.",
+        "Subject maximum": "The subject's observed score is above the permitted maximum.",
+    }
     if (
-        metric.decision != "regression"
-        or failed_bound is None
-        or interval is None
-        or interval.threshold is None
-        or interval.threshold_direction not in {"minimum", "maximum"}
+        metric.decision == "regression"
+        and bound is not None
+        and interval is not None
+        and interval.threshold is not None
+        and interval.threshold_direction in {"minimum", "maximum"}
     ):
-        return metric.explanation
-    label = "NLL ratio" if failed_bound.name == "Maximum NLL ratio" else "change"
-    within = (
-        interval.estimate >= interval.threshold
-        if interval.threshold_direction == "minimum"
-        else interval.estimate <= interval.threshold
-    )
-    if within:
-        return f"The observed {label} was within the policy limit, but its uncertainty interval extended beyond it."
+        label = "NLL ratio" if bound.name == "Maximum NLL ratio" else "change"
+        within = (
+            interval.estimate >= interval.threshold
+            if interval.threshold_direction == "minimum"
+            else interval.estimate <= interval.threshold
+        )
+        if within:
+            lead = f"The observed {label} was within the policy limit, but its uncertainty interval extended beyond it."
+        else:
+            lead = (
+                "The observed NLL ratio exceeded the policy limit. Lower NLL is better."
+                if label == "NLL ratio"
+                else "The observed change was outside the range allowed by the policy."
+            )
+        others = [explanations[c.name] for c in failures if c.name in explanations]
+        return " ".join([lead, *others])
     return (
-        "The observed NLL ratio exceeded the policy limit. Lower NLL is better."
-        if label == "NLL ratio"
-        else "The observed change was outside the range allowed by the policy."
+        " ".join(explanations[c.name] for c in failures if c.name in explanations)
+        or fallback
     )
 
 
@@ -824,7 +835,7 @@ def _captured_summary(
         passed = len(metrics) - failed - insufficient
         overview = (
             f"{len(metrics):,} metric / scope results: {passed:,} passed, "
-            f"{failed:,} did not meet policy, and {insufficient:,} need more evidence. "
+            f"{failed:,} did not meet policy, and {insufficient:,} {'needs' if insufficient == 1 else 'need'} more evidence. "
             "Each result applies to its recorded scope; overlapping slice counts must not be added together."
         )
         # Different metrics have different units; lead with the first adverse
@@ -836,16 +847,10 @@ def _captured_summary(
             )
         if focus is None:
             return overview
-        outcome = (
-            "did not meet policy"
-            if focus.decision == "regression"
-            else "needs more evidence"
+        return (
+            f"{focus.display_name} ({focus.display_scope}): {_captured_opening(focus)} "
+            + overview
         )
-        lead = f"{focus.display_name} ({focus.display_scope}) {outcome}"
-        check = next((c for c in focus.checks if c.passed is False), None)
-        if check is not None:
-            lead += f": the {check.name} check recorded {check.observed} against a requirement of {check.required}"
-        return lead + ". " + overview
     metric = metrics[0]
     recorded = (
         next(
@@ -906,7 +911,12 @@ def _captured_summary(
     if metric.interval is not None:
         interval = metric.interval
         parts.append(
-            f"The 95% interval for the {'ratio' if likelihood else 'change'} runs from "
+            (
+                f"The {number(recorded['interval']['mass'] * 100)}% interval"
+                if recorded is not None and recorded["interval"] is not None
+                else "The uncertainty interval"
+            )
+            + f" for the {'ratio' if likelihood else 'change'} runs from "
             f"{number(interval.lower)} to {number(interval.upper)}"
             + ("." if likelihood else f" {interval.unit}.")
         )

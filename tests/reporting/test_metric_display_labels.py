@@ -114,7 +114,7 @@ def test_captured_summaries_use_display_labels_but_junit_keeps_raw_names():
     assert "within the West coast slice" in _captured_summary(view.metrics, comparison)
     adverse = replace(view.metrics[0], decision="regression")
     assert _captured_summary((adverse, view.metrics[0])).startswith(
-        "Grounded QA judge quality (West coast) did not meet policy"
+        "Grounded QA judge quality (West coast): No explanation was supplied"
     )
     case = fromstring(render_junit(comparison)).find("testcase")
     assert case.get("name") == "grounded_qa-judge-quality"

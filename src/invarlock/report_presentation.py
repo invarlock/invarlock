@@ -205,6 +205,11 @@ class IntervalView:
 
 def display_label(value: str) -> str:
     """Present metric/scope identifiers only; leave authored text unchanged."""
+    prefix = ""
+    for component in ("Deterministic · ", "Judge · "):
+        if value.startswith(component):
+            prefix, value = component, value[len(component) :]
+            break
     acronyms = {
         "qa": "QA",
         "nll": "NLL",
@@ -215,12 +220,12 @@ def display_label(value: str) -> str:
         "http": "HTTP",
     }
     if value.lower() in acronyms:
-        return acronyms[value.lower()]
+        return prefix + acronyms[value.lower()]
     tokens = re.split(r"[_-]", value)
     if len(tokens) < 2 or any(
         re.fullmatch(r"[A-Za-z0-9]+", token) is None for token in tokens
     ):
-        return value
+        return prefix + value
     words = []
     index = 0
     while index < len(tokens):
@@ -231,7 +236,7 @@ def display_label(value: str) -> str:
         words.append(acronyms.get(word.lower(), word))
         index += 1
     words[0] = words[0][0].upper() + words[0][1:]
-    return " ".join(words)
+    return prefix + " ".join(words)
 
 
 @dataclass(frozen=True)
@@ -867,7 +872,7 @@ def render_html(view: ReportView) -> str:
         '<!doctype html><html lang="en"><head><meta charset="utf-8">',
         '<meta name="viewport" content="width=device-width,initial-scale=1">',
         f"<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none';{script_policy}\">",
-        f"<title>{e(view.title)}</title><style>{_CSS}</style></head><body><main>",
+        f"<title>{e(decision_label(view.decision))} · {e(view.title)}</title><style>{_CSS}</style></head><body><main>",
         f'<header class="brand">{_BRAND_MARK} InvarLock<span class="family">{e(view.family)}</span></header>',
         f'<section class="hero {_tone(view.decision)}" aria-labelledby="decision"><div class="verdict"><p class="eyebrow">Recorded policy result</p><h1 id="decision">{e(decision_label(view.decision))}</h1><p class="decision-summary">{_summary_html(view)}</p>',
     ]

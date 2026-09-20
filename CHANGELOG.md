@@ -67,7 +67,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   identifiers in technical details and machine outputs. Explain interval methods,
   paired outcomes, percentage points and the endpoint checked by each policy.
   Lead with the recorded outcome, distinguishing passing requirements, observed
-  losses and uncertainty that prevents a pass.
+  losses and uncertainty that prevents a pass. Explain missing results, count,
+  precision and score requirements without repeating verdict headings; identify
+  advisory and combined outcomes and use each captured interval's recorded level.
   Label measured judge precision failures correctly and keep decision-check
   columns visible in desktop reports without changing retained results.
 - Reject exact-match reports whose side means contradict their paired outcome

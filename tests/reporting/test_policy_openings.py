@@ -70,7 +70,7 @@ def test_observed_loss_inside_allowance_is_not_proof_of_excessive_loss():
             [(1, 1)] * 400,
             -2,
             "pass",
-            "The comparison met every recorded policy requirement.",
+            "The uncertainty interval is within the required range, and the other configured checks passed.",
         ),
         (
             [(1, 0)] * 128,
@@ -106,7 +106,7 @@ def test_observed_loss_inside_allowance_is_not_proof_of_excessive_loss():
             [(0, 1)] * 128,
             2,
             "pass",
-            "The comparison met every recorded policy requirement.",
+            "The uncertainty interval is within the required range, and the other configured checks passed.",
         ),
     ],
 )
@@ -159,7 +159,7 @@ def test_other_failed_requirements_are_not_described_as_comparison_regression(
             [(2, 2)] * 2,
             1.1,
             "pass",
-            "The comparison met every recorded policy requirement.",
+            "The uncertainty interval is within the required range, and the other configured checks passed.",
         ),
         (
             [(2, 2.4)] * 2,
@@ -189,7 +189,7 @@ def test_other_failed_requirements_are_not_described_as_comparison_regression(
             [(2, 1)] * 2,
             0.8,
             "pass",
-            "The comparison met every recorded policy requirement.",
+            "The uncertainty interval is within the required range, and the other configured checks passed.",
         ),
     ],
 )
@@ -207,26 +207,30 @@ def test_nll_openings_respect_lower_is_better_and_required_improvement(
 @pytest.mark.parametrize(
     "kwargs,decision,opening",
     [
-        ({}, "pass", "The judge comparison met every required policy requirement."),
+        (
+            {},
+            "pass",
+            "The interval for the score change stays within the allowed loss of 0 score points.",
+        ),
         (
             {"baseline": 1, "subject": 0},
             "regression",
-            "The judge comparison did not meet at least one required policy requirement.",
+            "The interval for the score change puts the loss beyond the allowance of 0 score points.",
         ),
         (
             {"incomplete": True},
             "insufficient_evidence",
-            "The available evidence does not establish that",
+            "Only 31 of 32 planned ratings completed",
         ),
         (
             {"policy_changes": {"minimum_units": 20}},
             "insufficient_evidence",
-            "The available evidence does not establish that",
+            "The complete schedule contains 16 independent units; the policy requires at least 20.",
         ),
         (
             {"role": "advisory"},
             "pass",
-            "The judge comparison met every advisory policy requirement.",
+            "This metric is advisory and does not gate required decisions.",
         ),
     ],
 )
@@ -267,6 +271,8 @@ def test_captured_success_is_explicit_before_the_observed_values():
     before = deepcopy(report)
     view = _view(report, snapshot)
     assert view.metrics[0].decision == "pass"
-    assert view.summary.startswith("This result met every recorded policy requirement.")
+    assert view.summary.startswith(
+        "The uncertainty interval is within the required range, and the other configured checks passed."
+    )
     assert "Across" in view.summary
     assert report == before

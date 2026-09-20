@@ -25,14 +25,18 @@ produce judge analysis and verification results described in
 
 ## Reading a report for a release review
 
-The opening states the recorded policy result before the chart. A pass means
-the configured requirements were met. A failed bound can mean the observed
+The heading names the recorded policy result; the opening explains what led
+to it before the chart. A passing description identifies the satisfied interval
+requirements instead of repeating the heading. A failed bound can mean the observed
 change exceeded the allowance or that uncertainty prevented establishing the
 required result. Too few records, a wide interval or an unmet absolute score
 requirement can also prevent a pass. Judge reports distinguish adverse results
 from insufficient evidence; advisory results do not authorize a required gate.
-A multi-metric opening summarizes all scopes and identifies an adverse or
+A multi-metric opening summarizes all scopes and explains an adverse or
 unresolved result without ranking unlike metrics by their numeric values.
+Combined evidence reports name both required component outcomes. Advisory
+judge reports identify their advisory role in the title and at the start of
+the explanation. Browser-tab titles include the recorded outcome.
 
 These are explanations of the retained decision, not additional verdicts.
 The report states which checks it performed; some report workflows authenticate

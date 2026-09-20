@@ -148,14 +148,14 @@ def test_reports_preserve_decision_and_role_without_gating_advisory_metrics(
         assert suite.get("skipped") == "0" and case.find("skipped") is None
     if outcome == "regression":
         assert (
-            f"The judge comparison did not meet at least one {role} policy requirement."
+            "The interval for the score change puts the loss beyond the allowance of 0 score points."
             in result.text
         )
         assert "bounds are satisfied" not in result.text
         if role == "required":
-            assert "did not meet at least one required policy requirement" in case.find(
-                "failure"
-            ).get("message")
+            assert case.find("failure").get("message") == (
+                "The interval for the score change puts the loss beyond the allowance of 0 score points."
+            )
 
 
 @pytest.mark.parametrize("signed", [True, False])

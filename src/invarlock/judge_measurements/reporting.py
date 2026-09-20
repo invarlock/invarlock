@@ -208,6 +208,74 @@ def _interval_observed(interval: dict[str, Any] | None) -> str:
     )
 
 
+def _reason_text(reason: str) -> str:
+    return {
+        "incomplete_planned_schedule": "Some planned ratings did not complete.",
+        "minimum_units_not_met": "There are fewer independent units than the policy requires.",
+        "maximum_interval_width_exceeded": "The interval is wider than the policy permits.",
+        "interval_crosses_decision_threshold": "The interval includes outcomes that meet the bound and outcomes that do not.",
+    }.get(reason, reason.replace("_", " "))
+
+
+def _judge_policy_explanation(analysis: dict[str, Any], policy: dict[str, Any]) -> str:
+    """Describe recorded gate outcomes without inferring decisions from numbers."""
+    higher = policy["direction"] == "higher"
+    allowance = policy["allowed_degradation"]
+    subject_bound = policy["subject_bound"]
+    if analysis["decision"] == "pass":
+        text = f"The interval for the score change stays within the allowed loss of {allowance} score points."
+        if subject_bound is not None:
+            text += (
+                f" The subject's score interval also stays at or above the required minimum of {subject_bound}."
+                if higher
+                else f" The subject's score interval also stays at or below the required maximum of {subject_bound}."
+            )
+        return text
+    if analysis["decision"] == "regression":
+        descriptions = []
+        for gate in analysis["gates"]:
+            if gate["decision"] != "regression":
+                continue
+            if gate["name"] == "paired_effect":
+                descriptions.append(
+                    f"The interval for the score change puts the loss beyond the allowance of {allowance} score points."
+                )
+            else:
+                descriptions.append(
+                    f"The subject's score interval lies entirely below the required minimum of {subject_bound}."
+                    if higher
+                    else f"The subject's score interval lies entirely above the required maximum of {subject_bound}."
+                )
+        return " ".join(descriptions)
+    counts = analysis["counts"]
+    if counts["incomplete_trials"]:
+        return f"Only {counts['completed_trials']:,} of {counts['expected_trials']:,} planned ratings completed, so the paired comparison could not be calculated."
+    descriptions = []
+    if "minimum_units_not_met" in analysis["reasons"]:
+        descriptions.append(
+            f"The complete schedule contains {counts['complete_units']:,} independent units; the policy requires at least {policy['minimum_units']:,}."
+        )
+    for gate in analysis["gates"]:
+        if gate["decision"] != "insufficient_evidence":
+            continue
+        label = (
+            "interval for the score change"
+            if gate["name"] == "paired_effect"
+            else "subject's score interval"
+        )
+        if "maximum_interval_width_exceeded" in gate["reasons"]:
+            descriptions.append(
+                f"The {label} is wider than the permitted {policy['maximum_interval_width']} score points."
+            )
+        if "interval_crosses_decision_threshold" in gate["reasons"]:
+            descriptions.append(
+                "The interval for the score change includes losses both within and beyond the policy allowance."
+                if gate["name"] == "paired_effect"
+                else f"The subject's score interval includes values that meet the required {'minimum' if higher else 'maximum'} of {subject_bound} and values that do not."
+            )
+    return " ".join(descriptions)
+
+
 def _policy_checks(
     analysis: dict[str, Any], policy: dict[str, Any]
 ) -> tuple[CheckView, ...]:
@@ -285,8 +353,8 @@ def _policy_checks(
                 else False
                 if decision == "regression"
                 else None,
-                explanation=", ".join(
-                    reason.replace("_", " ")
+                explanation=" ".join(
+                    _reason_text(reason)
                     for reason in (gate["reasons"] if gate else analysis["reasons"])
                 ),
             )
@@ -309,18 +377,11 @@ def _view(
     counts = analysis["counts"]
     role = policy["decision_role"]
     required = role == "required"
-    explanation = {
-        "pass": f"The judge comparison met every {role} policy requirement.",
-        "regression": f"The judge comparison did not meet at least one {role} policy requirement.",
-        "insufficient_evidence": f"The available evidence does not establish that the judge comparison meets every {role} policy requirement.",
-    }[analysis["decision"]]
-    if analysis["reasons"]:
-        explanation += (
-            " "
-            + "; ".join(
-                reason.replace("_", " ") for reason in analysis["reasons"]
-            ).capitalize()
-            + "."
+    explanation = _judge_policy_explanation(analysis, policy)
+    if not required:
+        explanation = (
+            "This metric is advisory and does not gate required decisions. "
+            + explanation
         )
     checks = _policy_checks(analysis, policy)
     with localcontext(Context(prec=100)):
@@ -693,8 +754,12 @@ def _view(
             ),
         )
     view = ReportView(
-        title="InvarLock bounded judge report",
-        family="Bounded judge measurement evidence",
+        title="InvarLock bounded judge report"
+        if required
+        else "InvarLock advisory judge report",
+        family="Bounded judge measurement evidence"
+        if required
+        else "Advisory judge measurement evidence",
         decision=analysis["decision"],
         summary=explanation
         + (
@@ -703,11 +768,6 @@ def _view(
             f"a change of {number(float(effect['mean']), signed=True)} score points."
             if effect is not None and subject is not None and baseline_mean is not None
             else " Mean scores and a paired effect are unavailable for the incomplete schedule."
-        )
-        + (
-            ""
-            if required
-            else " This metric is advisory and does not gate required decisions."
         ),
         metrics=(metric,),
         assurance=native_assurance

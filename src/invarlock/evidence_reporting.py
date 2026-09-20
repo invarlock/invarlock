@@ -1127,7 +1127,7 @@ def _native_policy_summary(
 ) -> str:
     """Explain the recorded gate without treating a bound failure as degradation."""
     if report["verdict"] == "pass":
-        return "The comparison met every recorded policy requirement."
+        return "The uncertainty interval is within the required range, and the other configured checks passed."
     comparison = report["comparison"]
     value = comparison["value"]
     if not checks[0].passed:
@@ -1180,7 +1180,6 @@ def _report_view(
     exact = kind == "exact_match_delta_pp"
     ratio = kind == "normalized_nll_ratio"
     checks = tuple(CheckView(**check) for check in core_policy_checks(report))
-    unmet = [check.name for check in checks if not check.passed]
     summary = _native_policy_summary(report, checks)
     label = (
         "Paired 95% confidence interval"
@@ -1277,9 +1276,7 @@ def _report_view(
         candidate_detail=f"{subject_matches:,} of {report['record_count']:,} matched"
         if subject_matches is not None
         else "",
-        explanation="All configured checks passed."
-        if not unmet
-        else "Checks not met: " + ", ".join(unmet) + ".",
+        explanation=summary,
         checks=checks,
         interval=IntervalView(
             lower=uncertainty["lower"],

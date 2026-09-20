@@ -64,9 +64,10 @@ def test_summary_aggregates_scopes_without_adding_overlapping_pair_counts():
     ]
     metrics = record_reporting._metric_views(comparison, {})
     summary = record_reporting._captured_summary(metrics)
-    assert summary.startswith(f"{metrics[1].display_name} (west) did not meet policy")
+    assert summary.startswith(f"{metrics[1].display_name} (west):")
+    assert "policy thresholds are unavailable" in summary
     assert (
-        "3 metric / scope results: 1 passed, 1 did not meet policy, and 1 need more evidence."
+        "3 metric / scope results: 1 passed, 1 did not meet policy, and 1 needs more evidence."
         in summary
     )
     assert "overlapping slice counts must not be added together" in summary
@@ -242,7 +243,7 @@ def test_unavailable_summary_explains_usable_pairs_without_inventing_scores(miss
     comparison = pack_json(snapshot, "report")
     before = dict(snapshot.files)
     view = record_reporting._view(comparison, snapshot)
-    assert view.summary.startswith("More evidence is needed")
+    assert "There are fewer paired records than the policy requires." in view.summary
     assert f"unavailable across {40 - missing} usable pairs" in view.summary
     assert "No change estimate or uncertainty interval is available." in view.summary
     assert "The policy requires at least 50 included pairs." in view.summary
@@ -286,6 +287,7 @@ def test_multi_summary_names_first_failed_check_without_ranking_metric_units():
         passing,
         name="quality",
         decision="regression",
+        explanation="Recorded explanation.",
         checks=(CheckView("Allowed change", "-26.11 pp", ">= -20 pp", False),),
     )
     later = replace(
@@ -294,13 +296,16 @@ def test_multi_summary_names_first_failed_check_without_ranking_metric_units():
         checks=(CheckView("Maximum latency", "999 ms", "<= 100 ms", False),),
     )
     summary = record_reporting._captured_summary((passing, failed, later))
-    assert summary.startswith(
-        "quality (overall) did not meet policy: the Allowed change check recorded -26.11 pp against a requirement of >= -20 pp."
-    )
+    assert summary.startswith("quality (overall): Recorded explanation.")
     assert "worst" not in summary
-    incomplete = replace(passing, decision="insufficient_evidence", checks=())
+    incomplete = replace(
+        passing,
+        decision="insufficient_evidence",
+        checks=(),
+        explanation="Recorded explanation.",
+    )
     assert record_reporting._captured_summary((passing, incomplete)).startswith(
-        "accuracy (overall) needs more evidence."
+        "accuracy (overall): Recorded explanation."
     )
     assert record_reporting._captured_summary((passing, passing)).startswith(
         "2 metric / scope results: 2 passed"
