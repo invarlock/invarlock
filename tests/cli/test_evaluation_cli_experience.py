@@ -574,11 +574,20 @@ def test_report_signed_manifest_presents_recorded_adverse_result_without_replay(
     assert (
         "Replay and scoring: Scoring and replay were not performed by report." in text
     )
+    # The opening explains the cause; original reason codes remain in the
+    # optional exact-data section rather than being repeated as prose.
     assert (
-        "Recorded reasons: missing results"
+        "missing a baseline or subject result"
         if missing
-        else "lower interval bound exceeds allowed regression"
+        else "observed change was outside the range allowed by the policy"
     ) in text
+    assert ("Exact comparison data" in text) is explain
+    if explain:
+        assert (
+            '"missing results"'
+            if missing
+            else '"lower interval bound exceeds allowed regression"'
+        ) in text
     assert f"{39 if missing else 40} usable pairs" in text
     assert f"{1 if missing else 0} missing results" in text
     assert "Independent verification: passed" not in text
