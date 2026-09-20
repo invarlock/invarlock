@@ -235,6 +235,29 @@ A failed check stops the journey; inspect its saved diagnostics, restore the
 expected input, and rerun with a new output directory. The launcher does not
 contact an external registry or establish interoperability with a hosted service.
 
+## Review a retained real handoff
+
+The [Mistral-7B ModelKit reference](https://github.com/invarlock/invarlock/blob/main/examples/integrations/modelkit-handoff/references/mistral-7b/README.md)
+records an actual BF16 baseline and published Q4_K_M subject, 128 fixed short
+LAMBADA cases, and real KitOps 1.15.0 packaging and independent recipient checks.
+The scores were 94/128 and 93/128. The paired 95% interval extended from −4.10336
+to +2.49680 percentage points, so it failed the declared −2 pp lower-bound
+requirement. This does not establish degradation; it fails to rule out a decline
+larger than the allowance. No absolute accuracy floor was declared.
+
+The reference separates GGUF file hashes from original and repacked ModelKit
+manifest identities, retains explicit caller policy and pair anchors, and
+preserves both valid package bindings and the rejected comparison. Its short
+Docker and Podman generation checks used the delivered subject bytes through
+`--smoke-on-policy-rejection`; they do not imply acceptance or a second 128-case
+Podman evaluation.
+
+The compact replay independently verifies historical evidence, the original
+receipt and DSSE. Exit zero means that the recorded rejection reproduced
+correctly. Repeating the physical package-content checks requires the original
+model files and complete selected package blobs listed in the reference; a fresh
+recipient must supply its own current policy, trust inputs and expected pair.
+
 ## Exercise the supported boundary
 
 The real CLI test packs synthetic fixture bytes with the pinned executable,

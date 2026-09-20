@@ -33,6 +33,7 @@
     "NFKC",
     "multiset",
     "invarlock",
+    "ModelKit",
     "venv",
     "pytest",
     "coveragerc",

@@ -5,7 +5,8 @@ delivered ModelKit blobs contain the actual baseline and subject directories,
 replays their signed technical evidence, and applies the recipient's current
 policy. The point-of-use checker consumes an existing evaluation. The separate real
 journey launcher also packs and transfers actual models and runs a bounded
-inference smoke after acceptance.
+inference smoke after acceptance, or after an explicit
+`--smoke-on-policy-rejection` request that preserves the rejected decision.
 
 Prepare Python 3.12 or newer, an installed InvarLock wheel and matching example
 checkout, the local package blobs and model directories for both sides, native
@@ -45,3 +46,8 @@ and CPU memory; it does not use a paid API or external registry.
 
 The fast tests and the original real-CLI serialization test retain synthetic
 package contents and make no inference claim.
+
+The [retained Mistral-7B reference](references/mistral-7b/README.md) includes a
+real BF16/Q4 comparison on 128 fixed cases, actual KitOps delivery checks, and
+bounded Docker and Podman generation. Its policy rejection remains visible; the
+compact replay verifies historical signed evidence without model execution.
