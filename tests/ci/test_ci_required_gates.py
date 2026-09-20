@@ -135,28 +135,19 @@ def test_evaluator_sdk_gate_tracks_shared_capture_and_scorer_dependencies() -> N
     workflow = _load(".github/workflows/evaluator-sdk.yml")
     paths = set(workflow["on"]["pull_request"]["paths"])
     required = {
-        "src/invarlock/evaluation_records/**",
-        "src/invarlock/evaluation_record_contracts/**",
-        "src/invarlock/evaluation_comparison/**",
-        "src/invarlock/judge_measurements/**",
-        "src/invarlock/core/**",
-        "src/invarlock/captured_*.py",
-        "src/invarlock/evidence_*.py",
-        "src/invarlock/filesystem/**",
-        "src/invarlock/paired_exact_match.py",
-        "src/invarlock/public_contracts.py",
-        "src/invarlock/record_reporting.py",
-        "src/invarlock/report_presentation.py",
-        "src/invarlock/report_publication.py",
-        "src/invarlock/engine.py",
-        "src/invarlock/cli/**",
+        "src/invarlock/**",
         "contracts/**",
         "requirements/workflows/core-py312.txt",
         "requirements/workflows/release-install-py312.txt",
         "pyproject.toml",
+        "uv.lock",
         "Makefile",
     }
     assert required <= paths
+    assert not any(
+        path.startswith("src/invarlock/") and path != "src/invarlock/**"
+        for path in paths
+    )
 
 
 def test_docs_ci_reports_for_every_pull_request_and_scopes_pushes() -> None:

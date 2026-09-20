@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -7,6 +8,15 @@ from pathlib import Path
 import pytest
 
 from tests._support_repository_contracts import MakefileContract
+
+
+def test_public_schema_ids_use_the_canonical_contract_namespace() -> None:
+    root = Path(__file__).resolve().parents[2]
+    schemas = sorted((root / "contracts").glob("*.schema.json"))
+    assert schemas
+    for path in schemas:
+        document = json.loads(path.read_text(encoding="utf-8"))
+        assert document["$id"] == f"https://invarlock.dev/contracts/{path.name}"
 
 
 def test_make_target_parser_keeps_repeated_declarations_and_recipe_colons() -> None:

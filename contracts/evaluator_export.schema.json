@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://invarlock.ai/schemas/evaluator_export.schema.json",
+  "$id": "https://invarlock.dev/contracts/evaluator_export.schema.json",
   "title": "Dedicated evaluator export",
   "type": "object",
   "additionalProperties": false,
