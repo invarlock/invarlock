@@ -128,14 +128,15 @@ offline fixture, since both requests initially name `evidence`:
 ```bash
 # Supply the key selected by the grader prefix through your secret manager.
 invarlock evaluate request-collect.yaml --preflight --json
-INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate request-collect.yaml --signing-key signer-private.pem --json
+INVARLOCK_ALLOW_JUDGE_NETWORK=1 invarlock evaluate request-collect.yaml --signing-key signer-private.pem --json
 ```
 
 The installed command constructs the pinned model and resumes through a private
 workspace. Review its call, token, cost and timeout limits before execution.
-Scope network permission to the collection command as shown; do not export it
-for offline preflight, import, verification or reporting. A denied network
-policy stops configured collection before model construction or call admission.
+The scoped switch permits network only during the configured judge lifecycle;
+native capture and other tasks remain offline. Without this opt-in or an already
+allowed caller policy, collection stops before model construction or admission.
+Preflight, import, verification and reporting do not need the switch.
 Missing dependencies or credentials fail preflight without a provider call.
 Installed collection requires exactly Inspect `0.3.263`, OpenAI `3.13.0`,
 Anthropic `1.6.0`, Google Gen AI `2.24.0`, and `httpx==0.28.1`. Use

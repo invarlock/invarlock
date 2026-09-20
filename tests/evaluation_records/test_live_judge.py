@@ -420,17 +420,23 @@ def test_subprocess_boundary_retains_collector_credentials_only(tmp_path, monkey
         monkeypatch.setenv(name, "synthetic-secret")
     monkeypatch.setenv("LIVE_TEST_VISIBLE", "not-allowed")
     monkeypatch.setenv("INVARLOCK_ALLOW_NETWORK", "1")
+    monkeypatch.setenv("INVARLOCK_ALLOW_JUDGE_NETWORK", "1")
     monkeypatch.setenv("HOME", "/untrusted/ambient/home")
     monkeypatch.setenv("XDG_CONFIG_HOME", "/untrusted/ambient/config")
     online = LIVE.environment(home=tmp_path / "online")
     assert online["OPENAI_API_KEY"] == "synthetic-secret"
     assert "INVARLOCK_ALLOW_NETWORK" not in online
+    assert "INVARLOCK_ALLOW_JUDGE_NETWORK" not in online
     assert not any(name in online for name in secrets if name != "OPENAI_API_KEY")
     offline = LIVE.environment(offline=True, home=tmp_path / "offline")
     assert "LIVE_TEST_VISIBLE" not in offline
     assert not any(name in offline for name in secrets)
     assert "INVARLOCK_ALLOW_NETWORK" not in offline
+    assert "INVARLOCK_ALLOW_JUDGE_NETWORK" not in offline
     assert "INVARLOCK_ALLOW_NETWORK" not in LIVE.environment(
+        offline=True, collection=True, home=tmp_path / "offline-forced"
+    )
+    assert "INVARLOCK_ALLOW_JUDGE_NETWORK" not in LIVE.environment(
         offline=True, collection=True, home=tmp_path / "offline-forced"
     )
     assert offline["HOME"] == str(tmp_path / "offline")
@@ -561,12 +567,14 @@ def test_online_cli_passes_only_explicit_provider_key(tmp_path, monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "synthetic-explicit-key")
     monkeypatch.setenv("AZURE_CLIENT_SECRET", "excluded")
     monkeypatch.setenv("INVARLOCK_ALLOW_NETWORK", "untrusted-ambient-value")
+    monkeypatch.setenv("INVARLOCK_ALLOW_JUDGE_NETWORK", "untrusted-ambient-value")
 
     def run(command, **kwargs):
         assert command[1:4] == ["-I", "-m", "invarlock"]
         assert kwargs["env"]["OPENAI_API_KEY"] == "synthetic-explicit-key"
         assert "AZURE_CLIENT_SECRET" not in kwargs["env"]
-        assert kwargs["env"].get("INVARLOCK_ALLOW_NETWORK") == (
+        assert "INVARLOCK_ALLOW_NETWORK" not in kwargs["env"]
+        assert kwargs["env"].get("INVARLOCK_ALLOW_JUDGE_NETWORK") == (
             None if "--preflight" in command else "1"
         )
         return SimpleNamespace(returncode=0, stdout='{"network_calls":0}', stderr="")

@@ -175,10 +175,12 @@ This is a maximum reservation, not an expected bill. Recheck provider prices
 and approve the aggregate schedule before collecting measurements.
 
 The admitted `judge.py collect --execute-collection` helper sets
-`INVARLOCK_ALLOW_NETWORK=1` only for its collection subprocess. Preflight,
+`INVARLOCK_ALLOW_JUDGE_NETWORK=1` only for its collection subprocess. Preflight,
 verification and reporting do not inherit that permission. When invoking the
 collection CLI directly, scope the setting to that command:
-`INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate request.json --signing-key signer.pem`.
+`INVARLOCK_ALLOW_JUDGE_NETWORK=1 invarlock evaluate request.json --signing-key signer.pem`.
+This permits provider calls only inside the configured judge phase; it does not
+enable network access for native model capture.
 
 Collect fresh measurements for that exact plan, retain all attempts, and finish
 the normal judge evaluation and verification workflow. Old ratings cannot be

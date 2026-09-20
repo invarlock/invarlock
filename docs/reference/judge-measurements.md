@@ -267,13 +267,16 @@ Install the core with its live-collection extra and use the installed command:
 python -m pip install "invarlock[judge]"
 # Supply the key selected by the grader prefix through your secret manager.
 invarlock evaluate judge-request.yaml --preflight --json
-INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate judge-request.yaml --signing-key signer-private.pem --json
+INVARLOCK_ALLOW_JUDGE_NETWORK=1 invarlock evaluate judge-request.yaml --signing-key signer-private.pem --json
 ```
 
-The network permission applies only to that collection process. With network
-access disabled, configured collection stops before loading the provider model
-or admitting a call. Preflight, retained-measurement import, verification and
-reporting remain available offline; do not export the switch for those commands.
+The process environment opt-in grants network access only within the configured
+judge lifecycle, including SDK initialization and cleanup. Native capture and
+other concurrent tasks retain the default network guard. Without that opt-in or
+an already allowed caller policy, collection stops before model construction or
+call admission. Use this scoped switch for native judge requests: the global
+`INVARLOCK_ALLOW_NETWORK` switch is incompatible with strict native execution.
+Preflight, retained-measurement import, verification and reporting remain offline.
 
 The `judge` extra installs pinned Inspect, OpenAI/OpenRouter, Anthropic, Google,
 and both HTTP client SDK dependencies directly. Collection, scoring,

@@ -233,6 +233,7 @@ def journey(output, reference, python):
     environment.pop("PYTHONPATH", None)
     environment.pop("INVARLOCK_SIGNING_KEY", None)
     environment.pop("INVARLOCK_ALLOW_NETWORK", None)
+    environment.pop("INVARLOCK_ALLOW_JUDGE_NETWORK", None)
     commands = []
 
     def command(*args, allowed=(0,)):

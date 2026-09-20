@@ -32,10 +32,12 @@ def test_complete_real_campaign_replays_and_preserves_original_outcome(
     # CLI in an isolated subprocess with network blocked. The installed gate
     # separately enforces a clean core-only wheel interpreter via main().
     monkeypatch.setenv("INVARLOCK_ALLOW_NETWORK", "1")
+    monkeypatch.setenv("INVARLOCK_ALLOW_JUDGE_NETWORK", "1")
     original_run = subprocess.run
 
     def offline_run(*args, **kwargs):
         assert "INVARLOCK_ALLOW_NETWORK" not in kwargs["env"]
+        assert "INVARLOCK_ALLOW_JUDGE_NETWORK" not in kwargs["env"]
         return original_run(*args, **kwargs)
 
     monkeypatch.setattr(REAL.subprocess, "run", offline_run)

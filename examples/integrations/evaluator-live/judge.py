@@ -308,7 +308,7 @@ def environment(offline=False, *, home, collection=False):
     if not offline and "OPENAI_API_KEY" in os.environ:
         value["OPENAI_API_KEY"] = os.environ["OPENAI_API_KEY"]
     if collection and not offline:
-        value["INVARLOCK_ALLOW_NETWORK"] = "1"
+        value["INVARLOCK_ALLOW_JUDGE_NETWORK"] = "1"
     return value
 
 

@@ -6,6 +6,7 @@ import asyncio
 import importlib.metadata
 import json
 import os
+import socket
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -37,6 +38,7 @@ def inputs(tmp_path, monkeypatch):
     # These SDK/model doubles exercise collection after admission policy passes;
     # do not remove the real process socket guard for offline tests.
     monkeypatch.setattr(configured, "network_policy_allows", lambda: True)
+    monkeypatch.delenv("INVARLOCK_ALLOW_JUDGE_NETWORK", raising=False)
     for name in (
         "OPENAI_API_KEY",
         "OPENAI_BASE_URL",
@@ -125,7 +127,10 @@ def sdk(monkeypatch):
     return module, model, client
 
 
-@pytest.mark.parametrize("environment_flag", [None, "1"])
+@pytest.mark.parametrize(
+    "environment_flag",
+    [None, "INVARLOCK_ALLOW_NETWORK", "INVARLOCK_ALLOW_JUDGE_NETWORK"],
+)
 def test_denied_network_stops_before_sdk_loading_or_admission(
     inputs, sdk, monkeypatch, environment_flag
 ):
@@ -141,11 +146,11 @@ def test_denied_network_stops_before_sdk_loading_or_admission(
     environment = {"OPENAI_API_KEY": KEY}
     if environment_flag is not None:
         # Credential mappings cannot override an already enforced process policy.
-        environment["INVARLOCK_ALLOW_NETWORK"] = environment_flag
+        environment[environment_flag] = "1"
     previous = security.network_policy_allows()
     security.enforce_network_policy(False)
     try:
-        with pytest.raises(InspectJudgeError, match="INVARLOCK_ALLOW_NETWORK=1"):
+        with pytest.raises(InspectJudgeError, match="INVARLOCK_ALLOW_JUDGE_NETWORK=1"):
             asyncio.run(
                 collect_configured(**inputs, environment=environment, on_stop=stopped)
             )
@@ -188,6 +193,104 @@ def test_offline_preflight_and_explicit_collection_scope_preserve_policy(
         security.enforce_network_policy(previous)
     collected.assert_awaited_once()
     client.close.assert_awaited_once()
+    assert not inputs["runner"].checkpoint_directory.exists()
+
+
+@pytest.mark.parametrize(
+    "outcome",
+    ["complete", "initialize_error", "collect_error", "close_error", "cancelled"],
+)
+def test_judge_opt_in_is_task_local_and_restored_after_every_lifecycle_exit(
+    inputs, sdk, monkeypatch, outcome
+):
+    from invarlock.evaluation_transaction import _require_closed_runtime_switches
+
+    module, model, client = sdk
+    for name in (
+        "INVARLOCK_ALLOW_NETWORK",
+        "INVARLOCK_ALLOW_REMOTE_CODE",
+        "INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("INVARLOCK_ALLOW_JUDGE_NETWORK", "1")
+    monkeypatch.setattr(
+        configured, "network_policy_allows", security.network_policy_allows
+    )
+
+    def get_model(*args, **kwargs):
+        assert security.network_policy_allows()
+        if outcome == "initialize_error":
+            raise ValueError("offline initialization failure")
+        return model
+
+    async def close():
+        assert security.network_policy_allows()
+        if outcome == "close_error":
+            raise ValueError("offline cleanup failure")
+
+    module.get_model.side_effect = get_model
+    client.close.side_effect = close
+
+    async def scenario():
+        entered, release = asyncio.Event(), asyncio.Event()
+
+        async def collect(**kwargs):
+            assert security.network_policy_allows()
+            entered.set()
+            await release.wait()
+            if outcome == "collect_error":
+                raise ValueError("offline collection failure")
+            return {"offline_double": True}
+
+        async def invoke():
+            try:
+                return await collect_configured(
+                    **inputs, environment={"OPENAI_API_KEY": KEY}
+                )
+            finally:
+                # The same calling task must regain its original denied policy.
+                assert not security.network_policy_allows()
+
+        monkeypatch.setattr(configured, "collect", collect)
+        task = asyncio.create_task(invoke())
+        if outcome != "initialize_error":
+            await asyncio.wait_for(entered.wait(), timeout=2)
+            # This concurrent task and native runtime admission stay offline.
+            assert not security.network_policy_allows()
+            _require_closed_runtime_switches()
+            with socket.socket() as blocked_socket:
+                with pytest.raises(RuntimeError, match="Network access disabled"):
+                    blocked_socket.connect(("127.0.0.1", 1))
+            if outcome == "cancelled":
+                task.cancel()
+            else:
+                release.set()
+        if outcome == "complete":
+            assert await task == {"offline_double": True}
+        else:
+            expected = (
+                asyncio.CancelledError
+                if outcome == "cancelled"
+                else (ValueError if outcome == "collect_error" else InspectJudgeError)
+            )
+            with pytest.raises(expected):
+                await task
+        assert not security.network_policy_allows()
+
+    previous = security.network_policy_allows()
+    security.enforce_default_security()
+    try:
+        # The scoped opt-in does not relax native capture's runtime switches.
+        _require_closed_runtime_switches()
+        assert not security.network_policy_allows()
+        validate_collection_environment(inputs["options"], {"OPENAI_API_KEY": KEY})
+        module.get_model.assert_not_called()
+        assert not security.network_policy_allows()
+        asyncio.run(scenario())
+        assert not security.network_policy_allows()
+    finally:
+        security.enforce_network_policy(previous)
+    assert client.close.await_count == (0 if outcome == "initialize_error" else 1)
     assert not inputs["runner"].checkpoint_directory.exists()
 
 

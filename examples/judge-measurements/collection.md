@@ -53,14 +53,16 @@ reservations must include applicable cache-write charges.
 ```bash
 python -m pip install "invarlock[judge]"
 invarlock evaluate judge-request.yaml --preflight --json
-INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate judge-request.yaml --signing-key signer-private.pem --json
+INVARLOCK_ALLOW_JUDGE_NETWORK=1 invarlock evaluate judge-request.yaml --signing-key signer-private.pem --json
 ```
 
-The network switch applies only to that command. Configured collection checks
-the current process policy before SDK loading, model construction or call
-admission. A credential mapping passed to the Python API cannot override a
-denied policy. Preflight and retained-measurement import, verification and
-reporting remain available offline.
+The scoped process environment opt-in permits network only during configured
+judge initialization, collection and cleanup. Native capture and other tasks
+remain offline; the global `INVARLOCK_ALLOW_NETWORK` switch is incompatible with
+strict native execution. A credential mapping passed to the Python API cannot
+grant this permission. Without the opt-in or an already allowed caller policy,
+collection stops before SDK loading or call admission. Preflight and
+retained-measurement import, verification and reporting remain available offline.
 
 The core `judge` extra directly installs the pinned Inspect, OpenAI/OpenRouter,
 Anthropic, Google, `httpx`, and `httpx2` SDKs. For a source build, run
