@@ -10,9 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Add dedicated native export mappings for all 19 maintained evaluator
-  ecosystems through `engine.export_evaluator_result` and `evaluator-json`,
-  with complete case checks, optional attributed numeric metrics and metadata
-  slices, and a shared offline scoring, verification and reporting path.
+  ecosystems through direct `evaluator-native-json` imports or the optional
+  `engine.export_evaluator_result` helper and `evaluator-json` envelope. Include
+  complete case checks, attributed numeric metrics, metadata slices and a shared
+  offline preflight, scoring, verification and reporting path, tested with actual
+  SDK exports through separately installed recipients.
 
 - Retain signed Docker and Podman CUDA execution references for native scorers,
   TensorRT-LLM and vision-text, with compact offline replay and frozen provenance.

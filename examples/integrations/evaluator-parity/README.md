@@ -1,9 +1,10 @@
 # Evaluator export parity
 
 This example checks each of the 19 dedicated native export profiles through the
-same installed InvarLock recipient. It does not call an evaluator SDK, model,
-judge service or container. Native field dictionaries exercise the documented
-export contracts; they are not evidence of a new upstream SDK execution.
+same installed InvarLock recipient. By default it constructs native field
+dictionaries. With `--native-captures`, it consumes hash-bound JSON files created
+separately by actual SDK serializers. The recipient itself calls no evaluator
+SDK, model, judge service or container. Neither route claims fresh model execution.
 
 Every scorer runs with both direct native JSON (`evaluator-native-json`) and the
 optional InvarLock export envelope (`evaluator-json`): 114 installed journeys.
@@ -93,7 +94,40 @@ python -m pytest tests/integration/test_evaluator_parity.py -k 'not installed'
 Set `INVARLOCK_EVALUATOR_PARITY_PYTHON` to the isolated candidate-wheel interpreter
 to include all installed-recipient integration tests. Those tests reject an
 interpreter importing evaluator SDKs or an editable checkout. Every journey
-verifies independently prepared run and policy anchors, confirms exact recorded
-outcomes, then rejects changed evidence. The exporter also rejects omitted and
+runs preflight without creating evidence, verifies independently prepared run
+and policy anchors, confirms exact recorded outcomes, then rejects changed evidence. The exporter also rejects omitted and
 duplicate cases against a separately supplied expected-ID list and refuses to
 replace an existing export.
+
+
+## Connect actual SDK exports to the recipient
+
+```bash
+make evaluator-sdk-test EVALUATOR=ragas
+```
+
+This gate builds a candidate wheel and installs it with hash-locked dependencies
+in a core-only recipient environment. A separate environment installs the pinned
+evaluator SDK. The SDK serializes both sides of the retained 400-case exact-match
+and NLL comparisons, and the two-case synthetic judge comparison. Those exact
+files then pass through the installed recipient with both import routes: six
+journeys per evaluator. The gate includes preflight, signed evaluation,
+independent verification, reporting, unchanged case facts and tamper rejection.
+
+SDKs with case or report objects use those public objects. SDKs exposing only
+metric results retain the original case arguments beside the SDK result. Required
+wrapper fields and unused metric context are serialization fixtures. OpenEvals
+uses its offline exact-match function on nullable JSON fields because its result
+type is a plain mapping; that auxiliary grade is identified separately from the
+retained measurements, and original task and answer text remain unchanged.
+No new model answers or likelihood values are computed, and synthetic judge ratings remain
+identified as synthetic. This proves the handoff, not a fresh model campaign.
+
+To inspect externally captured files, add `--native-captures /path/to/captures`
+to the single-journey command. That directory contains `baseline.json`,
+`subject.json` and `origin.json`. The closed manifest declares the evaluator,
+source version, scorer and SHA-256 of each fixed filename, plus capture provenance.
+An optional `provenance.input_projection` explicitly supplies the task-text
+mapping; the same mapping is retained in both request sources. The example
+rejects changed bytes, missing cases, wrong identities and changed measurements.
+It preserves exact capture files and the manifest beside the comparison.

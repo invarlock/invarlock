@@ -45,8 +45,11 @@ Three kinds of evidence have different scopes. Tests that place retained model
 answers and likelihoods, plus synthetic complete judge-call fixtures, into each
 native shape exercise the
 shared export/import, scoring and recipient flow; they do not establish that
-each SDK measured those facts. Pinned SDK smoke tests exercise actual upstream
-data objects and local evaluator calls without a new model campaign. The
+each SDK measured those facts. Pinned SDK checks also serialize these retained records through actual upstream
+data objects and serializers, then pass the resulting files through a separately
+installed recipient for all three scorers and both import routes. Local evaluator
+smokes exercise their public APIs without a new model campaign. SDK-required
+wrapper fields are identified as serialization fixtures, not extra measurements. The
 historical qualification matrix retains its original 17 per-case deterministic
 exports and two observation-only profiles: MLflow aggregate results and Garak
 detector summaries. Their identities and authority do not change. New native

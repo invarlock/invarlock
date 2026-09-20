@@ -196,12 +196,14 @@ Run `make pre-commit` for the repository hooks. Some hooks rewrite files;
 review their changes and repeat affected validation before committing.
 
 An evaluator integration is complete when its supported native result can use
-the shared export API, preserve cases and task failures, expose relevant scorer
-inputs and metadata, and pass installed evaluation, verification, reporting and
+the shared capture/import paths, preserve cases and task failures, expose relevant
+scorer inputs and metadata, and pass installed preflight, evaluation, verification, reporting and
 tamper rejection. Test missing inputs, conflicting identities and source grading
 failures separately. Do not require an upstream grading step when InvarLock can
-score the retained answers. Back advertised SDK shapes with actual SDK tests,
-and distinguish those serializer tests from new model-running qualification.
+score the retained answers. Back advertised SDK shapes with actual SDK exports
+passed through an independently installed core recipient for the supported scorer
+combinations, and distinguish those serializer tests from new model-running
+qualification.
 The [capture recipes](examples/evaluator-qualification/maintained/CAPTURE.md)
 describe the common boundary and the source-specific input requirements.
 

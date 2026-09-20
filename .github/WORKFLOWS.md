@@ -21,10 +21,11 @@ Workflow YAML is linted with `make workflow-lint`.
   changes to shell scripts, TOML files and dependency locks.
 - `repo-hygiene.yml` rejects generated artifacts and oversized files. Obsolete
   runs are cancelled; only the checks that inspect a change's history fetch it.
-- `evaluator-sdk.yml` checks the 19 pinned evaluator SDK capture profiles without
-  model or service calls. Its separate environments run only for capture-related
-  changes or an explicit dispatch. The ordinary distribution jobs also exercise
-  all 114 evaluator/scorer/import-route journeys in an SDK-free installed recipient.
+- `evaluator-sdk.yml` passes actual exports from 19 pinned evaluator SDKs through
+  separate SDK-free installed recipients, exercising all three scorers and both
+  import routes without model or service calls. Its jobs run only for capture or
+  recipe changes, or an explicit dispatch. The ordinary distribution jobs also
+  exercise all 114 native-shape evaluator/scorer/import-route journeys.
 
 Python dependency caches use each job's installed workflow locks as their keys.
 When adding an installation step or locked environment, include its lockfile in
