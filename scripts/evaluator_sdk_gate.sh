@@ -21,6 +21,20 @@ case "$SDK_NAME" in
   *) echo "Choose a supported evaluator from the integration guide." >&2; exit 2 ;;
 esac
 SDK_TESTS=("$SDK_TEST" "tests/evaluation_records/test_sdk_installed_handoff.py")
+SDK_TESTS+=("tests/evaluation_records/test_live_capture_cli.py::test_actual_capture_cli_sdk_guard_and_installed_recipient[$SDK_NAME]")
+case "$SDK_NAME" in
+  lm-evaluation-harness|inspect-ai|promptfoo|lighteval|garak|openai-evals|langfuse)
+    for SDK_LIVE_TEST in \
+      test_actual_framework_drives_callback_and_writes_native_export \
+      test_actual_framework_prompt_mutation_is_refused_before_task \
+      test_actual_framework_task_failure_is_retained; do
+      SDK_TESTS+=("tests/evaluation_records/test_live_harness_capture.py::${SDK_LIVE_TEST}[$SDK_NAME]")
+    done ;;
+  deepeval|ragas|hugging-face-evaluate|autoevals|openevals|arize-phoenix-evals|opik)
+    SDK_TESTS+=("tests/evaluation_records/test_live_scalar_capture.py::test_live_scalar_fresh_task_and_real_sdk_metric[$SDK_NAME]") ;;
+  pydantic-evals|azure-ai-evaluation|evidently|mlflow|trulens)
+    SDK_TESTS+=("tests/evaluation_records/test_live_batch_capture.py::test_real_sdk_execution_preserves_complete_synthetic_schedule[$SDK_NAME]") ;;
+esac
 case "$SDK_NAME" in
   deepeval|ragas|lighteval|hugging-face-evaluate|autoevals|openevals|arize-phoenix-evals|opik)
     SDK_TESTS+=("tests/evaluation_records/test_sdk_scalar_roundtrip.py") ;;
@@ -40,6 +54,7 @@ cd "$SDK_ROOT"
 export PYTHONPATH="$SDK_ROOT/src"
 export PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
 export INVARLOCK_REQUIRE_EVALUATOR_SDK="$SDK_NAME"
+export INVARLOCK_LIVE_EVALUATOR="$SDK_NAME"
 export HF_HUB_OFFLINE=1 HF_DATASETS_OFFLINE=1
 export DEEPEVAL_TELEMETRY_OPT_OUT=YES RAGAS_DO_NOT_TRACK=true OPIK_TRACK_DISABLE=true OTEL_SDK_DISABLED=true
 # SDK serialization and recipient verification run in different environments.
@@ -60,6 +75,38 @@ if [ -z "${INVARLOCK_EVALUATOR_PARITY_PYTHON:-}" ]; then
   export INVARLOCK_EVALUATOR_PARITY_PYTHON="$SDK_TEMP/recipient/bin/python"
 fi
 SDK_LOCK="$SDK_ROOT/examples/evaluator-qualification/locks/$SDK_NAME.txt"
+if [ "$SDK_NAME" = "lighteval" ]; then
+  # Preserve the historical qualification lock. The live pipeline needs the
+  # compatible hash-library constraint, plus independently checked NLP assets.
+  SDK_LOCK="$SDK_ROOT/examples/integrations/evaluator-live/locks/lighteval.txt"
+  export INVARLOCK_NLTK_ARCHIVE_DIR="$SDK_TEMP/nltk-archives"
+  export INVARLOCK_LIGHTEVAL_REGISTRY_ASSET="$SDK_TEMP/tinyBenchmarks.pkl"
+  python3 - "$SDK_ROOT/examples/integrations/evaluator-live/harness.py" "$INVARLOCK_NLTK_ARCHIVE_DIR" <<'PY'
+import hashlib
+import pathlib
+import runpy
+import sys
+import urllib.request
+
+driver = runpy.run_path(sys.argv[1])
+pins = driver["NLTK_ARCHIVES"]
+destination = pathlib.Path(sys.argv[2]) / "tokenizers"
+destination.mkdir(parents=True)
+for name, expected in pins.items():
+    url = f"https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/tokenizers/{name}.zip"
+    with urllib.request.urlopen(url, timeout=60) as response:
+        raw = response.read(32 * 1024 * 1024 + 1)
+    if len(raw) > 32 * 1024 * 1024 or hashlib.sha256(raw).hexdigest() != expected:
+        raise SystemExit(f"NLTK {name} archive differs from its independent pin")
+    (destination / f"{name}.zip").write_bytes(raw)
+resource = driver["LIGHTEVAL_REGISTRY_RESOURCE"]
+with urllib.request.urlopen(resource["url"], timeout=60) as response:
+    raw = response.read(resource["size"] + 1)
+if len(raw) != resource["size"] or hashlib.sha256(raw).hexdigest() != resource["sha256"]:
+    raise SystemExit("LightEval registry resource differs from its independent pin")
+(destination.parent.parent / "tinyBenchmarks.pkl").write_bytes(raw)
+PY
+fi
 test -f "$SDK_LOCK"
 # The top-level SDK versions are pinned by the maintained evaluator inventory.
 # These isolated test environments are not dependencies of the distributed core.
@@ -85,6 +132,13 @@ if [ "$SDK_NAME" = "promptfoo" ]; then
     --with-requirements "$SDK_ROOT/requirements/workflows/core-py312.txt" \
     --with pytest==9.1.1 \
     python -m pytest -q -o addopts='' --basetemp "$SDK_TEMP/pytest" "${SDK_TESTS[@]}"
+elif [ "$SDK_NAME" = "lighteval" ]; then
+  uv run --no-project --isolated --python 3.12 \
+    --with-requirements "$SDK_LOCK" \
+    "${SDK_RECIPE_DEPS[@]}" \
+    python -c 'import os,runpy,sys; driver=runpy.run_path(sys.argv[1]); driver["lighteval_resource"](os.environ["INVARLOCK_LIGHTEVAL_REGISTRY_ASSET"]); import pytest; raise SystemExit(pytest.main(sys.argv[2:]))' \
+    "$SDK_ROOT/examples/integrations/evaluator-live/harness.py" \
+    -q -o addopts='' --basetemp "$SDK_TEMP/pytest" "${SDK_TESTS[@]}"
 elif [ "${SDK_SERIALIZER_ONLY:-0}" = "1" ]; then
   # Probe native SDK serialization from source only. This is deliberately not
   # a core/SDK co-installation test: capture process and recipient may be separate.

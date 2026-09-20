@@ -16,6 +16,11 @@ profiles share the same captured `evaluate`, `verify` and `report` flow. The
 evaluator environment needs no InvarLock installation or common export envelope; the recipient
 needs only core InvarLock, with no evaluator SDK or account.
 
+Implementation tests exercise pinned SDK exports and actual task callbacks.
+The separate [live campaign](../../integrations/evaluator-live/README.md) tracks
+fresh model execution, likelihood measurement and plan-bound judge collection.
+Its pending qualification must not be inferred from a passing serialization test.
+
 For example, serialize the original DeepEval test cases with the SDK's own
 explicit serializer:
 
@@ -93,7 +98,7 @@ those cases as unavailable rather than implicitly converting them to text.
 
 | Evaluator key | Native `result` profile | Pairing and reference fields |
 | --- | --- | --- |
-| `lm-evaluation-harness` | List of `--log_samples` rows: `doc`, `arguments`, `target`, `filtered_resps` | `doc_id`; target is the original reference; select one completion |
+| `lm-evaluation-harness` | List of `--log_samples` rows: `doc`, `arguments`, `target`, `filtered_resps` | `doc_id`, or explicit `metadata.invarlock_id` in this dedicated profile; target is the original reference; select one completion |
 | `inspect-ai` | EvalLog SDK object or JSON log, `version: 1` or `2`, `status: success`, `samples` | Sample `id`, `input`, `target`, `output.choices`; one epoch and completion |
 | `promptfoo` | List of full result rows containing `testCase`, rendered `prompt`, `response` | `testCase.metadata.invarlock_id` and `invarlock_expected`; runtime failures remain errors |
 | `deepeval` | List of `{id, test_case: LLMTestCase}` | `input`, `actual_output`, `expected_output`; optional measured metric or MetricsData |

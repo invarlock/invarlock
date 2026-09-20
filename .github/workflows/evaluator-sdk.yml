@@ -10,6 +10,7 @@ on:
       - 'tests/examples/test_langfuse_export.py'
       - 'tests/integration/test_evaluator_parity.py'
       - 'examples/integrations/evaluator-parity/**'
+      - 'examples/integrations/evaluator-live/**'
       - 'examples/evaluator-qualification/maintained/CAPTURE.md'
       - 'examples/evaluator-qualification/locks/**'
       - 'examples/evaluator-qualification/matrix.json'

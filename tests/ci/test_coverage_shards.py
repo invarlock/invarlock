@@ -15,6 +15,28 @@ from scripts.ci import coverage_runner as runner
 from tests._support_repository_contracts import MakefileContract
 
 
+def test_all_live_example_helpers_belong_only_to_example_partition():
+    paths = {
+        path.relative_to(runner.ROOT).as_posix()
+        for path in (runner.ROOT / "tests/evaluation_records").glob("test_live_*.py")
+    }
+    examples = runner.selection("examples")
+    core = runner.selection("core")
+    assert paths
+    assert paths <= set(examples)
+    assert all(
+        examples.count(path) == 1 and f"--ignore={path}" in core for path in paths
+    )
+    result = subprocess.run(
+        ["make", "--dry-run", "examples-check", "PYTHON=true", "PYTEST_WORKERS=0"],
+        cwd=runner.ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert all(result.stdout.count(path) == 1 for path in paths)
+
+
 def write_data(path: Path, name: str = "src/invarlock/probe.py") -> None:
     data = CoverageData(basename=str(path))
     data.add_arcs({name: [(-1, 1), (1, 2), (2, -1)]})
@@ -318,6 +340,9 @@ def test_real_collection_is_disjoint_and_preserves_marker_exceptions(
         support: "import pytest\n@pytest.mark.integration\ndef test_container(): pass\n",
         "tests/runtime/test_duplicate.py": "def test_runtime(): pass\n",
     }
+    for name in runner.EXAMPLE_TESTS:
+        if name.endswith(".py"):
+            files.setdefault(name, "def test_example_helper(): pass\n")
     for name, contents in files.items():
         path = tmp_path / name
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -348,10 +373,15 @@ def test_real_collection_is_disjoint_and_preserves_marker_exceptions(
         )
         inventories.append(set(json.loads(path.read_text())))
     union = set().union(*inventories)
-    assert sum(map(len, inventories)) == len(union) == 8
+    assert sum(map(len, inventories)) == len(union) == len(files) - 1
     examples = inventories[runner.SHARDS.index("examples")]
     assert "tests/integration/test_evaluator_parity.py::test_parity" in examples
     assert "tests/evaluation_records/test_sdk_capture.py::test_sdk" in examples
+    assert all(
+        any(node.startswith(name + "::") for node in examples)
+        for name in runner.EXAMPLE_TESTS
+        if name.endswith(".py")
+    )
     assert (
         "tests/judge_measurements/test_collector.py::test_collector"
         in inventories[runner.SHARDS.index("core")]

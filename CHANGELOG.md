@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Exercise complete retained Luna judge studies through the installed workflow,
   preserving both passing and insufficient-evidence outcomes and rejecting
   altered measurements.
+  Add actual SDK callback tests and a bounded fresh-execution campaign with
+  preserved task ledgers, explicit likelihood capture bindings and independently
+  installed recipients. Fresh model/provider qualification remains separate
+  from controlled-callback tests and retained replays.
 
 - Retain signed Docker and Podman CUDA execution references for native scorers,
   TensorRT-LLM and vision-text, with compact offline replay and frozen provenance.

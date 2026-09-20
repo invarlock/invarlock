@@ -9,6 +9,7 @@ MYPY := $(PYTHON) -m mypy
 MKDOCS := $(PYTHON) -m mkdocs
 PYTEST_WORKERS ?= 0
 TEST_EXCLUDES ?=
+LIVE_EXAMPLE_TESTS := $(wildcard tests/evaluation_records/test_live_*.py)
 COVERAGE_ARTIFACT_DIR ?= artifacts/coverage
 COVERAGE_COMBINED_FILE ?= $(CURDIR)/.coverage.combined
 OPA ?= opa
@@ -270,7 +271,7 @@ coverage-release-report:  ## Enforce retained release coverage measurements
 coverage-examples:  ## Enforce branch-aware coverage for example launchers
 	COVERAGE_FILE=$(COVERAGE_EXAMPLES_FILE) $(PYTHON) -m coverage erase
 	COVERAGE_FILE=$(COVERAGE_EXAMPLES_FILE) PYTHONPATH=src:. $(PYTEST) $(PYTEST_WORKER_ARGS) -q \
-		tests/examples tests/integration/test_evaluator_parity.py tests/evaluation_records/test_sdk_capture.py \
+		tests/examples tests/integration/test_evaluator_parity.py tests/evaluation_records/test_sdk_capture.py tests/evaluation_records/test_live_*.py \
 		--cov=examples \
 		--cov-config=scripts/examples.coveragerc \
 		--cov-branch \
@@ -619,7 +620,7 @@ verify:  ## Run repository, product, docs, and contract gates in parallel by def
 	$(MAKE) -j $(VERIFY_TARGET_JOBS) \
 		public-evidence-audit contracts-check test runtime-test \
 		cli-smoke-core lint docs-check \
-		PYTEST_WORKERS=$(PYTEST_WORKERS) TEST_EXCLUDES=--ignore=tests/examples
+		PYTEST_WORKERS=$(PYTEST_WORKERS) TEST_EXCLUDES="--ignore=tests/examples $(addprefix --ignore=,$(LIVE_EXAMPLE_TESTS))"
 	$(MAKE) examples-check PYTEST_WORKERS=$(PYTEST_WORKERS)
 
 verify-fast: PYTEST_WORKERS = 2
@@ -628,7 +629,7 @@ verify-fast:  ## Run local gates in parallel without network, GPU, or downloads
 	$(MAKE) -j $(VERIFY_TARGET_JOBS) \
 		public-evidence-audit contracts-check test-fast runtime-test \
 		cli-smoke-core lint \
-		PYTEST_WORKERS=$(PYTEST_WORKERS) TEST_EXCLUDES=--ignore=tests/examples
+		PYTEST_WORKERS=$(PYTEST_WORKERS) TEST_EXCLUDES="--ignore=tests/examples $(addprefix --ignore=,$(LIVE_EXAMPLE_TESTS))"
 	$(MAKE) examples-check PYTEST_WORKERS=$(PYTEST_WORKERS)
 
 verify-checks:  ## Run non-test repository gates; CI behavioral coverage runs separately
@@ -652,7 +653,7 @@ public-evidence-sync:  ## Refresh the packaged public evidence index
 	PYTHONPATH=src $(PYTHON) scripts/checks/sync_packaged_public_evidence.py --write
 
 examples-check:  ## Test the maintained one-command integration journeys
-	PYTHONPATH=src:. $(PYTEST) $(PYTEST_WORKER_ARGS) -q tests/examples
+	PYTHONPATH=src:. $(PYTEST) $(PYTEST_WORKER_ARGS) -q tests/examples $(LIVE_EXAMPLE_TESTS)
 
 ##@ Documentation
 docs:  ## Build documentation strictly
