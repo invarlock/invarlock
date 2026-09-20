@@ -308,7 +308,11 @@ async def collect_configured(
     *,
     on_stop: Callable[[str], None] | None = None,
 ) -> JudgeMeasurements:
-    """Collect frozen judgments with pinned SDKs and an environment-only key."""
+    """Collect frozen judgments with pinned SDKs and an environment-only key.
+
+    ``runner.stop_after_batches`` requests a graceful invocation stop after
+    durable results, without changing the plan or checkpoint budget identity.
+    """
     allow_judge_network = os.environ.get(
         "INVARLOCK_ALLOW_JUDGE_NETWORK", ""
     ).strip().lower() in {"1", "true", "yes", "on"}

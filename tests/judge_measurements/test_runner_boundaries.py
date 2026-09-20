@@ -698,3 +698,132 @@ def test_anthropic_caller_cannot_bypass_continuation_reservation_guard():
     with pytest.raises(InspectJudgeError, match="configured single-attempt"):
         live._require_provider_retries_disabled(model)
     assert model.calls == 0
+
+
+@pytest.mark.parametrize("value", [True, False, 0, -1, 1.5, "1", 1_000_001])
+def test_graceful_batch_limit_rejects_invalid_values(runner_options, value):
+    with pytest.raises(InspectJudgeError, match="stop_after_batches"):
+        replace(runner_options, stop_after_batches=value).validate()
+    assert not runner_options.checkpoint_directory.exists()
+
+
+@pytest.mark.parametrize(
+    ("budget", "resume_limit", "expected_calls", "expected_stop"),
+    [
+        ({}, None, 4, "complete"),
+        ({}, 1, 4, "complete"),
+        ({"max_calls": 3}, None, 3, "capacity_exhausted"),
+        ({"max_cost_microusd": 300}, None, 3, "capacity_exhausted"),
+        ({"max_input_tokens": 300}, None, 3, "capacity_exhausted"),
+        ({"max_output_tokens": 384}, None, 3, "capacity_exhausted"),
+    ],
+)
+def test_graceful_stop_retains_entire_batch_and_resumes_original_budget(
+    inputs,
+    runner_options,
+    monkeypatch,
+    budget,
+    resume_limit,
+    expected_calls,
+    expected_stop,
+):
+    monkeypatch.setattr(live.importlib.metadata, "version", lambda _: "0.3.263")
+    monkeypatch.setattr(live, "prepare_inspect_config", lambda *_: None)
+    plan = copy.deepcopy(inputs["plan"])
+    plan["schedule"].update(repetitions=2, expected_trials=4)
+    options = replace(inputs["options"], concurrency=2, **budget)
+    calls = []
+
+    async def completed_call(*_args, request, **_kwargs):
+        identity = len(calls)
+        calls.append(request)
+        await asyncio.sleep(0)
+        event = copy.deepcopy(inputs["export"]["samples"][0]["events"][0])
+        event["uuid"] = f"event-graceful-{identity}"
+        event["output"]["request_id"] = f"response-graceful-{identity}"
+        event["input"] = request["messages"]
+        event["call"]["request"]["messages"] = request["messages"]
+        return event
+
+    monkeypatch.setattr(live, "_call_one", completed_call)
+    runner = replace(runner_options, stop_after_batches=1)
+    arguments = {
+        "plan": plan,
+        "options": options,
+        "model": NoCallModel(),
+        "baseline_run": inputs["baseline_run"],
+        "subject_run": inputs["subject_run"],
+    }
+    stops = []
+
+    def stopped(reason):
+        # The callback observes both durably finished attempts and no next
+        # admission, even though two eligible trials remain in the frozen plan.
+        assert len(list(runner.checkpoint_directory.glob("result-*.json"))) == 2
+        assert len(list(runner.checkpoint_directory.glob("admission-*.json"))) == 2
+        stops.append(reason)
+
+    first = asyncio.run(collect(**arguments, runner=runner, on_stop=stopped))
+    assert stops == ["requested"]
+    assert len(calls) == 2
+    assert first["completeness"]["completed_trials"] == 2
+    assert sum(not trial["attempts"] for trial in first["trials"]) == 2
+    original = {
+        path.name: path.read_bytes()
+        for path in runner.checkpoint_directory.glob("*.json")
+    }
+    assert "stop_after_batches" not in json.loads(original["collection.json"])
+    resumed_stops = []
+    resumed = asyncio.run(
+        collect(
+            **arguments,
+            runner=replace(runner, stop_after_batches=resume_limit),
+            on_stop=resumed_stops.append,
+        )
+    )
+    assert len(calls) == expected_calls
+    assert resumed_stops == [expected_stop]
+    assert resumed["completeness"]["completed_trials"] == expected_calls
+    assert all(
+        (runner.checkpoint_directory / name).read_bytes() == raw
+        for name, raw in original.items()
+    )
+    assert all(len(trial["attempts"]) <= 1 for trial in resumed["trials"])
+    replayed = asyncio.run(collect(**arguments, runner=runner))
+    assert replayed == resumed
+    assert len(calls) == expected_calls
+
+
+@pytest.mark.parametrize(
+    "max_calls,reason", [(1, "capacity_exhausted"), (10, "complete")]
+)
+def test_terminal_collection_reason_precedes_graceful_request(
+    inputs, runner_options, monkeypatch, max_calls, reason
+):
+    monkeypatch.setattr(live.importlib.metadata, "version", lambda _: "0.3.263")
+    monkeypatch.setattr(live, "prepare_inspect_config", lambda *_: None)
+    calls = []
+
+    async def completed_call(*_args, request, **_kwargs):
+        calls.append(request)
+        event = copy.deepcopy(inputs["export"]["samples"][0]["events"][0])
+        event["uuid"] = f"event-terminal-{len(calls)}"
+        event["output"]["request_id"] = f"response-terminal-{len(calls)}"
+        event["input"] = request["messages"]
+        event["call"]["request"]["messages"] = request["messages"]
+        return event
+
+    monkeypatch.setattr(live, "_call_one", completed_call)
+    stops = []
+    asyncio.run(
+        collect(
+            plan=inputs["plan"],
+            options=replace(inputs["options"], max_calls=max_calls),
+            runner=replace(runner_options, stop_after_batches=1),
+            model=NoCallModel(),
+            baseline_run=inputs["baseline_run"],
+            subject_run=inputs["subject_run"],
+            on_stop=stops.append,
+        )
+    )
+    assert stops == [reason]

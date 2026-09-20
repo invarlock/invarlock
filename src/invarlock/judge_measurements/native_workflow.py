@@ -171,7 +171,7 @@ def require_completed_collection(
     *,
     stop_reason: str | None = None,
 ) -> dict[str, Any]:
-    """Resume pending work only after an actual collector deadline."""
+    """Resume pending work after a deadline or graceful invocation stop."""
     pending = sum(not trial["attempts"] for trial in measurements["trials"])
     if not pending:
         return {"pending_trials": 0, "stop_reason": "complete", "resumable": False}
@@ -181,7 +181,7 @@ def require_completed_collection(
             "stop_reason": "retained_capacity_exhausted",
             "resumable": False,
         }
-    resumable = stop_reason == "deadline"
+    resumable = stop_reason in {"deadline", "requested"}
     message = (
         "Judge collection is incomplete; rerun the same request to resume its workspace"
         if resumable
@@ -196,7 +196,7 @@ def require_completed_collection(
             "resumable": resumable,
             "workspace": str(workspace),
             "pending_trials": pending,
-            "stop_reason": "deadline" if resumable else "unknown",
+            "stop_reason": stop_reason if resumable else "unknown",
             "evidence": None,
             "errors": [message],
         },

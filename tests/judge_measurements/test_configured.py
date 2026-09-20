@@ -884,3 +884,30 @@ def test_anthropic_implicit_temperature_change_cannot_dispatch(
     sdk[1].api.generate.assert_not_called()
     sdk[2].messages.create.assert_not_called()
     sdk[2].close.assert_awaited_once()
+
+
+def test_configured_graceful_batch_stop_preserves_runner_and_closes_client(
+    inputs, sdk, monkeypatch
+):
+    _, _, client = sdk
+    inputs["runner"] = replace(inputs["runner"], stop_after_batches=1)
+    retained = {"retained": "completed-batch"}
+    stops = []
+
+    async def collect_batch(**arguments):
+        assert arguments["runner"] is inputs["runner"]
+        assert arguments["runner"].stop_after_batches == 1
+        arguments["on_stop"]("requested")
+        return retained
+
+    monkeypatch.setattr(configured, "collect", collect_batch)
+    assert (
+        asyncio.run(
+            collect_configured(
+                **inputs, environment={"OPENAI_API_KEY": KEY}, on_stop=stops.append
+            )
+        )
+        == retained
+    )
+    assert stops == ["requested"]
+    client.close.assert_awaited_once()

@@ -273,9 +273,9 @@ def test_standalone_collection_checks_signing_key_before_any_call(staged, delega
     assert not request.evidence.exists()
 
 
-@pytest.mark.parametrize("exhausted", [False, True])
-def test_pending_collection_distinguishes_deadline_resume_from_retained_capacity(
-    staged, delegated, monkeypatch, exhausted
+@pytest.mark.parametrize("reason", ["deadline", "requested", "capacity_exhausted"])
+def test_pending_collection_distinguishes_resumable_stop_from_retained_capacity(
+    staged, delegated, monkeypatch, reason
 ):
     request = _standalone_collect(staged)
     plan = json.loads((request.root / "plan.json").read_bytes())
@@ -285,18 +285,12 @@ def test_pending_collection_distinguishes_deadline_resume_from_retained_capacity
 
     async def collect(*_args, on_stop):
         value = next(outcomes)
-        on_stop(
-            "capacity_exhausted"
-            if exhausted
-            else "deadline"
-            if value is pending
-            else "complete"
-        )
+        on_stop(reason if value is pending else "complete")
         return value
 
     delegated.collect_configured.side_effect = collect
     key, _ = _key(request.root / "evidence.pem")
-    if exhausted:
+    if reason == "capacity_exhausted":
         result = standalone.evaluate_judge_request(
             request, signing_key=key, unsigned=False
         )
@@ -313,6 +307,7 @@ def test_pending_collection_distinguishes_deadline_resume_from_retained_capacity
             error.value.payload["resumable"]
             and error.value.payload["pending_trials"] == 2
         )
+        assert error.value.payload["stop_reason"] == reason
         assert not request.evidence.exists()
         result = standalone.evaluate_judge_request(
             request, signing_key=key, unsigned=False

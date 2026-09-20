@@ -207,11 +207,17 @@ def _safe_failure(exception: Exception) -> tuple[str, dict[str, str]]:
 
 @dataclass(frozen=True)
 class RunnerOptions:
-    """Execution-only limits and durable checkpoint identity."""
+    """Execution limits and scorer identity for a durable checkpoint.
+
+    ``stop_after_batches`` stops this invocation after fully retained batches.
+    It is excluded from checkpoint identity, like the invocation timeout, so a
+    later invocation can resume with the same plan and collection budgets.
+    """
 
     checkpoint_directory: Path
     scorer_id: str
     invocation_timeout_seconds: int
+    stop_after_batches: int | None = None
 
     def validate(self) -> None:
         if not isinstance(self.checkpoint_directory, Path):
@@ -234,6 +240,11 @@ class RunnerOptions:
             raise InspectJudgeError(
                 "invocation_timeout_seconds must be between 1 and 604800"
             )
+        if self.stop_after_batches is not None and (
+            type(self.stop_after_batches) is not int
+            or not 1 <= self.stop_after_batches <= 1_000_000
+        ):
+            raise InspectJudgeError("stop_after_batches must be between 1 and 1000000")
 
 
 class _EventSink:
@@ -1127,6 +1138,7 @@ async def _collect_pinned(
             for trial in checkpoint["trials"]
             if not trial["attempts"]
         )
+        completed_batches = 0
         while True:
             check_directory()
             admitted = min(len(pending), options.concurrency, state.capacity())
@@ -1139,6 +1151,11 @@ async def _collect_pinned(
                     if not admitted
                     else "deadline"
                 )
+            if (
+                runner.stop_after_batches is not None
+                and completed_batches >= runner.stop_after_batches
+            ):
+                return stopped("requested")
 
             scheduled: list[tuple[dict[str, Any], dict[str, Any]]] = []
             for _ in range(admitted):
@@ -1250,6 +1267,7 @@ async def _collect_pinned(
             except BaseException:
                 await drain()
                 raise
+            completed_batches += 1
 
 
 async def collect(

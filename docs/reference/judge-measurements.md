@@ -229,6 +229,17 @@ zero collector retries, no tools or cache, and no inherited model settings.
 An admitted call without a retained result is an ambiguous timeout that cannot
 be retried. `verify` and `report` make no provider calls.
 
+Python collection callers can set `RunnerOptions.stop_after_batches` to a
+positive integer to pause after that many completed batches in the current
+invocation. Each batch's admitted calls finish and their results are durably
+retained before the runner reports `requested`; no later batch is admitted.
+Resume with the same plan, collection options and checkpoint directory, omitting
+the stop limit when ready to finish. Earlier calls and budget reservations remain
+in force. This execution control does not change plan or checkpoint identity and
+is not a request-file field. It does not cancel a provider request already in
+flight; the invocation deadline still applies. A complete schedule or exhausted
+budget takes precedence over the requested pause.
+
 Use `collect_configured` for Google's per-call clients. It fixes the endpoint to
 `https://generativelanguage.googleapis.com`, allows one SDK attempt, disables
 automatic function calling, and stops Inspect's internal malformed-function
