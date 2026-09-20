@@ -159,7 +159,7 @@ def _same_json(left: Any, right: Any) -> bool:
         return len(left) == len(right) and all(
             _same_json(a, b) for a, b in zip(left, right, strict=True)
         )
-    return left == right
+    return bool(left == right)
 
 
 def _alias(value: Mapping[str, Any], names: tuple[str, ...], label: str) -> Any:
