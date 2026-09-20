@@ -1210,6 +1210,23 @@ def _report_view(
     subject_matches = (
         paired["both_pass"] + paired["baseline_fail_subject_pass"] if paired else None
     )
+    basis: tuple[str, ...]
+    if exact:
+        assert paired is not None
+        basis = (
+            f"Baseline and subject are paired on the same {report['record_count']:,} cases. Newcombe hybrid score uses their paired match outcomes to form a nominal 95% confidence interval for the accuracy change.",
+            f"Both matched: {paired['both_pass']:,}; baseline only: {paired['baseline_pass_subject_fail']:,}; subject only: {paired['baseline_fail_subject_pass']:,}; neither matched: {paired['both_fail']:,}.",
+            "Change is subject accuracy minus baseline accuracy in percentage points, not relative percent change. The 95% confidence level describes the interval method, not the share of correct answers.",
+            "This exact-match method uses a fixed 95% confidence level; the allowed-loss threshold is a separate policy choice. Under suitable sampling and independent-pair assumptions, the method aims for intervals to cover the underlying accuracy difference in about 95% of repeated studies. This is not the probability that the subject exceeds the allowed loss, and these cases are not automatically representative of production.",
+        )
+    else:
+        basis = (
+            f"The declared percentile method resamples the same {report['record_count']:,} paired records with replacement, keeping each baseline and subject result together. Its retained resampling count is {uncertainty['replicates']:,}.",
+            "The interval covers the central 95% of the paired resampling distribution for the subject-to-baseline mean NLL ratio. Each side's NLL uses nats per expected UTF-8 byte."
+            if ratio
+            else "The interval covers the central 95% of the paired resampling distribution for subject-minus-baseline mean score change, in the displayed change units.",
+            "This describes resampling of the fixed recorded schedule; it is not a population confidence interval or a claim that the sample represents production traffic.",
+        )
     metric = MetricView(
         name=names.get(report["metric"], report["metric"]),
         scope="All paired records",
@@ -1237,6 +1254,8 @@ def _report_view(
             unit=unit,
             threshold_direction="maximum" if ratio else "minimum",
             neutral=1.0 if ratio else 0.0,
+            method="Newcombe hybrid score" if exact else "Paired percentile resampling",
+            basis=basis,
         ),
         notes=tuple(notes),
     )

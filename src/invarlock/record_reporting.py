@@ -566,13 +566,42 @@ def _metric_views(
                 if policy
                 else None
             )
+            confidence = number(interval["mass"] * 100)
             label = (
-                "95% paired-schedule ratio resampling interval"
+                f"{confidence}% paired-schedule ratio resampling interval"
                 if likelihood
-                else "Paired 95% confidence interval"
+                else f"Paired {confidence}% confidence interval"
                 if binary
-                else "95% paired-schedule resampling interval"
+                else f"{confidence}% paired-schedule resampling interval"
             )
+            basis: tuple[str, ...]
+            if interval["method"] in {
+                "newcombe_hybrid_score_paired_v1",
+                "newcombe_hybrid_score_paired_v2",
+            }:
+                basis = (
+                    f"Baseline and subject are paired on the same {complete:,} cases in this scope. Newcombe hybrid score uses their paired match outcomes to form a nominal {number(interval['mass'] * 100)}% confidence interval for the accuracy change.",
+                    "Change is subject accuracy minus baseline accuracy in percentage points, not relative percent change. The confidence level describes the interval method, not the share of correct answers."
+                    if percentage
+                    else "Change is subject score minus baseline score in the displayed score units, not relative percent change. The confidence level describes the interval method, not the share of correct answers.",
+                    "Each metric and scope has its own interval; these intervals do not provide a simultaneous confidence guarantee across all results or establish a representative production sample.",
+                )
+            elif interval["method"] in {
+                "paired_mean_shake256_percentile_v1",
+                "paired_percentile_bootstrap_sha256_v1",
+            }:
+                basis = (
+                    f"The declared percentile method resamples the same {complete:,} paired records in this scope with replacement, keeping each baseline and subject result together. Its retained resampling count is {interval['replicates']:,}.",
+                    f"The central {number(interval['mass'] * 100)}% of that distribution describes the subject-to-baseline mean NLL ratio. Each side's NLL uses nats per expected UTF-8 byte."
+                    if likelihood
+                    else f"The central {number(interval['mass'] * 100)}% of that distribution describes subject-minus-baseline mean score change in {display_unit} units.",
+                    "This is a fixed-schedule resampling interval, not a population confidence interval. Separate metric and scope intervals do not give a simultaneous confidence guarantee or establish a representative production sample.",
+                )
+            else:
+                basis = (
+                    f"Retained interval method: {interval['method']}.",
+                    "The report supplies these endpoints; a calculation explanation is unavailable for this method.",
+                )
             visual = IntervalView(
                 interval["lower"] * scale,
                 interval["upper"] * scale,
@@ -587,7 +616,10 @@ def _metric_views(
                 method={
                     "newcombe_hybrid_score_paired_v1": "Newcombe hybrid score",
                     "newcombe_hybrid_score_paired_v2": "Newcombe hybrid score",
+                    "paired_mean_shake256_percentile_v1": "Paired percentile resampling",
+                    "paired_percentile_bootstrap_sha256_v1": "Paired percentile resampling",
                 }.get(interval.get("method", ""), ""),
+                basis=basis,
             )
             if policy:
                 bound = interval["lower" if higher else "upper"]

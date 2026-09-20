@@ -64,6 +64,42 @@ identifiers for these formatted labels remain in **Recorded metric and scope
 identifiers**. Display formatting does not change grouping, verification inputs
 or existing JUnit identifiers.
 
+## Where the interval comes from
+
+**How this interval was calculated** explains the retained method and sample
+structure beside the chart. The marker is the observed comparison; the bar spans
+the recorded interval. A lower-bound requirement tests the left endpoint against
+the minimum, while an upper-bound requirement tests the right endpoint against
+the maximum. Other configured checks, such as completeness, sample count and
+precision, still apply.
+
+- **Exact match:** Baseline and subject answer the same cases. The Newcombe
+  hybrid score method uses paired successes and failures for a nominal 95%
+  confidence interval on their accuracy difference. Native reports also show the
+  four paired outcome counts. A change of 2 percentage points means, for example,
+  70% to 72% accuracy; it is not a 2% relative change. The confidence level is not
+  an answer-correctness rate or the fraction of model runs that exceed the
+  policy limit. The observed change can be within the allowance while its
+  interval fails the bound requirement; this does not establish a loss larger
+  than that allowance.
+- **NLL and other resampled scores:** The declared percentile method resamples
+  paired records together within the fixed schedule. Native reports retain
+  2,048 resamples; captured reports show their recorded count. The interval
+  describes the central recorded proportion of the resampling distribution for
+  the mean ratio or score change. It is not a population confidence interval.
+- **Judge scores:** Repeated ratings are averaged within cases, then cases within
+  declared independent units; units have equal weight. Two-sided Hoeffding bounds
+  use the bounded rating scale and independent-unit count. The report shows the
+  actual alpha error budget and its allocation across the declared comparison
+  family. More repetitions do not add independent units. Changes use normalized
+  rubric score points, not accuracy percentage points.
+
+These methods do not establish that the selected cases represent production
+traffic. A worse observed score describes the measured run. A policy rejection
+alone does not establish worse performance beyond those cases; an interval may
+simply fail to rule out a decline larger than the allowed margin. Reporting
+explains the recorded decision without recalculating it from rounded chart values.
+
 ## Runtime-side report
 
 Each side has an `invarlock/runtime-side-report-v1` object:

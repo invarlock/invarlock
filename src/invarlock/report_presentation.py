@@ -200,6 +200,7 @@ class IntervalView:
     threshold_direction: str | None = None
     neutral: float | None = None
     method: str = ""
+    basis: tuple[str, ...] = ()
 
 
 def display_label(value: str) -> str:
@@ -345,6 +346,58 @@ def _interval_summary(view: IntervalView, *, compact: bool = False) -> str:
     lower = number(view.lower, signed=view.neutral == 0)
     upper = number(view.upper, signed=view.neutral == 0)
     return f"{label}: {lower} to {upper} {view.unit}".strip()
+
+
+def _interval_reading(view: IntervalView) -> tuple[tuple[str, str], ...]:
+    """Explain geometry and endpoint rules without recalculating a verdict."""
+    change = "The marker shows the observed change between subject and baseline."
+    if view.unit == "pp":
+        change += " A change in percentage points (pp) is the subject percentage minus the baseline percentage."
+    elif view.unit == "ratio":
+        change += " A ratio divides the subject value by the baseline value; 1 means no change."
+    reading = [
+        ("Change", change),
+        (
+            "Interval",
+            "The bar shows uncertainty around that change. Its left endpoint is the lower bound; its right endpoint is the upper bound. The interval level does not tell you how often model runs would pass or fail the policy.",
+        ),
+    ]
+    if view.threshold is not None and view.threshold_direction in {
+        "minimum",
+        "maximum",
+    }:
+        reading.append(
+            (
+                "Policy rule",
+                "The paired lower bound (left endpoint) must be at least the policy minimum. The whole interval must lie on the allowed side of the threshold for this bound check to pass."
+                if view.threshold_direction == "minimum"
+                else "The upper bound (right endpoint) must be at most the policy maximum. The whole interval must lie on the allowed side of the threshold for this bound check to pass.",
+            )
+        )
+    if view.neutral is not None:
+        reading.append(
+            (
+                "No change",
+                "The dashed line marks no change. An interval crossing it includes changes in either direction. A worse observed score describes this run; policy rejection alone does not prove worse performance beyond these cases.",
+            )
+        )
+    return tuple(reading)
+
+
+def _interval_reading_html(view: IntervalView) -> str:
+    result = '<div class="interval-reading"><h4>How to read this comparison</h4><dl>'
+    result += "".join(
+        f"<dt>{escape(label)}</dt><dd>{escape(text)}</dd>"
+        for label, text in _interval_reading(view)
+    )
+    result += "</dl></div>"
+    if view.basis:
+        result += (
+            '<details class="interval-basis"><summary>How this interval was calculated</summary><div class="detail-content">'
+            + "".join(f"<p>{escape(text)}</p>" for text in view.basis)
+            + "</div></details>"
+        )
+    return result
 
 
 def _interval(view: IntervalView) -> str:
@@ -529,6 +582,7 @@ h1,h2,h3,h4,p{margin-top:0}h1{font-size:36px;line-height:1.15;letter-spacing:-.0
 .value{padding:12px;border-right:1px solid var(--line);min-width:0}.value:last-child{border:0}.value dt{font-size:13px;color:var(--muted)}.value dd{margin:4px 0 0;font-size:26px;font-weight:650;line-height:1.2;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .value small{display:block;margin-top:5px;font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--muted);letter-spacing:0}.interval{margin:22px 0}.interval svg{display:block;width:100%;height:auto}.interval figcaption{overflow-wrap:anywhere;font-size:13px;color:var(--muted);margin-top:8px}.axis{stroke:var(--line);stroke-width:2}.range{stroke:var(--range);stroke-width:7;stroke-linecap:round}.estimate{fill:var(--paper);stroke:var(--range);stroke-width:3}.threshold{stroke:var(--red);stroke-width:2}.neutral{stroke:var(--neutral);stroke-width:1.5;stroke-dasharray:3 4}.allowed{fill:var(--allowed)}.tick{stroke:var(--neutral);stroke-width:1.5}.legend{display:block;margin-top:4px}.chart-annotations{height:24px;position:relative;font-size:12px;font-variant-numeric:tabular-nums}.chart-label{position:absolute;max-width:72%;overflow-wrap:anywhere}.chart-label.middle{transform:translateX(-50%)}.chart-label.end{transform:translateX(-100%)}.limit-label{top:0;color:var(--red)}.interval-plot{position:relative}.interval-bounds{position:absolute;inset:0;pointer-events:none;font-size:12px;font-variant-numeric:tabular-nums}.bound-label{bottom:calc(47.222222% + 10px);line-height:1.2;font-weight:650}.chart-key{display:inline-block;margin-right:18px}.chart-key i,.legend i{display:inline-block;margin-right:7px;vertical-align:middle}.estimate-key{width:10px;height:10px;border:2px solid var(--range);border-radius:50%}.interval-key{width:16px;border-top:3px solid var(--range)}.neutral-key{width:16px;border-top:2px dashed var(--neutral)}.threshold-key{height:12px;border-left:2px solid var(--red)}.axis-labels{position:relative;height:22px;font-size:13px;font-variant-numeric:tabular-nums;color:var(--muted)}.axis-labels span{position:absolute;transform:translateX(-50%);white-space:nowrap}
 .scroll{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:14px;margin-top:16px}caption{text-align:left;font-weight:650;padding:0 0 8px}th{text-align:left;color:var(--muted);font-size:13px;font-weight:650}th,td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}th:first-child,td:first-child{padding-left:0}td:last-child,th:last-child{padding-right:0}tbody tr:last-child td,tbody tr:last-child th{border-bottom:0}
+.interval-reading{margin:18px 0;font-size:14px}.interval-reading h4{font-size:14px;margin:0 0 10px}.interval-reading dl{display:grid;grid-template-columns:100px minmax(0,1fr);gap:10px 16px;margin:0}.interval-reading dt{font-weight:650}.interval-reading dd{margin:0;color:var(--muted)}.interval-basis{margin:16px 0}.interval-basis p{font-size:14px;line-height:1.6}@media(max-width:600px){.interval-reading dl{grid-template-columns:1fr;gap:5px}.interval-reading dd+dt{margin-top:8px}}
 .check-label{display:none}.context-heading{font-size:14px;margin:14px 0 8px}.checks-table td{white-space:normal;overflow-wrap:anywhere}.checks-table td:last-child{white-space:nowrap;overflow-wrap:normal}.checks-table th[scope="row"]{width:48%}.check-detail{display:block;font-size:13px;font-weight:400;margin-top:4px;color:var(--muted)}.check-fail{color:var(--red);font-weight:650}.check-pass{color:var(--teal)}.check-unknown{color:var(--amber)}.notes{font-size:13px;color:var(--muted);padding-left:20px;margin-bottom:0}.notes li+li{margin-top:6px}
 .columns{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:24px}.panel dl{margin:0}.panel dt{font-size:13px;font-weight:650;margin-top:10px}.panel dt:first-child{margin-top:0}.panel dd{margin:3px 0 0;color:var(--muted);font-size:14px;overflow-wrap:anywhere}.panel ol,.panel ul{padding-left:20px;font-size:14px;margin:0}.panel li+li{margin-top:8px}
 .limits{color:var(--muted);font-size:14px;margin:24px 0}.limits h2{font-size:18px;margin-bottom:8px}.limits li+li{margin-top:6px}
@@ -894,6 +948,7 @@ def render_html(view: ReportView) -> str:
             parts.append("</dl>")
             if metric.interval:
                 parts.append(_interval(metric.interval))
+                parts.append(_interval_reading_html(metric.interval))
             parts.append(
                 '<div class="scroll" tabindex="0" role="region" aria-label="Decision checks"><table class="checks-table"><caption>Decision checks</caption><thead><tr><th scope="col">Check</th><th scope="col">Observed</th><th scope="col">Required</th><th scope="col">Result</th></tr></thead><tbody>'
             )
@@ -1046,10 +1101,20 @@ def render_markdown(view: ReportView, *, include_details: bool = False) -> str:
         if metric.interval:
             i = metric.interval
             lines += [
-                f"{clean(i.label)}: [{number(i.lower)}, {number(i.upper)}] {clean(i.unit)}.",
+                f"{clean(_interval_label(i))}: [{number(i.lower)}, {number(i.upper)}] {clean(i.unit)}.",
+                "",
+                "### How to read this comparison",
                 "",
             ]
+            for label, explanation in _interval_reading(i):
+                lines += [f"**{clean(label)}:** {clean(explanation)}", ""]
+            if i.basis:
+                lines += ["### How this interval was calculated", ""]
+                for paragraph in i.basis:
+                    lines += [clean(paragraph), ""]
         lines += [
+            "### Decision checks",
+            "",
             "| Check | Observed | Required | Result |",
             "| --- | --- | --- | --- |",
         ]

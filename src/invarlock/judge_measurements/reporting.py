@@ -323,6 +323,10 @@ def _view(
             + "."
         )
     checks = _policy_checks(analysis, policy)
+    with localcontext(Context(prec=100)):
+        confidence = (
+            format((1 - Decimal(policy["alpha"])) * 100, "f").rstrip("0").rstrip(".")
+        )
     # Floats are display geometry only. Decision arithmetic and exact strings are retained.
     interval = None
     if effect is not None:
@@ -340,14 +344,17 @@ def _view(
             if policy["direction"] == "higher"
             else "maximum",
             neutral=0.0,
+            method="Two-sided Hoeffding bound",
+            basis=(
+                f"The complete schedule contains {counts['scheduled_cases']:,} cases grouped into {counts['complete_units']:,} independent units, with {counts['repetitions']:,} ratings per side for each case. Repeated ratings are averaged within each case, then cases within each unit; units receive equal weight.",
+                "Two-sided Hoeffding bounds use the declared score range and the number of independent units. Repetitions and cases within a unit do not add independent units. The paired effect is subject minus baseline in normalized rubric score points, not accuracy percentage points.",
+                f"The declared family error budget is alpha {policy['alpha']}, shared across {policy['comparison_family_size']} interval claims. Each interval receives alpha / family size ({policy['alpha']} / {policy['comparison_family_size']}); family confidence is at least {confidence}% under the declared independence and bounded-score assumptions.",
+                "This concerns expected judge scores on the fixed benchmark. It does not establish representative production performance or the correctness of the judge's ratings.",
+            ),
         )
     baseline_mean = (
         _baseline_mean(plan, artifacts["measurements"]) if subject is not None else None
     )
-    with localcontext(Context(prec=100)):
-        confidence = (
-            format((1 - Decimal(policy["alpha"])) * 100, "f").rstrip("0").rstrip(".")
-        )
     metric = MetricView(
         name=policy["metric_name"],
         scope="Fixed benchmark; equal independent-unit weights"
