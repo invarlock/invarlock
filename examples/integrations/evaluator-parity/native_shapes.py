@@ -117,7 +117,11 @@ def payload(
         elif evaluator == "lighteval":
             native = {
                 **common,
-                "doc": {"query": prompt, "choices": [expected], "gold_index": 0},
+                "doc": {
+                    "query": prompt,
+                    "choices": [] if expected is None else [expected],
+                    "gold_index": 0,
+                },
                 "model_response": {"text": [output]},
                 "metric_result": {"exact_match": score},
             }

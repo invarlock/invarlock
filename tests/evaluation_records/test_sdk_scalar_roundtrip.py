@@ -64,7 +64,7 @@ def test_actual_scalar_sdk_retains_answers_likelihood_and_failures(
 ):
     _require_sdk_offline(evaluator, monkeypatch)
     entries = []
-    for kind in ("answer", "likelihood", "failure", "ungraded"):
+    for kind in ("answer", "likelihood", "failure", "ungraded", "reference-free"):
         entry = native_entry(evaluator)
         entry["id"] = kind
         entry["metadata"]["invarlock_scores"] = {"quality": 0.875}
@@ -82,6 +82,21 @@ def test_actual_scalar_sdk_retains_answers_likelihood_and_failures(
             entry["error"] = "Original generation failed"
         elif kind == "ungraded":
             del entry["metric_result"]
+        elif kind == "reference-free":
+            del entry["metric_result"]
+            if evaluator == "lighteval":
+                entry["doc"].update(choices=[], gold_index=0)
+            else:
+                parent, field = {
+                    "deepeval": ("test_case", "expected_output"),
+                    "ragas": ("sample", "reference"),
+                    "hugging-face-evaluate": (None, "references"),
+                    "autoevals": (None, "expected"),
+                    "openevals": (None, "reference_outputs"),
+                    "arize-phoenix-evals": ("record", "expected"),
+                    "opik": ("dataset_item", "reference"),
+                }[evaluator]
+                del (entry[parent] if parent else entry)[field]
         entries.append(entry)
     untouched = copy.deepcopy(entries)
     result = roundtrip(evaluator, entries, tmp_path=tmp_path)
@@ -92,12 +107,15 @@ def test_actual_scalar_sdk_retains_answers_likelihood_and_failures(
         "likelihood",
         "failure",
         "ungraded",
+        "reference-free",
     ]
-    assert [row["output"] for row in rows] == ["Answer", None, None, "Answer"]
+    assert [row["output"] for row in rows] == ["Answer", None, None, "Answer", "Answer"]
     assert rows[1]["likelihood"] == entries[1]["metadata"]["invarlock_likelihood"]
     assert rows[1]["error"] is None
     assert rows[2]["error"] == "Original generation failed"
     assert "metric_result" not in result[3]
+    assert "metric_result" not in result[4]
+    assert rows[4]["expected"] is None
     assert export_records(evaluator, result) == rows
 
 

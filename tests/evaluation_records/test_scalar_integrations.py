@@ -166,6 +166,15 @@ def test_lighteval_invalid_gold_indices(indices):
         export_records("lighteval", [entry])
 
 
+@pytest.mark.parametrize("indices", [None, False, True, -1, 1, 0.0, "0", [], [0]])
+def test_lighteval_reference_free_profile_rejects_malformed_gold_indices(indices):
+    entry = native_entry("lighteval")
+    entry["doc"].update(choices=[], gold_index=indices)
+    del entry["metric_result"]
+    with pytest.raises(EvaluationRecordsError, match="gold_index"):
+        export_records("lighteval", [entry])
+
+
 def test_lighteval_multiple_golds_and_raw_text_preserved():
     entry = native_entry("lighteval")
     entry["doc"]["gold_index"] = [0, 1]
@@ -285,6 +294,22 @@ def test_pinned_sdk_objects(evaluator, monkeypatch, tmp_path):
         entry["metric_result"] = ExactMatches().compute(
             doc=entry["doc"], model_response=entry["model_response"]
         )
+        # The real SDK documents empty choices for unreferenced generation;
+        # capturing it requires neither an invented gold answer nor a metric.
+        reference_free = {
+            "id": "generation-only",
+            "doc": Doc(query="Write a greeting", choices=[], gold_index=0),
+            "model_response": ModelResponse(text=["Hello"]),
+        }
+        generated = export_records(evaluator, [reference_free])[0]
+        assert generated["input"] == "Write a greeting"
+        assert generated["output"] == "Hello"
+        assert generated["expected"] is None and generated["scores"] == {}
+        retained = generated["context"]["upstream_record"]
+        assert retained["doc"]["choices"] == []
+        assert type(retained["doc"]["gold_index"]) is int
+        assert retained["doc"]["gold_index"] == 0
+        assert export_records(evaluator, [retained]) == [generated]
     elif evaluator == "autoevals":
         from autoevals import ExactMatch
 
@@ -409,13 +434,12 @@ def test_capture_without_upstream_grading(evaluator):
     assert export_records(evaluator, serialize_results(evaluator, [entry])) == [row]
 
 
-@pytest.mark.parametrize(
-    "evaluator", [name for name in EVALUATORS if name != "lighteval"]
-)
-def test_reference_free_judge_capture(evaluator):
-    from invarlock.evaluator_capture import (
-        capture_evaluator_run,
+@pytest.mark.parametrize("evaluator", EVALUATORS)
+def test_reference_free_judge_capture(evaluator, tmp_path):
+    from invarlock.engine import (
         evaluator_input_capabilities,
+        export_evaluator_result,
+        load_run,
     )
 
     entry = native_entry(evaluator)
@@ -428,14 +452,22 @@ def test_reference_free_judge_capture(evaluator):
         "arize-phoenix-evals": ("record", "expected"),
         "opik": ("dataset_item", "reference"),
     }
-    container, field = paths[evaluator]
-    del (entry[container] if container else entry)[field]
+    if evaluator == "lighteval":
+        entry["doc"].update(choices=[], gold_index=0)
+    else:
+        container, field = paths[evaluator]
+        del (entry[container] if container else entry)[field]
     del entry["metric_result"]
     records = export_records(evaluator, [entry])
     assert records[0]["expected"] is None
-    run = capture_evaluator_run(
-        records,
-        source={"name": evaluator, "version": "test"},
+    native_path, envelope_path = tmp_path / "native.json", tmp_path / "export.json"
+    native_path.write_text(json.dumps([entry], allow_nan=False))
+    run = export_evaluator_result(
+        evaluator,
+        [entry],
+        envelope_path,
+        expected_ids=[entry["id"]],
+        source_version="test",
         run_id="reference-free",
         artifact_digest="sha256:" + "a" * 64,
     )
@@ -443,6 +475,20 @@ def test_reference_free_judge_capture(evaluator):
     assert capabilities["judge"]["usable_count"] == 1
     assert capabilities["exact_match"]["usable_count"] == 0
     assert capabilities["normalized_nll_per_utf8_byte"]["usable_count"] == 0
+    for adapter, path in (
+        ("evaluator-native-json", native_path),
+        ("evaluator-json", envelope_path),
+    ):
+        imported = load_run(
+            path,
+            adapter=adapter,
+            source={"name": evaluator, "version": "test"},
+            run_id="reference-free",
+            artifact_digest="sha256:" + "a" * 64,
+        )
+        assert imported["records"] == run["records"]
+        assert evaluator_input_capabilities(imported) == capabilities
+        assert imported["records"][0]["metadata"] == {"slice": "baseline"}
 
 
 @pytest.mark.parametrize("evaluator", EVALUATORS)

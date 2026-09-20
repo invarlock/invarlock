@@ -21,8 +21,9 @@ entry has a caller-owned stable ``id`` and the following source-specific fields:
 ``metric_result`` is optional in every wrapper: capture original case facts
 without running an upstream metric when InvarLock will score them. Supplied
 metrics retain their native shape and are validated. Reference fields may be
-omitted for reference-free judge tasks; LightEval retains its explicit choices
-and gold-index profile. Missing references make exact-match/NLL facts unavailable.
+omitted for reference-free judge tasks; LightEval's generative profile uses
+``choices=[]`` and the unused integer ``gold_index=0``. Missing references make
+exact-match/NLL facts unavailable.
 JSON outputs remain structured; text-only scorer capability is checked centrally.
 
 SDK data objects or dictionaries using the same Python field names are accepted.
@@ -253,6 +254,14 @@ def _extract(evaluator: str, entry: dict[str, Any]) -> tuple[Any, Any, Any]:
     if evaluator == "lighteval":
         doc, response = entry["doc"], entry["model_response"]
         choices, indices = _required(doc, "choices"), _required(doc, "gold_index")
+        # LightEval 0.13.0 documents this exact Doc shape for generative tasks.
+        # Zero is an unused placeholder here, not an index into an answer list.
+        if choices == [] and type(indices) is int and indices == 0:
+            return (
+                _required(doc, "query"),
+                None,
+                _one(_required(response, "text"), "LightEval ModelResponse.text"),
+            )
         indices = indices if isinstance(indices, list) else [indices]
         if (
             not isinstance(choices, list)
