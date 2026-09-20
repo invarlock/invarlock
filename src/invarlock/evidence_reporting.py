@@ -1117,7 +1117,7 @@ def _native_report_context(
     changes = (
         "Baseline and candidate have the same authenticated artifact digest."
         if baseline == subject
-        else "Baseline and candidate have different authenticated artifact digests; the evidence does not identify a transformation procedure.",
+        else "Baseline and candidate have different authenticated artifact digests. These digests alone do not establish how the candidate was produced.",
     )
     return tuple(context), changes
 
