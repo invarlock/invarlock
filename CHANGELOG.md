@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   complete case checks, attributed numeric metrics, metadata slices and a shared
   offline preflight, scoring, verification and reporting path, tested with actual
   SDK exports through separately installed recipients.
+  Exercise complete retained Luna judge studies through the installed workflow,
+  preserving both passing and insufficient-evidence outcomes and rejecting
+  altered measurements.
 
 - Retain signed Docker and Podman CUDA execution references for native scorers,
   TensorRT-LLM and vision-text, with compact offline replay and frozen provenance.

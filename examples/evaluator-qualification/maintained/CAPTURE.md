@@ -415,6 +415,14 @@ objects and local evaluator calls to check the capture interface. Neither kind
 of test is a new model-quality campaign or a replacement for the historical
 qualification matrix.
 
+The installed gate separately re-evaluates complete real Luna grounded-QA
+measurements: the 422-case held-out study passes and the 40-case corrected pilot
+remains insufficient evidence. Both use the unchanged original runs, plan,
+policy and ratings through preflight, signed evaluation, independent verification
+and reporting, with changed-measurement rejection. These authentic journeys
+complement the adapter fixtures; old measurements cannot be rebound to newly
+exported run identities. See the [real judge journey](../../integrations/evaluator-parity/README.md).
+
 The [Mistral 7B likelihood reference](../../captured-results/references/mistral-7b-likelihood/README.md)
 retains actual baseline-to-Instruct measurements for 400 paired narrative
 continuations and a signed captured handoff. The earlier

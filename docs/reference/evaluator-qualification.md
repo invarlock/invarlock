@@ -75,6 +75,15 @@ source bindings into each native shape to test the shared interface; they do
 not claim new SDK likelihood measurements. Their synthetic complete judge calls
 exercise recipe and replay contracts, not a newly measured judge campaign.
 
+The installed gate also evaluates unchanged real Luna measurements from the
+grounded-QA held-out study (422 cases, 2,532 ratings, pass) and corrected pilot
+(40 cases, 240 ratings, insufficient evidence). Both complete preflight,
+signed evaluation, independent verification, reporting and measurement-tamper
+rejection. Their original canonical runs and policies remain bound to the
+ratings. These separate journeys establish real retained-judge execution;
+they do not relabel old calls as new evaluator-specific measurements. See the
+[runnable real judge journey](https://github.com/invarlock/invarlock/blob/main/examples/integrations/evaluator-parity/README.md).
+
 ## Three independent status axes
 
 The repository does not assign one cumulative “integration level.” Support,

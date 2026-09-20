@@ -22,7 +22,38 @@ The three scorer journeys have different evidence sources:
 | Normalized NLL | Original 400-case retained Mistral 7B continuation measurements and policy; regression |
 | Bounded judge | Explicitly synthetic two-case answers and complete constructed measurement records; pass |
 
-The real input origins and file hashes come from the
+The gate also runs two complete real judge studies through the installed
+recipient, using their original canonical inputs and unchanged Luna ratings:
+
+| Retained grounded-QA study | Cases | Real ratings | Expected outcome |
+| --- | ---: | ---: | --- |
+| [Held-out study](../../judge-measurements/references/k2-32b-luna-xhigh-heldout/README.md) | 422 | 2,532 | Pass |
+| [Corrected pilot](../../judge-measurements/references/k2-32b-luna-xhigh-pilot/README.md) | 40 | 240 | Insufficient evidence |
+
+These journeys authenticate the pinned archives, reconstruct the exact original
+plan and policy, then run preflight, signed evaluation, independent verification
+and reporting. Changed measurements must be rejected. They make no new model or
+judge calls. The pilot's inconclusive result remains unchanged.
+
+To retain these real journeys locally:
+
+```bash
+python examples/integrations/evaluator-parity/real_judge.py \
+  --recipient-python /path/to/recipient/bin/python \
+  --output /path/to/new-real-judge-output
+```
+
+The output includes local demonstration signing keys; share selected public
+reports and evidence rather than the entire directory. `--reference heldout`
+or `--reference pilot` selects one study; the default runs both.
+
+Real ratings bind the original runs and plan. An evaluator-specific re-export
+changes those identities, even when the answer text stays identical. The adapter
+matrix therefore retains synthetic judge fixtures for those new bindings. The
+real journeys prove the complete retained-measurement judge workflow, without
+claiming fresh judge collection through all 19 evaluators.
+
+The exact-match and NLL input origins and file hashes come from the
 [retained Langfuse reference](../../captured-results/references/langfuse/README.md).
 Their original policies and outcomes remain unchanged. Each profile preserves
 record IDs, prompts, references, outputs, slice tags and numerical likelihood
