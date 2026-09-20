@@ -313,6 +313,8 @@ def test_real_collection_is_disjoint_and_preserves_marker_exceptions(
         "tests/compatibility/test_retained.py": "def test_retained(): pass\n",
         "tests/judge_measurements/test_collector.py": "def test_collector(): pass\n",
         "tests/examples/test_duplicate.py": "def test_example(): pass\n",
+        "tests/integration/test_evaluator_parity.py": "def test_parity(): pass\n",
+        "tests/evaluation_records/test_sdk_capture.py": "def test_sdk(): pass\n",
         support: "import pytest\n@pytest.mark.integration\ndef test_container(): pass\n",
         "tests/runtime/test_duplicate.py": "def test_runtime(): pass\n",
     }
@@ -346,7 +348,10 @@ def test_real_collection_is_disjoint_and_preserves_marker_exceptions(
         )
         inventories.append(set(json.loads(path.read_text())))
     union = set().union(*inventories)
-    assert sum(map(len, inventories)) == len(union) == 6
+    assert sum(map(len, inventories)) == len(union) == 8
+    examples = inventories[runner.SHARDS.index("examples")]
+    assert "tests/integration/test_evaluator_parity.py::test_parity" in examples
+    assert "tests/evaluation_records/test_sdk_capture.py::test_sdk" in examples
     assert (
         "tests/judge_measurements/test_collector.py::test_collector"
         in inventories[runner.SHARDS.index("core")]
@@ -395,6 +400,7 @@ def test_shared_config_traces_child_processes_with_relative_paths(tmp_path):
 def test_run_collects_real_xdist_inventory_and_coverage(tmp_path, monkeypatch):
     pytest.importorskip("pytest_cov")
     pytest.importorskip("xdist")
+    monkeypatch.setattr(runner, "EXAMPLE_TESTS", ("tests/examples",))
     project = tmp_path / "project"
     tests = project / "tests/examples"
     tests.mkdir(parents=True)

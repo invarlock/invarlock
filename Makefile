@@ -270,7 +270,7 @@ coverage-release-report:  ## Enforce retained release coverage measurements
 coverage-examples:  ## Enforce branch-aware coverage for example launchers
 	COVERAGE_FILE=$(COVERAGE_EXAMPLES_FILE) $(PYTHON) -m coverage erase
 	COVERAGE_FILE=$(COVERAGE_EXAMPLES_FILE) PYTHONPATH=src:. $(PYTEST) $(PYTEST_WORKER_ARGS) -q \
-		tests/examples \
+		tests/examples tests/integration/test_evaluator_parity.py tests/evaluation_records/test_sdk_capture.py \
 		--cov=examples \
 		--cov-config=scripts/examples.coveragerc \
 		--cov-branch \
@@ -713,6 +713,13 @@ inspect-judge-sdk-test: dist-check  ## Resolve the optional judge SDK extra and 
 .PHONY: langfuse-sdk-test
 langfuse-sdk-test: dist-check  ## Qualify real Langfuse exports and SDK-free installed recipients
 	PYTHON=$(PYTHON) bash scripts/langfuse_sdk_gate.sh
+
+.PHONY: evaluator-parity-test evaluator-sdk-test
+evaluator-parity-test: dist-check  ## Replay all 19 dedicated profiles through an installed core recipient
+	PYTHON=$(PYTHON) bash scripts/evaluator_parity_gate.sh
+
+evaluator-sdk-test:  ## Exercise one installed evaluator SDK without model or service calls
+	bash scripts/evaluator_sdk_gate.sh "$(EVALUATOR)"
 
 install-smoke: dist-check  ## Install and discover the wheel outside the source checkout
 	@test -f $(RELEASE_INSTALL_RELEASE_LOCK) || { echo "No release lock for $(PYTHON); expected $(RELEASE_INSTALL_RELEASE_LOCK)" >&2; exit 2; }
