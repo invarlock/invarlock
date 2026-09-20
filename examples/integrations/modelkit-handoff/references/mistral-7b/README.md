@@ -171,6 +171,6 @@ rerun, and the failed policy remained unchanged.
 Execution used source `59d9bbc048d1fe10083e912b32912445cb7bb974` and the exact
 wheel recorded in provenance; its `0.16.1` filename does not identify the
 published release wheel. The HTML report was rendered later from the same
-signed pack using source `455f6ff48f33c577f08ac4327d68ae82a6976240`. This is an
+signed pack using source `7d52f3d076c15898dfd7489d9928d29c8997139e`. This is an
 execution and handoff reference for those declared artifacts, not a broad
 quantization-quality, production-workload or release qualification.

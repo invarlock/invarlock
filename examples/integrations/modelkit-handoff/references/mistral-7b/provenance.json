@@ -341,10 +341,10 @@
   },
   "render": {
     "evidence_unchanged": true,
-    "html_sha256": "769dfa31e75216de0442f3d7d782689de994f856ba7631a8f87d4baae54bff65",
-    "markdown_sha256": "bef074feb41e17861f363f4bbb3859332c178287e44f98537fe73c0455fa758c",
+    "html_sha256": "703b4f55821ae2cca5aa82ca4b979460e3aa2a9e50b93b0b7383a149f99a820e",
+    "markdown_sha256": "798238f57d5d8694c7c5e0cc5c145dd5af5578d95ba558ee1a33cf27dd74cbb2",
     "render_environment": "source checkout",
-    "renderer_source": "455f6ff48f33c577f08ac4327d68ae82a6976240"
+    "renderer_source": "7d52f3d076c15898dfd7489d9928d29c8997139e"
   },
   "result": {
     "baseline": {

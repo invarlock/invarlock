@@ -48,7 +48,7 @@ Matching previews do not establish equality of the complete retained fields.
 
 ## Exact-match accuracy: All paired records
 
-**Policy not met**. Checks not met: Paired lower bound.
+**Policy not met**. The observed loss was within the allowance, but a loss greater than 2 percentage points could not be ruled out.
 
 | Baseline | Subject | Change | Observed pairs |
 | --- | --- | --- | --- |
