@@ -192,7 +192,7 @@ def test_evaluator_parity_gate_replays_every_retained_campaign() -> None:
     gate = (REPO_ROOT / "scripts/evaluator_parity_gate.sh").read_text()
     assert "tests/integration/test_evaluator_parity.py" in gate
     assert "test_installed_sdk_free_recipient_signed_journey" in gate
-    assert 'INVARLOCK_REPLAY_RETAINED_CAMPAIGNS:-1' in gate
+    assert "INVARLOCK_REPLAY_RETAINED_CAMPAIGNS:-1" in gate
     assert 'if [[ "${PARITY_RETAINED}" = "0" ]]' in gate
     assert "mistral-7b-sentinel" in gate
     assert "priority-workflows" in gate
