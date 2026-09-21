@@ -214,13 +214,18 @@ def test_release_requires_sdk_tests_in_its_measured_interpreter():
         assert f"python -m pip install --require-hashes -r {lock}" in install["run"]
     assert install["run"].strip().endswith("python -m pip check")
 
-    for name in ("Run complete repository gates", "Enforce release coverage"):
-        step = next(item for item in steps if item.get("name") == name)
-        assert steps.index(install) < steps.index(step)
-        assert step["env"] == {
-            "INVARLOCK_REQUIRE_INSPECT_SDK": "1",
-            "INVARLOCK_REQUIRE_LANGFUSE_SDK": "1",
-        }
+    verify = next(
+        item for item in steps if item.get("name") == "Run complete repository gates"
+    )
+    coverage = next(
+        item for item in steps if item.get("name") == "Enforce release coverage"
+    )
+    assert steps.index(verify) < steps.index(install) < steps.index(coverage)
+    assert "env" not in verify
+    assert coverage["env"] == {
+        "INVARLOCK_REQUIRE_INSPECT_SDK": "1",
+        "INVARLOCK_REQUIRE_LANGFUSE_SDK": "1",
+    }
 
 
 def test_release_replays_installed_evaluator_campaigns_from_frozen_wheel():
