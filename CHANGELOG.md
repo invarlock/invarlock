@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.2] - 2026-09-20
+
 ### Added
 
 - Allow Python judge collectors to stop after completed, durably retained batches
@@ -71,6 +73,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Share report destination validation and publication bookkeeping across evidence
   families, while rendering only requested outputs and preserving their contracts.
 - Use one authenticated release publication path for the core artifact pair.
+- Render HTML reports with one consistent light palette across browser and
+  operating-system color preferences, including printed output.
 
 ### Removed
 
