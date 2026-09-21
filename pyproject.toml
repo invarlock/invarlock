@@ -127,6 +127,7 @@ hf = [
 ]
 runtime-test = [
   { include-group = "hf" },
+  "pillow>=11.3,<13",
   "peft==0.20.0",
   "torchao==0.18.0",
 ]

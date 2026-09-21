@@ -1605,6 +1605,7 @@ release = [
 runtime-test = [
     { name = "accelerate" },
     { name = "peft" },
+    { name = "pillow" },
     { name = "protobuf" },
     { name = "safetensors" },
     { name = "sentencepiece" },
@@ -1745,6 +1746,7 @@ release = [
 runtime-test = [
     { name = "accelerate", specifier = "==1.14.0+invarlock.1" },
     { name = "peft", specifier = "==0.20.0" },
+    { name = "pillow", specifier = ">=11.3,<13" },
     { name = "protobuf", specifier = ">=4.25" },
     { name = "safetensors", specifier = ">=0.8.0" },
     { name = "sentencepiece", specifier = ">=0.2.2" },

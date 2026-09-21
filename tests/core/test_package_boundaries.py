@@ -172,6 +172,7 @@ def test_public_extras_do_not_resolve_an_unqualified_model_runtime() -> None:
 
     groups = metadata["dependency-groups"]
     assert "accelerate==1.14.0+invarlock.1" in groups["hf"]
+    assert "pillow>=11.3,<13" in groups["runtime-test"]
     for name in ("runtime-test", "example-peft", "example-torchao"):
         assert {"include-group": "hf"} in groups[name]
     assert metadata["tool"]["uv"]["find-links"] == ["runtime/wheels"]
