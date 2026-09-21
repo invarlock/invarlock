@@ -146,7 +146,7 @@ def _timings(operation: Callable[[int], None], *, runs: int) -> list[float]:
 
 
 def measure_transaction(
-    transaction_root: Path, *, runs: int, temporary_root: Path
+    transaction_root: Path, *, runs: int, temporary_root: Path | None = None
 ) -> dict[str, object]:
     """Measure one retained transaction after a successful warmup."""
 
@@ -174,8 +174,13 @@ def measure_transaction(
         serialization.PrivateFormat.PKCS8,
         serialization.NoEncryption(),
     )
+    scratch_root = (
+        Path(tempfile.gettempdir()).resolve()
+        if temporary_root is None
+        else temporary_root
+    )
     with tempfile.TemporaryDirectory(
-        prefix=f".invarlock-{profile_id}-", dir=temporary_root
+        prefix=f".invarlock-{profile_id}-", dir=scratch_root
     ) as raw_directory:
         rendered = Path(raw_directory)
         verification_ms = _timings(
@@ -222,7 +227,6 @@ def measure_all(*, root: Path, runs: int) -> dict[str, object]:
         measure_transaction(
             transaction_parent / transaction_id,
             runs=runs,
-            temporary_root=root,
         )
         for transaction_id in TRANSACTION_IDS
     ]
