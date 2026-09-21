@@ -43,7 +43,7 @@
       "anyOf": [
         {
           "type": "string",
-          "pattern": "^sha256:[0-9a-f]{64}$",
+          "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])",
           "minLength": 71,
           "maxLength": 71
         },
@@ -56,7 +56,7 @@
       "anyOf": [
         {
           "type": "string",
-          "pattern": "^sha256:[0-9a-f]{64}$",
+          "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])",
           "minLength": 71,
           "maxLength": 71
         },
@@ -73,19 +73,19 @@
           "properties": {
             "baseline_run_sha256": {
               "type": "string",
-              "pattern": "^sha256:[0-9a-f]{64}$",
+              "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])",
               "minLength": 71,
               "maxLength": 71
             },
             "subject_run_sha256": {
               "type": "string",
-              "pattern": "^sha256:[0-9a-f]{64}$",
+              "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])",
               "minLength": 71,
               "maxLength": 71
             },
             "case_set_sha256": {
               "type": "string",
-              "pattern": "^sha256:[0-9a-f]{64}$",
+              "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])",
               "minLength": 71,
               "maxLength": 71
             },
@@ -93,7 +93,7 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "pattern": "^sha256:[0-9a-f]{64}$",
+                  "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])",
                   "minLength": 71,
                   "maxLength": 71
                 },
@@ -104,7 +104,7 @@
             },
             "subject_service_identity_sha256": {
               "type": "string",
-              "pattern": "^sha256:[0-9a-f]{64}$",
+              "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])",
               "minLength": 71,
               "maxLength": 71
             }
@@ -133,7 +133,7 @@
                 "properties": {
                   "subject_artifact_sha256": {
                     "type": "string",
-                    "pattern": "^sha256:[0-9a-f]{64}$",
+                    "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])",
                     "minLength": 71,
                     "maxLength": 71
                   }
@@ -185,7 +185,7 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "pattern": "^sha256:[0-9a-f]{64}$",
+                  "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])",
                   "minLength": 71,
                   "maxLength": 71
                 },
@@ -198,7 +198,7 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "pattern": "^sha256:[0-9a-f]{64}$",
+                  "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])",
                   "minLength": 71,
                   "maxLength": 71
                 },
@@ -272,7 +272,7 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "pattern": "^sha256:[0-9a-f]{64}$",
+                  "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])",
                   "minLength": 71,
                   "maxLength": 71
                 },
@@ -285,7 +285,7 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "pattern": "^sha256:[0-9a-f]{64}$",
+                  "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])",
                   "minLength": 71,
                   "maxLength": 71
                 },

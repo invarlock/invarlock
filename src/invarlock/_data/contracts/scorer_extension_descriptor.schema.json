@@ -29,11 +29,11 @@
     "scorer_abi": {"const": "1"},
     "scorer_id": {
       "type": "string",
-      "pattern": "^[a-z][a-z0-9_]{0,63}(\\.[a-z][a-z0-9_]{0,63})+$"
+      "pattern": "^[a-z][a-z0-9_]{0,63}(\\.[a-z][a-z0-9_]{0,63})+(?![\\s\\S])"
     },
     "scorer_version": {
       "type": "string",
-      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?![\\s\\S])"
     },
     "supported_tasks": {
       "type": "array",
@@ -41,7 +41,7 @@
       "uniqueItems": true,
       "items": {
         "type": "string",
-        "pattern": "^[a-z][a-z0-9_]{0,63}$"
+        "pattern": "^[a-z][a-z0-9_]{0,63}(?![\\s\\S])"
       }
     },
     "supported_input_kinds": {
@@ -56,7 +56,7 @@
       "uniqueItems": true,
       "items": {
         "type": "string",
-        "pattern": "^[a-z][a-z0-9_]{0,63}$"
+        "pattern": "^[a-z][a-z0-9_]{0,63}(?![\\s\\S])"
       }
     },
     "required_facts": {
@@ -75,7 +75,7 @@
     },
     "configuration_schema_sha256": {
       "type": "string",
-      "pattern": "^[a-f0-9]{64}$"
+      "pattern": "^[a-f0-9]{64}(?![\\s\\S])"
     },
     "replay_mode": {"const": "authenticated_record_facts"},
     "record_value_semantics": {"const": "unit_interval_score"},

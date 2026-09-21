@@ -29,17 +29,17 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 4096,
-      "pattern": "^(?!/)(?!~)(?![A-Za-z]:)(?!.*://)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*(?:^|/)\\.(?:/|$))(?!.*//)(?!\\s)(?!.*\\s$)(?!.*\\/$)[^\\u0000-\\u001f]+$"
+      "pattern": "^(?!/)(?!~)(?![A-Za-z]:)(?!.*://)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*(?:^|/)\\.(?:/|$))(?!.*//)(?!\\s)(?!.*\\s$)(?!.*\\/$)[^\\u0000-\\u001f]+(?![\\s\\S])"
     },
     "text": {
       "type": "string",
       "minLength": 1,
       "maxLength": 4096,
-      "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+      "pattern": "^[^\\u0000-\\u001f\\u007f]+(?![\\s\\S])"
     },
     "digest": {
       "type": "string",
-      "pattern": "^sha256:[a-f0-9]{64}$"
+      "pattern": "^sha256:[a-f0-9]{64}(?![\\s\\S])"
     },
     "source": {
       "type": "object",
@@ -118,7 +118,9 @@
             "inspect-json",
             "lm-eval-samples",
             "promptfoo-jsonl",
-            "langfuse-json"
+            "langfuse-json",
+            "evaluator-json",
+            "evaluator-native-json"
           ]
         },
         "source": {
@@ -131,7 +133,7 @@
           "anyOf": [
             {
               "type": "string",
-              "pattern": "^sha256:[a-f0-9]{64}$"
+              "pattern": "^sha256:[a-f0-9]{64}(?![\\s\\S])"
             },
             {
               "type": "null"
@@ -315,7 +317,7 @@
             "properties": {
               "artifact_digest": {
                 "type": "string",
-                "pattern": "^sha256:[a-f0-9]{64}$"
+                "pattern": "^sha256:[a-f0-9]{64}(?![\\s\\S])"
               }
             }
           }

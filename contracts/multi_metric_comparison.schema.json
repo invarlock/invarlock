@@ -20,15 +20,15 @@
       "properties": {
         "baseline": {
           "type": "string",
-          "pattern": "^sha256:[a-f0-9]{64}$"
+          "pattern": "^sha256:[a-f0-9]{64}(?![\\s\\S])"
         },
         "subject": {
           "type": "string",
-          "pattern": "^sha256:[a-f0-9]{64}$"
+          "pattern": "^sha256:[a-f0-9]{64}(?![\\s\\S])"
         },
         "policy": {
           "type": "string",
-          "pattern": "^sha256:[a-f0-9]{64}$"
+          "pattern": "^sha256:[a-f0-9]{64}(?![\\s\\S])"
         }
       },
       "required": [
@@ -47,25 +47,25 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 128,
-            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+            "pattern": "^[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
           },
           "slice": {
             "type": "string",
             "minLength": 1,
             "maxLength": 128,
-            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+            "pattern": "^[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
           },
           "kind": {
             "type": "string",
             "minLength": 1,
             "maxLength": 128,
-            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+            "pattern": "^[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
           },
           "unit": {
             "type": "string",
             "minLength": 1,
             "maxLength": 128,
-            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+            "pattern": "^[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
           },
           "direction": {
             "enum": [
@@ -92,7 +92,7 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 128,
-              "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+              "pattern": "^[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
             }
           },
           "baseline_mean": {
@@ -129,7 +129,7 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 128,
-                    "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                    "pattern": "^[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
                   },
                   "mass": {
                     "type": "number"

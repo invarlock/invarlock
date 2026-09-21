@@ -1,0 +1,69 @@
+{
+  "format": "invarlock/evaluator-live-reference-catalog-v1",
+  "evaluators": [
+    "arize-phoenix-evals",
+    "autoevals",
+    "azure-ai-evaluation",
+    "deepeval",
+    "evidently",
+    "garak",
+    "hugging-face-evaluate",
+    "inspect-ai",
+    "langfuse",
+    "lighteval",
+    "lm-evaluation-harness",
+    "mlflow",
+    "openai-evals",
+    "openevals",
+    "opik",
+    "promptfoo",
+    "pydantic-evals",
+    "ragas",
+    "trulens"
+  ],
+  "roles": [
+    "baseline",
+    "subject"
+  ],
+  "cases_per_evaluator_role": 8,
+  "import_routes": [
+    "envelope",
+    "native-json"
+  ],
+  "scorers": [
+    "exact_match",
+    "normalized_nll"
+  ],
+  "signed_packs": 76,
+  "expected": {
+    "integrity_ok": true,
+    "replay_status": "completed",
+    "decision": "regression",
+    "policy_verdict": "fail",
+    "verification_status": 7
+  },
+  "scope": "Eight-case integration engineering sentinel; not a powered model-quality benchmark.",
+  "archives": [
+    {
+      "path": "captures.zip",
+      "sha256": "ad3573797f9fe6d9ff69f2016e4b1c70d96b9388cc82ceb22e39eda1d2b90e27",
+      "bytes": 10250121,
+      "expanded_bytes": 61469476,
+      "members": 3661
+    },
+    {
+      "path": "exact-match.zip",
+      "sha256": "f86c66bfee349eda13a4e04267ae0976d935a55afc568f56fd676cc527dd724b",
+      "bytes": 2834371,
+      "expanded_bytes": 30529623,
+      "members": 760
+    },
+    {
+      "path": "normalized-nll.zip",
+      "sha256": "0afee050178e58eccea1db31cac0c37cb8c4571e79c3bbf1e4aed2d8571539b5",
+      "bytes": 2885546,
+      "expanded_bytes": 30647917,
+      "members": 760
+    }
+  ]
+}

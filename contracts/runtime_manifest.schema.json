@@ -30,22 +30,22 @@
   "$defs": {
     "sha256": {
       "type": "string",
-      "pattern": "^[a-f0-9]{64}$"
+      "pattern": "^[a-f0-9]{64}(?![\\s\\S])"
     },
     "imageDigest": {
       "type": "string",
-      "pattern": "^sha256:[a-f0-9]{64}$"
+      "pattern": "^sha256:[a-f0-9]{64}(?![\\s\\S])"
     },
     "basename": {
       "type": "string",
       "minLength": 1,
-      "pattern": "^[^/\\\\\\u0000-\\u001f]+$",
+      "pattern": "^[^/\\\\\\u0000-\\u001f]+(?![\\s\\S])",
       "not": {"enum": [".", ".."]}
     },
     "portableImageReference": {
       "type": "string",
       "minLength": 1,
-      "pattern": "^(?!/)(?![A-Za-z]:)[^\\\\\\u0000-\\u001f]+$"
+      "pattern": "^(?!/)(?![A-Za-z]:)[^\\\\\\u0000-\\u001f]+(?![\\s\\S])"
     },
     "reportReference": {
       "type": "object",

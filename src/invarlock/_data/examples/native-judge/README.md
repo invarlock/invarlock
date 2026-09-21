@@ -86,9 +86,13 @@ only after its resource and collection checks pass:
 ```bash
 invarlock evaluate request.yaml --runtime-profile runtime-profile.json \
   --signing-key signer-private.pem --preflight --json
-invarlock evaluate request.yaml --runtime-profile runtime-profile.json \
-  --signing-key signer-private.pem --json
+INVARLOCK_ALLOW_JUDGE_NETWORK=1 invarlock evaluate request.yaml \
+  --runtime-profile runtime-profile.json --signing-key signer-private.pem --json
 ```
+
+The scoped network opt-in allows only judge initialization, collection and
+cleanup to reach the provider. Native model execution and preflight remain
+network-disabled; do not enable the global `INVARLOCK_ALLOW_NETWORK` switch.
 
 After evidence is published, verify it using the independently prepared
 recipient policy and render a report:

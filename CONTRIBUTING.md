@@ -176,7 +176,7 @@ as the complete pull-request check:
 | Documentation or public command examples | `make docs-check` and `python -m pytest tests/docs -q`; exercise the documented commands |
 | Entry points, imports, packaged schemas, or dependencies | `make install-smoke`; this includes `dist-check` and isolated wheel consumers |
 | Captured evaluation behavior | Build and install the candidate wheel, then run `python examples/captured-results/wheel_smoke.py` and `python examples/captured-results/scorer_wheel_smoke.py --fixture examples/judge-measurements` |
-| Native evaluator capture or mapping | Follow the captured-results example with explicit model, protocol, and environment inputs; verify captured outputs in a separate wheel-only recipient; the [Harness likelihood reference](examples/captured-results/references/harness-likelihood/README.md) covers real NLL capture and offline replay |
+| Native evaluator capture or mapping | `make evaluator-sdk-test EVALUATOR=<name>` for the changed native profile, then `make evaluator-parity-test` for all three scorers and SDK-free installed recipients; retain original source identities and observations |
 | Evidence interpretation or verification | `make release-retained-evidence-compatibility`; retain the declared outcomes of historical evidence |
 | Inspect qualification semantics | `make evaluator-inspect-semantics`; run a fresh source-bound qualification and preserve historical profiles and evidence |
 | Batch evaluator qualification semantics | `make evaluator-batch-semantics`; replay the current profile's native rows and retain separate source-bound qualification artifacts |
@@ -194,6 +194,18 @@ these page inventory and reader-contract tests.
 
 Run `make pre-commit` for the repository hooks. Some hooks rewrite files;
 review their changes and repeat affected validation before committing.
+
+An evaluator integration is complete when its supported native result can use
+the shared capture/import paths, preserve cases and task failures, expose relevant
+scorer inputs and metadata, and pass installed preflight, evaluation, verification, reporting and
+tamper rejection. Test missing inputs, conflicting identities and source grading
+failures separately. Do not require an upstream grading step when InvarLock can
+score the retained answers. Back advertised SDK shapes with actual SDK exports
+passed through an independently installed core recipient for the supported scorer
+combinations, and distinguish those serializer tests from new model-running
+qualification.
+The [capture recipes](examples/evaluator-qualification/maintained/CAPTURE.md)
+describe the common boundary and the source-specific input requirements.
 
 For full coverage, install the pinned judge SDK closure into the same test
 interpreter and require its offline SDK tests instead of allowing skips:
@@ -214,7 +226,7 @@ The complete coverage gate requires Linux descriptor execution. On another
 operating system, run the relevant portable target such as `make
 coverage-examples`, and report the full Linux result from CI separately.
 CI collects Python 3.13 coverage in separate core, examples, support-tooling and
-add-in jobs. Each test belongs to one group. The required `coverage` gate combines
+runtime jobs. Each test belongs to one group. The required `coverage` gate combines
 all four successful measurements and enforces the existing domain, per-file and
 aggregate branch thresholds. Missing, failed or mismatched measurements cannot
 pass. Test timing reports are retained with each group's coverage data.

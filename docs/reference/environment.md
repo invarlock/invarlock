@@ -207,6 +207,7 @@ inputs apply only when new judge ratings are collected:
 
 | Variable | Behavior |
 | --- | --- |
+| `INVARLOCK_ALLOW_JUDGE_NETWORK=1` | Allows network only in the configured judge lifecycle; native capture and other tasks retain the default guard |
 | `OPENAI_API_KEY` | Credential selected by an `openai/...` grader |
 | `ANTHROPIC_API_KEY` | Credential selected by an `anthropic/...` grader |
 | `GOOGLE_API_KEY`, `GEMINI_API_KEY` | Credential aliases selected by a `google/...` grader; `GOOGLE_API_KEY` takes precedence when both are present |
@@ -216,6 +217,11 @@ inputs apply only when new judge ratings are collected:
 
 The grader prefix selects exactly one credential; judge code does not assume an
 OpenAI key. Credentials are never retained in requests or evidence. Collection
+reads `INVARLOCK_ALLOW_JUDGE_NETWORK` only from the process environment, accepting
+`1`, `true`, `yes`, or `on`. It grants a temporary context-local permission during
+judge initialization, collection and cleanup; it does not remove the global
+socket guard or change strict native execution switches. Request fields and
+credential mappings cannot grant this permission. Collection
 preflight checks this environment and the pinned optional dependencies without
 making calls. Offline retained-measurement import, verification and reporting
 need neither credentials nor these SDKs. See

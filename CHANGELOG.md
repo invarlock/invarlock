@@ -9,6 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Allow Python judge collectors to stop after completed, durably retained batches
+  and resume the same plan without resetting call or budget accounting.
+
+- Add dedicated native export mappings for all 19 maintained evaluator
+  ecosystems through direct `evaluator-native-json` imports or the optional
+  `engine.export_evaluator_result` helper and `evaluator-json` envelope. Include
+  complete case checks, attributed numeric metrics, metadata slices and a shared
+  offline preflight, scoring, verification and reporting path, tested with actual
+  SDK exports through separately installed recipients.
+  Exercise complete retained Luna judge studies through the installed workflow,
+  preserving both passing and insufficient-evidence outcomes and rejecting
+  altered measurements.
+  Add actual SDK callback tests and a bounded fresh-execution campaign with
+  preserved task ledgers, explicit likelihood capture bindings and independently
+  installed recipients. Fresh model/provider qualification remains separate
+  from controlled-callback tests and retained replays. Retain the Mistral 7B
+  sentinel across all 19 profiles and 114 scorer/import journeys, including
+  original blocked judge attempts and independently replayable results.
+  Add controlled HTTP task capture with original response retention, service-bound
+  likelihood replay, and separately bounded extended judge campaigns.
+  Retain deeper Inspect, Harness, Promptfoo and Langfuse qualification with 576
+  fresh model executions, 32 verified exact-match/NLL comparisons, 1,288 usable
+  judge ratings and 24 verified judge comparisons. Include live stop/resume and
+  budget controls without replacing policy rejections or insufficient evidence
+  with favorable results.
+
 - Retain signed Docker and Podman CUDA execution references for native scorers,
   TensorRT-LLM and vision-text, with compact offline replay and frozen provenance.
 - Add a maintained Langfuse experiment-export parser with explicit source and
@@ -55,6 +81,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Require the true end of string in anchored contract patterns so a trailing
+  newline cannot satisfy an otherwise exact identifier, digest or path match.
+
+- Accept reference-free LightEval generative records without inventing gold
+  answers, preserving judge availability and explicit missing-reference limits
+  for exact match and normalized NLL across both import routes.
+
+- Scope explicitly authorized judge network access to collection, preserving
+  native execution isolation and restoring the guard after failures or cancellation.
+
 - Accept complete Podman image IDs in authenticated builds and example workflows
   while retaining strict source, image and filesystem checks. Temporary registry
   cleanup also preserves image tags whose ownership has changed.
@@ -71,7 +107,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   precision and score requirements without repeating verdict headings; identify
   advisory and combined outcomes and use each captured interval's recorded level.
   Label measured judge precision failures correctly and keep decision-check
-  columns visible in desktop reports without changing retained results.
+  columns visible in desktop reports without changing retained results. Show
+  capture-bound model identities and multiple recorded datasets when available,
+  rejecting contradictions with attributed artifacts or legacy identity fields.
 - Reject exact-match reports whose side means contradict their paired outcome
   counts, even when the reported difference remains consistent. Reject captured
   reports whose recorded pass contradicts an available displayed requirement.

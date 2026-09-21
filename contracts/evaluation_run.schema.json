@@ -15,13 +15,13 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+          "pattern": "^[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
         },
         "version": {
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+          "pattern": "^[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
         }
       },
       "required": [
@@ -33,13 +33,13 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 128,
-      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+      "pattern": "^[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
     },
     "artifact_digest": {
       "anyOf": [
         {
           "type": "string",
-          "pattern": "^sha256:[a-f0-9]{64}$"
+          "pattern": "^sha256:[a-f0-9]{64}(?![\\s\\S])"
         },
         {
           "type": "null"
@@ -50,7 +50,7 @@
       "anyOf": [
         {
           "type": "string",
-          "pattern": "^sha256:[a-f0-9]{64}$"
+          "pattern": "^sha256:[a-f0-9]{64}(?![\\s\\S])"
         },
         {
           "type": "null"
@@ -75,25 +75,25 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 128,
-            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+            "pattern": "^[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
           },
           "version": {
             "type": "string",
             "minLength": 1,
             "maxLength": 128,
-            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+            "pattern": "^[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
           },
           "unit": {
             "type": "string",
             "minLength": 1,
             "maxLength": 128,
-            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+            "pattern": "^[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
           },
           "rubric_digest": {
             "anyOf": [
               {
                 "type": "string",
-                "pattern": "^sha256:[a-f0-9]{64}$"
+                "pattern": "^sha256:[a-f0-9]{64}(?![\\s\\S])"
               },
               {
                 "type": "null"
@@ -121,7 +121,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 128,
-            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+            "pattern": "^[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
           },
           "input": {},
           "expected": {},
@@ -174,17 +174,17 @@
               },
               "input_digest": {
                 "type": "string",
-                "pattern": "^sha256:[a-f0-9]{64}$"
+                "pattern": "^sha256:[a-f0-9]{64}(?![\\s\\S])"
               },
               "reference_digest": {
                 "type": "string",
-                "pattern": "^sha256:[a-f0-9]{64}$"
+                "pattern": "^sha256:[a-f0-9]{64}(?![\\s\\S])"
               },
               "artifact_digest": {
                 "anyOf": [
                   {
                     "type": "string",
-                    "pattern": "^sha256:[a-f0-9]{64}$"
+                    "pattern": "^sha256:[a-f0-9]{64}(?![\\s\\S])"
                   },
                   {
                     "type": "null"
@@ -193,11 +193,11 @@
               },
               "configuration_digest": {
                 "type": "string",
-                "pattern": "^sha256:[a-f0-9]{64}$"
+                "pattern": "^sha256:[a-f0-9]{64}(?![\\s\\S])"
               },
               "tokenizer_digest": {
                 "type": "string",
-                "pattern": "^sha256:[a-f0-9]{64}$"
+                "pattern": "^sha256:[a-f0-9]{64}(?![\\s\\S])"
               },
               "source": {
                 "type": "object",
@@ -207,13 +207,13 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 128,
-                    "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                    "pattern": "^[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
                   },
                   "version": {
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 128,
-                    "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                    "pattern": "^[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
                   }
                 },
                 "required": [
@@ -256,7 +256,7 @@
                   "properties": {
                     "artifact_digest": {
                       "type": "string",
-                      "pattern": "^sha256:[a-f0-9]{64}$"
+                      "pattern": "^sha256:[a-f0-9]{64}(?![\\s\\S])"
                     }
                   }
                 }
@@ -438,7 +438,7 @@
         "properties": {
           "artifact_digest": {
             "type": "string",
-            "pattern": "^sha256:[a-f0-9]{64}$"
+            "pattern": "^sha256:[a-f0-9]{64}(?![\\s\\S])"
           }
         }
       }

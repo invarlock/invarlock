@@ -47,7 +47,7 @@
       "properties": {
         "identity": {
           "type": "string",
-          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$"
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}(?![\\s\\S])"
         },
         "signing_key_path": {"$ref": "#/$defs/safeRelativePath"}
       },
@@ -59,13 +59,13 @@
   "$defs": {
     "digest": {
       "type": "string",
-      "pattern": "^sha256:[a-f0-9]{64}$"
+      "pattern": "^sha256:[a-f0-9]{64}(?![\\s\\S])"
     },
     "safeRelativePath": {
       "type": "string",
       "minLength": 1,
       "maxLength": 512,
-      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(?:/|$))[A-Za-z0-9._/-]+$"
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(?:/|$))[A-Za-z0-9._/-]+(?![\\s\\S])"
     }
   }
 }

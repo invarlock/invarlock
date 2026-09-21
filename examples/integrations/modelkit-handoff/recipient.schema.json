@@ -18,11 +18,11 @@
             },
             "package_digest": {
               "type": "string",
-              "pattern": "^sha256:[0-9a-f]{64}$"
+              "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])"
             },
             "content_digest": {
               "type": "string",
-              "pattern": "^sha256:[0-9a-f]{64}$"
+              "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])"
             },
             "candidate": {
               "type": "string",
@@ -31,7 +31,7 @@
             "artifact_file": {
               "type": "string",
               "minLength": 1,
-              "pattern": "\\.gguf$"
+              "pattern": "\\.gguf(?![\\s\\S])"
             }
           },
           "required": [
@@ -51,11 +51,11 @@
             },
             "package_digest": {
               "type": "string",
-              "pattern": "^sha256:[0-9a-f]{64}$"
+              "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])"
             },
             "content_digest": {
               "type": "string",
-              "pattern": "^sha256:[0-9a-f]{64}$"
+              "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])"
             },
             "candidate": {
               "type": "string",
@@ -64,7 +64,7 @@
             "artifact_file": {
               "type": "string",
               "minLength": 1,
-              "pattern": "\\.gguf$"
+              "pattern": "\\.gguf(?![\\s\\S])"
             }
           },
           "required": [
@@ -98,11 +98,11 @@
           "properties": {
             "baseline": {
               "type": "string",
-              "pattern": "^sha256:[0-9a-f]{64}$"
+              "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])"
             },
             "subject": {
               "type": "string",
-              "pattern": "^sha256:[0-9a-f]{64}$"
+              "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])"
             }
           },
           "required": [
@@ -116,11 +116,11 @@
           "properties": {
             "baseline": {
               "type": "string",
-              "pattern": "^sha256:[0-9a-f]{64}$"
+              "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])"
             },
             "subject": {
               "type": "string",
-              "pattern": "^sha256:[0-9a-f]{64}$"
+              "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])"
             }
           },
           "required": [
@@ -131,15 +131,15 @@
         },
         "schedule_digest": {
           "type": "string",
-          "pattern": "^sha256:[0-9a-f]{64}$"
+          "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])"
         },
         "evidence_signer_fingerprint": {
           "type": "string",
-          "pattern": "^sha256:[0-9a-f]{64}$"
+          "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])"
         },
         "request_digest": {
           "type": "string",
-          "pattern": "^sha256:[0-9a-f]{64}$"
+          "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])"
         }
       },
       "required": [
@@ -163,7 +163,7 @@
       "minProperties": 1,
       "propertyNames": {
         "type": "string",
-        "pattern": "^sha256:[0-9a-f]{64}$"
+        "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])"
       },
       "additionalProperties": {
         "type": "string",

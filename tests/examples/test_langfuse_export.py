@@ -183,6 +183,19 @@ def test_real_hosted_dataset_item_retains_public_sdk_fields(tmp_path, sdk, expor
     )
     assert run["records"][0]["id"] == "hosted-item"
     assert run["records"][0]["output"] == "Answer"
+    from invarlock.engine import export_evaluator_result
+
+    core = export_evaluator_result(
+        "langfuse",
+        result,
+        tmp_path / "core-export.json",
+        expected_ids=["hosted-item"],
+        source_version="4.14.1",
+        run_id=result.run_name,
+        artifact_digest="sha256:" + "a" * 64,
+    )
+    assert core["records"] == run["records"]
+    assert core["source_digest"] != run["source_digest"]
 
 
 @pytest.mark.parametrize("mutation", ["duplicate", "missing", "conflict", "object"])
@@ -252,3 +265,104 @@ def test_reference_capture_reproduces_complete_retained_model_facts(
         ]
     with pytest.raises(FileExistsError):
         module.main()
+
+
+@pytest.mark.parametrize("item_kind", ["local", "hosted"])
+def test_documented_langfuse_native_recipe(tmp_path, monkeypatch, sdk, item_kind):
+    from datetime import UTC, datetime
+
+    from langfuse.api import DatasetItem, DatasetStatus
+    from langfuse.experiment import ExperimentItemResult, ExperimentResult
+
+    from invarlock.evaluation_records.adapters import load_run
+    from invarlock.evaluation_records.langfuse import serialize_experiment_result
+
+    _, Evaluation = sdk
+    if item_kind == "local":
+        result = experiment(sdk)
+        planned_ids = ["one", "two"]
+        result.item_results[0].item["metadata"]["category"] = "documented-local"
+    else:
+        item = DatasetItem(
+            id="hosted-item",
+            status=DatasetStatus.ACTIVE,
+            input="Question",
+            expected_output="Answer",
+            metadata={
+                "category": "documented-hosted",
+                "invarlock_scores": {"quality": 0.75},
+            },
+            source_trace_id="source-trace",
+            source_observation_id="source-observation",
+            dataset_id="dataset",
+            dataset_name="documented-dataset",
+            created_at=datetime(2026, 1, 1, tzinfo=UTC),
+            updated_at=datetime(2026, 1, 2, tzinfo=UTC),
+            media_references=[],
+        )
+        result = ExperimentResult(
+            name="documented-hosted",
+            run_name="documented-run",
+            description="preserve description",
+            item_results=[
+                ExperimentItemResult(
+                    item=item,
+                    output="Answer",
+                    evaluations=[
+                        Evaluation(
+                            name="exact",
+                            value=1.0,
+                            comment="retained",
+                            metadata={"field": "retained"},
+                            data_type="NUMERIC",
+                        )
+                    ],
+                    trace_id="trace",
+                    dataset_run_id="run",
+                )
+            ],
+            run_evaluations=[],
+            experiment_id="run",
+            dataset_run_id="run",
+            dataset_run_url="https://example.invalid/dataset/run",
+        )
+        planned_ids = ["hosted-item"]
+    result.run_evaluations.append(
+        Evaluation(name="run-observation", value=0.5, comment="retained summary")
+    )
+    document = ROOT / "examples/evaluator-qualification/maintained/CAPTURE.md"
+    section = document.read_text().split("## Capture a Langfuse experiment as JSON", 1)[
+        1
+    ]
+    code = section.split("```python\n", 1)[1].split("```", 1)[0]
+    namespace = {"result": result, "planned_ids": planned_ids}
+    monkeypatch.chdir(tmp_path)
+    exec(compile(code, str(document), "exec"), namespace)
+    path = tmp_path / "langfuse-native.json"
+    native = json.loads(path.read_text())
+    # Compare every enumerated field with the actual SDK serialization contract.
+    assert native == serialize_experiment_result(result, "4.14.1")["result"]
+    run = load_run(
+        path,
+        adapter="evaluator-native-json",
+        source={"name": "langfuse", "version": "4.14.1"},
+        run_id=result.run_name,
+        artifact_digest="sha256:" + "a" * 64,
+    )
+    assert [row["id"] for row in run["records"]] == planned_ids
+    assert run["records"][0]["metadata"]["category"] == f"documented-{item_kind}"
+    if item_kind == "hosted":
+        assert run["records"][0]["scores"] == {"exact": 1.0, "quality": 0.75}
+        assert (
+            native["item_results"][0]["item"]["created_at"]
+            == "2026-01-01T00:00:00+00:00"
+        )
+        assert (
+            native["item_results"][0]["item"]["source_observation_id"]
+            == "source-observation"
+        )
+    path.unlink()
+    namespace["planned_ids"] = planned_ids + ["missing"]
+    with pytest.raises(ValueError, match="complete planned schedule"):
+        exec(compile(code, str(document), "exec"), namespace)
+    assert not path.exists()

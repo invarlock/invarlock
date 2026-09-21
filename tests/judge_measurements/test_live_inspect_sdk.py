@@ -7,6 +7,7 @@ import copy
 import importlib.metadata
 import json
 import os
+import socket
 from dataclasses import asdict, replace
 from pathlib import Path
 
@@ -26,6 +27,17 @@ from invarlock.judge_measurements.contracts import (
 )
 
 FIXTURES = Path(__file__).parent / "fixtures"
+
+
+def _forbid_socket_network(monkeypatch):
+    def forbid_socket(*args, **kwargs):
+        pytest.fail("SDK qualification attempted a real socket request")
+
+    for name in ("connect", "connect_ex", "sendto", "sendmsg"):
+        if hasattr(socket.socket, name):
+            monkeypatch.setattr(socket.socket, name, forbid_socket)
+    monkeypatch.setattr(socket, "create_connection", forbid_socket)
+    monkeypatch.setattr(socket, "getaddrinfo", forbid_socket)
 
 
 def _corrupt_wire_response(response, provider, outcome):
@@ -92,6 +104,11 @@ def test_configured_provider_wire_collection_replays_without_network(
 
     async def forbid_network(*args, **kwargs):
         raise AssertionError("SDK qualification attempted a real network request")
+
+    # Exercise the real configured scope without granting actual connectivity.
+    # These socket/transport blockers do not consult its ContextVar permission.
+    _forbid_socket_network(monkeypatch)
+    monkeypatch.setenv("INVARLOCK_ALLOW_JUDGE_NETWORK", "1")
 
     monkeypatch.setattr(
         httpx.AsyncHTTPTransport, "handle_async_request", forbid_network
@@ -343,6 +360,46 @@ def test_live_inspect_chat_completion_replays_offline(
     reference_mode,
     service_tier,
 ):
+    _exercise_live_chat_completion(
+        tmp_path,
+        monkeypatch,
+        finish_reason,
+        completion,
+        parse_status,
+        judge_model,
+        reference_mode,
+        service_tier,
+    )
+
+
+def test_live_inspect_graceful_stop_retains_checkpoint_and_resumes_offline(
+    tmp_path, monkeypatch
+):
+    _exercise_live_chat_completion(
+        tmp_path,
+        monkeypatch,
+        "stop",
+        '{"rating":"correct"}',
+        "ok",
+        "gpt-4o-2024-08-06",
+        "per_case",
+        "default",
+        stop_after_batches=1,
+    )
+
+
+def _exercise_live_chat_completion(
+    tmp_path,
+    monkeypatch,
+    finish_reason,
+    completion,
+    parse_status,
+    judge_model,
+    reference_mode,
+    service_tier,
+    *,
+    stop_after_batches=None,
+):
     required = os.environ.get("INVARLOCK_REQUIRE_INSPECT_SDK") == "1"
     try:
         version = importlib.metadata.version("inspect-ai")
@@ -364,6 +421,7 @@ def test_live_inspect_chat_completion_replays_offline(
     async def forbid_network(*args, **kwargs):
         raise AssertionError("live SDK test attempted a real HTTP request")
 
+    _forbid_socket_network(monkeypatch)
     monkeypatch.setattr(
         httpx.AsyncHTTPTransport, "handle_async_request", forbid_network
     )
@@ -395,6 +453,7 @@ def test_live_inspect_chat_completion_replays_offline(
         CollectionOptions.from_mapping(exported["collection"]),
         grader=plan["judge"]["requested_model"],
         requests_per_minute=10000,
+        **({"concurrency": 1} if stop_after_batches is not None else {}),
         **({"max_output_tokens": 50000} if judge_model == "gpt-5.6-luna" else {}),
     )
     requests = []
@@ -439,12 +498,45 @@ def test_live_inspect_chat_completion_replays_offline(
             max_retries=0,
             http_client=httpx.AsyncClient(transport=httpx.MockTransport(respond)),
         )
-        runner = RunnerOptions(tmp_path / "checkpoint", "correctness", 30)
+        runner = RunnerOptions(
+            tmp_path / "checkpoint",
+            "correctness",
+            30,
+            stop_after_batches=stop_after_batches,
+        )
         try:
+            if stop_after_batches is not None:
+                stops = []
+                first = await collect(
+                    plan=plan,
+                    options=options,
+                    runner=runner,
+                    model=model,
+                    on_stop=stops.append,
+                    **runs,
+                )
+                assert stops == ["requested"]
+                assert len(requests) == 1
+                assert sum(bool(trial["attempts"]) for trial in first["trials"]) == 1
+                for prefix in ("admission", "result"):
+                    assert (
+                        len(list(runner.checkpoint_directory.glob(f"{prefix}-*.json")))
+                        == 1
+                    )
+                original = {
+                    path.name: path.read_bytes()
+                    for path in runner.checkpoint_directory.glob("*.json")
+                }
+                runner = replace(runner, stop_after_batches=None)
             measurements = await collect(
                 plan=plan, options=options, runner=runner, model=model, **runs
             )
             assert len(requests) == 2
+            if stop_after_batches is not None:
+                assert all(
+                    (runner.checkpoint_directory / name).read_bytes() == raw
+                    for name, raw in original.items()
+                )
             resumed = await collect(
                 plan=plan, options=options, runner=runner, model=model, **runs
             )

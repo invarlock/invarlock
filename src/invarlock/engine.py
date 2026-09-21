@@ -97,7 +97,7 @@ from invarlock.evaluation_record_contracts.contracts import (
     EvaluationRecordsError,
     digest,
 )
-from invarlock.evaluation_records.adapters import load_run
+from invarlock.evaluation_records.adapters import load_run, write_evaluator_export
 from invarlock.evaluation_records.cases import (
     canonical_case_set as _canonical_case_set,
 )
@@ -108,6 +108,10 @@ from invarlock.evaluation_records.cases import (
 from invarlock.evaluation_records.identity import (
     evaluated_subject_digest,
     validate_service_identity,
+)
+from invarlock.evaluation_records.integrations import (
+    EVALUATORS,
+    export_evaluator_result,
 )
 from invarlock.evaluation_records.io import physical_file_digest, run_digest, write_run
 from invarlock.evaluation_runtime import (
@@ -354,6 +358,9 @@ __all__ = [
     "load_external_scoring_records_jsonl",
     "load_evaluation_request",
     "load_run",
+    "write_evaluator_export",
+    "export_evaluator_result",
+    "EVALUATORS",
     "load_runtime_behavioral_schedule",
     "load_runtime_import_side",
     "load_trust_inputs",

@@ -16,6 +16,26 @@ ROOT = Path(__file__).resolve().parents[2]
 CONFIG = ROOT / "scripts/ci/coverage.coveragerc"
 SHARDS = ("core", "examples", "support", "runtime")
 FAST_MARKERS = "not integration and not slow and not manual and not gpu"
+EXAMPLE_TESTS = (
+    "tests/examples",
+    "tests/integration/test_evaluator_parity.py",
+    "tests/evaluation_records/test_sdk_capture.py",
+    "tests/evaluation_records/test_live_batch_capture.py",
+    "tests/evaluation_records/test_live_capture_cli.py",
+    "tests/evaluation_records/test_live_campaign_helpers.py",
+    "tests/evaluation_records/test_live_harness_capture.py",
+    "tests/evaluation_records/test_live_harness_serialization_recovery.py",
+    "tests/evaluation_records/test_live_judge.py",
+    "tests/evaluation_records/test_live_closure_judge.py",
+    "tests/evaluation_records/test_live_http_service.py",
+    "tests/evaluation_records/test_live_lighteval_resources.py",
+    "tests/evaluation_records/test_live_model_worker.py",
+    "tests/evaluation_records/test_live_network.py",
+    "tests/evaluation_records/test_live_recipient.py",
+    "tests/evaluation_records/test_live_recovery.py",
+    "tests/evaluation_records/test_live_scalar_capture.py",
+    "tests/evaluation_records/test_live_supervisor.py",
+)
 RUNTIME_TESTS = (
     "tests/diagnostics",
     "tests/runtime",
@@ -74,12 +94,12 @@ def selection(shard: str) -> list[str]:
             "tests",
             "-m",
             FAST_MARKERS,
-            "--ignore=tests/examples",
+            *(f"--ignore={path}" for path in EXAMPLE_TESTS),
             *(f"--ignore={path}" for path in RUNTIME_TESTS),
             *(f"--ignore={path}" for path in SUPPORT_TESTS),
         ]
     if shard == "examples":
-        return ["tests/examples"]
+        return list(EXAMPLE_TESTS)
     if shard == "support":
         return list(SUPPORT_TESTS)
     if shard == "runtime":

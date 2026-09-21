@@ -1,0 +1,1808 @@
+{
+  "archive": {
+    "bytes": 9066265,
+    "expanded_bytes": 83660523,
+    "members": 2175,
+    "path": "judge-reference.zip",
+    "sha256": "sha256:c2ff45bd04702c08adf6cdfd36e9da9c1a8ba88955aa6b2e1596991797e4fcb6"
+  },
+  "companion_archive": {
+    "bytes": 10250121,
+    "expanded_bytes": 61469476,
+    "members": 3661,
+    "path": "captures.zip",
+    "sha256": "ad3573797f9fe6d9ff69f2016e4b1c70d96b9388cc82ceb22e39eda1d2b90e27"
+  },
+  "format": "invarlock/live-judge-reference-catalog-v1",
+  "reference": {
+    "counts": {
+      "attempt_status": {
+        "completed": 992,
+        "timeout_ambiguous": 32
+      },
+      "decisions": {
+        "insufficient_evidence": 52
+      },
+      "packs": 52,
+      "trials": 1024
+    },
+    "excluded": "No private keys, credentials, cache trees, model weights, execution authorization documents, unstarted trials.",
+    "format": "invarlock/live-judge-reference-v1",
+    "historical_trust_scope": "Verifier/signing expectations come from the already verified original recipient records, fixed before archive pinning; not new deployment approval.",
+    "model_capture_links": "model-captures.json",
+    "packs": [
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/primary-arize-phoenix-evals-envelope",
+        "event_sources": [
+          {
+            "member": "judge/main/primary-arize-phoenix-evals-envelope/sources/inspect-events-1.json",
+            "sha256": "sha256:6709e747aab10e4663ea23c1abc512e1c369db515ea457214e5a32947e8af0fd",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "94a69744494792be0ad454a2dbaea4460202435daf6f8308acd8b48ffbf9da77",
+          "recipient_policy_sha256": "8cf0cde0b3c1d42398bd8065540e5bab927970f03b990299758a3b898d919f04",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/primary-arize-phoenix-evals-envelope",
+        "plan_sha256": "sha256:197c874b2a900f14db5f48ca24b202d0ad50f5136375a91023019fe4be10b0d8",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:f44e661fad6d104f5bb0c4bcfe2d02346469984844801ae93b3789c753010b72"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:52b046480028c23ea72de0353936247248e04aff8b8a0d1c7bfb35556d2022e7"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/primary-arize-phoenix-evals-native-json",
+        "event_sources": [
+          {
+            "member": "judge/main/primary-arize-phoenix-evals-native-json/sources/inspect-events-1.json",
+            "sha256": "sha256:086d59da80e49cbbb5ead3cb4f5ef69786db2d332609f5c5d9832ae5622cd77f",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "da5379a821331359ce4244e12bf9db87f40f89c280627f08ac0bc064b3c65b5c",
+          "recipient_policy_sha256": "8c3434df9406e962a538102dddfb47ce003a00a2aeff574a1907317842a2bbf8",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/primary-arize-phoenix-evals-native-json",
+        "plan_sha256": "sha256:f3fb05baf041e0205c6c8efcdb3aa337b73382154c8952583b1a2cdf4c85b9ab",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:22922d0a4582d7a88f52a1d103ccbfb74b6c18aceb8a7dc852bba9512831c71a"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:133ef16b786b49a6ae93eda49db70476dec43790ead50b0903a45de4c86663d8"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/primary-autoevals-envelope",
+        "event_sources": [
+          {
+            "member": "judge/main/primary-autoevals-envelope/sources/inspect-events-1.json",
+            "sha256": "sha256:de27d8398708bf0a3d6168c7aeae42a58e706c9a4c298505eb5f70246d91b8fa",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "d5564bfd615a8ae795acfaebd74fec9972adf06774fae4da8fc62492b6d5513f",
+          "recipient_policy_sha256": "51f1920a1235c08f2892e22206d32b95a86c3ba8cb56412208a3a8410ba95b0e",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/primary-autoevals-envelope",
+        "plan_sha256": "sha256:d0aaf5a8982797d5cb441b8e3ecbf279cd3bbeba84524ea986bbb205fb344a46",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:84bf9c04650e7de701076e9b18ae7a7cb479b76b2000d97bb8e50942ad3fb500"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:d3180a3bc0a0ab265d29eed189c180a00904506c53bcc094a25eeb93473d1758"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/primary-autoevals-native-json",
+        "event_sources": [
+          {
+            "member": "judge/main/primary-autoevals-native-json/sources/inspect-events-1.json",
+            "sha256": "sha256:4afe4c3364874fc9b584c8b275642dcafb6b8801016003798a426b39de609f3d",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "4b88946cb6307865fb5806b736b1445f41abe91866237cbe0c4f82d213078ea7",
+          "recipient_policy_sha256": "569bb6a030b2a024534d2474b19902f1605320b2bfa92cd0526fa4098a617aa0",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/primary-autoevals-native-json",
+        "plan_sha256": "sha256:82286a2cf05fc7add79539fcce5bc10bc6ee6bffa6bfd40fe12c56790a69d293",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:3daa9ff1296a34f2661f3ba975de91ca557f31f4e3d8de2d50c49b73f7f8f51e"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:59dbe474da4574b82fbb937f8417db66eb0f731a97b42803ae2ae72edc799b01"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/primary-azure-ai-evaluation-envelope",
+        "event_sources": [
+          {
+            "member": "judge/main/primary-azure-ai-evaluation-envelope/sources/inspect-events-1.json",
+            "sha256": "sha256:836b4e800e876e60d8775af24b0c10077e302b1f2a6e71a7d9cff79cdd06863c",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "9200bd7c9ac7bdd3f7a193cf4fe9d93d3004da0514a800933e8f63c54be7ed24",
+          "recipient_policy_sha256": "535030aa440f781bbb7a1204fef0f0090351bab2db55b46f45821c9bb0f7ee93",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/primary-azure-ai-evaluation-envelope",
+        "plan_sha256": "sha256:442a26ffce96aef0d2a721612e3c3d0a2f5f3f581ec9ed2e4260b3239a19762b",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:bfa1e3b8ea85329b9891f1f0bf19c69e743df744aecac077694e327a3c65e7d1"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:78ec4efaba5b185f7e0ceec1521aee2d9dd108994739269194d66278e9f3c765"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/primary-azure-ai-evaluation-native-json",
+        "event_sources": [
+          {
+            "member": "judge/main/primary-azure-ai-evaluation-native-json/sources/inspect-events-1.json",
+            "sha256": "sha256:0ea60ea5bf2504c83204340757b428ad528e8e2e37b2013b049a28ecd0206422",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "b54b852dcf5a19aa16354a1c2c22a304d695d5d281e60f48455b00d35ebd2a05",
+          "recipient_policy_sha256": "b47f6604b286905eb49b8d86f34b69a0bc462cf1df934f9f5143408a25b81206",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/primary-azure-ai-evaluation-native-json",
+        "plan_sha256": "sha256:b822538d65287db334e04e91ed786708e77b9a1bfa92c80670627d2c9c7812f2",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:5fa9a4db94e26ef1bb0dc42bc04bf5724e7df707b0cb94526b1eb74b1a4a7266"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:962fba023a20607e63e4233e032137bb857c2e3bc9a65388c4260313d198e65f"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/primary-deepeval-envelope",
+        "event_sources": [
+          {
+            "member": "judge/main/primary-deepeval-envelope/sources/inspect-events-1.json",
+            "sha256": "sha256:a9e4f5d05cd1b4b1904cbd3a6692d84882a14a09cbb80fd0be90c82156a452f2",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "c9287748e5b17874ad0598389994134837bd3bf882671bbb3e295ad209e16daf",
+          "recipient_policy_sha256": "c449fbc3e7535df81bb0dce4b875e0319a276ad4b171b6fe8faafe646033ede3",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/primary-deepeval-envelope",
+        "plan_sha256": "sha256:3f795f93449da6b2949718b19aa362baca616e53f7d0921f30bf3a6639b93c2d",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:e546681ec1e6a62794b45ba0cfe14d212461aa43132fe956ec7699ff3cf8751a"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:650b953b5b4e85487020bff6887c17b9c63a051abfb78fd3b5cd7d12ba591805"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/primary-deepeval-native-json",
+        "event_sources": [
+          {
+            "member": "judge/main/primary-deepeval-native-json/sources/inspect-events-1.json",
+            "sha256": "sha256:42fa7237ff3e930d0f415fb162f6a2947a5a3d523980d91cc4fdcd135140ebfd",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "46d793139b05e4488b69cc48d1546d50c83fd4719248f6bc5bc44b1713b6165c",
+          "recipient_policy_sha256": "20506db15953d700b89946f8ffb8cf1710ed46a59fab352a107c7b0dc4815859",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/primary-deepeval-native-json",
+        "plan_sha256": "sha256:d932ad3dc558f63b2f6b983d321fbe829cadae126a48fc882da65d82c619468d",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:127d1ceb14d4da7ec6b49146b4fb81ab94911162f8758dfec7eb04ba6635fbb5"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:8690b64cdbd6fdda5c378240c02ad570e870754b44333570c34b9ea22a85765d"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/primary-evidently-envelope",
+        "event_sources": [
+          {
+            "member": "judge/main/primary-evidently-envelope/sources/inspect-events-1.json",
+            "sha256": "sha256:2c7c14cf2bd29d00c2eba48a4dcf04240b4e260ba3445d2db1fcad44ecd2d4fa",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "73d18ab2f1f745ad55651bb834a988c4669a907dfcdaac789f7f1d77156aa9e9",
+          "recipient_policy_sha256": "0f26753c21e6380a4333739fb6ac601e5f6541004aa9549e502353f35a4324f1",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/primary-evidently-envelope",
+        "plan_sha256": "sha256:fc14b434e57a1103f565f09b0ac511b65ab6c0d4315677e590efc11e1e5eef87",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:00e77e8249e846bf955ba5f399e8dce3ed2ab90515a3a04345a2c4bd67a28df5"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:277c804982b369aff972b642032be9a76783b8f42aee4e28db25230b3a36f33d"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/primary-evidently-native-json",
+        "event_sources": [
+          {
+            "member": "judge/main/primary-evidently-native-json/sources/inspect-events-1.json",
+            "sha256": "sha256:fc52689b59fe3a17fc81e5f15768aa349633923341b4e571439ed0e349c7b71e",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "84b9d0772ef10d1c0aed8f89400473d1935789487179f35438181ba3b3bf592b",
+          "recipient_policy_sha256": "7686f8b99b122dd469b35debf8229772bf00d90d1a4f156c1d446ef7d3f88f9e",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/primary-evidently-native-json",
+        "plan_sha256": "sha256:5a09cc0d4cf2f1442521cd8e30cad847eee1ae0e1d6977c8d63f2296c554aca1",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:91482e71e3ae10589e48f6f301250bb49fd0bfa0f57156bc1f15ef93668aef8c"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:1c3f9951e47a3fbfc549de68536bf664aa09b46a475b5af422f3f62316f9a98c"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/primary-garak-envelope",
+        "event_sources": [
+          {
+            "member": "judge/main/primary-garak-envelope/sources/inspect-events-1.json",
+            "sha256": "sha256:fdc36590313ecd47dc38b6778c79952dd2a5cf495b8f0d6316e81eb8034f8dfe",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "9b4e39ec6f7160db0f8352e208c956e1c9e62c70ff4e3b43dce6372d4ccf5ed8",
+          "recipient_policy_sha256": "572042372c9b7ad56d6daa32e19ec5388cdffd2b0eabb26cd1f96911c71fbe1d",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/primary-garak-envelope",
+        "plan_sha256": "sha256:7e0cffba78d2422e2981e104e1c0b6978ffb30a82a8fdbad189599f453f9a746",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:295f9cfebb88a6fa4be9ceed0473eead477c883f025197c5802c4833d78d5cee"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:2e958978a16a131139e74b3fc361cc66b1adfd9aa709ad31645230312bb646d5"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/primary-garak-native-json",
+        "event_sources": [
+          {
+            "member": "judge/main/primary-garak-native-json/sources/inspect-events-1.json",
+            "sha256": "sha256:b7f6e98ac963ff34c6eb4d71cabee16e79c9772294cd10d405b0de1d2131dc17",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "272a0839258e385d58e028aabac1a45e969717d5a9a111d990250cf8c71c0899",
+          "recipient_policy_sha256": "5e328f101d35388b53b73bb6c9a481db51b8267de7d6973554bcd3c9ae2666ad",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/primary-garak-native-json",
+        "plan_sha256": "sha256:2c03beac403575d8873b6b3d4ac2ae2ae2d9f8cf17b3f3d46375501f2c927141",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:786d9733f2c0a60eeccb63238e3b1c298d93b582e4886bad9282a809b142a002"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:489b443a0e3bfdc5639f5a8f413cdd973bcb47f49189ab152165f11238b3950b"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/primary-hugging-face-evaluate-envelope",
+        "event_sources": [
+          {
+            "member": "judge/main/primary-hugging-face-evaluate-envelope/sources/inspect-events-1.json",
+            "sha256": "sha256:93d8e10ad004b135ea99eb78405d140cdb00931f25d39c18535135d2c2259066",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "77cc517ff3a5f47b296947f4f6336f7f5f97710efc28668ab3e240e5f4f3c1f2",
+          "recipient_policy_sha256": "b846aaf9518cffa07a7d0b6197b7c72b9b548e57c5b2df688fd56f304ae1d2c5",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/primary-hugging-face-evaluate-envelope",
+        "plan_sha256": "sha256:893116373a11378b076c3b7003f6a29a8cfc5e3da331a757d468b7bdb9800d16",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:ceed17169cb2466d5a34b143c71e957b97551115bd74cf270df20653fa547e44"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:19b57c5b3ed294834dc83ba8d2b1f64c3d6a76b429be43aa10c7483d7e034f63"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/primary-hugging-face-evaluate-native-json",
+        "event_sources": [
+          {
+            "member": "judge/main/primary-hugging-face-evaluate-native-json/sources/inspect-events-1.json",
+            "sha256": "sha256:64db82e78a23ccfd26e3af1cb811d850fbcd9628d7d6d4c808d7f0060b2f0695",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "e2b975c0cb061eaa04c9ea104adbfde2fdaca0a9831fc2674102e44adfd83cbd",
+          "recipient_policy_sha256": "58b0029397401777bc0ff88be9f9381f37c84187560ed7b2b8fec731dbdb74ce",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/primary-hugging-face-evaluate-native-json",
+        "plan_sha256": "sha256:8cf8a7ed13c8d402f71682c937a50ca28cf182f6d74b9cccb68ed6dca7b8f3a9",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:c6c57302650a2627e7b01a9d4917726057002a293d35f611e7c6c558dcc7ba5d"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:e56525cac46f64c07da46ea3fbec5130a9d6c275d61cad78b7232c021c887b6c"
+        }
+      },
+      {
+        "attempt_status": {
+          "timeout_ambiguous": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/primary-inspect-ai-envelope",
+        "event_sources": [
+          {
+            "member": "judge/main/primary-inspect-ai-envelope/sources/inspect-events-1.json",
+            "sha256": "sha256:2b58bd3e4aeba22965ab92c4806ea07085589ef638662287441070a82f80538e",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "9766651bfb9d2e43d46b9e02adbd3ceb83f8f9441a600b4fe83a6c60d9b489c6",
+          "recipient_policy_sha256": "d760c67bf74b05c493160c24e4ad4681840be3788cc44e74440071bed07eb01f",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/primary-inspect-ai-envelope",
+        "plan_sha256": "sha256:e35b92a4bd89d34b9a32d01ac5bb7b27acee11dae781585d99c257b095c5b5fa",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:f4612e427f7eaf97e8b24a5c3a759ea8a4bc70920d695473346d64c893815d6b"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:c1ee57bb11963517324c38228b7798c44f88d98a1a52a18eb391e0ef1c41cd13"
+        }
+      },
+      {
+        "attempt_status": {
+          "timeout_ambiguous": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/primary-inspect-ai-native-json",
+        "event_sources": [
+          {
+            "member": "judge/main/primary-inspect-ai-native-json/sources/inspect-events-1.json",
+            "sha256": "sha256:ccc857b8d7ff2f6050b7346ad9cd49521a1b140f53fe3f9a7cc82a5e7009e2bc",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "8ba9c7ddf1a9f119fe19e2ea8d900c09922c51f7301c1ab2a81baca847308f5b",
+          "recipient_policy_sha256": "c76ef94ad741aaae0c96feab23464d2a7a4ff17730c235ecbe2289bf85338d4c",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/primary-inspect-ai-native-json",
+        "plan_sha256": "sha256:7e0a4013255dc394e753204da3dec13aac451e9681c93088deaf0e310a15a9cd",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:2a6f3d0a69ebc5744c7912ff874bd0263f4e68c0db92f1ac466972d73eb09c73"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:f268570fa0ce98048eaa2d559bde0f0ac42d01d9c54cfd54c055b0e395e87b80"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/primary-langfuse-envelope",
+        "event_sources": [
+          {
+            "member": "judge/main/primary-langfuse-envelope/sources/inspect-events-1.json",
+            "sha256": "sha256:61767f1817fed8968ae8a4960d77e8227852a3b3dcf3ed78d4dd581e68a73693",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "2b32efc348df9caaf980cbef6ecf0da9def46935a0ca6b9346daa8d8ef026d1e",
+          "recipient_policy_sha256": "a5f6251c91e18a64145631af665a7ba0e842ff99abf1c9a8ce2077c18c517f32",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/primary-langfuse-envelope",
+        "plan_sha256": "sha256:06134e8c840181d95cec53265617e8ace05455afc86ba236f4ac28eabf3d50f4",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:361b3686d8e11ce21ca6f8db040b2e006835cc690942b11b5d4da3cb311b8af7"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:4fde775266786046ca12d7d0194ab124d81bf77a4f9c46e25161633fcf8d1d4b"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/primary-langfuse-native-json",
+        "event_sources": [
+          {
+            "member": "judge/main/primary-langfuse-native-json/sources/inspect-events-1.json",
+            "sha256": "sha256:fd754f18fb876fe2aa9081d428968524a07856e34544dd499fb3bc8bffe850da",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "1a24da3c5acbc5b54bd33ddf0a8c37b8ada62d90a19d5ad369d46a34c1618309",
+          "recipient_policy_sha256": "d550ed9851ed1e0fc20492885cf31d7dc7d5476152351b706f6993a2d11d617a",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/primary-langfuse-native-json",
+        "plan_sha256": "sha256:515e3535cde1b1b9f9e21623b7f139dd128531870ae8ec2315dd80c93f97d4d3",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:f0ca6a9d50fdbca9cb16c8b21f47e9d9b1a3e4c9f696a153618163daeeffeaaf"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:f740406773c1368d7604fd0070083b9cfb1d369e40c671afa71b247b76065dcb"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/primary-lighteval-envelope",
+        "event_sources": [
+          {
+            "member": "judge/main/primary-lighteval-envelope/sources/inspect-events-1.json",
+            "sha256": "sha256:346765551c1ffe6055ce6e24b1a3fb6dfc8e19b371a553b339d664369dea1168",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "30db3b45e3428b2303b4260b36a81a9f4f485b5f15fc4abf88fa99e1c878606c",
+          "recipient_policy_sha256": "f454179838d3ea707c00d7be366a6d47be773b9d706d5f83168bda860147a841",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/primary-lighteval-envelope",
+        "plan_sha256": "sha256:5859ab74aef7310ae26b25864d71bec3621990160acb6926bc7bfb0a6b07b624",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:efc18f2b49f7c68f4b27726f6eaaf17a958929cfbb8a68b1994471a5a957de2f"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:0c1376e6abe02443ad2d9008917e1bde62a28a8fe830858b0afa5ceb3dfb45c3"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/primary-lighteval-native-json",
+        "event_sources": [
+          {
+            "member": "judge/main/primary-lighteval-native-json/sources/inspect-events-1.json",
+            "sha256": "sha256:838844fd952105560e9922e90a81d31619d6769527f859b208aa91b8dcce2fe3",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "fa20dde192f471272e680bef3deec35f7794e734e1b3f25b06d486e45eab18b0",
+          "recipient_policy_sha256": "45939c48b9760f8b511369f641b9aeadb421a88924a9a668f964ab4021521234",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/primary-lighteval-native-json",
+        "plan_sha256": "sha256:5259e4faf59ed0e74c203b512bf703cb3f9eacc389813bbf6016bcabed8f0352",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:f47858e34ae6869590f541abff651a8c50199cff178ee114bab12f758d9b683f"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:b201e25aaaf4de3ae31c51796a930d32d43535e2d0600dbbca80c788ec177818"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/primary-lm-evaluation-harness-envelope",
+        "event_sources": [
+          {
+            "member": "judge/main/primary-lm-evaluation-harness-envelope/sources/inspect-events-1.json",
+            "sha256": "sha256:2df3a95ba6c839e49b86ecf069fd8ce673e814a1871d98b8d9d36fe8624b5441",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "c8884d02f31476467857436558db54fa851bcd6921e11bc0dd0da4a50143c30b",
+          "recipient_policy_sha256": "4b525d9944de9ae273646967de0e05fe404688172e82fbfb7fe36f49cccf0163",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/primary-lm-evaluation-harness-envelope",
+        "plan_sha256": "sha256:337ced8e29d918aa61a84dba0b1ad30944e8e0f5e8e1b182fc77aa743296c532",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:1af48ca20edfa89f663c77fc1f58073f3e2323507fd986a798fc92f9cc980809"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:d6aeb7a8c07a28d07c2ad90b4a3a1b2ed1f9f369fd6e2346735c9752a3ce7dda"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/primary-lm-evaluation-harness-native-json",
+        "event_sources": [
+          {
+            "member": "judge/main/primary-lm-evaluation-harness-native-json/sources/inspect-events-1.json",
+            "sha256": "sha256:6581066425afdd60f2ceac7a12d246085466efee0d6056ae14efc294419c8a6b",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "c5fe2e9bc1aa9274099137f5fc0100eebacef88a2133e9de0b74a2d398cd7008",
+          "recipient_policy_sha256": "2e0ebca91559b866920b307743d9c6aa6106b29f65d2918347b457e659dfa644",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/primary-lm-evaluation-harness-native-json",
+        "plan_sha256": "sha256:f8320dbcf3f636abd0a91b7e86b025b45b45a7a09fc45ac546eb9c3472a8ccd3",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:dedeab864bb2420958d32079028e9115987f5a8d5e9361faa2a71bb89716b422"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:100ea194219b36e0ce7c459dcdb6c239a321dfe2c79f0d360d0dedc3a55a01a5"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/primary-mlflow-envelope",
+        "event_sources": [
+          {
+            "member": "judge/main/primary-mlflow-envelope/sources/inspect-events-1.json",
+            "sha256": "sha256:4d515330a682d7694bb5ffd2ec4792f9e345391751d288d6656b986ad68c89c5",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "4531435bfc143cc56d2f87469e887d244236e9bac3ce4463b585ea599e2f931f",
+          "recipient_policy_sha256": "90fda21a8ec0c543cdcc3cdddd5ea7b292e16a76a8d23469dda17b05239711bc",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/primary-mlflow-envelope",
+        "plan_sha256": "sha256:521653fd02fe7f0b69c2e4dbdfa567bb00b93aac8cf9187dc72e0bdd8045079e",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:f6cbb7ed1ac4927fa1528874a9fef31a01f5887bd6ddd9079688ed1357aa3b5a"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:5a640652b6b8f94a30dcad81a8d6e7dfafe5517bf2d91893612156c01354d8a1"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/primary-mlflow-native-json",
+        "event_sources": [
+          {
+            "member": "judge/main/primary-mlflow-native-json/sources/inspect-events-1.json",
+            "sha256": "sha256:abdc9ee9d1f237d1b188b9d9a9c32fc7e8859b8721907fff2238e455b699eb65",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "7cdbe0ee682bf3b8fcfa3a42fef037f5cfb727604cdf3035df5df081f8feed12",
+          "recipient_policy_sha256": "8d7a0a7d97a1d0f0a41f127f17c81f9391a7259a33c34a6a6747708d0e581393",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/primary-mlflow-native-json",
+        "plan_sha256": "sha256:b9cea3540ca018014151e4dacee9a4b6ea2f878f34b5b263f942599e8dca46fd",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:d189373ad5fe3bae44993b6714837c614d7910eba23116a61525a098e9bb4e19"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:c8781b6d15d40a9b15b8d1a751b5837036d9cbc1a4e6a8ce427516cbe6281877"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/primary-openai-evals-envelope",
+        "event_sources": [
+          {
+            "member": "judge/main/primary-openai-evals-envelope/sources/inspect-events-1.json",
+            "sha256": "sha256:e07feb5ccf62c2734c88e243fbaf7711ddf96719c0b5153023f8e35c4c610125",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "a82fa50f1f54e871ab450f3ecdd59aaff4c21435d8c2da1783c0a90b549766d0",
+          "recipient_policy_sha256": "d54f2b12d28ce31765518208a22276a6ac14e22aef9d9da47d3aaa2c4747f4a2",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/primary-openai-evals-envelope",
+        "plan_sha256": "sha256:e63e4122ea3927cb26aa360818cd22fecd982af36dbfce691e4199dd37908cea",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:dda0d48d8e4dd58b23eed155a3cee4fe7e413540849d64bbad36fdb34f55826c"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:cbd5eef5d6d643157a7270e91bbe694a2f59d958419bd9c8e07b705cc1129f19"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/primary-openai-evals-native-json",
+        "event_sources": [
+          {
+            "member": "judge/main/primary-openai-evals-native-json/sources/inspect-events-1.json",
+            "sha256": "sha256:5362ee76dd34d5ee7042d1456bc3b9ec58e3231589f737356e6a3a37908e6883",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "c5443232ae377a9098f2e0654b6f1387a2bb1cc99992136b735d758e17646c55",
+          "recipient_policy_sha256": "2172c32f92ccbbb7a227106625975e9b91a813ec861ac04572f3e70077e9f2b7",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/primary-openai-evals-native-json",
+        "plan_sha256": "sha256:2944ace099697788a5a32e7b08fbed5d6377158bb74043defd792c98820b30fe",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:bd5bea43b3de6065c6dc468ee59acce7cd0a5b0f19efffdcb0fdbaa0227c4356"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:6383bf8ab2c9747821e18d5f807d5a1b77d51bce95a0d08024f13d0bbef9a0ca"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/primary-openevals-envelope",
+        "event_sources": [
+          {
+            "member": "judge/main/primary-openevals-envelope/sources/inspect-events-1.json",
+            "sha256": "sha256:c5c42dae4e89245b09cc7a93ae51004ed15020fb685d46b981f23ab0c8fed7ad",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "e07b5c560841fa59e7fa7b061018aa9312c7839a11ae083eba0f58151eb35836",
+          "recipient_policy_sha256": "f2177889358bc1647189979fc4b6f94e61a7ffd5e412eb8265058c980c461ec8",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/primary-openevals-envelope",
+        "plan_sha256": "sha256:9fef1316501d774dc89ef7c3a4336a77370d9ee5a742da952796cdf000398bb6",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:2eb5a698f6c28dbbfdfa7869781850bdff317de97c9a837282caffec99633a00"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:437c8ae3a8a78a26b41be49d509186d82f456b0e56fb0d43eaba0c7fdde3977c"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/primary-openevals-native-json",
+        "event_sources": [
+          {
+            "member": "judge/main/primary-openevals-native-json/sources/inspect-events-1.json",
+            "sha256": "sha256:31895c50d3daa6b8d2de8ad1607d23ffb97174e3423394bd02193e876d69e4dc",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "a1742c7463724b2f499d104c0a56e716279d7898ffeceaee9424aa71a80a0424",
+          "recipient_policy_sha256": "78595c08522a2abfbce8f8e204282ba9b7815e1069cc717a291c585dee1107ea",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/primary-openevals-native-json",
+        "plan_sha256": "sha256:3ca7224b80a19894b9a9409b7610a463b9efe3b9b4bbf967a10e76ee76287e40",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:214d70b39b6d1bc300226f4f0df52e8bfac72befbd877113110900041b57a0f4"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:36e39405c1c3bd76bbf76f5c784db154b42b83b202b3135ef2cc09cedb54e08c"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/primary-opik-envelope",
+        "event_sources": [
+          {
+            "member": "judge/main/primary-opik-envelope/sources/inspect-events-1.json",
+            "sha256": "sha256:182a1977963c94c4a31c1cd9918c92282c7942f447937c4df9efce6b0b1d1b3d",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "fe9266e8d8dff8324fafa911856da21c6defaadb4ae79c5e4cd54f2122c92ad0",
+          "recipient_policy_sha256": "8c1446444e593d2fc3b8b58d0a2fcee60f1d57e4e45db13ebc9146347ecbd126",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/primary-opik-envelope",
+        "plan_sha256": "sha256:621c04e1a8db1094930115dcd20239f426f5c7ec4b021d1ba850a5932607ba03",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:d39098828cfb8df753f63440bd3ff1280b248b7a9989130b82900cdb00add936"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:7cc3ad8ec2c0ad4582905371b1d16f3c11cdbf04e58aa480c474dfd6af44ebd9"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/primary-opik-native-json",
+        "event_sources": [
+          {
+            "member": "judge/main/primary-opik-native-json/sources/inspect-events-1.json",
+            "sha256": "sha256:4e1062f98d3f084036671e839e331051c458bc80d7fc9bd6397be7d2ac839190",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "4e9d7e388465dfadd36de98e8f482791e548d66fb1d5e15aad246bb9b5cce9c8",
+          "recipient_policy_sha256": "61f30bb59e4004711e3b95809283abc0c28adb8545f63d772dfbdcf7eee48834",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/primary-opik-native-json",
+        "plan_sha256": "sha256:b4030ba8a519590062bc079154462277f90ca6dc904ac385f752eb512938f086",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:dbbe523bbffffc8c94b7a82c43551aa1befbb72ab49132f5daa2dc508dceb4ce"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:8dc5e288ae67ba76403ce6b83f88849bc5346b840d0a6a458eb511cedb101a96"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/primary-promptfoo-envelope",
+        "event_sources": [
+          {
+            "member": "judge/main/primary-promptfoo-envelope/sources/inspect-events-1.json",
+            "sha256": "sha256:2fe8812f2bc0c6eba379dc37e388f6417bf9a53674e599b5c794357f6c318db2",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "feab6fb730f8b17247d8650f1534c087bf8b55e4432d218668893c98afcab5ef",
+          "recipient_policy_sha256": "e7eb79757a7418f9750d8760973d103e54e6f99f3a12df80848f1dd09db55400",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/primary-promptfoo-envelope",
+        "plan_sha256": "sha256:8a7aa1b099f6ea3cc43e9f9078f947b518e688aa830efa49118f06bf3e967a16",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:04a41d2181c074ab8465e8a52bb3831f5fcc7c2bad3b83a1c6bf659ca0186fce"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:151b54ab8d5de2d1039efc0f7b6e7a552bff34c99cfae8baece742d0cb782ab6"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/primary-promptfoo-native-json",
+        "event_sources": [
+          {
+            "member": "judge/main/primary-promptfoo-native-json/sources/inspect-events-1.json",
+            "sha256": "sha256:c761293d2e3e8a7bea0ee3b55e886580585a6da96ac9ce6a93211a5117282981",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "840aab449a9395f10042a78a9eddb68817cfb6bf5a61f847d5a0d8ed13d23eb1",
+          "recipient_policy_sha256": "1b808a9f56fb63257bcc6c1902ac8bc1a52cacff98de21112d34c2467d2ee37e",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/primary-promptfoo-native-json",
+        "plan_sha256": "sha256:9ced198b2699d2ab2f1b4f0a7fbf14e6d4c3d70aa857c863da773a2553bb4190",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:f0d61340157198b970f0b718989ddcac7d9c858f380b1364020f513131590871"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:a9d08c8f72d6385df8c058f1902f854b5198196e82c8b827a8f92934cfb955dd"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/primary-pydantic-evals-envelope",
+        "event_sources": [
+          {
+            "member": "judge/main/primary-pydantic-evals-envelope/sources/inspect-events-1.json",
+            "sha256": "sha256:4b55f2a6e0a4649f92261911633b8ca12044911cfd95c7e48d4ed520fba6c121",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "dea8aac3464bc95491f8dca0995bb40449885d2f81c1bf419068e19bcaa186b6",
+          "recipient_policy_sha256": "4a6cebeaa3c0178a82419ca29c838663d644eec77a127e4f5a22ebb2e6ca2b59",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/primary-pydantic-evals-envelope",
+        "plan_sha256": "sha256:d4067298def7c45fda207f3339c7304e90c4ef34ed8fe4d61b0f5fa3a73bc9a0",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:d4033fa84369ca42ae8fd78072a480756fd599f6318e2e32d8fc539c439bc178"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:3e6c5d3ca137a64edfce9e878ac72008da1204a53abd28079f883dc95b89e09e"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/primary-pydantic-evals-native-json",
+        "event_sources": [
+          {
+            "member": "judge/main/primary-pydantic-evals-native-json/sources/inspect-events-1.json",
+            "sha256": "sha256:f5666bc0f092eee1c09b17e3805974d28a1c2bc4a53729bbf9a0109ee84fe18c",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "e4fc19bc2d0ea27a23c9ed65636f68aa28cc9e91dc7630eef64210e22c81b457",
+          "recipient_policy_sha256": "2854c7fa3003443d184b735623eeb0187fb7a0c72f6e90e2ec30494929d93557",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/primary-pydantic-evals-native-json",
+        "plan_sha256": "sha256:57e5d4855da066c77ebe09f562875f0b222ed04fa817d40141a29baabc23dfbb",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:2c08dce7768b941ce4c2f0d0fc5ac46ec69ac48dd4f5e6d98835d936ab6a68e9"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:4b80858f2b25d16f74bb8a6cdfa3b7d38253e626441cdccaaa8771ac707c7b40"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/primary-ragas-envelope",
+        "event_sources": [
+          {
+            "member": "judge/main/primary-ragas-envelope/sources/inspect-events-1.json",
+            "sha256": "sha256:bdef09d324c1016dc87a6e1b797c6f99c80175e058c38bfc56fe8d7ff661bad3",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "78f93f5bfcab1ea1f1dbf8d80696f2be194f599af5b3877280f1197fed30e7d7",
+          "recipient_policy_sha256": "002802438a3e3dd5cc81ba45ed8437233c3d70d1f41706aac9999c80c6d712b9",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/primary-ragas-envelope",
+        "plan_sha256": "sha256:62a5b506f6b050f6009d0f298b7ccee95e1f36a7cd638e2a687455fcc55136fe",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:e8832d4f32b7fc35ba95c4abe3b6c8474edeca9af25247c8dc0404d9ec0ef445"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:e93872bb75f1d0b7fdcd2e6c9d918215e32b839e59514b28b62e705a57efeafa"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/primary-ragas-native-json",
+        "event_sources": [
+          {
+            "member": "judge/main/primary-ragas-native-json/sources/inspect-events-1.json",
+            "sha256": "sha256:e4c67fcba30780592a78d79ce44f06114307fc20f67ef899dd2d53de3f7066c7",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "b46e0284bad519c6f7660ccfa2ca303376858d04809c46acb9c6ab062dc59ea3",
+          "recipient_policy_sha256": "1fb7b513803e97bb3a3efa48218ad091cc2d63fe0b7f1c4fe736a2b803377109",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/primary-ragas-native-json",
+        "plan_sha256": "sha256:b508f7d842b4d4d0ff3ea2232f5883a5498284b621614af1c560422dca7a50c0",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:42448987c4b85a0112ca777a512c94f5ad54f157f55b6272564d0899177f00bb"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:a04ff6380d887855e8a7bc1ec93fb1745e9e011807b61b9464b2d0f1a4269611"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/primary-trulens-envelope",
+        "event_sources": [
+          {
+            "member": "judge/main/primary-trulens-envelope/sources/inspect-events-1.json",
+            "sha256": "sha256:ba007ac1296aa5234b0d78a6c5ccaf043d4b1257b24f00a60511615e1aa1ee57",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "11ff68d17b4b2366b39cd8eb9925617e8407f861344f913d38604deb9d9f9dd5",
+          "recipient_policy_sha256": "1d78e9cd8d77d605ed6010542bd3ff6f8b7f6e7164a549a71bdbc5a1444d77dc",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/primary-trulens-envelope",
+        "plan_sha256": "sha256:72082cf98ca058a7e631706d30f7884869fb08c1bb2d755e3dd6b6f5e44cb284",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:8913559b0043f81e724211f7f164357f5907f949f4d83c904f9c2a60e663c5a3"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:1504caa40436d3b89f5cf95c1120af8db841b037216e761c1b3e9031226f2b44"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/primary-trulens-native-json",
+        "event_sources": [
+          {
+            "member": "judge/main/primary-trulens-native-json/sources/inspect-events-1.json",
+            "sha256": "sha256:ecf7a36d57f673fd9697bf5b0c71d4477f2fd91b5e74e9320e6fc80239e20ec7",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "18c3b148692d9f5358eee4dfd023f526b76d38562c44f102189fc35c6a87cb4b",
+          "recipient_policy_sha256": "abc45e9a5cdb57563629f2ab0d307140fa44ad62523e09d06a0e31295f17a147",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/primary-trulens-native-json",
+        "plan_sha256": "sha256:40f254a203c7ef0790e018e70511bfa461a0849cf6f200ed52527ff050c1eee3",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:cd38dbfb41e1ed101480acf4527815555a07e1565328f3182920c76b41001e0b"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:c7fa0497792ae9fb4e9a64654bed6422de183f2fe063959a90806d66569bbbf1"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/reference-free-inspect-ai-envelope",
+        "event_sources": [
+          {
+            "member": "judge/main/reference-free-inspect-ai-envelope/sources/inspect-events-1.json",
+            "sha256": "sha256:7a25e15da9c04cccff9b8d634803d5d0068c1128b6ebf584a75d42f69a6096c6",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "746bba5764df542e86164b99df7444be6dcaa4595ee2bc1d3a45143f4fea9384",
+          "recipient_policy_sha256": "95d3d879f14b2f05b055d2c91637b80e9e8e25f561ebdec29f9eeabeb5f244a7",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/reference-free-inspect-ai-envelope",
+        "plan_sha256": "sha256:cf4e77176344167988c590962d73b7e84a1f41a8d629331db6be3943d092dcaf",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:5e31c2ce42a69c6b2896ac4059a22a137e52c938bacef82992bfceaba54f404a"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:c91c08317201f84608642ae2dc178094f758374f0f0942c836ba14ff6572e5bf"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/reference-free-inspect-ai-native-json",
+        "event_sources": [
+          {
+            "member": "judge/main/reference-free-inspect-ai-native-json/sources/inspect-events-1.json",
+            "sha256": "sha256:18dbeb2c9f37e895ab42973229aa00095c9a1d880c8a32a501b461eff3b4f3c3",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "f314dd6283b4565a27e948b4587955b8edc3aa706fd0c03e85442b31c082af36",
+          "recipient_policy_sha256": "97d7f5af93149355e644c013a8e5e5737874d8514f7cd0032fd72ba195633a5a",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/reference-free-inspect-ai-native-json",
+        "plan_sha256": "sha256:eb72e8962aa31ac44a1bbd7ffc9b2bc798a7349b109fcfb91878bd8c6d80fb3d",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:4c556b46531c8623b80d706236a606c87213e529bc0c07ea6ab3064da841b7c5"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:0bd0373e09615806ea12df90a65a4079f4bbc02dcc73776b90a35c5afe5814a7"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/reference-free-lm-evaluation-harness-envelope",
+        "event_sources": [
+          {
+            "member": "judge/main/reference-free-lm-evaluation-harness-envelope/sources/inspect-events-1.json",
+            "sha256": "sha256:2299eecf4146c611da902e18b99363f22158b28afc4ac31664dfc40235b72271",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "8cc324b61b8c1a962508d8a67a9ed54de8f72a90546953a0def95017675fb45c",
+          "recipient_policy_sha256": "4361a81bd7aeabf475c2915092ed17d5fc6107ad207b36ef3186abdeb2cecb95",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/reference-free-lm-evaluation-harness-envelope",
+        "plan_sha256": "sha256:e4ffdadb640e27c2daaf9b81dcdc9b8f2a9b287027ff646d436bf00705424f6c",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:7f7fc8967db83437e55c61fb50d8c386d773b30989f540e84ba5e8228b3a6006"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:07d6f58c6aa1f604d63124edde5d495775215db9a23eaf9bad4f4034891524cf"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/reference-free-lm-evaluation-harness-native-json",
+        "event_sources": [
+          {
+            "member": "judge/main/reference-free-lm-evaluation-harness-native-json/sources/inspect-events-1.json",
+            "sha256": "sha256:3e77360353748b52f198f265554722aab84f0e7cf8f549786a477361a68bf6a8",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "6208eb271f8a9beac8da5e1075399fff5d6e4ec0185ae66acfddfefb00e4082a",
+          "recipient_policy_sha256": "28fa540e6f18b49d0d2ce8ab95130e7f744106bf26c233cee5ebfa4636c1d772",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/reference-free-lm-evaluation-harness-native-json",
+        "plan_sha256": "sha256:5308440181cf99d84c4ed8ca090445c0119c8021cbbf584cf65a9b2eeb186118",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:59a27eaeb06d95f5cf9095da37a8ee73f1f414a9f77b50aa1dcf38354fbe2755"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:9e4036ea52d063383ea506d792712a8d96861a02cfca9361c3b75669aa0e26e6"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/reference-free-promptfoo-envelope",
+        "event_sources": [
+          {
+            "member": "judge/main/reference-free-promptfoo-envelope/sources/inspect-events-1.json",
+            "sha256": "sha256:80e24fbf40324ba2c039f27c78fb5e3ad4c88df634a80bf61ffb2dcbe1e9efc3",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "5dc6505262c908b047e0cf6e86525843c12168c95dccb45d995ee09fa5dec120",
+          "recipient_policy_sha256": "f9af5ce1d7383787b1f4e0b80adf3f0cf2c41df78d2203ad8c0dd699aa5aad1f",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/reference-free-promptfoo-envelope",
+        "plan_sha256": "sha256:72f63260102e3cca951e35e5bb36ce31a5cfffa211383da0a4fcae5950b72f7e",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:cbd117587495be0249a0d0557a3ad96219292d8b1bdeee91a4e5cf71dfab0e39"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:8f742918a4547763299262d51ec573e5b49b5d9d70f65b013418b05c9ee79918"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": null,
+        "directory": "judge/main/reference-free-promptfoo-native-json",
+        "event_sources": [
+          {
+            "member": "judge/main/reference-free-promptfoo-native-json/sources/inspect-events-1.json",
+            "sha256": "sha256:539c913efc4d65159a9717c56cd66e5f1fb64d114eae30e4bd5f1695f72ea6a4",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "f0c8063f6a6a894ae93f08552adda8b484aef41561a20017ce7de0913bf0b733",
+          "recipient_policy_sha256": "c6c26d8936b20f9080ec815d2ab11c60b22bda294efecfc7fc12a9af9713dfcd",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/reference-free-promptfoo-native-json",
+        "plan_sha256": "sha256:7cde541c7929b82ac19cd063376dac7566a2d308726d7c946be87db056161ae7",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:aa5d9b81b2a4352173dd994935022083a452afc6cd3ec7a3b655b42bd2028d35"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:a440a71115dd8bd00ccd8ec7ed726f12d6f0c3a65717b586f189bff09080d4e5"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 48
+        },
+        "correction_of": null,
+        "directory": "judge/main/repeat-control-inspect-ai-envelope",
+        "event_sources": [
+          {
+            "member": "judge/main/repeat-control-inspect-ai-envelope/sources/inspect-events-1.json",
+            "sha256": "sha256:56e74fc0191750e1ddc271f37ca199b7e77428f71f2f79f320f7a9f7cc8039ec",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "2784bf209f224c6d9e25c8c9bec3df78ca9508fff7bed6c5eff7e2fd77aea8da",
+          "recipient_policy_sha256": "1bb92adcbf90c12eeaa869e9d9f974b5978a7eb306e9663b94a66d3e771f0da1",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/repeat-control-inspect-ai-envelope",
+        "plan_sha256": "sha256:876d1a676c3d6fca93b8eeb72982fd601d33a87dfa99d8b19d725b971d8d36ce",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:a11b2ec26c68d4709810400957caa15a66252aea0a89dce7d1821e69513dd5f0"
+        },
+        "trials": 48,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:74c8acb331704a639f9d65bc6f914ec86a67eadd1cfa698ba0a80427910d53a9"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 48
+        },
+        "correction_of": null,
+        "directory": "judge/main/repeat-control-inspect-ai-native-json",
+        "event_sources": [
+          {
+            "member": "judge/main/repeat-control-inspect-ai-native-json/sources/inspect-events-1.json",
+            "sha256": "sha256:f09908445c6d8b7aa6e18146093e5f6446fdb1347157460f840ea24990e766a1",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "4ec68b618516a34d454c681a35c3fe893132087a7e3c905aabfb522b5dd40ba5",
+          "recipient_policy_sha256": "3ea2a2a772e188e4815d86af458254128f6e2f4ea4de44fc4ec1c4a2bf6c70e1",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/repeat-control-inspect-ai-native-json",
+        "plan_sha256": "sha256:8e92a1a9d8c8ca264e261bd6ed5dd65ddca7785750479e6c85981be855ca2eaa",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:69b9f1845b2f3df863929b4f0706792838687042981aff1b314d21d35c37febb"
+        },
+        "trials": 48,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:fbc0194746431767b9b64a043820dca078533cc6c536241e17954d2aedac9d0b"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 48
+        },
+        "correction_of": null,
+        "directory": "judge/main/repeat-control-lm-evaluation-harness-envelope",
+        "event_sources": [
+          {
+            "member": "judge/main/repeat-control-lm-evaluation-harness-envelope/sources/inspect-events-1.json",
+            "sha256": "sha256:720a7d5e198a24e3f9b83f119557c63855f6b89bfcfc876622e8c43a4ce51338",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "7c5017f2ade4b768a72e94f481ff8f40173441b2fbfea64922a4e16c8711b153",
+          "recipient_policy_sha256": "fb572d13bf1c13d92f17b34bb9a301b3407f1f2b989b7bbc477cea257053f1c1",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/repeat-control-lm-evaluation-harness-envelope",
+        "plan_sha256": "sha256:7011ccd1abf781ea0f43b4748fd8aed3f9b54d423c13b363accbd1d3d9b1d93d",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:978b89dff2354a3e8a700976fcf3aba9c2709dc35f27bb7327d1e568abb89bf7"
+        },
+        "trials": 48,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:574430e06042e379dcf1c1cba323493dadb5913e01bb810da099da0457a6764e"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 48
+        },
+        "correction_of": null,
+        "directory": "judge/main/repeat-control-lm-evaluation-harness-native-json",
+        "event_sources": [
+          {
+            "member": "judge/main/repeat-control-lm-evaluation-harness-native-json/sources/inspect-events-1.json",
+            "sha256": "sha256:01de08d87ed8885a77131feb5d6b1b3a107637494c457e195c3d2a5931a3c97e",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "8ccaf11226d190dcba5cf37f5934ccf1de7dc28b4ccaeb9a6b34e1223a0d8174",
+          "recipient_policy_sha256": "d6d72349689acbb85b5a2cd188577bc7a6fa4a34e54ad225792611fbe49ed3f1",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/repeat-control-lm-evaluation-harness-native-json",
+        "plan_sha256": "sha256:32ce75b304b78773b75e2f83590f9b322437578399a259de0e9b39dcae9c7804",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:4836d87c5a5b1e67569f276a40ff927c6188776131a44ef417126066316f92e2"
+        },
+        "trials": 48,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:bb998afd7043335dc6dd72591dc947f3056aca2c9453acaac784d4275091cdc6"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 48
+        },
+        "correction_of": null,
+        "directory": "judge/main/repeat-control-promptfoo-envelope",
+        "event_sources": [
+          {
+            "member": "judge/main/repeat-control-promptfoo-envelope/sources/inspect-events-1.json",
+            "sha256": "sha256:91b8ca4216736979a0ebec89e77ce1c6f0b9571867213e5205aca485f5d798cb",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "4c35783471088fdea6549e9b2921a279c11943e46177cd42fe2ca3467b39263c",
+          "recipient_policy_sha256": "76e8812ce6bdcb9c8931a58d8820cb5eb9ffcec3f5544e9c24a4a4c633039f1d",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/repeat-control-promptfoo-envelope",
+        "plan_sha256": "sha256:a50522ffbbac6c81491511ac79c03fd86a825966e824bedfbd04ed1183fe6a85",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:ad6ba7cb96aa6eead340cc35fe763a0673b1cedc6d24fc9c1edbe472c099514b"
+        },
+        "trials": 48,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:e45b8a29542190801ac69005719d6d8d5bb8c7b7b0b6a6dac1e0d33af6ea1e07"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 48
+        },
+        "correction_of": null,
+        "directory": "judge/main/repeat-control-promptfoo-native-json",
+        "event_sources": [
+          {
+            "member": "judge/main/repeat-control-promptfoo-native-json/sources/inspect-events-1.json",
+            "sha256": "sha256:c2a29500e897c4a7e4879e9247eff96451d327f2e97449022a817b1c7b78701c",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "3592b86f1665470f280366454cf06f5e561599baa681ff3d2a7503372ed12eef",
+          "recipient_policy_sha256": "887ff1245a728c0b8ec991dc87a87307d2fb3bb7cafca214566338af020587e9",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "main/repeat-control-promptfoo-native-json",
+        "plan_sha256": "sha256:919081c6a1656cd8b3ec0112f577a624020f61d14de7feb6cad7564ce9bb5493",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:085a4b5638a7a21835d98bc3b7586e34b0fc0e35632e976a251121ebe65a4da0"
+        },
+        "trials": 48,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:5ab8aa1ee7de871c2b425b5914fb2b5ea31f600ae2d75c28cb644161662376d9"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": "main/primary-inspect-ai-envelope",
+        "directory": "judge/correction/primary-inspect-ai-envelope",
+        "event_sources": [
+          {
+            "member": "judge/correction/primary-inspect-ai-envelope/sources/inspect-events-1.json",
+            "sha256": "sha256:ac514dbd5919842f6e5de11d9e1aff182c9220447df286df21537984af3560e7",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "a01913c84c55e2ea8cea17372992275a76834bd69738392fcb70ae8430efabbc",
+          "recipient_policy_sha256": "c63100c11df182e87026e15d2baafd5f2fb2306470e05466fafcc11655dbda4e",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "correction/primary-inspect-ai-envelope",
+        "plan_sha256": "sha256:e35b92a4bd89d34b9a32d01ac5bb7b27acee11dae781585d99c257b095c5b5fa",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:f4612e427f7eaf97e8b24a5c3a759ea8a4bc70920d695473346d64c893815d6b"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:40c70fbb2941ba41c7761ecb9d9b41a42bbea446295fd2dc889c6bf770bbbe29"
+        }
+      },
+      {
+        "attempt_status": {
+          "completed": 16
+        },
+        "correction_of": "main/primary-inspect-ai-native-json",
+        "directory": "judge/correction/primary-inspect-ai-native-json",
+        "event_sources": [
+          {
+            "member": "judge/correction/primary-inspect-ai-native-json/sources/inspect-events-1.json",
+            "sha256": "sha256:22c6a4ef1761bb243a972794971850d3ff78adf3bbfca64cfa9d1818c0e4133f",
+            "source_id": "inspect-export"
+          }
+        ],
+        "expected": {
+          "accepted": false,
+          "authenticated": true,
+          "decision": "insufficient_evidence",
+          "envelope_sha256": "892c4c755533caf9b1e8bb0ebdedf1b23d3d87c49854501cc06150d6fbf90da7",
+          "recipient_policy_sha256": "a7771aeda2efcc66350b0faf99900fc90a08b126714f34206a888dcd2b0a2872",
+          "replayed": true,
+          "verified": true
+        },
+        "id": "correction/primary-inspect-ai-native-json",
+        "plan_sha256": "sha256:7e0a4013255dc394e753204da3dec13aac451e9681c93088deaf0e310a15a9cd",
+        "signer": {
+          "signer_identity": "live-luna-judge",
+          "signer_public_key_sha256": "sha256:2a6f3d0a69ebc5744c7912ff874bd0263f4e68c0db92f1ac466972d73eb09c73"
+        },
+        "trials": 16,
+        "verifier": {
+          "identity": "live-luna-recipient",
+          "signing_key_fingerprint": "sha256:3676a1bbc31912848eda5c52a96e417406e3ad19c6f5b3b5b6d9e34b2559f2c7"
+        }
+      }
+    ],
+    "protocol": "campaign/protocol.json",
+    "protocol_sha256": "sha256:e964bd9b396de61ceb1aa595f904c05a62de20081a4af21a3a4149d3d9d40c9b",
+    "scope": "Historical eight-case SDK integration sentinel. The archive preserves 32 original blocked/ambiguous attempts separately from 992 completed Luna ratings, including 32 later correction ratings. All 52 original policy decisions are insufficient_evidence; this is not a powered model-quality claim.",
+    "status": "retained reference"
+  }
+}

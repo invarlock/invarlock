@@ -125,6 +125,113 @@ def _common_context(
     return first, _short_context(cast(str, first))
 
 
+def _context_summary(
+    records: list[dict[str, Any]], key: str, container: str = "metadata"
+) -> str:
+    """Distinguish a complete multi-value field from absent or partial context."""
+    values: set[str] = set()
+    present = 0
+    for record in records:
+        context = record.get(container)
+        value = context.get(key) if isinstance(context, dict) else None
+        if isinstance(value, str) and value.strip():
+            present += 1
+            values.add(value)
+    if not present:
+        return "Unavailable in recorded context"
+    if present != len(records):
+        return "Mixed or incomplete across records"
+    if len(values) == 1:
+        return _short_context(next(iter(values)))
+    visible = ", ".join(_short_context(value, 96) for value in sorted(values)[:8])
+    if len(values) > 8:
+        visible += f", … ({len(values):,} values)"
+    return "Multiple recorded values: " + visible
+
+
+def _recorded_model_identity(
+    run: dict[str, Any], records: list[dict[str, Any]]
+) -> dict[str, str] | None:
+    """Read the model identity bound by maintained capture adapters.
+
+    The supported adapters retain the original worker identity either in the
+    normalized upstream record or in Langfuse's retained item metadata. Every
+    record must expose the same complete identity, and it must agree with the
+    run's attributed artifact and any older shallow display fields.
+    """
+
+    identities: list[dict[str, str] | None] = []
+    for record in records:
+        context = record.get("context")
+        if not isinstance(context, dict):
+            identities.append(None)
+            continue
+        candidates: list[Any] = []
+        upstream = context.get("upstream_record")
+        if isinstance(upstream, dict):
+            metadata = upstream.get("metadata")
+            if isinstance(metadata, dict):
+                candidates.append(metadata.get("invarlock_model_execution"))
+        langfuse = context.get("langfuse")
+        if isinstance(langfuse, dict):
+            item_result = langfuse.get("item_result")
+            item = item_result.get("item") if isinstance(item_result, dict) else None
+            metadata = item.get("metadata") if isinstance(item, dict) else None
+            if isinstance(metadata, dict):
+                candidates.append(metadata.get("invarlock_model_execution"))
+        candidates = [value for value in candidates if value is not None]
+        if not candidates:
+            identities.append(None)
+            continue
+        models: list[dict[str, str]] = []
+        usable = True
+        for value in candidates:
+            model = value.get("model") if isinstance(value, dict) else None
+            if not isinstance(model, dict):
+                usable = False
+                break
+            selected = {
+                key: model.get(key) for key in ("id", "revision", "artifact_digest")
+            }
+            if any(
+                not isinstance(value, str) or not value.strip()
+                for value in selected.values()
+            ):
+                usable = False
+                break
+            models.append(cast(dict[str, str], selected))
+        if not usable:
+            identities.append(None)
+            continue
+        if any(model != models[0] for model in models[1:]):
+            raise ValueError(
+                "recorded model execution identities contradict each other"
+            )
+        identities.append(models[0])
+    present = [identity for identity in identities if identity is not None]
+    if not present:
+        return None
+    if any(identity != present[0] for identity in present[1:]):
+        raise ValueError("recorded model identities differ across records")
+    identity = present[0]
+    artifact = run.get("artifact_digest")
+    if not isinstance(artifact, str):
+        return None
+    if artifact != identity["artifact_digest"]:
+        raise ValueError("recorded model identity contradicts the attributed artifact")
+    for key, legacy in (("id", "model_id"), ("revision", "model_revision")):
+        for record in records:
+            context = record.get("context")
+            if not isinstance(context, dict) or legacy not in context:
+                continue
+            shallow = context[legacy]
+            if not isinstance(shallow, str) or not shallow.strip():
+                raise ValueError("recorded model identity has invalid shallow context")
+            if shallow != identity[key]:
+                raise ValueError("recorded model identity contradicts shallow context")
+    return identity if len(present) == len(records) else None
+
+
 def _effective_messages(
     records: list[dict[str, Any]],
     source: str = "effective_messages",
@@ -249,6 +356,7 @@ def _captured_context(
     context = [("Evaluation mode", "Captured evaluator outputs")]
     service_details: list[tuple[str, Any]] = []
     model_keys = []
+    model_identities: list[dict[str, str] | None] = []
     messages = [
         _effective_messages(inputs[side]["records"]) for side in ("baseline", "subject")
     ]
@@ -268,12 +376,20 @@ def _captured_context(
             key: _common_context(records, key)
             for key in ("model_key", "model_id", "model_revision", "role")
         }
+        recorded_model = (
+            None
+            if run.get("service_identity") is not None
+            else _recorded_model_identity(run, records)
+        )
+        model_identities.append(recorded_model)
         model_keys.append(fields["model_key"][0])
         indexed = messages[0 if side == "baseline" else 1]
         label = side.title()
         identity = (
             "Recorded model ID: " + fields["model_id"][1]
             if fields["model_id"][0] is not None
+            else "Recorded model ID: " + _short_context(recorded_model["id"])
+            if recorded_model is not None
             else "Recorded model key: " + fields["model_key"][1]
             if fields["model_key"][0] is not None
             else "Recorded run: " + _short_context(str(run["run_id"]), 128)
@@ -339,7 +455,12 @@ def _captured_context(
         )
         recorded_context: tuple[tuple[str, str], ...] = (
             (label + " evaluator", evaluator),
-            (label + " model revision", fields["model_revision"][1]),
+            (
+                label + " model revision",
+                _short_context(recorded_model["revision"])
+                if recorded_model is not None
+                else fields["model_revision"][1],
+            ),
             (label + " capture role", fields["role"][1]),
             (
                 label + " workflow",
@@ -347,7 +468,7 @@ def _captured_context(
             ),
             (
                 label + " dataset",
-                _common_context(records, "dataset", "metadata")[1],
+                _context_summary(records, "dataset"),
             ),
             (label + " records", f"{len(records):,}"),
             (
@@ -406,6 +527,18 @@ def _captured_context(
             model += " This comparison does not identify the cause of an observed performance change or establish identical hidden weights."
         else:
             model = "The runs use different identity profiles: a model artifact and a hosted service. The service declaration does not identify model weights."
+    elif all(identity is not None for identity in model_identities):
+        left_identity, right_identity = cast(
+            tuple[dict[str, str], dict[str, str]], tuple(model_identities)
+        )
+        if left_identity == right_identity:
+            model = (
+                "Both runs record model ID "
+                + _short_context(left_identity["id"])
+                + " at the same revision and attributed artifact. Verification checks the retained identity bindings; the report does not reexecute the model."
+            )
+        else:
+            model = "The runs record different model IDs, revisions or attributed artifacts. Verification checks these retained identity bindings; the report does not reexecute either model."
     elif model_keys[0] is not None and model_keys[0] == model_keys[1]:
         model = (
             "Both runs record model key "

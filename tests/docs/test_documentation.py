@@ -813,7 +813,7 @@ def test_evaluator_docs_preserve_qualification_and_integration_depth() -> None:
 
     assert "Adapter support" in text
     assert "Replay authority" in text
-    assert "Signed-journey maturity" in text
+    assert "Signed OCI-journey maturity" in text
     assert "LM Evaluation Harness" in text
     assert "every retained independently replayable import" in normalized
     assert "102-record" in text

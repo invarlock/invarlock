@@ -46,3 +46,11 @@ examples/integrations/launch.py
 examples/integrations/lm-evaluation-harness/example.py
 examples/integrations/lm-evaluation-harness/launch.py
 examples/integrations/openai-evals/launch.py
+
+# Each driver executes inside its pinned evaluator environment in the mandatory
+# 19-profile SDK gate, including callback, failure and native import checks.
+# Campaign transport, bindings, recipient and worker controls remain covered by
+# the ordinary examples suite. Live model qualification is a separate gate.
+examples/integrations/evaluator-live/scalar.py
+examples/integrations/evaluator-live/batch.py
+examples/integrations/evaluator-live/harness.py

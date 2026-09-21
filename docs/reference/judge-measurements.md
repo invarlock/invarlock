@@ -229,6 +229,17 @@ zero collector retries, no tools or cache, and no inherited model settings.
 An admitted call without a retained result is an ambiguous timeout that cannot
 be retried. `verify` and `report` make no provider calls.
 
+Python collection callers can set `RunnerOptions.stop_after_batches` to a
+positive integer to pause after that many completed batches in the current
+invocation. Each batch's admitted calls finish and their results are durably
+retained before the runner reports `requested`; no later batch is admitted.
+Resume with the same plan, collection options and checkpoint directory, omitting
+the stop limit when ready to finish. Earlier calls and budget reservations remain
+in force. This execution control does not change plan or checkpoint identity and
+is not a request-file field. It does not cancel a provider request already in
+flight; the invocation deadline still applies. A complete schedule or exhausted
+budget takes precedence over the requested pause.
+
 Use `collect_configured` for Google's per-call clients. It fixes the endpoint to
 `https://generativelanguage.googleapis.com`, allows one SDK attempt, disables
 automatic function calling, and stops Inspect's internal malformed-function
@@ -267,8 +278,16 @@ Install the core with its live-collection extra and use the installed command:
 python -m pip install "invarlock[judge]"
 # Supply the key selected by the grader prefix through your secret manager.
 invarlock evaluate judge-request.yaml --preflight --json
-invarlock evaluate judge-request.yaml --signing-key signer-private.pem --json
+INVARLOCK_ALLOW_JUDGE_NETWORK=1 invarlock evaluate judge-request.yaml --signing-key signer-private.pem --json
 ```
+
+The process environment opt-in grants network access only within the configured
+judge lifecycle, including SDK initialization and cleanup. Native capture and
+other concurrent tasks retain the default network guard. Without that opt-in or
+an already allowed caller policy, collection stops before model construction or
+call admission. Use this scoped switch for native judge requests: the global
+`INVARLOCK_ALLOW_NETWORK` switch is incompatible with strict native execution.
+Preflight, retained-measurement import, verification and reporting remain offline.
 
 The `judge` extra installs pinned Inspect, OpenAI/OpenRouter, Anthropic, Google,
 and both HTTP client SDK dependencies directly. Collection, scoring,

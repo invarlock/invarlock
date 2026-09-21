@@ -6,13 +6,13 @@
   "$defs": {
     "object_digest": {
       "type": "string",
-      "pattern": "^[0-9a-f]{64}$",
+      "pattern": "^[0-9a-f]{64}(?![\\s\\S])",
       "minLength": 64,
       "maxLength": 64
     },
     "prefixed_digest": {
       "type": "string",
-      "pattern": "^sha256:[0-9a-f]{64}$",
+      "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])",
       "minLength": 71,
       "maxLength": 71
     },
@@ -185,7 +185,7 @@
         },
         "value": {
           "type": "string",
-          "pattern": "^[A-Za-z0-9+/]{86}==$",
+          "pattern": "^[A-Za-z0-9+/]{86}==(?![\\s\\S])",
           "minLength": 88,
           "maxLength": 88
         }

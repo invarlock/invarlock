@@ -7,12 +7,14 @@ import importlib
 import importlib.metadata
 import os
 from collections.abc import Callable, Mapping
+from contextlib import nullcontext
 from contextvars import ContextVar
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
 from invarlock.judge_measurement_types import JudgeMeasurementPlan, JudgeMeasurements
+from invarlock.security import network_policy_allows, temporarily_allow_network
 
 from .collector import (
     INSPECT_VERSION,
@@ -306,7 +308,43 @@ async def collect_configured(
     *,
     on_stop: Callable[[str], None] | None = None,
 ) -> JudgeMeasurements:
-    """Collect frozen judgments with pinned SDKs and an environment-only key."""
+    """Collect frozen judgments with pinned SDKs and an environment-only key.
+
+    ``runner.stop_after_batches`` requests a graceful invocation stop after
+    durable results, without changing the plan or checkpoint budget identity.
+    """
+    allow_judge_network = os.environ.get(
+        "INVARLOCK_ALLOW_JUDGE_NETWORK", ""
+    ).strip().lower() in {"1", "true", "yes", "on"}
+    if not allow_judge_network and not network_policy_allows():
+        raise InspectJudgeError(
+            "live judge collection requires an allowed network policy; "
+            "invoke only the collection command with INVARLOCK_ALLOW_JUDGE_NETWORK=1. "
+            "Preflight and retained-measurement import remain available offline"
+        )
+    with temporarily_allow_network() if allow_judge_network else nullcontext():
+        return await _collect_configured(
+            plan,
+            options,
+            runner,
+            baseline_run,
+            subject_run,
+            environment,
+            on_stop=on_stop,
+        )
+
+
+async def _collect_configured(
+    plan: JudgeMeasurementPlan,
+    options: CollectionOptions,
+    runner: RunnerOptions,
+    baseline_run: dict[str, Any],
+    subject_run: dict[str, Any],
+    environment: Mapping[str, str] | None,
+    *,
+    on_stop: Callable[[str], None] | None,
+) -> JudgeMeasurements:
+    """Keep model initialization, collection and cleanup inside the judge scope."""
     _check_options(plan, options)
     runner.validate()
     if plan["schedule"]["max_attempts"] != 1:

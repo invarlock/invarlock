@@ -53,15 +53,171 @@ _HEADER = "collection.json"
 _ADMISSION_PREFIX = "admission-"
 _RESULT_PREFIX = "result-"
 _LOCK = ".collection.lock"
+_PROVIDER_ERROR_TYPES = frozenset(
+    {
+        "APIError",
+        "APIConnectionError",
+        "APITimeoutError",
+        "APIStatusError",
+        "APIResponseValidationError",
+        "BadRequestError",
+        "AuthenticationError",
+        "PermissionDeniedError",
+        "NotFoundError",
+        "ConflictError",
+        "UnprocessableEntityError",
+        "RateLimitError",
+        "InternalServerError",
+    }
+)
+_TRANSPORT_ERROR_TYPES = frozenset(
+    {
+        "ConnectError",
+        "ConnectTimeout",
+        "PoolTimeout",
+        "ReadError",
+        "ReadTimeout",
+        "WriteError",
+        "WriteTimeout",
+        "RemoteProtocolError",
+        "LocalProtocolError",
+        "ProxyError",
+        "TimeoutException",
+    }
+)
+_ERROR_TYPES = {
+    "openai": _PROVIDER_ERROR_TYPES,
+    "openai._exceptions": _PROVIDER_ERROR_TYPES,
+    "anthropic": _PROVIDER_ERROR_TYPES,
+    "anthropic._exceptions": _PROVIDER_ERROR_TYPES,
+    "httpx": _TRANSPORT_ERROR_TYPES,
+    "httpx._exceptions": _TRANSPORT_ERROR_TYPES,
+    "httpx2": _TRANSPORT_ERROR_TYPES,
+    "httpx2._exceptions": _TRANSPORT_ERROR_TYPES,
+    "httpcore": _TRANSPORT_ERROR_TYPES,
+    "httpcore._exceptions": _TRANSPORT_ERROR_TYPES,
+    "httpcore2": _TRANSPORT_ERROR_TYPES,
+    "httpcore2._exceptions": _TRANSPORT_ERROR_TYPES,
+    "inspect_ai.model._model": frozenset({"ModelGenerateError", "AttemptTimeoutError"}),
+    "builtins": frozenset(
+        {
+            "TimeoutError",
+            "ConnectionRefusedError",
+            "ConnectionResetError",
+            "ConnectionAbortedError",
+            "ValueError",
+            "TypeError",
+            "RuntimeError",
+            "OSError",
+            "PermissionError",
+            "FileNotFoundError",
+        }
+    ),
+    "ssl": frozenset({"SSLError", "SSLCertVerificationError"}),
+    "socket": frozenset({"gaierror"}),
+}
+_PROVIDER_ERROR_CODES = frozenset(
+    {
+        "invalid_api_key",
+        "insufficient_quota",
+        "rate_limit_exceeded",
+        "context_length_exceeded",
+        "model_not_found",
+        "invalid_request_error",
+        "unsupported_value",
+        "invalid_value",
+        "unsupported_parameter",
+        "content_policy_violation",
+        "server_error",
+        "account_deactivated",
+    }
+)
+
+
+def _safe_failure(exception: Exception) -> tuple[str, dict[str, str]]:
+    """Retain only closed diagnostic identifiers, never provider error text."""
+    names: list[str] = []
+    seen: set[int] = set()
+    status_code: int | None = None
+    provider_code: str | None = None
+    incomplete = False
+    current: BaseException | None = exception
+    while current is not None and id(current) not in seen and len(seen) < 8:
+        seen.add(id(current))
+        kind = type(current)
+        known = kind.__name__ in _ERROR_TYPES.get(kind.__module__, ())
+        names.append(kind.__name__ if known else "UnknownError")
+        if known and kind.__module__.split(".", 1)[0] in {"openai", "anthropic"}:
+            fields = vars(current)
+            status = fields.get("status_code")
+            if status_code is None and type(status) is int and 100 <= status <= 599:
+                status_code = status
+            code = fields.get("code")
+            if (
+                provider_code is None
+                and type(code) is str
+                and code in _PROVIDER_ERROR_CODES
+            ):
+                provider_code = code
+        cause = current.__cause__
+        if cause is None:
+            if current.__suppress_context__:
+                incomplete = incomplete or current.__context__ is not None
+            else:
+                cause = current.__context__
+                # An exception raised while handling another is not proof that
+                # the earlier operation caused the current failure.
+                incomplete = incomplete or cause is not None
+        current = cause
+    incomplete = incomplete or current is not None
+    # Connection/pool failures precede sending application bytes. A provider's
+    # generic APIConnectionError can wrap read/write failures, so is insufficient.
+    before_send = bool({"ConnectError", "ConnectTimeout", "PoolTimeout"} & set(names))
+    ambiguous = bool(
+        {
+            "ReadError",
+            "ReadTimeout",
+            "WriteError",
+            "WriteTimeout",
+            "RemoteProtocolError",
+            "LocalProtocolError",
+        }
+        & set(names)
+    )
+    transport = (
+        before_send
+        and not ambiguous
+        and not incomplete
+        and "UnknownError" not in names
+        and status_code is None
+    )
+    return (
+        "transport_error" if transport else "timeout_ambiguous",
+        {
+            "code": "inspect-connect-failed" if transport else "inspect-call-failed",
+            "message": (
+                "Inspect judge call failed; exception_chain="
+                + ">".join(names)
+                + f"; http_status={status_code if status_code is not None else 'unavailable'}"
+                + f"; provider_code={provider_code or 'unavailable'}"
+            ),
+        },
+    )
 
 
 @dataclass(frozen=True)
 class RunnerOptions:
-    """Execution-only limits and durable checkpoint identity."""
+    """Execution limits and scorer identity for a durable checkpoint.
+
+    ``stop_after_batches`` stops this invocation after fully retained batches.
+    It is excluded from checkpoint identity, like the invocation timeout, so a
+    later invocation can resume with the same plan and collection budgets.
+    """
 
     checkpoint_directory: Path
     scorer_id: str
     invocation_timeout_seconds: int
+    stop_after_batches: int | None = None
 
     def validate(self) -> None:
         if not isinstance(self.checkpoint_directory, Path):
@@ -84,6 +240,11 @@ class RunnerOptions:
             raise InspectJudgeError(
                 "invocation_timeout_seconds must be between 1 and 604800"
             )
+        if self.stop_after_batches is not None and (
+            type(self.stop_after_batches) is not int
+            or not 1 <= self.stop_after_batches <= 1_000_000
+        ):
+            raise InspectJudgeError("stop_after_batches must be between 1 and 1000000")
 
 
 class _EventSink:
@@ -580,6 +741,7 @@ def _project_event(
     expected_request: dict[str, Any],
     options: CollectionOptions,
     failure_status: str | None,
+    failure_error: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     def public_message(message: Any) -> dict[str, str]:
         role = getattr(message, "role", None)
@@ -674,15 +836,18 @@ def _project_event(
     if failure_status is None and (
         event_error is not None or getattr(output, "error", None)
     ):
-        failure_status = (
-            "refusal" if getattr(output, "error", None) else "timeout_ambiguous"
-        )
+        failure_status = "timeout_ambiguous" if event_error is not None else "refusal"
     error = None
     if failure_status is not None:
         error = {
             "status": failure_status,
-            "code": "inspect-call-failed",
-            "message": "Inspect judge call did not complete",
+            **(
+                failure_error
+                or {
+                    "code": "inspect-call-failed",
+                    "message": "Inspect judge call did not complete",
+                }
+            ),
         }
         resolved_model = None
         projected_usage = None
@@ -783,7 +948,7 @@ def _project_event(
         },
         "output": {
             "model": resolved_model,
-            "request_id": _request_id(call_response, output),
+            "request_id": _request_id(call_response, output) if error is None else None,
             "finish_reason": stop_reason,
             "usage": projected_usage,
             "completion": completion
@@ -850,6 +1015,7 @@ async def _call_one(
         cls = classes[message["role"]]
         messages.append(cls(content=message["content"]))
     failure_status = None
+    failure_error = None
     try:
         with sink_module.use_model_event_sink(sink):
             async with asyncio.timeout(options.request_timeout_seconds):
@@ -860,19 +1026,27 @@ async def _call_one(
                     config=config,
                     cache=False,
                 )
-    except TimeoutError:
-        failure_status = "timeout_ambiguous"
-    except Exception:
-        if sink.complete is None:
-            failure_status = "timeout_ambiguous"
+    except TimeoutError as exc:
+        failure_status, failure_error = _safe_failure(exc)
+    except Exception as exc:
+        if (
+            sink.complete is None
+            or getattr(sink.complete, "error", None) is not None
+            or getattr(getattr(sink.complete, "output", None), "error", None)
+        ):
+            failure_status, failure_error = _safe_failure(exc)
     event = sink.complete or sink.pending
     if event is None:
-        raise InspectJudgeError("Inspect did not expose a model event for the call")
+        detail = f"; {failure_error['message']}" if failure_error is not None else ""
+        raise InspectJudgeError(
+            "Inspect did not expose a model event for the call" + detail
+        ) from None
     return _project_event(
         event,
         expected_request=request,
         options=options,
         failure_status=failure_status,
+        failure_error=failure_error,
     )
 
 
@@ -964,6 +1138,7 @@ async def _collect_pinned(
             for trial in checkpoint["trials"]
             if not trial["attempts"]
         )
+        completed_batches = 0
         while True:
             check_directory()
             admitted = min(len(pending), options.concurrency, state.capacity())
@@ -976,6 +1151,11 @@ async def _collect_pinned(
                     if not admitted
                     else "deadline"
                 )
+            if (
+                runner.stop_after_batches is not None
+                and completed_batches >= runner.stop_after_batches
+            ):
+                return stopped("requested")
 
             scheduled: list[tuple[dict[str, Any], dict[str, Any]]] = []
             for _ in range(admitted):
@@ -1087,6 +1267,7 @@ async def _collect_pinned(
             except BaseException:
                 await drain()
                 raise
+            completed_batches += 1
 
 
 async def collect(

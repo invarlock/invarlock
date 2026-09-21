@@ -1,0 +1,711 @@
+#!/usr/bin/env python3
+"""Replay native evaluator export contracts through an installed offline recipient.
+
+EM/NLL use original retained 400-case Mistral measurements and policies. Judge
+uses an explicitly synthetic complete measurement fixture. No evaluator SDK,
+model, judge service, or runtime container is executed by this program.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import importlib.util
+import json
+import os
+import subprocess
+from copy import deepcopy
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[3]
+HERE = Path(__file__).resolve().parent
+SPEC = importlib.util.spec_from_file_location(
+    "parity_native_shapes", HERE / "native_shapes.py"
+)
+if SPEC is None or SPEC.loader is None:
+    raise RuntimeError("cannot load evaluator native-shape definitions")
+SHAPES = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(SHAPES)
+SCORERS = ("exact_match", "normalized_nll", "judge")
+INPUT_FORMATS = ("envelope", "native-json")
+
+
+def require(condition, message):
+    """Enforce a qualification invariant even when Python optimization is active."""
+    if not condition:
+        raise ValueError(message)
+
+
+def read(path):
+    return json.loads(Path(path).read_bytes())
+
+
+def write(path, value):
+    path.write_text(json.dumps(value, indent=2, allow_nan=False) + "\n")
+
+
+def profiles():
+    return {
+        p["profile_id"]: p["upstream"]["version"]
+        for p in read(ROOT / "examples/evaluator-qualification/matrix.json")["profiles"]
+    }
+
+
+def retained(scorer):
+    if scorer == "judge":
+        rows = [
+            {
+                "id": f"synthetic-{i}",
+                "input": prompt,
+                "expected": output,
+                "output": output,
+                "metadata": {"fixture": "synthetic-no-judge-called"},
+            }
+            for i, (prompt, output) in enumerate(
+                (
+                    ("Capital of France?", "Paris"),
+                    ("Return the requested label.", "approved"),
+                )
+            )
+        ]
+        return (
+            [
+                {"records": deepcopy(rows), "artifact_digest": "sha256:" + marker * 64}
+                for marker in ("a", "b")
+            ],
+            {},
+            {
+                "scope": "Synthetic two-case full judge contract; ratings are constructed, not observed."
+            },
+        )
+    reference = read(
+        ROOT / "examples/captured-results/references/langfuse/reference.json"
+    )
+    runs, sources = [], {}
+    for side in ("baseline", "subject"):
+        origin = reference["sources"][f"{scorer}-{side}.json"]
+        raw = (ROOT / origin["path"]).read_bytes()
+        require(
+            "sha256:" + hashlib.sha256(raw).hexdigest() == origin["sha256"],
+            f"retained {scorer} {side} source digest differs",
+        )
+        runs.append(json.loads(raw))
+        sources[side] = origin
+    origin_root = (ROOT / sources["baseline"]["path"]).parents[2]
+    policy = read(origin_root / "evidence/inputs/policy.json")
+    expected = read(origin_root / "evidence/reports/evaluation.report.json")
+    return (
+        runs,
+        policy,
+        {
+            "scope": "Native-shape contract replay of retained Mistral measurements; not fresh SDK or model execution.",
+            "sources": sources,
+            "expected_metrics": expected["metrics"],
+            "expected_decision": expected["decision"],
+        },
+    )
+
+
+def _key(path):
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    from invarlock.evidence_pack_integrity import public_key_fingerprint
+
+    key = Ed25519PrivateKey.generate()
+    raw = key.private_bytes(
+        serialization.Encoding.PEM,
+        serialization.PrivateFormat.PKCS8,
+        serialization.NoEncryption(),
+    )
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(descriptor, "wb") as stream:
+        stream.write(raw)
+    return public_key_fingerprint(key.public_key())
+
+
+def read_native_captures(directory, evaluator, scorer, version):
+    """Read a closed capture manifest and exactly the two hash-bound JSON files."""
+    from invarlock.captured_contracts import read_file
+    from invarlock.evaluation_record_contracts.contracts import MAX_INPUT_BYTES
+    from invarlock.evidence_pack_json import parse_json_bytes
+
+    directory = Path(directory)
+    if directory.is_symlink() or not directory.is_dir():
+        raise ValueError("native capture path must be a real directory")
+    raw_manifest = read_file(directory / "origin.json", 65536)
+    manifest = parse_json_bytes(raw_manifest, label="native capture manifest")
+    if not isinstance(manifest, dict) or set(manifest) != {
+        "format",
+        "evaluator",
+        "source_version",
+        "scorer",
+        "files",
+        "provenance",
+    }:
+        raise ValueError("native capture manifest has invalid fields")
+    if (
+        manifest["format"] != "invarlock/evaluator-native-captures-v1"
+        or manifest["evaluator"] != evaluator
+        or manifest["source_version"] != version
+        or manifest["scorer"] != scorer
+        or not isinstance(manifest["provenance"], dict)
+        or not manifest["provenance"]
+    ):
+        raise ValueError("native capture manifest identity or provenance is invalid")
+    if not isinstance(manifest["files"], dict) or set(manifest["files"]) != {
+        "baseline",
+        "subject",
+    }:
+        raise ValueError("native capture manifest must bind both source files")
+    raw_sources = {}
+    for side in ("baseline", "subject"):
+        binding = manifest["files"][side]
+        if not isinstance(binding, dict) or set(binding) != {"sha256"}:
+            raise ValueError("native capture file binding has invalid fields")
+        raw = read_file(directory / f"{side}.json", MAX_INPUT_BYTES)
+        if binding["sha256"] != "sha256:" + hashlib.sha256(raw).hexdigest():
+            raise ValueError(f"native capture {side} digest mismatch")
+        raw_sources[side] = raw
+    return manifest, raw_manifest, raw_sources
+
+
+def export_pair(
+    output, evaluator, scorer, *, input_format="envelope", native_captures=None
+):
+    from invarlock.engine import export_evaluator_result
+    from invarlock.evaluation_records.adapters import load_run
+    from invarlock.evidence_pack_json import parse_json_bytes
+
+    originals, policy, origin = retained(scorer)
+    version = profiles()[evaluator]
+    supplied = None
+    if native_captures is not None:
+        manifest, raw_manifest, supplied = read_native_captures(
+            native_captures, evaluator, scorer, version
+        )
+        (output / "capture-origin.json").write_bytes(raw_manifest)
+        for side, raw in supplied.items():
+            (output / f"capture-{side}.json").write_bytes(raw)
+        origin["native_captures"] = {
+            "manifest": "capture-origin.json",
+            "manifest_sha256": "sha256:" + hashlib.sha256(raw_manifest).hexdigest(),
+            "provenance": manifest["provenance"],
+        }
+        origin["scope"] = (
+            "Supplied native captures of synthetic answers; judge ratings are constructed, not observed."
+            if scorer == "judge"
+            else "Supplied native captures of retained Mistral measurements; no fresh model execution."
+        )
+    sources, runs = [], []
+    projection = {
+        "lm-evaluation-harness": {
+            "kind": "json-pointer",
+            "pointer": "/context/arguments/0/0",
+        },
+        "promptfoo": {"kind": "json-pointer", "pointer": "/context/prompt"},
+    }.get(evaluator)
+    if supplied is not None and "input_projection" in manifest["provenance"]:
+        projection = manifest["provenance"]["input_projection"]
+    for side, original in zip(("baseline", "subject"), originals, strict=True):
+        path = output / f"{side}.json"
+        options = {
+            "source_version": version,
+            "run_id": f"parity-{scorer}-{side}",
+            "artifact_digest": original["artifact_digest"],
+        }
+        if "service_identity" in original:
+            options["service_identity"] = original["service_identity"]
+        if projection is not None:
+            options["input_projection"] = projection
+        native_payload = (
+            SHAPES.payload(
+                evaluator, original["records"], version, run_id=options["run_id"]
+            )
+            if supplied is None
+            else parse_json_bytes(supplied[side], label=f"native {side} capture")
+        )
+        adapter = {
+            "envelope": "evaluator-json",
+            "native-json": "evaluator-native-json",
+        }[input_format]
+        source = {
+            "path": path.name,
+            "adapter": adapter,
+            "source": {"name": evaluator, "version": version},
+            **{key: value for key, value in options.items() if key != "source_version"},
+        }
+        if input_format == "native-json":
+            # The capture process only writes its native JSON; core normalization and
+            # trust preparation happen in the separate recipient environment.
+            if supplied is not None:
+                path.write_bytes(supplied[side])
+            else:
+                if evaluator == "langfuse":
+                    native_payload = native_payload["result"]
+                write(path, native_payload)
+            run = load_run(path, **{k: v for k, v in source.items() if k != "path"})
+        else:
+            if supplied is not None and evaluator == "langfuse":
+                native_payload = {
+                    "format": "invarlock/langfuse-export-v1",
+                    "sdk_version": version,
+                    "result": native_payload,
+                }
+            run = export_evaluator_result(
+                evaluator,
+                native_payload,
+                path,
+                expected_ids=[r["id"] for r in original["records"]],
+                **options,
+            )
+        by_id = {r["id"]: r for r in original["records"]}
+        require(
+            set(by_id) == {r["id"] for r in run["records"]},
+            f"{evaluator} {scorer} {side} case membership differs",
+        )
+        for row in run["records"]:
+            before = by_id[row["id"]]
+            for key in ("input", "expected", "output", "metadata"):
+                require(
+                    row[key] == before[key],
+                    f"{evaluator} {scorer} {side} {key} differs",
+                )
+            require(
+                row.get("error") == before.get("error"),
+                f"{evaluator} {scorer} {side} error differs",
+            )
+            if scorer == "normalized_nll":
+                require(
+                    {
+                        k: v
+                        for k, v in row["likelihood"].items()
+                        if k not in {"source", "input_digest"}
+                    }
+                    == {
+                        k: v
+                        for k, v in before["likelihood"].items()
+                        if k not in {"source", "input_digest"}
+                    },
+                    f"{evaluator} {side} likelihood evidence differs",
+                )
+        runs.append(run)
+        sources.append(source)
+    return sources, runs, policy, origin
+
+
+def synthetic_measurements(plan, runs):
+    from invarlock.judge_measurements.contracts import (
+        canonical_payload,
+        expected_trial_id,
+        measurement_plan_digest,
+        render_judge_request,
+    )
+
+    fixture = read(HERE / "synthetic-judge.json")
+    digest = measurement_plan_digest(plan)
+    indexed = {
+        side: {r["id"]: r for r in run["records"]}
+        for side, run in zip(("baseline", "subject"), runs, strict=True)
+    }
+    trials = []
+    for binding in plan["answer_bindings"]:
+        for side in ("baseline", "subject"):
+            for repetition in range(1, plan["schedule"]["repetitions"] + 1):
+                row = indexed[side][binding["case_id"]]
+                request = render_judge_request(
+                    plan, input_text=row["input"], answer_text=row["output"]
+                )
+                index = len(trials)
+                attempt = deepcopy(fixture["attempt"])
+                attempt.update(
+                    resolved_model=plan["judge"]["approved_resolved_models"][0],
+                    request={
+                        "text": request.decode(),
+                        "sha256": hashlib.sha256(request).hexdigest(),
+                        "media_type": "application/json",
+                    },
+                    request_id=f"synthetic-request-{index}",
+                )
+                attempt["source"].update(
+                    source_id="synthetic",
+                    record_index=index,
+                    model_event_id=f"synthetic-event-{index}",
+                )
+                trials.append(
+                    {
+                        "trial_id": expected_trial_id(
+                            digest, binding["case_id"], side, repetition
+                        ),
+                        "case_id": binding["case_id"],
+                        "side": side,
+                        "repetition": repetition,
+                        "answer_sha256": binding[f"{side}_answer_sha256"],
+                        "plan_sha256": digest,
+                        "status": "complete",
+                        "attempts": [attempt],
+                        "selected_attempt": 1,
+                        "parse": {"status": "ok", "rating": "correct", "value": "1"},
+                    }
+                )
+    source = canonical_payload(
+        {"format": "invarlock/retained-judge-json-v1", "trials": trials}
+    )
+    return {
+        "format": "invarlock/judge-measurements-v1",
+        "profile_id": plan["profile_id"],
+        "plan_sha256": digest,
+        "source_profile": "retained-judge-json-v1",
+        "sources": [
+            {
+                "source_id": "synthetic",
+                "profile": "retained-judge-json-v1",
+                "encoding": "utf-8",
+                "byte_size": len(source),
+                "media_type": "application/json",
+                "content": source.decode(),
+                "sha256": hashlib.sha256(source).hexdigest(),
+            }
+        ],
+        "trials": trials,
+        "completeness": {
+            "status": "complete",
+            "expected_trials": len(trials),
+            "recorded_trials": len(trials),
+            "completed_trials": len(trials),
+        },
+    }
+
+
+def prepare(
+    output, evaluator, scorer, *, input_format="envelope", native_captures=None
+):
+    from invarlock.engine import captured_request_digest, normalize_captured_request
+    from invarlock.evaluation_records.io import run_digest
+
+    sources, runs, policy, origin = export_pair(
+        output,
+        evaluator,
+        scorer,
+        input_format=input_format,
+        native_captures=native_captures,
+    )
+    fingerprint = _key(output / "signer.pem")
+    _key(output / "verifier.pem")
+    request = {
+        "format_version": "invarlock/evaluation-request-v2",
+        "execution": {"mode": "captured"},
+        "comparison": {
+            "baseline": sources[0],
+            "subject": sources[1],
+            "policy": "policy.json",
+        },
+        "output": {"evidence": "evidence"},
+    }
+    if scorer == "judge":
+        from invarlock.judge_measurements.analysis import (
+            analyze_measurements,
+            decode_analysis_policy,
+        )
+        from invarlock.judge_measurements.captured_workflow import (
+            prepare_evaluator_judge,
+        )
+        from invarlock.judge_measurements.evidence import DECISION_SCOPE, object_sha256
+
+        recipe = read(HERE / "synthetic-judge.json")["recipe"]
+        recipe["plan"]["sampling"]["case_units"] = [
+            {"case_id": row["id"], "unit_id": row["id"]} for row in runs[0]["records"]
+        ]
+        plan, analysis_policy = prepare_evaluator_judge(recipe, *runs)
+        measurements = synthetic_measurements(plan, runs)
+        analysis = analyze_measurements(
+            plan,
+            measurements,
+            decode_analysis_policy(analysis_policy, plan=plan),
+            baseline_run=runs[0],
+            subject_run=runs[1],
+        ).to_dict()
+        require(
+            analysis["decision"] == "pass",
+            "synthetic judge contract did not produce its expected decision",
+        )
+        write(output / "measurements.json", measurements)
+        request["comparison"].update(
+            metric="judge",
+            judge={
+                "workspace": "unused-judge-work",
+                "signer_identity": "synthetic-parity-signer",
+                "measurements": "measurements.json",
+            },
+        )
+        trust = {
+            "format": "invarlock/judge-measurement-recipient-policy-v1",
+            "decision_scope": DECISION_SCOPE,
+            "intended_subject": runs[1]["artifact_digest"],
+            "required_metric_name": analysis_policy["metric_name"],
+            "trusted_signer": {
+                "identity": "synthetic-parity-signer",
+                "public_key_sha256": fingerprint,
+            },
+            "bindings": {
+                "baseline_run_sha256": run_digest(runs[0]),
+                "subject_run_sha256": run_digest(runs[1]),
+                "case_set_sha256": plan["case_set_sha256"],
+                "plan_sha256": object_sha256(plan),
+                "measurements_sha256": object_sha256(measurements),
+                "analysis_policy_sha256": object_sha256(analysis_policy),
+                "analysis_result_sha256": object_sha256(analysis),
+            },
+            "required_decision": "pass",
+        }
+        policy = recipe
+    else:
+        trust = {
+            "format": "invarlock/trust-inputs-v2",
+            "kind": "captured",
+            "policy": {"path": "policy.json"},
+            "anchors": {
+                "baseline_run_digest": run_digest(runs[0]),
+                "subject_run_digest": run_digest(runs[1]),
+                "request_digest": captured_request_digest(
+                    normalize_captured_request(
+                        request, baseline=runs[0], subject=runs[1], policy=policy
+                    )
+                ),
+                "evidence_signer_fingerprint": fingerprint,
+            },
+            "verifier": {
+                "identity": "evaluator-parity-recipient",
+                "signing_key_path": "verifier.pem",
+            },
+        }
+    write(output / "policy.json", policy)
+    write(output / "request.json", request)
+    write(output / "trust.json", trust)
+    write(output / "origin.json", origin)
+    return runs, origin
+
+
+def installed_identity(python):
+    code = """import importlib.util,json,invarlock
+from pathlib import Path
+from sysconfig import get_path
+package=Path(invarlock.__file__).resolve()
+if not package.is_relative_to(Path(get_path('purelib')).resolve()):
+ raise RuntimeError('recipient did not import the installed package')
+names=('inspect_ai','lm_eval','langfuse','deepeval','ragas','lighteval','evaluate','pydantic_evals','autoevals','openevals','mlflow','garak','evals','phoenix','opik','azure.ai.evaluation','evidently','trulens')
+absent=[]
+for name in names:
+ try: spec=importlib.util.find_spec(name)
+ except ModuleNotFoundError: spec=None
+ if spec is not None: raise RuntimeError('recipient unexpectedly contains '+name)
+ absent.append(name)
+print(json.dumps({'invarlock':invarlock.__file__,'sdk_modules_absent':absent}))"""
+    return json.loads(
+        subprocess.run(
+            [str(python), "-I", "-c", code],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        ).stdout
+    )
+
+
+def journey(
+    output, evaluator, scorer, python, *, input_format="envelope", native_captures=None
+):
+    runs, origin = prepare(
+        output,
+        evaluator,
+        scorer,
+        input_format=input_format,
+        native_captures=native_captures,
+    )
+    environment = dict(os.environ)
+    environment.pop("PYTHONPATH", None)
+    environment.pop("INVARLOCK_SIGNING_KEY", None)
+    environment.pop("INVARLOCK_ALLOW_NETWORK", None)
+    environment.pop("INVARLOCK_ALLOW_JUDGE_NETWORK", None)
+    commands = []
+
+    def command(*args, allowed=(0,)):
+        bootstrap = (
+            "import runpy,socket,sys\n"
+            "def blocked(*args,**kwargs): raise RuntimeError('evaluator parity forbids network calls')\n"
+            "socket.socket.connect=blocked; socket.create_connection=blocked\n"
+            "sys.argv=['invarlock',*sys.argv[1:]]\n"
+            "runpy.run_module('invarlock',run_name='__main__')"
+        )
+        result = subprocess.run(
+            [str(python), "-I", "-c", bootstrap, *map(str, args)],
+            cwd=output,
+            env=environment,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        commands.append(
+            {"command": list(map(str, args)), "exit_code": result.returncode}
+        )
+        require(
+            result.returncode in allowed,
+            result.stdout + result.stderr,
+        )
+        return json.loads(result.stdout)
+
+    status = 7 if scorer == "normalized_nll" else 0
+    decision = "regression" if status else "pass"
+    preflight = command(
+        "evaluate",
+        "request.json",
+        "--preflight",
+        "--signing-key",
+        "signer.pem",
+        "--json",
+    )
+    require(
+        preflight["ok"] and not (output / "evidence").exists(),
+        "preflight failed or published evidence",
+    )
+    write(output / "preflight.json", preflight)
+    evaluated = command(
+        "evaluate",
+        "request.json",
+        "--signing-key",
+        "signer.pem",
+        "--fail-on-policy",
+        "--json",
+        allowed=(status,),
+    )
+    require(
+        evaluated["authentication"] == "signed" and evaluated["decision"] == decision,
+        "evaluation authentication or decision differs",
+    )
+    receipt_args = (
+        [] if scorer == "judge" else ["--receipt", "verification.receipt.json"]
+    )
+    verified = command(
+        "verify",
+        "evidence",
+        "--trust-profile",
+        "trust.json",
+        *receipt_args,
+        "--json",
+        allowed=(status,),
+    )
+    write(output / "verification.json", verified)
+    if scorer == "judge":
+        require(
+            verified["authenticated"] and verified["replayed"] and verified["accepted"],
+            "judge verification did not authenticate, replay and accept",
+        )
+        require(
+            not (output / "unused-judge-work").exists(),
+            "retained judge replay unexpectedly collected new measurements",
+        )
+    else:
+        require(
+            verified["integrity_ok"] and verified["replay_status"] == "completed",
+            "deterministic verification did not complete with intact evidence",
+        )
+        require(
+            verified["decision"] == origin["expected_decision"],
+            "deterministic verification decision differs",
+        )
+        actual = read(output / "evidence/reports/evaluation.report.json")
+        # Native input wrappers can change the resampling representation. The
+        # independent recipient verifies each interval; original point facts and
+        # policy outcomes must remain identical.
+        require(
+            [
+                {k: v for k, v in metric.items() if k != "interval"}
+                for metric in actual["metrics"]
+            ]
+            == [
+                {k: v for k, v in metric.items() if k != "interval"}
+                for metric in origin["expected_metrics"]
+            ],
+            "deterministic point estimates or policy results differ",
+        )
+    command("report", "evidence", "--html", "report.html", "--json")
+    require(
+        evaluator in (output / "report.html").read_text(),
+        "report omits the evaluator identity",
+    )
+    for side, run in zip(("baseline", "subject"), runs, strict=True):
+        path = (
+            output
+            / "evidence"
+            / (f"{side}_run.json" if scorer == "judge" else f"records/{side}.json")
+        )
+        require(read(path) == run, f"published {side} run differs from capture")
+    # An output-byte change must fail original independent trust, even if parseable.
+    path = (
+        output
+        / "evidence"
+        / ("subject_run.json" if scorer == "judge" else "records/subject.json")
+    )
+    raw = path.read_bytes()
+    modified = json.loads(raw)
+    modified["records"][0]["output"] = "tampered"
+    mode = path.stat().st_mode & 0o777
+    path.chmod(mode | 0o200)
+    try:
+        write(path, modified)
+        rejected = command(
+            "verify",
+            "evidence",
+            "--trust-profile",
+            "trust.json",
+            "--json",
+            allowed=(4 if scorer == "judge" else 2,),
+        )
+    finally:
+        path.write_bytes(raw)
+        path.chmod(mode)
+    require(
+        not rejected.get("accepted", False),
+        "tampered evidence was unexpectedly accepted",
+    )
+    write(output / "tamper-refusal.json", rejected)
+    result = {
+        "evaluator": evaluator,
+        "scorer": scorer,
+        "input_format": input_format,
+        "decision": decision,
+        "verification_exit_code": status,
+        "tamper_rejected": True,
+        "record_count": len(runs[0]["records"]),
+        "scope": origin["scope"],
+        "commands": commands,
+    }
+    write(output / "result.json", result)
+    return result
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--evaluator", choices=profiles(), required=True)
+    parser.add_argument("--scorer", choices=SCORERS, required=True)
+    parser.add_argument("--input-format", choices=INPUT_FORMATS, default="envelope")
+    parser.add_argument("--native-captures", type=Path)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--recipient-python", type=Path, required=True)
+    args = parser.parse_args()
+    identity = installed_identity(args.recipient_python)
+    output = args.output.resolve()
+    output.mkdir(parents=True, exist_ok=False)
+    result = journey(
+        output,
+        args.evaluator,
+        args.scorer,
+        args.recipient_python.absolute(),
+        input_format=args.input_format,
+        native_captures=args.native_captures,
+    )
+    print(json.dumps({**result, "recipient": identity}, indent=2))
+
+
+if __name__ == "__main__":
+    main()

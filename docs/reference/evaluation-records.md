@@ -37,6 +37,7 @@ copies under `src/invarlock/_data/contracts/`.
 
 | Schema | Wire identifier | Meaning |
 | --- | --- | --- |
+| `evaluator_export.schema.json` | `invarlock/evaluator-export-v1` | Source-specific native payload with explicit evaluator version and run ID |
 | `evaluation_run.schema.json` | `invarlock/evaluation-run-v1` | Complete canonical run with records and score provenance |
 | `evaluation_case_set.schema.json` | `invarlock/evaluation-case-set-v1` | Independently reviewed IDs, inputs, expected values and metadata |
 | `comparison_policy.schema.json` | `invarlock/comparison-policy-v1` | Metric, slice, sample, interval and subject-bound requirements |
@@ -58,8 +59,10 @@ part of the complete run. Canonical `run_digest` covers the whole normalized run
 including provenance and all records, not just its model or schedule. Do not
 substitute a raw export checksum for a complete-run pin.
 
-`load_run` supports `invarlock`, `jsonl`, `inspect-json`, `lm-eval-samples`, and
-`promptfoo-jsonl`, and `langfuse-json`. These adapters normalize recorded outputs, never register a
+`load_run` supports `invarlock`, `jsonl`, `evaluator-native-json`, `evaluator-json`,
+`inspect-json`,
+`lm-eval-samples`, `promptfoo-jsonl`, and `langfuse-json`.
+These adapters normalize recorded outputs, never register a
 runtime provider or import execution authority. Original upstream bytes and
 their `source_digest` remain unchanged. A canonical `invarlock` run supplies its
 own metadata; external adapters require explicit source, run ID and artifact
@@ -68,6 +71,107 @@ are used. External captured request sources accept `artifact_digest: null`
 with the complete `service_identity` descriptor. Canonical `adapter: invarlock`
 runs carry their own descriptor and reject source identity overrides. The
 external parser also binds the original file bytes through `source_digest`.
+
+## Dedicated evaluator exports
+
+For an existing pipeline, save its native cases or results as JSON and use
+`adapter: evaluator-native-json` in the captured request. Dedicated mappings
+cover all 19 maintained ecosystems. Your pipeline keeps its current evaluator environment;
+evaluation, verification and reporting run in a separate core InvarLock
+environment without the upstream SDK. No common export envelope or SDK-side
+InvarLock installation is required; the file follows its evaluator's documented JSON profile.
+
+For example, use Ragas's own explicit serializer after retaining your
+`SingleTurnSample` objects and their planned IDs:
+
+```python
+import json
+
+rows = [{"id": case_id, "sample": sample.model_dump(mode="json")}
+        for case_id, sample in captured_samples]
+if [row["id"] for row in rows] != planned_ids:
+    raise ValueError("capture differs from the complete planned schedule")
+with open("subject-native.json", "x", encoding="utf-8") as stream:
+    json.dump(rows, stream, ensure_ascii=False, allow_nan=False)
+```
+
+`captured_samples` and the independently frozen `planned_ids` belong to your
+workflow. Export the baseline in the same way, preserving failed cases. Declare
+the raw file, actual SDK version, run ID and evaluated model identity in each
+captured request source:
+
+```yaml
+path: subject-native.json
+adapter: evaluator-native-json
+source: {name: ragas, version: "0.4.3"}
+run_id: subject-campaign
+artifact_digest: "<actual model artifact digest>"
+```
+
+Use the version actually captured. For hosted models, declare
+`artifact_digest: null` and the [complete service descriptor](#hosted-service-identity).
+Pin an independently reviewed `expected_case_set_digest` in policy to reject
+missing or changed scheduled cases, and an approved `expected_run_digest` on
+each source when required. Raw-file digests bind the imported bytes; the source
+name and version remain explicit attribution rather than proof of execution.
+
+When the evaluator SDK and InvarLock dependency requirements are compatible,
+the shared Python exporter also accepts native SDK objects directly:
+
+```python
+from importlib.metadata import version
+from invarlock.engine import export_evaluator_result, evaluator_input_capabilities
+
+run = export_evaluator_result(
+    "ragas",
+    [{"id": case_id, "sample": sample} for case_id, sample in captured_samples],
+    "subject-export.json",
+    expected_ids=planned_ids,
+    source_version=version("ragas"),
+    run_id="subject-campaign",
+    artifact_digest=model_artifact_digest,
+)
+print(evaluator_input_capabilities(run))
+```
+
+This convenience API checks complete case membership before writing, refuses
+an existing destination, and returns a validated canonical run. Its output is
+an `invarlock/evaluator-export-v1` envelope consumed with
+`adapter: evaluator-json`, using the same source/run/model declarations. For
+hosted models pass `artifact_digest=None, service_identity=identity`.
+Both adapters use the same source-specific mapping and downstream scorers.
+
+Keep pinned MLflow 3.14.0 in a separate environment: it requires
+`cryptography<49`, while core InvarLock requires `cryptography>=50`. Export the
+original prediction table as JSON and use `evaluator-native-json`; no core
+dependency change is needed. SDK serializer smoke tests run from source with
+minimal test dependencies and do not establish SDK/core co-installation.
+
+The [native shape recipes](https://github.com/invarlock/invarlock/blob/main/examples/evaluator-qualification/maintained/CAPTURE.md#dedicated-native-shapes)
+cover Harness, Inspect, Promptfoo, DeepEval, Ragas, LightEval, Hugging Face
+Evaluate, Pydantic Evals, AutoEvals, OpenEvals, MLflow, Garak, OpenAI Evals,
+Phoenix Evals, Langfuse, Opik, Azure AI Evaluation, Evidently and TruLens.
+With compatible co-installation, Inspect EvalLog and Langfuse ExperimentResult
+objects can be passed directly to the Python exporter. The raw-file route uses
+Inspect's JSON log or bare public Langfuse ExperimentResult fields, including
+`item_results`; it does not require a Langfuse-specific InvarLock envelope. Original outputs can be captured before
+upstream grading. Scalar SDK wrappers
+accept an optional `metric_result`; no extra evaluator call is required to use
+InvarLock's scorers. Reference fields may be omitted for reference-free judge
+tasks where the native profile permits them; exact match and NLL still require
+a reference. Structured outputs remain JSON for compatible policies; text-only
+scorers do not stringify them. Aggregate-only reports still need the original per-case
+prediction table or attempts.
+
+Per-case string metadata supplies policy slices. Optional
+`metadata.invarlock_scores` selects named finite numeric observations; native
+per-case numeric metrics are also retained where the profile defines them.
+Recorded-score policies require explicit `score_provenance` at export/import
+and matching `accepted_provenance` in policy. Numeric metrics do not become
+likelihoods or judge calls. Preserve actual continuation facts under
+`metadata.invarlock_likelihood` for NLL, and supply the separate complete judge
+measurement contract for judging. See [scorer selection](#capture-and-explicit-input-projections)
+and [policy requirements](#policy-and-identity).
 
 ## Langfuse experiments
 
@@ -198,10 +302,14 @@ the comparison is the ratio of subject and baseline means, with the same paired
 resampling method as native NLL. Interval width is measured in ratio units.
 Reference and configuration bindings and the declared tokenizer identities are
 checked before scoring. Replay does not execute the model or tokenizer, so their
-measurement claims remain source assertions. The separate
-[real Harness likelihood reference](https://github.com/invarlock/invarlock/blob/main/examples/captured-results/references/harness-likelihood/README.md)
-retains six same-model CPU pairs; synthetic contract tests and historical
-exact-match qualifications do not establish other native likelihood profiles.
+measurement claims remain source assertions. The
+[retained Mistral 7B sentinel](https://github.com/invarlock/invarlock/blob/main/examples/integrations/evaluator-live/references/mistral-7b-sentinel/README.md)
+contains fresh generation and reference-likelihood measurements across all 19
+maintained evaluator profiles, both import routes and two model artifacts. The
+[Harness likelihood reference](https://github.com/invarlock/invarlock/blob/main/examples/captured-results/references/harness-likelihood/README.md)
+is a smaller six-pair, same-model CPU control. Each reference qualifies its
+recorded profile; synthetic contract tests and exact-match results alone do not
+establish likelihood measurement support.
 
 Judge selection uses the separate judge recipe and retained measurement contract
 through the same captured request. It does not reinterpret a `recorded` scalar

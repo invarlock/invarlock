@@ -1,0 +1,79 @@
+name: Evaluator SDK capture
+
+on:
+  pull_request:
+    paths:
+      - 'src/invarlock/**'
+      - 'contracts/**'
+      - 'requirements/workflows/core-py312.txt'
+      - 'requirements/workflows/release-install-py312.txt'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - 'tests/evaluation_records/**'
+      - 'tests/examples/test_langfuse_export.py'
+      - 'tests/integration/test_evaluator_parity.py'
+      - 'examples/integrations/evaluator-parity/**'
+      - 'examples/integrations/evaluator-live/**'
+      - 'examples/evaluator-qualification/maintained/CAPTURE.md'
+      - 'examples/evaluator-qualification/locks/**'
+      - 'examples/evaluator-qualification/matrix.json'
+      - 'scripts/evaluator_sdk_gate.sh'
+      - 'Makefile'
+      - '.github/workflows/evaluator-sdk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        evaluator:
+          - lm-evaluation-harness
+          - inspect-ai
+          - promptfoo
+          - deepeval
+          - ragas
+          - lighteval
+          - hugging-face-evaluate
+          - pydantic-evals
+          - autoevals
+          - openevals
+          - mlflow
+          - garak
+          - openai-evals
+          - arize-phoenix-evals
+          - langfuse
+          - opik
+          - azure-ai-evaluation
+          - evidently
+          - trulens
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Set up uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4
+        with:
+          version: '0.10.10'
+      - name: Set up Node for Promptfoo
+        if: ${{ matrix.evaluator == 'promptfoo' }}
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '22.22.0'
+      - name: Exercise the pinned SDK without model or service calls
+        env:
+          EVALUATOR: ${{ matrix.evaluator }}
+        run: make evaluator-sdk-test EVALUATOR="$EVALUATOR"
