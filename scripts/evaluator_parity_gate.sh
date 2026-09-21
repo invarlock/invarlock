@@ -42,9 +42,13 @@ INVARLOCK_EVALUATOR_PARITY_PYTHON="${PARITY_RECIPIENT}" \
 # the campaigns' original passing, rejected and insufficient-evidence results.
 SENTINEL="${ROOT_DIR}/examples/integrations/evaluator-live/references/mistral-7b-sentinel"
 PRIORITY="${ROOT_DIR}/examples/integrations/evaluator-live/references/priority-workflows"
-"${PARITY_RECIPIENT}" -I "${SENTINEL}/replay.py"
+"${PARITY_RECIPIENT}" -I "${SENTINEL}/replay.py" \
+  > "${PARITY_TEMP}/sentinel-replay.json"
+echo "Retained sentinel exact-match and NLL replay passed (76 packs)."
 "${PARITY_RECIPIENT}" -I "${SENTINEL}/judge_replay.py" \
   --output "${PARITY_TEMP}/sentinel-judge"
-"${PARITY_RECIPIENT}" -I "${PRIORITY}/replay.py"
+"${PARITY_RECIPIENT}" -I "${PRIORITY}/replay.py" \
+  > "${PARITY_TEMP}/priority-replay.json"
+echo "Retained priority exact-match and NLL replay passed (32 packs)."
 "${PARITY_RECIPIENT}" -I "${PRIORITY}/judge_replay.py" \
   --output "${PARITY_TEMP}/priority-judge"
