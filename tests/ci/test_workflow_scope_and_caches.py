@@ -212,7 +212,11 @@ def test_release_requires_sdk_tests_in_its_measured_interpreter():
         "requirements/workflows/langfuse-sdk-tests-py313.txt",
     ):
         assert f"python -m pip install --require-hashes -r {lock}" in install["run"]
-    assert install["run"].strip().endswith("python -m pip check")
+    commands = install["run"].strip().splitlines()
+    assert commands[-2:] == [
+        "python -m pip check",
+        "python -m pytest tests/cli/test_cli_surface.py -q",
+    ]
 
     verify = next(
         item for item in steps if item.get("name") == "Run complete repository gates"

@@ -201,6 +201,7 @@ jobs:
           python -m pip install --require-hashes -r requirements/workflows/inspect-judge-tests-py313.txt
           python -m pip install --require-hashes -r requirements/workflows/langfuse-sdk-tests-py313.txt
           python -m pip check
+          python -m pytest tests/cli/test_cli_surface.py -q
       - name: Enforce release coverage
         env:
           INVARLOCK_REQUIRE_INSPECT_SDK: "1"
