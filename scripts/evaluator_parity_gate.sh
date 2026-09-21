@@ -6,7 +6,15 @@ PARITY_PYTHON="${PYTHON:-python3}"
 PARITY_PYTHON="$("${PARITY_PYTHON}" -c 'import sys; print(sys.executable)')"
 PARITY_TAG="$("${PARITY_PYTHON}" -c 'import sys; print(f"{sys.version_info.major}{sys.version_info.minor}")')"
 PARITY_LOCK="${ROOT_DIR}/requirements/workflows/release-install-py${PARITY_TAG}.txt"
+PARITY_RETAINED="${INVARLOCK_REPLAY_RETAINED_CAMPAIGNS:-1}"
 test -f "${PARITY_LOCK}"
+case "${PARITY_RETAINED}" in
+  0|1) ;;
+  *)
+    echo "INVARLOCK_REPLAY_RETAINED_CAMPAIGNS must be 0 or 1" >&2
+    exit 2
+    ;;
+esac
 PARITY_TEMP="$(mktemp -d "${TMPDIR:-/tmp}/invarlock-evaluator-parity.XXXXXX")"
 trap 'rm -rf "${PARITY_TEMP}"' EXIT
 trap 'exit 129' HUP
@@ -27,15 +35,21 @@ PARITY_RECIPIENT="${PARITY_TEMP}/recipient/bin/python"
 "${PARITY_RECIPIENT}" -m pip install --no-index "${parity_wheels[0]}"
 "${PARITY_RECIPIENT}" -m pip check
 cd "${PARITY_TEMP}"
-"${PARITY_RECIPIENT}" -I \
-  "${ROOT_DIR}/examples/integrations/evaluator-parity/real_judge.py" \
-  --recipient-python "${PARITY_RECIPIENT}" \
-  --output "${PARITY_TEMP}/retained-judge"
 INVARLOCK_EVALUATOR_PARITY_PYTHON="${PARITY_RECIPIENT}" \
   "${PARITY_PYTHON}" -m pytest -q \
   "${ROOT_DIR}/tests/integration/test_evaluator_parity.py" \
   -k test_installed_sdk_free_recipient_signed_journey -n "${PARITY_WORKERS:-4}" \
   --override-ini=addopts= --basetemp "${PARITY_TEMP}/journeys"
+
+if [[ "${PARITY_RETAINED}" = "0" ]]; then
+  echo "Installed evaluator parity passed; retained campaign replay is reserved for full release validation."
+  exit 0
+fi
+
+"${PARITY_RECIPIENT}" -I \
+  "${ROOT_DIR}/examples/integrations/evaluator-parity/real_judge.py" \
+  --recipient-python "${PARITY_RECIPIENT}" \
+  --output "${PARITY_TEMP}/retained-judge"
 
 # Replay every retained pack from the fresh evaluator campaigns through the
 # same isolated candidate recipient. These commands are offline and preserve

@@ -66,6 +66,13 @@ def test_ci_runs_the_repository_gates() -> None:
     assert _step(fast, "Build, install, and validate distributions")["run"] == (
         "make install-smoke inspect-judge-sdk-test langfuse-sdk-test"
     )
+    assert _step(
+        fast,
+        "Check all dedicated evaluator profiles with an installed recipient",
+    )["run"] == (
+        "INVARLOCK_REPLAY_RETAINED_CAMPAIGNS=0 "
+        "PYTHON=python bash scripts/evaluator_parity_gate.sh"
+    )
     assert _step(fast, "Lint workflows")["run"].endswith("make workflow-lint\n")
 
     minimum = jobs["minimum-python"]
@@ -79,6 +86,13 @@ def test_ci_runs_the_repository_gates() -> None:
     assert _step(minimum, "Check command surface")["run"] == "make cli-smoke-core"
     assert _step(minimum, "Build, install, and validate distributions")["run"] == (
         "make install-smoke inspect-judge-sdk-test langfuse-sdk-test"
+    )
+    assert _step(
+        minimum,
+        "Check all dedicated evaluator profiles with an installed recipient",
+    )["run"] == (
+        "INVARLOCK_REPLAY_RETAINED_CAMPAIGNS=0 "
+        "PYTHON=python bash scripts/evaluator_parity_gate.sh"
     )
     assert minimum["timeout-minutes"] >= 35
 

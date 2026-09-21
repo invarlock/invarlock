@@ -199,6 +199,11 @@ packs, 32 priority exact-match/NLL packs and 24 priority judge packs. The gate
 authenticates and preserves their original outcomes; it does not rerun models or
 call judge providers.
 
+Routine pull-request jobs run the same 114 installed profile journeys on Python
+3.12 and 3.13 with retained campaign replay disabled. The interpreter-independent
+campaign archives replay once in the full release workflow, avoiding duplicate
+work while keeping the release gate complete.
+
 The three-scorer consumer additionally exercises exact-match, normalized-NLL and
 judge selection through captured v2 requests and public SDK capture/import helpers.
 Its copied fixture inventory includes `collection.json`; tests exercise that

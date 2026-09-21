@@ -123,7 +123,10 @@ jobs:
       - name: Build, install, and validate distributions
         run: make install-smoke inspect-judge-sdk-test langfuse-sdk-test
       - name: Check all dedicated evaluator profiles with an installed recipient
-        run: make evaluator-parity-test
+        run: >-
+          INVARLOCK_REPLAY_RETAINED_CAMPAIGNS=0
+          PYTHON=python
+          bash scripts/evaluator_parity_gate.sh
       - name: Lint workflows
         run: |
           gopath="$(go env GOPATH)"
@@ -170,7 +173,10 @@ jobs:
       - name: Build, install, and validate distributions
         run: make install-smoke inspect-judge-sdk-test langfuse-sdk-test
       - name: Check all dedicated evaluator profiles with an installed recipient
-        run: make evaluator-parity-test
+        run: >-
+          INVARLOCK_REPLAY_RETAINED_CAMPAIGNS=0
+          PYTHON=python
+          bash scripts/evaluator_parity_gate.sh
 
   coverage-tests:
     if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.full) }}
