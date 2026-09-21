@@ -1544,6 +1544,7 @@ dev = [
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pytest-xdist" },
+    { name = "readme-renderer", extra = ["md"] },
     { name = "ruff" },
     { name = "setuptools" },
     { name = "twine" },
@@ -1625,6 +1626,7 @@ test = [
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pytest-xdist" },
+    { name = "readme-renderer", extra = ["md"] },
 ]
 
 [package.metadata]
@@ -1687,6 +1689,7 @@ dev = [
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "pytest-cov", specifier = ">=7.1.0" },
     { name = "pytest-xdist", specifier = ">=3.6" },
+    { name = "readme-renderer", extras = ["md"], specifier = "==45.0" },
     { name = "ruff", specifier = "==0.16.7" },
     { name = "setuptools", specifier = ">=83.0.0" },
     { name = "twine", specifier = ">=4.0.0" },
@@ -1766,6 +1769,7 @@ test = [
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "pytest-cov", specifier = ">=7.1.0" },
     { name = "pytest-xdist", specifier = ">=3.6" },
+    { name = "readme-renderer", extras = ["md"], specifier = "==45.0" },
 ]
 
 [[package]]
