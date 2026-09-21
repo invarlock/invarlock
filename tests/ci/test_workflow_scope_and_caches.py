@@ -163,7 +163,9 @@ def test_runtime_coverage_requires_pinned_sdk_tests_in_its_measured_interpreter(
         step for step in sdk_steps if step["if"] == "${{ matrix.shard == 'runtime' }}"
     )
     examples = next(
-        step for step in sdk_steps if step["if"] == "${{ matrix.shard == 'examples' }}"
+        step
+        for step in sdk_steps
+        if step["if"] == "${{ startsWith(matrix.shard, 'examples') }}"
     )
     assert (
         "--require-hashes -r requirements/workflows/langfuse-sdk-tests-py313.txt"
@@ -179,7 +181,7 @@ def test_runtime_coverage_requires_pinned_sdk_tests_in_its_measured_interpreter(
     assert steps.index(install) < steps.index(collect)
     assert steps.index(examples) < steps.index(collect)
     assert collect["env"]["INVARLOCK_REQUIRE_INSPECT_SDK"] == (
-        "${{ (matrix.shard == 'runtime' || matrix.shard == 'examples') && '1' || '0' }}"
+        "${{ (matrix.shard == 'runtime' || startsWith(matrix.shard, 'examples')) && '1' || '0' }}"
     )
     assert "INVARLOCK_REQUIRE_INSPECT_SDK" not in jobs["coverage"].get("env", {})
 
@@ -219,7 +221,9 @@ def test_release_requires_sdk_tests_in_its_measured_interpreter():
     ]
 
     verify = next(
-        item for item in steps if item.get("name") == "Run complete repository gates"
+        item
+        for item in steps
+        if item.get("name") == "Run repository and supplemental behavior gates"
     )
     coverage = next(
         item for item in steps if item.get("name") == "Enforce release coverage"

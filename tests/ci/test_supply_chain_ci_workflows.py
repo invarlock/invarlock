@@ -299,9 +299,12 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     assert "python -m build --no-isolation" in distribution_build
     assert "package_readme.py --check" in distribution_build
 
-    assert _step(build["steps"], "Run complete repository gates")["run"] == (
-        "make verify"
-    )
+    assert _step(build["steps"], "Run repository and supplemental behavior gates")[
+        "run"
+    ].splitlines() == [
+        "make verify-checks docs-check",
+        "python scripts/ci/coverage_runner.py supplement --workers 2",
+    ]
     build_tooling = _step(build["steps"], "Install build tooling")["run"]
     assert "requirements/workflows/ci-hf-py313.txt" in build_tooling
     assert "requirements/workflows/docs-ci-py313.txt" in build_tooling

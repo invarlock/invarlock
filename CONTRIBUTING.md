@@ -74,7 +74,7 @@ Run the local gate before opening a pull request:
 make verify-fast
 ```
 
-`make verify` and `make verify-fast` run independent suites concurrently with
+`make verify` and `make verify-fast` run disjoint general and runtime suites concurrently with
 bounded pytest-xdist workers. Examples run once, separately from the other tests.
 `make coverage-enforce` runs up to three disjoint groups concurrently, with
 two workers per group by default. Pass overrides as Make command-line arguments
@@ -229,9 +229,9 @@ uses a separate environment, so its execution does not contribute coverage.
 The complete coverage gate requires Linux descriptor execution. On another
 operating system, run the relevant portable target such as `make
 coverage-examples`, and report the full Linux result from CI separately.
-CI collects Python 3.13 coverage in separate core, examples, support-tooling and
-runtime jobs. Each test belongs to one group. The required `coverage` gate combines
-all four successful measurements and enforces the existing domain, per-file and
+CI splits examples across three groups balanced using retained test timings,
+alongside the core, support-tooling and runtime jobs. Each test belongs to one group. The required `coverage` gate combines
+all six successful measurements and enforces the existing domain, per-file and
 aggregate branch thresholds. Missing, failed or mismatched measurements cannot
 pass. Test timing reports are retained with each group's coverage data.
 
@@ -239,7 +239,14 @@ The `verify-fast` CI job runs `make verify-checks`, the installed-package journe
 and the 50,000-record signed-recipient case without tracing. Its success is also
 required by the coverage gate. Python 3.13 behavioral tests run under coverage;
 the separate Python 3.12 suite checks the minimum supported interpreter. Local
-`make verify-fast` still includes its behavioral tests.
+`make verify-fast` still includes its behavioral tests. Minimum-Python tests use
+the same partitions, with their existing marker policy, and run concurrently with installed
+package checks. The required `minimum-python` result rejects a failure or skip in
+either group.
+
+The release workflow runs the measured tests once. Separate supplemental tests
+cover the slow or integration-marked core cases outside routine coverage; docs,
+static checks and installed-artifact qualification remain separate gates.
 
 The 12,000-record capacity case remains under subprocess branch coverage. Both
 capacity cases retain the same assertions and watchdog; the large case is

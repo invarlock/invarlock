@@ -133,7 +133,7 @@ jobs:
           export PATH="${gopath}/bin:$PATH"
           make workflow-lint
 
-  minimum-python:
+  minimum-python-packages:
     if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.full) }}
     runs-on: ubuntu-latest
     timeout-minutes: 35
@@ -166,8 +166,6 @@ jobs:
           python -m pip install --require-hashes --find-links runtime/wheels -r requirements/workflows/ci-hf-py312.txt
           python -m build --wheel --no-isolation
           python -m pip install --no-deps --force-reinstall dist/*.whl
-      - name: Run minimum-Python tests
-        run: make test-fast runtime-test PYTEST_WORKERS=auto
       - name: Check command surface
         run: make cli-smoke-core
       - name: Build, install, and validate distributions
@@ -178,6 +176,48 @@ jobs:
           PYTHON=python
           bash scripts/evaluator_parity_gate.sh
 
+  minimum-python-tests:
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.full) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      PYTHON: python
+      PYTHONPATH: ${{ github.workspace }}/src
+      PYTHONWARNINGS: default
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [core, examples, examples-comparisons, examples-judge, support, runtime]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements/workflows/ci-hf-py312.txt
+      - name: Install dependencies
+        run: |
+          python scripts/security/build_hardened_accelerate_wheel.py bootstrap
+          python -m pip install --require-hashes --find-links runtime/wheels -r requirements/workflows/ci-hf-py312.txt
+          python -m build --wheel --no-isolation
+          python -m pip install --no-deps --force-reinstall dist/*.whl
+      - name: Run disjoint minimum-Python tests
+        run: python scripts/ci/coverage_runner.py test ${{ matrix.shard }} --workers 2
+
+  minimum-python:
+    if: ${{ always() && !(github.event_name == 'workflow_dispatch' && inputs.full) }}
+    needs: [minimum-python-tests, minimum-python-packages]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Require every minimum-Python check
+        env:
+          TEST_RESULT: ${{ needs.minimum-python-tests.result }}
+          PACKAGE_RESULT: ${{ needs.minimum-python-packages.result }}
+        run: test "$TEST_RESULT" = success && test "$PACKAGE_RESULT" = success
+
   coverage-tests:
     if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.full) }}
     runs-on: ubuntu-latest
@@ -185,7 +225,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [core, examples, support, runtime]
+        shard: [core, examples, examples-comparisons, examples-judge, support, runtime]
     env:
       PYTHON: python
       PYTHONPATH: ${{ github.workspace }}/src
@@ -214,15 +254,15 @@ jobs:
           python -m pip install --require-hashes -r requirements/workflows/inspect-judge-tests-py313.txt
           python -m pip check
       - name: Install examples coverage SDK dependencies
-        if: ${{ matrix.shard == 'examples' }}
+        if: ${{ startsWith(matrix.shard, 'examples') }}
         run: |
           python -m pip install --require-hashes -r requirements/workflows/inspect-judge-tests-py313.txt
           python -m pip install --require-hashes -r requirements/workflows/langfuse-sdk-tests-py313.txt
           python -m pip check
       - name: Collect disjoint test coverage
         env:
-          INVARLOCK_REQUIRE_LANGFUSE_SDK: ${{ matrix.shard == 'examples' && '1' || '0' }}
-          INVARLOCK_REQUIRE_INSPECT_SDK: ${{ (matrix.shard == 'runtime' || matrix.shard == 'examples') && '1' || '0' }}
+          INVARLOCK_REQUIRE_LANGFUSE_SDK: ${{ startsWith(matrix.shard, 'examples') && '1' || '0' }}
+          INVARLOCK_REQUIRE_INSPECT_SDK: ${{ (matrix.shard == 'runtime' || startsWith(matrix.shard, 'examples')) && '1' || '0' }}
         run: make coverage-collect-${{ matrix.shard }} PYTEST_WORKERS=2
       - name: Retain coverage and test timings
         if: ${{ always() }}

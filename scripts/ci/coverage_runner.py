@@ -14,7 +14,19 @@ from tempfile import TemporaryDirectory
 
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG = ROOT / "scripts/ci/coverage.coveragerc"
-SHARDS = ("core", "examples", "support", "runtime")
+EXAMPLE_PARTITIONS = {
+    "examples-comparisons": (
+        "tests/integration/test_evaluator_parity.py",
+        "tests/examples/test_priority_workflow_reference.py",
+        "tests/examples/test_captured_reference.py",
+    ),
+    "examples-judge": (
+        "tests/examples/test_judge_measurements_reference.py",
+        "tests/examples/test_judge_measurements_review.py",
+        "tests/examples/test_priority_judge_reference.py",
+    ),
+}
+SHARDS = ("core", "examples", *EXAMPLE_PARTITIONS, "support", "runtime")
 FAST_MARKERS = "not integration and not slow and not manual and not gpu"
 EXAMPLE_TESTS = (
     "tests/examples",
@@ -98,8 +110,14 @@ def selection(shard: str) -> list[str]:
             *(f"--ignore={path}" for path in RUNTIME_TESTS),
             *(f"--ignore={path}" for path in SUPPORT_TESTS),
         ]
+    if shard in EXAMPLE_PARTITIONS:
+        return list(EXAMPLE_PARTITIONS[shard])
     if shard == "examples":
-        return list(EXAMPLE_TESTS)
+        moved = {path for paths in EXAMPLE_PARTITIONS.values() for path in paths}
+        return [
+            *(path for path in EXAMPLE_TESTS if path not in moved),
+            *(f"--ignore={path}" for path in sorted(moved)),
+        ]
     if shard == "support":
         return list(SUPPORT_TESTS)
     if shard == "runtime":
@@ -112,6 +130,39 @@ def selection(shard: str) -> list[str]:
             ),
         ]
     raise ValueError(f"unknown coverage shard: {shard}")
+
+
+def test_selection(shard: str) -> list[str]:
+    """Keep unrestricted runtime and compatibility tests out of fast partitions."""
+    if shard == "supplement":
+        arguments = selection("core")
+        arguments[arguments.index(FAST_MARKERS)] = (
+            "integration or slow or manual or gpu"
+        )
+        return arguments
+    if shard == "runtime":
+        return [*RUNTIME_TESTS, "tests/compatibility"]
+    arguments = selection(shard)
+    if shard == "support":
+        arguments = [
+            path
+            for path in arguments
+            if not any(path.startswith(f"{root}/") for root in RUNTIME_TESTS)
+        ]
+    return [*arguments, "--ignore=tests/compatibility", "-m", FAST_MARKERS]
+
+
+def test(shard: str, workers: int) -> int:
+    """Run a selected behavior partition without coverage."""
+    if workers < 0:
+        raise ValueError("workers must be nonnegative")
+    arguments = test_selection(shard)
+    env = dict(os.environ)
+    env["PYTHONPATH"] = os.pathsep.join(str(ROOT / path) for path in ("src", "."))
+    command = [sys.executable, "-m", "pytest", "-q", *arguments]
+    if workers:
+        command.extend(["-n", str(workers)])
+    return subprocess.run(command, cwd=ROOT, env=env, check=False).returncode
 
 
 def source_identity() -> str:
@@ -265,9 +316,7 @@ def combine(artifact_dir: Path, output: Path) -> None:
     identity = source_identity()
     manifests = sorted(artifact_dir.glob("*/manifest.json"))
     if {path.parent.name for path in manifests} != set(SHARDS):
-        raise ValueError(
-            "coverage requires exactly core, examples, support and runtime"
-        )
+        raise ValueError(f"coverage requires exactly these shards: {', '.join(SHARDS)}")
     seen: set[str] = set()
     data_paths = []
     for manifest in manifests:
@@ -317,11 +366,20 @@ def main(argv: list[str] | None = None) -> int:
     runner.add_argument("shard", choices=SHARDS)
     runner.add_argument("--artifact-dir", type=Path, default=Path("artifacts/coverage"))
     runner.add_argument("--workers", type=int, default=2)
+    behavior = commands.add_parser("test")
+    behavior.add_argument("shard", choices=SHARDS)
+    behavior.add_argument("--workers", type=int, default=2)
+    supplement = commands.add_parser("supplement")
+    supplement.add_argument("--workers", type=int, default=2)
     merger = commands.add_parser("combine")
     merger.add_argument("artifact_dir", type=Path)
     merger.add_argument("--output", type=Path, default=Path(".coverage"))
     args = parser.parse_args(argv)
     try:
+        if args.command == "supplement":
+            return test("supplement", args.workers)
+        if args.command == "test":
+            return test(args.shard, args.workers)
         if args.command == "run":
             return run(args.shard, args.artifact_dir, args.workers)
         combine(args.artifact_dir, args.output)

@@ -32,6 +32,8 @@ def test_ci_runs_the_repository_gates() -> None:
         "policy-engine-interop",
         "verify-fast",
         "minimum-python",
+        "minimum-python-tests",
+        "minimum-python-packages",
         "coverage-tests",
         "coverage",
         "verify-full",
@@ -75,14 +77,11 @@ def test_ci_runs_the_repository_gates() -> None:
     )
     assert _step(fast, "Lint workflows")["run"].endswith("make workflow-lint\n")
 
-    minimum = jobs["minimum-python"]
+    minimum = jobs["minimum-python-packages"]
     _assert_core_wheel_install(minimum)
     assert _step(minimum, "Set up uv")["with"]["version"] == "0.10.10"
     python = _step(minimum, "Set up Python")
     assert python["with"]["python-version"] == "3.12"
-    assert _step(minimum, "Run minimum-Python tests")["run"] == (
-        "make test-fast runtime-test PYTEST_WORKERS=auto"
-    )
     assert _step(minimum, "Check command surface")["run"] == "make cli-smoke-core"
     assert _step(minimum, "Build, install, and validate distributions")["run"] == (
         "make install-smoke inspect-judge-sdk-test langfuse-sdk-test"
@@ -96,11 +95,24 @@ def test_ci_runs_the_repository_gates() -> None:
     )
     assert minimum["timeout-minutes"] >= 35
 
+    gate = jobs["minimum-python"]
+    assert set(gate["needs"]) == {"minimum-python-tests", "minimum-python-packages"}
+    assert "always()" in gate["if"]
+    assert _step(gate, "Require every minimum-Python check")["run"] == (
+        'test "$TEST_RESULT" = success && test "$PACKAGE_RESULT" = success'
+    )
+    tests = jobs["minimum-python-tests"]
+    assert tests["strategy"]["matrix"] == jobs["coverage-tests"]["strategy"]["matrix"]
+    assert _step(tests, "Run disjoint minimum-Python tests")["run"] == (
+        "python scripts/ci/coverage_runner.py test ${{ matrix.shard }} --workers 2"
+    )
     coverage_tests = jobs["coverage-tests"]
     _assert_core_wheel_install(coverage_tests)
     assert coverage_tests["strategy"]["matrix"]["shard"] == [
         "core",
         "examples",
+        "examples-comparisons",
+        "examples-judge",
         "support",
         "runtime",
     ]

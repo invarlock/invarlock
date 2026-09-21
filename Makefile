@@ -42,6 +42,8 @@ COVERAGE_RELEASE_FILE ?= $(CURDIR)/.coverage.release
 COVERAGE_EXAMPLES_FILE ?= $(CURDIR)/.coverage.examples
 COVERAGE_MAINTENANCE_FILE ?= $(CURDIR)/.coverage.maintenance
 COVERAGE_TARGET_JOBS ?= 3
+RUNTIME_TEST_ROOTS := tests/diagnostics tests/runtime tests/runtime_providers tests/judge_measurements
+COVERAGE_SHARDS := core examples examples-comparisons examples-judge support runtime
 VERIFY_TARGET_JOBS ?= 3
 
 MYPY_TYPED_SURFACE := \
@@ -76,7 +78,7 @@ RELEASE_EXAMPLE_COVERAGE_FILES := \
 .PHONY: help install dev-install lock-sync test test-fast test-parallel test-integration runtime-test
 .PHONY: coverage coverage-runtime coverage-qualification coverage-release coverage-examples coverage-maintenance coverage-enforce coverage-enforce-parallel
 .PHONY: coverage-report coverage-core-report coverage-runtime-report coverage-qualification-report coverage-release-report coverage-examples-report coverage-maintenance-report coverage-linux-check
-.PHONY: coverage-collect-core coverage-collect-examples coverage-collect-support coverage-collect-runtime verify-checks
+.PHONY: $(addprefix coverage-collect-,$(COVERAGE_SHARDS)) verify-checks
 .PHONY: compatibility-test trust-smoke example-evidence-handoff example-acceptance-handoff example-quickstart example-hf-transformers example-hf-vision-text example-peft-lora
 .PHONY: evaluator-qualification evaluator-replayable-imports evaluator-upstream-qualification evaluator-replayable-corpus evaluator-docs-matrix-check evaluator-scalar-semantics
 .PHONY: evaluator-inspect-semantics evaluator-batch-semantics
@@ -338,10 +340,10 @@ coverage-maintenance-report:  ## Enforce retained maintenance coverage measureme
 
 coverage-enforce: PYTEST_WORKERS = 2
 coverage-enforce: coverage-linux-check  ## Run disjoint coverage suites and enforce every domain
-	$(MAKE) -j $(COVERAGE_TARGET_JOBS) coverage-collect-core coverage-collect-examples coverage-collect-support coverage-collect-runtime PYTEST_WORKERS=$(PYTEST_WORKERS)
+	$(MAKE) -j $(COVERAGE_TARGET_JOBS) $(addprefix coverage-collect-,$(COVERAGE_SHARDS)) PYTEST_WORKERS=$(PYTEST_WORKERS)
 	$(MAKE) coverage-report
 
-coverage-collect-core coverage-collect-examples coverage-collect-support coverage-collect-runtime: coverage-collect-%: coverage-linux-check
+$(addprefix coverage-collect-,$(COVERAGE_SHARDS)): coverage-collect-%: coverage-linux-check
 	$(PYTHON) scripts/ci/coverage_runner.py run $* --artifact-dir "$(COVERAGE_ARTIFACT_DIR)" --workers $(PYTEST_WORKERS)
 
 coverage-report: coverage-linux-check  ## Combine all successful shards and enforce unchanged coverage requirements
@@ -620,7 +622,7 @@ verify:  ## Run repository, product, docs, and contract gates in parallel by def
 	$(MAKE) -j $(VERIFY_TARGET_JOBS) \
 		public-evidence-audit contracts-check test runtime-test \
 		cli-smoke-core lint docs-check \
-		PYTEST_WORKERS=$(PYTEST_WORKERS) TEST_EXCLUDES="--ignore=tests/examples $(addprefix --ignore=,$(LIVE_EXAMPLE_TESTS))"
+		PYTEST_WORKERS=$(PYTEST_WORKERS) TEST_EXCLUDES="--ignore=tests/examples $(addprefix --ignore=,$(LIVE_EXAMPLE_TESTS) $(RUNTIME_TEST_ROOTS))"
 	$(MAKE) examples-check PYTEST_WORKERS=$(PYTEST_WORKERS)
 
 verify-fast: PYTEST_WORKERS = 2
@@ -629,7 +631,7 @@ verify-fast:  ## Run local gates in parallel without network, GPU, or downloads
 	$(MAKE) -j $(VERIFY_TARGET_JOBS) \
 		public-evidence-audit contracts-check test-fast runtime-test \
 		cli-smoke-core lint \
-		PYTEST_WORKERS=$(PYTEST_WORKERS) TEST_EXCLUDES="--ignore=tests/examples $(addprefix --ignore=,$(LIVE_EXAMPLE_TESTS))"
+		PYTEST_WORKERS=$(PYTEST_WORKERS) TEST_EXCLUDES="--ignore=tests/examples $(addprefix --ignore=,$(LIVE_EXAMPLE_TESTS) $(RUNTIME_TEST_ROOTS))"
 	$(MAKE) examples-check PYTEST_WORKERS=$(PYTEST_WORKERS)
 
 verify-checks:  ## Run non-test repository gates; CI behavioral coverage runs separately
