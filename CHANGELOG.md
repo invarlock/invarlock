@@ -7,12 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-
-- Balance example coverage across three groups, run minimum-Python tests and
-  installed-package checks concurrently, and remove duplicate runtime and
-  release test execution while preserving test inventories and coverage gates.
-
 ## [0.16.2] - 2026-09-20
 
 ### Added
@@ -55,6 +49,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   endpoint validation and offline SDK transport tests.
 
 ### Changed
+
+- Balance example coverage across three groups, run minimum-Python tests and
+  installed-package checks concurrently, and remove duplicate runtime and
+  release test execution while preserving test inventories and coverage gates.
+  Validate release branches through their pull requests instead of also starting
+  duplicate push checks.
 
 - Move judge collection into the core package. The `invarlock[judge]` extra now
   installs the pinned provider SDKs directly; collection imports use

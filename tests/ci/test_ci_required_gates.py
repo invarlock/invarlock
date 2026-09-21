@@ -39,11 +39,7 @@ def test_ci_runs_the_repository_gates() -> None:
         "verify-full",
         "supply-chain",
     }
-    assert workflow["on"]["push"]["branches"] == [
-        "main",
-        "staging/next",
-        "release/v*",
-    ]
+    assert workflow["on"]["push"]["branches"] == ["main", "staging/next"]
 
     interop = jobs["policy-engine-interop"]
     assert _step(interop, "Set up Python")["with"]["python-version"] == "3.12"

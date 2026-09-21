@@ -258,3 +258,19 @@ def test_release_replays_installed_evaluator_campaigns_from_frozen_wheel():
     assert replay["run"] == "PYTHON=python bash scripts/evaluator_parity_gate.sh"
     assert steps.index(build) < steps.index(ledger) < steps.index(replay)
     assert steps.index(replay) < steps.index(digest_check)
+
+
+@pytest.mark.parametrize(
+    "name", ["ci.yml", "docs-ci.yml", "codeql.yml", "container-front-door-smoke.yml"]
+)
+def test_promotion_uses_pr_checks_without_duplicate_branch_push(name):
+    events = _load(WORKFLOWS / name)["on"]
+    assert "release/v*" not in events["push"]["branches"]
+    assert "staging/next" in events["push"]["branches"]
+    assert "pull_request" in events
+    destinations = (events["pull_request"] or {}).get("branches")
+    assert destinations is None or "main" in destinations
+    if name == "codeql.yml":
+        assert "schedule" in events and "workflow_dispatch" in events
+    if name == "ci.yml":
+        assert events["push"]["tags"] == ["v*"]

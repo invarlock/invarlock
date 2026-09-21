@@ -2,9 +2,9 @@ name: Container Front Door
 
 on:
   pull_request:
-    branches: [staging/next]
+    branches: [main, staging/next]
   push:
-    branches: [staging/next, 'release/v*']
+    branches: [staging/next]
   workflow_dispatch:
 
 concurrency:

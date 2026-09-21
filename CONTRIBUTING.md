@@ -233,7 +233,9 @@ CI splits examples across three groups balanced using retained test timings,
 alongside the core, support-tooling and runtime jobs. Each test belongs to one group. The required `coverage` gate combines
 all six successful measurements and enforces the existing domain, per-file and
 aggregate branch thresholds. Missing, failed or mismatched measurements cannot
-pass. Test timing reports are retained with each group's coverage data.
+pass. Test timing reports are retained with each group's coverage data. Release
+promotion branches are checked through their pull requests; main/staging pushes,
+release tags and scheduled security scans retain their separate checks.
 
 The `verify-fast` CI job runs `make verify-checks`, the installed-package journeys
 and the 50,000-record signed-recipient case without tracing. Its success is also
