@@ -8,6 +8,9 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import stat
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -19,6 +22,32 @@ assert SPEC and SPEC.loader
 PARITY = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(PARITY)
 EVALUATORS = tuple(PARITY.profiles())
+
+
+def test_qualification_invariants_survive_optimized_python():
+    code = (
+        "import runpy; "
+        f"module=runpy.run_path({str(SCRIPT)!r}); "
+        "module['require'](False, 'optimized qualification refusal')"
+    )
+    result = subprocess.run(
+        [sys.executable, "-O", "-c", code],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode != 0
+    assert "optimized qualification refusal" in result.stderr
+
+
+def test_qualification_key_is_new_and_owner_only(tmp_path):
+    path = tmp_path / "signer.pem"
+    PARITY._key(path)
+    original = path.read_bytes()
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600
+    with pytest.raises(FileExistsError):
+        PARITY._key(path)
+    assert path.read_bytes() == original
 
 
 @pytest.mark.parametrize("input_format", PARITY.INPUT_FORMATS)

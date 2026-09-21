@@ -22,11 +22,18 @@ HERE = Path(__file__).resolve().parent
 SPEC = importlib.util.spec_from_file_location(
     "parity_native_shapes", HERE / "native_shapes.py"
 )
-assert SPEC and SPEC.loader
+if SPEC is None or SPEC.loader is None:
+    raise RuntimeError("cannot load evaluator native-shape definitions")
 SHAPES = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(SHAPES)
 SCORERS = ("exact_match", "normalized_nll", "judge")
 INPUT_FORMATS = ("envelope", "native-json")
+
+
+def require(condition, message):
+    """Enforce a qualification invariant even when Python optimization is active."""
+    if not condition:
+        raise ValueError(message)
 
 
 def read(path):
@@ -78,7 +85,10 @@ def retained(scorer):
     for side in ("baseline", "subject"):
         origin = reference["sources"][f"{scorer}-{side}.json"]
         raw = (ROOT / origin["path"]).read_bytes()
-        assert "sha256:" + hashlib.sha256(raw).hexdigest() == origin["sha256"]
+        require(
+            "sha256:" + hashlib.sha256(raw).hexdigest() == origin["sha256"],
+            f"retained {scorer} {side} source digest differs",
+        )
         runs.append(json.loads(raw))
         sources[side] = origin
     origin_root = (ROOT / sources["baseline"]["path"]).parents[2]
@@ -103,14 +113,14 @@ def _key(path):
     from invarlock.evidence_pack_integrity import public_key_fingerprint
 
     key = Ed25519PrivateKey.generate()
-    path.write_bytes(
-        key.private_bytes(
-            serialization.Encoding.PEM,
-            serialization.PrivateFormat.PKCS8,
-            serialization.NoEncryption(),
-        )
+    raw = key.private_bytes(
+        serialization.Encoding.PEM,
+        serialization.PrivateFormat.PKCS8,
+        serialization.NoEncryption(),
     )
-    path.chmod(0o600)
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(descriptor, "wb") as stream:
+        stream.write(raw)
     return public_key_fingerprint(key.public_key())
 
 
@@ -250,27 +260,35 @@ def export_pair(
                 **options,
             )
         by_id = {r["id"]: r for r in original["records"]}
-        assert set(by_id) == {r["id"] for r in run["records"]}
+        require(
+            set(by_id) == {r["id"] for r in run["records"]},
+            f"{evaluator} {scorer} {side} case membership differs",
+        )
         for row in run["records"]:
             before = by_id[row["id"]]
             for key in ("input", "expected", "output", "metadata"):
-                assert row[key] == before[key], (evaluator, scorer, side, key)
-            assert row.get("error") == before.get("error"), (
-                evaluator,
-                scorer,
-                side,
-                "error",
+                require(
+                    row[key] == before[key],
+                    f"{evaluator} {scorer} {side} {key} differs",
+                )
+            require(
+                row.get("error") == before.get("error"),
+                f"{evaluator} {scorer} {side} error differs",
             )
             if scorer == "normalized_nll":
-                assert {
-                    k: v
-                    for k, v in row["likelihood"].items()
-                    if k not in {"source", "input_digest"}
-                } == {
-                    k: v
-                    for k, v in before["likelihood"].items()
-                    if k not in {"source", "input_digest"}
-                }
+                require(
+                    {
+                        k: v
+                        for k, v in row["likelihood"].items()
+                        if k not in {"source", "input_digest"}
+                    }
+                    == {
+                        k: v
+                        for k, v in before["likelihood"].items()
+                        if k not in {"source", "input_digest"}
+                    },
+                    f"{evaluator} {side} likelihood evidence differs",
+                )
         runs.append(run)
         sources.append(source)
     return sources, runs, policy, origin
@@ -407,7 +425,10 @@ def prepare(
             baseline_run=runs[0],
             subject_run=runs[1],
         ).to_dict()
-        assert analysis["decision"] == "pass"
+        require(
+            analysis["decision"] == "pass",
+            "synthetic judge contract did not produce its expected decision",
+        )
         write(output / "measurements.json", measurements)
         request["comparison"].update(
             metric="judge",
@@ -466,7 +487,20 @@ def prepare(
 
 
 def installed_identity(python):
-    code = "import importlib.util,json,invarlock; from pathlib import Path; from sysconfig import get_path; assert Path(invarlock.__file__).resolve().is_relative_to(Path(get_path('purelib')).resolve()); names=('inspect_ai','lm_eval','langfuse','deepeval','ragas','lighteval','evaluate','pydantic_evals','autoevals','openevals','mlflow','garak','evals','phoenix','opik','azure.ai.evaluation','evidently','trulens'); absent=[]\nfor name in names:\n try: spec=importlib.util.find_spec(name)\n except ModuleNotFoundError: spec=None\n assert spec is None, name\n absent.append(name)\nprint(json.dumps({'invarlock':invarlock.__file__,'sdk_modules_absent':absent}))"
+    code = """import importlib.util,json,invarlock
+from pathlib import Path
+from sysconfig import get_path
+package=Path(invarlock.__file__).resolve()
+if not package.is_relative_to(Path(get_path('purelib')).resolve()):
+ raise RuntimeError('recipient did not import the installed package')
+names=('inspect_ai','lm_eval','langfuse','deepeval','ragas','lighteval','evaluate','pydantic_evals','autoevals','openevals','mlflow','garak','evals','phoenix','opik','azure.ai.evaluation','evidently','trulens')
+absent=[]
+for name in names:
+ try: spec=importlib.util.find_spec(name)
+ except ModuleNotFoundError: spec=None
+ if spec is not None: raise RuntimeError('recipient unexpectedly contains '+name)
+ absent.append(name)
+print(json.dumps({'invarlock':invarlock.__file__,'sdk_modules_absent':absent}))"""
     return json.loads(
         subprocess.run(
             [str(python), "-I", "-c", code],
@@ -491,11 +525,20 @@ def journey(
     environment = dict(os.environ)
     environment.pop("PYTHONPATH", None)
     environment.pop("INVARLOCK_SIGNING_KEY", None)
+    environment.pop("INVARLOCK_ALLOW_NETWORK", None)
+    environment.pop("INVARLOCK_ALLOW_JUDGE_NETWORK", None)
     commands = []
 
     def command(*args, allowed=(0,)):
+        bootstrap = (
+            "import runpy,socket,sys\n"
+            "def blocked(*args,**kwargs): raise RuntimeError('evaluator parity forbids network calls')\n"
+            "socket.socket.connect=blocked; socket.create_connection=blocked\n"
+            "sys.argv=['invarlock',*sys.argv[1:]]\n"
+            "runpy.run_module('invarlock',run_name='__main__')"
+        )
         result = subprocess.run(
-            [str(python), "-I", "-m", "invarlock", *map(str, args)],
+            [str(python), "-I", "-c", bootstrap, *map(str, args)],
             cwd=output,
             env=environment,
             capture_output=True,
@@ -505,7 +548,10 @@ def journey(
         commands.append(
             {"command": list(map(str, args)), "exit_code": result.returncode}
         )
-        assert result.returncode in allowed, result.stdout + result.stderr
+        require(
+            result.returncode in allowed,
+            result.stdout + result.stderr,
+        )
         return json.loads(result.stdout)
 
     status = 7 if scorer == "normalized_nll" else 0
@@ -518,7 +564,10 @@ def journey(
         "signer.pem",
         "--json",
     )
-    assert preflight["ok"] and not (output / "evidence").exists()
+    require(
+        preflight["ok"] and not (output / "evidence").exists(),
+        "preflight failed or published evidence",
+    )
     write(output / "preflight.json", preflight)
     evaluated = command(
         "evaluate",
@@ -529,7 +578,10 @@ def journey(
         "--json",
         allowed=(status,),
     )
-    assert evaluated["authentication"] == "signed" and evaluated["decision"] == decision
+    require(
+        evaluated["authentication"] == "signed" and evaluated["decision"] == decision,
+        "evaluation authentication or decision differs",
+    )
     receipt_args = (
         [] if scorer == "judge" else ["--receipt", "verification.receipt.json"]
     )
@@ -544,33 +596,50 @@ def journey(
     )
     write(output / "verification.json", verified)
     if scorer == "judge":
-        assert (
-            verified["authenticated"] and verified["replayed"] and verified["accepted"]
+        require(
+            verified["authenticated"] and verified["replayed"] and verified["accepted"],
+            "judge verification did not authenticate, replay and accept",
         )
-        assert not (output / "unused-judge-work").exists()
+        require(
+            not (output / "unused-judge-work").exists(),
+            "retained judge replay unexpectedly collected new measurements",
+        )
     else:
-        assert verified["integrity_ok"] and verified["replay_status"] == "completed"
-        assert verified["decision"] == origin["expected_decision"]
+        require(
+            verified["integrity_ok"] and verified["replay_status"] == "completed",
+            "deterministic verification did not complete with intact evidence",
+        )
+        require(
+            verified["decision"] == origin["expected_decision"],
+            "deterministic verification decision differs",
+        )
         actual = read(output / "evidence/reports/evaluation.report.json")
         # Native input wrappers can change the resampling representation. The
         # independent recipient verifies each interval; original point facts and
         # policy outcomes must remain identical.
-        assert [
-            {k: v for k, v in metric.items() if k != "interval"}
-            for metric in actual["metrics"]
-        ] == [
-            {k: v for k, v in metric.items() if k != "interval"}
-            for metric in origin["expected_metrics"]
-        ]
+        require(
+            [
+                {k: v for k, v in metric.items() if k != "interval"}
+                for metric in actual["metrics"]
+            ]
+            == [
+                {k: v for k, v in metric.items() if k != "interval"}
+                for metric in origin["expected_metrics"]
+            ],
+            "deterministic point estimates or policy results differ",
+        )
     command("report", "evidence", "--html", "report.html", "--json")
-    assert evaluator in (output / "report.html").read_text()
+    require(
+        evaluator in (output / "report.html").read_text(),
+        "report omits the evaluator identity",
+    )
     for side, run in zip(("baseline", "subject"), runs, strict=True):
         path = (
             output
             / "evidence"
             / (f"{side}_run.json" if scorer == "judge" else f"records/{side}.json")
         )
-        assert read(path) == run
+        require(read(path) == run, f"published {side} run differs from capture")
     # An output-byte change must fail original independent trust, even if parseable.
     path = (
         output
@@ -595,7 +664,10 @@ def journey(
     finally:
         path.write_bytes(raw)
         path.chmod(mode)
-    assert not rejected.get("accepted", False)
+    require(
+        not rejected.get("accepted", False),
+        "tampered evidence was unexpectedly accepted",
+    )
     write(output / "tamper-refusal.json", rejected)
     result = {
         "evaluator": evaluator,

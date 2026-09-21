@@ -267,9 +267,18 @@ def journey(output, reference, python):
         "signer.pem",
         "--json",
     )
-    assert preflight["network_calls"] == 0 and not preflight["collection_available"]
-    assert preflight["planned_trials"] == REFERENCES[reference]["trials"]
-    assert not (output / "evidence").exists()
+    PARITY.require(
+        preflight["network_calls"] == 0 and not preflight["collection_available"],
+        "retained judge preflight unexpectedly permits collection",
+    )
+    PARITY.require(
+        preflight["planned_trials"] == REFERENCES[reference]["trials"],
+        "retained judge preflight trial count differs",
+    )
+    PARITY.require(
+        not (output / "evidence").exists(),
+        "retained judge preflight published evidence",
+    )
     PARITY.write(output / "preflight.json", preflight)
     status = 0 if reference == "heldout" else 7
     evaluated = command(
@@ -281,8 +290,14 @@ def journey(output, reference, python):
         "--json",
         allowed=(status,),
     )
-    assert evaluated["authentication"] == "signed"
-    assert evaluated["decision"] == REFERENCES[reference]["decision"]
+    PARITY.require(
+        evaluated["authentication"] == "signed",
+        "retained judge evidence is not signed",
+    )
+    PARITY.require(
+        evaluated["decision"] == REFERENCES[reference]["decision"],
+        "retained judge decision differs",
+    )
     verified = command(
         "verify",
         "evidence",
@@ -291,9 +306,18 @@ def journey(output, reference, python):
         "--json",
         allowed=(status,),
     )
-    assert verified["authenticated"] and verified["replayed"] and verified["verified"]
-    assert verified["accepted"] == (reference == "heldout")
-    assert verified["decision"] == REFERENCES[reference]["decision"]
+    PARITY.require(
+        verified["authenticated"] and verified["replayed"] and verified["verified"],
+        "retained judge verification did not authenticate and replay",
+    )
+    PARITY.require(
+        verified["accepted"] == (reference == "heldout"),
+        "retained judge acceptance differs",
+    )
+    PARITY.require(
+        verified["decision"] == REFERENCES[reference]["decision"],
+        "verified retained judge decision differs",
+    )
     PARITY.write(output / "verification.json", verified)
     command(
         "report",
@@ -304,7 +328,10 @@ def journey(output, reference, python):
         "report.md",
         "--json",
     )
-    assert "gpt-5.6-luna" in (output / "report.html").read_text()
+    PARITY.require(
+        "gpt-5.6-luna" in (output / "report.html").read_text(),
+        "judge report omits the retained judge model",
+    )
     for name in (
         "baseline_run",
         "subject_run",
@@ -313,12 +340,18 @@ def journey(output, reference, python):
         "measurements",
         "analysis_result",
     ):
-        assert PARITY.read(output / "evidence" / f"{name}.json") == documents[name]
+        PARITY.require(
+            PARITY.read(output / "evidence" / f"{name}.json") == documents[name],
+            f"published judge {name} differs from retained evidence",
+        )
     path = output / "evidence/measurements.json"
     raw, mode = path.read_bytes(), path.stat().st_mode & 0o777
     altered = json.loads(raw)
     altered["trials"][0]["attempts"][0]["response"]["text"] = '{"rating":"incorrect"}'
-    assert altered != json.loads(raw)
+    PARITY.require(
+        altered != json.loads(raw),
+        "judge tamper probe did not alter the measurement",
+    )
     path.chmod(mode | 0o200)
     try:
         PARITY.write(path, altered)
@@ -333,14 +366,23 @@ def journey(output, reference, python):
     finally:
         path.write_bytes(raw)
         path.chmod(mode)
-    assert not rejected["accepted"] and not rejected["verified"]
+    PARITY.require(
+        not rejected["accepted"] and not rejected["verified"],
+        "altered judge measurement was unexpectedly accepted",
+    )
     PARITY.write(output / "altered-measurement-refusal.json", rejected)
-    assert not (output / "unused-judge-work").exists()
+    PARITY.require(
+        not (output / "unused-judge-work").exists(),
+        "retained judge replay unexpectedly collected new measurements",
+    )
     for name, pin in origin["files"].items():
         directory = output / "retained"
         if name not in {"collection", "receipt", "recipient"}:
             directory /= "evidence"
-        assert ARCHIVE.sha((directory / f"{name}.json").read_bytes()) == pin["sha256"]
+        PARITY.require(
+            ARCHIVE.sha((directory / f"{name}.json").read_bytes()) == pin["sha256"],
+            f"retained judge {name} digest differs after replay",
+        )
     result = {
         "reference": reference,
         "workflow": "grounded_qa",
