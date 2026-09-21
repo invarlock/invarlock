@@ -3,25 +3,25 @@ from __future__ import annotations
 import json
 from typing import cast
 
-from click import Argument, Command, Group, Option
+from typer.core import TyperArgument, TyperCommand, TyperGroup, TyperOption
 from typer.main import get_command
 from typer.testing import CliRunner
 
 from invarlock.cli.app import app
 
 RUNNER = CliRunner()
-ROOT_COMMAND = cast(Group, get_command(app))
+ROOT_COMMAND = cast(TyperGroup, get_command(app))
 
 
-def _command(name: str) -> Command:
-    return ROOT_COMMAND.commands[name]
+def _command(name: str) -> TyperCommand:
+    return cast(TyperCommand, ROOT_COMMAND.commands[name])
 
 
 def _arguments(name: str) -> set[str]:
     return {
         param.name
         for param in _command(name).params
-        if isinstance(param, Argument) and param.name is not None
+        if isinstance(param, TyperArgument) and param.name is not None
     }
 
 
@@ -29,7 +29,7 @@ def _options(name: str) -> set[str]:
     return {
         option
         for param in _command(name).params
-        if isinstance(param, Option)
+        if isinstance(param, TyperOption)
         for option in param.opts
         if option.startswith("--")
     }

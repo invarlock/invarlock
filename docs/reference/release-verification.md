@@ -52,19 +52,22 @@ repository workflow:
    all seven retained public signed evidence packs and all four retained
    evaluator-qualification transactions through the isolated candidate-wheel
    CLI;
-7. runs `twine check` on both archives;
-8. installs the wheel alone in a clean environment outside the checkout and
+7. exercises all 19 maintained evaluator profiles and both import routes through
+   an independently installed recipient, then replays the 184 signed packs from
+   the retained evaluator campaigns without new model or judge calls;
+8. runs `twine check` on both archives;
+9. installs the wheel alone in a clean environment outside the checkout and
    exercises the CLI, captured consumer, offline judge consumer, diagnostics,
    and provider entry-point discovery;
-9. exercises the public CLI, all provider conformance commands, diagnostics,
+10. exercises the public CLI, all provider conformance commands, diagnostics,
    and entry-point discovery;
-10. audits the installed dependency surface and generates an SBOM;
-11. records the wheel and source archive in one SHA-256 ledger and attaches build-provenance
+11. audits the installed dependency surface and generates an SBOM;
+12. records the wheel and source archive in one SHA-256 ledger and attaches build-provenance
     attestations during the tag run;
-12. after a complete TestPyPI or PyPI publication, verifies both hosted
+13. after a complete TestPyPI or PyPI publication, verifies both hosted
     archives against that tag-run ledger, installs the hosted wheel,
    and repeats the conformance smoke; and
-13. after a verified production PyPI run, publishes the
+14. after a verified production PyPI run, publishes the
     documentation from that exact tag source to its immutable version path,
     `latest`, and `stable` in one serialized `gh-pages` commit.
 
@@ -185,7 +188,21 @@ replays verification and all three report formats. It preserves the fixture's
 `insufficient_evidence` decision and checks wrong signer, plan, subject, and
 unsigned evidence rejection. It runs without provider SDK extras and requires
 Inspect and OpenAI SDK modules to be absent. Provider SDK collection is qualified
-separately by `make inspect-judge-sdk-test`; offline replay needs only core.
+separately by `make inspect-judge-sdk-test`; Langfuse export is qualified by
+`make langfuse-sdk-test`. Offline replay needs only core.
+
+`make evaluator-parity-test` installs the candidate wheel into an independent
+recipient, exercises all 19 maintained evaluator profiles across the supported
+scorer and import routes, and replays the four retained fresh-campaign archives.
+Those archives contain 76 sentinel exact-match/NLL packs, 52 sentinel judge
+packs, 32 priority exact-match/NLL packs and 24 priority judge packs. The gate
+authenticates and preserves their original outcomes; it does not rerun models or
+call judge providers.
+
+Routine pull-request jobs run the same 114 installed profile journeys on Python
+3.12 and 3.13 with retained campaign replay disabled. The interpreter-independent
+campaign archives replay once in the full release workflow, avoiding duplicate
+work while keeping the release gate complete.
 
 The three-scorer consumer additionally exercises exact-match, normalized-NLL and
 judge selection through captured v2 requests and public SDK capture/import helpers.

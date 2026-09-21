@@ -198,3 +198,59 @@ def test_full_verification_requires_sdk_tests_before_collecting_coverage():
     assert "if" not in install
     assert steps.index(install) < steps.index(verify)
     assert verify["env"]["INVARLOCK_REQUIRE_INSPECT_SDK"] == "1"
+
+
+def test_release_requires_sdk_tests_in_its_measured_interpreter():
+    steps = _load(WORKFLOWS / "release.yml")["jobs"]["build_check"]["steps"]
+    install = next(
+        step
+        for step in steps
+        if step.get("name") == "Install measured SDK dependencies"
+    )
+    for lock in (
+        "requirements/workflows/inspect-judge-tests-py313.txt",
+        "requirements/workflows/langfuse-sdk-tests-py313.txt",
+    ):
+        assert f"python -m pip install --require-hashes -r {lock}" in install["run"]
+    commands = install["run"].strip().splitlines()
+    assert commands[-2:] == [
+        "python -m pip check",
+        "python -m pytest tests/cli/test_cli_surface.py -q",
+    ]
+
+    verify = next(
+        item for item in steps if item.get("name") == "Run complete repository gates"
+    )
+    coverage = next(
+        item for item in steps if item.get("name") == "Enforce release coverage"
+    )
+    assert steps.index(verify) < steps.index(install) < steps.index(coverage)
+    assert "env" not in verify
+    assert coverage["env"] == {
+        "INVARLOCK_REQUIRE_INSPECT_SDK": "1",
+        "INVARLOCK_REQUIRE_LANGFUSE_SDK": "1",
+    }
+
+
+def test_release_replays_installed_evaluator_campaigns_from_frozen_wheel():
+    steps = _load(WORKFLOWS / "release.yml")["jobs"]["build_check"]["steps"]
+    build = next(
+        item for item in steps if item.get("name") == "Build first-party distributions"
+    )
+    ledger = next(
+        item for item in steps if item.get("name") == "Record distribution digests"
+    )
+    replay = next(
+        item
+        for item in steps
+        if item.get("name")
+        == "Qualify installed evaluator integrations and retained campaigns"
+    )
+    digest_check = next(
+        item
+        for item in steps
+        if item.get("name") == "Verify distribution digests before artifact upload"
+    )
+    assert replay["run"] == "PYTHON=python bash scripts/evaluator_parity_gate.sh"
+    assert steps.index(build) < steps.index(ledger) < steps.index(replay)
+    assert steps.index(replay) < steps.index(digest_check)

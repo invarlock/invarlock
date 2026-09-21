@@ -1475,7 +1475,7 @@ wheels = [
 
 [[package]]
 name = "invarlock"
-version = "0.16.1"
+version = "0.16.2"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
@@ -1544,6 +1544,7 @@ dev = [
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pytest-xdist" },
+    { name = "readme-renderer", extra = ["md"] },
     { name = "ruff" },
     { name = "setuptools" },
     { name = "twine" },
@@ -1605,6 +1606,7 @@ release = [
 runtime-test = [
     { name = "accelerate" },
     { name = "peft" },
+    { name = "pillow" },
     { name = "protobuf" },
     { name = "safetensors" },
     { name = "sentencepiece" },
@@ -1624,6 +1626,7 @@ test = [
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pytest-xdist" },
+    { name = "readme-renderer", extra = ["md"] },
 ]
 
 [package.metadata]
@@ -1686,6 +1689,7 @@ dev = [
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "pytest-cov", specifier = ">=7.1.0" },
     { name = "pytest-xdist", specifier = ">=3.6" },
+    { name = "readme-renderer", extras = ["md"], specifier = "==45.0" },
     { name = "ruff", specifier = "==0.16.7" },
     { name = "setuptools", specifier = ">=83.0.0" },
     { name = "twine", specifier = ">=4.0.0" },
@@ -1745,6 +1749,7 @@ release = [
 runtime-test = [
     { name = "accelerate", specifier = "==1.14.0+invarlock.1" },
     { name = "peft", specifier = "==0.20.0" },
+    { name = "pillow", specifier = ">=11.3,<13" },
     { name = "protobuf", specifier = ">=4.25" },
     { name = "safetensors", specifier = ">=0.8.0" },
     { name = "sentencepiece", specifier = ">=0.2.2" },
@@ -1764,6 +1769,7 @@ test = [
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "pytest-cov", specifier = ">=7.1.0" },
     { name = "pytest-xdist", specifier = ">=3.6" },
+    { name = "readme-renderer", extras = ["md"], specifier = "==45.0" },
 ]
 
 [[package]]
