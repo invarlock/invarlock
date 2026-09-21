@@ -41,12 +41,14 @@
     "source_version": {
       "type": "string",
       "minLength": 1,
-      "maxLength": 512
+      "maxLength": 128,
+      "pattern": "^[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
     },
     "run_id": {
       "type": "string",
       "minLength": 1,
-      "maxLength": 512
+      "maxLength": 128,
+      "pattern": "^[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
     },
     "payload": {
       "oneOf": [

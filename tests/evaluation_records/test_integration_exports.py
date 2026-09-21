@@ -31,6 +31,24 @@ def test_export_capacity_and_nesting_fail_before_publication(tmp_path, monkeypat
     assert not path.exists()
 
 
+@pytest.mark.parametrize("field", ["source_version", "run_id"])
+@pytest.mark.parametrize("invalid", ["x" * 129, "value\nwith-control"])
+def test_export_identity_bounds_match_the_canonical_run(tmp_path, field, invalid):
+    raw = (FIXTURES / "inspect-0.3.254.json").read_bytes()
+    result = json.loads(raw)
+    options = {
+        "expected_ids": [str(row["id"]) for row in result["samples"]],
+        "source_version": "1",
+        "run_id": "run",
+        "artifact_digest": "sha256:" + "a" * 64,
+    }
+    options[field] = invalid
+    destination = tmp_path / "export.json"
+    with pytest.raises(EvaluationRecordsError):
+        export_evaluator_result("inspect-ai", result, destination, **options)
+    assert not destination.exists()
+
+
 def test_optional_sdk_failure_does_not_publish(tmp_path, monkeypatch):
     from invarlock.evaluation_records import integrations
 

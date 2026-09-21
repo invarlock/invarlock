@@ -81,6 +81,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Require the true end of string in anchored contract patterns so a trailing
+  newline cannot satisfy an otherwise exact identifier, digest or path match.
+
 - Accept reference-free LightEval generative records without inventing gold
   answers, preserving judge availability and explicit missing-reference limits
   for exact match and normalized NLL across both import routes.

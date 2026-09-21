@@ -15,7 +15,7 @@
     "format_version": {"const": "invarlock/runtime-scoring-observation-v1"},
     "provider_name": {
       "type": "string",
-      "pattern": "^[a-z][a-z0-9_]{0,63}$"
+      "pattern": "^[a-z][a-z0-9_]{0,63}(?![\\s\\S])"
     },
     "artifact_identity_sha256": {"$ref": "#/$defs/sha256"},
     "schedule_sha256": {"$ref": "#/$defs/sha256"},
@@ -29,7 +29,7 @@
   "$defs": {
     "sha256": {
       "type": "string",
-      "pattern": "^[a-f0-9]{64}$"
+      "pattern": "^[a-f0-9]{64}(?![\\s\\S])"
     },
     "record": {
       "type": "object",
@@ -58,7 +58,7 @@
         "error_code": {
           "anyOf": [
             {"type": "null"},
-            {"type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$"}
+            {"type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}(?![\\s\\S])"}
           ]
         }
       },

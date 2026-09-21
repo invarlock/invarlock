@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -10,6 +11,13 @@ import pytest
 from tests._support_repository_contracts import MakefileContract
 
 
+def _first_party_schema_paths(root: Path) -> list[Path]:
+    return [
+        *sorted((root / "contracts").glob("*.json")),
+        *sorted((root / "examples").rglob("*.schema.json")),
+    ]
+
+
 def test_public_schema_ids_use_the_canonical_contract_namespace() -> None:
     root = Path(__file__).resolve().parents[2]
     schemas = sorted((root / "contracts").glob("*.schema.json"))
@@ -17,6 +25,55 @@ def test_public_schema_ids_use_the_canonical_contract_namespace() -> None:
     for path in schemas:
         document = json.loads(path.read_text(encoding="utf-8"))
         assert document["$id"] == f"https://invarlock.dev/contracts/{path.name}"
+
+
+def test_printable_identifier_patterns_reject_a_final_control_character() -> None:
+    root = Path(__file__).resolve().parents[2]
+    checked = 0
+
+    def visit(value: object) -> None:
+        nonlocal checked
+        if isinstance(value, dict):
+            pattern = value.get("pattern")
+            if isinstance(pattern, str) and r"\x00-\x1f\x7f" in pattern:
+                checked += 1
+                assert re.search(pattern, "identifier\n") is None
+            for child in value.values():
+                visit(child)
+        elif isinstance(value, list):
+            for child in value:
+                visit(child)
+
+    for path in _first_party_schema_paths(root):
+        visit(json.loads(path.read_text(encoding="utf-8")))
+    assert checked > 0
+
+
+def test_anchored_contract_patterns_require_the_true_end_of_string() -> None:
+    root = Path(__file__).resolve().parents[2]
+    checked = 0
+
+    def visit(value: object, path: Path) -> None:
+        nonlocal checked
+        if isinstance(value, dict):
+            pattern = value.get("pattern")
+            if isinstance(pattern, str) and pattern.startswith("^"):
+                checked += 1
+                assert not pattern.endswith("$"), (
+                    f"{path} uses a terminal $ anchor that accepts a final newline"
+                )
+                assert pattern.endswith(r"(?![\s\S])"), (
+                    f"{path} does not require the true end of the string"
+                )
+            for child in value.values():
+                visit(child, path)
+        elif isinstance(value, list):
+            for child in value:
+                visit(child, path)
+
+    for path in _first_party_schema_paths(root):
+        visit(json.loads(path.read_text(encoding="utf-8")), path)
+    assert checked > 0
 
 
 def test_make_target_parser_keeps_repeated_declarations_and_recipe_colons() -> None:
