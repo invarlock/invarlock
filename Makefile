@@ -716,7 +716,7 @@ langfuse-sdk-test: dist-check  ## Qualify real Langfuse exports and SDK-free ins
 	PYTHON=$(PYTHON) bash scripts/langfuse_sdk_gate.sh
 
 .PHONY: evaluator-parity-test evaluator-sdk-test
-evaluator-parity-test: dist-check  ## Replay all 19 dedicated profiles through an installed core recipient
+evaluator-parity-test: dist-check  ## Qualify 19 installed profiles and replay retained evaluator campaigns
 	PYTHON=$(PYTHON) bash scripts/evaluator_parity_gate.sh
 
 evaluator-sdk-test: dist-check  ## Pass actual evaluator SDK exports through an installed recipient

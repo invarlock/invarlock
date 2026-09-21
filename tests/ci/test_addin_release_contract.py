@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import ast
 import tomllib
 from pathlib import Path
+
+import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ROOT = REPO_ROOT
@@ -30,7 +33,30 @@ def test_single_distribution_owns_all_first_party_provider_entry_points() -> Non
 
 def test_first_party_distribution_versions_match_core() -> None:
     project = _project()
-    assert project["version"] == "0.16.1"
+    source = ast.parse((ROOT / "src/invarlock/__init__.py").read_text(encoding="utf-8"))
+    module_version = next(
+        ast.literal_eval(node.value)
+        for node in source.body
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name) and target.id == "__version__"
+            for target in node.targets
+        )
+    )
+    citation = yaml.safe_load((ROOT / "CITATION.cff").read_text(encoding="utf-8"))
+    locked = tomllib.loads((ROOT / "uv.lock").read_text(encoding="utf-8"))
+    root_package = next(
+        package
+        for package in locked["package"]
+        if package["name"] == "invarlock" and package.get("source") == {"editable": "."}
+    )
+    assert {
+        project["version"],
+        module_version,
+        citation["version"],
+        citation["preferred-citation"]["version"],
+        root_package["version"],
+    } == {project["version"]}
     assert project["name"] == "invarlock"
     assert (ROOT / "packaging/README.md").is_file()
 
@@ -55,10 +81,11 @@ def test_judge_extra_requires_only_supported_provider_sdks_without_enlarging_cor
     )
 
 
-def test_all_addins_ship_the_declared_license_text() -> None:
-    expected = (REPO_ROOT / "LICENSE").read_bytes()
-    assert expected
-    assert (REPO_ROOT / "LICENSE").read_bytes() == expected
+def test_single_distribution_declares_the_repository_license() -> None:
+    license_text = (REPO_ROOT / "LICENSE").read_text(encoding="utf-8")
+    assert _project()["license"] == "Apache-2.0"
+    assert "Apache License" in license_text
+    assert "Version 2.0" in license_text
     assert "license-files" not in _project()
 
 
@@ -159,6 +186,17 @@ def test_optional_judge_sdk_has_hashed_release_gate_without_source_shadowing() -
     release = (REPO_ROOT / ".github/workflows/release.yml").read_text()
     assert "make install-smoke inspect-judge-sdk-test" in ci
     assert "bash scripts/inspect_judge_sdk_gate.sh" in release
+
+
+def test_evaluator_parity_gate_replays_every_retained_campaign() -> None:
+    gate = (REPO_ROOT / "scripts/evaluator_parity_gate.sh").read_text()
+    assert "tests/integration/test_evaluator_parity.py" in gate
+    assert "test_installed_sdk_free_recipient_signed_journey" in gate
+    assert "mistral-7b-sentinel" in gate
+    assert "priority-workflows" in gate
+    for root in ("SENTINEL", "PRIORITY"):
+        assert f'"${{{root}}}/replay.py"' in gate
+        assert f'"${{{root}}}/judge_replay.py"' in gate
 
 
 def test_runtime_image_build_contexts_include_declared_inputs() -> None:

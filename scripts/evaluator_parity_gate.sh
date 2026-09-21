@@ -36,3 +36,15 @@ INVARLOCK_EVALUATOR_PARITY_PYTHON="${PARITY_RECIPIENT}" \
   "${ROOT_DIR}/tests/integration/test_evaluator_parity.py" \
   -k test_installed_sdk_free_recipient_signed_journey -n "${PARITY_WORKERS:-4}" \
   --override-ini=addopts= --basetemp "${PARITY_TEMP}/journeys"
+
+# Replay every retained pack from the fresh evaluator campaigns through the
+# same isolated candidate recipient. These commands are offline and preserve
+# the campaigns' original passing, rejected and insufficient-evidence results.
+SENTINEL="${ROOT_DIR}/examples/integrations/evaluator-live/references/mistral-7b-sentinel"
+PRIORITY="${ROOT_DIR}/examples/integrations/evaluator-live/references/priority-workflows"
+"${PARITY_RECIPIENT}" -I "${SENTINEL}/replay.py"
+"${PARITY_RECIPIENT}" -I "${SENTINEL}/judge_replay.py" \
+  --output "${PARITY_TEMP}/sentinel-judge"
+"${PARITY_RECIPIENT}" -I "${PRIORITY}/replay.py"
+"${PARITY_RECIPIENT}" -I "${PRIORITY}/judge_replay.py" \
+  --output "${PARITY_TEMP}/priority-judge"
