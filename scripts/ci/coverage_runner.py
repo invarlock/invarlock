@@ -165,7 +165,7 @@ def test(shard: str, workers: int) -> int:
     return subprocess.run(command, cwd=ROOT, env=env, check=False).returncode
 
 
-def source_identity() -> str:
+def source_identity(snapshot: dict[str, str] | None = None) -> str:
     """Bind local edits as well as the commit, without storing source contents."""
     commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT)
     files = subprocess.check_output(
@@ -173,6 +173,9 @@ def source_identity() -> str:
         cwd=ROOT,
     )
     digest = hashlib.sha256(commit)
+    if snapshot is not None:
+        snapshot.clear()
+        snapshot["HEAD"] = commit.decode().strip()
     for relative in sorted(set(files.split(b"\0")) - {b""}):
         path = ROOT / os.fsdecode(relative)
         digest.update(relative + b"\0")
@@ -182,7 +185,10 @@ def source_identity() -> str:
             content = b"file\0" + path.read_bytes()
         else:
             content = b"deleted\0"
-        digest.update(hashlib.sha256(content).digest())
+        file_digest = hashlib.sha256(content)
+        digest.update(file_digest.digest())
+        if snapshot is not None:
+            snapshot[os.fsdecode(relative)] = file_digest.hexdigest()
     return digest.hexdigest()
 
 
@@ -245,7 +251,8 @@ def run(shard: str, artifact_dir: Path, workers: int) -> int:
     destination.mkdir(parents=True, exist_ok=True)
     # Never let an interrupted retry inherit the previous attempt's success.
     manifest = destination / "manifest.json"
-    identity = source_identity()
+    before: dict[str, str] = {}
+    identity = source_identity(before)
     _write_json(manifest, {"version": 1, "shard": shard, "status": "running"})
     inventory = destination / "inventory.json"
     inventory.unlink(missing_ok=True)
@@ -299,8 +306,19 @@ def run(shard: str, artifact_dir: Path, workers: int) -> int:
     _write_json(manifest, record)
     if result.returncode:
         return result.returncode
-    if source_identity() != identity:
-        raise ValueError("source files changed while coverage was running")
+    after: dict[str, str] = {}
+    if source_identity(after) != identity:
+        changed = sorted(
+            path
+            for path in before.keys() | after.keys()
+            if before.get(path) != after.get(path)
+        )
+        record["changed_source_paths"] = changed
+        _write_json(manifest, record)
+        raise ValueError(
+            "source files changed while coverage was running: "
+            + json.dumps(changed, ensure_ascii=True)
+        )
     record.update(
         status="passed",
         inventory=_inventory(inventory),

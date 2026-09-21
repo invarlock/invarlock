@@ -45,7 +45,7 @@ def write_data(path: Path, name: str = "src/invarlock/probe.py") -> None:
 
 @pytest.fixture
 def artifacts(tmp_path, monkeypatch):
-    monkeypatch.setattr(runner, "source_identity", lambda: "source")
+    monkeypatch.setattr(runner, "source_identity", lambda *args: "source")
     root = tmp_path / "artifacts"
     for shard in runner.SHARDS:
         folder = root / shard
@@ -197,7 +197,11 @@ def test_source_identity_includes_content_deletions_links_and_commit(
         return commit[0] if command[1] == "rev-parse" else b"file.py\0link.py\0"
 
     monkeypatch.setattr(runner.subprocess, "check_output", git)
-    identities = [runner.source_identity()]
+    snapshot = {"stale": "discard"}
+    identities = [runner.source_identity(snapshot)]
+    assert set(snapshot) == {"HEAD", "file.py", "link.py"}
+    assert snapshot["HEAD"] == "commit-one"
+    assert snapshot["file.py"] != snapshot["link.py"]
     source.write_text("after")
     identities.append(runner.source_identity())
     source.unlink()
@@ -243,7 +247,14 @@ def test_run_records_success_only_after_validating_outputs(
     tmp_path, monkeypatch, shard, workers, exit_code, changed
 ):
     identities = iter(["before", "after" if changed else "before"])
-    monkeypatch.setattr(runner, "source_identity", lambda: next(identities))
+
+    def identity(snapshot):
+        value = next(identities)
+        snapshot["tracked.py"] = value
+        snapshot["HEAD"] = "unchanged"
+        return value
+
+    monkeypatch.setattr(runner, "source_identity", identity)
 
     def execute(command, *, cwd, env, check):
         assert cwd == runner.ROOT and check is False
@@ -272,6 +283,8 @@ def test_run_records_success_only_after_validating_outputs(
     record = json.loads((tmp_path / shard / "manifest.json").read_text())
     assert record["status"] == ("passed" if not exit_code and not changed else "failed")
     assert record["duration_seconds"] >= 0
+    if changed:
+        assert record["changed_source_paths"] == ["tracked.py"]
 
 
 def test_invalid_shard_and_worker_count_are_rejected(tmp_path):
@@ -460,7 +473,7 @@ def test_run_collects_real_xdist_inventory_and_coverage(tmp_path, monkeypatch):
     for directory in ("examples", "src"):
         (project / directory).mkdir(exist_ok=True)
     monkeypatch.setattr(runner, "ROOT", project)
-    monkeypatch.setattr(runner, "source_identity", lambda: "source")
+    monkeypatch.setattr(runner, "source_identity", lambda *args: "source")
     artifacts = tmp_path / "artifacts"
     assert runner.run("examples", artifacts, 2) == 0
     record = json.loads((artifacts / "examples/manifest.json").read_text())
