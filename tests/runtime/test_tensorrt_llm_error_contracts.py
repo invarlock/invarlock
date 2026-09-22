@@ -154,6 +154,31 @@ def test_pinned_file_rejects_size_mode_and_digest_drift(tmp_path: Path) -> None:
 
 
 @pytest.mark.skipif(
+    not hasattr(os, "mkfifo") or not hasattr(os, "O_NONBLOCK"),
+    reason="nonblocking named pipes unavailable",
+)
+def test_pinned_file_rejects_named_pipe_without_blocking(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pipe = tmp_path / "runner.pipe"
+    os.mkfifo(pipe)
+    real_open = os.open
+
+    def checked_open(path, flags, *args, **kwargs):  # noqa: ANN001, ANN002, ANN003
+        if path == pipe.name:
+            assert flags & os.O_NONBLOCK
+        return real_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(execution.os, "open", checked_open)
+    with pytest.raises(
+        execution.TensorRTLLMExecutionError, match="changed while being opened"
+    ):
+        execution._PinnedFile.open(  # noqa: SLF001
+            pipe, expected_sha256=None, require_executable=False
+        )
+
+
+@pytest.mark.skipif(
     os.name != "posix" or not hasattr(os, "O_NOFOLLOW"),
     reason="secure file pinning requires POSIX nofollow support",
 )
@@ -804,6 +829,30 @@ def test_snapshot_bundle_rejects_invalid_layouts(
     for name in entries:
         source.joinpath(name).write_bytes(b"value")
     with pytest.raises(execution.TensorRTLLMExecutionError, match="count|single-rank"):
+        session._snapshot_bundle(source, tmp_path / "snapshot")  # noqa: SLF001
+
+
+@pytest.mark.skipif(
+    not hasattr(os, "mkfifo") or not hasattr(os, "O_NONBLOCK"),
+    reason="nonblocking named pipes unavailable",
+)
+def test_snapshot_bundle_rejects_named_pipe_without_blocking(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    source.joinpath("config.json").write_bytes(b"{}")
+    pipe = source / "rank0.engine"
+    os.mkfifo(pipe)
+    real_open = os.open
+
+    def checked_open(path, flags, *args, **kwargs):  # noqa: ANN001, ANN002, ANN003
+        if path == pipe:
+            assert flags & os.O_NONBLOCK
+        return real_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(session.os, "open", checked_open)
+    with pytest.raises(execution.TensorRTLLMExecutionError, match="non-regular"):
         session._snapshot_bundle(source, tmp_path / "snapshot")  # noqa: SLF001
 
 

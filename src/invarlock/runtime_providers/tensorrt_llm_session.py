@@ -413,7 +413,10 @@ def _snapshot_bundle(source: Path, destination: Path) -> None:
         try:
             descriptor = os.open(
                 entry,
-                os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | os.O_NOFOLLOW,
+                os.O_RDONLY
+                | getattr(os, "O_CLOEXEC", 0)
+                | os.O_NOFOLLOW
+                | getattr(os, "O_NONBLOCK", 0),
             )
         except OSError as exc:
             raise TensorRTLLMExecutionError(
@@ -729,6 +732,8 @@ class TensorRTLLMSession:
             raise ValueError("TensorRT-LLM execution supports only text_causal")
         if len(batch.records) > _MAX_BATCH_RECORDS:
             raise ValueError("TensorRT-LLM batch exceeds the record limit")
+        if len(batch.records) > self._config.execution_settings.batch_size:
+            raise ValueError("TensorRT-LLM batch exceeds the configured batch_size")
         with self._score_lock:
             self._require_open()
             self._latest_observation_sha256 = None

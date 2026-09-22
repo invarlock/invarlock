@@ -126,7 +126,7 @@ def test_hf_provider_receipts_a_real_tiny_local_transformers_journey(
     )
     provider = HFTransformersProvider()
     identity = provider.identify_artifact(spec)
-    input_text = "token-1 token-2 token-3"
+    input_text = "token-1 token-2"
     batch = EvaluationBatch(
         schedule_sha256=hashlib.sha256(b"tiny-local-hf-schedule").hexdigest(),
         records=(

@@ -49,8 +49,13 @@ def test_runtime_dockerfile_has_one_hf_runtime_dependency_surface() -> None:
         "requirements/workflows/runtime-wheel-build-py312.txt",
         "requirements/workflows/accelerate-upstream-wheel.txt",
     ]
-    assert "RUNTIME_REQUIREMENTS_AMD64" in text
-    assert "RUNTIME_REQUIREMENTS_ARM64" in text
+    assert "RUNTIME_REQUIREMENTS_AMD64" not in text
+    assert "RUNTIME_REQUIREMENTS_ARM64" not in text
+    assert 'amd64) echo "/mnt/requirements/workflows/runtime-image-py312.txt"' in text
+    assert (
+        'arm64) echo "/mnt/requirements/workflows/runtime-image-py312-aarch64.txt"'
+        in text
+    )
     assert "runtime-image-py312-cu" not in text
     assert "runtime-image-quant" not in text
     assert "gptq" not in text.lower()

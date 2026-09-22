@@ -1328,7 +1328,7 @@ def _hf_model_inputs(
         add_special_tokens=True,
         max_length=settings.context_length,
         return_tensors="pt",
-        truncation=True,
+        truncation=False,
     )
     if not isinstance(encoded, Mapping) or "input_ids" not in encoded:
         raise RuntimeError("strict HF tokenizer did not return input_ids")
@@ -1340,6 +1340,8 @@ def _hf_model_inputs(
         raise RuntimeError("strict HF tokenizer returned invalid input_ids")
     if input_ids.shape[1] < 1:
         raise RuntimeError("strict HF tokenizer returned empty input_ids")
+    if input_ids.shape[1] > settings.context_length:
+        raise ValueError("strict HF prompt exceeds the authenticated context length")
     return input_ids
 
 

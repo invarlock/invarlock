@@ -165,7 +165,10 @@ class _PinnedFile:
                     )
                 descriptor = os.open(
                     absolute.name,
-                    os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | os.O_NOFOLLOW,
+                    os.O_RDONLY
+                    | getattr(os, "O_CLOEXEC", 0)
+                    | os.O_NOFOLLOW
+                    | getattr(os, "O_NONBLOCK", 0),
                     dir_fd=parent_descriptor,
                 )
             except OSError as exc:
