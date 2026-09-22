@@ -219,6 +219,33 @@ def test_plan_loader_rejects_ambiguous_and_oversized_json(
         contracts.load_measurement_plan(FIXTURES / "plan.json")
 
 
+def test_plan_loader_rejects_a_non_object_document(tmp_path: Path) -> None:
+    plan_path = tmp_path / "array.json"
+    plan_path.write_text("[]", encoding="utf-8")
+
+    with pytest.raises(JudgeMeasurementContractError, match="JSON object"):
+        contracts.load_measurement_plan(plan_path)
+
+
+def test_request_renderer_rejects_an_unknown_reference_mode() -> None:
+    plan = _plan()
+    plan["prompt"]["reference_mode"] = cast(Any, "future-mode")
+
+    with pytest.raises(JudgeMeasurementContractError, match="reference mode"):
+        contracts.render_judge_request(plan, input_text="input", answer_text="answer")
+
+
+def test_request_renderer_bounds_demonstration_assistant_content() -> None:
+    plan = _plan()
+    plan["prompt"]["system"] = "x" * contracts.JUDGE_REQUEST_MAX_BYTES
+    plan["prompt"]["demonstrations"] = [
+        {"input": "input", "answer": "answer", "rating": "correct"}
+    ]
+
+    with pytest.raises(JudgeMeasurementContractError, match="exceeds"):
+        contracts.render_judge_request(plan, input_text="input", answer_text="answer")
+
+
 def test_plan_rejects_prompt_expansion_before_large_request_construction() -> None:
     plan = _plan()
     reference = "r" * 100_000

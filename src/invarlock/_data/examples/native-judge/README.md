@@ -10,6 +10,10 @@ rubric, such as whether an answer stays within supplied context. A judge rating
 is a measurement of that rubric, not a replacement for task-specific tests. To
 try the evidence workflow without models, containers or API credentials, start
 with the [offline frozen-answer example](../judge-measurements/README.md).
+To run the judge itself from a local HF checkpoint or GGUF file, use the
+[native local judge example](../native-local-judge/README.md). That profile
+executes the authenticated artifact directly in an offline runtime; this starter
+uses a hosted judge account.
 
 The two invented questions demonstrate wiring. They cannot establish benchmark
 quality or satisfy the interval precision in the example policy. Replace them

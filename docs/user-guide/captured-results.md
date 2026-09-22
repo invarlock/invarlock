@@ -131,6 +131,15 @@ their bindings and reject a projection override.
 
 ## Judge captured answers
 
+For an offline local judge, the recipe can select `runtime-provider-judge` with
+`comparison.judge.model` binding an inspected HF or GGUF artifact and runtime.
+The InvarLock process must already run inside the strict offline container;
+the ordinary host CLI does not launch a judge container. The
+[local judge example](https://github.com/invarlock/invarlock/blob/main/examples/native-local-judge/README.md) demonstrates
+model inspection, plan preparation and recipient verification. This local model
+selection cannot be combined with a retained `comparison.judge.measurements`
+file; retained-measurement import does not need model resources.
+
 Keep the captured request's baseline and subject source definitions and replace
 its comparison policy selection with:
 

@@ -11,6 +11,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `openai-compatible-judge` for explicitly configured vLLM, Ollama, LM Studio
+  and compatible Chat Completions services. Retain bounded requests, responses,
+  endpoint identity and checkpoints for offline verification, with dedicated
+  credential configuration and an endpoint setup example. Service observations
+  do not substitute for direct local artifact authentication.
+
+- Add native local judge collection through `runtime-provider-judge` for
+  `hf_transformers` and `llama_cpp`. Bind the complete local artifact identity,
+  pinned offline runtime, exact judge request and retained provider
+  observations for independent verification without model execution. Include
+  fixed generation controls, bounded collection, durable checkpoints and a local
+  judge setup example. Support explicit plan-bound canonical JSON or ChatML
+  prompt rendering, with matching offline replay and role-delimiter checks.
+
 - Allow Python judge collectors to stop after completed, durably retained batches
   and resume the same plan without resetting call or budget accounting.
 

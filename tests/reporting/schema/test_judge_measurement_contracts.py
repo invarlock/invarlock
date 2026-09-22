@@ -116,35 +116,81 @@ def test_judge_contract_retains_incomplete_attempts_and_unavailable_fields() -> 
 
 
 def test_judge_contracts_bound_all_collections_and_text() -> None:
-    def check(value: object) -> None:
+    approved_optional = {
+        ("plan", "properties", "prompt"): {"reference_mode", "runtime_format"},
+        ("plan", "properties", "judge"): {"service_identity"},
+        ("plan", "properties", "judge", "properties", "service_identity"): {
+            "response_format"
+        },
+    }
+    observed_optional = {}
+
+    def check(value: object, path: tuple[str | int, ...]) -> None:
         if isinstance(value, dict):
             if value.get("type") == "object":
                 assert value["additionalProperties"] is False
-                optional = set(value["properties"]) - set(value["required"])
+                properties = set(value["properties"])
+                required = set(value["required"])
+                assert required <= properties
+                optional = properties - required
+                assert optional == approved_optional.get(path, set())
                 if optional:
-                    assert set(value["properties"]) == {
-                        "system",
-                        "template",
-                        "references",
-                        "demonstrations",
-                        "reference_mode",
-                    }
-                    assert optional == {"reference_mode"}
-                    assert value["properties"]["reference_mode"]["enum"] == [
-                        "none",
-                        "per_case",
-                    ]
-                else:
-                    assert set(value["required"]) == set(value["properties"])
+                    observed_optional[path] = optional
             if value.get("type") == "array":
                 assert isinstance(value["maxItems"], int)
             if value.get("type") == "string":
                 assert isinstance(value["maxLength"], int)
-            for child in value.values():
-                check(child)
+            for name, child in value.items():
+                check(child, (*path, name))
         elif isinstance(value, list):
-            for child in value:
-                check(child)
+            for index, child in enumerate(value):
+                check(child, (*path, index))
 
-    check(public_contracts.load_judge_measurement_plan_schema())
-    check(public_contracts.load_judge_measurements_schema())
+    check(public_contracts.load_judge_measurement_plan_schema(), ("plan",))
+    check(public_contracts.load_judge_measurements_schema(), ("measurements",))
+    assert observed_optional == approved_optional
+
+
+@pytest.mark.parametrize(
+    ("path", "allowed"),
+    [
+        (("prompt", "reference_mode"), ("none", "per_case")),
+        (("prompt", "runtime_format"), ("canonical-json-v1", "chatml-v1")),
+        (
+            ("judge", "service_identity", "service"),
+            ("vllm", "ollama", "lm_studio", "openai_compatible"),
+        ),
+        (
+            ("judge", "service_identity", "response_format"),
+            ("json_object", "json_schema"),
+        ),
+    ],
+)
+def test_judge_plan_optional_controls_are_closed(path, allowed) -> None:
+    validator = Draft202012Validator(
+        public_contracts.load_judge_measurement_plan_schema()
+    )
+    payload = json.loads((FIXTURES / "plan.json").read_text())
+    payload["judge"]["service_identity"] = {
+        "service": "ollama",
+        "endpoint_sha256": "a" * 64,
+    }
+    target = payload
+    for part in path[:-1]:
+        target = target[part]
+    for value in allowed:
+        target[path[-1]] = value
+        validator.validate(payload)
+    for invalid in ("unknown", "", True, None, 1, {}, []):
+        target[path[-1]] = invalid
+        with pytest.raises(ValidationError):
+            validator.validate(payload)
+    del target[path[-1]]
+    if path[-1] == "service":
+        with pytest.raises(ValidationError):
+            validator.validate(payload)
+    else:
+        validator.validate(payload)
+    target["unapproved"] = True
+    with pytest.raises(ValidationError):
+        validator.validate(payload)

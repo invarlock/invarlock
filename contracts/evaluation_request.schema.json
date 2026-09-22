@@ -142,6 +142,7 @@
       "type": "object",
       "required": ["workspace", "signer_identity"],
       "properties": {
+        "model": {"$ref": "#/$defs/comparisonSide"},
         "workspace": {"$ref": "#/$defs/safeReference"},
         "signer_identity": {
           "type": "string",

@@ -60,13 +60,18 @@ def test_real_collection_environment_fails_without_loading_model(monkeypatch, fa
 
 @pytest.fixture
 def delegated(monkeypatch):
+    monkeypatch.setenv("INVARLOCK_ALLOW_JUDGE_NETWORK", "1")
     real = workflow.collection_api()
     api = ModuleType("invarlock.judge_measurements")
     api.CollectionOptions = real.CollectionOptions
     api.RunnerOptions = real.RunnerOptions
     api.prepare_collection = real.prepare_collection
     api.validate_collection_environment = Mock(
-        return_value={"credential_available": True}
+        return_value={
+            "credential_available": True,
+            "network_authorized": True,
+            "network_authorization_variable": "INVARLOCK_ALLOW_JUDGE_NETWORK",
+        }
     )
 
     async def collected(*args, on_stop):
@@ -84,7 +89,9 @@ def test_collect_frozen_delegates_exact_frozen_answers_and_checkpoint(
     recipe = _recipe()
     plan, baseline, subject = object(), {"baseline": "frozen"}, {"subject": "frozen"}
     assert workflow.collection_preflight(recipe["collection"]) == {
-        "credential_available": True
+        "credential_available": True,
+        "network_authorized": True,
+        "network_authorization_variable": "INVARLOCK_ALLOW_JUDGE_NETWORK",
     }
     status = {"stop_reason": "stale"}
     result = workflow.collect_frozen(

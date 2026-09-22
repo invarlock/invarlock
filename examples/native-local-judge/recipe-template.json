@@ -1,0 +1,92 @@
+{
+  "format": "invarlock/native-judge-policy-v1",
+  "plan": {
+    "format": "invarlock/judge-measurement-plan-v1",
+    "profile_id": "text-frozen-answer-v1",
+    "rubric": {
+      "text": "Rate whether the answer correctly answers the question. Mark incorrect for a factually wrong answer."
+    },
+    "prompt": {
+      "system": "Grade the delimited answer using the rubric.",
+      "template": "Grade the input and answer against the rubric. Return only a JSON object with one rating field.",
+      "demonstrations": [],
+      "references": []
+    },
+    "judge": {
+      "provider": "hf_transformers",
+      "requested_model": "replace-with-inspected-model-id",
+      "approved_resolved_models": [
+        "replace-with-inspected-model-id"
+      ],
+      "model_identity": {
+        "kind": "local_weights",
+        "weights_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "config": {
+        "temperature": "0",
+        "top_p": "1",
+        "max_output_tokens": 128,
+        "seed": 0,
+        "reasoning_effort": null
+      },
+      "tools": false
+    },
+    "parser": {
+      "id": "json-rating-v1"
+    },
+    "scale": {
+      "id": "bounded-discrete-v1",
+      "ratings": [
+        {
+          "label": "incorrect",
+          "value": "0"
+        },
+        {
+          "label": "correct",
+          "value": "1"
+        }
+      ]
+    },
+    "sampling": {
+      "basis": "curated_benchmark",
+      "unit_weighting": "equal",
+      "within_unit_weighting": "equal_cases",
+      "case_units": [
+        {
+          "case_id": "case-1",
+          "unit_id": "unit-1"
+        }
+      ]
+    },
+    "schedule": {
+      "order": "case-side-repetition-lexicographic-v1",
+      "trial_id_scheme": "plan-case-side-repetition-sha256-v1",
+      "repetitions": 1,
+      "max_attempts": 1,
+      "attempt_selection": "first_completed_response",
+      "retry_on": [],
+      "cache": "forbid"
+    }
+  },
+  "analysis": {
+    "format": "invarlock/judge-analysis-policy-v1",
+    "metric_name": "factual-correctness",
+    "decision_role": "required",
+    "direction": "higher",
+    "method": "fixed-benchmark-hoeffding-v1",
+    "alpha": "0.05",
+    "comparison_family_size": 2,
+    "minimum_units": 20,
+    "maximum_interval_width": "0.3",
+    "allowed_degradation": "0.05",
+    "subject_bound": null
+  },
+  "collection": {
+    "profile": "runtime-provider-text-frozen-answer-v1",
+    "max_calls": 2,
+    "max_output_tokens": 256
+  },
+  "runner": {
+    "scorer_id": "factual-correctness"
+  }
+}
