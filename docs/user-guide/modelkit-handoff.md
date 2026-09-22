@@ -187,6 +187,11 @@ paths point to the actual source model directories. The source-side `blobs` and
 package identities before transfer. All technical anchors, content digests,
 policies and public keys must already be selected independently. Keep private
 signing keys outside the package and recipient directories.
+The operator-owned request may select absolute source paths or relative paths
+that stay beside the request file. The launcher rejects selected source
+symlinks, scans copied directories for links, and requires each trusted public
+key to have a SHA-256 fingerprint before transferring files. Do not run a
+recipient request supplied by an untrusted party.
 
 Use a separate Python environment containing the installed InvarLock wheel for
 recipient verification. Build or select a reviewed local GGUF runtime image and

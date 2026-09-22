@@ -584,6 +584,8 @@ def _parse_batch_request(payload: bytes) -> _BatchScoreRequest:
         engine_config,
         settings,
     ) = _validated_runtime_inputs(request)
+    if len(records) > settings.batch_size:
+        raise TensorRTLLMRunnerError("batch records exceed the configured batch_size")
     return _BatchScoreRequest(
         engine_bundle=engine_bundle,
         tokenizer_contract_path=tokenizer_path,

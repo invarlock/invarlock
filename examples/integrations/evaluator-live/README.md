@@ -232,20 +232,43 @@ independently approve the complete protocol digest before starting workers.
 Start the ordinary model worker with that protocol, then start the HTTP bridge:
 
 ```bash
+python - /private/path/baseline.cap <<'PY'
+import os
+import secrets
+import sys
+
+descriptor = os.open(sys.argv[1], os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+with os.fdopen(descriptor, "w", encoding="ascii") as output:
+    output.write(secrets.token_hex(32))
+PY
 python examples/integrations/evaluator-live/http_service.py \
   --protocol /path/to/http-protocol.json \
   --protocol-sha256 sha256:REVIEWED_DIGEST --role baseline \
-  --socket /private/path/baseline.sock --output /path/to/new-http-baseline
+  --socket /private/path/baseline.sock --output /path/to/new-http-baseline \
+  --capability-file /private/path/baseline.cap
 ```
 
 Run both the worker and bridge under the external `supervise.py` process-group
 deadline described above. The bridge additionally applies a whole-process alarm
 that interrupts slow HTTP reads and worker waits. Repeat for the subject, then
-run the ordinary capture command in each admitted SDK environment. Presence of
-`http_services` selects the declared HTTP endpoint. Omit `--socket` from the
-HTTP capture command; local captures still require their private socket. Python capture network permission is
-limited to the exact endpoint, alongside Promptfoo's existing local callback
-bridge permission.
+run the capture command in each admitted SDK environment:
+
+```bash
+python examples/integrations/evaluator-live/capture.py \
+  --protocol /path/to/http-protocol.json \
+  --protocol-sha256 sha256:REVIEWED_DIGEST --role baseline \
+  --evaluator inspect-ai --output /path/to/new-http-capture-baseline \
+  --http-capability-file /private/path/baseline.cap
+```
+
+Presence of `http_services` selects the declared HTTP endpoint. Omit `--socket`
+from the HTTP capture command. Generate a separate capability file for the
+subject run. Keep each file private to the service and capture processes and
+remove it after capture. The capability is sent in an HTTP header and is not
+written into the frozen protocol, task journals or evidence. Local captures
+still require their private socket. Python capture network permission is limited
+to the exact endpoint, alongside Promptfoo's existing local callback bridge
+permission.
 
 The request carries the exact frozen task text, reference and configuration.
 References are used for continuation likelihood; they are not appended to the

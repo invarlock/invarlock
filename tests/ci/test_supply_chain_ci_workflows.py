@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import inspect
+import json
 import math
 import os
 import re
@@ -97,6 +98,47 @@ def test_workflow_pip_installs_use_hashed_lock_files() -> None:
                     offenders.append(f"{path.name}: {line}")
 
     assert offenders == []
+
+
+def test_promptfoo_sdk_gate_uses_a_required_dependency_lock() -> None:
+    lock_root = Path("examples/evaluator-qualification/locks/promptfoo")
+    manifest = json.loads((lock_root / "package.json").read_text(encoding="utf-8"))
+    lock = json.loads((lock_root / "package-lock.json").read_text(encoding="utf-8"))
+    pins = dict(
+        line.split("=", 1)
+        for line in Path("examples/evaluator-qualification/locks/promptfoo.txt")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    )
+    version = pins["package"].removeprefix("promptfoo@")
+    assert pins["package"] == f"promptfoo@{version}"
+    assert manifest["dependencies"] == {"promptfoo": version}
+    assert manifest["overrides"] == {"promptfoo": {"js-yaml": "5.2.2"}}
+    assert lock["lockfileVersion"] == 3
+    assert lock["packages"][""]["dependencies"] == manifest["dependencies"]
+    assert lock["packages"]["node_modules/promptfoo"]["version"] == version
+    assert lock["packages"]["node_modules/promptfoo"]["integrity"] == pins["integrity"]
+    assert lock["packages"]["node_modules/js-yaml"]["version"] == "5.2.2"
+    assert all(
+        package.get("integrity")
+        and package.get("resolved", "").startswith("https://registry.npmjs.org/")
+        for path, package in lock["packages"].items()
+        if path
+    )
+    assert all(
+        package.get("optional") is not True and "optionalDependencies" not in package
+        for package in lock["packages"].values()
+    )
+    gate = Path("scripts/evaluator_sdk_gate.sh").read_text(encoding="utf-8")
+    assert "npm ci --prefix" in gate
+    assert (
+        "npm audit --package-lock-only --omit=dev --omit=optional --audit-level=high"
+        in gate
+    )
+    assert 'npm ci --prefix "$SDK_TEMP" --omit=optional' in gate
+    assert "--ignore-scripts" in gate
+    assert "npm install --prefix" not in gate
+    assert "npm pack" not in gate
 
 
 def test_hf_installed_audit_binds_reviewed_locks_and_preserves_report() -> None:

@@ -249,7 +249,10 @@ def _read_content_bytes(
         | getattr(os, "O_NOFOLLOW", 0)
     )
     file_flags = (
-        os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_NONBLOCK", 0)
     )
     try:
         directory = os.open(content_store, directory_flags)
@@ -573,7 +576,7 @@ class HFVisionTextScorer:
                             text=rendered,
                             images=image,
                             return_tensors="pt",
-                            truncation=True,
+                            truncation=False,
                             max_length=settings.context_length,
                         )
                     finally:
@@ -596,6 +599,13 @@ class HFVisionTextScorer:
                         or input_ids.shape[0] != 1
                     ):
                         raise RuntimeError("vision-text input_ids are invalid")
+                    if (
+                        input_ids.shape[1] < 1
+                        or input_ids.shape[1] > settings.context_length
+                    ):
+                        raise ValueError(
+                            "vision-text input exceeds the authenticated context length"
+                        )
                     deadline = time.monotonic() + settings.timeout_seconds
 
                     generated = generate(

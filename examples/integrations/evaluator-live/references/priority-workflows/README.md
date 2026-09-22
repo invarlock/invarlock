@@ -47,6 +47,9 @@ three archive snapshots and complete member manifest, then checks:
 
 - Original SDK, task and HTTP request/response bindings against each frozen
   protocol, including actual service observation windows and model identities.
+  The archived HTTP helper bytes match the protocol and capture-manifest source
+  digests. Replay uses the current verifier on retained records; it does not
+  execute the historical HTTP service.
 - Native inputs and both import routes against the exact normalized run digests
   in the signed evidence.
 - Every original signed receipt and a fresh independent evidence verification
@@ -89,7 +92,9 @@ it does not independently attest that the original GPU computation occurred.
 ## Retained files
 
 [reference.json](reference.json) maps source profiles, captures, signed packs and
-archive pins. [provenance.json](provenance.json) records the original collection
+archive pins. [http_service.py.txt](http_service.py.txt) retains the source of
+the original HTTP helper so its recorded digest remains checkable after the
+live example changes. [provenance.json](provenance.json) records the original collection
 archive and the unchanged-file mapping. `captures.zip` includes original model
 and task journals, HTTP bodies, SDK exports, setup failures and their recovery
 logs, preflight results, source inventories and resource observations.

@@ -806,8 +806,35 @@ def test_content_store_rejects_links_and_path_syntax(tmp_path: Path) -> None:
         )
 
 
-def test_scorer_executes_authenticated_vision_text_exact_match(
+@pytest.mark.skipif(
+    not hasattr(os, "mkfifo") or not hasattr(os, "O_NONBLOCK"),
+    reason="nonblocking named pipes unavailable",
+)
+def test_content_store_rejects_named_pipe_without_blocking(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pipe = tmp_path / "image_pipe"
+    os.mkfifo(pipe)
+    real_open = os.open
+
+    def checked_open(path, flags, *args, **kwargs):  # noqa: ANN001, ANN002, ANN003
+        if path == pipe.name:
+            assert flags & os.O_NONBLOCK
+        return real_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(provider_module.os, "open", checked_open)
+    with pytest.raises(ValueError, match="identity does not match"):
+        _read_content_bytes(
+            tmp_path,
+            content_id=pipe.name,
+            expected_sha256="0" * 64,
+            expected_byte_length=1,
+        )
+
+
+@pytest.mark.parametrize("input_token_count", [3, 129])
+def test_scorer_executes_authenticated_vision_text_exact_match(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, input_token_count: int
 ) -> None:
     torch = pytest.importorskip("torch")
     image_bytes = b"test image bytes"
@@ -860,9 +887,16 @@ def test_scorer_executes_authenticated_vision_text_exact_match(
 
         def __call__(self, **kwargs):  # noqa: ANN003
             assert kwargs["images"] is image
+            assert kwargs["truncation"] is False
             return {
-                "input_ids": torch.tensor([[1, 2, 3]]),
-                "attention_mask": torch.tensor([[1, 1, 1]]),
+                "input_ids": torch.tensor(
+                    [
+                        [1, 2, 3]
+                        if input_token_count == 3
+                        else list(range(input_token_count))
+                    ]
+                ),
+                "attention_mask": torch.ones((1, input_token_count)),
                 "pixel_values": torch.ones((1, 3, 2, 2)),
             }
 
@@ -909,6 +943,11 @@ def test_scorer_executes_authenticated_vision_text_exact_match(
         timeout_seconds=10,
     )
 
+    if input_token_count > settings.context_length:
+        with pytest.raises(ValueError, match="exceeds the authenticated context"):
+            scorer(batch, settings)
+        assert image.closed is True
+        return
     observation = scorer(batch, settings)
 
     assert image.closed is True

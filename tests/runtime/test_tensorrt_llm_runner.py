@@ -288,6 +288,20 @@ def test_runner_batch_request_schema_is_closed(
         )
 
 
+def test_runner_batch_rejects_more_records_than_configured_batch_size(
+    tmp_path: Path,
+) -> None:
+    payload, _engine = _runtime_batch_request(
+        tmp_path,
+        records=[
+            {"input_text": f"prompt {index}", "record_id": f"record/{index}"}
+            for index in range(5)
+        ],
+    )
+    with pytest.raises(runner.TensorRTLLMRunnerError, match="configured batch_size"):
+        runner._parse_batch_request(payload)  # noqa: SLF001
+
+
 def test_runner_batch_rejects_prompt_beyond_authenticated_context_before_engine_load(
     tmp_path: Path,
     fake_backend: runner._Backend,  # noqa: SLF001

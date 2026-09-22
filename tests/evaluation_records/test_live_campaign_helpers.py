@@ -651,6 +651,31 @@ def test_capture_refuses_unadmitted_profiles_before_creating_output(
     assert not output.exists()
 
 
+@pytest.mark.parametrize("hosted", [False, True])
+def test_capture_refuses_mismatched_http_capability_before_sdk_loading(
+    modules, tmp_path, hosted
+):
+    protocol = {"evaluators": ["inspect-ai"]}
+    if hosted:
+        protocol["http_services"] = {}
+    output = tmp_path / "must-not-exist"
+    with pytest.raises(
+        ValueError,
+        match="requires a private capability file"
+        if hosted
+        else "does not use an HTTP capability file",
+    ):
+        modules.capture.capture(
+            protocol,
+            "baseline",
+            "inspect-ai",
+            None if hosted else "unused",
+            output,
+            http_capability_file=None if hosted else tmp_path / "capability",
+        )
+    assert not output.exists()
+
+
 def test_promptfoo_capture_checks_actual_package_pin(modules, monkeypatch, tmp_path):
     protocol = _capture_setup(modules, monkeypatch)
     version = modules.common.versions()["promptfoo"]
@@ -682,7 +707,9 @@ def test_capture_cli_checks_digest_before_invoking_capture(
     monkeypatch.setattr(
         modules.capture,
         "capture",
-        lambda *args: calls.append(args) or {"status": "synthetic-test"},
+        lambda *args, **kwargs: (
+            calls.append((args, kwargs)) or {"status": "synthetic-test"}
+        ),
     )
     arguments = [
         "capture.py",
@@ -705,7 +732,8 @@ def test_capture_cli_checks_digest_before_invoking_capture(
     assert calls == []
     arguments[4] = modules.common.digest(protocol)
     modules.capture.main()
-    assert calls[0][:3] == (protocol, "baseline", "deepeval")
+    assert calls[0][0][:3] == (protocol, "baseline", "deepeval")
+    assert calls[0][1] == {"http_capability_file": None}
     assert json.loads(capsys.readouterr().out) == {"status": "synthetic-test"}
 
 

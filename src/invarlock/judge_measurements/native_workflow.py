@@ -160,6 +160,14 @@ def collection_preflight(
         result["budgets"] = budgets
         return result
     options = api.CollectionOptions(**configuration)
+    from invarlock.judge_measurements.runner import (
+        _require_qualified_live_provider_model,
+    )
+
+    try:
+        _require_qualified_live_provider_model(options.grader)
+    except ValueError as exc:
+        raise JudgeWorkflowError(str(exc)) from exc
     result = dict(api.validate_collection_environment(options))
     result.update(
         network_authorized=_judge_network_authorized(),

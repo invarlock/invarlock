@@ -22,6 +22,11 @@ a guard stops Inspect's malformed-function retry before another request. Use
 `collect_configured` to install that guard and the Anthropic guard that stops
 automatic `pause_turn` continuations. Other inherited
 model, provider, or generation settings are rejected before a call is admitted.
+For direct Anthropic and Google collection, the live request projection accepts
+versioned Claude models before 4.6 and versioned Gemini models before 3.
+Claude 4.6 and newer, Gemini 3 and newer, and unversioned model aliases stop
+at preflight until their pinned SDK request shapes are qualified. Offline
+verification of retained evidence keeps its original contract.
 
 The installed native and captured `metric: judge` workflows and frozen-answer
 `judge_collect` request use `collect_configured`. It validates the pinned SDK environment,
@@ -41,8 +46,9 @@ services. Google's endpoint is explicitly
 and ambient OpenAI organization/project routing are also rejected. Google and
 Anthropic plans require `seed: null` because the pinned adapters do not forward
 seeds. Anthropic requires `top_p: "1"`; the wire request sends temperature alone
-because recent models reject both sampling controls. Thinking models and newer
-models that discard temperature require approved temperature `"1"`.
+when extended reasoning is disabled. Supported extended reasoning sends a
+mapped thinking budget instead, requires approved temperature `"1"`, and
+requires an output-token limit above that budget.
 
 Offline replay accepts historical requests that omitted the tier without
 rewriting them or asserting their billing tier. An explicit tier must be

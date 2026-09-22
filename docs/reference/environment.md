@@ -11,7 +11,7 @@ caller-owned provider resources.
 > environment variables
 >
 > **Stability:** Documented variables are public operator inputs;
-> repository-test and add-in-internal variables are excluded
+> repository-test and internal-only variables are excluded
 >
 > **Use this page when:** Supplying key paths, independent verifier anchors,
 > runtime-image identity, device selection, or caller-owned provider support

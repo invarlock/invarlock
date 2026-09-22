@@ -384,6 +384,31 @@ def test_openai_evals_joins_events_by_sample_and_keeps_cond_logp_unpromoted():
     assert len(rows["a"]["context"]["upstream_record"]["events"]) == 3
 
 
+@pytest.mark.parametrize(
+    "summary_kind", ["spec", "final_report", "nested_final_report"]
+)
+def test_openai_evals_rejects_conflicting_summary_run_identity(summary_kind):
+    summary = (
+        {"spec": {"run_id": "other-run"}}
+        if summary_kind == "spec"
+        else (
+            {"final_report": {"accuracy": 1.0}, "run_id": "other-run"}
+            if summary_kind == "final_report"
+            else {"final_report": {"run_id": "other-run", "accuracy": 1.0}}
+        )
+    )
+    with pytest.raises(EvaluationRecordsError, match="multiple runs"):
+        export_records(
+            "openai-evals",
+            {
+                "events": [
+                    summary,
+                    event("sampling", {"prompt": "q", "sampled": "a"}),
+                ]
+            },
+        )
+
+
 def test_trulens_feedback_table_uses_declared_feedback_names():
     rows = export_records(
         "trulens",

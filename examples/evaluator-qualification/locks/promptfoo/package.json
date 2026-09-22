@@ -1,0 +1,14 @@
+{
+  "name": "invarlock-promptfoo-sdk-gate",
+  "private": true,
+  "version": "1.0.0",
+  "packageManager": "npm@10.9.2",
+  "dependencies": {
+    "promptfoo": "0.121.19"
+  },
+  "overrides": {
+    "promptfoo": {
+      "js-yaml": "5.2.2"
+    }
+  }
+}

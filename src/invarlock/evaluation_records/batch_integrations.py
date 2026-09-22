@@ -627,16 +627,33 @@ def _garak(value: Any) -> list[dict[str, Any]]:
     return records
 
 
+def _openai_run_ids(entry: dict[str, Any]) -> set[str]:
+    """Bind the recorder's event, spec and final-report identity claims."""
+    ids = {_id(entry["run_id"])} if "run_id" in entry else set()
+    if "spec" in entry:
+        spec = _obj(entry["spec"], "OpenAI Evals run spec")
+        if "run_id" in spec:
+            ids.add(_id(spec["run_id"]))
+    if "final_report" in entry:
+        final_report = _obj(entry["final_report"], "OpenAI Evals final report")
+        if "run_id" in final_report:
+            ids.add(_id(final_report["run_id"]))
+    return ids
+
+
 def _openai(value: Any) -> list[dict[str, Any]]:
     report = value if isinstance(value, dict) else {"events": value}
     report = _obj(_json(report), "OpenAI Evals log")
     events = _array(report.get("events"), "OpenAI Evals events")
     summary = {key: item for key, item in report.items() if key != "events"}
     grouped: dict[str, list[dict[str, Any]]] = {}
-    run_ids = set()
+    run_ids = _openai_run_ids(report)
+    sample_run_ids = set()
+    events_without_run_id = 0
     event_ids = set()
     for raw in events:
         event = _obj(raw, "OpenAI Evals event")
+        run_ids.update(_openai_run_ids(event))
         if (
             ("spec" in event or "final_report" in event)
             and "type" not in event
@@ -650,7 +667,9 @@ def _openai(value: Any) -> list[dict[str, Any]]:
         ident = _id(event.get("sample_id"))
         _obj(event.get("data"), "OpenAI Evals event data")
         if "run_id" in event:
-            run_ids.add(_id(event["run_id"]))
+            sample_run_ids.add(_id(event["run_id"]))
+        else:
+            events_without_run_id += 1
         if "event_id" in event:
             event_id = event["event_id"]
             if type(event_id) is not int or event_id < 0 or event_id in event_ids:
@@ -661,6 +680,8 @@ def _openai(value: Any) -> list[dict[str, Any]]:
         grouped.setdefault(ident, []).append(event)
     if len(run_ids) > 1:
         raise EvaluationRecordsError("OpenAI Evals log contains multiple runs")
+    if sample_run_ids and events_without_run_id:
+        raise EvaluationRecordsError("OpenAI Evals sample events have mixed run IDs")
     records = []
     for ident, case_events in grouped.items():
         samplings = [
@@ -891,11 +912,12 @@ def export_records(evaluator: str, results: object) -> list[dict[str, Any]]:
         "pydantic-evals": _pydantic,
         "azure-ai-evaluation": _azure,
         "garak": _garak,
-        "openai-evals": _openai,
         "trulens": _trulens,
     }
     if evaluator in {"evidently", "mlflow"}:
         records = _scored_table(results, evaluator)
+    elif evaluator == "openai-evals":
+        records = _openai(results)
     else:
         records = functions[evaluator](results)
     _array(records, f"{evaluator} captured records")

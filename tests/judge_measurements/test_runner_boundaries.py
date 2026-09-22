@@ -96,6 +96,41 @@ def _project(inputs, event):
 
 
 @pytest.mark.parametrize(
+    ("provider", "model_name"),
+    [
+        ("anthropic", "claude-sonnet-4-7"),
+        ("google", "gemini-3-flash"),
+    ],
+)
+@pytest.mark.parametrize("reasoning_effort", [None, "none"])
+def test_direct_collection_rejects_unqualified_provider_before_checkpoint(
+    inputs, runner_options, provider, model_name, reasoning_effort
+):
+    grader = f"{provider}/{model_name}"
+    inputs["plan"]["judge"].update(
+        provider=provider,
+        requested_model=grader,
+        approved_resolved_models=[model_name],
+    )
+    inputs["plan"]["judge"]["config"].update(
+        reasoning_effort=reasoning_effort, temperature="1"
+    )
+    options = replace(inputs["options"], grader=grader)
+    with pytest.raises(InspectJudgeError, match="live wire shape is not qualified"):
+        asyncio.run(
+            collect(
+                plan=inputs["plan"],
+                options=options,
+                runner=runner_options,
+                model=object(),
+                baseline_run=inputs["baseline_run"],
+                subject_run=inputs["subject_run"],
+            )
+        )
+    assert not runner_options.checkpoint_directory.exists()
+
+
+@pytest.mark.parametrize(
     ("field", "value", "message"),
     [
         ("checkpoint_directory", "checkpoint", "must be a Path"),
@@ -596,6 +631,12 @@ def _provider_wire(inputs, event, provider):
                 "completion_tokens": event.output.usage.output_tokens,
             },
         }
+    record = inputs["baseline_run"]["records"][0]
+    expected = render_request(
+        inputs["plan"], input_text=record["input"], answer=record["output"]
+    )
+    messages = expected["messages"]
+    config = expected["config"]
     if provider == "openai":
         event.call.request = {
             "model": "approved-model",
@@ -603,6 +644,64 @@ def _provider_wire(inputs, event, provider):
             "temperature": event.config.temperature,
             "top_p": event.config.top_p,
             "max_tokens": event.config.max_tokens,
+        }
+    elif provider == "anthropic":
+        event.call.request = {
+            "model": "approved-model",
+            "messages": [
+                message.copy() for message in messages if message["role"] != "system"
+            ],
+            "system": [
+                {
+                    "type": "text",
+                    "text": message["content"],
+                    "cache_control": {"type": "ephemeral"},
+                }
+                for message in messages
+                if message["role"] == "system"
+            ],
+            "max_tokens": config["max_output_tokens"],
+            "tools": [],
+            "cache_control": {"type": "ephemeral"},
+            "extra_headers": {"x-irid": "trace123"},
+            "extra_body": {"temperature": float(config["temperature"])},
+        }
+    elif provider == "google":
+        event.call.request = {
+            "contents": [
+                {"role": "user", "parts": [{"text": message["content"]}]}
+                for message in messages
+                if message["role"] != "system"
+            ],
+            "generation_config": {
+                "candidateCount": 1,
+                "httpOptions": {"headers": {"x-irid": "trace123"}},
+                "maxOutputTokens": config["max_output_tokens"],
+                "temperature": float(config["temperature"]),
+                "thinkingConfig": {"includeThoughts": True},
+                "topP": float(config["top_p"]),
+            },
+            "safety_settings": [
+                {"category": category, "threshold": "BLOCK_NONE"}
+                for category in sorted(live._GOOGLE_SAFETY_CATEGORIES)
+            ],
+            "system_instruction": [
+                message["content"]
+                for message in messages
+                if message["role"] == "system"
+            ]
+            or None,
+            "tool_config": None,
+            "tools": None,
+        }
+    else:
+        event.call.request = {
+            "model": "approved-model",
+            "messages": [message.copy() for message in messages],
+            "temperature": float(config["temperature"]),
+            "top_p": float(config["top_p"]),
+            "max_tokens": config["max_output_tokens"],
+            "extra_headers": {"x-irid": "trace123"},
         }
     event.call.response = response
     assert _project(inputs, event)["output"]["completion"] == event.output.completion
@@ -660,6 +759,29 @@ def test_completed_call_rejects_malformed_provider_evidence(
     response = _provider_wire(inputs, sdk_event, provider)
     _replace_wire_field(response, path, value)
     with pytest.raises(InspectJudgeError, match=message):
+        _project(inputs, sdk_event)
+
+
+@pytest.mark.parametrize("corruption", ["missing_trace", "prefixed_model"])
+def test_openrouter_requires_native_wire_route(inputs, sdk_event, corruption):
+    _provider_wire(inputs, sdk_event, "openrouter")
+    if corruption == "missing_trace":
+        del sdk_event.call.request["extra_headers"]
+        message = "headers"
+    else:
+        sdk_event.call.request["model"] = "openrouter/approved-model"
+        message = "model differs"
+    with pytest.raises(InspectJudgeError, match=message):
+        _project(inputs, sdk_event)
+
+
+def test_direct_openai_live_event_requires_native_sdk_request(inputs, sdk_event):
+    _provider_wire(inputs, sdk_event, "openai")
+    record = inputs["baseline_run"]["records"][0]
+    sdk_event.call.request = render_request(
+        inputs["plan"], input_text=record["input"], answer=record["output"]
+    )
+    with pytest.raises(InspectJudgeError, match="native SDK shape"):
         _project(inputs, sdk_event)
 
 
