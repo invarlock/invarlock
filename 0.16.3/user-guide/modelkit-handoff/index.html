@@ -1,0 +1,2491 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Paired model release-regression evaluation with independently verifiable evidence">
+      
+      
+      
+        <link rel="canonical" href="https://invarlock.github.io/invarlock/user-guide/modelkit-handoff/">
+      
+      
+        <link rel="prev" href="../hosted-service-requalification/">
+      
+      
+        <link rel="next" href="../change-scenarios/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/invarlock-app-icon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>ModelKit recipient handoff - InvarLock Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Sora:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Sora";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#verify-a-modelkit-at-the-point-of-use" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="InvarLock Documentation" class="md-header__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
+      
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            InvarLock Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              ModelKit recipient handoff
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/invarlock/invarlock" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    invarlock
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Overview
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../getting-started/" class="md-tabs__link">
+          
+  
+  
+  User guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../assurance/assurance-case/" class="md-tabs__link">
+          
+  
+  
+  Assurance
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/cli/" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../security/trust-model/" class="md-tabs__link">
+          
+  
+  
+  Security
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="InvarLock Documentation" class="md-nav__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
+      
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
+
+    </a>
+    InvarLock Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/invarlock/invarlock" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    invarlock
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../captured-results/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Captured results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hosted-service-requalification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosted-service requalification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ModelKit recipient handoff
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ModelKit recipient handoff
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#select-the-package-and-the-contents-separately" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Select the package and the contents separately
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#produce-a-portable-package" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Produce a portable package
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prepare-independent-recipient-inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prepare independent recipient inputs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#interpret-the-result" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Interpret the result
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#transfer-actual-evaluated-models-and-run-an-inference-smoke" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Transfer actual evaluated models and run an inference smoke
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#review-a-retained-real-handoff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Review a retained real handoff
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#exercise-the-supported-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exercise the supported boundary
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../change-scenarios/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Change scenarios
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../key-management/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Key management
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../runtime-providers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime providers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluation-request/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation request
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../schedule-and-policy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schedule and policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evidence-and-verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence and verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../verification-failure-lab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verification failure lab
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diagnostics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optional diagnostics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ci-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CI integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../public-evidence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Publish public evidence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assurance
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Assurance
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/assurance-case/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assurance case
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/decision-semantics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decision semantics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/pairing-and-replay/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pairing and replay
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/acceptance-checklist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Acceptance checklist
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/evaluation-records/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation records
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/evaluation-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation capacity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/compatibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compatibility covenant
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/acceptance-attestations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Acceptance attestations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/policy-engine-interop/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Policy-engine interoperability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/evaluator-qualification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluator qualification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/artifacts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifacts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/judge-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Judge measurements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/evidence-sets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence sets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/runtime-providers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime providers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/runtime-security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime-security API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/environment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/release-verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/documentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Security
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/trust-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trust model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/threat-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threat model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/best-practices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security practices
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/dependency-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dependency-audit exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#select-the-package-and-the-contents-separately" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Select the package and the contents separately
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#produce-a-portable-package" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Produce a portable package
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prepare-independent-recipient-inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prepare independent recipient inputs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#interpret-the-result" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Interpret the result
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#transfer-actual-evaluated-models-and-run-an-inference-smoke" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Transfer actual evaluated models and run an inference smoke
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#review-a-retained-real-handoff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Review a retained real handoff
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#exercise-the-supported-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exercise the supported boundary
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="verify-a-modelkit-at-the-point-of-use">Verify a ModelKit at the point of use<a class="headerlink" href="#verify-a-modelkit-at-the-point-of-use" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p><strong>User guide</strong></p>
+<p><strong>Outcome:</strong> Check the exact delivered package, both actual model directories,
+signed evaluation evidence, and the recipient's current acceptance policy.</p>
+<p><strong>Audience:</strong> Model publishers and recipients integrating an artifact handoff.</p>
+<p><strong>Prerequisites:</strong> Python 3.12 or newer, the installed
+InvarLock wheel, a separately reviewed copy of the example script, complete
+local package blobs, and independently selected trust inputs.</p>
+</blockquote>
+<p>Use the <a href="../getting-started/#matching-wheels-and-examples">matching wheel and examples</a>.
+The example uses the public InvarLock verifier and needs no service account. Its result is a check at the time
+of invocation. A deployment consumer must use the checked directories and prevent
+later writes or substitutions before loading them.</p>
+<p>This handoff consumes native pack-v1 evidence and its native acceptance
+attestation. Captured packs and judge envelopes are different assurance
+contracts and cannot be substituted, even when their signed decisions pass.</p>
+<h2 id="select-the-package-and-the-contents-separately">Select the package and the contents separately<a class="headerlink" href="#select-the-package-and-the-contents-separately" title="Permanent link">&para;</a></h2>
+<p>A ModelKit digest identifies the exact OCI manifest bytes. It does not identify
+the contained model in InvarLock's checkpoint format. Changing a package description
+or switching from tar to gzip changes the package digest while preserving the
+model contents. Changing a weight, tokenizer, or configuration file changes the
+model contents and requires matching evaluation evidence.</p>
+<p>The example verifies the manifest, config, stored layer digest, decompressed
+archive digest, and every extracted file. It compares the complete file inventory
+with the actual candidate directory, including operational files that the core
+checkpoint identity intentionally excludes. For a Hugging Face directory, it also recomputes the normal
+<code>hf_snapshot_tree_sha256</code> identity. For a GGUF model, the recipient supplies an
+<code>artifact_file</code> relative to that directory, and the content identity is the exact
+file's SHA-256. Additional files still belong to the complete package inventory;
+a GGUF file digest does not authenticate those files by itself. Neither a package label nor a mapping supplied
+by a package author becomes an acceptance authority.</p>
+<p>The supported packaging subset is KitOps <strong>1.15.0</strong>, one embedded model directory,
+one tar or gzip-compressed tar model layer, manifest schema version 2, and <code>Kitfile</code>
+manifest version <code>1.0.0</code>. Only regular files and directories in ordinary tar
+headers are accepted. Model parts, references, additional code or dataset layers,
+raw single-file packages, <code>zstd</code>, sparse files, links, and PAX/GNU extension headers
+fail explicitly. Extended metadata is rejected before the tar parser reads its
+payload. Keep all model assets inside the selected model directory.</p>
+<h2 id="produce-a-portable-package">Produce a portable package<a class="headerlink" href="#produce-a-portable-package" title="Permanent link">&para;</a></h2>
+<p>Use a reviewed KitOps 1.15.0 executable and check its binary checksum against the
+release asset. The source revision is
+<code>6b8162ae5da4d46f1d2af2beb43e7fb077f052f4</code>. Prepare this <code>Kitfile</code> beside <code>model/</code>:</p>
+<div class="codehilite"><pre><span></span><code><span class="nt">manifestVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1.0.0</span>
+<span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">release-candidate</span>
+<span class="nt">model</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">model</span>
+</code></pre></div>
+
+<div class="codehilite"><pre><span></span><code>kit<span class="w"> </span>--config<span class="w"> </span>publisher-store<span class="w"> </span>pack<span class="w"> </span>package-context<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--tag<span class="w"> </span>registry.example/models/candidate:review
+kit<span class="w"> </span>--config<span class="w"> </span>publisher-store<span class="w"> </span>inspect<span class="w"> </span>registry.example/models/candidate:review
+</code></pre></div>
+
+<p>Freeze the returned SHA-256 manifest digest. Retain its exact raw blob, the config
+blob, and the model-layer blob. The CLI's local content store holds them under
+<code>publisher-store/storage/blobs/sha256/</code>, named by the hexadecimal digest. A portable
+recipient directory can contain just these blobs; the verifier does not consult
+tags, registry credentials, a publisher cache, or the CLI's rendered manifest.</p>
+<p>Perform this for both baseline and subject. Repackaging is a separate operation
+from model transformation: retain the actual transformation's command, source and
+output identities, runtime, and configuration with the evaluation provenance.
+This example checks package-to-content binding; it does not independently
+establish that the declared transformation was executed.</p>
+<h2 id="prepare-independent-recipient-inputs">Prepare independent recipient inputs<a class="headerlink" href="#prepare-independent-recipient-inputs" title="Permanent link">&para;</a></h2>
+<p>The recipient selects the package digests, expected model-content digests,
+technical artifact-identity and runtime digests, schedule, evidence signer, trusted
+envelope keys, evaluated policy, and current recipient policy through its own
+review process. Copying those choices from the incoming package provides no
+independent trust decision.</p>
+<p>Create <code>recipient.json</code> using the closed
+<a href="https://github.com/invarlock/invarlock/blob/main/examples/integrations/modelkit-handoff/recipient.schema.json">recipient schema</a>.
+Paths are relative to that file. Its fields are:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Recipient input</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>format</code></td>
+<td><code>invarlock/example-modelkit-recipient-v1</code></td>
+</tr>
+<tr>
+<td><code>sides.baseline</code>, <code>sides.subject</code></td>
+<td>Each contains <code>blobs</code>, <code>package_digest</code>, <code>candidate</code>, and <code>content_digest</code>; optional <code>artifact_file</code> selects a GGUF member relative to <code>candidate</code></td>
+</tr>
+<tr>
+<td><code>evidence</code></td>
+<td>The complete signed evidence directory</td>
+</tr>
+<tr>
+<td><code>technical_policy</code></td>
+<td>The independently selected evaluated policy JSON</td>
+</tr>
+<tr>
+<td><code>technical_anchors.artifact_digests</code></td>
+<td>Typed artifact-identity digests for <code>baseline</code> and <code>subject</code>; these differ from model-content digests</td>
+</tr>
+<tr>
+<td><code>technical_anchors.runtime_digests</code></td>
+<td>Runtime digests for <code>baseline</code> and <code>subject</code></td>
+</tr>
+<tr>
+<td><code>technical_anchors.schedule_digest</code></td>
+<td>Independently selected evaluation schedule digest</td>
+</tr>
+<tr>
+<td><code>technical_anchors.evidence_signer_fingerprint</code></td>
+<td>Trusted evidence signer fingerprint</td>
+</tr>
+<tr>
+<td><code>technical_anchors.request_digest</code></td>
+<td>Optional independently selected SHA-256 digest of the complete canonical normalized evaluation request</td>
+</tr>
+<tr>
+<td><code>envelope</code></td>
+<td>The signed acceptance DSSE envelope</td>
+</tr>
+<tr>
+<td><code>recipient_policy</code></td>
+<td>Current recipient policy, including signer status and freshness limits</td>
+</tr>
+<tr>
+<td><code>trusted_public_keys</code></td>
+<td>A nonempty mapping from independently trusted fingerprints to public-key paths</td>
+</tr>
+<tr>
+<td><code>limits</code></td>
+<td>Optional positive resource ceilings described below</td>
+</tr>
+</tbody>
+</table>
+<p>Supply <code>request_digest</code> when acceptance requires the exact evaluated context,
+including the request's generation settings, scorer configuration, security
+settings, and observation payload references. The example passes this expectation
+to the public verifier and rejects a mismatch even when both package mappings
+and signatures are valid. It does not infer the expected digest from the incoming
+evidence. Omitting the field preserves the existing artifact, runtime, schedule,
+policy and signer checks; omission does not establish an independently selected
+complete-request match.</p>
+<p>The current replay checks this expectation against the evidence manifest also
+bound by the acceptance envelope's receipt. It does not retroactively claim that
+an older receipt recorded a request anchor. Requiring a particular verifier
+trust profile remains a separate recipient-policy choice.</p>
+<p>The actual <code>candidate</code> paths must be directories with no symlink components.
+For GGUF, set <code>artifact_file</code> to a safe relative filename such as <code>model.gguf</code> and
+set <code>content_digest</code> to that file's SHA-256. The selected path must be a regular
+file ending in <code>.gguf</code>. Traversal, links, missing files and other formats fail
+closed. Both authenticated acceptance-predicate digest kinds must match the
+selected directory or file identity; a package author cannot switch that meaning.
+For a delivered ModelKit, unpack its frozen digest into private staging, then
+verify those actual paths. Keep staging inaccessible to untrusted writers during
+verification and model loading. The verifier extracts a separate temporary copy
+for comparison and removes it after checking; it does not publish a deployment.</p>
+<div class="codehilite"><pre><span></span><code>python<span class="w"> </span>examples/integrations/modelkit_handoff.py<span class="w"> </span>--request<span class="w"> </span>recipient.json
+</code></pre></div>
+
+<p>To run outside the checkout, copy the reviewed <code>modelkit_handoff.py</code> from the
+same source artifact into a recipient directory and run it against the installed
+public wheel. The script imports only the standard library and InvarLock.
+Retain its source checksum with your integration. It is example code, not a
+new installed CLI or a compatibility promise for arbitrary ModelKit layouts.</p>
+<h2 id="interpret-the-result">Interpret the result<a class="headerlink" href="#interpret-the-result" title="Permanent link">&para;</a></h2>
+<p>The JSON result keeps package/content mappings, technical integrity, technical
+policy verdict, envelope authentication, envelope-to-evidence binding, and current
+acceptance separate. It cross-checks the envelope's embedded receipt against the
+exact evidence manifest that the verifier replayed, then checks both actual
+candidate directories again before returning.</p>
+<table>
+<thead>
+<tr>
+<th>Exit</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0</code></td>
+<td>Package and content checks, technical replay, and current recipient acceptance all passed</td>
+</tr>
+<tr>
+<td><code>1</code></td>
+<td>Authentic bound material was rejected by technical or current recipient policy</td>
+</tr>
+<tr>
+<td><code>2</code></td>
+<td>Inputs were invalid, unsupported, altered, incomplete, unauthenticated, or inconsistently bound</td>
+</tr>
+</tbody>
+</table>
+<p>An expired or revoked acceptance may fail while the historical technical result
+still passes. Preserve both results. A successful check does not assert production
+quality, general model safety, delivery receipt, or permission to replace the
+recipient's deployment controls.</p>
+<p>Default limits are 2 MiB per JSON document, 160 GiB per stored blob, decompressed
+archive and model contents, and 200,000 archive members or candidate entries.
+The optional keys are <code>max_json_bytes</code>, <code>max_blob_bytes</code>, <code>max_archive_bytes</code>,
+<code>max_model_bytes</code>, and <code>max_members</code>. Choose smaller limits for smaller models.
+Archive and model bytes are streamed, but verification needs temporary disk space
+for the stored layer, decompressed archive, and extracted model. Large models also
+require repeated content reads. Apply an outer execution deadline and disk quota
+appropriate to the expected artifact sizes.</p>
+<h2 id="transfer-actual-evaluated-models-and-run-an-inference-smoke">Transfer actual evaluated models and run an inference smoke<a class="headerlink" href="#transfer-actual-evaluated-models-and-run-an-inference-smoke" title="Permanent link">&para;</a></h2>
+<p>The real journey is a separate launcher from the synthetic serialization tests.
+It requires actual model files, native signed evidence for those exact files,
+an acceptance envelope, and independently selected technical and recipient
+policies. The subject must be an executable GGUF model. A published quantized
+sibling and its baseline at original precision must each have a content identity;
+do not substitute evidence from a different model revision or conversion.
+Prepare the comparison through the <a href="https://github.com/invarlock/invarlock/blob/main/examples/integrations/gguf-llama-cpp/README.md">GGUF runtime example</a>
+and retain its transformation provenance. A passing small sample establishes only
+the policy and precision stated in that sample, not a broader model qualification.</p>
+<p>Prepare <code>source-recipient.json</code> with the fields described above. Its <code>candidate</code>
+paths point to the actual source model directories. The source-side <code>blobs</code> and
+<code>package_digest</code> fields may be omitted: the launcher generates and freezes those
+package identities before transfer. All technical anchors, content digests,
+policies and public keys must already be selected independently. Keep private
+signing keys outside the package and recipient directories.
+The operator-owned request may select absolute source paths or relative paths
+that stay beside the request file. The launcher rejects selected source
+symlinks, scans copied directories for links, and requires each trusted public
+key to have a SHA-256 fingerprint before transferring files. Do not run a
+recipient request supplied by an untrusted party.</p>
+<p>Use a separate Python environment containing the installed InvarLock wheel for
+recipient verification. Build or select a reviewed local GGUF runtime image and
+freeze its immutable image ID in the selected Docker or Podman engine. The
+image used for evaluation is authenticated by
+the evidence's runtime anchors; the separate smoke image establishes only the
+bounded inference recorded by this launcher. Reserve disk for the source models,
+publisher blobs, recipient blobs and unpacked models, plus temporary verifier
+archives. A pair of 7B models at original and quantized precision can need over
+100 GiB of free space.</p>
+<p>Run from the matching example checkout, with an output directory outside it:</p>
+<div class="codehilite"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>examples.integrations.modelkit_real_journey<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--request<span class="w"> </span>source-recipient.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--kit<span class="w"> </span>/tools/kit<span class="w"> </span>--kit-sha256<span class="w"> </span>REVIEWED_BINARY_SHA256<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--python<span class="w"> </span>/environments/recipient/bin/python<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--container-engine<span class="w"> </span>docker<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--smoke-image<span class="w"> </span>sha256:REVIEWED_LOCAL_IMAGE_ID<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--container-llama<span class="w"> </span>/opt/llama.cpp/llama-completion<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output<span class="w"> </span>/artifacts/modelkit-handoff
+</code></pre></div>
+
+<p>Use <code>--container-engine podman</code> for Podman. The default is <code>docker</code>; the
+launcher uses only the selected engine and does not fall back to another engine.
+Supply the full <code>sha256:</code> image ID from that engine's local image store; mutable
+tags and shortened IDs are rejected. Podman inspection may omit the <code>sha256:</code>
+prefix, which is normalized before checking the exact selected image identity.</p>
+<p>The launcher packs both actual models with KitOps 1.15.0, freezes their original
+manifest digests, changes each tag through a metadata repack, and copies the
+content store and evidence to a separate recipient directory. The recipient
+unpacks by the original digest, verifies the complete package/content/evidence
+and acceptance binding, and confirms that the repack has different package
+identities but the same model identities. It rejects a changed candidate,
+missing package blob, altered evidence, wrong runtime anchor and revoked signer.
+It then checks acceptance again and loads the exact unpacked subject for up to
+eight generated tokens by default. The Docker or Podman smoke uses CPU execution,
+no network, a non-root user, a read-only model mount, and explicit resource limits.</p>
+<p><code>result.json</code> records the package digests, individual acceptance decisions and
+actual generated output, selected container engine and immutable smoke image ID.
+<code>logs/</code> retains commands, exit codes, runtime identity and diagnostics. <code>recipient/recipient.json</code> is a portable input to the verifier.
+A failed check stops the journey; inspect its saved diagnostics, restore the
+expected input, and rerun with a new output directory. The launcher does not
+contact an external registry or establish interoperability with a hosted service.</p>
+<h2 id="review-a-retained-real-handoff">Review a retained real handoff<a class="headerlink" href="#review-a-retained-real-handoff" title="Permanent link">&para;</a></h2>
+<p>The <a href="https://github.com/invarlock/invarlock/blob/main/examples/integrations/modelkit-handoff/references/mistral-7b/README.md">Mistral-7B ModelKit reference</a>
+records an actual BF16 baseline and published Q4_K_M subject, 128 fixed short
+LAMBADA cases, and real KitOps 1.15.0 packaging and independent recipient checks.
+The scores were 94/128 and 93/128. The paired 95% interval extended from −4.10336
+to +2.49680 percentage points, so it failed the declared −2 pp lower-bound
+requirement. This does not establish degradation; it fails to rule out a decline
+larger than the allowance. No absolute accuracy floor was declared.</p>
+<p>The reference separates GGUF file hashes from original and repacked ModelKit
+manifest identities, retains explicit caller policy and pair anchors, and
+preserves both valid package bindings and the rejected comparison. Its short
+Docker and Podman generation checks used the delivered subject bytes through
+<code>--smoke-on-policy-rejection</code>; they do not imply acceptance or a second 128-case
+Podman evaluation.</p>
+<p>The compact replay independently verifies historical evidence, the original
+receipt and DSSE. Exit zero means that the recorded rejection reproduced
+correctly. Repeating the physical package-content checks requires the original
+model files and complete selected package blobs listed in the reference; a fresh
+recipient must supply its own current policy, trust inputs and expected pair.</p>
+<h2 id="exercise-the-supported-boundary">Exercise the supported boundary<a class="headerlink" href="#exercise-the-supported-boundary" title="Permanent link">&para;</a></h2>
+<p>The real CLI test packs synthetic fixture bytes with the pinned executable,
+repackages them using gzip, copies the content store to an independent recipient,
+unpacks the original digest after the tag changes, and rejects later candidate
+replacement. It runs no model inference.</p>
+<div class="codehilite"><pre><span></span><code><span class="nv">INVARLOCK_KIT_BINARY</span><span class="o">=</span>/tools/kit<span class="w"> </span><span class="se">\</span>
+<span class="nv">INVARLOCK_KIT_BINARY_SHA256</span><span class="o">=</span>REVIEWED_BINARY_SHA256<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>-q<span class="w"> </span>tests/integration/test_modelkit_cli.py
+</code></pre></div>
+
+<p>The fast example tests also exercise signed evidence and acceptance, malformed
+metadata, path traversal, links, duplicate members, unreadable directories,
+resource limits, and mutations during verification. Retained historical evidence
+is not modified by these tests.</p>
+<p>See the <a href="https://github.com/kitops-ml/kitops/releases/tag/v1.15.0">KitOps 1.15.0 release</a>,
+the <a href="https://github.com/kitops-ml/kitops/blob/6b8162ae5da4d46f1d2af2beb43e7fb077f052f4/pkg/artifact/kitfile.go">pinned model format implementation</a>,
+and <a href="../../reference/acceptance-attestations/">recipient acceptance attestations</a>.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "navigation.sections", "navigation.expand", "navigation.tabs", "navigation.top", "search.highlight", "search.suggest", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../../assets/javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
