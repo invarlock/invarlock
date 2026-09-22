@@ -50,8 +50,10 @@ The policy has five closed fields: `format`, `plan`, `analysis`, `collection` an
 parser, scale, sampling and schedule choices. Omit run/case/answer digests,
 `rubric.sha256` and `schedule.expected_trials`: InvarLock derives them after native
 capture. The analysis contains the judge analysis policy without `plan_sha256`,
-which is also derived. `collection` declares the budgets below;
-`runner` declares `scorer_id` and `invocation_timeout_seconds` (1–604800 seconds).
+which is also derived. `collection` declares the selected collector's bounds.
+For hosted collection, `runner` declares `scorer_id` and
+`invocation_timeout_seconds` (1–604800 seconds). For local collection it contains
+only `scorer_id`; the model runtime settings own the execution timeout.
 
 The exact original policy bytes are bound into the runtime configuration before
 answers are generated. Native collection retains all six original provider files
@@ -62,9 +64,10 @@ bindings include `native_capture_sha256`; native capture cannot be stripped to
 turn the result into ordinary imported-answer evidence.
 
 Preflight validates the rubric and full trial reservation, native artifacts and
-resources, installed collector and API environment without making calls. Native
-providers keep their existing network restrictions. Only the explicitly
-configured judge collector calls a supported hosted endpoint. The grader prefix
+resources, and the selected collector without making calls. Native providers
+keep their existing network restrictions. Hosted collection additionally checks
+its SDK and API environment. Only the explicitly configured hosted collector
+calls a supported endpoint. The grader prefix
 selects `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY` (or
 `GEMINI_API_KEY`), or `OPENROUTER_API_KEY`; credentials never enter request
 files or evidence.
@@ -98,8 +101,9 @@ recipe, and a private `comparison.judge.workspace` with an explicit
 [captured-results guide](../user-guide/captured-results.md#judge-captured-answers)
 shows source mapping, explicit text projection and offline measurement import.
 
-The core collector uses the optional pinned Inspect SDK for live collection.
-It does not require an upstream evaluator to use Inspect or change versions.
+Hosted collection uses the optional pinned Inspect SDK. Native local collection
+uses the separate `runtime-provider-judge` profile described below.
+Neither requires an upstream evaluator to use Inspect or change versions.
 Existing evaluators supply frozen case facts; InvarLock applies its own scorer.
 Core import, verification and reporting work without Inspect. A caller-owned
 collector can use `invarlock.engine.prepare_evaluator_judge` and
@@ -183,7 +187,7 @@ establish independent recipient acceptance. `output.signer_identity` names the
 identity placed in a signed envelope; a recipient still has to pin that identity
 and its public-key fingerprint independently. Unsigned output retains no signer.
 
-The installed `judge_collect` mode instead declares
+Hosted `judge_collect` mode instead declares
 `execution.collection: {integration: inspect-judge, configuration: collector.json, workspace: judge-work}`
 and `comparison.measurements: null`. The configuration is closed and contains no
 credentials or provider URL:
@@ -315,6 +319,89 @@ frozen-answer v3 requests; they retain their normal meaning for native v1 reques
 
 Cost admission uses the declared per-call reservation. Retained token use and
 available SDK cost fields support accounting, but do not verify a provider invoice.
+
+## Native local judge collection
+
+Select `runtime-provider-judge` to grade frozen text with a local
+`hf_transformers` checkpoint or `llama_cpp` GGUF artifact. The judge is distinct
+from the baseline and subject models whose answers it grades. This profile runs
+the judge through InvarLock's authenticated native runtime, with local model
+files, a pinned OCI image and network-disabled execution. No hosted SDK,
+credential or judge network opt-in is required. A localhost HTTP endpoint is
+still a service boundary and does not establish these native artifact bindings.
+
+The judge model uses the existing artifact/runtime request shape. Native v1 and
+captured v2 requests supply it as `comparison.judge.model`; frozen-answer v3 requests use
+`execution.collection.model` and
+`execution.collection.integration: runtime-provider-judge`. Keep the model path
+and referenced support files beneath the request root. A captured request cannot
+combine a local model with `comparison.judge.measurements` for offline import.
+The separate collection configuration contains exactly:
+
+```json
+{
+  "profile": "runtime-provider-text-frozen-answer-v1",
+  "max_calls": 2,
+  "max_output_tokens": 256
+}
+```
+
+The two reservations above cover one case, two sides and one 128-token rating
+per side. Both bounds must cover the complete planned schedule. Context size,
+seed, batch size and timeout belong to the authenticated model runtime settings.
+This profile rejects the hosted `invocation_timeout_seconds` option. The private
+request workspace holds a separate admission and retained result for each trial.
+Completed trials are reusable for unchanged inputs; an admission without its
+result is ambiguous and cannot silently execute again. Retained measurements
+are bounded to 384 MiB, including duplicated observations and outputs. Before
+each new inference, the collector counts exact retained bytes and reserves a
+48 MiB next source plus a 1 MiB envelope. Schedules exceeding the full-schedule
+worst-case capacity require durable checkpoints, supplied by the CLI workspace.
+This incremental reservation allows larger schedules when actual outputs are
+small. If another source cannot fit, collection stops before the next admission,
+preserves completed shards, and does not publish incomplete evidence.
+
+The InvarLock process must already be inside the strict offline container for
+local collection, with the judge artifact and backend resources mounted. Existing
+baseline and subject OCI settings do not launch or select a third judge image.
+Normal host execution cannot use this profile by supplying a local path alone.
+`INVARLOCK_JUDGE_RUNTIME_DEVICE` selects its device, falling back to
+`INVARLOCK_RUNTIME_DEVICE`; baseline and subject overrides are not used. A signing
+key mounted into this container is available to the trusted runtime process.
+To keep that key on a separate host, collect unsigned and publish the unchanged
+retained measurements through `judge_import` there.
+See the
+[runnable local judge example](https://github.com/invarlock/invarlock/blob/main/examples/native-local-judge/README.md)
+for both providers, container setup and generation of complete frozen-answer v3
+request files. Its fixture pair is a setup demonstration, not real-model
+qualification evidence.
+
+The plan declares `judge.model_identity.kind: local_weights` and binds
+`weights_sha256` to `artifact_identity_sha256` of the complete canonical artifact
+identity. This binds the provider's model, immutable revision, checkpoint or GGUF
+content, and tokenizer identity as applicable. It is not the hash of a display
+name, a mutable model directory path, or just one weight shard. Retain the
+runtime image and backend identity separately; a model digest cannot substitute
+for execution provenance.
+
+Each prompt is the exact canonical normalized judge-request JSON. There is no
+implicit chat-template application or conversion into a provider-specific
+conversation. Select an artifact that can follow this declared prompt and return
+the plan's JSON rating format. Generation uses temperature `0`, top-p `1`, an
+explicit seed, `reasoning_effort: null`, no tools, no response cache, and one
+attempt without retries.
+Context and output bounds must fit the complete rendered request. A malformed
+rating or interrupted admitted execution remains a retained failed or incomplete
+outcome; it does not authorize a new unrecorded attempt.
+
+Retained `retained-runtime-provider-judge-v1` sources include the exact
+artifact identity, runtime observation, provider receipt, ordered schedule,
+input and output observations. Offline verification checks their mutual
+bindings and reconstructs measurements and analysis without loading the model
+or contacting a service. Signature authentication and replay do not independently
+attest the host or guarantee identical results from a future runtime. Ordinary
+judge precision, coverage, independent-unit and recipient trust requirements
+still apply; local execution does not turn an insufficient result into a pass.
 
 ## Replay, authentication and acceptance
 

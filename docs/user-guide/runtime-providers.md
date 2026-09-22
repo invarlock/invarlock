@@ -52,6 +52,14 @@ For native judging, follow the [judge request workflow](evaluation-request.md#ju
 Judge collection, evidence and recipient verification have separate contracts;
 the provider still owns the original artifact and answer-capture provenance.
 
+The judge itself can also use a native runtime. The `runtime-provider-judge`
+collection profile supports `hf_transformers` and `llama_cpp` with authenticated
+local artifacts and a pinned, network-disabled runtime. This is a separate
+selection from the providers that generate baseline and subject answers. It does
+not add local judge support to the vision-text or TensorRT-LLM providers. Follow
+the [local judge setup](https://github.com/invarlock/invarlock/blob/main/examples/native-local-judge/README.md) for artifact
+identity, exact prompt bytes, collection bounds and offline recipient replay.
+
 ## Common provider workflow
 
 Every run-mode provider follows the same operator sequence:

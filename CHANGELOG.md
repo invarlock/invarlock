@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add native local judge collection through `runtime-provider-judge` for
+  `hf_transformers` and `llama_cpp`. Bind the complete local artifact identity,
+  pinned offline runtime, exact canonical judge request and retained provider
+  observations for independent verification without model execution. Include
+  fixed generation controls, bounded collection, durable checkpoints and a local
+  judge setup example.
+
 - Allow Python judge collectors to stop after completed, durably retained batches
   and resume the same plan without resetting call or budget accounting.
 
