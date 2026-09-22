@@ -18,13 +18,14 @@ from scripts.release import release_distribution_validation as validation
 def _metadata(
     *,
     requires_python: str | None = None,
+    requires_dist: tuple[validation.RequirementIdentity, ...] = (),
     extras: tuple[str, ...] = (),
 ) -> validation.ExpectedPackageMetadata:
     return validation.ExpectedPackageMetadata(
         name="example",
         version="1.0",
         requires_python=requires_python,
-        requires_dist=(),
+        requires_dist=requires_dist,
         provides_extra=extras,
     )
 
@@ -177,6 +178,16 @@ def test_executable_file_rejects_non_executable_regular_file(tmp_path: Path) -> 
             b"Name: example\nVersion: 1.0\nRequires-Python: >=3.12\n\n",
             _metadata(),
             "Requires-Python",
+        ),
+        (
+            b"Name: example\nVersion: 1.0\nRequires-Python: >=3.13\n\n",
+            _metadata(requires_python=">=3.12"),
+            "Requires-Python",
+        ),
+        (
+            b"Name: example\nVersion: 1.0\nRequires-Dist: dependency>=1\n\n",
+            _metadata(),
+            "Requires-Dist",
         ),
         (
             b"Name: example\nVersion: 1.0\nProvides-Extra: other\n\n",
@@ -384,6 +395,65 @@ def test_empty_canonical_extra_is_rejected(monkeypatch: pytest.MonkeyPatch) -> N
 def test_project_table_rejects_invalid_toml(tmp_path: Path) -> None:
     (tmp_path / "pyproject.toml").write_text("[project\n", encoding="utf-8")
     with pytest.raises(validation.ReleasePreflightError, match="unreadable"):
+        validation._project_table(tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("project", "message"),
+    [
+        ({"name": "", "version": "1.0"}, "identity is invalid"),
+        (
+            {"name": "example", "version": "1.0", "requires-python": []},
+            "requires-python is invalid",
+        ),
+        (
+            {"name": "example", "version": "1.0", "dependencies": "invalid"},
+            "dependencies are invalid",
+        ),
+        (
+            {
+                "name": "example",
+                "version": "1.0",
+                "optional-dependencies": [],
+            },
+            "optional dependencies are invalid",
+        ),
+        (
+            {
+                "name": "example",
+                "version": "1.0",
+                "optional-dependencies": {"feature": [], "FEATURE": []},
+            },
+            "names are ambiguous",
+        ),
+        (
+            {
+                "name": "example",
+                "version": "1.0",
+                "optional-dependencies": {"feature": "invalid"},
+            },
+            "optional dependencies are invalid",
+        ),
+    ],
+)
+def test_expected_metadata_rejects_invalid_project_shapes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    project: object,
+    message: str,
+) -> None:
+    monkeypatch.setattr(validation, "_project_table", lambda _root: project)
+
+    with pytest.raises(validation.ReleasePreflightError, match=message):
+        validation._expected_package_metadata(tmp_path)
+
+
+def test_project_table_rejects_a_nonmapping_project(tmp_path: Path) -> None:
+    (tmp_path / "pyproject.toml").write_text("project = []\n", encoding="utf-8")
+
+    with pytest.raises(
+        validation.ReleasePreflightError, match="metadata is unreadable"
+    ):
         validation._project_table(tmp_path)
 
 
@@ -811,6 +881,24 @@ def test_sdist_validation_rejects_corrupt_archive(tmp_path: Path) -> None:
         )
 
 
+def test_sdist_validation_rejects_excessive_member_count(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sdist = tmp_path / "candidate.tar.gz"
+    _write_sdist(sdist, [_tar_info("example-1.0")])
+    monkeypatch.setattr(validation, "MAX_ARCHIVE_MEMBERS", 0)
+
+    with pytest.raises(validation.ReleasePreflightError, match="too many"):
+        validation._validate_sdist_distribution(
+            _spec(tmp_path),
+            sdist,
+            {},
+            expected_metadata=_metadata(),
+            expected_entry_points={},
+        )
+
+
 def test_distribution_pair_rejects_checkout_identity(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -856,6 +944,30 @@ def test_distribution_discovery_and_manifest_reject_unsafe_inputs(
     manifest.write_text(f"{digest} other.whl\n", encoding="utf-8")
     with pytest.raises(validation.ReleasePreflightError, match="exactly"):
         validation._load_hash_manifest(manifest, {"candidate.whl"})
+
+
+def test_distribution_discovery_rejects_symlink_entries(tmp_path: Path) -> None:
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    target = tmp_path / "candidate.whl"
+    target.write_bytes(b"wheel")
+    (dist / target.name).symlink_to(target)
+
+    with pytest.raises(validation.ReleasePreflightError, match="symbolic links"):
+        validation._find_distribution_artifacts(dist)
+
+
+def test_hash_manifest_ignores_comments_and_blank_lines(tmp_path: Path) -> None:
+    manifest = tmp_path / "hashes.txt"
+    digest = "0" * 64
+    manifest.write_text(
+        f"\n# generated hashes\n{digest} candidate.whl\n",
+        encoding="utf-8",
+    )
+
+    assert validation._load_hash_manifest(manifest, {"candidate.whl"}) == {
+        "candidate.whl": digest
+    }
 
 
 def test_hash_manifest_rejects_oversized_file(tmp_path: Path) -> None:

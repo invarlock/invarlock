@@ -168,7 +168,14 @@ def _schedule():
         records=[
             {
                 "record_id": "stable-1",
-                "input_text": "Prompt",
+                "input_parts": [
+                    {
+                        "kind": "text",
+                        "role": "prompt",
+                        "text": "Prompt",
+                        "sha256": hashlib.sha256(b"Prompt").hexdigest(),
+                    }
+                ],
                 "expected_output": "Answer",
             }
         ],
@@ -228,6 +235,7 @@ def _write_run(tmp_path: Path, module: ModuleType) -> Path:
         "samples_sha256": _digest(samples.read_bytes()),
         "model_tree_sha256": "sha256:" + ("a" * 64),
         "dataset_sha256": "b" * 64,
+        "runtime_image_digest": "sha256:" + "c" * 64,
         "record_count": 1,
         "stable_id_field": "id",
     }
@@ -684,11 +692,14 @@ def test_run_manifest_requires_provenance(tmp_path: Path) -> None:
         module.load_run(tmp_path / "missing.json", "baseline")
 
 
-def test_run_manifest_rejects_incomplete_provenance(tmp_path: Path) -> None:
+@pytest.mark.parametrize("missing", ["execution_config", "runtime_image_digest"])
+def test_run_manifest_rejects_incomplete_provenance(
+    tmp_path: Path, missing: str
+) -> None:
     module = _module()
     manifest = _write_run(tmp_path, module)
     value = json.loads(manifest.read_text(encoding="utf-8"))
-    del value["execution_config"]
+    del value[missing]
     manifest.write_text(json.dumps(value), encoding="utf-8")
 
     with pytest.raises(module.BridgeError, match="provenance is incomplete"):
@@ -1050,8 +1061,9 @@ def test_complete_rejects_changed_prepared_identity(
         )
 
 
+@pytest.mark.parametrize("inspection_prefix", ["sha256:", ""])
 def test_launcher_runs_workers_in_restricted_inspected_image(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, inspection_prefix: str
 ) -> None:
     module = _launcher_module()
     from examples.integrations import launch as shared_launch
@@ -1140,10 +1152,12 @@ def test_launcher_runs_workers_in_restricted_inspected_image(
                     base_config if command[-1] == base_id else child_config
                 )
             if command[4] == "{{.Id}}" and not command[-1].startswith("sha256:"):
-                return base_id if "example-runtime" in command[-1] else final_id
+                return inspection_prefix + (
+                    base_id if "example-runtime" in command[-1] else final_id
+                ).removeprefix("sha256:")
             if "org.invarlock.example.base-image-id" in " ".join(command):
                 return base_id
-            return final_id
+            return inspection_prefix + final_id.removeprefix("sha256:")
         if "model_inputs.py" in " ".join(command):
             prepared = tmp_path / "journey/prepared"
             for role in ("baseline", "subject"):

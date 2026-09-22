@@ -137,7 +137,10 @@
             "jsonl",
             "inspect-json",
             "lm-eval-samples",
-            "promptfoo-jsonl"
+            "promptfoo-jsonl",
+            "langfuse-json",
+            "evaluator-json",
+            "evaluator-native-json"
           ]
         },
         "run_digest": {
@@ -156,7 +159,7 @@
           "anyOf": [
             {
               "type": "string",
-              "pattern": "^sha256:[a-f0-9]{64}$"
+              "pattern": "^sha256:[a-f0-9]{64}(?![\\s\\S])"
             },
             {
               "type": "null"
@@ -370,7 +373,7 @@
             "properties": {
               "artifact_digest": {
                 "type": "string",
-                "pattern": "^sha256:[a-f0-9]{64}$"
+                "pattern": "^sha256:[a-f0-9]{64}(?![\\s\\S])"
               }
             }
           }

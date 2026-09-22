@@ -535,7 +535,7 @@ def runtime_request_binding_errors(
     every provider. First-party providers additionally require their complete
     closed request configuration and bind it to artifact and backend facts in the
     provider receipt. This keeps the independent verifier free of provider or
-    add-in imports while still rejecting substituted runtime provenance.
+    provider imports while still rejecting substituted runtime provenance.
     """
 
     errors: list[str] = []

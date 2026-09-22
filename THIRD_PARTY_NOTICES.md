@@ -37,20 +37,18 @@ direct dependencies are:
 | `sentencepiece` | [google/sentencepiece](https://github.com/google/sentencepiece) | Apache-2.0 | SentencePiece tokenizer runtime |
 | `tiktoken` | [openai/tiktoken](https://github.com/openai/tiktoken) | MIT | GPT-style tokenizer runtime |
 
-## First-party optional distributions
+## Optional runtime features
 
-The release builds the core and five optional Python distributions:
+The release builds one `invarlock` Python distribution. Public extras expose
+optional dependencies without creating separate first-party distributions:
 
-| Distribution | Direct runtime dependency boundary |
+| Extra | Direct runtime dependency boundary |
 | --- | --- |
-| `invarlock` | Core dependencies above; the Hugging Face stack belongs to the runtime image and repository groups |
-| `invarlock-diagnostics` | NumPy, licensed under BSD 3-Clause |
-| `invarlock-runtime-gguf` | A compatible `invarlock` core distribution |
-| `invarlock-runtime-hf-vision-text` | A compatible `invarlock` core distribution and Pillow (HPND); the runtime image supplies the inference stack |
-| `invarlock-runtime-tensorrt-llm` | A compatible `invarlock` core distribution |
-| `invarlock-inspect-judge` | A compatible `invarlock` core distribution; its `inspect` extra adds Inspect AI, the OpenAI client and `httpx` |
+| `invarlock[diagnostics]` | NumPy, licensed under BSD 3-Clause |
+| `invarlock[vision-text]` | Pillow (HPND) |
+| `invarlock[judge]` | Inspect AI, OpenAI/OpenRouter, Anthropic, Google Gen AI, and `httpx` clients |
 
-The GGUF, vision-text, and TensorRT-LLM connector wheels do not bundle model
+The built-in GGUF, vision-text, and TensorRT-LLM providers do not bundle model
 weights or native backends. The vision-text image adds Pillow from a hash-pinned
 lock to the selected digest-pinned InvarLock CUDA base. The repository's
 optional GGUF image builds a pinned
@@ -60,10 +58,10 @@ whose CUDA, TensorRT, and other components remain subject to their upstream
 license terms. Inspect the relevant Dockerfile, pinned requirements, image
 contents, and generated SBOM before redistributing an image.
 
-The Inspect judge package supports bounded collection and retained export import.
-The optional evaluator and provider clients remain separately installed; their
-upstream license files and the installed artifact metadata apply. The core
-verifies retained judge evidence without these optional clients.
+Core supports bounded judge collection and retained export import. The
+`invarlock[judge]` extra installs the pinned evaluator and provider clients; their
+upstream license files and the installed artifact metadata apply. Core imports
+and verifies retained judge evidence without these optional clients.
 
 ## Public qualification data
 

@@ -1,0 +1,147 @@
+{
+  "scope": "Synthetic closed-contract judge fixture; no model, judge, provider or evaluator SDK was called.",
+  "recipe": {
+    "format": "invarlock/native-judge-policy-v1",
+    "plan": {
+      "format": "invarlock/judge-measurement-plan-v1",
+      "profile_id": "text-frozen-answer-v1",
+      "rubric": {
+        "text": "Rate factual correctness."
+      },
+      "prompt": {
+        "system": "Grade the delimited answer using the rubric.",
+        "template": "Grade the input and answer against the rubric. Return only a JSON object with one rating field.",
+        "demonstrations": [],
+        "references": []
+      },
+      "judge": {
+        "provider": "openai",
+        "requested_model": "openai/gpt-4o-2024-08-06",
+        "approved_resolved_models": [
+          "gpt-4o-2024-08-06"
+        ],
+        "model_identity": {
+          "kind": "hosted_api",
+          "weights_sha256": null
+        },
+        "config": {
+          "temperature": "0",
+          "top_p": "1",
+          "max_output_tokens": 128,
+          "seed": null,
+          "reasoning_effort": null
+        },
+        "tools": false
+      },
+      "parser": {
+        "id": "json-rating-v1"
+      },
+      "scale": {
+        "id": "bounded-discrete-v1",
+        "ratings": [
+          {
+            "label": "incorrect",
+            "value": "0"
+          },
+          {
+            "label": "correct",
+            "value": "1"
+          }
+        ]
+      },
+      "sampling": {
+        "basis": "curated_benchmark",
+        "unit_weighting": "equal",
+        "within_unit_weighting": "equal_cases",
+        "case_units": [
+          {
+            "case_id": "synthetic-one",
+            "unit_id": "synthetic-one"
+          },
+          {
+            "case_id": "synthetic-two",
+            "unit_id": "synthetic-two"
+          }
+        ]
+      },
+      "schedule": {
+        "order": "case-side-repetition-lexicographic-v1",
+        "trial_id_scheme": "plan-case-side-repetition-sha256-v1",
+        "repetitions": 1,
+        "max_attempts": 1,
+        "attempt_selection": "first_completed_response",
+        "retry_on": [
+          "transport_error"
+        ],
+        "cache": "forbid"
+      }
+    },
+    "analysis": {
+      "format": "invarlock/judge-analysis-policy-v1",
+      "metric_name": "factual-correctness",
+      "decision_role": "required",
+      "direction": "higher",
+      "method": "fixed-benchmark-hoeffding-v1",
+      "alpha": "0.05",
+      "comparison_family_size": 2,
+      "minimum_units": 1,
+      "maximum_interval_width": "2",
+      "allowed_degradation": "1",
+      "subject_bound": null
+    },
+    "collection": {
+      "grader": "openai/gpt-4o-2024-08-06",
+      "inspect_version": "0.3.263",
+      "profile": "inspect-text-frozen-answer-v1",
+      "epochs": 1,
+      "log_model_api": true,
+      "log_samples": true,
+      "sdk_max_retries": 0,
+      "tools": false,
+      "concurrency": 2,
+      "requests_per_minute": 60,
+      "request_timeout_seconds": 30,
+      "max_calls": 10,
+      "max_input_tokens": 10000,
+      "max_output_tokens": 10000,
+      "max_cost_microusd": 10000,
+      "input_tokens_per_call": 100,
+      "cost_microusd_per_call": 100
+    },
+    "runner": {
+      "scorer_id": "factual-correctness",
+      "invocation_timeout_seconds": 30
+    }
+  },
+  "attempt": {
+    "attempt": 1,
+    "role": "judge",
+    "resolved_model": "example-judge-001",
+    "status": "completed",
+    "request": {
+      "media_type": "application/json",
+      "text": "{\"config\":{\"max_output_tokens\":128,\"reasoning_effort\":null,\"seed\":null,\"temperature\":\"0\",\"top_p\":\"1\"},\"format\":\"invarlock/judge-request-v1\",\"messages\":[{\"content\":\"Grade the delimited answer using the rubric.\",\"role\":\"system\"},{\"content\":\"{\\\"answer\\\":\\\"Paris\\\",\\\"input\\\":\\\"Capital of France?\\\",\\\"instruction\\\":\\\"Grade the input and answer against the rubric. Return only a JSON object with one rating field.\\\",\\\"references\\\":[],\\\"rubric\\\":\\\"Rate factual correctness.\\\"}\",\"role\":\"user\"}],\"model\":\"example-judge\",\"model_role\":\"judge\",\"response_format\":{\"additional_properties\":false,\"rating_labels\":[\"incorrect\",\"correct\"],\"required\":[\"rating\"],\"type\":\"json_object\"},\"tools\":[]}",
+      "sha256": "beda8003c7bd392d85221f775fa9925608e8da8a076d965ab63fb91308caa8ca"
+    },
+    "response": {
+      "media_type": "application/json",
+      "text": "{\"rating\":\"correct\"}",
+      "sha256": "6c31bc0464ad8144a4052a658dde8a4f2425fe0f8b136751734440c7e01c3ff6"
+    },
+    "request_id": "request-1",
+    "finish_reason": "stop",
+    "error": null,
+    "usage": {
+      "input_tokens": 35,
+      "output_tokens": 5
+    },
+    "cache": "none",
+    "source": {
+      "source_id": "source-1",
+      "scorer_id": "factual-correctness",
+      "model_event_id": "event-1",
+      "record_index": 0,
+      "attempt_index": 0
+    }
+  }
+}

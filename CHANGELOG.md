@@ -7,13 +7,149 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.2] - 2026-09-22
+
 ### Added
+
+- Add `openai-compatible-judge` for explicitly configured vLLM, Ollama, LM Studio
+  and compatible Chat Completions services. Retain bounded requests, responses,
+  endpoint identity and checkpoints for offline verification, with dedicated
+  credential configuration and an endpoint setup example. Service observations
+  do not substitute for direct local artifact authentication.
+
+- Add native local judge collection through `runtime-provider-judge` for
+  `hf_transformers` and `llama_cpp`. Bind the complete local artifact identity,
+  pinned offline runtime, exact judge request and retained provider
+  observations for independent verification without model execution. Include
+  fixed generation controls, bounded collection, durable checkpoints and a local
+  judge setup example. Support explicit plan-bound canonical JSON or ChatML
+  prompt rendering, with matching offline replay and role-delimiter checks.
+
+- Allow Python judge collectors to stop after completed, durably retained batches
+  and resume the same plan without resetting call or budget accounting.
+
+- Add dedicated native export mappings for all 19 maintained evaluator
+  ecosystems through direct `evaluator-native-json` imports or the optional
+  `engine.export_evaluator_result` helper and `evaluator-json` envelope. Include
+  complete case checks, attributed numeric metrics, metadata slices and a shared
+  offline preflight, scoring, verification and reporting path, tested with actual
+  SDK exports through separately installed recipients.
+  Exercise complete retained Luna judge studies through the installed workflow,
+  preserving both passing and insufficient-evidence outcomes and rejecting
+  altered measurements.
+  Add actual SDK callback tests and a bounded fresh-execution campaign with
+  preserved task ledgers, explicit likelihood capture bindings and independently
+  installed recipients. Fresh model/provider qualification remains separate
+  from controlled-callback tests and retained replays. Retain the Mistral 7B
+  sentinel across all 19 profiles and 114 scorer/import journeys, including
+  original blocked judge attempts and independently replayable results.
+  Add controlled HTTP task capture with original response retention, service-bound
+  likelihood replay, and separately bounded extended judge campaigns.
+  Retain deeper Inspect, Harness, Promptfoo and Langfuse qualification with 576
+  fresh model executions, 32 verified exact-match/NLL comparisons, 1,288 usable
+  judge ratings and 24 verified judge comparisons. Include live stop/resume and
+  budget controls without replacing policy rejections or insufficient evidence
+  with favorable results.
+
+- Retain signed Docker and Podman CUDA execution references for native scorers,
+  TensorRT-LLM and vision-text, with compact offline replay and frozen provenance.
+- Add a maintained Langfuse experiment-export parser with explicit source and
+  item identities, scorer-specific measurements, and offline verification.
+- Add a real ModelKit handoff journey and exact GGUF file mapping inside the
+  verified package, including recipient policy and delivered-model checks.
+
+- Support explicit OpenAI, Anthropic, Google and OpenRouter judge collection
+  profiles through the optional pinned SDKs, with provider-specific credentials,
+  endpoint validation and offline SDK transport tests.
 
 ### Changed
 
+- Balance example coverage across three groups, run minimum-Python tests and
+  installed-package checks concurrently, and remove duplicate runtime and
+  release test execution while preserving test inventories and coverage gates.
+  Validate release branches through their pull requests instead of also starting
+  duplicate push checks.
+
+- Move judge collection into the core package. The `invarlock[judge]` extra now
+  installs the pinned provider SDKs directly; collection imports use
+  `invarlock.judge_measurements`.
+- Consolidate diagnostics and all maintained runtime providers into the
+  `invarlock` distribution. Optional dependencies are exposed through the
+  `diagnostics`, `vision-text`, and `judge` extras. Hugging Face inference
+  dependencies remain in authenticated runtime images and the repository `hf`
+  dependency group.
+- Return the shared `invarlock/evidence-report-v2` result for native reports in
+  every output format, including terminal and HTML. Output destinations are
+  recorded in `requested_outputs` and `written_outputs`.
+- Require structured runtime input parts and complete Harness capture provenance.
+  Direct Python callers must supply the canonical input parts instead of relying
+  on the former text-only constructor behavior.
+
+- Move contributor, CI, documentation, build and security tools into reusable
+  dependency groups, separate from published product extras.
+- Resolve runtime options once using an immutable environment snapshot. Explicit
+  command options take precedence over environment settings with or without a
+  profile, including conflicts between common options and side-specific values.
+- Share report destination validation and publication bookkeeping across evidence
+  families, while rendering only requested outputs and preserving their contracts.
+- Use one authenticated release publication path for the core artifact pair.
+- Render HTML reports with one consistent light palette across browser and
+  operating-system color preferences, including printed output.
+
 ### Removed
 
+- Remove the separate first-party add-in distributions and the old judge import
+  namespace. Release builds now contain one wheel and one source archive.
+- Remove obsolete Python entry-point discovery fallbacks, the unused signed-receipt
+  alias and the old native report result class. No forwarding aliases are provided.
+
 ### Fixed
+
+- Require the true end of string in anchored contract patterns so a trailing
+  newline cannot satisfy an otherwise exact identifier, digest or path match.
+
+- Accept reference-free LightEval generative records without inventing gold
+  answers, preserving judge availability and explicit missing-reference limits
+  for exact match and normalized NLL across both import routes.
+
+- Scope explicitly authorized judge network access to collection, preserving
+  native execution isolation and restoring the guard after failures or cancellation.
+- Execute native local-judge comparisons inside the declared offline container,
+  with matching image and device bindings for the baseline, subject and judge.
+  Reject incompatible runtime controls before model execution.
+
+- Accept complete Podman image IDs in authenticated builds and example workflows
+  while retaining strict source, image and filesystem checks. Temporary registry
+  cleanup also preserves image tags whose ownership has changed.
+- Support explicit Docker and Podman selection in TensorRT preparation, including
+  access to generated artifacts under rootless container engines.
+- Reject unsupported native batch sizes during preflight before model execution.
+- Make report summaries show the observed comparison, distinguish judge rubric
+  scores and independent units, and retain supporting counts in Markdown and HTML.
+  Present metric and scope names as readable labels while retaining exact
+  identifiers in technical details and machine outputs. Explain interval methods,
+  paired outcomes, percentage points and the endpoint checked by each policy.
+  Lead with the recorded outcome, distinguishing passing requirements, observed
+  losses and uncertainty that prevents a pass. Explain missing results, count,
+  precision and score requirements without repeating verdict headings; identify
+  advisory and combined outcomes and use each captured interval's recorded level.
+  Label measured judge precision failures correctly and keep decision-check
+  columns visible in desktop reports without changing retained results. Show
+  capture-bound model identities and multiple recorded datasets when available,
+  rejecting contradictions with attributed artifacts or legacy identity fields.
+  Show the judge's model, service endpoint, response format and local prompt
+  format where applicable, distinguishing service-reported identities from
+  authenticated local artifacts.
+- Reject exact-match reports whose side means contradict their paired outcome
+  counts, even when the reported difference remains consistent. Reject captured
+  reports whose recorded pass contradicts an available displayed requirement.
+- Keep provider retries within admitted judge attempts, reject ignored settings,
+  and validate reported usage before charging a collection budget.
+- Apply the resolved environment snapshot to optional runtime resource bindings.
+- Update AnyIO to 4.14.2 in affected CI and runtime locks to address TLS hostname
+  validation and process-pool blocking advisories.
+- Update the documentation dependency SoupSieve to 2.9.2 to address selector
+  parsing denial-of-service advisories.
 
 ## [0.16.1] - 2026-09-16
 

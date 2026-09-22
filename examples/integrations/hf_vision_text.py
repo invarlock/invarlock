@@ -53,7 +53,7 @@ _SNAPSHOT_REPOSITORY_METADATA = (".gitattributes", "LICENSE", "README.md")
 
 @dataclass(frozen=True)
 class ModelProfile:
-    """Immutable model coordinates already qualified by the vision add-in."""
+    """Immutable model coordinates already qualified by the vision-text provider."""
 
     model_id: str
     revision: str

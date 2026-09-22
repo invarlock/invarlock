@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://invarlock.dev/contracts/evaluator_export.schema.json",
+  "title": "Dedicated evaluator export",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "evaluator",
+    "source_version",
+    "run_id",
+    "payload"
+  ],
+  "properties": {
+    "format": {
+      "const": "invarlock/evaluator-export-v1"
+    },
+    "evaluator": {
+      "enum": [
+        "lm-evaluation-harness",
+        "inspect-ai",
+        "promptfoo",
+        "deepeval",
+        "ragas",
+        "lighteval",
+        "hugging-face-evaluate",
+        "pydantic-evals",
+        "autoevals",
+        "openevals",
+        "mlflow",
+        "garak",
+        "openai-evals",
+        "arize-phoenix-evals",
+        "langfuse",
+        "opik",
+        "azure-ai-evaluation",
+        "evidently",
+        "trulens"
+      ]
+    },
+    "source_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
+    },
+    "payload": {
+      "oneOf": [
+        {
+          "type": "object"
+        },
+        {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 50000
+        }
+      ]
+    }
+  }
+}

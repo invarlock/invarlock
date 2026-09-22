@@ -73,12 +73,34 @@ the existing multi-metric comparison-policy behavior. Missing likelihood facts
 produce insufficient evidence; InvarLock does not estimate them from generated
 answers, token counts alone or an evaluator's summary score.
 
-Use `invarlock.engine.capture_evaluator_run` to preserve canonical per-case
-records and `evaluator_input_capabilities` to inspect available facts before
-selecting a scorer. The [maintained capture example](https://github.com/invarlock/invarlock/blob/main/examples/evaluator-qualification/maintained/CAPTURE.md)
-covers the evaluator shortlist and distinguishes tested capture paths from
-upstream qualification. Keep using your evaluator's environment; InvarLock can
-consume its retained exports in a separate environment.
+Keep your existing evaluator environment and save its original per-case results
+as JSON using the [native source recipes](https://github.com/invarlock/invarlock/blob/main/examples/evaluator-qualification/maintained/CAPTURE.md#dedicated-native-shapes).
+Point baseline and subject at those files with `adapter: evaluator-native-json`,
+the actual evaluator name/version, run ID, and model or hosted-service identity.
+All 19 profiles use the same policy, evaluation, verification and reporting flow.
+The capture process needs no InvarLock installation or common export envelope; the recipient
+needs only core InvarLock. Pin the independently reviewed case set in policy so
+missing cases cannot disappear from both sides. The
+[onboarding example](../reference/evaluation-records.md#dedicated-evaluator-exports)
+shows raw JSON capture and the request source.
+
+If your SDK's dependencies are compatible with core InvarLock, the optional
+`invarlock.engine.export_evaluator_result` convenience API accepts SDK objects,
+checks the independent planned IDs, and writes an envelope for
+`adapter: evaluator-json`. Keep MLflow 3.14.0 in a separate evaluator environment
+because its cryptography dependency conflicts with core InvarLock; use the raw
+JSON route. `capture_evaluator_run` remains available for explicitly mapped
+canonical records, and `evaluator_input_capabilities` reports missing facts
+before scorer selection. Source-only SDK serializer tests do not establish
+co-installation compatibility.
+
+You can capture frozen outputs before upstream grading. Optional numeric metrics
+use their declared provenance and a `recorded` policy; per-case string metadata
+supports slices under the same policy. These observations do not replace the
+likelihood or judge measurements required above. Supply an actual typed
+likelihood under `metadata.invarlock_likelihood`; do not fabricate generated text
+for a likelihood-only case. A successful import establishes usable captured
+facts, and does not itself qualify a model or approve a release.
 
 For a measured NLL comparison between distinct checkpoints, replay the
 [Mistral 7B reference](https://github.com/invarlock/invarlock/blob/main/examples/captured-results/references/mistral-7b-likelihood/README.md).
@@ -108,6 +130,15 @@ by converting a structured object to text. Canonical `invarlock` runs already co
 their bindings and reject a projection override.
 
 ## Judge captured answers
+
+For an offline local judge, the recipe can select `runtime-provider-judge` with
+`comparison.judge.model` binding an inspected HF or GGUF artifact and runtime.
+The InvarLock process must already run inside the strict offline container;
+the ordinary host CLI does not launch a judge container. The
+[local judge example](https://github.com/invarlock/invarlock/blob/main/examples/native-local-judge/README.md) demonstrates
+model inspection, plan preparation and recipient verification. This local model
+selection cannot be combined with a retained `comparison.judge.measurements`
+file; retained-measurement import does not need model resources.
 
 Keep the captured request's baseline and subject source definitions and replace
 its comparison policy selection with:

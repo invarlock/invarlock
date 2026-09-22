@@ -19,6 +19,7 @@ import yaml
 from examples.integrations import launch
 from examples.integrations.evaluator_transaction.image_cleanup import (
     OwnedImageTag,
+    normalize_image_id,
     record_owned_image_tag,
     remove_owned_image_tags,
     temporary_image_tag,
@@ -269,14 +270,7 @@ def _inspect_image_id(repository: Path, *, container_engine: str, image: str) ->
         cwd=repository,
         capture_output=True,
     )
-    image_id = completed.stdout.strip()
-    if (
-        not image_id.startswith("sha256:")
-        or len(image_id) != 71
-        or any(character not in "0123456789abcdef" for character in image_id[7:])
-    ):
-        raise RuntimeError("container inspection did not return a sha256 image ID")
-    return image_id
+    return normalize_image_id(completed.stdout)
 
 
 def _build_runtime_image(
@@ -310,20 +304,30 @@ def _build_runtime_image(
     image = image_tag or f"invarlock-example-gguf:{commit[:12]}"
     launch._run(
         [
-            "make",
-            "-C",
-            "addins/gguf",
-            "build",
-            f"PYTHON={sys.executable}",
-            f"CONTAINER_ENGINE={container_engine}",
-            f"SOURCE_COMMIT={commit}",
-            f"SOURCE_BUNDLE={source_bundle}",
-            f"SOURCE_BUNDLE_SHA256={source_digest}",
+            sys.executable,
+            str(repository / "scripts/authenticated_runtime_build.py"),
+            "--repository",
+            str(repository),
+            "--source-commit",
+            commit,
+            "--source-bundle",
+            str(source_bundle),
+            "--source-bundle-sha256",
+            source_digest,
+            "--container-engine",
+            container_engine,
+            "--dockerfile",
+            "runtime/Dockerfile.gguf",
+            "--image",
+            image,
+            "--build-arg",
             f"SOURCE_DATE_EPOCH={epoch}",
+            "--build-arg",
             f"LLAMA_CPP_APT_SNAPSHOT={_APT_SNAPSHOT}",
+            "--build-arg",
             "LLAMA_CPP_BUILD_JOBS=8",
-            f"IMAGE={image}",
-            f"BUILD_STATEMENT={build_root / 'runtime-build.json'}",
+            "--statement",
+            str(build_root / "runtime-build.json"),
         ],
         cwd=repository,
     )
@@ -394,8 +398,8 @@ def _inspect_spec(
 ) -> dict[str, object]:
     code = (
         "from pathlib import Path; import json; "
-        "from invarlock_addins.gguf.provider import LlamaCppProvider; "
-        "from invarlock_addins.gguf.session import LlamaCppRuntimeBindings; "
+        "from invarlock.runtime_providers.llama_cpp import LlamaCppProvider; "
+        "from invarlock.runtime_providers.llama_cpp_session import LlamaCppRuntimeBindings; "
         "binding=LlamaCppRuntimeBindings(gguf_path=Path('/inputs/model.gguf'),"
         "executable_path=Path('/opt/llama.cpp/llama-completion'),"
         "source_archive_path=Path('/opt/llama.cpp/source/llama.cpp-b10015.tar.gz')); "

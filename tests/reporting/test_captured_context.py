@@ -247,7 +247,211 @@ def test_recorded_workflow_and_dataset_are_complete_row_facts_not_case_inference
     assert dict(facts)["Subject records"] == "3"
     runs["subject"]["records"][-1]["metadata"]["dataset"] = "other-dataset"
     _, facts, _, _ = record_reporting._captured_context(runs)
-    assert dict(facts)["Subject dataset"] == "Mixed or incomplete across records"
+    assert (
+        dict(facts)["Subject dataset"]
+        == "Multiple recorded values: other-dataset, public-dialogues"
+    )
+
+
+def test_bound_worker_identity_is_presented_when_shallow_fields_are_absent():
+    runs = inputs()
+    identities = {
+        "baseline": {
+            "id": "publisher/baseline",
+            "revision": "a" * 40,
+            "artifact_digest": "sha256:" + "b" * 64,
+        },
+        "subject": {
+            "id": "publisher/subject",
+            "revision": "c" * 40,
+            "artifact_digest": "sha256:" + "d" * 64,
+        },
+    }
+    for side, run in runs.items():
+        run["artifact_digest"] = identities[side]["artifact_digest"]
+        for index, row in enumerate(run["records"]):
+            row["context"].pop("model_key")
+            row["context"]["upstream_record"] = {
+                "metadata": {"invarlock_model_execution": {"model": identities[side]}}
+            }
+            row["metadata"] = {"dataset": "dataset-a" if index < 2 else "dataset-b"}
+    subjects, context, changes, _ = record_reporting._captured_context(runs)
+    assert subjects == (
+        ("Baseline", "Recorded model ID: publisher/baseline"),
+        ("Subject", "Recorded model ID: publisher/subject"),
+    )
+    facts = dict(context)
+    assert facts["Baseline model revision"] == "a" * 40
+    assert facts["Subject model revision"] == "c" * 40
+    assert facts["Baseline dataset"] == "Multiple recorded values: dataset-a, dataset-b"
+    assert "different model IDs, revisions or attributed artifacts" in changes[0]
+    assert "does not reexecute either model" in changes[0]
+
+
+def test_unattributed_nested_worker_identity_is_not_presented():
+    runs = inputs()
+    model = {
+        "id": "publisher/unattributed",
+        "revision": "a" * 40,
+        "artifact_digest": "sha256:" + "b" * 64,
+    }
+    for run in runs.values():
+        for row in run["records"]:
+            row["context"].pop("model_key")
+            row["context"]["upstream_record"] = {
+                "metadata": {"invarlock_model_execution": {"model": model}}
+            }
+    subjects, _, changes, _ = record_reporting._captured_context(runs)
+    assert subjects == (
+        ("Baseline", "Recorded run: baseline"),
+        ("Subject", "Recorded run: subject"),
+    )
+    assert "Model-key comparison is unavailable" in changes[0]
+
+
+def test_bound_langfuse_worker_identity_and_shared_model_are_presented():
+    runs = inputs()
+    model = {
+        "id": "publisher/shared",
+        "revision": "a" * 40,
+        "artifact_digest": "sha256:" + "b" * 64,
+    }
+    for run in runs.values():
+        run["artifact_digest"] = model["artifact_digest"]
+        for row in run["records"]:
+            row["context"].pop("model_key")
+            row["context"]["langfuse"] = {
+                "item_result": {
+                    "item": {
+                        "metadata": {
+                            "invarlock_model_execution": {"model": dict(model)}
+                        }
+                    }
+                }
+            }
+    subjects, _, changes, _ = record_reporting._captured_context(runs)
+    assert all("publisher/shared" in value for _, value in subjects)
+    assert "same revision and attributed artifact" in changes[0]
+
+
+def test_dataset_summary_bounds_many_recorded_values():
+    runs = inputs()
+    for run in runs.values():
+        run["records"] = []
+        for index in range(10):
+            row = deepcopy(inputs()["baseline"]["records"][0])
+            row["id"] = f"case-{index}"
+            row["metadata"] = {"dataset": f"dataset-{index}"}
+            run["records"].append(row)
+    _, context, _, _ = record_reporting._captured_context(runs)
+    assert dict(context)["Baseline dataset"].endswith("… (10 values)")
+
+
+@pytest.mark.parametrize(
+    "kind", ["missing", "metadata", "malformed", "incomplete", "conflict"]
+)
+def test_unusable_worker_identity_is_hidden_or_rejected(kind):
+    runs = inputs()
+    model = {
+        "id": "publisher/model",
+        "revision": "a" * 40,
+        "artifact_digest": "sha256:" + "b" * 64,
+    }
+    for run in runs.values():
+        run["artifact_digest"] = model["artifact_digest"]
+        for row in run["records"]:
+            row["context"].pop("model_key")
+            row["context"]["upstream_record"] = {
+                "metadata": {"invarlock_model_execution": {"model": dict(model)}}
+            }
+    target = runs["subject"]["records"][-1]["context"]
+    if kind == "missing":
+        target.pop("upstream_record")
+        subjects, _, _, _ = record_reporting._captured_context(runs)
+        assert subjects[1] == ("Subject", "Recorded run: subject")
+        return
+    execution = target["upstream_record"]["metadata"]["invarlock_model_execution"]
+    if kind == "metadata":
+        target["upstream_record"]["metadata"] = []
+        subjects, _, _, _ = record_reporting._captured_context(runs)
+        assert subjects[1] == ("Subject", "Recorded run: subject")
+        return
+    if kind == "malformed":
+        target["upstream_record"]["metadata"]["invarlock_model_execution"] = "bad"
+        subjects, _, _, _ = record_reporting._captured_context(runs)
+        assert subjects[1] == ("Subject", "Recorded run: subject")
+        return
+    if kind == "incomplete":
+        execution["model"].pop("revision")
+        subjects, _, _, _ = record_reporting._captured_context(runs)
+        assert subjects[1] == ("Subject", "Recorded run: subject")
+        return
+    else:
+        target["langfuse"] = {
+            "item_result": {
+                "item": {
+                    "metadata": {
+                        "invarlock_model_execution": {
+                            "model": {**model, "revision": "c" * 40}
+                        }
+                    }
+                }
+            }
+        }
+    with pytest.raises(ValueError, match="recorded model"):
+        record_reporting._captured_context(runs)
+
+
+@pytest.mark.parametrize(
+    "contradiction",
+    [
+        "artifact",
+        "shallow",
+        "partial-model-id",
+        "mixed-model-id",
+        "partial-revision",
+        "invalid-model-id",
+        "invalid-revision",
+        "nested",
+    ],
+)
+def test_bound_worker_identity_rejects_conflicting_sources(contradiction):
+    runs = inputs()
+    identity = {
+        "id": "publisher/model",
+        "revision": "a" * 40,
+        "artifact_digest": "sha256:" + "b" * 64,
+    }
+    for run in runs.values():
+        run["artifact_digest"] = identity["artifact_digest"]
+        for row in run["records"]:
+            row["context"].pop("model_key")
+            row["context"]["upstream_record"] = {
+                "metadata": {"invarlock_model_execution": {"model": dict(identity)}}
+            }
+    if contradiction == "artifact":
+        runs["subject"]["artifact_digest"] = "sha256:" + "c" * 64
+    elif contradiction == "shallow":
+        for row in runs["subject"]["records"]:
+            row["context"]["model_id"] = "publisher/other"
+    elif contradiction == "partial-model-id":
+        runs["subject"]["records"][0]["context"]["model_id"] = "publisher/other"
+    elif contradiction == "mixed-model-id":
+        for row in runs["subject"]["records"]:
+            row["context"]["model_id"] = identity["id"]
+        runs["subject"]["records"][-1]["context"]["model_id"] = "publisher/other"
+    elif contradiction == "partial-revision":
+        runs["subject"]["records"][-1]["context"]["model_revision"] = "c" * 40
+    elif contradiction == "invalid-model-id":
+        runs["subject"]["records"][-1]["context"]["model_id"] = 42
+    elif contradiction == "invalid-revision":
+        runs["subject"]["records"][-1]["context"]["model_revision"] = ""
+    else:
+        runs["subject"]["records"][-1]["context"]["upstream_record"]["metadata"][
+            "invarlock_model_execution"
+        ]["model"]["revision"] = "c" * 40
+    with pytest.raises(ValueError, match="recorded model"):
+        record_reporting._captured_context(runs)
 
 
 @pytest.mark.parametrize(

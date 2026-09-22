@@ -44,8 +44,9 @@ from pathlib import Path
 import invarlock
 import invarlock.cli.app
 import invarlock.runtime_providers.hf_transformers
-import invarlock.runtime_providers.gguf_identity
-import invarlock.runtime_providers.tensorrt_llm_identity
+import invarlock.runtime_providers.hf_vision_text
+import invarlock.runtime_providers.llama_cpp
+import invarlock.runtime_providers.tensorrt_llm
 
 distribution = metadata.distribution(\"invarlock\")
 distribution_root = Path(distribution.locate_file(\"\")).resolve()
@@ -73,21 +74,43 @@ _FIRST_PARTY_RUNTIME_PROVIDERS = {
         "runtime_qualification": "not_probed",
         "support_tier": "core_supported",
     },
+    "hf_vision_text": {
+        "module": "invarlock.runtime_providers.hf_vision_text",
+        "connector_status": "ready",
+        "backend_delivery": "python_extra",
+        "runtime_qualification": "not_probed",
+        "support_tier": "core_supported",
+    },
+    "llama_cpp": {
+        "module": "invarlock.runtime_providers.llama_cpp",
+        "connector_status": "ready",
+        "backend_delivery": "python_extra",
+        "runtime_qualification": "not_probed",
+        "support_tier": "core_supported",
+    },
+    "tensorrt_llm": {
+        "module": "invarlock.runtime_providers.tensorrt_llm",
+        "connector_status": "ready",
+        "backend_delivery": "python_extra",
+        "runtime_qualification": "not_probed",
+        "support_tier": "core_supported",
+    },
 }
 _PROBED_INVARLOCK_MODULES = frozenset(
     {
         "invarlock",
         "invarlock.cli.app",
         "invarlock.runtime_providers.hf_transformers",
-        "invarlock.runtime_providers.gguf_identity",
-        "invarlock.runtime_providers.tensorrt_llm_identity",
+        "invarlock.runtime_providers.hf_vision_text",
+        "invarlock.runtime_providers.llama_cpp",
+        "invarlock.runtime_providers.tensorrt_llm",
     }
 )
 
 
 try:
     from scripts.release.first_party_distribution_validation import (
-        validate_first_party_addin_distributions,
+        validate_first_party_distributions,
     )
     from scripts.release.release_distribution_validation import (
         InstalledWheelImport,
@@ -104,7 +127,7 @@ try:
     )
 except ImportError:  # pragma: no cover - direct script execution path
     from first_party_distribution_validation import (  # type: ignore[import-not-found, no-redef]
-        validate_first_party_addin_distributions,
+        validate_first_party_distributions,
     )
     from release_distribution_validation import (  # type: ignore[import-not-found, no-redef]  # noqa: F401
         InstalledWheelImport,
@@ -478,10 +501,10 @@ def run_release_preflight(config: ReleasePreflightConfig) -> dict[str, Any]:
     """Validate a release candidate and return only portable result details."""
     validate_clean_exact_checkout(config)
     artifacts = validate_distributions(config)
-    addin_artifacts = validate_first_party_addin_distributions(
+    validate_first_party_distributions(
         repo_root=config.repo_root,
         expected_version=config.expected_version,
-        dist_dir=config.dist_dir / "addins",
+        core_dist_dir=config.dist_dir,
     )
     _imported, compatibility = _probe_installed_wheel(config, artifacts.wheel)
     _run_current_public_evidence_audit(config)
@@ -500,14 +523,6 @@ def run_release_preflight(config: ReleasePreflightConfig) -> dict[str, Any]:
                 "name": artifacts.sdist.name,
                 "sha256": artifacts.hashes[artifacts.sdist.name],
             },
-        ],
-        "first_party_addins": [
-            {
-                "name": item.distribution,
-                "sdist": item.sdist,
-                "wheel": item.wheel,
-            }
-            for item in addin_artifacts
         ],
         "installed_wheel_import": "isolated_venv_from_candidate_wheel",
         "installed_wheel_retained_evidence_compatibility": compatibility,

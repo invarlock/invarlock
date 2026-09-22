@@ -28,40 +28,40 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 1024,
-      "pattern": "^(?!/)(?!~)(?![A-Za-z]:)(?!.*://)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*(?:^|/)\\.(?:/|$))(?!.*//)(?!\\s)(?!.*\\s$)(?!.*\\/$)[^\\u0000-\\u001f]+$"
+      "pattern": "^(?!/)(?!~)(?![A-Za-z]:)(?!.*://)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*(?:^|/)\\.(?:/|$))(?!.*//)(?!\\s)(?!.*\\s$)(?!.*\\/$)[^\\u0000-\\u001f]+(?![\\s\\S])"
     },
     "providerName": {
       "type": "string",
-      "pattern": "^[a-z][a-z0-9_]{0,63}$"
+      "pattern": "^[a-z][a-z0-9_]{0,63}(?![\\s\\S])"
     },
     "taskName": {
-      "$comment": "Standard identifiers include text_causal, text_seq2seq, masked_language, and vision_text_generation. A provider must explicitly declare execution support; optional add-ins may use another canonical identifier.",
+      "$comment": "Standard identifiers include text_causal, text_seq2seq, masked_language, and vision_text_generation. A provider must explicitly declare execution support; optional extensions may use another canonical identifier.",
       "type": "string",
-      "pattern": "^[a-z][a-z0-9_]{0,63}$"
+      "pattern": "^[a-z][a-z0-9_]{0,63}(?![\\s\\S])"
     },
     "settingName": {
       "type": "string",
-      "pattern": "^[a-z][a-z0-9_]{0,63}$"
+      "pattern": "^[a-z][a-z0-9_]{0,63}(?![\\s\\S])"
     },
     "sha256": {
       "type": "string",
-      "pattern": "^[a-f0-9]{64}$"
+      "pattern": "^[a-f0-9]{64}(?![\\s\\S])"
     },
     "recordFieldName": {
       "type": "string",
-      "pattern": "^[A-Za-z_][A-Za-z0-9_-]{0,127}$"
+      "pattern": "^[A-Za-z_][A-Za-z0-9_-]{0,127}(?![\\s\\S])"
     },
     "modelId": {
       "type": "string",
       "minLength": 1,
       "maxLength": 1024,
-      "pattern": "^(?!\\s)(?!.*\\s$)(?!.*://)[^\\u0000-\\u001f]+$"
+      "pattern": "^(?!\\s)(?!.*\\s$)(?!.*://)[^\\u0000-\\u001f]+(?![\\s\\S])"
     },
     "artifactLocator": {
       "type": "string",
       "minLength": 1,
       "maxLength": 4096,
-      "pattern": "^(?!\\s)(?!.*\\s$)[^\\u0000-\\u001f]+$"
+      "pattern": "^(?!\\s)(?!.*\\s$)[^\\u0000-\\u001f]+(?![\\s\\S])"
     },
     "jsonScalar": {
       "anyOf": [
@@ -142,6 +142,7 @@
       "type": "object",
       "required": ["workspace", "signer_identity"],
       "properties": {
+        "model": {"$ref": "#/$defs/comparisonSide"},
         "workspace": {"$ref": "#/$defs/safeReference"},
         "signer_identity": {
           "type": "string",
@@ -168,11 +169,11 @@
         "scorer_abi": {"const": "1"},
         "scorer_id": {
           "type": "string",
-          "pattern": "^[a-z][a-z0-9_]{0,63}(\\.[a-z][a-z0-9_]{0,63})+$"
+          "pattern": "^[a-z][a-z0-9_]{0,63}(\\.[a-z][a-z0-9_]{0,63})+(?![\\s\\S])"
         },
         "scorer_version": {
           "type": "string",
-          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?![\\s\\S])"
         },
         "descriptor_sha256": {"$ref": "#/$defs/sha256"},
         "configuration": {
@@ -334,11 +335,11 @@
     },
     "observationId": {
       "type": "string",
-      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}(?![\\s\\S])"
     },
     "observationKind": {
       "type": "string",
-      "pattern": "^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$",
+      "pattern": "^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*(?![\\s\\S])",
       "maxLength": 128
     },
     "observationInput": {
@@ -363,7 +364,7 @@
         "scope": {"enum": ["baseline", "subject", "comparison"]},
         "payload_digest": {
           "type": "string",
-          "pattern": "^sha256:[a-f0-9]{64}$"
+          "pattern": "^sha256:[a-f0-9]{64}(?![\\s\\S])"
         }
       },
       "additionalProperties": false

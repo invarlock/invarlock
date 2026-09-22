@@ -14,11 +14,45 @@ from tempfile import TemporaryDirectory
 
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG = ROOT / "scripts/ci/coverage.coveragerc"
-SHARDS = ("core", "examples", "support", "addins")
+EXAMPLE_PARTITIONS = {
+    "examples-comparisons": (
+        "tests/integration/test_evaluator_parity.py",
+        "tests/examples/test_priority_workflow_reference.py",
+        "tests/examples/test_captured_reference.py",
+    ),
+    "examples-judge": (
+        "tests/examples/test_judge_measurements_reference.py",
+        "tests/examples/test_judge_measurements_review.py",
+        "tests/examples/test_priority_judge_reference.py",
+    ),
+}
+SHARDS = ("core", "examples", *EXAMPLE_PARTITIONS, "support", "runtime")
 FAST_MARKERS = "not integration and not slow and not manual and not gpu"
-ADDIN_TESTS = tuple(
-    f"addins/{name}/tests"
-    for name in ("diagnostics", "gguf", "multimodal", "tensorrt_llm", "inspect_judge")
+EXAMPLE_TESTS = (
+    "tests/examples",
+    "tests/integration/test_evaluator_parity.py",
+    "tests/evaluation_records/test_sdk_capture.py",
+    "tests/evaluation_records/test_live_batch_capture.py",
+    "tests/evaluation_records/test_live_capture_cli.py",
+    "tests/evaluation_records/test_live_campaign_helpers.py",
+    "tests/evaluation_records/test_live_harness_capture.py",
+    "tests/evaluation_records/test_live_harness_serialization_recovery.py",
+    "tests/evaluation_records/test_live_judge.py",
+    "tests/evaluation_records/test_live_closure_judge.py",
+    "tests/evaluation_records/test_live_http_service.py",
+    "tests/evaluation_records/test_live_lighteval_resources.py",
+    "tests/evaluation_records/test_live_model_worker.py",
+    "tests/evaluation_records/test_live_network.py",
+    "tests/evaluation_records/test_live_recipient.py",
+    "tests/evaluation_records/test_live_recovery.py",
+    "tests/evaluation_records/test_live_scalar_capture.py",
+    "tests/evaluation_records/test_live_supervisor.py",
+)
+RUNTIME_TESTS = (
+    "tests/diagnostics",
+    "tests/runtime",
+    "tests/runtime_providers",
+    "tests/judge_measurements",
 )
 SUPPORT_TESTS = (
     "tests/ci/test_coverage_branch_rate.py",
@@ -57,6 +91,7 @@ SUPPORT_TESTS = (
     "tests/scripts/test_runtime_qualification.py",
     "tests/scripts/test_runtime_qualification_edges.py",
     "tests/scripts/test_runtime_qualification_security.py",
+    "tests/runtime/test_tensorrt_llm_canary_preflight.py",
     "tests/scripts/test_sync_packaged_contracts.py",
     "tests/scripts/test_sync_packaged_public_evidence.py",
     "tests/scripts/test_tagged_release_candidate.py",
@@ -71,19 +106,66 @@ def selection(shard: str) -> list[str]:
             "tests",
             "-m",
             FAST_MARKERS,
-            "--ignore=tests/examples",
+            *(f"--ignore={path}" for path in EXAMPLE_TESTS),
+            *(f"--ignore={path}" for path in RUNTIME_TESTS),
             *(f"--ignore={path}" for path in SUPPORT_TESTS),
         ]
+    if shard in EXAMPLE_PARTITIONS:
+        return list(EXAMPLE_PARTITIONS[shard])
     if shard == "examples":
-        return ["tests/examples"]
+        moved = {path for paths in EXAMPLE_PARTITIONS.values() for path in paths}
+        return [
+            *(path for path in EXAMPLE_TESTS if path not in moved),
+            *(f"--ignore={path}" for path in sorted(moved)),
+        ]
     if shard == "support":
         return list(SUPPORT_TESTS)
-    if shard == "addins":
-        return list(ADDIN_TESTS)
+    if shard == "runtime":
+        return [
+            *RUNTIME_TESTS,
+            *(
+                f"--ignore={path}"
+                for path in SUPPORT_TESTS
+                if any(path.startswith(f"{root}/") for root in RUNTIME_TESTS)
+            ),
+        ]
     raise ValueError(f"unknown coverage shard: {shard}")
 
 
-def source_identity() -> str:
+def test_selection(shard: str) -> list[str]:
+    """Keep unrestricted runtime and compatibility tests out of fast partitions."""
+    if shard == "supplement":
+        arguments = selection("core")
+        arguments[arguments.index(FAST_MARKERS)] = (
+            "integration or slow or manual or gpu"
+        )
+        return arguments
+    if shard == "runtime":
+        return [*RUNTIME_TESTS, "tests/compatibility"]
+    arguments = selection(shard)
+    if shard == "support":
+        arguments = [
+            path
+            for path in arguments
+            if not any(path.startswith(f"{root}/") for root in RUNTIME_TESTS)
+        ]
+    return [*arguments, "--ignore=tests/compatibility", "-m", FAST_MARKERS]
+
+
+def test(shard: str, workers: int) -> int:
+    """Run a selected behavior partition without coverage."""
+    if workers < 0:
+        raise ValueError("workers must be nonnegative")
+    arguments = test_selection(shard)
+    env = dict(os.environ)
+    env["PYTHONPATH"] = os.pathsep.join(str(ROOT / path) for path in ("src", "."))
+    command = [sys.executable, "-m", "pytest", "-q", *arguments]
+    if workers:
+        command.extend(["-n", str(workers)])
+    return subprocess.run(command, cwd=ROOT, env=env, check=False).returncode
+
+
+def source_identity(snapshot: dict[str, str] | None = None) -> str:
     """Bind local edits as well as the commit, without storing source contents."""
     commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT)
     files = subprocess.check_output(
@@ -91,6 +173,9 @@ def source_identity() -> str:
         cwd=ROOT,
     )
     digest = hashlib.sha256(commit)
+    if snapshot is not None:
+        snapshot.clear()
+        snapshot["HEAD"] = commit.decode().strip()
     for relative in sorted(set(files.split(b"\0")) - {b""}):
         path = ROOT / os.fsdecode(relative)
         digest.update(relative + b"\0")
@@ -100,7 +185,10 @@ def source_identity() -> str:
             content = b"file\0" + path.read_bytes()
         else:
             content = b"deleted\0"
-        digest.update(hashlib.sha256(content).digest())
+        file_digest = hashlib.sha256(content)
+        digest.update(file_digest.digest())
+        if snapshot is not None:
+            snapshot[os.fsdecode(relative)] = file_digest.hexdigest()
     return digest.hexdigest()
 
 
@@ -163,7 +251,8 @@ def run(shard: str, artifact_dir: Path, workers: int) -> int:
     destination.mkdir(parents=True, exist_ok=True)
     # Never let an interrupted retry inherit the previous attempt's success.
     manifest = destination / "manifest.json"
-    identity = source_identity()
+    before: dict[str, str] = {}
+    identity = source_identity(before)
     _write_json(manifest, {"version": 1, "shard": shard, "status": "running"})
     inventory = destination / "inventory.json"
     inventory.unlink(missing_ok=True)
@@ -172,15 +261,24 @@ def run(shard: str, artifact_dir: Path, workers: int) -> int:
     env = dict(os.environ)
     env["COVERAGE_FILE"] = str(data)
     env["INVARLOCK_COVERAGE_INVENTORY"] = str(inventory)
-    addin_sources = ()
-    if shard == "addins":
-        addin_sources = tuple(str(Path(path).parent / "src") for path in ADDIN_TESTS)
-    elif shard == "support":
-        addin_sources = ("addins/tensorrt_llm/src",)
+    # The coverage plugins are loaded explicitly below so the shard environment
+    # is deterministic. Entry-point autoload would register them a second time
+    # in a clean environment and can also admit unrelated ambient plugins.
+    env["PYTEST_DISABLE_PLUGIN_AUTOLOAD"] = "1"
     env["PYTHONPATH"] = os.pathsep.join(
-        str(ROOT / path) for path in ("scripts/ci", "src", ".", *addin_sources)
+        str(ROOT / path) for path in ("scripts/ci", "src", ".")
     )
-    command = [sys.executable, "-m", "pytest", "-p", "coverage_runner"]
+    command = [
+        sys.executable,
+        "-m",
+        "pytest",
+        "-p",
+        "coverage_runner",
+        "-p",
+        "pytest_cov.plugin",
+        "-p",
+        "xdist.plugin",
+    ]
     if workers:
         command.extend(["-n", str(workers)])
     command.extend(
@@ -208,8 +306,19 @@ def run(shard: str, artifact_dir: Path, workers: int) -> int:
     _write_json(manifest, record)
     if result.returncode:
         return result.returncode
-    if source_identity() != identity:
-        raise ValueError("source files changed while coverage was running")
+    after: dict[str, str] = {}
+    if source_identity(after) != identity:
+        changed = sorted(
+            path
+            for path in before.keys() | after.keys()
+            if before.get(path) != after.get(path)
+        )
+        record["changed_source_paths"] = changed
+        _write_json(manifest, record)
+        raise ValueError(
+            "source files changed while coverage was running: "
+            + json.dumps(changed, ensure_ascii=True)
+        )
     record.update(
         status="passed",
         inventory=_inventory(inventory),
@@ -225,7 +334,7 @@ def combine(artifact_dir: Path, output: Path) -> None:
     identity = source_identity()
     manifests = sorted(artifact_dir.glob("*/manifest.json"))
     if {path.parent.name for path in manifests} != set(SHARDS):
-        raise ValueError("coverage requires exactly core, examples, support and addins")
+        raise ValueError(f"coverage requires exactly these shards: {', '.join(SHARDS)}")
     seen: set[str] = set()
     data_paths = []
     for manifest in manifests:
@@ -275,11 +384,20 @@ def main(argv: list[str] | None = None) -> int:
     runner.add_argument("shard", choices=SHARDS)
     runner.add_argument("--artifact-dir", type=Path, default=Path("artifacts/coverage"))
     runner.add_argument("--workers", type=int, default=2)
+    behavior = commands.add_parser("test")
+    behavior.add_argument("shard", choices=SHARDS)
+    behavior.add_argument("--workers", type=int, default=2)
+    supplement = commands.add_parser("supplement")
+    supplement.add_argument("--workers", type=int, default=2)
     merger = commands.add_parser("combine")
     merger.add_argument("artifact_dir", type=Path)
     merger.add_argument("--output", type=Path, default=Path(".coverage"))
     args = parser.parse_args(argv)
     try:
+        if args.command == "supplement":
+            return test("supplement", args.workers)
+        if args.command == "test":
+            return test(args.shard, args.workers)
         if args.command == "run":
             return run(args.shard, args.artifact_dir, args.workers)
         combine(args.artifact_dir, args.output)

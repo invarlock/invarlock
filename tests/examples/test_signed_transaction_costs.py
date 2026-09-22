@@ -21,8 +21,18 @@ def _module() -> ModuleType:
     return module
 
 
-def test_measurements_replay_current_model_signed_transactions(tmp_path: Path) -> None:
+def test_measurements_replay_current_model_signed_transactions(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     module = _module()
+    scratch_roots: list[Path | None] = []
+    original = module.measure_transaction
+
+    def measure(*args: object, **kwargs: object) -> dict[str, object]:
+        scratch_roots.append(kwargs.get("temporary_root"))
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(module, "measure_transaction", measure)
 
     result = module.measure_all(root=ROOT, runs=2)
 
@@ -39,6 +49,7 @@ def test_measurements_replay_current_model_signed_transactions(tmp_path: Path) -
         assert item["package_bytes"] > item["evidence_bytes"]
         assert item["verification_and_receipt_median_ms"] > 0
         assert item["report_render_median_ms"] > 0
+    assert scratch_roots == [None] * len(module.TRANSACTION_IDS)
 
 
 def test_measurement_sizes_match_the_retained_directories() -> None:

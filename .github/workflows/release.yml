@@ -27,11 +27,6 @@ on:
         description: "Successful tagged release workflow run ID required for publication"
         type: string
         default: ""
-      publication_phase:
-        description: "Publication phase (complete normally; bootstrap/finish only for first-time PyPI projects)"
-        type: choice
-        options: [ complete, bootstrap, finish ]
-        default: complete
 
 permissions:
   contents: read
@@ -161,8 +156,10 @@ jobs:
             requirements/workflows/ci-hf-py313.txt
             requirements/workflows/docs-ci-py313.txt
             requirements/workflows/inspect-judge-tests-py313.txt
+            requirements/workflows/langfuse-sdk-tests-py313.txt
             requirements/workflows/pip-bootstrap.txt
             requirements/workflows/release-install-py313.txt
+            requirements/workflows/release-options-py313.txt
             requirements/workflows/release-security-py313.txt
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
@@ -180,8 +177,10 @@ jobs:
           npm audit --audit-level=high
       - name: Install actionlint
         run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
-      - name: Run complete repository gates
-        run: make verify
+      - name: Run repository and supplemental behavior gates
+        run: |
+          make verify-checks docs-check
+          python scripts/ci/coverage_runner.py supplement --workers 2
       - name: Audit maintained dependency locks
         id: dependency_audit
         run: |
@@ -199,7 +198,16 @@ jobs:
             artifacts/supply-chain/cve-audit.md
           if-no-files-found: warn
           retention-days: 30
+      - name: Install measured SDK dependencies
+        run: |
+          python -m pip install --require-hashes -r requirements/workflows/inspect-judge-tests-py313.txt
+          python -m pip install --require-hashes -r requirements/workflows/langfuse-sdk-tests-py313.txt
+          python -m pip check
+          python -m pytest tests/cli/test_cli_surface.py -q
       - name: Enforce release coverage
+        env:
+          INVARLOCK_REQUIRE_INSPECT_SDK: "1"
+          INVARLOCK_REQUIRE_LANGFUSE_SDK: "1"
         run: make coverage-enforce
       - name: Lint release workflows
         run: |
@@ -300,11 +308,6 @@ jobs:
           python scripts/release/package_readme.py --check
           rm -rf build dist
           python -m build --no-isolation
-          python -m build --no-isolation --outdir dist/addins addins/diagnostics
-          python -m build --no-isolation --outdir dist/addins addins/gguf
-          python -m build --no-isolation --outdir dist/addins addins/multimodal
-          python -m build --no-isolation --outdir dist/addins addins/tensorrt_llm
-          python -m build --no-isolation --outdir dist/addins addins/inspect_judge
       - name: Record distribution digests
         id: dist_digests
         run: |
@@ -323,9 +326,9 @@ jobs:
           source_archives = [
               path for path in distributions if path.name.endswith(".tar.gz")
           ]
-          if len(wheels) != 6 or len(source_archives) != 6:
+          if len(wheels) != 1 or len(source_archives) != 1:
               raise SystemExit(
-                  "expected six wheels and six source distributions, found "
+                  "expected one wheel and one source distribution, found "
                   f"{len(wheels)} wheels and {len(source_archives)} source archives"
               )
           lines = [
@@ -336,10 +339,11 @@ jobs:
           (dist / "SHA256SUMS").write_text("".join(lines), encoding="utf-8")
           PY
           echo "ledger_sha256=$(sha256sum dist/SHA256SUMS | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
+      - name: Qualify installed evaluator integrations and retained campaigns
+        run: PYTHON=python bash scripts/evaluator_parity_gate.sh
       - name: Twine check
         run: |
           python -m twine check dist/*.whl dist/*.tar.gz
-          python -m twine check dist/addins/*
       - name: Validate first-party distribution source parity
         env:
           INVARLOCK_RELEASE_TAG: ${{ needs.resolve_release_ref.outputs.release_tag }}
@@ -348,7 +352,6 @@ jobs:
           --repo-root .
           --expected-version "${INVARLOCK_RELEASE_TAG#v}"
           --core-dist-dir dist
-          --addin-dist-dir dist/addins
       - name: Render built package descriptions
         run: python scripts/release/package_rendering.py
       - name: Run clean-checkout release preflight
@@ -393,38 +396,26 @@ jobs:
           python -m pip install --no-deps --force-reinstall dist/*.whl
           python -m pip check
           python scripts/release/core_wheel_consumers.py --cli "$(command -v invarlock)"
-          python -m pip install --no-deps --force-reinstall dist/addins/*.whl
-          python -m pip check
-          invarlock --help
-          python -c "import invarlock.cli.app"
-          invarlock-gguf-conformance
-          invarlock-hf-vision-text-conformance
-          invarlock-tensorrt-llm-conformance
-          python -c "from invarlock_addins.diagnostics import spectral_observation; assert spectral_observation([[1.0]])['status'] == 'observation'"
-          python -c "from importlib.metadata import version; from pathlib import Path; from sysconfig import get_path; import sys; import invarlock; import invarlock_addins.inspect_judge as judge; assert version('invarlock-inspect-judge') == judge.__version__ == invarlock.__version__; assert Path(judge.__file__).resolve().is_relative_to(Path(get_path('purelib')).resolve()); assert callable(judge.import_export) and callable(judge.prepare_collection); assert 'inspect_ai' not in sys.modules"
-          python -c "from importlib import import_module; from pathlib import Path; from sysconfig import get_path; from invarlock import __version__; from invarlock.core.registry import CoreRegistry; from invarlock.core.runtime_provider import INVARLOCK_RUNTIME_PROVIDER_ABI; registry = CoreRegistry(); expected = {'hf_vision_text': 'invarlock-runtime-hf-vision-text', 'llama_cpp': 'invarlock-runtime-gguf', 'tensorrt_llm': 'invarlock-runtime-tensorrt-llm'}; providers = {name: registry.get_runtime_provider(name) for name in expected}; assert all(provider.name == name and provider.abi_version == INVARLOCK_RUNTIME_PROVIDER_ABI for name, provider in providers.items()); assert all(registry.get_plugin_info(name, 'runtime_providers')['package'] == package and registry.get_plugin_info(name, 'runtime_providers')['version'] == __version__ and registry.get_plugin_info(name, 'runtime_providers')['entry_point'] == name for name, package in expected.items()); site = Path(get_path('purelib')).resolve(); assert all(Path(import_module(provider.__class__.__module__).__file__).resolve().is_relative_to(site) for provider in providers.values())"
-          python - <<'PY'
+          python - <<'PYCODE'
           import os
           from importlib.metadata import version
 
-          projects = (
-              "invarlock",
-              "invarlock-diagnostics",
-              "invarlock-inspect-judge",
-              "invarlock-runtime-gguf",
-              "invarlock-runtime-hf-vision-text",
-              "invarlock-runtime-tensorrt-llm",
-          )
-          observed = {project: version(project) for project in projects}
-          expected = observed["invarlock"]
-          if any(candidate != expected for candidate in observed.values()):
-              raise SystemExit(f"first-party version mismatch: {observed}")
+          installed_version = version("invarlock")
           release_version = os.environ["INVARLOCK_RELEASE_TAG"].removeprefix("v")
-          if expected != release_version:
+          if installed_version != release_version:
               raise SystemExit(
-                  f"release tag/version mismatch: tag={release_version}, packages={observed}"
+                  f"release tag/version mismatch: tag={release_version}, installed={installed_version}"
               )
-          PY
+          PYCODE
+          deactivate
+          python -m venv .optional-venv
+          . .optional-venv/bin/activate
+          python -m pip install --upgrade --require-hashes -r requirements/workflows/pip-bootstrap.txt
+          python -m pip install --require-hashes -r requirements/workflows/release-install-py313.txt
+          python -m pip install --require-hashes -r requirements/workflows/release-options-py313.txt
+          python -m pip install --no-deps --force-reinstall dist/*.whl
+          python -m pip check
+          python scripts/release/core_wheel_consumers.py --mode optional --cli "$(command -v invarlock)"
       - name: Resolve and qualify the optional judge SDK extra
         run: PYTHON=python bash scripts/inspect_judge_sdk_gate.sh
       - name: Create release install-surface venv
@@ -440,7 +431,7 @@ jobs:
           unset PYTHONPATH
           python -m pip install --upgrade --require-hashes -r requirements/workflows/pip-bootstrap.txt
           python -m pip install --require-hashes -r requirements/workflows/release-install-py313.txt
-          python -m pip install --no-deps --force-reinstall dist/*.whl dist/addins/*.whl
+          python -m pip install --no-deps --force-reinstall dist/*.whl
           python -m pip check
           site_packages="$(python - <<'PY'
           import site
@@ -470,8 +461,6 @@ jobs:
           path: |
             dist/*.whl
             dist/*.tar.gz
-            dist/addins/*.whl
-            dist/addins/*.tar.gz
             dist/SHA256SUMS
           if-no-files-found: error
           retention-days: 14
@@ -598,88 +587,11 @@ jobs:
             --dist-dir _release_dist \
             --release-tag "${INVARLOCK_RELEASE_TAG}" \
             --github-output "${GITHUB_OUTPUT}"
-      - name: Verify completed bootstrap publication
-        if: >-
-          ${{
-            inputs.target == 'pypi' &&
-            inputs.publication_phase == 'finish'
-          }}
-        env:
-          EXPECTED_DIST_LEDGER_SHA256: ${{ steps.verify_candidate.outputs.dist_ledger_sha256 }}
-          INVARLOCK_RELEASE_VERSION: ${{ needs.resolve_release_ref.outputs.release_tag }}
-        run: |
-          python scripts/release/verify_hosted_distributions.py \
-            --ledger _release_dist/SHA256SUMS \
-            --expected-ledger-sha256 "${EXPECTED_DIST_LEDGER_SHA256}" \
-            --target pypi \
-            --version "${INVARLOCK_RELEASE_VERSION}" \
-            --project invarlock \
-            --project invarlock-diagnostics \
-            --project invarlock-inspect-judge \
-            --project invarlock-runtime-gguf \
-            --project invarlock-runtime-hf-vision-text
-
-  publication_plan:
-    needs: [authorize_candidate, resolve_release_ref]
-    if: >-
-      ${{
-        github.event_name == 'workflow_dispatch' &&
-        inputs.publish == true &&
-        inputs.release_tag != ''
-      }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-    outputs:
-      matrix: ${{ steps.plan.outputs.matrix }}
-    steps:
-      - name: Resolve publication phase
-        id: plan
-        shell: bash
-        env:
-          INVARLOCK_PUBLICATION_PHASE: ${{ inputs.publication_phase }}
-          INVARLOCK_PUBLISH_TARGET: ${{ inputs.target }}
-        run: |
-          set -euo pipefail
-
-          if [ "${INVARLOCK_PUBLISH_TARGET}" != "pypi" ]; then
-            case "${INVARLOCK_PUBLICATION_PHASE}" in
-              bootstrap)
-                echo "bootstrap publication is only valid for production PyPI" >&2
-                exit 1
-                ;;
-              finish)
-                echo "finish publication is only valid for production PyPI" >&2
-                exit 1
-                ;;
-            esac
-          fi
-
-          case "${INVARLOCK_PUBLICATION_PHASE}" in
-            complete)
-              matrix='{"include":[{"package":"core","environment_suffix":""},{"package":"diagnostics","environment_suffix":"-diagnostics"},{"package":"inspect-judge","environment_suffix":"-inspect-judge"},{"package":"runtime-gguf","environment_suffix":"-runtime-gguf"},{"package":"runtime-hf-vision-text","environment_suffix":"-runtime-hf-vision-text"},{"package":"runtime-tensorrt-llm","environment_suffix":"-runtime-tensorrt-llm"}]}'
-              ;;
-            bootstrap)
-              matrix='{"include":[{"package":"core","environment_suffix":""},{"package":"diagnostics","environment_suffix":"-diagnostics"},{"package":"inspect-judge","environment_suffix":"-inspect-judge"},{"package":"runtime-gguf","environment_suffix":"-runtime-gguf"},{"package":"runtime-hf-vision-text","environment_suffix":"-runtime-hf-vision-text"}]}'
-              ;;
-            finish)
-              matrix='{"include":[{"package":"runtime-tensorrt-llm","environment_suffix":"-runtime-tensorrt-llm"}]}'
-              ;;
-            *)
-              echo "unsupported publication phase" >&2
-              exit 1
-              ;;
-          esac
-          echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
 
   prepare_publication:
-    needs: [authorize_candidate, publication_plan, resolve_release_ref]
+    needs: [authorize_candidate, resolve_release_ref]
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.publication_plan.outputs.matrix) }}
     permissions:
       actions: read
       contents: read
@@ -706,54 +618,21 @@ jobs:
           run-id: ${{ needs.authorize_candidate.outputs.artifact_run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Stage publish distributions
-        env:
-          INVARLOCK_PACKAGE: ${{ matrix.package }}
         run: |
           set -euo pipefail
           rm -rf publish-dist
           mkdir -p publish-dist
-          case "${INVARLOCK_PACKAGE}" in
-            core)
-              distribution_root="_release_dist"
-              distribution_prefix="invarlock"
-              ;;
-            diagnostics)
-              distribution_root="_release_dist/addins"
-              distribution_prefix="invarlock_diagnostics"
-              ;;
-            inspect-judge)
-              distribution_root="_release_dist/addins"
-              distribution_prefix="invarlock_inspect_judge"
-              ;;
-            runtime-gguf)
-              distribution_root="_release_dist/addins"
-              distribution_prefix="invarlock_runtime_gguf"
-              ;;
-            runtime-hf-vision-text)
-              distribution_root="_release_dist/addins"
-              distribution_prefix="invarlock_runtime_hf_vision_text"
-              ;;
-            runtime-tensorrt-llm)
-              distribution_root="_release_dist/addins"
-              distribution_prefix="invarlock_runtime_tensorrt_llm"
-              ;;
-            *)
-              echo "unsupported first-party package: ${INVARLOCK_PACKAGE}" >&2
-              exit 1
-              ;;
-          esac
-
           distributions=()
           while IFS= read -r distribution; do
             distributions+=("${distribution}")
           done < <(
-            find "${distribution_root}" -maxdepth 1 -type f \
-              \( -name "${distribution_prefix}-*.whl" \
-                 -o -name "${distribution_prefix}-*.tar.gz" \) \
+            find _release_dist -maxdepth 1 -type f \
+              \( -name "invarlock-*.whl" \
+                 -o -name "invarlock-*.tar.gz" \) \
               -print | sort
           )
           if [ "${#distributions[@]}" -ne 2 ]; then
-            echo "expected one wheel and one source archive for ${INVARLOCK_PACKAGE}" >&2
+            echo "expected one wheel and one source archive for invarlock" >&2
             exit 1
           fi
           cp "${distributions[@]}" publish-dist/
@@ -816,30 +695,17 @@ jobs:
       - name: Reject conflicting hosted distributions
         env:
           EXPECTED_DIST_LEDGER_SHA256: ${{ needs.authorize_candidate.outputs.dist_ledger_sha256 }}
-          INVARLOCK_PACKAGE: ${{ matrix.package }}
           INVARLOCK_PUBLISH_TARGET: ${{ inputs.target }}
           INVARLOCK_RELEASE_VERSION: ${{ needs.resolve_release_ref.outputs.release_tag }}
         run: |
           set -euo pipefail
-          case "${INVARLOCK_PACKAGE}" in
-            core) project="invarlock" ;;
-            diagnostics) project="invarlock-diagnostics" ;;
-            inspect-judge) project="invarlock-inspect-judge" ;;
-            runtime-gguf) project="invarlock-runtime-gguf" ;;
-            runtime-hf-vision-text) project="invarlock-runtime-hf-vision-text" ;;
-            runtime-tensorrt-llm) project="invarlock-runtime-tensorrt-llm" ;;
-            *)
-              echo "unsupported first-party package: ${INVARLOCK_PACKAGE}" >&2
-              exit 1
-              ;;
-          esac
           python scripts/release/verify_hosted_distributions.py \
             --ledger _release_dist/SHA256SUMS \
             --expected-ledger-sha256 "${EXPECTED_DIST_LEDGER_SHA256}" \
             --target "${INVARLOCK_PUBLISH_TARGET}" \
             --version "${INVARLOCK_RELEASE_VERSION}" \
             --attempts 1 \
-            --project "${project}" \
+            --project invarlock \
             --allow-missing
       - name: Reconfirm immutable release tag
         env:
@@ -857,19 +723,16 @@ jobs:
       - name: Upload verified publication files
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: publish-dist-${{ matrix.package }}
+          name: publish-dist
           path: publish-dist/*
           if-no-files-found: error
           retention-days: 1
 
   publish:
-    needs: [prepare_publication, publication_plan, resolve_release_ref]
+    needs: [prepare_publication, resolve_release_ref]
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.publication_plan.outputs.matrix) }}
-    environment: ${{ format('{0}{1}', inputs.target, matrix.environment_suffix) }}
+    environment: ${{ inputs.target }}
     permissions:
       actions: read
       id-token: write
@@ -883,7 +746,7 @@ jobs:
       - name: Download verified publication files
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
-          name: publish-dist-${{ matrix.package }}
+          name: publish-dist
           path: publish-dist
       - name: Reconfirm immutable release tag
         env:
@@ -919,12 +782,11 @@ jobs:
     if: >-
       ${{
         github.event_name == 'workflow_dispatch' &&
-        inputs.publish == true &&
-        inputs.publication_phase != 'bootstrap'
+        inputs.publish == true
       }}
     runs-on: ubuntu-latest
-    # Hosted verification can consume about 110 minutes at its documented
-    # 12 attempts, 18 serial requests per attempt, and 30-second request timeout.
+    # Hosted verification can consume about 20 minutes at its documented
+    # 12 attempts, 3 serial requests per attempt, and 30-second request timeout.
     timeout-minutes: 130
     permissions:
       actions: read
@@ -961,8 +823,7 @@ jobs:
     if: >-
       ${{
         github.event_name == 'workflow_dispatch' &&
-        inputs.publish == true &&
-        inputs.publication_phase != 'bootstrap'
+        inputs.publish == true
       }}
     runs-on: ubuntu-latest
     # Leave the same bounded verification budget plus installation headroom.
@@ -1001,6 +862,7 @@ jobs:
       - name: Install published wheels and smoke test
         env:
           INVARLOCK_LIGHT_IMPORT: "1"
+          INVARLOCK_RELEASE_TAG: ${{ needs.resolve_release_ref.outputs.release_tag }}
         run: |
           python -m venv .venv
           . .venv/bin/activate
@@ -1012,32 +874,26 @@ jobs:
           python -m pip install --no-deps --force-reinstall wheelhouse/invarlock-*.whl
           python -m pip check
           python scripts/release/core_wheel_consumers.py --cli "$(command -v invarlock)"
-          python -m pip install --no-deps --force-reinstall wheelhouse/invarlock_*.whl
-          python -m pip check
-          invarlock --help
-          python -c "import invarlock.cli.app"
-          invarlock-gguf-conformance
-          invarlock-hf-vision-text-conformance
-          invarlock-tensorrt-llm-conformance
-          python -c "from invarlock_addins.diagnostics import spectral_observation; assert spectral_observation([[1.0]])['status'] == 'observation'"
-          python -c "from importlib.metadata import version; from pathlib import Path; from sysconfig import get_path; import sys; import invarlock; import invarlock_addins.inspect_judge as judge; assert version('invarlock-inspect-judge') == judge.__version__ == invarlock.__version__; assert Path(judge.__file__).resolve().is_relative_to(Path(get_path('purelib')).resolve()); assert callable(judge.import_export) and callable(judge.prepare_collection); assert 'inspect_ai' not in sys.modules"
-          python -c "from importlib import import_module; from pathlib import Path; from sysconfig import get_path; from invarlock import __version__; from invarlock.core.registry import CoreRegistry; from invarlock.core.runtime_provider import INVARLOCK_RUNTIME_PROVIDER_ABI; registry = CoreRegistry(); expected = {'hf_vision_text': 'invarlock-runtime-hf-vision-text', 'llama_cpp': 'invarlock-runtime-gguf', 'tensorrt_llm': 'invarlock-runtime-tensorrt-llm'}; providers = {name: registry.get_runtime_provider(name) for name in expected}; assert all(provider.name == name and provider.abi_version == INVARLOCK_RUNTIME_PROVIDER_ABI for name, provider in providers.items()); assert all(registry.get_plugin_info(name, 'runtime_providers')['package'] == package and registry.get_plugin_info(name, 'runtime_providers')['version'] == __version__ and registry.get_plugin_info(name, 'runtime_providers')['entry_point'] == name for name, package in expected.items()); site = Path(get_path('purelib')).resolve(); assert all(Path(import_module(provider.__class__.__module__).__file__).resolve().is_relative_to(site) for provider in providers.values())"
-          python - <<'PY'
+          python - <<'PYCODE'
+          import os
           from importlib.metadata import version
 
-          projects = (
-              "invarlock",
-              "invarlock-diagnostics",
-              "invarlock-inspect-judge",
-              "invarlock-runtime-gguf",
-              "invarlock-runtime-hf-vision-text",
-              "invarlock-runtime-tensorrt-llm",
-          )
-          observed = {project: version(project) for project in projects}
-          expected = observed["invarlock"]
-          if any(candidate != expected for candidate in observed.values()):
-              raise SystemExit(f"first-party version mismatch: {observed}")
-          PY
+          installed_version = version("invarlock")
+          release_version = os.environ["INVARLOCK_RELEASE_TAG"].removeprefix("v")
+          if installed_version != release_version:
+              raise SystemExit(
+                  f"release tag/version mismatch: tag={release_version}, installed={installed_version}"
+              )
+          PYCODE
+          deactivate
+          python -m venv .optional-venv
+          . .optional-venv/bin/activate
+          python -m pip install --upgrade --require-hashes -r requirements/workflows/pip-bootstrap.txt
+          python -m pip install --require-hashes -r requirements/workflows/release-install-py313.txt
+          python -m pip install --require-hashes -r requirements/workflows/release-options-py313.txt
+          python -m pip install --no-deps --force-reinstall wheelhouse/invarlock-*.whl
+          python -m pip check
+          python scripts/release/core_wheel_consumers.py --mode optional --cli "$(command -v invarlock)"
 
   publish_documentation:
     name: Publish tagged documentation
@@ -1046,8 +902,7 @@ jobs:
       ${{
         github.event_name == 'workflow_dispatch' &&
         inputs.publish == true &&
-        inputs.target == 'pypi' &&
-        inputs.publication_phase != 'bootstrap'
+        inputs.target == 'pypi'
       }}
     permissions:
       contents: write

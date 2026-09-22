@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parents[2]
 MAKE = MakefileContract.read(ROOT / "Makefile")
 SOURCES = {
     "core": "src/invarlock/engine.py",
-    "addins": "addins/diagnostics/src/invarlock_addins/diagnostics/observations.py",
+    "runtime": "src/invarlock/runtime_providers/llama_cpp.py",
     "qualification": "scripts/qualification_source.py",
     "release": "scripts/release/release_preflight.py",
     "examples": "examples/quickstart/run.py",
@@ -204,10 +204,10 @@ def test_domain_reports_preserve_their_own_line_exclusions(
         assert result.returncode != 0, result.stdout + result.stderr
     if domain == "examples":
         assert "66.67%" in result.stdout
-    # The original addin/example file ratchets read pyproject.toml, whose
-    # NotImplementedError exclusion differs from their aggregate configs.
+    # Core and example file ratchets read pyproject.toml, whose
+    # NotImplementedError exclusion differs from the aggregate configs.
     file_result = _run(corpus, _arguments(domain, per_file=True))
-    assert (file_result.returncode == 0) == (domain in {"core", "addins", "examples"})
+    assert (file_result.returncode == 0) == (domain in {"core", "examples"})
 
 
 def test_example_threshold_cannot_be_diluted_by_other_domains(corpus: Path) -> None:
@@ -267,14 +267,20 @@ def test_combined_xml_retains_uncovered_branches(corpus: Path) -> None:
     assert "50.00% branch coverage" in result.stdout + result.stderr
 
 
-@pytest.mark.parametrize("domain", ["core", "addins", "examples"])
+@pytest.mark.parametrize("domain", ["core", "runtime", "examples"])
 def test_collection_discovers_unexecuted_package_files_after_checkout_move(
     tmp_path: Path, domain: str
 ) -> None:
     collected = tmp_path / "collected"
     collected.mkdir()
     _copy_configs(collected)
-    for directory in ("src/invarlock", "addins", "scripts", "examples"):
+    for directory in (
+        "src/invarlock",
+        "scripts",
+        "examples",
+        "tests/diagnostics",
+        "tests/runtime_providers",
+    ):
         (collected / directory).mkdir(parents=True, exist_ok=True)
     unexecuted = collected / SOURCES[domain]
     unexecuted.parent.mkdir(parents=True, exist_ok=True)

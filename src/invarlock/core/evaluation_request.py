@@ -164,6 +164,7 @@ class ComparisonSideRequest:
 class JudgeRequest:
     workspace: Path
     signer_identity: str
+    model: ComparisonSideRequest | None = None
 
 
 @dataclass(frozen=True)
@@ -252,6 +253,7 @@ class CapturedJudgeRequest:
     workspace: Path
     signer_identity: str
     measurements: Path | None = None
+    model: ComparisonSideRequest | None = None
 
 
 @dataclass(frozen=True)
@@ -527,7 +529,11 @@ def _default_provider_resolver(provider_name: str) -> RuntimeProvider:
 
 
 def _build_judge_request(
-    value: dict[str, Any], *, root: Path, evidence_reference: str
+    value: dict[str, Any],
+    *,
+    root: Path,
+    evidence_reference: str,
+    model: ComparisonSideRequest | None = None,
 ) -> JudgeRequest:
     label = "comparison.judge.workspace"
     reference = cast(str, value["workspace"])
@@ -548,7 +554,9 @@ def _build_judge_request(
         raise EvaluationRequestError(
             "judge workspace and output.evidence must not overlap"
         )
-    return JudgeRequest(workspace=workspace, signer_identity=value["signer_identity"])
+    return JudgeRequest(
+        workspace=workspace, signer_identity=value["signer_identity"], model=model
+    )
 
 
 def _resolve_provider(
@@ -655,6 +663,72 @@ def _build_side(
             provider_resolver=provider_resolver,
         ),
     )
+
+
+def _judge_model_payload(model: ComparisonSideRequest, *, root: Path) -> dict[str, Any]:
+    """Validate a programmatic local model binding through the authored schema."""
+    if (
+        not isinstance(model, ComparisonSideRequest)
+        or not isinstance(model.artifact, ArtifactRequest)
+        or not isinstance(model.runtime, RuntimeRequest)
+    ):
+        raise EvaluationRequestError("judge model must be a typed local model binding")
+    if not isinstance(model.artifact.path, Path):
+        raise EvaluationRequestError("judge model requires a local artifact path")
+    try:
+        reference = model.artifact.path.relative_to(root).as_posix()
+    except ValueError as exc:
+        raise EvaluationRequestError(
+            "judge model must remain inside request root"
+        ) from exc
+    try:
+        spec = ModelRuntimeSpec(
+            provider_name=model.runtime.provider,
+            model_id=model.artifact.model_id,
+            settings=model.runtime.settings,
+        )
+    except (ValueError, TypeError) as exc:
+        raise EvaluationRequestError(f"judge model runtime is invalid: {exc}") from exc
+    value = {
+        "artifact": {
+            "path": reference,
+            "model_id": model.artifact.model_id,
+            "locator": model.artifact.locator,
+        },
+        "runtime": {
+            "provider": model.runtime.provider,
+            "settings": dict(spec.settings),
+        },
+    }
+    definition = load_evaluation_request_schema()
+    errors = list(
+        jsonschema.Draft202012Validator(
+            {"$ref": "#/$defs/comparisonSide", "$defs": definition["$defs"]}
+        ).iter_errors(value)
+    )
+    if errors:
+        raise EvaluationRequestError(
+            "judge model binding does not match the closed schema"
+        )
+    _resolve_existing_reference(
+        root, reference, label="judge model artifact", expected="artifact"
+    )
+    return value
+
+
+def _validate_judge_model_binding(
+    model: ComparisonSideRequest, *, root: Path, workspace: Path, evidence: Path
+) -> None:
+    _judge_model_payload(model, root=root)
+    artifact = model.artifact.path
+    assert artifact is not None
+    if any(
+        destination.is_relative_to(artifact) or artifact.is_relative_to(destination)
+        for destination in (workspace, evidence)
+    ):
+        raise EvaluationRequestError(
+            "judge model must not overlap workspace or evidence destination"
+        )
 
 
 def _build_import_side(
@@ -902,6 +976,18 @@ def _build_request(
                     comparison["judge"],
                     root=root,
                     evidence_reference=output["evidence"],
+                    model=(
+                        _build_side(
+                            comparison["judge"]["model"],
+                            side_name="judge.model",
+                            execution_mode="run",
+                            root=root,
+                            provider_cache=provider_cache,
+                            provider_resolver=provider_resolver,
+                        )
+                        if "model" in comparison["judge"]
+                        else None
+                    ),
                 )
                 if metric == "judge"
                 else None
@@ -923,6 +1009,8 @@ def _validate_judge_workspace_inputs(
     request: EvaluationRequest, request_path: Path | None = None
 ) -> None:
     judge = request.comparison.judge
+    if (request.comparison.metric == "judge") != (judge is not None):
+        raise EvaluationRequestError("judge configuration must accompany metric: judge")
     if judge is None:
         return
     workspace = judge.workspace
@@ -947,7 +1035,18 @@ def _validate_judge_workspace_inputs(
     _build_judge_request(
         judge_value, root=request.root, evidence_reference=evidence_reference
     )
-    for side in (request.comparison.baseline, request.comparison.subject):
+    if judge.model is not None:
+        _validate_judge_model_binding(
+            judge.model,
+            root=request.root,
+            workspace=workspace,
+            evidence=request.output.evidence,
+        )
+    for side in (
+        request.comparison.baseline,
+        request.comparison.subject,
+        *((judge.model,) if judge.model is not None else ()),
+    ):
         artifact = side.artifact.path
         if artifact is not None and (
             workspace.is_relative_to(artifact) or artifact.is_relative_to(workspace)
@@ -975,7 +1074,7 @@ def _validate_judge_workspace_inputs(
 
 
 def _build_captured_request(
-    value: dict[str, Any], *, root: Path
+    value: dict[str, Any], *, root: Path, provider_resolver: ProviderResolver
 ) -> CapturedEvaluationRequest:
     comparison = cast(dict[str, Any], value["comparison"])
     output = cast(dict[str, Any], value["output"])
@@ -1032,6 +1131,18 @@ def _build_captured_request(
                     )
                 ),
                 signer_identity=judge["signer_identity"],
+                model=(
+                    _build_side(
+                        judge["model"],
+                        side_name="judge.model",
+                        execution_mode="run",
+                        root=root,
+                        provider_cache={},
+                        provider_resolver=provider_resolver,
+                    )
+                    if "model" in judge
+                    else None
+                ),
                 measurements=(
                     _resolve_existing_reference(
                         root,
@@ -1061,7 +1172,7 @@ def load_evaluation_request(
     """Load one strict request anchored to its file's real parent directory.
 
     The built-in resolver intentionally exposes only the canonical Hugging Face
-    provider. Optional provider add-ins must supply an explicit, authorized
+    provider. Optional providers must supply an explicit, authorized
     resolver. Callers must repeat no-follow resolution when opening returned
     paths so a later filesystem mutation cannot cross the request root.
     """
@@ -1118,13 +1229,22 @@ def load_evaluation_request(
         target[key] = reference
     if format_version == CAPTURED_EVALUATION_REQUEST_FORMAT_VERSION:
         captured = _build_captured_request(
-            _validate_captured_schema(validated), root=root
+            _validate_captured_schema(validated),
+            root=root,
+            provider_resolver=provider_resolver or _default_provider_resolver,
         )
         if captured.judge is not None and request_path.absolute().is_relative_to(
             captured.judge.workspace
         ):
             raise EvaluationRequestError(
                 "Judge workspace must remain separate from request file"
+            )
+        if captured.judge is not None and captured.judge.model is not None:
+            _validate_judge_model_binding(
+                captured.judge.model,
+                root=root,
+                workspace=captured.judge.workspace,
+                evidence=captured.evidence,
             )
         return captured
     request = _build_request(

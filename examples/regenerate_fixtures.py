@@ -78,7 +78,16 @@ def regenerate(
     example_records = [
         {
             "record_id": f"record-{index:02d}",
-            "input_text": f"Return token-{index:02d}",
+            "input_parts": [
+                {
+                    "kind": "text",
+                    "role": "prompt",
+                    "text": f"Return token-{index:02d}",
+                    "sha256": hashlib.sha256(
+                        (f"Return token-{index:02d}").encode()
+                    ).hexdigest(),
+                }
+            ],
             "expected_output": f"token-{index:02d}",
         }
         for index in range(50)

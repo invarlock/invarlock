@@ -90,14 +90,14 @@ from invarlock.evaluation_oci import (
     OciRuntimeExecutor,
     OciSideLaunch,
     OciWorkerLimits,
-    launch_from_environment,
+    launch_from_resolved_config,
 )
 from invarlock.evaluation_record_contracts.contracts import MAX_RECORDS as _MAX_RECORDS
 from invarlock.evaluation_record_contracts.contracts import (
     EvaluationRecordsError,
     digest,
 )
-from invarlock.evaluation_records.adapters import load_run
+from invarlock.evaluation_records.adapters import load_run, write_evaluator_export
 from invarlock.evaluation_records.cases import (
     canonical_case_set as _canonical_case_set,
 )
@@ -109,8 +109,16 @@ from invarlock.evaluation_records.identity import (
     evaluated_subject_digest,
     validate_service_identity,
 )
+from invarlock.evaluation_records.integrations import (
+    EVALUATORS,
+    export_evaluator_result,
+)
 from invarlock.evaluation_records.io import physical_file_digest, run_digest, write_run
-from invarlock.evaluation_runtime import RuntimeResourceResolver
+from invarlock.evaluation_runtime import (
+    ResolvedRuntimeConfig,
+    ResolvedRuntimeSide,
+    RuntimeResourceResolver,
+)
 from invarlock.evaluation_transaction import (
     EvaluationPreflightError,
     EvaluationPreflightResult,
@@ -140,7 +148,6 @@ from invarlock.evidence_receipt import (
     verify_signed_verification_receipt,
 )
 from invarlock.evidence_reporting import (
-    EvidenceReport,
     EvidenceReportError,
     EvidenceReportV2,
     render_evidence,
@@ -285,7 +292,6 @@ __all__ = [
     "EvidencePackStatus",
     "EvidenceObservation",
     "EvidenceReceiptError",
-    "EvidenceReport",
     "EvidenceReportError",
     "EvidenceVerification",
     "EvidenceVerificationError",
@@ -321,6 +327,8 @@ __all__ = [
     "RuntimeProviderCapabilities",
     "RuntimeProviderPluginIdentity",
     "RuntimeProviderReceipt",
+    "ResolvedRuntimeConfig",
+    "ResolvedRuntimeSide",
     "RuntimeResourceResolver",
     "RuntimeScoringRecord",
     "RuntimeSession",
@@ -350,10 +358,13 @@ __all__ = [
     "load_external_scoring_records_jsonl",
     "load_evaluation_request",
     "load_run",
+    "write_evaluator_export",
+    "export_evaluator_result",
+    "EVALUATORS",
     "load_runtime_behavioral_schedule",
     "load_runtime_import_side",
     "load_trust_inputs",
-    "launch_from_environment",
+    "launch_from_resolved_config",
     "make_run",
     "digest",
     "evaluated_subject_digest",

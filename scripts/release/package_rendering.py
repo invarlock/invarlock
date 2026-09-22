@@ -146,7 +146,6 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", type=Path, default=Path.cwd())
     parser.add_argument("--core-dist-dir", type=Path, default=Path("dist"))
-    parser.add_argument("--addin-dist-dir", type=Path, default=Path("dist/addins"))
     parser.add_argument("--output-dir", type=Path)
     args = parser.parse_args(argv)
     root = args.repo_root.resolve()
@@ -155,9 +154,8 @@ def main(argv: list[str] | None = None) -> int:
             project = root / relative
             name, version = read_distribution_project(project)
             spec = DistributionValidationSpec(project, name, version, "")
-            directory = args.core_dist_dir if relative == "." else args.addin_dist_dir
             wheel, sdist = _artifact_pair(
-                dist_dir=root / directory, distribution_name=name
+                dist_dir=root / args.core_dist_dir, distribution_name=name
             )
             rendered = render_pair(spec, wheel, sdist)
             if args.output_dir is not None:

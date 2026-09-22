@@ -269,26 +269,7 @@ def test_auxiliary_docs_track_the_product_and_release_surface() -> None:
 
     workflows = text_by_path[".github/WORKFLOWS.md"]
     notices = text_by_path["THIRD_PARTY_NOTICES.md"]
-    distribution_projects = (
-        "pyproject.toml",
-        "addins/diagnostics/pyproject.toml",
-        "addins/gguf/pyproject.toml",
-        "addins/multimodal/pyproject.toml",
-        "addins/tensorrt_llm/pyproject.toml",
-        "addins/inspect_judge/pyproject.toml",
-    )
-    distributions = {
-        tomllib.loads(_read(relative))["project"]["name"]
-        for relative in distribution_projects
-    }
-    assert distributions == {
-        "invarlock",
-        "invarlock-diagnostics",
-        "invarlock-runtime-gguf",
-        "invarlock-runtime-hf-vision-text",
-        "invarlock-runtime-tensorrt-llm",
-        "invarlock-inspect-judge",
-    }
+    distributions = {"invarlock"}
     for distribution in distributions:
         assert distribution in workflows
         assert distribution in notices
@@ -301,7 +282,7 @@ def test_auxiliary_docs_track_the_product_and_release_surface() -> None:
         "## Hugging Face runtime group", maxsplit=1
     )[0]
     hf_section = notices.split("## Hugging Face runtime group", maxsplit=1)[1].split(
-        "## First-party optional distributions", maxsplit=1
+        "## Optional runtime features", maxsplit=1
     )[0]
     assert _code_table_names(core_section) == _declared_dependency_names(
         "pyproject.toml"
@@ -345,17 +326,7 @@ def test_runtime_qualification_docs_use_authenticated_candidate_wheels() -> None
     assert "scripts/qualification_candidate_wheels.py" in guide
     assert "--wheel dist/invarlock-*.whl" in guide
 
-    addin_wheels = {
-        "addins/gguf/README.md": "invarlock_runtime_gguf-*.whl",
-        "addins/multimodal/README.md": ("invarlock_runtime_hf_vision_text-*.whl"),
-        "addins/tensorrt_llm/README.md": ("invarlock_runtime_tensorrt_llm-*.whl"),
-    }
-    for relative, wheel in addin_wheels.items():
-        text = _read(relative)
-        assert "scripts/qualification_candidate_wheels.py" in text
-        assert "CANDIDATE_WHEEL_MANIFEST" in text
-        assert "dist/invarlock-*.whl" in text
-        assert wheel in text
+    assert reference.count("--wheel dist/invarlock-*.whl") == 1
 
 
 def test_runtime_and_report_references_track_current_closed_contracts() -> None:
@@ -368,14 +339,12 @@ def test_runtime_and_report_references_track_current_closed_contracts() -> None:
     ):
         assert f"`{setting}`" in runtime_reference
 
-    gguf_addin = _read("addins/gguf/README.md")
     gguf_guide = _read("docs/user-guide/runtime-providers.md")
     for fragment in (
         "cpu_threads=16",
         "prompt_batch_size=512",
         "prompt_microbatch_size=512",
     ):
-        assert fragment in gguf_addin
         assert fragment in gguf_guide
 
     contracts = _read("docs/reference/contracts.md")
@@ -385,7 +354,7 @@ def test_runtime_and_report_references_track_current_closed_contracts() -> None:
 
     cli = _read("docs/reference/cli.md")
     assert "[--json]" in cli.split("## `report`", maxsplit=1)[1]
-    assert "invarlock/evidence-report-v1" in cli
+    assert "invarlock/evidence-report-v2" in cli
 
     api = _read("docs/reference/api-guide.md")
     assert "expected_request_digest: str | None = None" in api
@@ -672,7 +641,9 @@ def test_public_example_includes_every_required_input_and_verify_anchor() -> Non
     assert 'expected_policy_verdict="fail"' in handoff
     assert "tampered_report.write_bytes" in handoff
     makefile = _read("Makefile")
-    handoff_recipe = makefile.split("trust-boundary-demo:", 1)[1].split("\n\n", 1)[0]
+    handoff_recipe = makefile.split("example-evidence-handoff:", 1)[1].split("\n\n", 1)[
+        0
+    ]
     assert "rm -rf" not in handoff_recipe
 
 
@@ -842,7 +813,7 @@ def test_evaluator_docs_preserve_qualification_and_integration_depth() -> None:
 
     assert "Adapter support" in text
     assert "Replay authority" in text
-    assert "Signed-journey maturity" in text
+    assert "Signed OCI-journey maturity" in text
     assert "LM Evaluation Harness" in text
     assert "every retained independently replayable import" in normalized
     assert "102-record" in text

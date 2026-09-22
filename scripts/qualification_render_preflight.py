@@ -946,7 +946,7 @@ def main(argv: list[str] | None = None) -> int:
             max_output_tokens=arguments.max_output_tokens,
         )
     elif arguments.profile == "multimodal":
-        provider = importlib.import_module("invarlock_addins.multimodal.provider")
+        provider = importlib.import_module("invarlock.runtime_providers.hf_vision_text")
         result = preflight_multimodal(
             schedule,
             schedule_file_sha256=schedule_file_sha256,

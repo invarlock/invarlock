@@ -5,7 +5,6 @@ relative_files = True
 patch = subprocess
 source =
     src/invarlock
-    addins
     scripts
     examples
 omit =

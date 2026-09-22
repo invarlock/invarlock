@@ -104,17 +104,15 @@ def test_failed_commands_preserve_diagnostics_and_cleanup(monkeypatch):
     assert not roots[0].exists()
 
 
-@pytest.mark.parametrize("mode", ["absent", "namespace-absent", "available", "loaded"])
+@pytest.mark.parametrize("mode", ["absent", "available", "loaded"])
 def test_core_only_check_rejects_optional_provider_sdks(monkeypatch, mode):
     module = _module()
 
     def find(name):
-        if mode == "namespace-absent" and name == "invarlock_addins.inspect_judge":
-            raise ModuleNotFoundError(name)
         return object() if mode == "available" else None
 
     monkeypatch.setattr(module.importlib.util, "find_spec", find)
-    for name in ("inspect_ai", "openai", "invarlock_addins.inspect_judge"):
+    for name in ("inspect_ai", "openai"):
         monkeypatch.delitem(sys.modules, name, raising=False)
     if mode == "loaded":
         monkeypatch.setitem(sys.modules, "openai", object())

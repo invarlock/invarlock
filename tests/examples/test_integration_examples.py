@@ -1247,7 +1247,7 @@ def test_runtime_image_builds_from_authenticated_source(
         repository=repository,
         build_root=build,
         container_engine="docker",
-        dockerfile="addins/example/Dockerfile",
+        dockerfile="runtime/Dockerfile",
         image_prefix="custom-example",
     )
     assert image == "sha256:" + ("d" * 64)
@@ -1256,7 +1256,7 @@ def test_runtime_image_builds_from_authenticated_source(
     build_command = next(
         item for item in commands if "authenticated_runtime_build.py" in " ".join(item)
     )
-    assert "addins/example/Dockerfile" in build_command
+    assert "runtime/Dockerfile" in build_command
     assert "custom-example:" + "c" * 12 in build_command
     assert build_command[build_command.index("--statement") + 1] == str(
         build / "runtime-build.json"
@@ -1378,7 +1378,7 @@ def test_runtime_image_authenticates_a_layered_base(
         repository=repository,
         build_root=build,
         container_engine="docker",
-        dockerfile="addins/multimodal/runtime/Dockerfile",
+        dockerfile="runtime/Dockerfile",
         authenticated_base_image=base,
     )
     command = next(
@@ -1388,8 +1388,9 @@ def test_runtime_image_authenticates_a_layered_base(
     assert f"RUNTIME_BASE_IMAGE={base}" in command
 
 
+@pytest.mark.parametrize("inspection_prefix", ["sha256:", ""])
 def test_local_image_publication_is_digest_bound_and_disposable(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, inspection_prefix: str
 ) -> None:
     commands: list[list[str]] = []
     digest = "sha256:" + ("a" * 64)
@@ -1411,9 +1412,13 @@ def test_local_image_publication_is_digest_bound_and_disposable(
         elif command[1] == "port":
             output = endpoint
         elif command[1:3] == ["image", "inspect"]:
-            output = f'{digest} ["{canonical}"]'
+            output = (
+                f'{inspection_prefix}{digest.removeprefix("sha256:")} ["{canonical}"]'
+            )
         else:
             output = ""
+        if command[1:3] == ["image", "inspect"] and command[4] == "{{.Id}}":
+            output = output.split(" ", 1)[0]
         return subprocess.CompletedProcess(command, 0, stdout=output, stderr="")
 
     monkeypatch.setattr(local_registry, "_run", fake_run)
@@ -1433,7 +1438,7 @@ def test_local_image_publication_is_digest_bound_and_disposable(
     assert "127.0.0.1::5000" in run
     assert ["docker", "push", published] in commands
     assert commands[-3:] == [
-        ["docker", "image", "remove", published],
+        ["docker", "image", "rm", published],
         ["docker", "container", "rm", "--force", container],
         ["docker", "volume", "rm", "--force", volume],
     ]
@@ -1503,11 +1508,13 @@ def test_local_image_publication_cleans_nothing_when_volume_creation_fails(
         ("digest", "lacks one canonical digest"),
     ),
 )
+@pytest.mark.parametrize("inspection_prefix", ["sha256:", ""])
 def test_local_image_publication_fails_closed_and_cleans_up(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     failure: str,
     message: str,
+    inspection_prefix: str,
 ) -> None:
     commands: list[list[str]] = []
     digest = "sha256:" + ("a" * 64)
@@ -1540,9 +1547,11 @@ def test_local_image_publication_fails_closed_and_cleans_up(
                 details = "[]"
             else:
                 details = json.dumps([f"{endpoint}/example-runtime@{digest}"])
-            output = f"{observed} {details}"
+            output = f"{inspection_prefix}{observed.removeprefix('sha256:')} {details}"
         else:
             output = ""
+        if command[1:3] == ["image", "inspect"] and command[4] == "{{.Id}}":
+            output = output.split(" ", 1)[0]
         return subprocess.CompletedProcess(command, 0, stdout=output, stderr="")
 
     monkeypatch.setattr(local_registry, "_run", fake_run)
@@ -1583,6 +1592,8 @@ def test_local_image_publication_supports_podman_and_cleanup_errors(
             output = f'{digest} ["{canonical}"]'
         else:
             output = ""
+        if command[1:3] == ["image", "inspect"] and command[4] == "{{.Id}}":
+            output = output.split(" ", 1)[0]
         return subprocess.CompletedProcess(command, 0, stdout=output, stderr="")
 
     monkeypatch.setattr(local_registry, "_run", fake_run)

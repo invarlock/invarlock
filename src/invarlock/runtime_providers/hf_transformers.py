@@ -7,7 +7,6 @@ Optional backend imports remain lazy so the core package stays Torch-free.
 
 from __future__ import annotations
 
-import hashlib
 import importlib
 import json
 import math
@@ -1315,19 +1314,13 @@ def _hf_model_inputs(
     settings: RuntimeExecutionSettings,
     device: object,
 ) -> Any:
-    if record.input_parts:
-        if len(record.input_parts) != 1 or (
-            record.input_parts[0].kind != "text"
-            or record.input_parts[0].role != "prompt"
-        ):
-            raise ValueError(
-                "built-in HF causal execution requires one prompt text input part"
-            )
-        expected_input_sha256 = evaluation_input_parts_sha256(record.input_parts)
-    else:
-        expected_input_sha256 = hashlib.sha256(
-            record.input_text.encode("utf-8")
-        ).hexdigest()
+    if len(record.input_parts) != 1 or (
+        record.input_parts[0].kind != "text" or record.input_parts[0].role != "prompt"
+    ):
+        raise ValueError(
+            "built-in HF causal execution requires one prompt text input part"
+        )
+    expected_input_sha256 = evaluation_input_parts_sha256(record.input_parts)
     if expected_input_sha256 != record.input_sha256:
         raise ValueError("runtime evaluation input does not match input_sha256")
     encoded = tokenizer_call(
@@ -1814,7 +1807,7 @@ class HFTransformersProvider:
                 "normalized_nll_per_utf8_byte",
             ),
             execution_modes=("in_process",),
-            required_extra="hf",
+            required_extra=None,
             required_image=None,
         )
 

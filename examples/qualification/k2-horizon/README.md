@@ -135,7 +135,7 @@ group for later downloads, then install that candidate wheel. Ensure the
 
 ```bash
 python scripts/security/build_hardened_accelerate_wheel.py bootstrap
-uv sync --locked --extra ci --group hf
+uv sync --locked --group ci --group hf
 . .venv/bin/activate
 python -m pip install --no-deps --force-reinstall dist/invarlock-*.whl
 ```
@@ -416,9 +416,11 @@ The finalization command writes `runtime-finalized/runtime-build.json` with form
 `invarlock/k2-runtime-build-v1`, status `ready`, the exact SGLang source commit
 and reviewed source-file hashes from the catalog, its Docker image ID, source
 archive digest, complete dependency-inventory digest, and security-review
-digest. A Docker image ID is an OCI configuration digest; do not substitute a
-registry manifest digest for it. Retain the image archive and any registry
-manifest relationship separately. The image must contain the candidate
+digest. Retain the exact local image ID reported by the engine; its image store
+may report a configuration digest or a manifest digest. Do not replace that
+recorded identity with another engine's local ID or a registry manifest digest.
+Retain the image archive and any registry manifest relationship separately. The
+image must contain the candidate
 InvarLock wheel and both campaign modules plus the catalog under an importable
 `examples.qualification` directory. The plan binds both modules' actual bytes, including the hardware policy and
 container resource limits. A launcher change requires a newly prepared image and

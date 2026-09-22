@@ -8,8 +8,8 @@ if you already have compatible engines and a pinned runtime image.
 
 This one-command example downloads a revision-pinned Qwen3-0.6B checkpoint,
 builds a source-authenticated TensorRT-LLM 1.2.1 runtime image, and converts it
-into BF16 and ModelOpt-calibrated FP8 single-rank H100 engines. It then
-compares them through InvarLock's public `evaluate`, `verify`, and `report`
+into BF16 and ModelOpt-calibrated FP8 single-rank engines for the selected GPUs.
+It then compares them through InvarLock's public `evaluate`, `verify`, and `report`
 commands. Both engine builds run concurrently on separate GPUs; evaluation
 also runs the baseline and subject workers concurrently.
 
@@ -20,9 +20,42 @@ does not provide a Qwen3.5 model adapter.
 
 ## Prerequisites
 
-The maintained showcase requires Linux, Docker with two visible H100 GPUs,
-network access for the pinned model downloads and runtime-image build, and
-roughly 20 GB of temporary disk space. Both engines originate from the same
+The maintained showcase requires Linux and Docker or Podman with two visible CUDA GPUs
+that support both BF16 and FP8 in the
+[pinned TensorRT-LLM 1.2.1 release](https://nvidia.github.io/TensorRT-LLM/1.2.1/legacy/reference/support-matrix.html).
+Build each engine for its selected GPU and runtime; engine portability across
+GPU architectures is not assumed. Docker requires NVIDIA Container Toolkit
+configured for `--gpus device=INDEX`. Podman requires NVIDIA CDI devices
+configured for `--device nvidia.com/gpu=INDEX`. CDI (Container Device Interface)
+is how Podman exposes the selected GPU to the container. Rootless Podman builds
+use `--userns=keep-id` so the unprivileged build user can write the private work
+directory. Podman also uses `relabel=shared` on that example-created writable
+build directory. The shared SELinux container label follows generated engines
+when they move into the resource directory, allowing subsequent inspection and
+evaluation containers to read them. The build work directory retains its private
+filesystem permissions. Read-only model, helper, and prepared-engine sources
+are not relabeled. On an
+SELinux host, the operator must provide container-readable labels on those
+sources; SELinux enforcement remains enabled. Use a local Linux engine for this
+GPU workflow.
+
+Both entry points accept `--container-engine docker|podman`; the default is
+`INVARLOCK_CONTAINER_ENGINE`, or `docker` when unset. The selected engine is used
+for image preparation, engine builds, inspection, preflight, and evaluation.
+Append `--container-engine podman` to either command's `EXAMPLE_ARGS` value to
+select Podman. An unavailable engine or missing GPU device fails the command;
+there is no fallback to another engine or to CPU execution. Both engines retain
+the offline inspection and evaluation boundary, immutable image binding,
+unprivileged runtime user, dropped capabilities, and privilege-escalation ban.
+
+Command and failure-path tests cover both engines. They do not qualify actual
+GPU execution under Podman; that requires running this complete workflow with
+the intended Linux host, CDI configuration, GPU, and immutable runtime image.
+
+Network access is required for the pinned model downloads and runtime-image
+build, along with substantial free disk space. The pinned vendor image alone
+occupies about 55 GiB when unpacked; allow additional space for build caches, model files,
+checkpoints, and engine outputs. Both engines originate from the same
 public Apache-2.0 checkpoint and therefore share one authenticated tokenizer
 contract. The maintained 102-record schedule is also the FP8 calibration
 input. You also need Git, Make, `uv`, and the
@@ -47,8 +80,7 @@ revision, runtime image, tokenizer contract, schedule, and policy.
 ## Prepared-engine transaction
 
 Advanced users who already have qualified engines can run the lower-level
-transaction without rebuilding them. Install matching released wheels for
-`invarlock` and `invarlock-runtime-tensorrt-llm`, then prepare a new input
+transaction without rebuilding them. Install the matching released `invarlock` wheel, then prepare a new input
 directory with this fixed layout:
 
 ```text

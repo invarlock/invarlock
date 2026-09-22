@@ -761,3 +761,167 @@ def test_reading_an_operational_file_may_update_access_time(tmp_path):
     os.utime(status, ns=(1_000_000_000, status.stat().st_mtime_ns))
     result = _verify(store, digest, model)
     assert result["model_file_count"] == 3
+
+
+@pytest.mark.parametrize("compressed", [False, True])
+def test_gguf_member_uses_file_identity_and_full_package_inventory(
+    tmp_path, compressed
+):
+    data = b"GGUF\x03\x00\x00\x00synthetic serialization fixture"
+    store, digest, model = _package(
+        tmp_path,
+        compressed=compressed,
+        members=[("model/weights.gguf", data), ("model/README.txt", b"model note")],
+    )
+    for entry in model.iterdir():
+        entry.unlink()
+    (model / "weights.gguf").write_bytes(data)
+    (model / "README.txt").write_bytes(b"model note")
+    content = "sha256:" + hashlib.sha256(data).hexdigest()
+    result = handoff.verify_package_content(
+        blobs=store,
+        expected_package_digest=digest,
+        candidate=model,
+        expected_content_digest=content,
+        artifact_file="weights.gguf",
+    )
+    assert result["artifact_digest_kind"] == "file_sha256"
+    assert result["artifact_file"] == "weights.gguf"
+    assert result["artifact_content_digest"] == content
+    assert result["model_file_count"] == 2
+    (model / "README.txt").write_bytes(b"replacement unrelated to GGUF identity")
+    with pytest.raises(handoff.ModelKitError, match="inventory"):
+        handoff.verify_package_content(
+            blobs=store,
+            expected_package_digest=digest,
+            candidate=model,
+            expected_content_digest=content,
+            artifact_file="weights.gguf",
+        )
+
+
+@pytest.mark.parametrize(
+    "member",
+    [
+        "../outside.gguf",
+        "/outside.gguf",
+        "weights.bin",
+        "missing.gguf",
+        "model.safetensors/weights.gguf",
+    ],
+)
+def test_gguf_member_selection_rejects_unsafe_missing_or_other_formats(
+    tmp_path, member
+):
+    store, digest, model = _package(tmp_path)
+    with pytest.raises(handoff.ModelKitError):
+        handoff.verify_package_content(
+            blobs=store,
+            expected_package_digest=digest,
+            candidate=model,
+            expected_content_digest=checkpoint_tree_sha256(model),
+            artifact_file=member,
+        )
+
+
+def _pax_size_archive(
+    payload=b"10 size=1\n", *, member_type=tarfile.REGTYPE, repetitions=1
+):
+    metadata = tarfile.TarInfo("model/PaxHeaders/model.gguf")
+    metadata.type = tarfile.XHDTYPE
+    metadata.size = len(payload)
+    prefix = metadata.tobuf() + payload + b"\0" * ((-len(payload)) % 512)
+    member = tarfile.TarInfo("model/model.gguf")
+    member.type = member_type
+    member.size = 0
+    return io.BytesIO(
+        prefix * repetitions + member.tobuf() + b"x" + b"\0" * 511 + b"\0" * 1024
+    )
+
+
+def test_bounded_pax_size_extension_extracts_exact_regular_file(tmp_path):
+    from pathlib import PurePosixPath
+
+    files, length = handoff._extract(
+        _pax_size_archive(), tmp_path, PurePosixPath("model"), handoff.Limits()
+    )
+    assert length == 1
+    assert files["model.gguf"] == ("sha256:" + hashlib.sha256(b"x").hexdigest(), 1)
+    assert (tmp_path / "model/model.gguf").read_bytes() == b"x"
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        b"99 size=1\n",
+        b"10 size=0\n",
+        b"11 size=-1\n",
+        b"11 size=01\n",
+        b"10 size=1\n10 size=2\n",
+        b"15 path=escape\n",
+        b"18 GNU.sparse=1\n",
+        b"10 size=1\n15 path=escape\n",
+        b"29 size=999999999999999999999\n",
+    ],
+)
+def test_pax_size_extension_rejects_other_metadata_or_invalid_lengths(
+    tmp_path, payload
+):
+    from pathlib import PurePosixPath
+
+    with pytest.raises(handoff.ModelKitError):
+        handoff._extract(
+            _pax_size_archive(payload),
+            tmp_path,
+            PurePosixPath("model"),
+            handoff.Limits(),
+        )
+
+
+@pytest.mark.parametrize("kind", [tarfile.DIRTYPE, tarfile.SYMTYPE, tarfile.LNKTYPE])
+def test_pax_size_cannot_override_nonregular_members(tmp_path, kind):
+    from pathlib import PurePosixPath
+
+    with pytest.raises(handoff.ModelKitError):
+        handoff._extract(
+            _pax_size_archive(member_type=kind),
+            tmp_path,
+            PurePosixPath("model"),
+            handoff.Limits(),
+        )
+
+
+def test_pax_size_does_not_stack_or_exceed_recipient_limits(tmp_path):
+    from pathlib import PurePosixPath
+
+    for archive, limits in [
+        (_pax_size_archive(repetitions=2), handoff.Limits()),
+        (_pax_size_archive(b"13 size=4096\n"), handoff.Limits(max_model_bytes=1024)),
+        (_pax_size_archive(), handoff.Limits(max_members=1)),
+    ]:
+        with pytest.raises(handoff.ModelKitError):
+            handoff._extract(archive, tmp_path, PurePosixPath("model"), limits)
+
+
+@pytest.mark.parametrize("padding_byte", [b"x", b"\xff"])
+def test_pax_size_extension_rejects_nonzero_padding(tmp_path, padding_byte):
+    from io import BytesIO
+    from pathlib import PurePosixPath
+
+    raw = bytearray(_pax_size_archive().getvalue())
+    raw[512 + len(b"10 size=1\n")] = padding_byte[0]
+    with pytest.raises(handoff.ModelKitError, match="padding"):
+        handoff._extract(
+            BytesIO(raw), tmp_path, PurePosixPath("model"), handoff.Limits()
+        )
+
+
+def test_pax_size_extension_rejects_truncated_padding(tmp_path):
+    from io import BytesIO
+    from pathlib import PurePosixPath
+
+    raw = _pax_size_archive().getvalue()[: 512 + len(b"10 size=1\n") + 1]
+    with pytest.raises(handoff.ModelKitError, match="padding"):
+        handoff._extract(
+            BytesIO(raw), tmp_path, PurePosixPath("model"), handoff.Limits()
+        )

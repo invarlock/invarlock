@@ -102,7 +102,9 @@ def test_run_request_keeps_host_transaction_and_passes_per_side_executor(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     request = _request(tmp_path / "request.yaml")
-    monkeypatch.setattr(evaluation_oci.shutil, "which", lambda name: f"/bin/{name}")
+    monkeypatch.setattr(
+        evaluation_oci.shutil, "which", lambda name, *, path=None: f"/bin/{name}"
+    )
     _mock_image_inspection(monkeypatch)
     _mock_preflight_success(monkeypatch)
     observed: dict[str, object] = {}
@@ -162,7 +164,9 @@ def test_worker_failure_is_a_structured_host_transaction_failure(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     request = _request(tmp_path / "request.yaml")
-    monkeypatch.setattr(evaluation_oci.shutil, "which", lambda name: f"/bin/{name}")
+    monkeypatch.setattr(
+        evaluation_oci.shutil, "which", lambda name, *, path=None: f"/bin/{name}"
+    )
     _mock_image_inspection(monkeypatch)
     _mock_preflight_success(monkeypatch)
 
@@ -189,7 +193,9 @@ def test_mutable_side_image_is_rejected_before_transaction(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     request = _request(tmp_path / "request.yaml")
-    monkeypatch.setattr(evaluation_oci.shutil, "which", lambda name: f"/bin/{name}")
+    monkeypatch.setattr(
+        evaluation_oci.shutil, "which", lambda name, *, path=None: f"/bin/{name}"
+    )
     _mock_image_inspection(monkeypatch)
     result = CliRunner().invoke(
         app,
@@ -233,7 +239,9 @@ def test_profile_preflight_uses_pinned_oci_launch_and_keeps_json_contract(
 ) -> None:
     request = _request(tmp_path / "request.yaml")
     profile = _runtime_profile(tmp_path / "runtime.json")
-    monkeypatch.setattr(evaluation_oci.shutil, "which", lambda name: f"/bin/{name}")
+    monkeypatch.setattr(
+        evaluation_oci.shutil, "which", lambda name, *, path=None: f"/bin/{name}"
+    )
     _mock_image_inspection(monkeypatch)
     # These lower-priority environment values must neither win nor invalidate
     # the fully resolved profile launch.
@@ -303,7 +311,9 @@ def test_profile_oci_failures_do_not_reach_transaction(
     else:
         payload["runtime"]["image"] = "registry.example/mutable:latest"
     profile.write_text(json.dumps(payload))
-    monkeypatch.setattr(evaluation_oci.shutil, "which", lambda name: f"/bin/{name}")
+    monkeypatch.setattr(
+        evaluation_oci.shutil, "which", lambda name, *, path=None: f"/bin/{name}"
+    )
     _mock_image_inspection(monkeypatch)
 
     def forbidden(*_args: object, **_kwargs: object):

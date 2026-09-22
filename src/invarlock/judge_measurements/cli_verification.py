@@ -53,7 +53,7 @@ def execute_judge_verification(
         conflicting.append("max_bootstrap_draws")
     if conflicting:
         fail(
-            "Legacy trust options do not apply to judge verification: "
+            "Native and captured trust options do not apply to judge verification: "
             + ", ".join("--" + name.replace("_", "-") for name in conflicting)
         )
     if options.receipt is None and (

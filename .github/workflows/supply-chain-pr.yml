@@ -134,6 +134,19 @@ jobs:
               for number, (_, count) in enumerate(cases, 1):
                   extra_expected.extend([[relative, number]] * count)
 
+          relative = "examples/integrations/modelkit-handoff/references/mistral-7b/provenance.json"
+          revision = "27d67f1b5f57dc0953326b2601d68371d40ea8da"
+          field = "tokenizer_revision"
+          public_line = f'    "{field}": "{revision}"'
+          write_cases(relative, [
+              (public_line, 0),
+              (public_line.replace(revision, revision[:-1] + "0"), 1),
+              (public_line.replace(field, "api_key"), 1),
+              (public_line + f', "api_key": "{canary}"', 1),
+          ])
+          for other in ("prefix/" + relative, relative + ".bak", relative.replace("provenance.json", "unrelated.json")):
+              write_cases(other, [(public_line, 1)])
+
           public_digests = [
               "4b98863889c17ffa7a7d391e83264fde0aa76f6883ef2e863065728b126508f8",
               "7292215bb68b9cf650023939b2c0e0a9a6f48c77b39600a4069c796c33384b94",
@@ -380,7 +393,7 @@ jobs:
           python scripts/security/run_pip_audit.py \
             --path "${{ steps.hf_surface.outputs.site_packages }}" \
             --installed-lock requirements/workflows/hf-py313.txt \
-            --installed-lock-sha256 034d95f20a71249b0321ac33d50f6b1eb9b16773ae891a2a43d3efe4fca64ec9 \
+            --installed-lock-sha256 482f8f578d2070e7c5f3fae746d4885a030ee73cdf8e2447add93b821ef85976 \
             --installed-bootstrap-lock requirements/workflows/pip-bootstrap.txt \
             --installed-bootstrap-lock-sha256 8639968bea3cd8bc234d2a6d38f2c54e5d1b09c3474ac954278c99c2fa44e944 \
             --installed-project-wheel dist/*.whl \

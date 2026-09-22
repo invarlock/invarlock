@@ -117,7 +117,7 @@ compile_req_platform() {
 compile_release_install() {
   local output="$1"
   local python_version="$2"
-  local python_tag="${python_version/./}"
+  local input="${3:-requirements/workflows/release-install.in}"
   local output_arg="$1"
   if [[ "${output}" == "${ROOT_DIR}/"* ]]; then
     output_arg="${output#${ROOT_DIR}/}"
@@ -125,11 +125,9 @@ compile_release_install() {
   (
     cd "${ROOT_DIR}"
     uv pip compile \
-      requirements/workflows/release-install.in \
+      "${input}" \
       --python-platform x86_64-unknown-linux-gnu \
       --python-version "${python_version}" \
-      --constraints requirements/workflows/release-security-py313.txt \
-      --constraints "requirements/workflows/ci-hf-py${python_tag}.txt" \
       --find-links runtime/wheels \
       --generate-hashes \
       --custom-compile-command "scripts/security/refresh_pinned_requirements.sh --write --group workflows" \
@@ -141,7 +139,7 @@ run_workflow_locks() {
   compile_pyproject "${WORKFLOW_DIR}/ci-hf-py312.txt" \
     --python-version 3.12 \
     --group runtime-test \
-    --extra ci
+    --group ci
 
   compile_pyproject "${WORKFLOW_DIR}/core-py312.txt" \
     --python-version 3.12
@@ -149,11 +147,11 @@ run_workflow_locks() {
   compile_pyproject "${WORKFLOW_DIR}/ci-hf-py313.txt" \
     --python-version 3.13 \
     --group runtime-test \
-    --extra ci
+    --group ci
 
   compile_pyproject "${WORKFLOW_DIR}/docs-ci-py313.txt" \
     --python-version 3.13 \
-    --extra docs-ci
+    --group docs
 
   compile_pyproject "${WORKFLOW_DIR}/hf-py313.txt" \
     --python-version 3.13 \
@@ -244,6 +242,14 @@ run_workflow_locks() {
       --custom-compile-command "scripts/security/refresh_pinned_requirements.sh --write --group workflows"
   done
 
+  for langfuse_python in 3.12 3.13; do
+    compile_pyproject "${WORKFLOW_DIR}/langfuse-sdk-tests-py${langfuse_python/./}.txt" \
+      "${WORKFLOW_DIR}/langfuse-sdk-tests.in" \
+      --constraint "${WORKFLOW_DIR}/inspect-judge-tests-py${langfuse_python/./}.txt" \
+      --python-version "${langfuse_python}" \
+      --custom-compile-command "scripts/security/refresh_pinned_requirements.sh --write --group workflows"
+  done
+
   compile_req_platform \
     "${WORKFLOW_DIR}/inspect-ai-runtime.in" \
     "${WORKFLOW_DIR}/inspect-ai-runtime-py312.txt" \
@@ -306,19 +312,23 @@ run_workflow_locks() {
 
   compile_pyproject "${WORKFLOW_DIR}/precommit-ci-py313.txt" \
     --python-version 3.13 \
-    --extra precommit-ci
+    --group precommit
 
   compile_pyproject "${WORKFLOW_DIR}/release-security-py313.txt" \
     --python-version 3.13 \
-    --extra release-ci \
-    --extra security-ci
+    --group release \
+    --group security
 
   compile_release_install "${WORKFLOW_DIR}/release-install-py312.txt" 3.12
   compile_release_install "${WORKFLOW_DIR}/release-install-py313.txt" 3.13
+  compile_release_install "${WORKFLOW_DIR}/release-options-py312.txt" 3.12 \
+    requirements/workflows/release-options.in
+  compile_release_install "${WORKFLOW_DIR}/release-options-py313.txt" 3.13 \
+    requirements/workflows/release-options.in
 
   compile_pyproject "${WORKFLOW_DIR}/security-ci-py313.txt" \
     --python-version 3.13 \
-    --extra security-ci
+    --group security
 }
 
 case "${GROUP}" in

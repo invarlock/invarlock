@@ -343,7 +343,9 @@ def test_cli_evaluate_rejects_bad_run_artifact_before_worker_launch(
         baseline_digest="0" * 64,
     )
     runtime = "sha256:" + "a" * 64
-    monkeypatch.setattr(evaluation_oci.shutil, "which", lambda _name: "/bin/docker")
+    monkeypatch.setattr(
+        evaluation_oci.shutil, "which", lambda _name, **_kwargs: "/bin/docker"
+    )
     monkeypatch.setattr(
         evaluation_oci,
         "_inspect_local_image",
@@ -646,6 +648,11 @@ def test_cli_run_preflight_passes_the_oci_resource_resolver(
 ) -> None:
     request, signing_key = _materialize_run_request(tmp_path)
     runtime = "sha256:" + "a" * 64
+    resource_root = tmp_path / "vision-resources"
+    resource_root.mkdir()
+    (resource_root / "images").mkdir()
+    monkeypatch.setenv("INVARLOCK_HF_VISION_TEXT_RESOURCE_ROOT", str(resource_root))
+    monkeypatch.setenv("INVARLOCK_HF_VISION_TEXT_CONTENT_STORE", "images")
     original = evaluation_transaction.preflight_evaluation_request
     observed: dict[str, object] = {}
 
@@ -655,15 +662,22 @@ def test_cli_run_preflight_passes_the_oci_resource_resolver(
         raising=False,
     )
 
-    monkeypatch.setattr(evaluation_oci.shutil, "which", lambda _name: "/bin/docker")
     monkeypatch.setattr(
-        evaluation_oci,
-        "_inspect_local_image",
-        lambda _engine, _image: evaluation_oci._LocalImageInspection(
+        evaluation_oci.shutil, "which", lambda _name, **_kwargs: "/bin/docker"
+    )
+
+    def inspect_image(_engine: str, _image: str):  # noqa: ANN202
+        # Image inspection must not change the resource environment already
+        # selected for this evaluation, even before the executor is created.
+        monkeypatch.setenv(
+            "INVARLOCK_HF_VISION_TEXT_RESOURCE_ROOT", str(tmp_path / "changed")
+        )
+        return evaluation_oci._LocalImageInspection(
             config_id=runtime,
             repo_digests=(),
-        ),
-    )
+        )
+
+    monkeypatch.setattr(evaluation_oci, "_inspect_local_image", inspect_image)
 
     def record_resolver(*args: object, **kwargs: object):  # noqa: ANN202
         observed["resource_resolver"] = kwargs.get("resource_resolver")
@@ -693,6 +707,10 @@ def test_cli_run_preflight_passes_the_oci_resource_resolver(
 
     assert invoked.exit_code == 0, invoked.stdout
     assert isinstance(observed["resource_resolver"], evaluation_oci.OciRuntimeExecutor)
+    resolver = observed["resource_resolver"]
+    assert resolver.environment["INVARLOCK_HF_VISION_TEXT_RESOURCE_ROOT"] == str(
+        resource_root
+    )
     assert "runtime_resources" in json.loads(invoked.stdout)["checks"]
 
 
@@ -815,4 +833,22 @@ def test_run_preflight_contextualizes_provider_authentication_contract_errors(
         )
 
     assert calls == 2
+    assert not (tmp_path / "artifacts").exists()
+
+
+@pytest.mark.parametrize("side", ["baseline", "subject"])
+def test_run_preflight_rejects_non_strict_batch_before_reading_data(
+    tmp_path, monkeypatch, side
+):
+    request, key = _materialize_run_request(tmp_path)
+    value = yaml.safe_load(request.read_text())
+    value["comparison"][side]["runtime"]["settings"]["batch_size"] = 2
+    request.write_text(yaml.safe_dump(value))
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("invalid execution settings reached data or runtime work")
+
+    monkeypatch.setattr(evaluation_transaction, "_read_request_file", forbidden)
+    with pytest.raises(EvaluationPreflightError, match="batch_size=1"):
+        preflight_evaluation_request(request, signing_key_path=key)
     assert not (tmp_path / "artifacts").exists()

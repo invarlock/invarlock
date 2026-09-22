@@ -17,7 +17,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 128,
-            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+            "pattern": "^[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
           },
           "kind": {
             "enum": [
@@ -46,7 +46,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 128,
-            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+            "pattern": "^[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
           },
           "aggregation": {
             "const": "mean"
@@ -74,7 +74,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 128,
-            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+            "pattern": "^[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
           },
           "accepted_provenance": {
             "type": "object",
@@ -92,25 +92,25 @@
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 128,
-                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                "pattern": "^[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
               },
               "version": {
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 128,
-                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                "pattern": "^[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
               },
               "unit": {
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 128,
-                "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                "pattern": "^[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
               },
               "rubric_digest": {
                 "anyOf": [
                   {
                     "type": "string",
-                    "pattern": "^sha256:[a-f0-9]{64}$"
+                    "pattern": "^sha256:[a-f0-9]{64}(?![\\s\\S])"
                   },
                   {
                     "type": "null"
@@ -167,7 +167,7 @@
                     },
                     "unicode_version": {
                       "type": "string",
-                      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+                      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?![\\s\\S])",
                       "maxLength": 32
                     }
                   },
@@ -200,15 +200,15 @@
                   "properties": {
                     "configuration_digest": {
                       "type": "string",
-                      "pattern": "^sha256:[a-f0-9]{64}$"
+                      "pattern": "^sha256:[a-f0-9]{64}(?![\\s\\S])"
                     },
                     "baseline_tokenizer_digest": {
                       "type": "string",
-                      "pattern": "^sha256:[a-f0-9]{64}$"
+                      "pattern": "^sha256:[a-f0-9]{64}(?![\\s\\S])"
                     },
                     "subject_tokenizer_digest": {
                       "type": "string",
-                      "pattern": "^sha256:[a-f0-9]{64}$"
+                      "pattern": "^sha256:[a-f0-9]{64}(?![\\s\\S])"
                     }
                   },
                   "required": [
@@ -255,7 +255,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 128,
-            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+            "pattern": "^[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
           },
           "where": {
             "type": "object",
@@ -276,7 +276,7 @@
     },
     "expected_case_set_digest": {
       "type": "string",
-      "pattern": "^sha256:[a-f0-9]{64}$"
+      "pattern": "^sha256:[a-f0-9]{64}(?![\\s\\S])"
     }
   },
   "required": [

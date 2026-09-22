@@ -6,7 +6,7 @@ import os
 
 import pytest
 
-from invarlock import evaluation_transaction, evidence_reporting, trust_inputs
+from invarlock import captured_contracts, evaluation_transaction, trust_inputs
 from invarlock.core import checkpoint_identity, evaluation_request
 from invarlock.core.runtime_provider import types as provider_types
 from invarlock.filesystem import atomic_directory
@@ -138,8 +138,8 @@ def test_parent_close_failure_releases_newly_owned_descriptors(
         "provider_resource": lambda: provider_types._validate_resource_path(
             tmp_path, "a/b/input", label="test"
         ),
-        "html_output": lambda: evidence_reporting._write_html_no_clobber(
-            directory / "report.html", "report"
+        "html_output": lambda: captured_contracts.atomic_write(
+            directory / "report.html", b"report"
         ),
     }
     try:

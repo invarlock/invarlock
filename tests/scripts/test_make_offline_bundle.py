@@ -117,7 +117,7 @@ def test_make_offline_bundle_packages_release_materials(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize("missing", [False, True])
 @pytest.mark.parametrize("with_ledger", [False, True])
-def test_nested_addins_require_their_own_signed_inventory(
+def test_distributions_require_their_own_signed_inventory(
     tmp_path, missing, with_ledger
 ):
     script = (
@@ -129,16 +129,17 @@ def test_nested_addins_require_their_own_signed_inventory(
         tmp_path / "output",
         tmp_path / "sbom.json",
     )
-    for name in ("invarlock-0.3.12.whl", "addins/invarlock_runtime_gguf-0.3.12.whl"):
+    for name in ("invarlock-0.3.12.whl", "invarlock-0.3.12.tar.gz"):
         _write(dist / name, name)
-        if not (missing and name.startswith("addins/")):
+        if not (missing and name.endswith(".tar.gz")):
             _write(dist / (name + ".sigstore.json"), "{}")
     if with_ledger:
         _write(
             dist / "SHA256SUMS",
             "".join(
                 f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.relative_to(dist).as_posix()}\n"
-                for path in sorted(dist.rglob("*.whl"))
+                for path in sorted(dist.rglob("*"))
+                if path.name.endswith((".whl", ".tar.gz"))
             ),
         )
     _write(provenance / "attestation.jsonl", "{}")
@@ -226,7 +227,7 @@ def test_offline_inventory_rejects_unbound_or_linked_files(tmp_path, alter):
     _write(provenance / "attestation.jsonl", "{}")
     _write(sbom, "{}")
     if alter == "cross_directory_sidecar":
-        _write(dist / "addins/invarlock-0.3.12.whl", "other wheel")
+        _write(dist / "nested/invarlock-secondary-0.3.12.whl", "other wheel")
     elif alter == "extra_file":
         _write(dist / "unlisted.txt", "unexpected")
     else:

@@ -36,7 +36,7 @@ FIXTURE_FILES = (
 
 
 def require_core_only() -> None:
-    for module in ("inspect_ai", "openai", "invarlock_addins.inspect_judge"):
+    for module in ("inspect_ai", "openai"):
         try:
             available = importlib.util.find_spec(module) is not None
         except ModuleNotFoundError:
@@ -57,7 +57,15 @@ def main() -> None:
             "Install the candidate wheel and supply its invarlock executable"
         )
     environment = os.environ.copy()
-    for key in ("PYTHONPATH", "INVARLOCK_SIGNING_KEY", "OPENAI_API_KEY"):
+    for key in (
+        "PYTHONPATH",
+        "INVARLOCK_SIGNING_KEY",
+        "OPENAI_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "GOOGLE_API_KEY",
+        "GEMINI_API_KEY",
+        "OPENROUTER_API_KEY",
+    ):
         environment.pop(key, None)
     environment.update(PYTHONSAFEPATH="1", PYTHONNOUSERSITE="1")
     with tempfile.TemporaryDirectory(prefix="invarlock-judge-smoke-") as directory:

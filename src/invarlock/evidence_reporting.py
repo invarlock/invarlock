@@ -33,7 +33,6 @@ from invarlock.evidence_pack_json import (
     read_regular_file_bytes,
 )
 from invarlock.evidence_pack_snapshot import PackSnapshot
-from invarlock.filesystem.atomic_file import write_file_no_replace
 from invarlock.paired_exact_match import (
     PAIRED_CONFIDENCE_INTERVAL_METHODS,
     PairedExactMatchError,
@@ -53,6 +52,11 @@ from invarlock.report_presentation import (
 )
 from invarlock.report_presentation import (
     render_markdown as render_report_markdown,
+)
+from invarlock.report_publication import (
+    ReportPublicationError,
+    publish_report_outputs,
+    validate_report_destinations,
 )
 
 _MAX_MANIFEST_BYTES = 256 * 1024
@@ -78,15 +82,6 @@ class EvidenceReportError(ValueError):
             dict(payload.get("written_outputs", {})) if payload else {}
         )
         self.failed_output = payload.get("failed_output") if payload else None
-
-
-@dataclass(frozen=True)
-class EvidenceReport:
-    text: str
-    html_path: Path | None
-    evidence_signer: str
-    pack_manifest_digest: str
-    observations: tuple[dict[str, Any], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -468,23 +463,6 @@ def _signature_verified_report(
     if canonical_json_bytes(report) != report_raw:
         raise EvidenceReportError("canonical evaluation report is not canonical JSON")
     return _closed_comparison_report(report), signer, observations
-
-
-def _write_html_no_clobber(path: Path, html: str) -> Path:
-    destination = Path(path).absolute()
-    if destination.name in {"", ".", ".."}:
-        raise EvidenceReportError("HTML destination must name a regular file")
-    try:
-        write_file_no_replace(destination, html.encode("utf-8"))
-    except FileExistsError as exc:
-        raise EvidenceReportError(
-            f"HTML destination already exists: {destination}"
-        ) from exc
-    except OSError as exc:
-        raise EvidenceReportError(
-            f"could not write HTML report: {exc}", exit_code=1
-        ) from exc
-    return destination
 
 
 def _number(value: object, *, field: str) -> float:
@@ -961,6 +939,18 @@ def _comparison_acceptance(
                 comparison_value=comparison_value,
                 uncertainty=uncertainty,
             )
+            paired = report["paired_binary"]
+            for side, discordant in (
+                ("baseline", "baseline_pass_subject_fail"),
+                ("subject", "baseline_fail_subject_pass"),
+            ):
+                expected_mean = (paired["both_pass"] + paired[discordant]) / count
+                if not math.isclose(
+                    side_means[side], expected_mean, rel_tol=1e-12, abs_tol=1e-12
+                ):
+                    raise EvidenceReportError(
+                        "canonical report side means do not match paired outcome counts"
+                    )
         passed = lower >= limit
     else:
         if baseline_mean <= 0.0 or subject_mean < 0.0:
@@ -1127,9 +1117,51 @@ def _native_report_context(
     changes = (
         "Baseline and candidate have the same authenticated artifact digest."
         if baseline == subject
-        else "Baseline and candidate have different authenticated artifact digests; the evidence does not identify a transformation procedure.",
+        else "Baseline and candidate have different authenticated artifact digests. These digests alone do not establish how the candidate was produced.",
     )
     return tuple(context), changes
+
+
+def _native_policy_summary(
+    report: dict[str, Any], checks: tuple[CheckView, ...]
+) -> str:
+    """Explain the recorded gate without treating a bound failure as degradation."""
+    if report["verdict"] == "pass":
+        return "The uncertainty interval is within the required range, and the other configured checks passed."
+    comparison = report["comparison"]
+    value = comparison["value"]
+    if not checks[0].passed:
+        if comparison["kind"] == "exact_match_delta_pp":
+            minimum = comparison["minimum"]
+            if minimum <= value < 0:
+                return (
+                    "The observed loss was within the allowance, but a loss greater than "
+                    + number(-minimum)
+                    + " percentage points could not be ruled out."
+                )
+            if minimum <= 0 <= value:
+                return "The observed score did not decline, but a loss beyond the policy allowance could not be ruled out."
+            if value < minimum <= 0:
+                return "The observed loss exceeded the policy allowance."
+            return "The comparison did not establish the improvement required by the policy."
+        if comparison["kind"] == "normalized_nll_ratio":
+            return (
+                "The observed subject-to-baseline NLL ratio was within the limit, but its uncertainty interval extended beyond it."
+                if value <= comparison["maximum"]
+                else "The observed subject-to-baseline NLL ratio exceeded the policy limit."
+            )
+        return (
+            "The comparison did not establish the score change required by the policy."
+        )
+    explanations = {
+        "Record count": "There were too few paired records to meet the policy requirement.",
+        "Interval width": "The uncertainty interval was wider than the policy permits.",
+        "Baseline accuracy": "The baseline accuracy was below the required minimum.",
+        "Candidate accuracy": "The subject accuracy was below the required minimum.",
+    }
+    return next(
+        explanations[check.name] for check in checks[1:] if check.passed is False
+    )
 
 
 def _report_view(
@@ -1148,14 +1180,7 @@ def _report_view(
     exact = kind == "exact_match_delta_pp"
     ratio = kind == "normalized_nll_ratio"
     checks = tuple(CheckView(**check) for check in core_policy_checks(report))
-    unmet = [check.name for check in checks if not check.passed]
-    summary = (
-        "Every configured check passed for this paired evaluation. Independent recipient acceptance is a separate step."
-        if report["verdict"] == "pass"
-        else "This evaluation did not meet its recorded policy. Checks not met: "
-        + ", ".join(unmet)
-        + "."
-    )
+    summary = _native_policy_summary(report, checks)
     label = (
         "Paired 95% confidence interval"
         if uncertainty["scope"] == "paired_binary_outcomes"
@@ -1213,6 +1238,30 @@ def _report_view(
         )
     value_scale = 100 if exact else 1
     suffix = "%" if exact else " nats / byte" if ratio else " score"
+    paired = report.get("paired_binary") if exact else None
+    baseline_matches = (
+        paired["both_pass"] + paired["baseline_pass_subject_fail"] if paired else None
+    )
+    subject_matches = (
+        paired["both_pass"] + paired["baseline_fail_subject_pass"] if paired else None
+    )
+    basis: tuple[str, ...]
+    if exact:
+        assert paired is not None
+        basis = (
+            f"Baseline and subject are paired on the same {report['record_count']:,} cases. Newcombe hybrid score uses their paired match outcomes to form a nominal 95% confidence interval for the accuracy change.",
+            f"Both matched: {paired['both_pass']:,}; baseline only: {paired['baseline_pass_subject_fail']:,}; subject only: {paired['baseline_fail_subject_pass']:,}; neither matched: {paired['both_fail']:,}.",
+            "Change is subject accuracy minus baseline accuracy in percentage points, not relative percent change. The 95% confidence level describes the interval method, not the share of correct answers.",
+            "This exact-match method uses a fixed 95% confidence level; the allowed-loss threshold is a separate policy choice. Under suitable sampling and independent-pair assumptions, the method aims for intervals to cover the underlying accuracy difference in about 95% of repeated studies. This is not the probability that the subject exceeds the allowed loss, and these cases are not automatically representative of production.",
+        )
+    else:
+        basis = (
+            f"The declared percentile method resamples the same {report['record_count']:,} paired records with replacement, keeping each baseline and subject result together. Its retained resampling count is {uncertainty['replicates']:,}.",
+            "The interval covers the central 95% of the paired resampling distribution for the subject-to-baseline mean NLL ratio. Each side's NLL uses nats per expected UTF-8 byte."
+            if ratio
+            else "The interval covers the central 95% of the paired resampling distribution for subject-minus-baseline mean score change, in the displayed change units.",
+            "This describes resampling of the fixed recorded schedule; it is not a population confidence interval or a claim that the sample represents production traffic.",
+        )
     metric = MetricView(
         name=names.get(report["metric"], report["metric"]),
         scope="All paired records",
@@ -1221,9 +1270,13 @@ def _report_view(
         candidate=number(report["subject"]["mean_score"] * value_scale) + suffix,
         change=number(comparison["value"], signed=not ratio) + " " + unit,
         count=f"{report['record_count']:,}",
-        explanation="All configured checks passed."
-        if not unmet
-        else "Checks not met: " + ", ".join(unmet) + ".",
+        baseline_detail=f"{baseline_matches:,} of {report['record_count']:,} matched"
+        if baseline_matches is not None
+        else "",
+        candidate_detail=f"{subject_matches:,} of {report['record_count']:,} matched"
+        if subject_matches is not None
+        else "",
+        explanation=summary,
         checks=checks,
         interval=IntervalView(
             lower=uncertainty["lower"],
@@ -1234,8 +1287,25 @@ def _report_view(
             unit=unit,
             threshold_direction="maximum" if ratio else "minimum",
             neutral=1.0 if ratio else 0.0,
+            method="Newcombe hybrid score" if exact else "Paired percentile resampling",
+            basis=basis,
         ),
         notes=tuple(notes),
+    )
+    summary += (
+        f" The subject matched the expected answer in {subject_matches:,} of {metric.count} cases, "
+        f"compared with {baseline_matches:,} for the baseline. "
+        f"Accuracy changed from {metric.baseline} to {metric.candidate}, a change of {metric.change}."
+        if exact
+        else (
+            f" Across {metric.count} paired records, the subject scored {metric.candidate}, "
+            f"compared with {metric.baseline} for the baseline, "
+            + (
+                f"a subject-to-baseline ratio of {number(comparison['value'])}."
+                if ratio
+                else f"a change of {metric.change}."
+            )
+        )
     )
     return ReportView(
         title="InvarLock comparison report",
@@ -1308,27 +1378,9 @@ def _render_html(
     )
 
 
-def _render_native_evidence(
-    evidence_path: Path,
-    *,
-    html_path: Path | None = None,
-    explain: bool = False,
-    _view_sink: list[ReportView] | None = None,
-) -> EvidenceReport:
-    """Render the signature-authenticated canonical report without mutation."""
-
+def _render_native_evidence(evidence_path: Path) -> tuple[ReportView, str]:
+    """Load the signature-authenticated native presentation without mutation."""
     evidence = Path(evidence_path)
-    if not evidence.is_dir() or evidence.is_symlink():
-        raise EvidenceReportError("evidence must be a real directory")
-    if html_path is not None:
-        try:
-            Path(html_path).absolute().resolve().relative_to(evidence.resolve())
-        except ValueError:
-            pass
-        else:
-            raise EvidenceReportError(
-                "HTML destination must remain outside the immutable evidence pack"
-            )
     snapshot, capture_errors = PackSnapshot.capture(
         evidence, validate_structural_json=False
     )
@@ -1367,8 +1419,6 @@ def _render_native_evidence(
                 context=context,
                 changes=changes,
             )
-            text = render_report_markdown(view, include_details=explain)
-            rendered_html = render_report_html(view) if html_path is not None else None
             materialized_errors = snapshot.files.materialized_stability_errors(
                 snapshot_root
             )
@@ -1377,23 +1427,10 @@ def _render_native_evidence(
     stability_errors = [*materialized_errors, *snapshot.stability_errors()]
     if stability_errors:
         raise EvidenceReportError("; ".join(stability_errors))
-    if _view_sink is not None:
-        _view_sink.append(view)
     manifest_entry = snapshot.files.entry("manifest.json")
     if manifest_entry is None:  # pragma: no cover - capture contract owns inventory
         raise EvidenceReportError("evidence manifest snapshot is unavailable")
-    output = (
-        _write_html_no_clobber(html_path, rendered_html)
-        if html_path is not None and rendered_html is not None
-        else None
-    )
-    return EvidenceReport(
-        text=text,
-        html_path=output,
-        evidence_signer=evidence_signer,
-        pack_manifest_digest="sha256:" + manifest_entry.sha256,
-        observations=tuple(observations),
-    )
+    return view, "sha256:" + manifest_entry.sha256
 
 
 def render_evidence(
@@ -1404,9 +1441,9 @@ def render_evidence(
     markdown_path: Path | None = None,
     junit_path: Path | None = None,
     case_ids: tuple[str, ...] = (),
-) -> EvidenceReport | EvidenceReportV2:
+) -> EvidenceReportV2:
     """Render either evidence family without replay or implicit receipt discovery."""
-    from invarlock.captured_contracts import atomic_write, sha
+    from invarlock.captured_contracts import sha
     from invarlock.captured_reporting import (
         CapturedReportError,
         _load,
@@ -1455,8 +1492,6 @@ def render_evidence(
         raise EvidenceReportError(
             f"evidence manifest schema failed: {exc}", exit_code=exc.exit_code
         ) from exc
-    if not captured and markdown_path is None and junit_path is None:
-        return _render_native_evidence(evidence, html_path=html_path, explain=explain)
     requested = {
         name: str(path)
         for name, path in (
@@ -1477,52 +1512,17 @@ def render_evidence(
         "errors": [],
     }
     try:
-        resolved: set[Path] = set()
-        for value in requested.values():
-            destination = Path(value).absolute()
-            if destination.name in {"", ".", ".."}:
-                raise EvidenceReportError("report destination must name a file")
-            canonical = destination.resolve()
-            if canonical.is_relative_to(
-                evidence.resolve()
-            ) or destination.is_relative_to(evidence.absolute()):
-                raise EvidenceReportError(
-                    "report destination must remain outside the immutable evidence pack"
-                )
-            if any(
-                canonical.is_relative_to(other) or other.is_relative_to(canonical)
-                for other in resolved
-            ):
-                raise EvidenceReportError("report destinations collide")
-            resolved.add(canonical)
-            if destination.exists() or destination.is_symlink():
-                raise EvidenceReportError(
-                    f"report destination already exists: {destination}"
-                )
-            for parent in destination.parents:
-                if parent.is_symlink() or (parent.exists() and not parent.is_dir()):
-                    raise EvidenceReportError(
-                        "report destination parent must be a real directory"
-                    )
+        validate_report_destinations(requested, evidence=evidence)
         if captured:
             manifest, values, signer, _ = _load(evidence)
             view = _view(manifest, values, signer)
             manifest_digest = sha(canonical_json_bytes(manifest))
         else:
-            views: list[ReportView] = []
-            native = _render_native_evidence(
-                evidence, explain=explain, _view_sink=views
-            )
-            view = views[0]
-            manifest_digest = native.pack_manifest_digest
+            view, manifest_digest = _render_native_evidence(evidence)
         payload["pack_manifest_digest"] = manifest_digest
         text = render_report_markdown(view, include_details=explain)
-        rendered = {}
-        if "html" in requested:
-            rendered["html"] = render_report_html(view).encode("utf-8")
-        if "markdown" in requested:
-            rendered["markdown"] = text.encode("utf-8")
-        if "junit" in requested:
+
+        def render_junit() -> bytes:
             suite = Element(
                 "testsuite",
                 name="InvarLock recorded policy checks",
@@ -1549,12 +1549,23 @@ def render_evidence(
                         else "failure",
                         message=xml_text(metric.explanation),
                     )
-            rendered["junit"] = tostring(suite, encoding="utf-8", xml_declaration=True)
-        for name, raw in rendered.items():
-            payload["failed_output"] = name
-            atomic_write(Path(requested[name]), raw)
-            payload["written_outputs"][name] = requested[name]
+            return cast(bytes, tostring(suite, encoding="utf-8", xml_declaration=True))
+
+        payload["written_outputs"] = publish_report_outputs(
+            requested,
+            {
+                "html": lambda: render_report_html(view).encode("utf-8"),
+                "markdown": lambda: text.encode("utf-8"),
+                "junit": render_junit,
+            },
+            evidence=evidence,
+        )
         payload["failed_output"] = None
+    except ReportPublicationError as exc:
+        payload["written_outputs"] = dict(exc.written_outputs)
+        payload["failed_output"] = exc.failed_output
+        payload["errors"] = [str(exc)[:1024]]
+        raise EvidenceReportError(str(exc), payload=payload) from exc
     except (OSError, ValueError, RuntimeError) as exc:
         payload["errors"] = [str(exc)[:1024]]
         raise EvidenceReportError(str(exc), payload=payload) from exc
@@ -1568,7 +1579,6 @@ def render_evidence(
 
 
 __all__ = [
-    "EvidenceReport",
     "EvidenceReportV2",
     "EvidenceReportError",
     "render_evidence",

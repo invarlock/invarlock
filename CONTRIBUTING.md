@@ -33,7 +33,7 @@ python3.13 -m venv .venv
 source .venv/bin/activate
 python -m pip install uv==0.10.10
 python scripts/security/build_hardened_accelerate_wheel.py bootstrap
-uv sync --locked --extra dev --group runtime-test
+uv sync --locked --group dev --group runtime-test
 npm ci
 ```
 
@@ -47,11 +47,11 @@ go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
 ```
 
 The bootstrap verifies and builds the pinned hardened Accelerate wheel in
-`runtime/wheels`. Repository runtime groups use that wheel; the public tooling
-extras do not install model execution dependencies.
+`runtime/wheels`. Repository runtime groups use that wheel. Maintainer tools are installed through
+dependency groups; published extras contain only optional product features.
 
 Add Go's binary directory to `PATH`. These tools are not installed by the
-Python development extra.
+Python development dependency group.
 
 For an exact Linux x86_64 CI reproduction, create a separate Python 3.13
 environment and run:
@@ -74,11 +74,11 @@ Run the local gate before opening a pull request:
 make verify-fast
 ```
 
-`make verify` and `make verify-fast` run independent suites concurrently with
+`make verify` and `make verify-fast` run disjoint general and runtime suites concurrently with
 bounded pytest-xdist workers. Examples run once, separately from the other tests.
-`make coverage-enforce` runs disjoint groups with two workers per group;
-locally, one group runs at a time to avoid CPU contention. Pass overrides as
-Make command-line arguments when diagnosing a failure sequentially:
+`make coverage-enforce` runs up to three disjoint groups concurrently, with
+two workers per group by default. Pass overrides as Make command-line arguments
+when diagnosing a failure sequentially:
 
 ```bash
 make verify-fast VERIFY_TARGET_JOBS=1 PYTEST_WORKERS=0
@@ -95,19 +95,23 @@ listed below. Run them for the affected surface before requesting review.
 - `src/invarlock/` contains the request transaction, provider ABI, canonical
   evidence bundle, independent verifier, and report renderer. Captured records,
   comparison, and record contracts have evaluator-neutral implementation owners
-  behind the same `invarlock.engine` facade.
+  behind the same `invarlock.engine` facade. The same package contains the
+  built-in GGUF, TensorRT-LLM, Hugging Face vision-text, diagnostics and
+  judge-measurement implementations.
 - `contracts/` contains the shipped JSON contracts.
-- `addins/` contains the independently installable GGUF, TensorRT-LLM,
-  Hugging Face vision-text, diagnostics, and Inspect judge collection packages.
 - `tests/` mirrors the maintained runtime, contract, evidence, CLI, and release
   surfaces.
 - `scripts/` contains repository checks, release validation, and security
   utilities used by maintainers; user-facing operations remain in the installed
   CLI.
 
-Hugging Face Transformers is the built-in reference provider. New runtime
-integrations implement the provider ABI in an optional package. Keep runtime-
-specific dependencies out of the core distribution.
+Hugging Face Transformers is the built-in reference provider. Maintained
+first-party adapters are shipped in the same wheel and implement the provider
+ABI without importing their optional execution backends during discovery or
+CLI help. Source runtime preparation uses dependency groups such as `hf` and
+`runtime-test`; maintained runtime images include their execution dependencies.
+The public `diagnostics`, `vision-text` and `judge` extras install optional
+feature dependencies.
 
 ## Contract changes
 
@@ -170,9 +174,9 @@ as the complete pull-request check:
 | Python behavior or example launcher | Focused failing test first, then `make verify` and the applicable coverage target |
 | Coverage across the repository | `make coverage-enforce` on Linux; CI enforces 95% combined and branch coverage, including per-file checks |
 | Documentation or public command examples | `make docs-check` and `python -m pytest tests/docs -q`; exercise the documented commands |
-| Entry points, imports, packaged schemas, or dependencies | `make addins-install-smoke`; this includes `dist-check` and isolated wheel consumers |
+| Entry points, imports, packaged schemas, or dependencies | `make install-smoke`; this includes `dist-check` and isolated wheel consumers |
 | Captured evaluation behavior | Build and install the candidate wheel, then run `python examples/captured-results/wheel_smoke.py` and `python examples/captured-results/scorer_wheel_smoke.py --fixture examples/judge-measurements` |
-| Native evaluator capture or mapping | Follow the captured-results example with explicit model, protocol, and environment inputs; verify captured outputs in a separate wheel-only recipient; the [Harness likelihood reference](examples/captured-results/references/harness-likelihood/README.md) covers real NLL capture and offline replay |
+| Native evaluator capture or mapping | `make evaluator-sdk-test EVALUATOR=<name>` for the changed native profile, then `make evaluator-parity-test` for all three scorers and SDK-free installed recipients; retain original source identities and observations |
 | Evidence interpretation or verification | `make release-retained-evidence-compatibility`; retain the declared outcomes of historical evidence |
 | Inspect qualification semantics | `make evaluator-inspect-semantics`; run a fresh source-bound qualification and preserve historical profiles and evidence |
 | Batch evaluator qualification semantics | `make evaluator-batch-semantics`; replay the current profile's native rows and retain separate source-bound qualification artifacts |
@@ -191,20 +195,60 @@ these page inventory and reader-contract tests.
 Run `make pre-commit` for the repository hooks. Some hooks rewrite files;
 review their changes and repeat affected validation before committing.
 
+An evaluator integration is complete when its supported native result can use
+the shared capture/import paths, preserve cases and task failures, expose relevant
+scorer inputs and metadata, and pass installed preflight, evaluation, verification, reporting and
+tamper rejection. Test missing inputs, conflicting identities and source grading
+failures separately. Do not require an upstream grading step when InvarLock can
+score the retained answers. Back advertised SDK shapes with actual SDK exports
+passed through an independently installed core recipient for the supported scorer
+combinations, and distinguish those serializer tests from new model-running
+qualification.
+The [capture recipes](examples/evaluator-qualification/maintained/CAPTURE.md)
+describe the common boundary and the source-specific input requirements.
+
+For full coverage, install the pinned judge SDK closure into the same test
+interpreter and require its offline SDK tests instead of allowing skips:
+
+```bash
+python -m pip install --require-hashes \
+  -r requirements/workflows/inspect-judge-tests-py313.txt
+python -m pip install --require-hashes \
+  -r requirements/workflows/langfuse-sdk-tests-py313.txt
+python -m pip check
+INVARLOCK_REQUIRE_INSPECT_SDK=1 \
+INVARLOCK_REQUIRE_LANGFUSE_SDK=1 \
+  make coverage-enforce
+```
+
+The SDK locks intentionally replace shared dependency versions with their pinned
+closures; `pip check` verifies compatibility with the other test dependencies.
+Use the matching `py312` lock for Python 3.12. The installed-SDK smoke gate
+uses a separate environment, so its execution does not contribute coverage.
+
 The complete coverage gate requires Linux descriptor execution. On another
 operating system, run the relevant portable target such as `make
 coverage-examples`, and report the full Linux result from CI separately.
-CI collects Python 3.13 coverage in separate core, examples, support-tooling and
-add-in jobs. Each test belongs to one group. The required `coverage` gate combines
-all four successful measurements and enforces the existing domain, per-file and
+CI splits examples across three groups balanced using retained test timings,
+alongside the core, support-tooling and runtime jobs. Each test belongs to one group. The required `coverage` gate combines
+all six successful measurements and enforces the existing domain, per-file and
 aggregate branch thresholds. Missing, failed or mismatched measurements cannot
-pass. Test timing reports are retained with each group's coverage data.
+pass. Test timing reports are retained with each group's coverage data. Release
+promotion branches are checked through their pull requests; main/staging pushes,
+release tags and scheduled security scans retain their separate checks.
 
 The `verify-fast` CI job runs `make verify-checks`, the installed-package journeys
 and the 50,000-record signed-recipient case without tracing. Its success is also
 required by the coverage gate. Python 3.13 behavioral tests run under coverage;
 the separate Python 3.12 suite checks the minimum supported interpreter. Local
-`make verify-fast` still includes its behavioral tests.
+`make verify-fast` still includes its behavioral tests. Minimum-Python tests use
+the same partitions, with their existing marker policy, and run concurrently with installed
+package checks. The required `minimum-python` result rejects a failure or skip in
+either group.
+
+The release workflow runs the measured tests once. Separate supplemental tests
+cover the slow or integration-marked core cases outside routine coverage; docs,
+static checks and installed-artifact qualification remain separate gates.
 
 The 12,000-record capacity case remains under subprocess branch coverage. Both
 capacity cases retain the same assertions and watchdog; the large case is
@@ -223,9 +267,8 @@ recorded comparison decisions, and independent verification.
 
 Tests must exercise production code and assert meaningful outcomes. A passing
 test that only restates fixture data is not evidence that a user journey works.
-`make dist-check` builds and validates the core, diagnostics, GGUF connector,
-Hugging Face vision-text connector, TensorRT-LLM connector, and Inspect judge
-preparation distributions.
+`make dist-check` builds and validates the single `invarlock` wheel and source
+distribution, including the built-in runtime and optional-feature modules.
 
 For runtime launcher changes, run the opt-in real-container journey with a
 working Docker or Podman engine. Commit the source being tested, create its

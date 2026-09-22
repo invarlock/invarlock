@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+from dataclasses import replace
 from typing import Any, cast
 from xml.etree.ElementTree import Element, SubElement, tostring
 
@@ -122,6 +123,113 @@ def _common_context(
     if mixed or present != len(records):
         return None, "Mixed or incomplete across records"
     return first, _short_context(cast(str, first))
+
+
+def _context_summary(
+    records: list[dict[str, Any]], key: str, container: str = "metadata"
+) -> str:
+    """Distinguish a complete multi-value field from absent or partial context."""
+    values: set[str] = set()
+    present = 0
+    for record in records:
+        context = record.get(container)
+        value = context.get(key) if isinstance(context, dict) else None
+        if isinstance(value, str) and value.strip():
+            present += 1
+            values.add(value)
+    if not present:
+        return "Unavailable in recorded context"
+    if present != len(records):
+        return "Mixed or incomplete across records"
+    if len(values) == 1:
+        return _short_context(next(iter(values)))
+    visible = ", ".join(_short_context(value, 96) for value in sorted(values)[:8])
+    if len(values) > 8:
+        visible += f", … ({len(values):,} values)"
+    return "Multiple recorded values: " + visible
+
+
+def _recorded_model_identity(
+    run: dict[str, Any], records: list[dict[str, Any]]
+) -> dict[str, str] | None:
+    """Read the model identity bound by maintained capture adapters.
+
+    The supported adapters retain the original worker identity either in the
+    normalized upstream record or in Langfuse's retained item metadata. Every
+    record must expose the same complete identity, and it must agree with the
+    run's attributed artifact and any older shallow display fields.
+    """
+
+    identities: list[dict[str, str] | None] = []
+    for record in records:
+        context = record.get("context")
+        if not isinstance(context, dict):
+            identities.append(None)
+            continue
+        candidates: list[Any] = []
+        upstream = context.get("upstream_record")
+        if isinstance(upstream, dict):
+            metadata = upstream.get("metadata")
+            if isinstance(metadata, dict):
+                candidates.append(metadata.get("invarlock_model_execution"))
+        langfuse = context.get("langfuse")
+        if isinstance(langfuse, dict):
+            item_result = langfuse.get("item_result")
+            item = item_result.get("item") if isinstance(item_result, dict) else None
+            metadata = item.get("metadata") if isinstance(item, dict) else None
+            if isinstance(metadata, dict):
+                candidates.append(metadata.get("invarlock_model_execution"))
+        candidates = [value for value in candidates if value is not None]
+        if not candidates:
+            identities.append(None)
+            continue
+        models: list[dict[str, str]] = []
+        usable = True
+        for value in candidates:
+            model = value.get("model") if isinstance(value, dict) else None
+            if not isinstance(model, dict):
+                usable = False
+                break
+            selected = {
+                key: model.get(key) for key in ("id", "revision", "artifact_digest")
+            }
+            if any(
+                not isinstance(value, str) or not value.strip()
+                for value in selected.values()
+            ):
+                usable = False
+                break
+            models.append(cast(dict[str, str], selected))
+        if not usable:
+            identities.append(None)
+            continue
+        if any(model != models[0] for model in models[1:]):
+            raise ValueError(
+                "recorded model execution identities contradict each other"
+            )
+        identities.append(models[0])
+    present = [identity for identity in identities if identity is not None]
+    if not present:
+        return None
+    if any(identity != present[0] for identity in present[1:]):
+        raise ValueError("recorded model identities differ across records")
+    identity = present[0]
+    artifact = run.get("artifact_digest")
+    if not isinstance(artifact, str):
+        return None
+    if artifact != identity["artifact_digest"]:
+        raise ValueError("recorded model identity contradicts the attributed artifact")
+    for key, legacy in (("id", "model_id"), ("revision", "model_revision")):
+        for record in records:
+            context = record.get("context")
+            if not isinstance(context, dict) or legacy not in context:
+                continue
+            shallow = context[legacy]
+            if not isinstance(shallow, str) or not shallow.strip():
+                raise ValueError("recorded model identity has invalid shallow context")
+            if shallow != identity[key]:
+                raise ValueError("recorded model identity contradicts shallow context")
+    return identity if len(present) == len(records) else None
 
 
 def _effective_messages(
@@ -248,6 +356,7 @@ def _captured_context(
     context = [("Evaluation mode", "Captured evaluator outputs")]
     service_details: list[tuple[str, Any]] = []
     model_keys = []
+    model_identities: list[dict[str, str] | None] = []
     messages = [
         _effective_messages(inputs[side]["records"]) for side in ("baseline", "subject")
     ]
@@ -267,12 +376,20 @@ def _captured_context(
             key: _common_context(records, key)
             for key in ("model_key", "model_id", "model_revision", "role")
         }
+        recorded_model = (
+            None
+            if run.get("service_identity") is not None
+            else _recorded_model_identity(run, records)
+        )
+        model_identities.append(recorded_model)
         model_keys.append(fields["model_key"][0])
         indexed = messages[0 if side == "baseline" else 1]
         label = side.title()
         identity = (
             "Recorded model ID: " + fields["model_id"][1]
             if fields["model_id"][0] is not None
+            else "Recorded model ID: " + _short_context(recorded_model["id"])
+            if recorded_model is not None
             else "Recorded model key: " + fields["model_key"][1]
             if fields["model_key"][0] is not None
             else "Recorded run: " + _short_context(str(run["run_id"]), 128)
@@ -338,7 +455,12 @@ def _captured_context(
         )
         recorded_context: tuple[tuple[str, str], ...] = (
             (label + " evaluator", evaluator),
-            (label + " model revision", fields["model_revision"][1]),
+            (
+                label + " model revision",
+                _short_context(recorded_model["revision"])
+                if recorded_model is not None
+                else fields["model_revision"][1],
+            ),
             (label + " capture role", fields["role"][1]),
             (
                 label + " workflow",
@@ -346,7 +468,7 @@ def _captured_context(
             ),
             (
                 label + " dataset",
-                _common_context(records, "dataset", "metadata")[1],
+                _context_summary(records, "dataset"),
             ),
             (label + " records", f"{len(records):,}"),
             (
@@ -405,6 +527,18 @@ def _captured_context(
             model += " This comparison does not identify the cause of an observed performance change or establish identical hidden weights."
         else:
             model = "The runs use different identity profiles: a model artifact and a hosted service. The service declaration does not identify model weights."
+    elif all(identity is not None for identity in model_identities):
+        left_identity, right_identity = cast(
+            tuple[dict[str, str], dict[str, str]], tuple(model_identities)
+        )
+        if left_identity == right_identity:
+            model = (
+                "Both runs record model ID "
+                + _short_context(left_identity["id"])
+                + " at the same revision and attributed artifact. Verification checks the retained identity bindings; the report does not reexecute the model."
+            )
+        else:
+            model = "The runs record different model IDs, revisions or attributed artifacts. Verification checks these retained identity bindings; the report does not reexecute either model."
     elif model_keys[0] is not None and model_keys[0] == model_keys[1]:
         model = (
             "Both runs record model key "
@@ -566,13 +700,42 @@ def _metric_views(
                 if policy
                 else None
             )
+            confidence = number(interval["mass"] * 100)
             label = (
-                "95% paired-schedule ratio resampling interval"
+                f"{confidence}% paired-schedule ratio resampling interval"
                 if likelihood
-                else "Paired 95% confidence interval"
+                else f"Paired {confidence}% confidence interval"
                 if binary
-                else "95% paired-schedule resampling interval"
+                else f"{confidence}% paired-schedule resampling interval"
             )
+            basis: tuple[str, ...]
+            if interval["method"] in {
+                "newcombe_hybrid_score_paired_v1",
+                "newcombe_hybrid_score_paired_v2",
+            }:
+                basis = (
+                    f"Baseline and subject are paired on the same {complete:,} cases in this scope. Newcombe hybrid score uses their paired match outcomes to form a nominal {number(interval['mass'] * 100)}% confidence interval for the accuracy change.",
+                    "Change is subject accuracy minus baseline accuracy in percentage points, not relative percent change. The confidence level describes the interval method, not the share of correct answers."
+                    if percentage
+                    else "Change is subject score minus baseline score in the displayed score units, not relative percent change. The confidence level describes the interval method, not the share of correct answers.",
+                    "Each metric and scope has its own interval; these intervals do not provide a simultaneous confidence guarantee across all results or establish a representative production sample.",
+                )
+            elif interval["method"] in {
+                "paired_mean_shake256_percentile_v1",
+                "paired_percentile_bootstrap_sha256_v1",
+            }:
+                basis = (
+                    f"The declared percentile method resamples the same {complete:,} paired records in this scope with replacement, keeping each baseline and subject result together. Its retained resampling count is {interval['replicates']:,}.",
+                    f"The central {number(interval['mass'] * 100)}% of that distribution describes the subject-to-baseline mean NLL ratio. Each side's NLL uses nats per expected UTF-8 byte."
+                    if likelihood
+                    else f"The central {number(interval['mass'] * 100)}% of that distribution describes subject-minus-baseline mean score change in {display_unit} units.",
+                    "This is a fixed-schedule resampling interval, not a population confidence interval. Separate metric and scope intervals do not give a simultaneous confidence guarantee or establish a representative production sample.",
+                )
+            else:
+                basis = (
+                    f"Retained interval method: {interval['method']}.",
+                    "The report supplies these endpoints; a calculation explanation is unavailable for this method.",
+                )
             visual = IntervalView(
                 interval["lower"] * scale,
                 interval["upper"] * scale,
@@ -587,7 +750,10 @@ def _metric_views(
                 method={
                     "newcombe_hybrid_score_paired_v1": "Newcombe hybrid score",
                     "newcombe_hybrid_score_paired_v2": "Newcombe hybrid score",
+                    "paired_mean_shake256_percentile_v1": "Paired percentile resampling",
+                    "paired_percentile_bootstrap_sha256_v1": "Paired percentile resampling",
                 }.get(interval.get("method", ""), ""),
+                basis=basis,
             )
             if policy:
                 bound = interval["lower" if higher else "upper"]
@@ -642,19 +808,14 @@ def _metric_views(
                     None,
                 )
             )
-        unmet = [c.name for c in checks if c.passed is False]
-        explanation = (
-            "All configured checks passed."
-            if m["decision"] == "pass"
-            else (
-                "More evidence is needed: "
-                + (", ".join(unmet) if unmet else "; ".join(m["reasons"]))
-                + "."
-                if m["decision"] == "insufficient_evidence"
-                else "The policy was not met: "
-                + (", ".join(unmet) if unmet else "; ".join(m["reasons"]))
-                + "."
+        if m["decision"] == "pass" and any(check.passed is False for check in checks):
+            raise EvaluationRecordsError(
+                "captured recorded pass contradicts a displayed policy requirement"
             )
+        explanation = (
+            "The policy thresholds are unavailable in this report; the retained decision has not been independently replayed."
+            if policy is None
+            else "The retained comparison does not include an explanation for this result."
         )
         notes = [
             "Higher values are better."
@@ -674,8 +835,6 @@ def _metric_views(
             )
         if binary and policy is not None and "subject_minimum" not in policy:
             notes.append("No absolute minimum score is required by this policy.")
-        if m["reasons"]:
-            notes.append("Recorded reasons: " + "; ".join(m["reasons"]))
         if policy is None:
             notes.append(
                 "Requirements are unavailable in this comparison-only view. The original decision is displayed without independent replay."
@@ -712,6 +871,7 @@ def _metric_views(
                 notes=tuple(notes),
             )
         )
+        metrics[-1] = replace(metrics[-1], explanation=_captured_opening(metrics[-1]))
     # Bring actionable findings first; original order and exact values remain in evidence.
     metrics.sort(
         key=lambda m: {"regression": 0, "insufficient_evidence": 1, "pass": 2}[
@@ -746,6 +906,63 @@ def _view(comparison: dict[str, Any], evidence: CapturedSnapshot | None) -> Repo
     return _assemble_view(comparison, inputs, manifest, signer)
 
 
+def _captured_opening(metric: MetricView) -> str:
+    """Explain the recorded outcome using available, unrounded policy facts."""
+    interval = metric.interval
+    fallback = (
+        metric.explanation or "No explanation was supplied for this recorded result."
+    )
+    if metric.decision == "pass":
+        return (
+            "The uncertainty interval is within the required range, and the other configured checks passed."
+            if interval is not None and interval.threshold is not None
+            else fallback
+        )
+    failures = [check for check in metric.checks if check.passed is False]
+    bound = next(
+        (
+            check
+            for check in failures
+            if check.name in {"Allowed change", "Maximum NLL ratio"}
+        ),
+        None,
+    )
+    explanations = {
+        "Complete paired results": "Some included cases are missing a baseline or subject result.",
+        "Included pair count": "There are fewer paired records than the policy requires.",
+        "Interval width": "The uncertainty interval is wider than the policy permits.",
+        "Subject minimum": "The subject's observed score is below the required minimum.",
+        "Subject maximum": "The subject's observed score is above the permitted maximum.",
+    }
+    if (
+        metric.decision == "regression"
+        and bound is not None
+        and interval is not None
+        and interval.threshold is not None
+        and interval.threshold_direction in {"minimum", "maximum"}
+    ):
+        label = "NLL ratio" if bound.name == "Maximum NLL ratio" else "change"
+        within = (
+            interval.estimate >= interval.threshold
+            if interval.threshold_direction == "minimum"
+            else interval.estimate <= interval.threshold
+        )
+        if within:
+            lead = f"The observed {label} was within the policy limit, but its uncertainty interval extended beyond it."
+        else:
+            lead = (
+                "The observed NLL ratio exceeded the policy limit. Lower NLL is better."
+                if label == "NLL ratio"
+                else "The observed change was outside the range allowed by the policy."
+            )
+        others = [explanations[c.name] for c in failures if c.name in explanations]
+        return " ".join([lead, *others])
+    return (
+        " ".join(explanations[c.name] for c in failures if c.name in explanations)
+        or fallback
+    )
+
+
 def _captured_summary(
     metrics: tuple[MetricView, ...], comparison: dict[str, Any] | None = None
 ) -> str:
@@ -755,7 +972,7 @@ def _captured_summary(
         passed = len(metrics) - failed - insufficient
         overview = (
             f"{len(metrics):,} metric / scope results: {passed:,} passed, "
-            f"{failed:,} did not meet policy, and {insufficient:,} need more evidence. "
+            f"{failed:,} did not meet policy, and {insufficient:,} {'needs' if insufficient == 1 else 'need'} more evidence. "
             "Each result applies to its recorded scope; overlapping slice counts must not be added together."
         )
         # Different metrics have different units; lead with the first adverse
@@ -767,16 +984,10 @@ def _captured_summary(
             )
         if focus is None:
             return overview
-        outcome = (
-            "did not meet policy"
-            if focus.decision == "regression"
-            else "needs more evidence"
+        return (
+            f"{focus.display_name} ({focus.display_scope}): {_captured_opening(focus)} "
+            + overview
         )
-        lead = f"{focus.name} ({focus.scope}) {outcome}"
-        check = next((c for c in focus.checks if c.passed is False), None)
-        if check is not None:
-            lead += f": the {check.name} check recorded {check.observed} against a requirement of {check.required}"
-        return lead + ". " + overview
     metric = metrics[0]
     recorded = (
         next(
@@ -795,12 +1006,14 @@ def _captured_summary(
         if recorded is not None
         else metric.interval is not None and metric.interval.neutral == 1
     )
-    parts = [] if metric.decision == "pass" else [metric.explanation]
-    scope = "" if metric.scope == "overall" else f" within the {metric.scope} slice"
+    parts = [_captured_opening(metric)]
+    scope = (
+        "" if metric.scope == "overall" else f" within the {metric.display_scope} slice"
+    )
     pairs = "pair" if metric.count == "1" else "pairs"
     if metric.baseline != "Unavailable" and metric.candidate != "Unavailable":
         sentence = (
-            f"Across {metric.count} usable {pairs}{scope}, the subject's {metric.name} "
+            f"Across {metric.count} usable {pairs}{scope}, the subject's {metric.display_name} "
             f"was {metric.candidate}, compared with {metric.baseline} for the baseline"
         )
         if metric.change != "Unavailable":
@@ -824,7 +1037,7 @@ def _captured_summary(
         )
         verb = "are" if unavailable == "Baseline and subject scores" else "is"
         parts.append(
-            f"{unavailable} for {metric.name} {verb} unavailable across {metric.count} usable {pairs}{scope}."
+            f"{unavailable} for {metric.display_name} {verb} unavailable across {metric.count} usable {pairs}{scope}."
         )
     if recorded is not None and recorded["missing_ids"]:
         missing = len(recorded["missing_ids"])
@@ -835,7 +1048,12 @@ def _captured_summary(
     if metric.interval is not None:
         interval = metric.interval
         parts.append(
-            f"The 95% interval for the {'ratio' if likelihood else 'change'} runs from "
+            (
+                f"The {number(recorded['interval']['mass'] * 100)}% interval"
+                if recorded is not None and recorded["interval"] is not None
+                else "The uncertainty interval"
+            )
+            + f" for the {'ratio' if likelihood else 'change'} runs from "
             f"{number(interval.lower)} to {number(interval.upper)}"
             + ("." if likelihood else f" {interval.unit}.")
         )
@@ -851,6 +1069,8 @@ def _captured_summary(
             parts.append(f"The policy requires at least {minimum} included pairs.")
         elif check.name in {"Allowed change", "Maximum NLL ratio"}:
             relation, value = check.required.split(" ", 1)
+            if check.name == "Maximum NLL ratio":
+                value = value.removesuffix(" ratio")
             parts.append(
                 "The policy requires the interval to stay "
                 + ("at or above " if relation == ">=" else "at or below ")

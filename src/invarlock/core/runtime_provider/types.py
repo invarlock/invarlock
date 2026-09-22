@@ -88,7 +88,7 @@ def require_runtime_task(value: object, *, field_name: str = "task") -> RuntimeT
     """Return one canonical task identifier or fail closed.
 
     The ABI reserves the identifiers in ``STANDARD_RUNTIME_TASKS`` but
-    intentionally accepts any canonical snake-case identifier. Optional add-ins
+    intentionally accepts any canonical snake-case identifier. Optional providers
     can therefore declare later modalities without an ABI or schema revision.
     """
 
@@ -462,8 +462,8 @@ class EvaluationRecord:
     record_id: str
     input_text: str
     input_sha256: str
+    input_parts: tuple[EvaluationInputPart, ...]
     expected_output: str | None = None
-    input_parts: tuple[EvaluationInputPart, ...] = ()
 
     def __post_init__(self) -> None:
         _require_nonempty_string(self.record_id, field_name="record_id")
@@ -474,10 +474,8 @@ class EvaluationRecord:
             self.expected_output, str
         ):
             raise ValueError("expected_output must be a string or null")
-        if not isinstance(self.input_parts, tuple):
-            raise ValueError("input_parts must be a tuple")
-        if not self.input_parts:
-            return
+        if not isinstance(self.input_parts, tuple) or not self.input_parts:
+            raise ValueError("input_parts must be a non-empty tuple")
         roles = [part.role for part in self.input_parts]
         if len(roles) != len(set(roles)):
             raise ValueError("input part roles must be unique within a record")

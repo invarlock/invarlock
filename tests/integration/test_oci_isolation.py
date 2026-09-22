@@ -191,7 +191,7 @@ def runtime():
     engine = os.environ.get("INVARLOCK_CONTAINER_ENGINE", "docker")
     image = os.environ.get("INVARLOCK_RUNTIME_IMAGE", "invarlock-runtime:local")
     metadata = json.loads(_engine(engine, "image", "inspect", image).stdout)[0]
-    image_id = metadata["Id"]
+    image_id = oci._normalized_config_id(metadata["Id"])
     for variable, label in (
         ("RUNTIME_SOURCE_COMMIT", "org.opencontainers.image.revision"),
         ("RUNTIME_SOURCE_BUNDLE_SHA256", "dev.invarlock.source-bundle-sha256"),
@@ -312,6 +312,7 @@ def _record(name, runtime, command, result, **observations):
     root.mkdir(parents=True, exist_ok=True)
     payload = {
         "case": name,
+        "engine_name": runtime.engine,
         "image_id": runtime.baseline.image_digest,
         "source_commit": os.environ.get("RUNTIME_SOURCE_COMMIT"),
         "source_bundle_sha256": os.environ.get("RUNTIME_SOURCE_BUNDLE_SHA256"),

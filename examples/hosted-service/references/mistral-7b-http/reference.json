@@ -61,8 +61,8 @@
   "external_provider_qualification": false,
   "files": {
     "README.md": {
-      "byte_size": 6979,
-      "sha256": "sha256:ac688d8eb383d1ad852c8547b4ddca870a9c5894832a1754c54288a9b30d70bb"
+      "byte_size": 7783,
+      "sha256": "sha256:3bbb39ec4f318aa061e3457f0f813022d5c4462e2d79423861e91f5900df4b47"
     },
     "capture/baseline.json": {
       "byte_size": 560537,

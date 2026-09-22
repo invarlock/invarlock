@@ -74,11 +74,11 @@ def test_official_qwen35_08b_gguf_identity() -> None:
     assert example._OFFICIAL_MODEL.sha256 == (
         "37ae482d336108d23516fa35e8e0c4126688d81018b87178a18d752a1357814f"
     )
-    dockerfile = (
-        Path(__file__).resolve().parents[2] / "addins/gguf/runtime/Dockerfile"
-    ).read_text(encoding="utf-8")
-    assert "--target llama-completion llama-quantize" in dockerfile
-    assert "COPY --from=llama-cpp-build /opt/llama.cpp/llama-quantize" in dockerfile
+    dockerfile = (Path(__file__).resolve().parents[2] / "runtime/Dockerfile").read_text(
+        encoding="utf-8"
+    )
+    assert "COPY src /project/src" in dockerfile
+    assert "invarlock" in dockerfile
 
 
 def test_pinned_download_accepts_exact_bytes_and_rejects_drift(
@@ -200,19 +200,15 @@ def test_image_inspection_and_runtime_build_use_immutable_current_source(
         commands.append(command)
         if "qualification_source.py" in " ".join(command):
             return _completed(command, json.dumps({"source_bundle_sha256": image_id}))
-        if command[:3] == ["make", "-C", "addins/gguf"]:
-            statement_path = next(
-                Path(value.split("=", 1)[1])
-                for value in command
-                if value.startswith("BUILD_STATEMENT=")
-            )
+        if "authenticated_runtime_build.py" in " ".join(command):
+            statement_path = Path(command[command.index("--statement") + 1])
             statement_path.write_text(
                 json.dumps(
                     {
                         "base_image": None,
                         "build_arguments": {},
                         "dockerfile": {
-                            "path": "runtime/Dockerfile",
+                            "path": "runtime/Dockerfile.gguf",
                             "sha256": image_id,
                         },
                         "format_version": "invarlock/runtime-image-build-v1",
@@ -239,11 +235,13 @@ def test_image_inspection_and_runtime_build_use_immutable_current_source(
         == image_id
     )
     make = next(
-        command for command in commands if command[:3] == ["make", "-C", "addins/gguf"]
+        command
+        for command in commands
+        if "authenticated_runtime_build.py" in " ".join(command)
     )
-    assert "SOURCE_COMMIT=" + "c" * 40 in make
+    assert "runtime/Dockerfile.gguf" in make
     assert "LLAMA_CPP_APT_SNAPSHOT=20260701T000000Z" in make
-    assert any(value.startswith("BUILD_STATEMENT=") for value in make)
+    assert "--statement" in make
 
     monkeypatch.setattr(
         example.launch,

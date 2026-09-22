@@ -168,7 +168,7 @@ engine, device, or entrypoint inputs.
 
 ## Optional provider resources
 
-The GGUF (`llama_cpp`) add-in requires all three values together:
+The GGUF (`llama_cpp`) provider requires all three values together:
 
 | Variable | Meaning |
 | --- | --- |
@@ -176,14 +176,14 @@ The GGUF (`llama_cpp`) add-in requires all three values together:
 | `INVARLOCK_GGUF_BACKEND_EXECUTABLE` | Safe relative `backend_executable` resource beneath that root |
 | `INVARLOCK_GGUF_BACKEND_SOURCE` | Safe relative `backend_source` resource beneath that root |
 
-The TensorRT-LLM add-in requires both values together:
+The TensorRT-LLM provider requires both values together:
 
 | Variable | Meaning |
 | --- | --- |
 | `INVARLOCK_TENSORRT_LLM_RESOURCE_ROOT` | Caller-owned absolute root containing the engine and tokenizer contract |
 | `INVARLOCK_TENSORRT_LLM_TOKENIZER_CONTRACT` | Safe relative tokenizer-contract resource beneath that root |
 
-The Hugging Face vision-text add-in requires both values together:
+The Hugging Face vision-text provider requires both values together:
 
 | Variable | Meaning |
 | --- | --- |
@@ -207,13 +207,24 @@ inputs apply only when new judge ratings are collected:
 
 | Variable | Behavior |
 | --- | --- |
-| `OPENAI_API_KEY` | Required nonempty credential for the configured collector; never retain it in a request or evidence |
-| `OPENAI_BASE_URL`, `OPENAI_API_BASE` | Presence is rejected, including an empty value; custom endpoints are unsupported |
-| `OPENAI_SAFETY_IDENTIFIER` | Presence is rejected; inherited identifier controls are unsupported |
+| `INVARLOCK_ALLOW_JUDGE_NETWORK=1` | Allows network only in the configured judge lifecycle; native capture and other tasks retain the default guard |
+| `OPENAI_API_KEY` | Credential selected by an `openai/...` grader |
+| `ANTHROPIC_API_KEY` | Credential selected by an `anthropic/...` grader |
+| `GOOGLE_API_KEY`, `GEMINI_API_KEY` | Credential aliases selected by a `google/...` grader; `GOOGLE_API_KEY` takes precedence when both are present |
+| `OPENROUTER_API_KEY` | Credential selected by an `openrouter/...` grader |
+| Provider base-URL variables | Presence is rejected, including an empty value; configured collection uses the provider's official endpoint |
+| Provider alternate-auth variables | OpenAI safety identifiers, Anthropic auth tokens, and Google Vertex/ADC controls are rejected for this key-only collection path |
 
-Collection preflight checks this environment and the pinned optional
-dependencies without making calls. Offline retained-measurement import,
-verification and reporting need neither credentials nor these SDKs. See
+The grader prefix selects exactly one credential; judge code does not assume an
+OpenAI key. Credentials are never retained in requests or evidence. Collection
+reads `INVARLOCK_ALLOW_JUDGE_NETWORK` only from the process environment, accepting
+`1`, `true`, `yes`, or `on`. It grants a temporary context-local permission during
+judge initialization, collection and cleanup; it does not remove the global
+socket guard or change strict native execution switches. Request fields and
+credential mappings cannot grant this permission. Collection
+preflight checks this environment and the pinned optional dependencies without
+making calls. Offline retained-measurement import, verification and reporting
+need neither credentials nor these SDKs. See
 [judge measurements](judge-measurements.md#frozen-answer-requests-and-preflight)
 for the configuration and reservation limits.
 
@@ -261,7 +272,7 @@ must make its own authorization decision.
 - Record the exact image digest and engine/device selection with the comparison
   record; do not infer them from a mutable shell profile later.
 
-Variables used only by repository tests, image builds, or add-in runner
+Variables used only by repository tests, image builds, or provider runner
 internals are not part of this public inventory. Treat this page and
 `invarlock COMMAND --help` as the supported operator surface.
 

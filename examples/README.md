@@ -23,8 +23,32 @@ revision, as explained in [getting started](../docs/user-guide/getting-started.m
 | Compare two HTTP service runs | [Hosted service](hosted-service/README.md) | New calls to an endpoint you supply, followed by offline evaluation and verification |
 | Inspect actual model comparison results | [Retained comparisons](captured-results/references/README.md) | Offline replay of routing, likelihood and HTTP results, including policy rejections |
 | Inspect a larger judge study | [Held-out judge reference](judge-measurements/references/k2-32b-luna-xhigh-heldout/README.md) | Offline replay of 10,260 retained ratings across fixed QA and extraction tasks |
+| Use Langfuse experiment results | [Langfuse handoff](integrations/langfuse/README.md) | Preserve complete experiment records for scoring and offline verification |
 | Check a delivered model package | [ModelKit handoff](integrations/modelkit-handoff/README.md) | Checks that the package matches approved evidence and recipient policy |
 | Add verification to CI or a policy engine | [CI examples](ci/README.md) and [OPA/CUE example](policy-engine-interop/README.md) | Automation patterns with their supported receipt and policy boundaries |
+
+## Inspect a practical model change
+
+For a walkthrough of a completed model comparison, start with one of these
+retained comparisons. Their replay paths need no model or provider calls; the
+quantization guide also explains how to run a fresh comparison.
+
+| Change to examine | Start here | Decision shown |
+| --- | --- | --- |
+| Move a checkpoint from BF16 to a smaller GGUF for local deployment | [Qwen3.5-9B quantization](integrations/gguf-deployment/README.md#retained-results) | 212 to 219 exact matches out of 400; passes the declared deployment comparison, including a −2 percentage-point tolerance and 20% per-side floors |
+| Add a system instruction to improve output-format compliance | [K2 32B extraction prompt](judge-measurements/references/k2-32b-luna-xhigh-heldout/README.md#task-and-proposed-change) | 1,288 source units; the subject meets the allowed-degradation and absolute rubric-score requirements |
+| Replace a base checkpoint with its instruction-tuned counterpart while retaining a prose-completion workload | [Mistral 7B likelihood](captured-results/references/mistral-7b-likelihood/README.md) | 400 pairs; rejects a roughly 9.1% NLL increase against the illustrative 5% tolerance |
+
+For each result, read the actual change, observed values and policy together.
+Use the linked commands to inspect the evidence and reproduce its verification.
+A recipient supplies its own approved policy and identities before relying on
+a new comparison; the example thresholds are not defaults for every workload.
+
+The [six-case Harness fixture](captured-results/references/harness-likelihood/README.md)
+and [low-accuracy HTTP reference](hosted-service/references/mistral-7b-http/README.md)
+remain useful integration demonstrations. Use them to check measurement and
+transport behavior. Use the larger comparisons above to discuss a substantive
+model or prompt change.
 
 ## Terms used in the examples
 
@@ -61,7 +85,7 @@ command. The Make targets below are entry points, not complete invocations.
 | [GGUF with llama.cpp](integrations/gguf-llama-cpp/README.md) | `make example-gguf-llama-cpp` | Qwen3.5-0.8B Q8 and a Q5 derivative |
 | [BF16-to-GGUF deployment](integrations/gguf-deployment/README.md) | `make example-gguf-deployment` | Selected 8B, 9B and 27B models across Transformers BF16 and llama.cpp Q5_K_M |
 | [LM Evaluation Harness](integrations/lm-evaluation-harness/README.md) | `make example-lm-evaluation-harness` | Imports per-case model results; does not rely on the evaluator's aggregate score |
-| [TensorRT-LLM](integrations/tensorrt-llm/README.md) | `make example-tensorrt-llm` | Qwen3-0.6B BF16 and calibrated FP8 engines on two H100 GPUs |
+| [TensorRT-LLM](integrations/tensorrt-llm/README.md) | `make example-tensorrt-llm` | Qwen3-0.6B BF16 and calibrated FP8 engines on two compatible CUDA GPUs |
 | [Offline evidence handoff](integrations/README.md) | `make example-evidence-handoff` | Included paired records, policy rejection and file-tampering rejection; no model or GPU |
 
 Completed transactions write a signed evidence pack, a verifier receipt and an

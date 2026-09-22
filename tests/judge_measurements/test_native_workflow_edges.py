@@ -7,7 +7,6 @@ import copy
 import importlib
 import json
 import os
-import sys
 from pathlib import Path
 from types import ModuleType
 from unittest.mock import AsyncMock, Mock
@@ -24,17 +23,17 @@ from tests.judge_measurements.test_native_workspace import native as native
 from tests.judge_measurements.test_workflow import staged as staged
 
 
-def _installed_api(monkeypatch):
-    source = Path(__file__).parents[2] / "addins/inspect_judge/src"
-    monkeypatch.syspath_prepend(str(source))
-    return importlib.import_module("invarlock_addins.inspect_judge")
-
-
-def test_missing_installed_collector_has_safe_install_diagnostic(monkeypatch):
-    monkeypatch.setitem(sys.modules, "invarlock_addins.inspect_judge", None)
-    with pytest.raises(
-        workflow.JudgeWorkflowError, match=r"pip install .*invarlock\[judge\]=="
-    ):
+def test_missing_collection_sdk_has_safe_install_diagnostic(monkeypatch):
+    api = workflow.collection_api()
+    monkeypatch.setenv("OPENAI_API_KEY", "offline-unused-key")
+    for name in ("OPENAI_BASE_URL", "OPENAI_API_BASE", "OPENAI_SAFETY_IDENTIFIER"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(
+        importlib.metadata,
+        "version",
+        Mock(side_effect=importlib.metadata.PackageNotFoundError("missing")),
+    )
+    with pytest.raises(api.InspectJudgeError, match=r'install "invarlock\[judge\]"'):
         workflow.collection_preflight(_recipe()["collection"])
 
 
@@ -42,7 +41,7 @@ def test_missing_installed_collector_has_safe_install_diagnostic(monkeypatch):
     "fault", ["missing_key", "endpoint_override", "missing_dependency"]
 )
 def test_real_collection_environment_fails_without_loading_model(monkeypatch, fault):
-    api = _installed_api(monkeypatch)
+    api = workflow.collection_api()
     for name in ("OPENAI_API_KEY", "OPENAI_BASE_URL", "OPENAI_API_BASE"):
         monkeypatch.delenv(name, raising=False)
     if fault != "missing_key":
@@ -61,13 +60,18 @@ def test_real_collection_environment_fails_without_loading_model(monkeypatch, fa
 
 @pytest.fixture
 def delegated(monkeypatch):
-    real = _installed_api(monkeypatch)
-    api = ModuleType("invarlock_addins.inspect_judge")
+    monkeypatch.setenv("INVARLOCK_ALLOW_JUDGE_NETWORK", "1")
+    real = workflow.collection_api()
+    api = ModuleType("invarlock.judge_measurements")
     api.CollectionOptions = real.CollectionOptions
     api.RunnerOptions = real.RunnerOptions
     api.prepare_collection = real.prepare_collection
     api.validate_collection_environment = Mock(
-        return_value={"credential_available": True}
+        return_value={
+            "credential_available": True,
+            "network_authorized": True,
+            "network_authorization_variable": "INVARLOCK_ALLOW_JUDGE_NETWORK",
+        }
     )
 
     async def collected(*args, on_stop):
@@ -75,7 +79,7 @@ def delegated(monkeypatch):
         return {"retained": True}
 
     api.collect_configured = AsyncMock(side_effect=collected)
-    monkeypatch.setitem(sys.modules, "invarlock_addins.inspect_judge", api)
+    monkeypatch.setattr(workflow, "collection_api", lambda: api)
     return api
 
 
@@ -85,7 +89,9 @@ def test_collect_frozen_delegates_exact_frozen_answers_and_checkpoint(
     recipe = _recipe()
     plan, baseline, subject = object(), {"baseline": "frozen"}, {"subject": "frozen"}
     assert workflow.collection_preflight(recipe["collection"]) == {
-        "credential_available": True
+        "credential_available": True,
+        "network_authorized": True,
+        "network_authorization_variable": "INVARLOCK_ALLOW_JUDGE_NETWORK",
     }
     status = {"stop_reason": "stale"}
     result = workflow.collect_frozen(
@@ -274,9 +280,9 @@ def test_standalone_collection_checks_signing_key_before_any_call(staged, delega
     assert not request.evidence.exists()
 
 
-@pytest.mark.parametrize("exhausted", [False, True])
-def test_pending_collection_distinguishes_deadline_resume_from_retained_capacity(
-    staged, delegated, monkeypatch, exhausted
+@pytest.mark.parametrize("reason", ["deadline", "requested", "capacity_exhausted"])
+def test_pending_collection_distinguishes_resumable_stop_from_retained_capacity(
+    staged, delegated, monkeypatch, reason
 ):
     request = _standalone_collect(staged)
     plan = json.loads((request.root / "plan.json").read_bytes())
@@ -286,18 +292,12 @@ def test_pending_collection_distinguishes_deadline_resume_from_retained_capacity
 
     async def collect(*_args, on_stop):
         value = next(outcomes)
-        on_stop(
-            "capacity_exhausted"
-            if exhausted
-            else "deadline"
-            if value is pending
-            else "complete"
-        )
+        on_stop(reason if value is pending else "complete")
         return value
 
     delegated.collect_configured.side_effect = collect
     key, _ = _key(request.root / "evidence.pem")
-    if exhausted:
+    if reason == "capacity_exhausted":
         result = standalone.evaluate_judge_request(
             request, signing_key=key, unsigned=False
         )
@@ -314,6 +314,7 @@ def test_pending_collection_distinguishes_deadline_resume_from_retained_capacity
             error.value.payload["resumable"]
             and error.value.payload["pending_trials"] == 2
         )
+        assert error.value.payload["stop_reason"] == reason
         assert not request.evidence.exists()
         result = standalone.evaluate_judge_request(
             request, signing_key=key, unsigned=False

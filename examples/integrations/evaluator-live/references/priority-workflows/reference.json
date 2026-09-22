@@ -1,0 +1,1129 @@
+{
+  "archives": [
+    {
+      "bytes": 10286564,
+      "expanded_bytes": 68689951,
+      "members": 2977,
+      "path": "captures.zip",
+      "sha256": "f0cc24c07ea81306efae3146176e28b1416b427df1730fff3d1eba3497be9cd5"
+    },
+    {
+      "bytes": 4222607,
+      "expanded_bytes": 65418540,
+      "members": 320,
+      "path": "exact-match.zip",
+      "sha256": "05268c70a541552a24e08784a941ea4535eb677737d87d17ab54f06a01c18faf"
+    },
+    {
+      "bytes": 4243109,
+      "expanded_bytes": 65468940,
+      "members": 320,
+      "path": "normalized-nll.zip",
+      "sha256": "4e1d77ffd11f202d715a8e3fb40d599b1647f5a783bfb19d0104ef66a5467b6e"
+    }
+  ],
+  "captures": [
+    {
+      "case_count": 64,
+      "directory": "capture/captures/local/baseline/inspect-ai",
+      "evaluator": "inspect-ai",
+      "native_sha256": "sha256:baf6fe07b6ac3d751a2e7400b322f37aafef937e142737c92b681887fc7ecf7b",
+      "profile": "local",
+      "protocol_digest": "sha256:78512347e5a53bebdd78293349ed66a97ef5796f44f6b6112f1783beed1f6353",
+      "role": "baseline",
+      "version": "0.3.254"
+    },
+    {
+      "case_count": 64,
+      "directory": "capture/captures/local/subject/inspect-ai",
+      "evaluator": "inspect-ai",
+      "native_sha256": "sha256:a2bb3f797d1f5eea2da5ede5c4e12582d7d85290acacd84c6e1def48afaa0f42",
+      "profile": "local",
+      "protocol_digest": "sha256:fd8364f7e1ef8dcef8041fa01f4e4f283f4dbe76a182ac4dc72d4da8a71c6c80",
+      "role": "subject",
+      "version": "0.3.254"
+    },
+    {
+      "case_count": 64,
+      "directory": "capture/captures/local/baseline/lm-evaluation-harness",
+      "evaluator": "lm-evaluation-harness",
+      "native_sha256": "sha256:1726a4447a288476a8789357492746a9ebafa3057a01e09ec95f0466d0700095",
+      "profile": "local",
+      "protocol_digest": "sha256:78512347e5a53bebdd78293349ed66a97ef5796f44f6b6112f1783beed1f6353",
+      "role": "baseline",
+      "version": "0.4.12"
+    },
+    {
+      "case_count": 64,
+      "directory": "capture/captures/local/subject/lm-evaluation-harness",
+      "evaluator": "lm-evaluation-harness",
+      "native_sha256": "sha256:c5b6205b425749acf397f9572345edb599daf0f701a080c8c2073520d1d71e16",
+      "profile": "local",
+      "protocol_digest": "sha256:fd8364f7e1ef8dcef8041fa01f4e4f283f4dbe76a182ac4dc72d4da8a71c6c80",
+      "role": "subject",
+      "version": "0.4.12"
+    },
+    {
+      "case_count": 64,
+      "directory": "capture/captures/local/baseline/promptfoo",
+      "evaluator": "promptfoo",
+      "native_sha256": "sha256:8ec6b93f89a7ae2ec0c27cfd0bd36e0a843753c8fe9e9070036ee940a76977c1",
+      "profile": "local",
+      "protocol_digest": "sha256:78512347e5a53bebdd78293349ed66a97ef5796f44f6b6112f1783beed1f6353",
+      "role": "baseline",
+      "version": "0.121.19"
+    },
+    {
+      "case_count": 64,
+      "directory": "capture/captures/local/subject/promptfoo",
+      "evaluator": "promptfoo",
+      "native_sha256": "sha256:212b38bb12871575c0fe4d2588b6f896f3cc4eb4c570e962769c6dbb612cc882",
+      "profile": "local",
+      "protocol_digest": "sha256:fd8364f7e1ef8dcef8041fa01f4e4f283f4dbe76a182ac4dc72d4da8a71c6c80",
+      "role": "subject",
+      "version": "0.121.19"
+    },
+    {
+      "case_count": 64,
+      "directory": "capture/captures/local/baseline/langfuse",
+      "evaluator": "langfuse",
+      "native_sha256": "sha256:341f84c68465f46af12e0f2db1373f9d9f9ea5c291a71ddb6996cbe77c2bd968",
+      "profile": "local",
+      "protocol_digest": "sha256:78512347e5a53bebdd78293349ed66a97ef5796f44f6b6112f1783beed1f6353",
+      "role": "baseline",
+      "version": "4.14.1"
+    },
+    {
+      "case_count": 64,
+      "directory": "capture/captures/local/subject/langfuse",
+      "evaluator": "langfuse",
+      "native_sha256": "sha256:78d283614023afde7ba7b9b7efc1843abccf44a3ff507c25f48e6a19a0a49179",
+      "profile": "local",
+      "protocol_digest": "sha256:fd8364f7e1ef8dcef8041fa01f4e4f283f4dbe76a182ac4dc72d4da8a71c6c80",
+      "role": "subject",
+      "version": "4.14.1"
+    },
+    {
+      "case_count": 8,
+      "directory": "capture/captures/http/baseline/inspect-ai",
+      "evaluator": "inspect-ai",
+      "native_sha256": "sha256:e25f794d3cf0790c41c96071e23270c2e23333443201a4a326b1440d48c0031a",
+      "profile": "http",
+      "protocol_digest": "sha256:fbf420336d54c322531f03fa666ec2570b945bc08dce265a90a5211695a901bc",
+      "role": "baseline",
+      "version": "0.3.254"
+    },
+    {
+      "case_count": 8,
+      "directory": "capture/captures/http/subject/inspect-ai",
+      "evaluator": "inspect-ai",
+      "native_sha256": "sha256:09ac63069e413177a16dbec0378c54f8f93c69e614003a527da678017403d969",
+      "profile": "http",
+      "protocol_digest": "sha256:c2859c329f6385c3cda4e867ba033dc4ad8e2c90ccaffa4417accb38d3a10706",
+      "role": "subject",
+      "version": "0.3.254"
+    },
+    {
+      "case_count": 8,
+      "directory": "capture/captures/http/baseline/lm-evaluation-harness",
+      "evaluator": "lm-evaluation-harness",
+      "native_sha256": "sha256:77da7c371c26305dfff57ccd174652cfa311fedd1865ddb13e9d83354ce1cb76",
+      "profile": "http",
+      "protocol_digest": "sha256:fbf420336d54c322531f03fa666ec2570b945bc08dce265a90a5211695a901bc",
+      "role": "baseline",
+      "version": "0.4.12"
+    },
+    {
+      "case_count": 8,
+      "directory": "capture/captures/http/subject/lm-evaluation-harness",
+      "evaluator": "lm-evaluation-harness",
+      "native_sha256": "sha256:2097e1db02c09e19a4add410619f62acb3142699b60605fa7ab890ea0adff666",
+      "profile": "http",
+      "protocol_digest": "sha256:c2859c329f6385c3cda4e867ba033dc4ad8e2c90ccaffa4417accb38d3a10706",
+      "role": "subject",
+      "version": "0.4.12"
+    },
+    {
+      "case_count": 8,
+      "directory": "capture/captures/http/baseline/promptfoo",
+      "evaluator": "promptfoo",
+      "native_sha256": "sha256:fef53528214dc0c72053e79b122b16decd804339b34e1852d7e27755b047d8b7",
+      "profile": "http",
+      "protocol_digest": "sha256:fbf420336d54c322531f03fa666ec2570b945bc08dce265a90a5211695a901bc",
+      "role": "baseline",
+      "version": "0.121.19"
+    },
+    {
+      "case_count": 8,
+      "directory": "capture/captures/http/subject/promptfoo",
+      "evaluator": "promptfoo",
+      "native_sha256": "sha256:4a98760dfee5c01e1e2cf1edc230811a9eb49c90a0b12c19df4f788f5769e9c4",
+      "profile": "http",
+      "protocol_digest": "sha256:c2859c329f6385c3cda4e867ba033dc4ad8e2c90ccaffa4417accb38d3a10706",
+      "role": "subject",
+      "version": "0.121.19"
+    },
+    {
+      "case_count": 8,
+      "directory": "capture/captures/http/baseline/langfuse",
+      "evaluator": "langfuse",
+      "native_sha256": "sha256:5dd482ebcc871ca129d8ad738940af449b03f12f437743951b6d5c0aa3b6587d",
+      "profile": "http",
+      "protocol_digest": "sha256:fbf420336d54c322531f03fa666ec2570b945bc08dce265a90a5211695a901bc",
+      "role": "baseline",
+      "version": "4.14.1"
+    },
+    {
+      "case_count": 8,
+      "directory": "capture/captures/http/subject/langfuse",
+      "evaluator": "langfuse",
+      "native_sha256": "sha256:c78465d86242e1720db57765926e59ee364743325f5674d4e576e1f3f3e3dd48",
+      "profile": "http",
+      "protocol_digest": "sha256:c2859c329f6385c3cda4e867ba033dc4ad8e2c90ccaffa4417accb38d3a10706",
+      "role": "subject",
+      "version": "4.14.1"
+    }
+  ],
+  "evaluators": [
+    "inspect-ai",
+    "lm-evaluation-harness",
+    "promptfoo",
+    "langfuse"
+  ],
+  "format": "invarlock/evaluator-priority-reference-v1",
+  "fresh_model_case_requests": 576,
+  "import_routes": [
+    "envelope",
+    "native-json"
+  ],
+  "judge_companion": "separate reference; not included in these EM/NLL archives",
+  "packs": [
+    {
+      "anchors": {
+        "baseline_run_digest": "sha256:04f96b5362b295aeb9a457db69bf63b7fc12689713fd435385432f131194080c",
+        "evidence_signer_fingerprint": "sha256:306b53a138a03e1e2f8eb45c374539ed7b808823de050dd852bda826fd2b1748",
+        "request_digest": "sha256:c7344f55fe69266103b31e0d3e149b949534be6f4e0649ca03ff96fc5b759e69",
+        "subject_run_digest": "sha256:cc9d166479b6b1eb42ef1086399cd8ad27c8603ed3c4387687dce27ed308e5a1"
+      },
+      "directory": "recipient/local/inspect-ai/envelope/exact_match",
+      "evaluator": "inspect-ai",
+      "expected": {
+        "decision": "regression",
+        "integrity_ok": true,
+        "pack_manifest_digest": "sha256:6ae681e56c2e367ce1634ecd94850ba973384de75fd699e07d172a0a576ceb40",
+        "policy_verdict": "fail",
+        "replay_status": "completed"
+      },
+      "expected_status": 7,
+      "id": "local/inspect-ai/envelope/exact_match",
+      "profile": "local",
+      "receipt_public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAYWgZ860DfISItaz4vwxBmAK6pXM/cULkC6RJeZBf23k=\n-----END PUBLIC KEY-----\n",
+      "route": "envelope",
+      "scorer": "exact_match",
+      "verifier": {
+        "identity": "live-evaluator-recipient",
+        "signing_key_fingerprint": "sha256:cae7f6f81bc299cce0103fb2ff87c6f604bb3a2772e71c8f215c61f33b73e6db",
+        "trust_profile_digest": "sha256:3265da1cb9459b4c14fae985c10f3b4f5e5255cd11d56fc47e7119cef6c434c4"
+      }
+    },
+    {
+      "anchors": {
+        "baseline_run_digest": "sha256:04f96b5362b295aeb9a457db69bf63b7fc12689713fd435385432f131194080c",
+        "evidence_signer_fingerprint": "sha256:775804d90549e6a16b48e1b1c211eeeeb6376517b5458fbb94828b985f57c180",
+        "request_digest": "sha256:55bf1fda1f07470055f6f8d2949740a5d42998e61e9dfbc60c251e7bcec62d1a",
+        "subject_run_digest": "sha256:cc9d166479b6b1eb42ef1086399cd8ad27c8603ed3c4387687dce27ed308e5a1"
+      },
+      "directory": "recipient/local/inspect-ai/envelope/normalized_nll",
+      "evaluator": "inspect-ai",
+      "expected": {
+        "decision": "regression",
+        "integrity_ok": true,
+        "pack_manifest_digest": "sha256:da8af4a5fcc69900dbe080b297546051ab88c1137c0ce0b37ce25b1ae18af4ec",
+        "policy_verdict": "fail",
+        "replay_status": "completed"
+      },
+      "expected_status": 7,
+      "id": "local/inspect-ai/envelope/normalized_nll",
+      "profile": "local",
+      "receipt_public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEADpX6kEM2K4j/TjwQHNs8ROyqY6vlSJKbmEGYHr5ONDo=\n-----END PUBLIC KEY-----\n",
+      "route": "envelope",
+      "scorer": "normalized_nll",
+      "verifier": {
+        "identity": "live-evaluator-recipient",
+        "signing_key_fingerprint": "sha256:2b43230d638e6deeedd70f2513cd35c3bb2d8729ec020033d65332851d104e41",
+        "trust_profile_digest": "sha256:bd876385b69db0790e19d39609297fa5c625a9bfec4c7c4de0fca25258044817"
+      }
+    },
+    {
+      "anchors": {
+        "baseline_run_digest": "sha256:75946ae28ef26de26a8b881c59c041ca0e8e97f60b8849c999ee8bd9c5c8be6e",
+        "evidence_signer_fingerprint": "sha256:c7d1a1060ed89888af83d0171e4a0ccf2bf93854c470120a5aa7e42e87e7bfd6",
+        "request_digest": "sha256:b98c4c73685b2f964769ddf28f23a88d9c9d5d1647609dde52754947140f9ee2",
+        "subject_run_digest": "sha256:d389a09205b5b9ad053ed291e5a4c439404f0d310578cd6cdb9f431a6353721f"
+      },
+      "directory": "recipient/local/inspect-ai/native-json/exact_match",
+      "evaluator": "inspect-ai",
+      "expected": {
+        "decision": "regression",
+        "integrity_ok": true,
+        "pack_manifest_digest": "sha256:d7edfe47aced780fab4d60dba8a0885cb61049ae037eab43da83b4a20d823623",
+        "policy_verdict": "fail",
+        "replay_status": "completed"
+      },
+      "expected_status": 7,
+      "id": "local/inspect-ai/native-json/exact_match",
+      "profile": "local",
+      "receipt_public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAn2eMdu+AHYuj8pSY3AyQjhJo58KEmwoeDtfICDTxa94=\n-----END PUBLIC KEY-----\n",
+      "route": "native-json",
+      "scorer": "exact_match",
+      "verifier": {
+        "identity": "live-evaluator-recipient",
+        "signing_key_fingerprint": "sha256:6f1747c085c2d1f228773f06e9c7156ccb921260d247c4cd57d17ba85aa5e7e4",
+        "trust_profile_digest": "sha256:779867ee30ddd68acf1d214af341dcc2a0227b97ba4b02e68cb0a397013a225b"
+      }
+    },
+    {
+      "anchors": {
+        "baseline_run_digest": "sha256:75946ae28ef26de26a8b881c59c041ca0e8e97f60b8849c999ee8bd9c5c8be6e",
+        "evidence_signer_fingerprint": "sha256:2d3fc8a53c6ccb0f291444a117b6b01630bc9650bd85c7e46f9e5950ecfd253f",
+        "request_digest": "sha256:4fbffa14852a8eaa53833c43d1e195683d6fff3cec8c1e0238b31680e4ba83e0",
+        "subject_run_digest": "sha256:d389a09205b5b9ad053ed291e5a4c439404f0d310578cd6cdb9f431a6353721f"
+      },
+      "directory": "recipient/local/inspect-ai/native-json/normalized_nll",
+      "evaluator": "inspect-ai",
+      "expected": {
+        "decision": "regression",
+        "integrity_ok": true,
+        "pack_manifest_digest": "sha256:f47e06be37d6941c9df63ea251f3d74851b1c7603fe56b9df4ff1a45b9fe643f",
+        "policy_verdict": "fail",
+        "replay_status": "completed"
+      },
+      "expected_status": 7,
+      "id": "local/inspect-ai/native-json/normalized_nll",
+      "profile": "local",
+      "receipt_public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAZFKqxmgJIyHU3lWJyXFulm83kTWC5G+icx+5XMllb/g=\n-----END PUBLIC KEY-----\n",
+      "route": "native-json",
+      "scorer": "normalized_nll",
+      "verifier": {
+        "identity": "live-evaluator-recipient",
+        "signing_key_fingerprint": "sha256:6872aee3d31b2e9d0d661aeaaf42a3b1cf5074d4b0a1481613a275b59eed08db",
+        "trust_profile_digest": "sha256:79cdf1c002726052cbfb022db4c80090686d432dec4471df555188b3c358ca94"
+      }
+    },
+    {
+      "anchors": {
+        "baseline_run_digest": "sha256:15f5b6f83a772405acd841845bdd0874564bbc473e489d21d78967536c931cae",
+        "evidence_signer_fingerprint": "sha256:960362bf67516b8d06a319f813f32c4e14818efe9fcb6f1bfecd987d32415759",
+        "request_digest": "sha256:b400ca22850da7b740863130b43b4ffac7d14382cc5795e2eb66e2be72dc24cd",
+        "subject_run_digest": "sha256:387fc5860ce5fec8bca2128ba0530c2d7a75f62cade613c3c69cf496f4d5d8b9"
+      },
+      "directory": "recipient/local/lm-evaluation-harness/envelope/exact_match",
+      "evaluator": "lm-evaluation-harness",
+      "expected": {
+        "decision": "regression",
+        "integrity_ok": true,
+        "pack_manifest_digest": "sha256:67494de20838e82d82f434a5b6b748ea2c9d0aaf0bf6225b060367e8d2cf58d4",
+        "policy_verdict": "fail",
+        "replay_status": "completed"
+      },
+      "expected_status": 7,
+      "id": "local/lm-evaluation-harness/envelope/exact_match",
+      "profile": "local",
+      "receipt_public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA7afmCh9FjSRbXkaUo2UUD7G8zZNjK7u3Q0ucpENYEhY=\n-----END PUBLIC KEY-----\n",
+      "route": "envelope",
+      "scorer": "exact_match",
+      "verifier": {
+        "identity": "live-evaluator-recipient",
+        "signing_key_fingerprint": "sha256:7fe276450c1a5d7f63591fa07ae422a68e7a99fd100415e9f5ec2cfee1ef2dde",
+        "trust_profile_digest": "sha256:02381a1ebb8390d0185ed975ddd7992c97eebff2aff9b92bb5bb3f9cc980ec35"
+      }
+    },
+    {
+      "anchors": {
+        "baseline_run_digest": "sha256:15f5b6f83a772405acd841845bdd0874564bbc473e489d21d78967536c931cae",
+        "evidence_signer_fingerprint": "sha256:bf3632d9d4d6218cbbce3ab327f8052158067d2c43f8eab8092841442b5003b6",
+        "request_digest": "sha256:76eda66076fe4812d246b915a294a2a58ac808b75794cfc8cedfa221c57efa12",
+        "subject_run_digest": "sha256:387fc5860ce5fec8bca2128ba0530c2d7a75f62cade613c3c69cf496f4d5d8b9"
+      },
+      "directory": "recipient/local/lm-evaluation-harness/envelope/normalized_nll",
+      "evaluator": "lm-evaluation-harness",
+      "expected": {
+        "decision": "regression",
+        "integrity_ok": true,
+        "pack_manifest_digest": "sha256:d40ab1e6cad36086e624e1774b4f278091d5d52fccdc12e3469b47b41a29949c",
+        "policy_verdict": "fail",
+        "replay_status": "completed"
+      },
+      "expected_status": 7,
+      "id": "local/lm-evaluation-harness/envelope/normalized_nll",
+      "profile": "local",
+      "receipt_public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAuJYbT+m7sQcNs+m3HBaPHOjxTw6ywvjg6dcHSv0+flg=\n-----END PUBLIC KEY-----\n",
+      "route": "envelope",
+      "scorer": "normalized_nll",
+      "verifier": {
+        "identity": "live-evaluator-recipient",
+        "signing_key_fingerprint": "sha256:fbecd5e399ba3278a7d87ca2b77b4bb68a8ae369f20ce605e47a71be1423ca8f",
+        "trust_profile_digest": "sha256:51bfa1fe6964f979ebcad09b45ab33faccafea255e03282cd7344271872871d4"
+      }
+    },
+    {
+      "anchors": {
+        "baseline_run_digest": "sha256:a94aa016edff091dbdd81d29c70dcdec82f00bae3cfc42297c1076a7548fbf20",
+        "evidence_signer_fingerprint": "sha256:d77a4effcaeb15479965b4e7fc955884304efdccad9ccdc387a32c8710306817",
+        "request_digest": "sha256:59cb394c521ca74628f1c15a8442d86b225fe0b5c2a87edd4e476da340d6ca97",
+        "subject_run_digest": "sha256:54147e7327b10913bff48c0438ec8f3c86380f9522f16d2ca017674a15c41a4c"
+      },
+      "directory": "recipient/local/lm-evaluation-harness/native-json/exact_match",
+      "evaluator": "lm-evaluation-harness",
+      "expected": {
+        "decision": "regression",
+        "integrity_ok": true,
+        "pack_manifest_digest": "sha256:e3cadd926d45d6d40621d222317b37716e1136348de81ed57d82c3dc8d707464",
+        "policy_verdict": "fail",
+        "replay_status": "completed"
+      },
+      "expected_status": 7,
+      "id": "local/lm-evaluation-harness/native-json/exact_match",
+      "profile": "local",
+      "receipt_public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEANwG82KZ1pYGtxTyRa6vBgB4rCNJnOUgOEQi5dmo1jGQ=\n-----END PUBLIC KEY-----\n",
+      "route": "native-json",
+      "scorer": "exact_match",
+      "verifier": {
+        "identity": "live-evaluator-recipient",
+        "signing_key_fingerprint": "sha256:3e6500d5436b6eb842ac8f446e330c8d38518a9985d55c5687ca8259aa90313f",
+        "trust_profile_digest": "sha256:11d302f153dcce685d74e2c1e53e060562e467addbbf9dc1940f90b127f068e4"
+      }
+    },
+    {
+      "anchors": {
+        "baseline_run_digest": "sha256:a94aa016edff091dbdd81d29c70dcdec82f00bae3cfc42297c1076a7548fbf20",
+        "evidence_signer_fingerprint": "sha256:9d0bbbbe92eca3b838b6725314ea55e217d9fc9ad1707a71cdb6c4ee414555d1",
+        "request_digest": "sha256:39a615deb759b6dc4c9b2b52fd02167590bce09e933b03a5b79ac9410a713ad4",
+        "subject_run_digest": "sha256:54147e7327b10913bff48c0438ec8f3c86380f9522f16d2ca017674a15c41a4c"
+      },
+      "directory": "recipient/local/lm-evaluation-harness/native-json/normalized_nll",
+      "evaluator": "lm-evaluation-harness",
+      "expected": {
+        "decision": "regression",
+        "integrity_ok": true,
+        "pack_manifest_digest": "sha256:ea6e7184637773a76b3d44e56698f8f062c470fae4e73e04b6add7d4bc041790",
+        "policy_verdict": "fail",
+        "replay_status": "completed"
+      },
+      "expected_status": 7,
+      "id": "local/lm-evaluation-harness/native-json/normalized_nll",
+      "profile": "local",
+      "receipt_public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAFybATjeLt9nFNzxRY/Vmcb6hjVJK7iR+LGSad8quIsE=\n-----END PUBLIC KEY-----\n",
+      "route": "native-json",
+      "scorer": "normalized_nll",
+      "verifier": {
+        "identity": "live-evaluator-recipient",
+        "signing_key_fingerprint": "sha256:92c3fc0f0fd7339371d4f72ddf34bd6439553093197839cafb654e1d9d5add69",
+        "trust_profile_digest": "sha256:93da2855db420e2763337bb80b5fec05e731f3d9a9470d359faa0aea1a98cdaa"
+      }
+    },
+    {
+      "anchors": {
+        "baseline_run_digest": "sha256:f77557add4462fbb99fb4280bb5094637e88d0d0230f132ed53e57cd94702338",
+        "evidence_signer_fingerprint": "sha256:409e5d10813a2afd67c660a1b5daef45f475638fffa7dd288d846af16ce2b212",
+        "request_digest": "sha256:24381db8ba4cdc0f2ae1b70f39834eeff23e869ccd803efead257d896a8c860a",
+        "subject_run_digest": "sha256:1ac6d74c0c90cf37f4b1c36673c092a95ea9b6f0643a63d3daeaa102236b00c3"
+      },
+      "directory": "recipient/local/promptfoo/envelope/exact_match",
+      "evaluator": "promptfoo",
+      "expected": {
+        "decision": "regression",
+        "integrity_ok": true,
+        "pack_manifest_digest": "sha256:33df9a14c01562c3c3c4e292f423abb434ba072331e61c62fe64ba3bb3e2a99e",
+        "policy_verdict": "fail",
+        "replay_status": "completed"
+      },
+      "expected_status": 7,
+      "id": "local/promptfoo/envelope/exact_match",
+      "profile": "local",
+      "receipt_public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAoDC8pUnkVK/AQHQ4gc21RpFKbOUVHhNFtQaa66Yv4Y8=\n-----END PUBLIC KEY-----\n",
+      "route": "envelope",
+      "scorer": "exact_match",
+      "verifier": {
+        "identity": "live-evaluator-recipient",
+        "signing_key_fingerprint": "sha256:fb427fc5e7e644ed9a0dbf567699f37cfb3e01194b3903da594b863d7c72d46c",
+        "trust_profile_digest": "sha256:74ec433c5093f4602c0c04bcb8a0c5f9deb7db4eed6319713e2663223007a8e0"
+      }
+    },
+    {
+      "anchors": {
+        "baseline_run_digest": "sha256:f77557add4462fbb99fb4280bb5094637e88d0d0230f132ed53e57cd94702338",
+        "evidence_signer_fingerprint": "sha256:35fc39d035d4cdf9ba5a1306a2d8e153d87ed2d8ddc00f5bc4987c12e375025b",
+        "request_digest": "sha256:42883361a697e339065c53ea0f08113ef3154670bbad3ec113cf23d24de0f221",
+        "subject_run_digest": "sha256:1ac6d74c0c90cf37f4b1c36673c092a95ea9b6f0643a63d3daeaa102236b00c3"
+      },
+      "directory": "recipient/local/promptfoo/envelope/normalized_nll",
+      "evaluator": "promptfoo",
+      "expected": {
+        "decision": "regression",
+        "integrity_ok": true,
+        "pack_manifest_digest": "sha256:e5e9e13a493d08598d5c9179dbaaca2c80974fdccf1061e3fb5091ef6668de90",
+        "policy_verdict": "fail",
+        "replay_status": "completed"
+      },
+      "expected_status": 7,
+      "id": "local/promptfoo/envelope/normalized_nll",
+      "profile": "local",
+      "receipt_public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEADJ+m0s+ARb5UmGpCr6OptrGUxXZhcU1kFLX6YvON6NQ=\n-----END PUBLIC KEY-----\n",
+      "route": "envelope",
+      "scorer": "normalized_nll",
+      "verifier": {
+        "identity": "live-evaluator-recipient",
+        "signing_key_fingerprint": "sha256:ffab248eacbd6d4fb3450439c1ea83b8f65894e17903ae72154cd1acd8b31f7a",
+        "trust_profile_digest": "sha256:be61a9a1050c1ed3bb81879a4ac59640a631c7162b6cb660b125366c4243839e"
+      }
+    },
+    {
+      "anchors": {
+        "baseline_run_digest": "sha256:bcfc9f6bf31725c02bfad53e64726dfd680f354a91f2d771e1196938efedfa17",
+        "evidence_signer_fingerprint": "sha256:d131910b9211d27f20cd23fdf8958da1a9e96886480db52b1dfb1eda93240060",
+        "request_digest": "sha256:caed611cb4f84916970badb3c09c26e0dd31f1e59d28aebb904373b10151493b",
+        "subject_run_digest": "sha256:dc58f0557a3304258f4f3f511ff06a4aa6c191d09c442995b662e3340d774ba3"
+      },
+      "directory": "recipient/local/promptfoo/native-json/exact_match",
+      "evaluator": "promptfoo",
+      "expected": {
+        "decision": "regression",
+        "integrity_ok": true,
+        "pack_manifest_digest": "sha256:d0d0fe633465ed63aed16ef7f8936e1d1e0ee4a12061a0095ea968bd0a24ced7",
+        "policy_verdict": "fail",
+        "replay_status": "completed"
+      },
+      "expected_status": 7,
+      "id": "local/promptfoo/native-json/exact_match",
+      "profile": "local",
+      "receipt_public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA6bm/gNMlmAsgQfwp8kWuaDOFqoOReTJIiyZLDjO4PVw=\n-----END PUBLIC KEY-----\n",
+      "route": "native-json",
+      "scorer": "exact_match",
+      "verifier": {
+        "identity": "live-evaluator-recipient",
+        "signing_key_fingerprint": "sha256:fc670fe81ba55e8d2aeee9aecfcbb96d3ee563ae1b144639857566dc29fce071",
+        "trust_profile_digest": "sha256:f876d17ebeb55c71f2589b48c7d221c59bd7005d28171bcbdb7b126ff0240562"
+      }
+    },
+    {
+      "anchors": {
+        "baseline_run_digest": "sha256:bcfc9f6bf31725c02bfad53e64726dfd680f354a91f2d771e1196938efedfa17",
+        "evidence_signer_fingerprint": "sha256:fbbbcc0f9e2bc2877b6d39bd5540c26a73f17f5b0bde4ecf34751f81067aa738",
+        "request_digest": "sha256:ddf397cb2ebe6877db0bf88d7f27dcb835b29aa76aaaf7663b389acc4a68b125",
+        "subject_run_digest": "sha256:dc58f0557a3304258f4f3f511ff06a4aa6c191d09c442995b662e3340d774ba3"
+      },
+      "directory": "recipient/local/promptfoo/native-json/normalized_nll",
+      "evaluator": "promptfoo",
+      "expected": {
+        "decision": "regression",
+        "integrity_ok": true,
+        "pack_manifest_digest": "sha256:330d989918dd7c760a4c7e78f7752a3cbf3c2450d8687bb8a757a3c6e896a79a",
+        "policy_verdict": "fail",
+        "replay_status": "completed"
+      },
+      "expected_status": 7,
+      "id": "local/promptfoo/native-json/normalized_nll",
+      "profile": "local",
+      "receipt_public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAYB+kUy9/M78J9qUJy/m7sOB109V3DPO31rdtGRz67o0=\n-----END PUBLIC KEY-----\n",
+      "route": "native-json",
+      "scorer": "normalized_nll",
+      "verifier": {
+        "identity": "live-evaluator-recipient",
+        "signing_key_fingerprint": "sha256:199aa394df952df71c1ef4d819a159df7e77c7dbf927da41383ded16fe96d8c5",
+        "trust_profile_digest": "sha256:c069df00afa45148c26dc129f04406fa7d03dd7d75ce3be173e0422f1b288a09"
+      }
+    },
+    {
+      "anchors": {
+        "baseline_run_digest": "sha256:f52845eebd55b939bc57ddf578d759b02dc847d5eaf1a6d44fc84a920f96ee6b",
+        "evidence_signer_fingerprint": "sha256:fe55b82bdf2517672c7f385ae71e4ed2193589b5b49630ee0387839174a44ac0",
+        "request_digest": "sha256:77dbe7f3aabf84d5847f1daab28737420e511b4fb811892d4624be8f273cb138",
+        "subject_run_digest": "sha256:60ce48262dced1b40bbdf6abb3a6b748973b68129f5c3564c44b1667da81bc0a"
+      },
+      "directory": "recipient/local/langfuse/envelope/exact_match",
+      "evaluator": "langfuse",
+      "expected": {
+        "decision": "regression",
+        "integrity_ok": true,
+        "pack_manifest_digest": "sha256:a3617a9e344b62c7d41977bb5727fb3eaf19a01c16e8bdc275761781ccfbfd9e",
+        "policy_verdict": "fail",
+        "replay_status": "completed"
+      },
+      "expected_status": 7,
+      "id": "local/langfuse/envelope/exact_match",
+      "profile": "local",
+      "receipt_public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA0M17X52zU3SApJwf5N8j60k3pLWbuZuctxgkKlF3xeM=\n-----END PUBLIC KEY-----\n",
+      "route": "envelope",
+      "scorer": "exact_match",
+      "verifier": {
+        "identity": "live-evaluator-recipient",
+        "signing_key_fingerprint": "sha256:ada57d346aa8380217002d17da80df894eff062fb64a0a00f9cd157af2f86aa7",
+        "trust_profile_digest": "sha256:6aa38df50264445b78abd5d0cd5de1c95049446fd3735ee00a8614e137323679"
+      }
+    },
+    {
+      "anchors": {
+        "baseline_run_digest": "sha256:f52845eebd55b939bc57ddf578d759b02dc847d5eaf1a6d44fc84a920f96ee6b",
+        "evidence_signer_fingerprint": "sha256:13a86d1ed344fd0d8c49ae21effe27baf06480556ceb9fae653104f99177f2bd",
+        "request_digest": "sha256:0d761ed425ef8319f9c4fb29e8597746826e938ec8ebbffdd1c7672753cba177",
+        "subject_run_digest": "sha256:60ce48262dced1b40bbdf6abb3a6b748973b68129f5c3564c44b1667da81bc0a"
+      },
+      "directory": "recipient/local/langfuse/envelope/normalized_nll",
+      "evaluator": "langfuse",
+      "expected": {
+        "decision": "regression",
+        "integrity_ok": true,
+        "pack_manifest_digest": "sha256:d7155265258a683619564e85ec9cf4a0c96c9b91dcd58e5e8cf8ab19d8d4575a",
+        "policy_verdict": "fail",
+        "replay_status": "completed"
+      },
+      "expected_status": 7,
+      "id": "local/langfuse/envelope/normalized_nll",
+      "profile": "local",
+      "receipt_public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAm8VGs9Dcgek52Nqktc8DntzeRbZVBCqAHPYBg3t0pCg=\n-----END PUBLIC KEY-----\n",
+      "route": "envelope",
+      "scorer": "normalized_nll",
+      "verifier": {
+        "identity": "live-evaluator-recipient",
+        "signing_key_fingerprint": "sha256:72a8ab5b4759f1bb55f5568ad75d327fb8e3b6474461ada1dc51fe1e7c80a9e6",
+        "trust_profile_digest": "sha256:bd65b71e3881172e739c22e2ec0d5f9369c265ddab0fde3b018fb00014c125e7"
+      }
+    },
+    {
+      "anchors": {
+        "baseline_run_digest": "sha256:1f3c323fc4c9902a31563e63c6455b50654dc52d8802f8cfd62139746cbeae98",
+        "evidence_signer_fingerprint": "sha256:d751b044b71b5c052b1882fda07432ae54d304a9dc49bf566f304b6104870138",
+        "request_digest": "sha256:6ec51d31f9a22f8e9196b37317d18a805e6f7742fd70604be0099a02183ed0e1",
+        "subject_run_digest": "sha256:69ca9d630c4df7d4ef2d160acccc177ae220190e9f511a0341111f1e04d4bc25"
+      },
+      "directory": "recipient/local/langfuse/native-json/exact_match",
+      "evaluator": "langfuse",
+      "expected": {
+        "decision": "regression",
+        "integrity_ok": true,
+        "pack_manifest_digest": "sha256:7c904ccea6f9dc06fc3705de5a38b7bd5984a3b9c9683c3c154935eb52422ea8",
+        "policy_verdict": "fail",
+        "replay_status": "completed"
+      },
+      "expected_status": 7,
+      "id": "local/langfuse/native-json/exact_match",
+      "profile": "local",
+      "receipt_public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA8cWjSYBY77ZoFzXLEIBYCCHBAb6Uus4mxXuPXpHQq0A=\n-----END PUBLIC KEY-----\n",
+      "route": "native-json",
+      "scorer": "exact_match",
+      "verifier": {
+        "identity": "live-evaluator-recipient",
+        "signing_key_fingerprint": "sha256:f0cc10b7c1776514ffe2bed19600b4f7a783aba451f44a63331a2f281740f59b",
+        "trust_profile_digest": "sha256:063a2344fcacbc2c33226f148dfe2304c7cf12fc2c53e1ec526e2b8b85cb661e"
+      }
+    },
+    {
+      "anchors": {
+        "baseline_run_digest": "sha256:1f3c323fc4c9902a31563e63c6455b50654dc52d8802f8cfd62139746cbeae98",
+        "evidence_signer_fingerprint": "sha256:473c4fd353f8cbe15669f475ac2c96a7509d16b707e52f62d5666ecdb7d8838b",
+        "request_digest": "sha256:27b7e537f61419ceaeb42b73d2449e905c90330a9ccaad7ae55cca7fcb589b66",
+        "subject_run_digest": "sha256:69ca9d630c4df7d4ef2d160acccc177ae220190e9f511a0341111f1e04d4bc25"
+      },
+      "directory": "recipient/local/langfuse/native-json/normalized_nll",
+      "evaluator": "langfuse",
+      "expected": {
+        "decision": "regression",
+        "integrity_ok": true,
+        "pack_manifest_digest": "sha256:d5d1d3d654a9fa1a1d6ae1c7eaf42da45e36ae76b2b8cce87448c2dc6adbed0f",
+        "policy_verdict": "fail",
+        "replay_status": "completed"
+      },
+      "expected_status": 7,
+      "id": "local/langfuse/native-json/normalized_nll",
+      "profile": "local",
+      "receipt_public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAeibfSbfLcd6t5HvaBNrtQnV9/zQt14jHq6hh1acnrKw=\n-----END PUBLIC KEY-----\n",
+      "route": "native-json",
+      "scorer": "normalized_nll",
+      "verifier": {
+        "identity": "live-evaluator-recipient",
+        "signing_key_fingerprint": "sha256:903c54044674422e0903bae7c8669fd3dee7becaecacd343590f738cea947212",
+        "trust_profile_digest": "sha256:7085e7ddb36129d43063553359072d4f9718f3ddfb81b24f70d55c8412a75936"
+      }
+    },
+    {
+      "anchors": {
+        "baseline_run_digest": "sha256:e822b260684b8eab48d002278386eb52de93d6b6d45a2df66729f6f408b5adb8",
+        "evidence_signer_fingerprint": "sha256:63f754142c5bd7d4986a93ab7d3dab722d317e748b38678e269a2a74e044347b",
+        "request_digest": "sha256:7ab3fdc278ebdacede9f77ac76ab861126fdef76fc861d5b0a04981f261e7a24",
+        "subject_run_digest": "sha256:835bb97cae4148f3f3e10b560eeddc51e3cf5aa28c0fd6bf6509af3c3303ed4a"
+      },
+      "directory": "recipient/http/inspect-ai/envelope/exact_match",
+      "evaluator": "inspect-ai",
+      "expected": {
+        "decision": "regression",
+        "integrity_ok": true,
+        "pack_manifest_digest": "sha256:0628bf5ed00bb7090cd26d784a3491567660923928587f33274f4a46803f950d",
+        "policy_verdict": "fail",
+        "replay_status": "completed"
+      },
+      "expected_status": 7,
+      "id": "http/inspect-ai/envelope/exact_match",
+      "profile": "http",
+      "receipt_public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAHcpZtadczMHk1RdJRBrVL91udIvqQG0iHkQFIJuVgjU=\n-----END PUBLIC KEY-----\n",
+      "route": "envelope",
+      "scorer": "exact_match",
+      "verifier": {
+        "identity": "live-evaluator-recipient",
+        "signing_key_fingerprint": "sha256:f27a2cda315265c8268d88e1f63dd95892d5b88e2ac61163fb8225b69c8088f3",
+        "trust_profile_digest": "sha256:46aede5c6ee2fed9792ce7ae04b5f7a32b06ee0ecf79d6c904e03026f5b97539"
+      }
+    },
+    {
+      "anchors": {
+        "baseline_run_digest": "sha256:e822b260684b8eab48d002278386eb52de93d6b6d45a2df66729f6f408b5adb8",
+        "evidence_signer_fingerprint": "sha256:a1e2a30c35f591668a11d6ce5d86c7725b64bc4f514658cb464a059dd6370644",
+        "request_digest": "sha256:02d44325e2287474115a0775b59c3984a9b169140534dc30fc80b65cd22f3d94",
+        "subject_run_digest": "sha256:835bb97cae4148f3f3e10b560eeddc51e3cf5aa28c0fd6bf6509af3c3303ed4a"
+      },
+      "directory": "recipient/http/inspect-ai/envelope/normalized_nll",
+      "evaluator": "inspect-ai",
+      "expected": {
+        "decision": "regression",
+        "integrity_ok": true,
+        "pack_manifest_digest": "sha256:27b98d20a309b73bef15bc7f3d9dfe7a22f3f0bd64910dd2677b55e2a4b52fc4",
+        "policy_verdict": "fail",
+        "replay_status": "completed"
+      },
+      "expected_status": 7,
+      "id": "http/inspect-ai/envelope/normalized_nll",
+      "profile": "http",
+      "receipt_public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMKfjhhgROuq/NNP2WbZD9BffipaX0Xmj5I/eT5529lQ=\n-----END PUBLIC KEY-----\n",
+      "route": "envelope",
+      "scorer": "normalized_nll",
+      "verifier": {
+        "identity": "live-evaluator-recipient",
+        "signing_key_fingerprint": "sha256:1e58dc92a1455c815da60ab0539a1a32f9ccd7c6e9c1d89e19415e3701628958",
+        "trust_profile_digest": "sha256:0790c78ab6eec943bd776bfdc10bc79a246920665ad1fb263ddd73efa8b90214"
+      }
+    },
+    {
+      "anchors": {
+        "baseline_run_digest": "sha256:1e51c3d685ba13497b2e6b88c97b775a15378901be0e600b079ea0413e03be4d",
+        "evidence_signer_fingerprint": "sha256:c3f8b9b662ba8fca8933b0020a92cbce9db6104085784a5236f32b33db8000a0",
+        "request_digest": "sha256:27142bd819474995963e92d5b37ab43b05b531d3fa288e9cdc9f54a7607e562d",
+        "subject_run_digest": "sha256:32b5bcb863aa9541f25f03ecd7dd1308cd98c5b27573cfa942c766cf502b96f3"
+      },
+      "directory": "recipient/http/inspect-ai/native-json/exact_match",
+      "evaluator": "inspect-ai",
+      "expected": {
+        "decision": "regression",
+        "integrity_ok": true,
+        "pack_manifest_digest": "sha256:307ba723fca7377b7343b8d6a342924f092c5d00b0b02eff74111baaab0cced0",
+        "policy_verdict": "fail",
+        "replay_status": "completed"
+      },
+      "expected_status": 7,
+      "id": "http/inspect-ai/native-json/exact_match",
+      "profile": "http",
+      "receipt_public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAV3phQDYfhPvTFC9CoApo3yQ0XoCNuBS3TcbKvpkQFHs=\n-----END PUBLIC KEY-----\n",
+      "route": "native-json",
+      "scorer": "exact_match",
+      "verifier": {
+        "identity": "live-evaluator-recipient",
+        "signing_key_fingerprint": "sha256:f4bfa65c8eb88ae5b4b8e101d9378400739372b666019a9ef4cd40b2b63021db",
+        "trust_profile_digest": "sha256:84a1aee7f86b5de8db4318163e862a022531b05b292f6f2c6f6263274fad1193"
+      }
+    },
+    {
+      "anchors": {
+        "baseline_run_digest": "sha256:1e51c3d685ba13497b2e6b88c97b775a15378901be0e600b079ea0413e03be4d",
+        "evidence_signer_fingerprint": "sha256:1f3e4ae984ef3fd60e54df76d54ce6c74597891830fa11485d0e234405bc6d91",
+        "request_digest": "sha256:c8e9dedafe2f5fa29598d872f877fab8b921bb8169ab31fcb7ad565f18e48897",
+        "subject_run_digest": "sha256:32b5bcb863aa9541f25f03ecd7dd1308cd98c5b27573cfa942c766cf502b96f3"
+      },
+      "directory": "recipient/http/inspect-ai/native-json/normalized_nll",
+      "evaluator": "inspect-ai",
+      "expected": {
+        "decision": "regression",
+        "integrity_ok": true,
+        "pack_manifest_digest": "sha256:a8dc420df14d77949af9aa701f83b32b56ecafc3f85014b9ca336a82019b064e",
+        "policy_verdict": "fail",
+        "replay_status": "completed"
+      },
+      "expected_status": 7,
+      "id": "http/inspect-ai/native-json/normalized_nll",
+      "profile": "http",
+      "receipt_public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAISkToE+pGTJnRmTPYqvn/AL4WY2Ub8lNVXEXrLThc4M=\n-----END PUBLIC KEY-----\n",
+      "route": "native-json",
+      "scorer": "normalized_nll",
+      "verifier": {
+        "identity": "live-evaluator-recipient",
+        "signing_key_fingerprint": "sha256:4548993aa03402e1b1e3cc98d17c123ec65a2dbb885ba1654d780c645f6ac7e7",
+        "trust_profile_digest": "sha256:45f7e62f27aab625455b9af33284864b56fd23e905958b7f2fd71f1a6b428c73"
+      }
+    },
+    {
+      "anchors": {
+        "baseline_run_digest": "sha256:5e507b3cba0b5f18515939ada29321c90abb5daa2442e1f8e14ad77426eb2f61",
+        "evidence_signer_fingerprint": "sha256:5e2d432ba4160a72f08e558baf49c69f1165bd2e9a3f89dd8a0b35c207bc9df9",
+        "request_digest": "sha256:36dbe57553d153a7328e17ffdd548969aa29803f470f28ce471eb36f4b82bbd8",
+        "subject_run_digest": "sha256:cb0b1f44458df153cbead9f57f881d364de12a1423c2220ce02cdd8bfe09a91d"
+      },
+      "directory": "recipient/http/lm-evaluation-harness/envelope/exact_match",
+      "evaluator": "lm-evaluation-harness",
+      "expected": {
+        "decision": "regression",
+        "integrity_ok": true,
+        "pack_manifest_digest": "sha256:8cd52a8ecd823e8d30b30f1898b96ba6ff1ea36902780b12f74351cd5e7d0a6c",
+        "policy_verdict": "fail",
+        "replay_status": "completed"
+      },
+      "expected_status": 7,
+      "id": "http/lm-evaluation-harness/envelope/exact_match",
+      "profile": "http",
+      "receipt_public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMjCTtX9ErbISaOJx7fl7FsPwomBb46XppKY5of+49zA=\n-----END PUBLIC KEY-----\n",
+      "route": "envelope",
+      "scorer": "exact_match",
+      "verifier": {
+        "identity": "live-evaluator-recipient",
+        "signing_key_fingerprint": "sha256:2dcbbf5294345fdc262fbb4ac31b23c422dbf1f1ba505f71ac63f62bd7b35fb7",
+        "trust_profile_digest": "sha256:7b742688efbdada8c7922a2c9335cc3c516b071aac634a9f45ffee3de08dc9c9"
+      }
+    },
+    {
+      "anchors": {
+        "baseline_run_digest": "sha256:5e507b3cba0b5f18515939ada29321c90abb5daa2442e1f8e14ad77426eb2f61",
+        "evidence_signer_fingerprint": "sha256:5692c1dad92d15e8f2d0532a7f5aa525197c30e65808b212aea165c1bf8f3dbc",
+        "request_digest": "sha256:19b6e47c0ac2574e85643f237bf5e0027a25b9ebd89c3d5fe080279092aa421d",
+        "subject_run_digest": "sha256:cb0b1f44458df153cbead9f57f881d364de12a1423c2220ce02cdd8bfe09a91d"
+      },
+      "directory": "recipient/http/lm-evaluation-harness/envelope/normalized_nll",
+      "evaluator": "lm-evaluation-harness",
+      "expected": {
+        "decision": "regression",
+        "integrity_ok": true,
+        "pack_manifest_digest": "sha256:b9e9e2e430e840a9ba852807fc08e9d788a8c76330a9db9b1196679a9cf56758",
+        "policy_verdict": "fail",
+        "replay_status": "completed"
+      },
+      "expected_status": 7,
+      "id": "http/lm-evaluation-harness/envelope/normalized_nll",
+      "profile": "http",
+      "receipt_public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAG7jJ7D4Q7YXMQtPZY9SbGWyLxfiWv/WH5tShhW/gmRE=\n-----END PUBLIC KEY-----\n",
+      "route": "envelope",
+      "scorer": "normalized_nll",
+      "verifier": {
+        "identity": "live-evaluator-recipient",
+        "signing_key_fingerprint": "sha256:2a6046d259689c9d2d4935c7cf1d4803d116b688a6c9d91a5a7d066effbfca0b",
+        "trust_profile_digest": "sha256:1a31ed405cf3c245fbaabf321072220b7db3404f097447001a310dc35734a86d"
+      }
+    },
+    {
+      "anchors": {
+        "baseline_run_digest": "sha256:651dd5eafda640233a8ddfce3a921e82cf15f6d0f9a83e983c8edfcc15b75ab1",
+        "evidence_signer_fingerprint": "sha256:86f64c858d70abf13ac7dca8272361c0552fa5712c2134fdc68bb067a60cf1a0",
+        "request_digest": "sha256:bdf5b64148794391f4722e53c9e16451017b83e6dcb6f84ddbdece622dc50897",
+        "subject_run_digest": "sha256:e77363c251ca5845178f106d3632e25664d0c958ec5011313a91b03f1a86f9e6"
+      },
+      "directory": "recipient/http/lm-evaluation-harness/native-json/exact_match",
+      "evaluator": "lm-evaluation-harness",
+      "expected": {
+        "decision": "regression",
+        "integrity_ok": true,
+        "pack_manifest_digest": "sha256:1aeb162f1400c0084db74380b6b0306ee0c7472f14dd831d784fc82d46c52067",
+        "policy_verdict": "fail",
+        "replay_status": "completed"
+      },
+      "expected_status": 7,
+      "id": "http/lm-evaluation-harness/native-json/exact_match",
+      "profile": "http",
+      "receipt_public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEALZrKoG4eXwv72GrJUk9mEFFWQuu4j4/l331IN1ARtcs=\n-----END PUBLIC KEY-----\n",
+      "route": "native-json",
+      "scorer": "exact_match",
+      "verifier": {
+        "identity": "live-evaluator-recipient",
+        "signing_key_fingerprint": "sha256:daeb417890195387ca645e1a31d00689698497ce4ecab72036f2862123029a11",
+        "trust_profile_digest": "sha256:a9bda2e230b0d7dfb7bcba48c4ba462617a20a95a2254ed51ff5e2e142b68ab2"
+      }
+    },
+    {
+      "anchors": {
+        "baseline_run_digest": "sha256:651dd5eafda640233a8ddfce3a921e82cf15f6d0f9a83e983c8edfcc15b75ab1",
+        "evidence_signer_fingerprint": "sha256:fd796ca7c1311b548ad0126169cc80d0cae359b0032f72a85cb84d827c728f98",
+        "request_digest": "sha256:b210335e12d180b0a4b59738430130a1630bf21eccfad4807d1aba9f3ff7c4a7",
+        "subject_run_digest": "sha256:e77363c251ca5845178f106d3632e25664d0c958ec5011313a91b03f1a86f9e6"
+      },
+      "directory": "recipient/http/lm-evaluation-harness/native-json/normalized_nll",
+      "evaluator": "lm-evaluation-harness",
+      "expected": {
+        "decision": "regression",
+        "integrity_ok": true,
+        "pack_manifest_digest": "sha256:39f3bc718df448570ff57bf7f04bfded57a34cd5565d0e2df0c70d958e7db4db",
+        "policy_verdict": "fail",
+        "replay_status": "completed"
+      },
+      "expected_status": 7,
+      "id": "http/lm-evaluation-harness/native-json/normalized_nll",
+      "profile": "http",
+      "receipt_public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAQ82iopv36QIOhifUxtLeDE7HvzCfI2nOHv+YrUpQcVc=\n-----END PUBLIC KEY-----\n",
+      "route": "native-json",
+      "scorer": "normalized_nll",
+      "verifier": {
+        "identity": "live-evaluator-recipient",
+        "signing_key_fingerprint": "sha256:cdcb52d443e5caa7331c20f86cacbc5aa53ea7a8d9c376bab048e23dd8f3ae8d",
+        "trust_profile_digest": "sha256:c3cc16627eb6352c7322833feb9ed3e7a4a130efef6111caa98045a33ca219ee"
+      }
+    },
+    {
+      "anchors": {
+        "baseline_run_digest": "sha256:08d5d47cc6f47343050bb9c56dcd960e1d90d3f08e1bb3716d1f2602b7c3a52f",
+        "evidence_signer_fingerprint": "sha256:5877a24c4787082de235bc264ca5345dfe7b355218bceb3ae86c852cb475dc5c",
+        "request_digest": "sha256:d8882b39a5adad3dd1be5b9e23054fe278375c00e5f454aa66fb494ac50b68a5",
+        "subject_run_digest": "sha256:be0c95a2e840630699cd008ab03188fb2ee0105da2d8da344385233c158827ed"
+      },
+      "directory": "recipient/http/promptfoo/envelope/exact_match",
+      "evaluator": "promptfoo",
+      "expected": {
+        "decision": "regression",
+        "integrity_ok": true,
+        "pack_manifest_digest": "sha256:3428484103b772b3697509e487b4d9145e68fa7fc4d7bed5950d2f0cdc934487",
+        "policy_verdict": "fail",
+        "replay_status": "completed"
+      },
+      "expected_status": 7,
+      "id": "http/promptfoo/envelope/exact_match",
+      "profile": "http",
+      "receipt_public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAvvrWDLaDZt//wX+/9fT6BytIQNgcoE8r2dmpH7tBFM8=\n-----END PUBLIC KEY-----\n",
+      "route": "envelope",
+      "scorer": "exact_match",
+      "verifier": {
+        "identity": "live-evaluator-recipient",
+        "signing_key_fingerprint": "sha256:a6841febc34e6fb730702f4899846a6bd0a1481523874c9e26846640abc82e17",
+        "trust_profile_digest": "sha256:43d25293aa25e14ffbd892031c810d12fb24d99a9d57fb63e3f19aed400b10ba"
+      }
+    },
+    {
+      "anchors": {
+        "baseline_run_digest": "sha256:08d5d47cc6f47343050bb9c56dcd960e1d90d3f08e1bb3716d1f2602b7c3a52f",
+        "evidence_signer_fingerprint": "sha256:fab95d5ffe510ec41124e563599a0b2452d7a9fdb38fda6cfac36e69d8f887da",
+        "request_digest": "sha256:c77a6d857206297d87dd3542b5e9f363e362eb50f6172f6e6f1d08d363fcb79f",
+        "subject_run_digest": "sha256:be0c95a2e840630699cd008ab03188fb2ee0105da2d8da344385233c158827ed"
+      },
+      "directory": "recipient/http/promptfoo/envelope/normalized_nll",
+      "evaluator": "promptfoo",
+      "expected": {
+        "decision": "regression",
+        "integrity_ok": true,
+        "pack_manifest_digest": "sha256:df8cd1bc732014690733e00deede4d10342b4b1001879ab8c62f6c54e68b6fcb",
+        "policy_verdict": "fail",
+        "replay_status": "completed"
+      },
+      "expected_status": 7,
+      "id": "http/promptfoo/envelope/normalized_nll",
+      "profile": "http",
+      "receipt_public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAQM/GV24/ZiyHhsHckwSZKvr/V/tgqboVmQSVGQMx1F8=\n-----END PUBLIC KEY-----\n",
+      "route": "envelope",
+      "scorer": "normalized_nll",
+      "verifier": {
+        "identity": "live-evaluator-recipient",
+        "signing_key_fingerprint": "sha256:2fa7023278a9be2fa97af11dbf54858cedf60fc404259eacfb83bc5ac086e170",
+        "trust_profile_digest": "sha256:ac8160a1b82a2a9d221edf6139a4467b9159c61e15eb3f9a95a28ec22dbe3b0e"
+      }
+    },
+    {
+      "anchors": {
+        "baseline_run_digest": "sha256:a4ab39974c4d306223ddb19f1b634a7b328fb2f03ac32761625d9fb613d4892f",
+        "evidence_signer_fingerprint": "sha256:17891381ee317caf2b81498abb2bbe7f224bccd6a8099ee7e43d40bd6f4a953f",
+        "request_digest": "sha256:fde96d73a227f176460debb92ffd767430365c58d30137948ba8791c929059d8",
+        "subject_run_digest": "sha256:8a48775cff39a48e31cea4449848c3894f533f3ebde59adbf19cf4e2ed37906c"
+      },
+      "directory": "recipient/http/promptfoo/native-json/exact_match",
+      "evaluator": "promptfoo",
+      "expected": {
+        "decision": "regression",
+        "integrity_ok": true,
+        "pack_manifest_digest": "sha256:2236c80dad57a79585c88035f28b21490e1fb463ddf4655b4bed8f317e9d0b24",
+        "policy_verdict": "fail",
+        "replay_status": "completed"
+      },
+      "expected_status": 7,
+      "id": "http/promptfoo/native-json/exact_match",
+      "profile": "http",
+      "receipt_public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA+r3sKqhDdF1Xk7gtD+SuKrkXym2J4ZoPz7+NBecQpLA=\n-----END PUBLIC KEY-----\n",
+      "route": "native-json",
+      "scorer": "exact_match",
+      "verifier": {
+        "identity": "live-evaluator-recipient",
+        "signing_key_fingerprint": "sha256:6d6015024889c5e951547f0798fe44ad91ad8cc936b32621c8c4de8306c740d7",
+        "trust_profile_digest": "sha256:082f789d8472788850580bb338cd053bd74a8eb8425718e341a7c1ae57f3f6d2"
+      }
+    },
+    {
+      "anchors": {
+        "baseline_run_digest": "sha256:a4ab39974c4d306223ddb19f1b634a7b328fb2f03ac32761625d9fb613d4892f",
+        "evidence_signer_fingerprint": "sha256:3d1efc00fe58a9d5cea9614559042e0fb05d08c906c9d5a4443ac80ea81c4bfc",
+        "request_digest": "sha256:fdb49f85c43aa563855aba7548808e4a6b27791cfcb14918ce417f3cd24cd166",
+        "subject_run_digest": "sha256:8a48775cff39a48e31cea4449848c3894f533f3ebde59adbf19cf4e2ed37906c"
+      },
+      "directory": "recipient/http/promptfoo/native-json/normalized_nll",
+      "evaluator": "promptfoo",
+      "expected": {
+        "decision": "regression",
+        "integrity_ok": true,
+        "pack_manifest_digest": "sha256:ff882657c7df0889a850242c1429915c222f37403d2ac04f7762d48848916c91",
+        "policy_verdict": "fail",
+        "replay_status": "completed"
+      },
+      "expected_status": 7,
+      "id": "http/promptfoo/native-json/normalized_nll",
+      "profile": "http",
+      "receipt_public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAnC6eVbqXYRmLwTzf+lI7xohg3jdqmWU7ODRhxwVvZZ8=\n-----END PUBLIC KEY-----\n",
+      "route": "native-json",
+      "scorer": "normalized_nll",
+      "verifier": {
+        "identity": "live-evaluator-recipient",
+        "signing_key_fingerprint": "sha256:4778d05aeabe37dc98d5d5caf034db24c5800840fd5e2d9a67b22a28ac9dab45",
+        "trust_profile_digest": "sha256:5bc4f085b7257936f67dc6da64bece8babfd7d2d4183162c218c8838949f1fdd"
+      }
+    },
+    {
+      "anchors": {
+        "baseline_run_digest": "sha256:29d2a65122b7fe04014729220b1633fe54f179f9528074264ae2ab62b6eeba73",
+        "evidence_signer_fingerprint": "sha256:30be2d6844bbba6cfa0c18ae68c63f93fde944021390ce764dede3a2b89ec12e",
+        "request_digest": "sha256:0d086f696580afd3d075a9c1a8aa24b01fb9af8acbb4d32daab2ed820197ad54",
+        "subject_run_digest": "sha256:9206aaa054b8d254d029d839e88272e2323fa2f8664a45b9e0dd769bba3cbba7"
+      },
+      "directory": "recipient/http/langfuse/envelope/exact_match",
+      "evaluator": "langfuse",
+      "expected": {
+        "decision": "regression",
+        "integrity_ok": true,
+        "pack_manifest_digest": "sha256:d396050c0b0d3866a367ada7e0f21a06ab46ebb26dad185d77bf16463ba1843b",
+        "policy_verdict": "fail",
+        "replay_status": "completed"
+      },
+      "expected_status": 7,
+      "id": "http/langfuse/envelope/exact_match",
+      "profile": "http",
+      "receipt_public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAcGoQ4m4igOJG/dwN9LCToqg3zPINjqBOq0BfNeAxquY=\n-----END PUBLIC KEY-----\n",
+      "route": "envelope",
+      "scorer": "exact_match",
+      "verifier": {
+        "identity": "live-evaluator-recipient",
+        "signing_key_fingerprint": "sha256:e7ff4bcefc4c40158206eaa1ed7777c3ce3396338f86633f14350372f87a3e73",
+        "trust_profile_digest": "sha256:8926bad3af6b21c18038fe1f34764ebbfce9d51967d87965c1e92cd587ce9bc4"
+      }
+    },
+    {
+      "anchors": {
+        "baseline_run_digest": "sha256:29d2a65122b7fe04014729220b1633fe54f179f9528074264ae2ab62b6eeba73",
+        "evidence_signer_fingerprint": "sha256:54e722add8ff27383985c263aac3a1c1e305d3d3cca04022f4f12f60f6aeee06",
+        "request_digest": "sha256:6457bd61ccdb37dbaffe35f2faf9e30d6b9349bbc504c37176a33d47256df0e8",
+        "subject_run_digest": "sha256:9206aaa054b8d254d029d839e88272e2323fa2f8664a45b9e0dd769bba3cbba7"
+      },
+      "directory": "recipient/http/langfuse/envelope/normalized_nll",
+      "evaluator": "langfuse",
+      "expected": {
+        "decision": "regression",
+        "integrity_ok": true,
+        "pack_manifest_digest": "sha256:fc42a399a616e0ddc69f6b3689a9a6607c9f6a3ec9b75c650914a00a68809b19",
+        "policy_verdict": "fail",
+        "replay_status": "completed"
+      },
+      "expected_status": 7,
+      "id": "http/langfuse/envelope/normalized_nll",
+      "profile": "http",
+      "receipt_public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAZ2W5yXZFVvbDE8fc+edOCDMuyAkyxa4Z0EurcGgridk=\n-----END PUBLIC KEY-----\n",
+      "route": "envelope",
+      "scorer": "normalized_nll",
+      "verifier": {
+        "identity": "live-evaluator-recipient",
+        "signing_key_fingerprint": "sha256:16f248ecbe01506a384906c7619e838176f54d609716d629be1644c5e9f9bfd9",
+        "trust_profile_digest": "sha256:1e32723ffa2c25676b275fac2135a07b2a99e7031681db67029950705d142a92"
+      }
+    },
+    {
+      "anchors": {
+        "baseline_run_digest": "sha256:63ac5a6a8759109921e58e1683ee48df71199a79074b35906e9ef0bdad885df6",
+        "evidence_signer_fingerprint": "sha256:9ee62d9a74ce9daca39b97085552a5b45d0c29312ed832a2719543722bdffda5",
+        "request_digest": "sha256:d5d967b9527baaa5c7f0eadffe8caa52eafea8eab04d06e9934b1bf16bf39dea",
+        "subject_run_digest": "sha256:62594d9f5bf95d6914e3a622fcbfee8c0712b640e14a173a23d99982e2ceca43"
+      },
+      "directory": "recipient/http/langfuse/native-json/exact_match",
+      "evaluator": "langfuse",
+      "expected": {
+        "decision": "regression",
+        "integrity_ok": true,
+        "pack_manifest_digest": "sha256:e487d9dd695d377a42603f8e7ec8feeb3d3c64c0c73364a7c0a9492e1514a569",
+        "policy_verdict": "fail",
+        "replay_status": "completed"
+      },
+      "expected_status": 7,
+      "id": "http/langfuse/native-json/exact_match",
+      "profile": "http",
+      "receipt_public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEARXw2L8+N9Y3x4iRYpC2ZREG8/kBj8Gx4Cq0iExsDamw=\n-----END PUBLIC KEY-----\n",
+      "route": "native-json",
+      "scorer": "exact_match",
+      "verifier": {
+        "identity": "live-evaluator-recipient",
+        "signing_key_fingerprint": "sha256:5692f908a2fd04dfc43ba58d7eedcae9ef093141133e3c5f9a782520b808d75f",
+        "trust_profile_digest": "sha256:42d805003a3f4fdd92c831a82d9ea7ce5a8c7a931d03befeed96eeaef3313266"
+      }
+    },
+    {
+      "anchors": {
+        "baseline_run_digest": "sha256:63ac5a6a8759109921e58e1683ee48df71199a79074b35906e9ef0bdad885df6",
+        "evidence_signer_fingerprint": "sha256:e8c33f7fc961e9c05965db1f8f24c0d3e3d997e64d6a6451bb888bf9e849820e",
+        "request_digest": "sha256:a344cf21555b40050b7321293bda2d4ce778455c348914dc55b20a39e89324e9",
+        "subject_run_digest": "sha256:62594d9f5bf95d6914e3a622fcbfee8c0712b640e14a173a23d99982e2ceca43"
+      },
+      "directory": "recipient/http/langfuse/native-json/normalized_nll",
+      "evaluator": "langfuse",
+      "expected": {
+        "decision": "regression",
+        "integrity_ok": true,
+        "pack_manifest_digest": "sha256:7a306560c816e685a668b73ab8eb6ae273c433466dd1176d0eb87999848ecd1d",
+        "policy_verdict": "fail",
+        "replay_status": "completed"
+      },
+      "expected_status": 7,
+      "id": "http/langfuse/native-json/normalized_nll",
+      "profile": "http",
+      "receipt_public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAkNTe1HCN/zlzpSDHk79sBraZ/DpoNyKGD0SQkPeSmZs=\n-----END PUBLIC KEY-----\n",
+      "route": "native-json",
+      "scorer": "normalized_nll",
+      "verifier": {
+        "identity": "live-evaluator-recipient",
+        "signing_key_fingerprint": "sha256:bd63b585524ea000478ff723266d0852a68d2fec1fc7b3f81e8f0bf1da6ba118",
+        "trust_profile_digest": "sha256:7b130127b34a5e80042c1e48a0b20b6f87f6106d6cac93f3f683328957ba75f6"
+      }
+    }
+  ],
+  "related_reference": {
+    "cases_per_evaluator_role": 8,
+    "evaluators": 19,
+    "path": "../mistral-7b-sentinel",
+    "scope": "previous original sentinel; unchanged evidence, not new64-case execution"
+  },
+  "roles": [
+    "baseline",
+    "subject"
+  ],
+  "scope": "Integration workflow qualification on frozen selected tasks, not a representative production or general model-quality claim.",
+  "scorers": [
+    "exact_match",
+    "normalized_nll"
+  ],
+  "signed_packs": 32,
+  "source_profiles": {
+    "http": {
+      "cases_per_role": 8,
+      "endpoint_profile": "/v1/tasks generation plus reference likelihood; not OpenAI-compatible or third-party cloud",
+      "kind": "controlled_http_task_service",
+      "protocol": "capture/inputs/http-8-protocol.json",
+      "protocol_sha256": "f1d319f8627de1013afd8b5c6f6d99792abbac80b1e5d8dc84e9d4840eff3b70"
+    },
+    "local": {
+      "cases_per_role": 64,
+      "kind": "local_artifact",
+      "protocol": "capture/inputs/local-64-protocol.json",
+      "protocol_sha256": "d0caf0bac2d400eb5f9bb008de79d3eefe37a21d1ad14224df89a94c227746fe"
+    }
+  }
+}

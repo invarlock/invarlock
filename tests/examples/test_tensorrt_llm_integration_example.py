@@ -42,6 +42,22 @@ def showcase() -> Any:
 
 
 @pytest.fixture
+def showcase_trust(example: Any, tmp_path: Path) -> list[str]:
+    evidence = tmp_path / "evidence.pem"
+    verifier = tmp_path / "verifier.pem"
+    example._key(evidence)
+    example._key(verifier)
+    return [
+        "--evidence-signing-key",
+        str(evidence),
+        "--verifier-signing-key",
+        str(verifier),
+        "--trust-root",
+        str(tmp_path / "trust"),
+    ]
+
+
+@pytest.fixture
 def inputs(tmp_path: Path) -> Path:
     root = tmp_path / "inputs"
     root.mkdir()
@@ -268,14 +284,16 @@ def test_resource_root_rejects_oversized_and_unmountable_inputs(
     records.write_text("{}\n", encoding="utf-8")
     comma_root = tmp_path / "comma,root"
     inputs.rename(comma_root)
-    with pytest.raises(ValueError, match="Docker mount"):
+    with pytest.raises(ValueError, match="container mount"):
         example._root(comma_root)
 
 
+@pytest.mark.parametrize("container_engine", ["docker", "podman"])
 def test_inspect_runs_real_offline_gpu_probe_and_validates_output(
     example: Any,
     inputs: Path,
     monkeypatch: pytest.MonkeyPatch,
+    container_engine: str,
 ) -> None:
     seen: list[str] = []
 
@@ -291,9 +309,19 @@ def test_inspect_runs_real_offline_gpu_probe_and_validates_output(
 
     monkeypatch.setattr(example, "run_bounded_command", run)
     digest = "sha256:" + "a" * 64
-    assert example._inspect(inputs, digest, digest, "cuda:1") == _inspection()
+    assert (
+        example._inspect(inputs, digest, digest, "cuda:1", container_engine)
+        == _inspection()
+    )
     assert seen[seen.index("--network") + 1] == "none"
-    assert seen[seen.index("--gpus") + 1] == "device=1"
+    assert seen[0] == container_engine
+    if container_engine == "docker":
+        assert seen[seen.index("--gpus") + 1] == "device=1"
+        assert "--device" not in seen
+    else:
+        assert seen[seen.index("--device") + 1] == "nvidia.com/gpu=1"
+        assert "--gpus" not in seen
+    assert "--cap-drop=ALL" in seen and "no-new-privileges" in seen
     assert "--read-only" in seen and "--pull=never" in seen
     assert "65532:65532" in seen
     assert f"INVARLOCK_RUNTIME_IMAGE_DIGEST={digest}" in seen
@@ -588,11 +616,13 @@ def test_run_main_rejects_incoherent_trust_modes(example: Any, tmp_path: Path) -
     )
 
 
+@pytest.mark.parametrize("container_engine", ["docker", "podman"])
 def test_execute_runs_preflight_evaluate_verify_report_with_provider_resources(
     example: Any,
     inputs: Path,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    container_engine: str,
 ) -> None:
     paths = {
         name: tmp_path / name
@@ -622,13 +652,16 @@ def test_execute_runs_preflight_evaluate_verify_report_with_provider_resources(
 
     monkeypatch.setattr(example, "run_bounded_command", run)
     digest = "sha256:" + "a" * 64
-    example._execute(inputs, paths, digest, digest, ("cuda:0", "cuda:1"))
+    example._execute(
+        inputs, paths, digest, digest, ("cuda:0", "cuda:1"), container_engine
+    )
     assert len(calls) == 4
     assert "--preflight" in calls[0][0] and calls[0][0][3] == "evaluate"
     assert "--preflight" not in calls[1][0] and calls[1][0][3] == "evaluate"
     assert calls[2][0][3] == "verify" and "--trust-profile" in calls[2][0]
     assert calls[3][0][3] == "report"
     for command, environment in calls[:2]:
+        assert command[command.index("--container-engine") + 1] == container_engine
         assert command[command.index("--baseline-runtime-device") + 1] == "cuda:0"
         assert command[command.index("--subject-runtime-device") + 1] == "cuda:1"
         assert environment["INVARLOCK_TENSORRT_LLM_RESOURCE_ROOT"] == str(inputs)
@@ -639,16 +672,22 @@ def test_execute_runs_preflight_evaluate_verify_report_with_provider_resources(
         encoding="utf-8",
     )
     with pytest.raises(ValueError, match="baseline engine solved fewer"):
-        example._execute(inputs, paths, digest, digest, ("cuda:0", "cuda:1"))
+        example._execute(
+            inputs, paths, digest, digest, ("cuda:0", "cuda:1"), container_engine
+        )
 
     paths["receipt"].unlink()
     with pytest.raises(ValueError, match="missing verified outputs"):
-        example._execute(inputs, paths, digest, digest, ("cuda:0", "cuda:1"))
+        example._execute(
+            inputs, paths, digest, digest, ("cuda:0", "cuda:1"), container_engine
+        )
 
     paths["receipt"].write_text("{}\n", encoding="utf-8")
     report.write_text("[]\n", encoding="utf-8")
     with pytest.raises(ValueError, match="invalid outputs"):
-        example._execute(inputs, paths, digest, digest, ("cuda:0", "cuda:1"))
+        example._execute(
+            inputs, paths, digest, digest, ("cuda:0", "cuda:1"), container_engine
+        )
 
 
 @pytest.mark.parametrize(
@@ -723,23 +762,42 @@ def test_execute_rejects_false_green_transaction_outputs(
         example._execute(inputs, paths, digest, digest, ("cuda:0", "cuda:1"))
 
 
+@pytest.mark.parametrize("container_engine", ["docker", "podman"])
+@pytest.mark.parametrize("engine_source", ["cli", "environment"])
 def test_main_is_one_inspect_prepare_execute_transaction(
-    example: Any, inputs: Path, monkeypatch: pytest.MonkeyPatch
+    example: Any,
+    inputs: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    container_engine: str,
+    engine_source: str,
 ) -> None:
     observed: list[str] = []
+    selected: list[str] = []
+    monkeypatch.setenv(
+        "INVARLOCK_CONTAINER_ENGINE",
+        container_engine if engine_source == "environment" else "invalid-ignored",
+    )
     digest = "sha256:" + "a" * 64
     paths = {name: inputs / name for name in ("evidence", "receipt")}
     monkeypatch.setattr(
         example,
         "_inspect",
-        lambda *_args: observed.append("inspect") or _inspection(),
+        lambda *args: (
+            selected.append(args[-1]),
+            observed.append("inspect"),
+            _inspection(),
+        )[-1],
     )
     monkeypatch.setattr(
         example,
         "_prepare",
         lambda *_args, **_kwargs: observed.append("prepare") or paths,
     )
-    monkeypatch.setattr(example, "_execute", lambda *_args: observed.append("execute"))
+    monkeypatch.setattr(
+        example,
+        "_execute",
+        lambda *args: (selected.append(args[-1]), observed.append("execute")),
+    )
     assert (
         example.main(
             [
@@ -752,24 +810,28 @@ def test_main_is_one_inspect_prepare_execute_transaction(
                 "--subject-locator",
                 "hf://subject@rev",
                 "--ephemeral-trust-root",
+                *(
+                    ["--container-engine", container_engine]
+                    if engine_source == "cli"
+                    else []
+                ),
             ]
         )
         == 0
     )
     assert observed == ["inspect", "prepare", "execute"]
+    assert selected == [container_engine, container_engine]
 
 
-def test_image_probe_uses_addin_provider_and_official_runner(
+def test_image_probe_uses_core_provider_and_official_runner(
     monkeypatch: pytest.MonkeyPatch, inputs: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     packages = {
         name: ModuleType(name)
         for name in (
-            "invarlock_addins",
-            "invarlock_addins.tensorrt_llm",
-            "invarlock_addins.tensorrt_llm.execution",
-            "invarlock_addins.tensorrt_llm.provider",
-            "invarlock_addins.tensorrt_llm.session",
+            "invarlock.runtime_providers._tensorrt_llm_execution",
+            "invarlock.runtime_providers.tensorrt_llm",
+            "invarlock.runtime_providers.tensorrt_llm_session",
         )
     }
 
@@ -786,11 +848,11 @@ def test_image_probe_uses_addin_provider_and_official_runner(
             return spec
 
     packages[
-        "invarlock_addins.tensorrt_llm.execution"
+        "invarlock.runtime_providers._tensorrt_llm_execution"
     ].official_tensorrt_llm_runner_path = lambda: Path("/runner")  # type: ignore[attr-defined]
-    packages["invarlock_addins.tensorrt_llm.provider"].TensorRTLLMProvider = Provider  # type: ignore[attr-defined]
+    packages["invarlock.runtime_providers.tensorrt_llm"].TensorRTLLMProvider = Provider  # type: ignore[attr-defined]
     packages[
-        "invarlock_addins.tensorrt_llm.session"
+        "invarlock.runtime_providers.tensorrt_llm_session"
     ].TensorRTLLMRuntimeBindings = Bindings  # type: ignore[attr-defined]
     for name, module in packages.items():
         monkeypatch.setitem(sys.modules, name, module)
@@ -980,8 +1042,12 @@ def test_showcase_policy_rejects_high_discordance_at_102_records() -> None:
     assert interval.upper_pp - interval.lower_pp > 20.0
 
 
+@pytest.mark.parametrize("container_engine", ["docker", "podman"])
 def test_showcase_container_build_and_transaction_commands(
-    showcase: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    showcase: Any,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    container_engine: str,
 ) -> None:
     paths = showcase._create_workspace(tmp_path / "showcase")
     (paths.models / "qwen3-0.6b").mkdir()
@@ -989,6 +1055,15 @@ def test_showcase_container_build_and_transaction_commands(
 
     def run(command: list[str], **options: Any) -> subprocess.CompletedProcess[str]:
         calls.append((command, options))
+        if "--engine" in command:
+            mount = next(value for value in command if ",dst=/work" in value)
+            engine = (
+                Path(mount.removeprefix("type=bind,src=").split(",dst=/work", 1)[0])
+                / "engine"
+            )
+            engine.mkdir()
+            (engine / "config.json").write_text("{}\n", encoding="utf-8")
+            (engine / "rank0.engine").write_bytes(b"engine")
         return subprocess.CompletedProcess(command, 0)
 
     monkeypatch.setattr(showcase, "run_bounded_command", run)
@@ -1000,15 +1075,37 @@ def test_showcase_container_build_and_transaction_commands(
         role="baseline",
         device="1",
         image=digest,
-        container_engine="docker",
+        container_engine=container_engine,
     )
     command = calls[-1][0]
     assert stat.S_IMODE((paths.work / "baseline").stat().st_mode) == 0o700
     assert command[command.index("--user") + 1] == "1000:1000"
-    assert command[command.index("--gpus") + 1] == "device=1"
+    assert command[0] == container_engine
+    if container_engine == "docker":
+        assert command[command.index("--gpus") + 1] == "device=1"
+        assert "--device" not in command and "--userns=keep-id" not in command
+    else:
+        assert command[command.index("--device") + 1] == "nvidia.com/gpu=1"
+        assert "--gpus" not in command and "--userns=keep-id" in command
+    assert "--cap-drop=ALL" in command and "no-new-privileges" in command
+    assert "--pull=never" in command
+    work_mount = f"type=bind,src={paths.work / 'baseline'},dst=/work"
+    if container_engine == "podman":
+        assert work_mount + ",relabel=shared" in command
+    else:
+        assert work_mount in command
+    assert all(
+        "relabel=" not in value or value == work_mount + ",relabel=shared"
+        for value in command
+    )
+    assert "label=disable" not in command
+    assert not any("relabel=private" in value for value in command)
     assert "--network" in command and "none" in command
     assert "LD_LIBRARY_PATH=/usr/local/tensorrt/lib" in command
-    assert "/resources/baseline-engine" in command
+    assert command[command.index("--engine") + 1] == "/work/engine"
+    assert all("dst=/resources" not in value for value in command)
+    assert (paths.resources / "baseline-engine/rank0.engine").read_bytes() == b"engine"
+    assert not (paths.work / "baseline/engine").exists()
     assert command[command.index("--quantization") + 1] == "none"
 
     showcase._container_build(
@@ -1016,7 +1113,7 @@ def test_showcase_container_build_and_transaction_commands(
         role="subject",
         device="2",
         image=digest,
-        container_engine="docker",
+        container_engine=container_engine,
     )
     subject = calls[-1][0]
     assert subject[subject.index("--quantization") + 1] == "fp8"
@@ -1029,24 +1126,40 @@ def test_showcase_container_build_and_transaction_commands(
             role="subject",
             device="cuda:1",
             image=digest,
-            container_engine="docker",
+            container_engine=container_engine,
         )
 
     showcase._run_transaction(
         paths,
         image=digest,
         devices=("0", "1"),
-        container_engine="docker",
+        container_engine=container_engine,
+        evidence_signing_key=tmp_path / "evidence.pem",
+        verifier_signing_key=tmp_path / "verifier.pem",
+        trust_root=tmp_path / "trust",
     )
     transaction, options = calls[-1]
     assert transaction[1].endswith("tensorrt-llm/run.py")
     assert transaction[transaction.index("--baseline-device") + 1] == "cuda:0"
     assert transaction[transaction.index("--subject-device") + 1] == "cuda:1"
-    assert options["environment"]["INVARLOCK_CONTAINER_ENGINE"] == "docker"
+    assert options["environment"]["INVARLOCK_CONTAINER_ENGINE"] == container_engine
+    assert transaction[transaction.index("--container-engine") + 1] == container_engine
+    for flag, path in (
+        ("--evidence-signing-key", tmp_path / "evidence.pem"),
+        ("--verifier-signing-key", tmp_path / "verifier.pem"),
+        ("--trust-root", tmp_path / "trust"),
+    ):
+        assert transaction[transaction.index(flag) + 1] == str(path)
+        assert all(str(path) not in str(command) for command, _ in calls[:-1])
+    assert "--ephemeral-trust-root" not in transaction
 
 
+@pytest.mark.parametrize("container_engine", ["docker", "podman"])
 def test_showcase_container_build_uses_unprivileged_identity_when_host_is_root(
-    showcase: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    showcase: Any,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    container_engine: str,
 ) -> None:
     paths = showcase._create_workspace(tmp_path / "showcase-root")
     (paths.models / "qwen3-0.6b").mkdir()
@@ -1059,35 +1172,140 @@ def test_showcase_container_build_uses_unprivileged_identity_when_host_is_root(
         "chown",
         lambda path, uid, gid: ownership.append((Path(path), uid, gid)),
     )
-    monkeypatch.setattr(
-        showcase,
-        "run_bounded_command",
-        lambda command, **_options: commands.append(command),
-    )
+
+    def run(command: list[str], **_options: Any) -> None:
+        commands.append(command)
+        assert command[command.index("--engine") + 1] == "/work/engine"
+        assert all("dst=/resources" not in value for value in command)
+        assert stat.S_IMODE(paths.resources.stat().st_mode) == 0o755
+        assert not (paths.resources / "baseline-engine").exists()
+        engine = paths.work / "baseline/engine"
+        assert not engine.exists()
+        engine.mkdir()
+        (engine / "config.json").write_text("{}\n", encoding="utf-8")
+        (engine / "rank0.engine").write_bytes(b"engine")
+
+    monkeypatch.setattr(showcase, "run_bounded_command", run)
 
     showcase._container_build(
         paths,
         role="baseline",
         device="0",
         image="sha256:" + "a" * 64,
-        container_engine="docker",
+        container_engine=container_engine,
     )
 
+    assert commands[0][0] == container_engine
+    work_mount = f"type=bind,src={paths.work / 'baseline'},dst=/work"
+    assert (
+        work_mount + (",relabel=shared" if container_engine == "podman" else "")
+    ) in commands[0]
+    assert "--userns=keep-id" not in commands[0]
     assert commands[0][commands[0].index("--user") + 1] == "65532:65532"
     assert ownership == [
         (paths.work, 65532, 65532),
         (paths.work / "baseline", 65532, 65532),
     ]
+    assert (paths.resources / "baseline-engine/rank0.engine").read_bytes() == b"engine"
+    assert not (paths.work / "baseline/engine").exists()
 
 
+@pytest.mark.parametrize("existing", ["directory", "dangling_symlink"])
+def test_showcase_container_build_preserves_existing_destination(
+    showcase: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, existing: str
+) -> None:
+    paths = showcase._create_workspace(tmp_path / "showcase-existing")
+    destination = paths.resources / "baseline-engine"
+    if existing == "directory":
+        destination.mkdir()
+    else:
+        destination.symlink_to(tmp_path / "missing")
+    monkeypatch.setattr(
+        showcase,
+        "run_bounded_command",
+        lambda *_args, **_kwargs: pytest.fail("existing output must prevent the build"),
+    )
+
+    with pytest.raises(FileExistsError, match="engine output already exists"):
+        showcase._container_build(
+            paths,
+            role="baseline",
+            device="0",
+            image="sha256:" + "a" * 64,
+            container_engine="docker",
+        )
+    assert not (paths.work / "baseline").exists()
+    assert showcase.os.path.lexists(destination)
+
+
+@pytest.mark.parametrize(
+    "invalid",
+    ["failed", "missing", "symlink", "incomplete", "linked_file", "collision"],
+)
+def test_showcase_container_build_does_not_publish_invalid_output(
+    showcase: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, invalid: str
+) -> None:
+    paths = showcase._create_workspace(tmp_path / "showcase-invalid")
+    monkeypatch.setattr(showcase.os, "geteuid", lambda: 1000)
+    monkeypatch.setattr(showcase.os, "getegid", lambda: 1000)
+    destination = paths.resources / "baseline-engine"
+
+    def run(command: list[str], **_options: Any) -> None:
+        engine = paths.work / "baseline/engine"
+        if invalid == "missing":
+            return
+        if invalid == "symlink":
+            engine.symlink_to(paths.resources, target_is_directory=True)
+            return
+        engine.mkdir()
+        (engine / "config.json").write_text("{}\n", encoding="utf-8")
+        if invalid == "failed":
+            raise subprocess.CalledProcessError(1, command)
+        if invalid == "incomplete":
+            return
+        if invalid == "linked_file":
+            (engine / "rank0.engine").symlink_to(engine / "config.json")
+            return
+        (engine / "rank0.engine").write_bytes(b"engine")
+        destination.mkdir()
+        (destination / "preserve").write_bytes(b"existing")
+
+    monkeypatch.setattr(showcase, "run_bounded_command", run)
+    expected_error = (
+        subprocess.CalledProcessError
+        if invalid == "failed"
+        else FileExistsError
+        if invalid == "collision"
+        else RuntimeError
+    )
+    with pytest.raises(expected_error):
+        showcase._container_build(
+            paths,
+            role="baseline",
+            device="0",
+            image="sha256:" + "a" * 64,
+            container_engine="docker",
+        )
+    if invalid == "collision":
+        assert [path.name for path in destination.iterdir()] == ["preserve"]
+        assert (destination / "preserve").read_bytes() == b"existing"
+    else:
+        assert not showcase.os.path.lexists(destination)
+
+
+@pytest.mark.parametrize("container_engine", ["docker", "podman"])
 def test_showcase_main_runs_two_downloads_and_builds(
     showcase: Any,
+    showcase_trust: list[str],
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
+    container_engine: str,
 ) -> None:
+    monkeypatch.setenv("INVARLOCK_CONTAINER_ENGINE", container_engine)
     paths = showcase._create_workspace(tmp_path / "prepared")
     events: list[str] = []
+    transaction_values: dict[str, Any] = {}
     monkeypatch.setattr(showcase, "_require_committed_checkout", lambda _root: "c" * 40)
     monkeypatch.setattr(showcase, "_create_workspace", lambda _value: paths)
     monkeypatch.setattr(
@@ -1111,9 +1329,18 @@ def test_showcase_main_runs_two_downloads_and_builds(
     monkeypatch.setattr(
         showcase,
         "_run_transaction",
-        lambda _paths, **_values: events.append("transaction"),
+        lambda _paths, **values: (
+            transaction_values.update(values),
+            events.append("transaction"),
+        ),
     )
-    assert showcase.main(["--workspace", str(tmp_path / "ignored")]) == 0
+    assert (
+        showcase.main(["--workspace", str(tmp_path / "ignored"), *showcase_trust]) == 0
+    )
+    assert transaction_values["container_engine"] == container_engine
+    assert transaction_values["evidence_signing_key"] == Path(showcase_trust[1])
+    assert transaction_values["verifier_signing_key"] == Path(showcase_trust[3])
+    assert transaction_values["trust_root"] == Path(showcase_trust[5])
     assert events[0] == "download"
     assert set(events[1:3]) == {"build-baseline", "build-subject"}
     assert events[-2:] == ["inputs", "transaction"]
@@ -1127,8 +1354,62 @@ def test_showcase_main_runs_two_downloads_and_builds(
         lambda **_arguments: ("sha256:" + "a" * 64, "sha256:" + "b" * 64),
     )
     (paths.workspace / "runtime-build").rmdir()
-    assert showcase.main([]) == 2
+    assert showcase.main(showcase_trust) == 2
     assert "not immutable" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    "invalid",
+    [
+        "missing",
+        "incomplete",
+        "malformed",
+        "same_key",
+        "symlink",
+        "existing_trust",
+        "inside_workspace",
+    ],
+)
+def test_showcase_authenticates_caller_trust_before_download_or_gpu_build(
+    showcase: Any,
+    showcase_trust: list[str],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    invalid: str,
+) -> None:
+    paths = showcase._create_workspace(tmp_path / "workspace")
+    monkeypatch.setattr(showcase, "_require_committed_checkout", lambda _root: "c" * 40)
+    monkeypatch.setattr(showcase, "_create_workspace", lambda _value: paths)
+    monkeypatch.setattr(
+        showcase,
+        "_download",
+        lambda _paths: pytest.fail("invalid trust reached download"),
+    )
+    monkeypatch.setattr(
+        showcase,
+        "_runtime_image",
+        lambda **_kwargs: pytest.fail("invalid trust reached image build"),
+    )
+    args = list(showcase_trust)
+    if invalid == "missing":
+        args = []
+    elif invalid == "incomplete":
+        args = args[:2]
+    elif invalid == "malformed":
+        Path(args[1]).write_text("invalid private key")
+    elif invalid == "same_key":
+        Path(args[3]).write_bytes(Path(args[1]).read_bytes())
+    elif invalid == "symlink":
+        alias = tmp_path / "alias.pem"
+        alias.symlink_to(args[1])
+        args[1] = str(alias)
+    elif invalid == "existing_trust":
+        Path(args[5]).mkdir()
+    else:
+        local = paths.workspace / "evidence.pem"
+        local.write_bytes(Path(args[1]).read_bytes())
+        args[1] = str(local)
+    assert showcase.main(args) == 2
 
 
 def test_showcase_rejects_dirty_source_before_downloads(
@@ -1149,6 +1430,42 @@ def test_showcase_rejects_dirty_source_before_downloads(
     assert showcase.main([]) == 2
     assert downloads == []
     assert "tracked source is dirty" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    "missing",
+    ["examples", "examples.integrations", "examples.integrations.bounded_command"],
+)
+def test_prepare_helper_uses_flat_mounted_runner_when_package_is_unavailable(
+    prepare_helper: Any, monkeypatch: pytest.MonkeyPatch, missing: str
+) -> None:
+    real_import = builtins.__import__
+
+    def container_import(name: str, *args: Any, **kwargs: Any) -> Any:
+        if name == "examples.integrations.bounded_command":
+            raise ModuleNotFoundError(f"No module named {missing!r}", name=missing)
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", container_import)
+    helper = _load("tensorrt_prepare_import_check", Path(prepare_helper.__file__))
+    assert helper.run_bounded_command is prepare_helper._test_flat_runner
+
+
+def test_prepare_helper_preserves_missing_runner_dependency(
+    prepare_helper: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real_import = builtins.__import__
+    failure = ModuleNotFoundError("missing runner dependency", name="invarlock")
+
+    def container_import(name: str, *args: Any, **kwargs: Any) -> Any:
+        if name == "examples.integrations.bounded_command":
+            raise failure
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", container_import)
+    with pytest.raises(ModuleNotFoundError) as error:
+        _load("tensorrt_prepare_missing_dependency", Path(prepare_helper.__file__))
+    assert error.value is failure
 
 
 def test_prepare_helper_contract_conversion_and_build(
@@ -1340,3 +1657,111 @@ def test_prepare_helper_main_and_failure_paths(
     assert contract.read_bytes() == b"contract"
     with pytest.raises(RuntimeError, match="already exists"):
         prepare.main(arguments)
+
+
+@pytest.mark.parametrize("module_name", ["example", "showcase"])
+def test_tensorrt_rejects_invalid_engine_environment_before_work(
+    request: pytest.FixtureRequest,
+    monkeypatch: pytest.MonkeyPatch,
+    module_name: str,
+    inputs: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    module = request.getfixturevalue(module_name)
+    monkeypatch.setenv("INVARLOCK_CONTAINER_ENGINE", "unsupported")
+    monkeypatch.setattr(
+        module,
+        "run_bounded_command",
+        lambda *_a, **_kw: pytest.fail("invalid engine reached subprocess"),
+    )
+    arguments = (
+        []
+        if module_name == "showcase"
+        else [
+            "--runtime-image",
+            "sha256:" + "a" * 64,
+            "--resource-root",
+            str(inputs),
+            "--baseline-locator",
+            "baseline",
+            "--subject-locator",
+            "subject",
+            "--ephemeral-trust-root",
+        ]
+    )
+    assert module.main(arguments) == 2
+    assert "container engine must be docker or podman" in capsys.readouterr().err
+
+
+def test_tensorrt_helpers_reject_unknown_engine_before_launch(
+    example: Any,
+    showcase: Any,
+    inputs: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for module in (example, showcase):
+        monkeypatch.setattr(
+            module,
+            "run_bounded_command",
+            lambda *_a, **_kw: pytest.fail("invalid engine reached subprocess"),
+        )
+    digest = "sha256:" + "a" * 64
+    with pytest.raises(ValueError, match="container engine"):
+        example._inspect(inputs, digest, digest, "cuda:0", "unknown")
+    with pytest.raises(ValueError, match="container engine"):
+        example._execute(inputs, {}, digest, digest, ("cuda:0", "cuda:1"), "unknown")
+    paths = showcase._create_workspace(tmp_path / "invalid-engine")
+    with pytest.raises(ValueError, match="container engine"):
+        showcase._container_build(
+            paths, role="baseline", device="0", image=digest, container_engine="unknown"
+        )
+    assert not (paths.work / "baseline").exists()
+
+
+@pytest.mark.parametrize("failure", ["unavailable", "cdi", "timeout", "output_limit"])
+def test_prepared_engine_failure_never_falls_back_or_publishes(
+    example: Any,
+    inputs: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    failure: str,
+) -> None:
+    calls: list[list[str]] = []
+
+    def run(command: list[str], **_kwargs: Any) -> subprocess.CompletedProcess[str]:
+        calls.append(command)
+        if failure == "cdi":
+            return subprocess.CompletedProcess(
+                command, 1, "", "unresolvable CDI device nvidia.com/gpu=0"
+            )
+        raise RuntimeError(f"engine inspection {failure}")
+
+    monkeypatch.setattr(example, "run_bounded_command", run)
+    monkeypatch.setattr(
+        example,
+        "_prepare",
+        lambda *_a, **_kw: pytest.fail("failed inspection published outputs"),
+    )
+    assert (
+        example.main(
+            [
+                "--container-engine",
+                "podman",
+                "--runtime-image",
+                "sha256:" + "a" * 64,
+                "--resource-root",
+                str(inputs),
+                "--baseline-locator",
+                "baseline",
+                "--subject-locator",
+                "subject",
+                "--ephemeral-trust-root",
+            ]
+        )
+        == 2
+    )
+    assert len(calls) == 1 and calls[0][0] == "podman"
+    assert "FAIL" in capsys.readouterr().err
+    assert not (inputs / example._REQUEST).exists()
+    assert not (inputs / example._EVIDENCE).exists()

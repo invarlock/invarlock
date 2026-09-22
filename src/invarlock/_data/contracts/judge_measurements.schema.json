@@ -16,7 +16,9 @@
     "source_profile": {
       "enum": [
         "retained-judge-json-v1",
-        "retained-inspect-model-events-v1"
+        "retained-inspect-model-events-v1",
+        "retained-runtime-provider-judge-v1",
+        "retained-openai-compatible-judge-v1"
       ]
     },
     "sources": {
@@ -31,7 +33,9 @@
           "profile": {
             "enum": [
               "retained-judge-json-v1",
-              "retained-inspect-model-events-v1"
+              "retained-inspect-model-events-v1",
+              "retained-runtime-provider-judge-v1",
+              "retained-openai-compatible-judge-v1"
             ]
           },
           "encoding": {
@@ -360,7 +364,7 @@
                 "oneOf": [
                   {
                     "type": "string",
-                    "pattern": "^(?:0|1|0\\.[0-9]{0,14}[1-9])$",
+                    "pattern": "^(?:0|1|0\\.[0-9]{0,14}[1-9])(?![\\s\\S])",
                     "minLength": 1,
                     "maxLength": 17
                   },
@@ -439,7 +443,7 @@
   "$defs": {
     "sha256": {
       "type": "string",
-      "pattern": "^[0-9a-f]{64}$",
+      "pattern": "^[0-9a-f]{64}(?![\\s\\S])",
       "minLength": 64,
       "maxLength": 64
     },
@@ -447,7 +451,7 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 128,
-      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+      "pattern": "^[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
     }
   }
 }

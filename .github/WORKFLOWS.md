@@ -21,6 +21,13 @@ Workflow YAML is linted with `make workflow-lint`.
   changes to shell scripts, TOML files and dependency locks.
 - `repo-hygiene.yml` rejects generated artifacts and oversized files. Obsolete
   runs are cancelled; only the checks that inspect a change's history fetch it.
+- `evaluator-sdk.yml` passes actual exports from 19 pinned evaluator SDKs through
+  separate SDK-free installed recipients, exercising all three scorers and both
+  import routes without model or service calls. Its jobs run for capture and
+  recipe changes and for shared scorer, report, contract or recipient-dependency
+  changes that can affect these journeys, or by explicit dispatch. The ordinary
+  distribution jobs also exercise all 114 native-shape
+  evaluator/scorer/import-route journeys.
 
 Python dependency caches use each job's installed workflow locks as their keys.
 When adding an installation step or locked environment, include its lockfile in
@@ -37,8 +44,7 @@ that job's `cache-dependency-path`.
 
 ## Security and release
 
-- `codeql.yml` analyzes core code, maintained scripts and all five shipped
-  add-in source trees.
+- `codeql.yml` analyzes the complete core distribution and maintained scripts.
 - `supply-chain-pr.yml` audits the core and Hugging Face install surfaces and
   scans the pull-request delta for secrets.
 - `scorecards.yml` publishes OpenSSF Scorecard results.
@@ -51,17 +57,16 @@ that job's `cache-dependency-path`.
   disabled and a candidate version exercises the Linux release gates without
   creating or moving a tag.
 
-The release workflow builds, validates, attests, and publishes six Python
-distributions: `invarlock`, `invarlock-diagnostics`,
-`invarlock-runtime-gguf`, `invarlock-runtime-hf-vision-text`,
-`invarlock-runtime-tensorrt-llm`, and `invarlock-inspect-judge`. The optional
-packages live under `addins/`; their provider-specific runtime dependencies
-stay outside the core wheel.
+The release workflow builds, validates, attests, and publishes one Python
+distribution: `invarlock`. Judge collection, diagnostics, and all maintained
+runtime providers are in core; optional dependencies are installed through the
+`judge`, `diagnostics`, `vision-text`, and `hf` extras. Provider-specific native
+runtime dependencies stay outside the base wheel.
 Candidate and published core wheels use `scripts/release/core_wheel_consumers.py`,
 the same consumer suite as local installed-wheel validation. It stages quickstart,
 captured, judge, three-scorer and retained approval journeys outside the checkout
 and checks signing, independent verification, reports and rejection exit codes
-before the optional packages are installed.
+without installing optional dependency extras.
 
 ## Local checks
 
@@ -71,7 +76,15 @@ make workflow-lint
 make docs-check
 make security
 make dist-check
+make evaluator-parity-test
+make evaluator-sdk-test EVALUATOR=ragas
 ```
+
+The SDK probes use the maintained evaluator package pins in isolated evaluator
+environments. These pins do not lock every transitive SDK dependency. The
+installed recipient gate uses the hash-locked core dependency set. SDK serializer
+tests establish compatibility with the exercised source shape; they do not
+establish new model or service measurements.
 
 The container journey is opt-in because it builds an image from authenticated
 committed source. Create the archive with `scripts/qualification_source.py`

@@ -22,22 +22,22 @@
   "$defs": {
     "sha256": {
       "type": "string",
-      "pattern": "^[a-f0-9]{64}$"
+      "pattern": "^[a-f0-9]{64}(?![\\s\\S])"
     },
     "providerName": {
       "type": "string",
-      "pattern": "^[a-z][a-z0-9_]{0,63}$"
+      "pattern": "^[a-z][a-z0-9_]{0,63}(?![\\s\\S])"
     },
     "taskName": {
-      "$comment": "Standard identifiers include text_causal, text_seq2seq, masked_language, and vision_text_generation. A provider must explicitly declare execution support; the canonical pattern permits later add-in tasks without changing the provider ABI.",
+      "$comment": "Standard identifiers include text_causal, text_seq2seq, masked_language, and vision_text_generation. A provider must explicitly declare execution support; the canonical pattern permits later extension tasks without changing the provider ABI.",
       "type": "string",
-      "pattern": "^[a-z][a-z0-9_]{0,63}$"
+      "pattern": "^[a-z][a-z0-9_]{0,63}(?![\\s\\S])"
     },
     "logicalName": {
       "type": "string",
       "minLength": 1,
       "maxLength": 512,
-      "pattern": "^(?!\\s)(?!/)(?![A-Za-z]:)(?!.*:/)(?!.*//)(?!.*\\/$)(?!.*(?:^|/)\\.(?:/|$))(?!.*(?:^|/)\\.\\.(?:/|$))[^\\\\\\u0000-\\u001f]*\\S$"
+      "pattern": "^(?!\\s)(?!/)(?![A-Za-z]:)(?!.*:/)(?!.*//)(?!.*\\/$)(?!.*(?:^|/)\\.(?:/|$))(?!.*(?:^|/)\\.\\.(?:/|$))[^\\\\\\u0000-\\u001f]*\\S(?![\\s\\S])"
     },
     "recordId": {
       "allOf": [
@@ -53,7 +53,7 @@
     },
     "immutableRevision": {
       "type": "string",
-      "pattern": "^[0-9a-f]{40,64}$"
+      "pattern": "^[0-9a-f]{40,64}(?![\\s\\S])"
     },
     "datasetIdentity": {
       "type": "object",
@@ -141,7 +141,7 @@
     },
     "partRole": {
       "type": "string",
-      "pattern": "^[a-z][a-z0-9_]{0,63}$"
+      "pattern": "^[a-z][a-z0-9_]{0,63}(?![\\s\\S])"
     },
     "textInputPart": {
       "type": "object",
@@ -176,7 +176,7 @@
         "content_id": {"$ref": "#/$defs/partRole"},
         "media_type": {
           "type": "string",
-          "pattern": "^[a-z0-9][a-z0-9!#$&^_.+-]{0,126}/[a-z0-9][a-z0-9!#$&^_.+-]{0,126}$"
+          "pattern": "^[a-z0-9][a-z0-9!#$&^_.+-]{0,126}/[a-z0-9][a-z0-9!#$&^_.+-]{0,126}(?![\\s\\S])"
         },
         "byte_length": {"type": "integer", "minimum": 1},
         "sha256": {"$ref": "#/$defs/sha256"}

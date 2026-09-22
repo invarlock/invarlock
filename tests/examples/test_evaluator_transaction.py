@@ -53,7 +53,14 @@ def _schedule():
         records=[
             {
                 "record_id": "stable-1",
-                "input_text": "Prompt",
+                "input_parts": [
+                    {
+                        "kind": "text",
+                        "role": "prompt",
+                        "text": "Prompt",
+                        "sha256": hashlib.sha256(b"Prompt").hexdigest(),
+                    }
+                ],
                 "expected_output": "Answer",
             }
         ],
@@ -805,8 +812,9 @@ def test_runtime_image_inspection_requires_and_dispatches_attestation(
     )
 
 
+@pytest.mark.parametrize("inspection_prefix", ["sha256:", ""])
 def test_shared_image_inspection_rechecks_the_signed_oci_observation(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, inspection_prefix: str
 ) -> None:
     from examples.integrations import launch as shared_launch
 
@@ -853,7 +861,7 @@ def test_shared_image_inspection_rechecks_the_signed_oci_observation(
         del cwd, capture_output
         template = command[4]
         if template == "{{.Id}}":
-            stdout = image
+            stdout = inspection_prefix + image.removeprefix("sha256:")
         elif "RootFS.Layers" in template:
             stdout = json.dumps([base, layer] if command[-1] == image else [base])
         elif template == "{{json .Config}}":
@@ -920,8 +928,9 @@ def test_workers_mount_role_private_output_parents(
     assert all(call["output"].name == "result" for call in commands)
 
 
+@pytest.mark.parametrize("inspection_prefix", ["sha256:", ""])
 def test_launcher_returns_the_verified_child_image_id(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, inspection_prefix: str
 ) -> None:
     launcher = _launcher_module()
     from examples.integrations import launch as shared_launch
@@ -1005,7 +1014,9 @@ def test_launcher_returns_the_verified_child_image_id(
                     base_config if command[-1] == base_id else child_config
                 )
             if template == "{{.Id}}":
-                return base_id if "example-runtime" in command[-1] else child_id
+                return inspection_prefix + (
+                    base_id if "example-runtime" in command[-1] else child_id
+                ).removeprefix("sha256:")
             if "base-image-id" in template:
                 return base_id
             if "evaluator-lock-sha256" in template:

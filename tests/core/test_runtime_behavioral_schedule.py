@@ -85,7 +85,7 @@ def test_build_schedule_from_material_derives_digest_in_canonical_builder() -> N
     records = [
         {
             "record_id": record["record_id"],
-            "input_text": record["input_parts"][0]["text"],
+            "input_parts": record["input_parts"],
             "expected_output": record["expected_output"],
         }
         for record in payload["records"]
@@ -216,7 +216,16 @@ def test_schedule_accepts_future_canonical_task_without_contract_change() -> Non
         records=[
             {
                 "record_id": "future/1",
-                "input_text": "Transcribe the authenticated audio input.",
+                "input_parts": [
+                    {
+                        "kind": "text",
+                        "role": "prompt",
+                        "text": "Transcribe the authenticated audio input.",
+                        "sha256": hashlib.sha256(
+                            b"Transcribe the authenticated audio input."
+                        ).hexdigest(),
+                    }
+                ],
                 "expected_output": "hello",
             }
         ],

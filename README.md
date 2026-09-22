@@ -96,10 +96,14 @@ its commit and wheel digest when sharing it. A missing release archive is an
 error, never a reason to substitute another version. See
 [matching wheels and examples](docs/user-guide/getting-started.md#matching-wheels-and-examples).
 
-To collect new judge ratings, install `python -m pip install "invarlock[judge]"`.
-Judge scoring is built into the core; this extra adds the matching collector and
-its pinned provider SDKs. Offline import, verification and reporting need only
-`invarlock`. See [judge setup](docs/reference/judge-measurements.md#frozen-answer-requests-and-preflight).
+For hosted judge collection, install `python -m pip install "invarlock[judge]"`.
+This extra adds the pinned provider SDKs. Native local judging uses core InvarLock
+with authenticated `hf_transformers` or `llama_cpp` runtime resources and local
+model artifacts. Offline import, verification and reporting need only the core.
+See [judge setup](docs/reference/judge-measurements.md#frozen-answer-requests-and-preflight),
+the [native local judge example](examples/native-local-judge/README.md), or the
+[OpenAI-compatible endpoint example](examples/openai-compatible-judge/README.md)
+for vLLM, Ollama and LM Studio services.
 
 ## What can you use it for?
 
@@ -170,9 +174,15 @@ precision and quality requirements. A point estimate alone does not decide the
 result. [Schedule and policy](docs/user-guide/schedule-and-policy.md)
 explains the statistical scope and thresholds.
 
-Judge collection uses the optional `invarlock-inspect-judge[inspect]` package
-with explicit call, token, cost, timeout and checkpoint limits. Importing retained
-ratings, verification and reporting work offline in the core wheel. Start with
+Judge collection is built into core. Hosted collection uses the pinned SDKs in
+`invarlock[judge]`; `runtime-provider-judge` runs an authenticated local HF or GGUF
+artifact offline. The local profile binds the complete artifact identity, runtime,
+canonical request and retained output, without a hidden chat template or HTTP
+endpoint. `openai-compatible-judge` instead collects through an explicitly
+configured Chat Completions service and retains endpoint identity without
+claiming authenticated local weights. Collection uses explicit limits and durable
+checkpoints. Importing retained ratings, verification and reporting work offline
+in the core wheel. Start with
 `invarlock evaluate --init my-judge --example native-judge` and replace the
 illustrative model pins with your actual runtime inputs. See
 [judge scoring](docs/reference/judge-measurements.md)
@@ -186,19 +196,27 @@ preserving each check's meaning.
 
 ## Keep your evaluator or run the comparison here
 
-**Use existing records.** Installed parsers cover selected Inspect AI, LM
-Evaluation Harness and Promptfoo export profiles, plus canonical JSON and generic
-JSONL. The [capture SDK](docs/reference/api-guide.md)
-lets other pipelines supply the required per-case facts. Structured inputs need
-an explicit text projection for judging; normalized NLL needs actual likelihood
-measurements. An aggregate score cannot substitute for missing observations.
+**Use existing records.** Dedicated profiles cover all 19 evaluators in the
+maintained shortlist. Export supported native JSON from your existing environment,
+then select `adapter: evaluator-native-json` in InvarLock. No InvarLock installation
+is needed in the evaluator environment, and recipients need no evaluator SDK or
+account. If you prefer a Python helper, `invarlock.engine.export_evaluator_result`
+prepares a complete export for `adapter: evaluator-json`. Both routes use the same
+`evaluate`, `verify` and `report` commands.
+
+The [capture guide](docs/reference/evaluation-records.md#dedicated-evaluator-exports)
+covers source shapes, complete case IDs, custom numeric metrics and metadata
+slices. Exact match needs answers and references; normalized NLL needs actual
+continuation measurements; judging needs task/answer text and complete judge
+measurements. An aggregate score cannot substitute for the required per-case
+records. Structured inputs can use an explicit text projection.
 The [qualification matrix](docs/reference/evaluator-qualification.md)
 distinguishes installed support, replay authority and retained runtime evidence
 for each declared profile.
 
 **Run a native comparison.** Hugging Face Transformers is the built-in runtime.
-Optional GGUF/llama.cpp, TensorRT-LLM and Hugging Face vision-text packages provide
-additional runtime profiles. Native run mode uses a caller-authorized,
+GGUF/llama.cpp, TensorRT-LLM and Hugging Face vision-text providers are included
+in core, with optional execution dependencies. Native run mode uses a caller-authorized,
 digest-addressed Docker or Podman image. Follow the
 [getting-started guide](docs/user-guide/getting-started.md)
 for artifact pins, runtime setup and independent verification inputs.
@@ -218,7 +236,9 @@ service again.
 ## Inspect real retained examples
 
 The repository includes signed evidence, receipts and replay instructions from
-actual model runs. Each reference establishes its declared workflow and scope:
+actual model runs. Start with the [practical change walkthroughs](examples/README.md#inspect-a-practical-model-change)
+for quantization, extraction instructions or a checkpoint replacement. Each
+reference establishes its declared workflow and scope:
 
 | Reference | Retained work |
 | --- | --- |

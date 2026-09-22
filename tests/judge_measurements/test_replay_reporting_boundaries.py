@@ -118,6 +118,12 @@ def test_reports_preserve_decision_and_role_without_gating_advisory_metrics(
         publication.path, html_path=html_path, junit_path=junit_path
     )
     assert result.facts["assurance"]["policy_decision"] == outcome
+    policy_label = {
+        "pass": "Policy satisfied",
+        "regression": "Policy not met",
+        "insufficient_evidence": "More evidence needed",
+    }[outcome]
+    assert f"**Policy result:** {policy_label}" in result.text
     assert result.facts["assurance"]["decision_role"] == role
     assert f"Decision role: {role}" in result.text
     assert "16 cases" in result.text
@@ -141,10 +147,15 @@ def test_reports_preserve_decision_and_role_without_gating_advisory_metrics(
         assert suite.get("errors") == str(int(outcome == "insufficient_evidence"))
         assert suite.get("skipped") == "0" and case.find("skipped") is None
     if outcome == "regression":
-        assert f"At least one declared {role} bound is violated." in result.text
+        assert (
+            "The interval for the score change puts the loss beyond the allowance of 0 score points."
+            in result.text
+        )
         assert "bounds are satisfied" not in result.text
         if role == "required":
-            assert "bound is violated" in case.find("failure").get("message")
+            assert case.find("failure").get("message") == (
+                "The interval for the score change puts the loss beyond the allowance of 0 score points."
+            )
 
 
 @pytest.mark.parametrize("signed", [True, False])
@@ -153,7 +164,7 @@ def test_reports_show_descriptive_baseline_and_correct_signing_next_step(
 ):
     publication, _ = _publish(tmp_path, baseline=1, subject=0, signed=signed)
     result = render_judge_evidence(publication.path)
-    assert "| 1 | 0" in result.text
+    assert "| 1 score | 0 score | -1 score |" in result.text
     assert "equal independent-unit weights" in result.text
     assert result.facts["descriptive_means"]["baseline"] == "1.000000000000000"
     signing_step = "republish the same retained inputs"

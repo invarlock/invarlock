@@ -1,0 +1,14 @@
+[run]
+branch = True
+parallel = True
+patch = subprocess
+source =
+    src/invarlock/diagnostics
+    src/invarlock/runtime_providers
+    src/invarlock/judge_measurements
+omit =
+    tests/*
+
+[report]
+show_missing = True
+precision = 2

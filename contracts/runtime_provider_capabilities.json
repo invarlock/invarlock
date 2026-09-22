@@ -20,7 +20,7 @@
     },
     "provider_name": {
       "type": "string",
-      "pattern": "^[a-z][a-z0-9_]{0,63}$"
+      "pattern": "^[a-z][a-z0-9_]{0,63}(?![\\s\\S])"
     },
     "provider_abi": {
       "const": "1"
@@ -38,9 +38,9 @@
       "minItems": 1,
       "uniqueItems": true,
       "items": {
-        "$comment": "Standard identifiers include text_causal, text_seq2seq, masked_language, and vision_text_generation. A provider must explicitly declare execution support; canonical add-in task identifiers need no ABI revision.",
+        "$comment": "Standard identifiers include text_causal, text_seq2seq, masked_language, and vision_text_generation. A provider must explicitly declare execution support; canonical extension task identifiers need no ABI revision.",
         "type": "string",
-        "pattern": "^[a-z][a-z0-9_]{0,63}$"
+        "pattern": "^[a-z][a-z0-9_]{0,63}(?![\\s\\S])"
       }
     },
     "metrics": {
@@ -65,13 +65,13 @@
     "required_extra": {
       "anyOf": [
         {"type": "null"},
-        {"type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$"}
+        {"type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}(?![\\s\\S])"}
       ]
     },
     "required_image": {
       "anyOf": [
         {"type": "null"},
-        {"type": "string", "pattern": "^\\S+$"}
+        {"type": "string", "pattern": "^\\S+(?![\\s\\S])"}
       ]
     }
   },

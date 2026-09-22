@@ -55,7 +55,7 @@ def main() -> None:
             raise ValueError("measurement output must be a new file")
         with pinned_directory(output.parent):
             pass
-        from invarlock_addins.inspect_judge import CollectionOptions, import_export
+        from invarlock.judge_measurements import CollectionOptions, import_export
 
         measurements = import_export(
             read_regular_file_bytes(
@@ -74,9 +74,7 @@ def main() -> None:
             output, canonical_payload(measurements), create_parents=False
         )
     except ImportError:
-        parser.exit(
-            2, "Judge import requires matching core and inspect_judge packages.\n"
-        )
+        parser.exit(2, "Judge import requires the invarlock core package.\n")
     except (OSError, ValueError) as exc:
         parser.exit(2, f"Judge import failed: {exc}\n")
     completed = measurements["completeness"]["completed_trials"]

@@ -18,7 +18,11 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 try:
     from examples.integrations.bounded_command import run_bounded_command
 except ModuleNotFoundError as exc:
-    if exc.name != "examples":
+    if exc.name not in {
+        "examples",
+        "examples.integrations",
+        "examples.integrations.bounded_command",
+    }:
         raise
     from bounded_command import run_bounded_command  # type: ignore[no-redef]
 

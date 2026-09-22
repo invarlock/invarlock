@@ -15,6 +15,28 @@ from scripts.ci import coverage_runner as runner
 from tests._support_repository_contracts import MakefileContract
 
 
+def test_all_live_example_helpers_belong_only_to_example_partition():
+    paths = {
+        path.relative_to(runner.ROOT).as_posix()
+        for path in (runner.ROOT / "tests/evaluation_records").glob("test_live_*.py")
+    }
+    examples = runner.selection("examples")
+    core = runner.selection("core")
+    assert paths
+    assert paths <= set(examples)
+    assert all(
+        examples.count(path) == 1 and f"--ignore={path}" in core for path in paths
+    )
+    result = subprocess.run(
+        ["make", "--dry-run", "examples-check", "PYTHON=true", "PYTEST_WORKERS=0"],
+        cwd=runner.ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert all(result.stdout.count(path) == 1 for path in paths)
+
+
 def write_data(path: Path, name: str = "src/invarlock/probe.py") -> None:
     data = CoverageData(basename=str(path))
     data.add_arcs({name: [(-1, 1), (1, 2), (2, -1)]})
@@ -23,7 +45,7 @@ def write_data(path: Path, name: str = "src/invarlock/probe.py") -> None:
 
 @pytest.fixture
 def artifacts(tmp_path, monkeypatch):
-    monkeypatch.setattr(runner, "source_identity", lambda: "source")
+    monkeypatch.setattr(runner, "source_identity", lambda *args: "source")
     root = tmp_path / "artifacts"
     for shard in runner.SHARDS:
         folder = root / shard
@@ -64,7 +86,7 @@ def test_combine_preserves_each_shards_branches(artifacts, tmp_path):
 
 
 @pytest.mark.parametrize("extra", [False, True])
-def test_combine_requires_exactly_four_shards(artifacts, tmp_path, extra):
+def test_combine_requires_every_declared_shard(artifacts, tmp_path, extra):
     if extra:
         folder = artifacts / "unexpected"
         folder.mkdir()
@@ -104,7 +126,7 @@ def test_combine_rejects_invalid_inventory(artifacts, tmp_path, value):
 
 @pytest.mark.parametrize("overlap", [False, True])
 def test_combine_rejects_changed_or_overlapping_inventory(artifacts, tmp_path, overlap):
-    inventory = ["tests/addins/test_probe.py::test_probe"]
+    inventory = ["tests/runtime/test_probe.py::test_probe"]
     runner._write_json(artifacts / "core/inventory.json", inventory)
     if overlap:
         path = artifacts / "core/manifest.json"
@@ -175,7 +197,11 @@ def test_source_identity_includes_content_deletions_links_and_commit(
         return commit[0] if command[1] == "rev-parse" else b"file.py\0link.py\0"
 
     monkeypatch.setattr(runner.subprocess, "check_output", git)
-    identities = [runner.source_identity()]
+    snapshot = {"stale": "discard"}
+    identities = [runner.source_identity(snapshot)]
+    assert set(snapshot) == {"HEAD", "file.py", "link.py"}
+    assert snapshot["HEAD"] == "commit-one"
+    assert snapshot["file.py"] != snapshot["link.py"]
     source.write_text("after")
     identities.append(runner.source_identity())
     source.unlink()
@@ -214,14 +240,21 @@ def test_inventory_plugin_handles_empty_master_and_atomic_worker_collection(
         ("core", 2, 1, False),
         ("core", 0, 0, True),
         ("support", 0, 0, False),
-        ("addins", 0, 0, False),
+        ("runtime", 0, 0, False),
     ],
 )
 def test_run_records_success_only_after_validating_outputs(
     tmp_path, monkeypatch, shard, workers, exit_code, changed
 ):
     identities = iter(["before", "after" if changed else "before"])
-    monkeypatch.setattr(runner, "source_identity", lambda: next(identities))
+
+    def identity(snapshot):
+        value = next(identities)
+        snapshot["tracked.py"] = value
+        snapshot["HEAD"] = "unchanged"
+        return value
+
+    monkeypatch.setattr(runner, "source_identity", identity)
 
     def execute(command, *, cwd, env, check):
         assert cwd == runner.ROOT and check is False
@@ -229,9 +262,9 @@ def test_run_records_success_only_after_validating_outputs(
         assert "--cov-report=" in command and "--durations=20" in command
         assert "--cov-branch" in command
         assert "-m" in command
+        assert env["PYTEST_DISABLE_PLUGIN_AUTOLOAD"] == "1"
         assert "scripts/ci" in env["PYTHONPATH"]
-        assert ("addins/diagnostics/src" in env["PYTHONPATH"]) is (shard == "addins")
-        assert ("addins/tensorrt_llm/src" in env["PYTHONPATH"]) is (shard != "core")
+        assert "addins" not in env["PYTHONPATH"]
         path = Path(env["COVERAGE_FILE"])
         manifest = json.loads((path.parent / "manifest.json").read_text())
         assert manifest["status"] == "running"
@@ -250,6 +283,8 @@ def test_run_records_success_only_after_validating_outputs(
     record = json.loads((tmp_path / shard / "manifest.json").read_text())
     assert record["status"] == ("passed" if not exit_code and not changed else "failed")
     assert record["duration_seconds"] >= 0
+    if changed:
+        assert record["changed_source_paths"] == ["tracked.py"]
 
 
 def test_invalid_shard_and_worker_count_are_rejected(tmp_path):
@@ -286,9 +321,10 @@ def test_support_inventory_matches_existing_specialized_targets():
         )
     assert set(runner.SUPPORT_TESTS) == selected
     assert len(runner.SUPPORT_TESTS) == len(selected)
-    canary = "addins/tensorrt_llm/tests/test_tensorrt_llm_canary_preflight.py"
+    canary = "tests/runtime/test_tensorrt_llm_canary_preflight.py"
     assert canary in make.target("coverage-qualification").text
-    assert any(canary.startswith(path + "/") for path in runner.selection("addins"))
+    assert any(canary.startswith(path + "/") for path in runner.selection("runtime"))
+    assert f"--ignore={canary}" in runner.selection("runtime")
 
 
 def isolated_env() -> dict[str, str]:
@@ -296,6 +332,7 @@ def isolated_env() -> dict[str, str]:
         key: value
         for key, value in os.environ.items()
         if not key.startswith(("COVERAGE_", "COV_CORE_", "INVARLOCK_COVERAGE_"))
+        and key != "PYTEST_DISABLE_PLUGIN_AUTOLOAD"
     }
 
 
@@ -304,15 +341,24 @@ def test_real_collection_is_disjoint_and_preserves_marker_exceptions(
 ):
     support = "tests/support/test_support.py"
     monkeypatch.setattr(runner, "SUPPORT_TESTS", (support,))
-    monkeypatch.setattr(runner, "ADDIN_TESTS", ("addins/example/tests",))
+    monkeypatch.setattr(runner, "RUNTIME_TESTS", ("tests/runtime",))
     files = {
         "tests/test_core.py": "def test_core(): pass\n",
         "tests/test_slow.py": "import pytest\n@pytest.mark.slow\ndef test_slow(): pass\n",
         "tests/compatibility/test_retained.py": "def test_retained(): pass\n",
+        "tests/judge_measurements/test_collector.py": "def test_collector(): pass\n",
         "tests/examples/test_duplicate.py": "def test_example(): pass\n",
+        "tests/integration/test_evaluator_parity.py": "def test_parity(): pass\n",
+        "tests/evaluation_records/test_sdk_capture.py": "def test_sdk(): pass\n",
         support: "import pytest\n@pytest.mark.integration\ndef test_container(): pass\n",
-        "addins/example/tests/test_duplicate.py": "def test_addin(): pass\n",
+        "tests/runtime/test_duplicate.py": "def test_runtime(): pass\n",
     }
+    for name in runner.EXAMPLE_TESTS:
+        if name.endswith(".py"):
+            files.setdefault(name, "def test_example_helper(): pass\n")
+    for paths in runner.EXAMPLE_PARTITIONS.values():
+        for name in paths:
+            files.setdefault(name, "def test_partitioned_example(): pass\n")
     for name, contents in files.items():
         path = tmp_path / name
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -343,7 +389,25 @@ def test_real_collection_is_disjoint_and_preserves_marker_exceptions(
         )
         inventories.append(set(json.loads(path.read_text())))
     union = set().union(*inventories)
-    assert sum(map(len, inventories)) == len(union) == 5
+    assert sum(map(len, inventories)) == len(union) == len(files) - 1
+    examples = set().union(
+        *(
+            inventory
+            for shard, inventory in zip(runner.SHARDS, inventories, strict=True)
+            if shard.startswith("examples")
+        )
+    )
+    assert "tests/integration/test_evaluator_parity.py::test_parity" in examples
+    assert "tests/evaluation_records/test_sdk_capture.py::test_sdk" in examples
+    assert all(
+        any(node.startswith(name + "::") for node in examples)
+        for name in runner.EXAMPLE_TESTS
+        if name.endswith(".py")
+    )
+    assert (
+        "tests/judge_measurements/test_collector.py::test_collector"
+        in inventories[runner.SHARDS.index("core")]
+    )
     assert f"{support}::test_container" in union
     assert "tests/compatibility/test_retained.py::test_retained" in union
     assert not any("test_slow" in node for node in union)
@@ -358,8 +422,8 @@ def test_shared_config_traces_child_processes_with_relative_paths(tmp_path):
     parent.write_text(
         "import subprocess, sys\nsubprocess.run([sys.executable, 'src/invarlock/child.py'], check=True)\n"
     )
-    for directory in ("addins", "scripts", "examples"):
-        (tmp_path / directory).mkdir()
+    for directory in ("scripts", "examples", "src"):
+        (tmp_path / directory).mkdir(exist_ok=True)
     env = isolated_env()
     data_path = tmp_path / "data"
     env["COVERAGE_FILE"] = str(data_path)
@@ -386,6 +450,9 @@ def test_shared_config_traces_child_processes_with_relative_paths(tmp_path):
 
 
 def test_run_collects_real_xdist_inventory_and_coverage(tmp_path, monkeypatch):
+    pytest.importorskip("pytest_cov")
+    pytest.importorskip("xdist")
+    monkeypatch.setattr(runner, "EXAMPLE_TESTS", ("tests/examples",))
     project = tmp_path / "project"
     tests = project / "tests/examples"
     tests.mkdir(parents=True)
@@ -403,10 +470,10 @@ def test_run_collects_real_xdist_inventory_and_coverage(tmp_path, monkeypatch):
     plugin = project / "scripts/ci/coverage_runner.py"
     plugin.parent.mkdir(parents=True)
     plugin.symlink_to(Path(runner.__file__))
-    for directory in ("examples", "addins"):
-        (project / directory).mkdir()
+    for directory in ("examples", "src"):
+        (project / directory).mkdir(exist_ok=True)
     monkeypatch.setattr(runner, "ROOT", project)
-    monkeypatch.setattr(runner, "source_identity", lambda: "source")
+    monkeypatch.setattr(runner, "source_identity", lambda *args: "source")
     artifacts = tmp_path / "artifacts"
     assert runner.run("examples", artifacts, 2) == 0
     record = json.loads((artifacts / "examples/manifest.json").read_text())
@@ -416,3 +483,52 @@ def test_run_collects_real_xdist_inventory_and_coverage(tmp_path, monkeypatch):
         artifacts / "examples/.coverage"
     )
     assert (artifacts / "examples/junit.xml").is_file()
+
+
+@pytest.mark.parametrize("shard", runner.SHARDS)
+def test_minimum_python_preserves_marker_and_runtime_exceptions(shard):
+    selected = runner.test_selection(shard)
+    if shard == "runtime":
+        assert selected == [*runner.RUNTIME_TESTS, "tests/compatibility"]
+    else:
+        assert selected[-2:] == ["-m", runner.FAST_MARKERS]
+        assert "--ignore=tests/compatibility" in selected
+        if shard == "support":
+            assert not any(
+                path.startswith(root + "/")
+                for path in selected
+                for root in runner.RUNTIME_TESTS
+            )
+
+
+def test_supplement_selects_only_unmeasured_core_markers():
+    selected = runner.test_selection("supplement")
+    regular = runner.selection("core")
+    marker_index = regular.index(runner.FAST_MARKERS)
+    assert selected[marker_index] == "integration or slow or manual or gpu"
+    selected[marker_index] = runner.FAST_MARKERS
+    assert selected == regular
+
+
+@pytest.mark.parametrize("workers", [0, 2])
+def test_behavior_runner_propagates_failure_and_selection(monkeypatch, workers):
+    def execute(command, *, cwd, env, check):
+        assert command[:4] == [sys.executable, "-m", "pytest", "-q"]
+        assert all(arg in command for arg in runner.test_selection("core"))
+        assert ("-n" in command) is bool(workers)
+        assert cwd == runner.ROOT and check is False
+        assert str(runner.ROOT / "src") in env["PYTHONPATH"]
+        return SimpleNamespace(returncode=3)
+
+    monkeypatch.setattr(runner.subprocess, "run", execute)
+    assert runner.test("core", workers) == 3
+    with pytest.raises(ValueError, match="nonnegative"):
+        runner.test("core", -1)
+
+
+def test_behavior_cli_dispatches_both_modes(monkeypatch):
+    calls = []
+    monkeypatch.setattr(runner, "test", lambda *args: calls.append(args) or 0)
+    assert runner.main(["test", "core", "--workers", "0"]) == 0
+    assert runner.main(["supplement"]) == 0
+    assert calls == [("core", 0), ("supplement", 2)]

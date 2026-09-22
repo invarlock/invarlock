@@ -22,7 +22,7 @@ def test_single_metric_summary_includes_values_interval_and_bound_requirements()
     view = record_reporting._view(comparison, snapshot)
     metric = view.metrics[0]
     assert (
-        f"the subject's {metric.name} was {metric.candidate}, compared with {metric.baseline} for the baseline, a change of {metric.change}."
+        f"the subject's {metric.display_name} was {metric.candidate}, compared with {metric.baseline} for the baseline, a change of {metric.change}."
         in view.summary
     )
     assert "The 95% interval for the change runs from" in view.summary
@@ -64,9 +64,10 @@ def test_summary_aggregates_scopes_without_adding_overlapping_pair_counts():
     ]
     metrics = record_reporting._metric_views(comparison, {})
     summary = record_reporting._captured_summary(metrics)
-    assert summary.startswith(f"{metrics[1].name} (west) did not meet policy")
+    assert summary.startswith(f"{metrics[1].display_name} (west):")
+    assert "policy thresholds are unavailable" in summary
     assert (
-        "3 metric / scope results: 1 passed, 1 did not meet policy, and 1 need more evidence."
+        "3 metric / scope results: 1 passed, 1 did not meet policy, and 1 needs more evidence."
         in summary
     )
     assert "overlapping slice counts must not be added together" in summary
@@ -96,6 +97,7 @@ def test_match_counts_require_complete_binary_mean_with_exact_integer_arithmetic
     )
     if mutation == "missing":
         metric["missing_ids"] = ["case-missing"]
+        metric["decision"] = "insufficient_evidence"
     elif mutation == "nonbinary":
         metric["kind"] = "recorded"
     elif mutation == "aggregation":
@@ -171,6 +173,8 @@ def test_count_sublabels_preserve_included_and_usable_pairs_and_policy_scope(
     _, comparison, policy = binary_comparison()
     metric = comparison["metrics"][0]
     metric["missing_ids"] = ["one-missing"] if missing else []
+    if missing:
+        metric["decision"] = "insufficient_evidence"
     count = metric["count"]
     configured = (
         {item["name"]: item for item in policy["metrics"]} if with_policy else {}
@@ -218,12 +222,12 @@ def test_nll_summary_describes_ratio_without_calling_it_a_delta(scope):
     summary = record_reporting._captured_summary(metrics, comparison)
     assert "Across 1 usable pair" in summary
     assert (
-        "the subject's nll was 1.5 nats / byte, compared with 2 nats / byte for the baseline"
+        "the subject's NLL was 1.5 nats / byte, compared with 2 nats / byte for the baseline"
         in summary
     )
     assert "a subject-to-baseline ratio of 0.75" in summary
     assert "The 95% interval for the ratio runs from" in summary
-    assert "at or below 1.1 ratio" in summary
+    assert "at or below 1.1." in summary
     assert "a change of 0.75" not in summary
     assert ("within the west slice" in summary) is (scope == "west")
 
@@ -242,7 +246,7 @@ def test_unavailable_summary_explains_usable_pairs_without_inventing_scores(miss
     comparison = pack_json(snapshot, "report")
     before = dict(snapshot.files)
     view = record_reporting._view(comparison, snapshot)
-    assert view.summary.startswith("More evidence is needed")
+    assert "There are fewer paired records than the policy requires." in view.summary
     assert f"unavailable across {40 - missing} usable pairs" in view.summary
     assert "No change estimate or uncertainty interval is available." in view.summary
     assert "The policy requires at least 50 included pairs." in view.summary
@@ -286,6 +290,7 @@ def test_multi_summary_names_first_failed_check_without_ranking_metric_units():
         passing,
         name="quality",
         decision="regression",
+        explanation="Recorded explanation.",
         checks=(CheckView("Allowed change", "-26.11 pp", ">= -20 pp", False),),
     )
     later = replace(
@@ -294,14 +299,92 @@ def test_multi_summary_names_first_failed_check_without_ranking_metric_units():
         checks=(CheckView("Maximum latency", "999 ms", "<= 100 ms", False),),
     )
     summary = record_reporting._captured_summary((passing, failed, later))
-    assert summary.startswith(
-        "quality (overall) did not meet policy: the Allowed change check recorded -26.11 pp against a requirement of >= -20 pp."
-    )
+    assert summary.startswith("quality (overall): Recorded explanation.")
     assert "worst" not in summary
-    incomplete = replace(passing, decision="insufficient_evidence", checks=())
+    incomplete = replace(
+        passing,
+        decision="insufficient_evidence",
+        checks=(),
+        explanation="Recorded explanation.",
+    )
     assert record_reporting._captured_summary((passing, incomplete)).startswith(
-        "accuracy (overall) needs more evidence."
+        "accuracy (overall): Recorded explanation."
     )
     assert record_reporting._captured_summary((passing, passing)).startswith(
         "2 metric / scope results: 2 passed"
     )
+
+
+@pytest.mark.parametrize(
+    "scores,maximum,expected",
+    [
+        (
+            (-4.4, -4.4),
+            1.05,
+            "The observed NLL ratio exceeded the policy limit. Lower NLL is better.",
+        ),
+        (
+            (-2, -6),
+            1.05,
+            "The observed NLL ratio was within the policy limit, but its uncertainty interval extended beyond it.",
+        ),
+        (
+            (-3.6, -3.6),
+            0.8,
+            "The observed NLL ratio exceeded the policy limit. Lower NLL is better.",
+        ),
+    ],
+)
+def test_nll_opening_explains_failed_bound_instead_of_repeating_status(
+    scores, maximum, expected
+):
+    from invarlock.evaluation_comparison.comparison import compare_runs
+    from tests.evaluation_comparison.test_likelihood import policy, row, run
+
+    configured = policy()
+    configured["metrics"][0]["ratio_max"] = maximum
+    comparison = compare_runs(
+        run([row("a"), row("b")]),
+        run([row("a", scores[0]), row("b", scores[1])]),
+        configured,
+    )
+    before = deepcopy(comparison)
+    metrics = record_reporting._metric_views(
+        comparison, {"nll": configured["metrics"][0]}
+    )
+    assert metrics[0].decision == "regression"
+    summary = record_reporting._captured_summary(metrics, comparison)
+    assert summary.startswith(expected)
+    assert "The policy was not met" not in summary
+    assert "subject-to-baseline ratio of" in summary
+    assert comparison == before
+
+
+@pytest.mark.parametrize(
+    "direction,estimate",
+    [("minimum", -3), ("minimum", 1), ("maximum", 3), ("maximum", -1)],
+)
+def test_scalar_opening_respects_direction_and_does_not_call_every_failure_a_loss(
+    direction, estimate
+):
+    from dataclasses import replace
+
+    from invarlock.report_presentation import CheckView, IntervalView
+
+    _, comparison, _ = binary_comparison()
+    base = record_reporting._metric_views(comparison, {})[0]
+    interval = IntervalView(
+        -4, 4, estimate, 0, "Interval", "score", threshold_direction=direction
+    )
+    metric = replace(
+        base,
+        decision="regression",
+        interval=interval,
+        checks=(CheckView("Allowed change", "bound", "limit", False),),
+    )
+    opening = record_reporting._captured_opening(metric)
+    within = estimate >= 0 if direction == "minimum" else estimate <= 0
+    assert ("within the policy limit" in opening) == within
+    assert ("outside the range" in opening) != within
+    assert "loss" not in opening
+    assert "The policy was not met" not in opening

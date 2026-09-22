@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Callable
 from pathlib import Path
 from types import SimpleNamespace
@@ -42,7 +43,14 @@ def _schedule_bytes() -> bytes:
         records=[
             {
                 "record_id": "record/1",
-                "input_text": "Return A",
+                "input_parts": [
+                    {
+                        "kind": "text",
+                        "role": "prompt",
+                        "text": "Return A",
+                        "sha256": hashlib.sha256(b"Return A").hexdigest(),
+                    }
+                ],
                 "expected_output": "A",
             }
         ],
@@ -243,7 +251,14 @@ def test_input_preflight_rejects_before_in_process_model_preparation(
         records=[
             {
                 "record_id": "record/1",
-                "input_text": "Return A",
+                "input_parts": [
+                    {
+                        "kind": "text",
+                        "role": "prompt",
+                        "text": "Return A",
+                        "sha256": hashlib.sha256(b"Return A").hexdigest(),
+                    }
+                ],
                 "expected_output": "A",
             }
         ],

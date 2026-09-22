@@ -28,19 +28,53 @@ their declared exact-match profiles; they are not evidence for every new metric.
 
 ## Capture for exact match, likelihood and judge scoring
 
-The installed `load_run` parsers support canonical JSON, generic JSONL,
-`inspect-json`, `lm-eval-samples` and `promptfoo-jsonl`. Other workflows can map
-original per-case facts through `invarlock.engine.capture_evaluator_run` and
-inspect `evaluator_input_capabilities`. These are captured-input interfaces,
-separate from qualification and the example-owned signed OCI bridges.
+Dedicated native mappings cover all 19 ecosystems below. Export supported JSON
+cases, reports, prediction tables or attempts from your existing environment,
+then import them with `adapter: evaluator-native-json`. The optional installed
+`invarlock.engine.export_evaluator_result` helper prepares a common envelope for
+`adapter: evaluator-json` when SDK/core dependencies permit co-installation.
+Every profile uses the same captured `evaluate`, independent `verify` and
+`report` flow, with per-case metadata slices and attributed numeric metrics when
+supplied. Recipients need no evaluator SDK or account. The
+[native shape recipes](https://github.com/invarlock/invarlock/blob/main/examples/evaluator-qualification/maintained/CAPTURE.md#dedicated-native-shapes)
+and [public API example](evaluation-records.md#dedicated-evaluator-exports)
+describe the capture boundary. Canonical JSON, generic JSONL and the existing
+Inspect, Harness, Promptfoo and Langfuse parser names remain available.
 
-The [maintained capture helper](https://github.com/invarlock/invarlock/blob/main/examples/evaluator-qualification/maintained/CAPTURE.md)
-covers all 19 ecosystems through explicit canonical records. It can also join
-17 retained deterministic exports to their original cases and independent
-schedule. MLflow aggregate observations and Garak detector summaries cannot
-supply original per-case predictions, references or likelihoods; those workflows
-must capture the actual records separately. Historical matrix identities and
-authority remain unchanged.
+The evidence sources have different scopes. Tests that place retained model
+answers and likelihoods, plus synthetic complete judge-call fixtures, into each
+native shape exercise the
+shared export/import, scoring and recipient flow; they do not establish that
+each SDK measured those facts. Pinned SDK checks also serialize these retained records through actual upstream
+data objects and serializers, then pass the resulting files through a separately
+installed recipient for all three scorers and both import routes. Local evaluator
+smokes exercise their public APIs without a new model campaign. SDK-required
+wrapper fields are identified as serialization fixtures, not extra measurements. The
+historical qualification matrix retains its original 17 per-case deterministic
+exports and two observation-only profiles: MLflow aggregate results and Garak
+detector summaries. Their identities and authority do not change. New native
+MLflow prediction-table and Garak attempt capture paths require the actual rows;
+the historical summaries cannot supply them.
+
+The [fresh Mistral 7B sentinel](https://github.com/invarlock/invarlock/blob/main/examples/integrations/evaluator-live/references/mistral-7b-sentinel/README.md)
+executes both models through all 19 maintained profiles, retaining 304 model
+executions and 114 scorer/import journeys. Eight fixed cases cover narrative
+continuation, answerable questions and unanswerable questions. Its 992 usable
+judge ratings were collected against those retained answers; the original 32
+blocked attempts remain separate. Independent recipients authenticate and replay
+the resulting comparisons. These small-sample integration checks preserve policy
+failures and insufficient-evidence outcomes; they do not establish production
+model quality, hosted storage support or arbitrary evaluator configurations.
+
+The [priority workflow reference](https://github.com/invarlock/invarlock/blob/main/examples/integrations/evaluator-live/references/priority-workflows/README.md)
+extends Inspect, Harness, Promptfoo and Langfuse with 64-case local comparisons
+and eight-case controlled HTTP-service comparisons. Its 576 model executions
+support 32 independently verified exact-match/NLL comparisons and 24 judge
+comparisons, including reference-free, repetition and budget controls. All 1,288
+admitted judge calls produced usable ratings; four stop/resume checks preserved
+the original checkpoint bytes. The HTTP profile qualifies the declared task
+service, not arbitrary cloud APIs or hosted evaluator storage. Policy rejections
+and insufficient-evidence outcomes remain visible in the retained references.
 
 InvarLock owns the selected scorer. Exact match requires string answers and
 references. Judge requires task and answer text plus a declared recipe and
@@ -51,12 +85,24 @@ Normalized NLL requires typed reference-continuation log probabilities, byte and
 token counts, and bound source, artifact, configuration and tokenizer identities.
 Naming an evaluator cannot supply these facts.
 
-The separate [Harness likelihood reference](https://github.com/invarlock/invarlock/blob/main/examples/captured-results/references/harness-likelihood/README.md)
-retains real unmodified Harness `0.4.12` `HFLM` measurements on six authored
-same-model CPU pairs, followed by signed evaluation and independent replay.
-It establishes that likelihood compatibility profile. Synthetic canonical NLL
-tests exercise the shared contract across the shortlist; neither those tests nor
-the retained exact-match matrix qualify all 19 native likelihood or judge paths.
+The [Mistral 7B likelihood reference](https://github.com/invarlock/invarlock/blob/main/examples/captured-results/references/mistral-7b-likelihood/README.md)
+retains actual baseline-to-Instruct measurements for 400 paired narrative
+continuations, both model identities, and signed evaluation and independent
+recipient replay. The smaller [Harness likelihood control](https://github.com/invarlock/invarlock/blob/main/examples/captured-results/references/harness-likelihood/README.md)
+retains the earlier six same-model CPU pairs. Both establish their declared
+measurement profiles. The 19-profile contract replays adapt retained facts and
+source bindings into each native shape to test the shared interface; they do
+not claim new SDK likelihood measurements. Their synthetic complete judge calls
+exercise recipe and replay contracts, not a newly measured judge campaign.
+
+The installed gate also evaluates unchanged real Luna measurements from the
+grounded-QA held-out study (422 cases, 2,532 ratings, pass) and corrected pilot
+(40 cases, 240 ratings, insufficient evidence). Both complete preflight,
+signed evaluation, independent verification, reporting and measurement-tamper
+rejection. Their original canonical runs and policies remain bound to the
+ratings. These separate journeys establish real retained-judge execution;
+they do not relabel old calls as new evaluator-specific measurements. See the
+[runnable real judge journey](https://github.com/invarlock/invarlock/blob/main/examples/integrations/evaluator-parity/README.md).
 
 ## Three independent status axes
 
@@ -68,7 +114,7 @@ and cannot safely substitute for one another.
 | --- | --- | --- |
 | Adapter support | `maintained_adapter` or an external adapter | Whether this repository maintains the source-specific runner, dependency lock, and upstream entry point; support grants no replay authority |
 | Replay authority | `deterministic_per_record` or `observation_only` | Whether complete ordered facts can be independently recomputed and imported, or only retained as authenticated context |
-| Signed-journey maturity | Retained with a named corpus and record count, or `None retained` | Whether a model-running, signed `evaluate` → `verify` → `report` OCI transaction has completed and been retained as release evidence |
+| Signed OCI-journey maturity | Retained with a named corpus and record count, or `None retained` | Whether a model-running, signed `evaluate` → `verify` → `report` OCI transaction has completed and been retained as release evidence |
 
 The stable qualification-result contract continues to emit
 `outcome: qualified_for_import` with `authority: verdict_authority` for an
@@ -329,7 +375,7 @@ new signed transactions.
 
 ### Application evaluation SDKs
 
-| Upstream evaluator | Pinned version | Executed upstream entry point | Adapter support | Replay authority | Retained signed transactions |
+| Upstream evaluator | Pinned version | Executed upstream entry point | Adapter support | Replay authority | Retained signed OCI transactions |
 | --- | --- | --- | --- | --- | --- |
 | Promptfoo | `promptfoo@0.121.19` | `promptfoo eval` | Maintained | Independently replayable (102 shared outputs) | None retained |
 | DeepEval | `deepeval==4.1.3` | `deepeval.metrics.ExactMatchMetric.measure` | Maintained | Independently replayable (102 shared outputs) | None retained |
@@ -341,7 +387,7 @@ new signed transactions.
 
 ### Benchmark harnesses
 
-| Upstream evaluator | Pinned version | Executed upstream entry point | Adapter support | Replay authority | Retained signed transactions |
+| Upstream evaluator | Pinned version | Executed upstream entry point | Adapter support | Replay authority | Retained signed OCI transactions |
 | --- | --- | --- | --- | --- | --- |
 | LM Evaluation Harness | `lm-eval==0.4.12` | `lm_eval.api.metrics.exact_match_hf_evaluate` | Maintained | Independently replayable (102 shared outputs) | Retained (2 signed transactions, 400 records each) |
 | Inspect AI | `inspect-ai==0.3.254` | `inspect_ai.scorer.match` | Maintained | Independently replayable (102 shared outputs) | Retained (2 signed transactions, 400 records each) |
@@ -350,7 +396,7 @@ new signed transactions.
 
 ### Evaluation and observability platforms
 
-| Upstream evaluator | Pinned version | Executed upstream entry point | Adapter support | Replay authority | Retained signed transactions |
+| Upstream evaluator | Pinned version | Executed upstream entry point | Adapter support | Replay authority | Retained signed OCI transactions |
 | --- | --- | --- | --- | --- | --- |
 | MLflow Model Evaluation | `mlflow==3.14.0` | `mlflow.models.evaluate` | Maintained | Observation-only: aggregate only | None retained |
 | Arize Phoenix Evals | `arize-phoenix-evals==3.3.0` | `phoenix.evals.metrics.exact_match` | Maintained | Independently replayable (102 shared outputs) | None retained |
@@ -361,13 +407,13 @@ new signed transactions.
 
 ### General metric libraries
 
-| Upstream evaluator | Pinned version | Executed upstream entry point | Adapter support | Replay authority | Retained signed transactions |
+| Upstream evaluator | Pinned version | Executed upstream entry point | Adapter support | Replay authority | Retained signed OCI transactions |
 | --- | --- | --- | --- | --- | --- |
 | Hugging Face Evaluate | `evaluate==0.4.6` | `evaluate.load('exact_match').compute` | Maintained | Independently replayable (102 shared outputs) | None retained |
 
 ### Security and red-team evaluators
 
-| Upstream evaluator | Pinned version | Executed upstream entry point | Adapter support | Replay authority | Retained signed transactions |
+| Upstream evaluator | Pinned version | Executed upstream entry point | Adapter support | Replay authority | Retained signed OCI transactions |
 | --- | --- | --- | --- | --- | --- |
 | Garak | `garak==0.15.1` | `python -m garak` | Maintained | Observation-only: unsupported replay semantics | None retained |
 <!-- evaluator-matrix:end -->

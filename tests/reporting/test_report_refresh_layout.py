@@ -428,7 +428,7 @@ def test_adverse_metric_overview_starts_open(decision, opened):
     assert '<details class="overview-disclosure">' in html or opened
 
 
-def test_checks_have_mobile_labels_and_dark_theme_is_screen_only():
+def test_checks_have_mobile_labels_and_reports_keep_the_light_palette():
     from invarlock.report_presentation import _CSS, CheckView
 
     metric = MetricView(
@@ -447,8 +447,10 @@ def test_checks_have_mobile_labels_and_dark_theme_is_screen_only():
         assert f'data-label="{label}"' in html
         assert f'aria-hidden="true">{label}</span>' in html
     assert "min-width:540px" not in _CSS
-    assert "@media screen and (prefers-color-scheme:dark)" in _CSS
-    assert _CSS.index("prefers-color-scheme:dark") < _CSS.index("@media print")
+    assert "prefers-color-scheme" not in _CSS
+    assert "color-scheme:dark" not in _CSS
+    assert ":root{color-scheme:light;" in _CSS
+    assert "report-theme-toggle" not in html
     assert "default-src 'none'" in html
 
 

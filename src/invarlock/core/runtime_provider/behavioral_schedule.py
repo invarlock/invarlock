@@ -42,9 +42,6 @@ _DATASET_IDENTITY_FIELDS = frozenset(
 _RECORD_FIELDS = frozenset(
     {"record_id", "input_parts", "input_sha256", "expected_output"}
 )
-_LEGACY_RECORD_MATERIAL_FIELDS = frozenset(
-    {"record_id", "input_text", "expected_output"}
-)
 _STRUCTURED_RECORD_MATERIAL_FIELDS = frozenset(
     {"record_id", "input_parts", "expected_output"}
 )
@@ -431,31 +428,12 @@ def build_runtime_behavioral_schedule_from_material(
         field_name = f"records[{index}]"
         if not isinstance(value, Mapping):
             raise ValueError(f"{field_name} must be an object")
-        record_fields = frozenset(value)
-        input_parts: tuple[EvaluationInputPart, ...]
-        if record_fields == _LEGACY_RECORD_MATERIAL_FIELDS:
-            input_text = value["input_text"]
-            if not isinstance(input_text, str):
-                raise ValueError(f"{field_name}.input_text must be text")
-            text_part = EvaluationInputPart(
-                kind="text",
-                role="prompt",
-                text=input_text,
-                sha256=hashlib.sha256(input_text.encode("utf-8")).hexdigest(),
-            )
-            input_parts = (text_part,)
-        elif record_fields == _STRUCTURED_RECORD_MATERIAL_FIELDS:
-            input_parts = _build_input_parts(
-                value["input_parts"], field_name=f"{field_name}.input_parts"
-            )
-        else:
-            expected = (
-                _STRUCTURED_RECORD_MATERIAL_FIELDS
-                if "input_parts" in value
-                else _LEGACY_RECORD_MATERIAL_FIELDS
-            )
-            _require_exact_fields(value, expected=expected, field_name=field_name)
-            raise AssertionError("unreachable record material validation")
+        _require_exact_fields(
+            value, expected=_STRUCTURED_RECORD_MATERIAL_FIELDS, field_name=field_name
+        )
+        input_parts = _build_input_parts(
+            value["input_parts"], field_name=f"{field_name}.input_parts"
+        )
         materialized_records.append(
             {
                 "record_id": value["record_id"],

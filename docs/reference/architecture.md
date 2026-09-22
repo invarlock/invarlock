@@ -124,15 +124,16 @@ The `invarlock` distribution contains:
 - the Hugging Face Transformers provider; and
 - the independent verifier and report renderer.
 
-The GGUF, TensorRT-LLM, and Hugging Face vision-text providers are first-party
-optional distributions. They implement the same ABI and register through the
-`invarlock.runtime_providers` entry-point group. Numeric diagnostics are a
-separate observation-only package and have no acceptance authority.
-The fifth optional distribution, `invarlock-inspect-judge`, adapts bounded
-collection logs to core judge measurements. Its `inspect` extra supplies the
-provider SDK collection path. Offline import, schedule replay, analysis, signing,
+The GGUF, TensorRT-LLM, and Hugging Face vision-text providers ship in the core
+distribution. They implement the same ABI and register through the
+`invarlock.runtime_providers` entry-point group. Numeric diagnostics also live
+in core; their optional NumPy dependency is exposed through
+`invarlock[diagnostics]`, and diagnostics have no acceptance authority.
+The core `invarlock.judge_measurements` module adapts bounded collection logs to
+judge measurements. The `invarlock[judge]` extra supplies its pinned provider SDKs.
+Offline import, schedule replay, analysis, signing,
 independent verification, and reporting live in core and do not import or require
-Inspect or OpenAI SDKs. `evaluate` invokes the installed collector when a judge
+Inspect or OpenAI SDKs. `evaluate` invokes the core collector when a judge
 request requires new ratings, under its explicit budgets. Preflight, retained-call
 import, verification and reporting make no provider calls.
 
@@ -140,16 +141,16 @@ import, verification and reporting make no provider calls.
 invarlock
 ├── request + evidence contracts
 ├── evaluate / verify / report transactions
-├── Hugging Face provider
-├── provider ABI
+├── all maintained runtime providers + provider ABI
+├── bounded judge collection
+├── observation-only diagnostics
 └── canonical verifier + renderer
 
-first-party optional distributions
-├── invarlock-runtime-gguf
-├── invarlock-runtime-tensorrt-llm
-├── invarlock-runtime-hf-vision-text
-├── invarlock-diagnostics (observation only)
-└── invarlock-inspect-judge (bounded collection adapter)
+public dependency extras
+├── hf
+├── diagnostics
+├── vision-text
+└── judge
 ```
 
 See [Runtime providers](runtime-providers.md) for the extension contract.

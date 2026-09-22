@@ -12,13 +12,18 @@ import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from huggingface_hub import snapshot_download
 from transformers import AutoTokenizer
 
 from examples.integrations.bounded_command import run_bounded_command
 from examples.integrations.launch import _require_committed_checkout, _runtime_image
+from examples.integrations.trust_material import (
+    load_external_key,
+    validate_new_trust_root,
+)
+from invarlock.evaluation_oci import ContainerEngine, _gpu_arguments
 from invarlock.evidence_pack_contract import canonical_json_bytes
 
 _MODEL = (
@@ -92,8 +97,13 @@ def _container_build(
     image: str,
     container_engine: str,
 ) -> None:
-    if not device.isdigit():
+    if container_engine not in {"docker", "podman"}:
+        raise ValueError("container engine must be docker or podman")
+    if not device.isascii() or not device.isdigit():
         raise ValueError("GPU device indices must be nonnegative integers")
+    destination = paths.resources / f"{role}-engine"
+    if os.path.lexists(destination):
+        raise FileExistsError(f"engine output already exists: {destination}")
     helper = Path(__file__).with_name("prepare.py").resolve(strict=True)
     bounded_runner = (
         Path(__file__).resolve().parents[1] / "bounded_command.py"
@@ -107,14 +117,18 @@ def _container_build(
         os.chown(role_work, runtime_uid, runtime_gid)
     runtime_identity = str(runtime_uid)
     runtime_user = f"{runtime_uid}:{runtime_gid}"
+    # Generated engines move to resources for later containers to read.
+    # Share their container label; never relabel caller-owned inputs.
+    work_mount = f"type=bind,src={role_work},dst=/work"
+    if container_engine == "podman":
+        work_mount += ",relabel=shared"
     command = [
         container_engine,
         "run",
         "--rm",
         "--network",
         "none",
-        "--gpus",
-        f"device={device}",
+        *_gpu_arguments(cast(ContainerEngine, container_engine), f"cuda:{device}"),
         "--pull=never",
         "--cap-drop=ALL",
         "--security-opt",
@@ -136,9 +150,7 @@ def _container_build(
         "--mount",
         f"type=bind,src={paths.models / 'qwen3-0.6b'},dst=/model,readonly",
         "--mount",
-        f"type=bind,src={role_work},dst=/work",
-        "--mount",
-        f"type=bind,src={paths.resources},dst=/resources",
+        work_mount,
         "--mount",
         f"type=bind,src={helper},dst=/example/prepare.py,readonly",
         "--mount",
@@ -152,12 +164,15 @@ def _container_build(
         "--checkpoint",
         "/work/checkpoint",
         "--engine",
-        f"/resources/{role}-engine",
+        "/work/engine",
         "--tokenizer-contract",
         f"/work/{role}.tokenizer-contract.json",
         "--quantization",
         _VARIANTS[role],
     ]
+    if container_engine == "podman" and os.geteuid() != 0:
+        # Keep the caller-owned private work mount writable under rootless Podman.
+        command.insert(2, "--userns=keep-id")
     if role == "subject":
         records = Path(__file__).with_name("records.json").resolve(strict=True)
         command[command.index("--entrypoint") : command.index("--entrypoint")] = [
@@ -166,6 +181,17 @@ def _container_build(
         ]
         command.extend(["--calibration-records", "/example/records.json"])
     run_bounded_command(command, check=True, label="TensorRT-LLM engine build")
+    engine = role_work / "engine"
+    if engine.is_symlink() or not engine.is_dir():
+        raise RuntimeError("TensorRT-LLM did not produce a real engine directory")
+    outputs = list(engine.iterdir())
+    if {path.name for path in outputs} != {"config.json", "rank0.engine"} or any(
+        path.is_symlink() or not path.is_file() for path in outputs
+    ):
+        raise RuntimeError("TensorRT-LLM produced an unexpected engine layout")
+    if os.path.lexists(destination):
+        raise FileExistsError(f"engine output already exists: {destination}")
+    engine.rename(destination)
 
 
 def _prepare_inputs(paths: Paths, *, tokenizer: Any | None = None) -> None:
@@ -232,10 +258,15 @@ def _run_transaction(
     image: str,
     devices: tuple[str, str],
     container_engine: str,
+    evidence_signing_key: Path,
+    verifier_signing_key: Path,
+    trust_root: Path,
 ) -> None:
     command = [
         sys.executable,
         str(Path(__file__).with_name("run.py")),
+        "--container-engine",
+        container_engine,
         "--runtime-image",
         image,
         "--resource-root",
@@ -248,6 +279,12 @@ def _run_transaction(
         f"cuda:{devices[0]}",
         "--subject-device",
         f"cuda:{devices[1]}",
+        "--evidence-signing-key",
+        str(evidence_signing_key),
+        "--verifier-signing-key",
+        str(verifier_signing_key),
+        "--trust-root",
+        str(trust_root),
     ]
     environment = dict(os.environ)
     environment["INVARLOCK_CONTAINER_ENGINE"] = container_engine
@@ -263,15 +300,51 @@ def _run_transaction(
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workspace", type=Path)
-    parser.add_argument("--container-engine", choices=("docker",), default="docker")
+    parser.add_argument(
+        "--container-engine",
+        choices=("docker", "podman"),
+        default=os.environ.get("INVARLOCK_CONTAINER_ENGINE", "docker"),
+    )
     parser.add_argument("--baseline-device", default="0")
     parser.add_argument("--subject-device", default="1")
+    parser.add_argument("--evidence-signing-key", type=Path)
+    parser.add_argument("--verifier-signing-key", type=Path)
+    parser.add_argument("--trust-root", type=Path)
     arguments = parser.parse_args(argv)
     try:
+        if arguments.container_engine not in {"docker", "podman"}:
+            raise ValueError("container engine must be docker or podman")
         if arguments.baseline_device == arguments.subject_device:
             raise ValueError("the showcase requires two distinct GPU indices")
         _require_committed_checkout(Path(__file__).resolve().parents[3])
+        if any(
+            value is None
+            for value in (
+                arguments.evidence_signing_key,
+                arguments.verifier_signing_key,
+                arguments.trust_root,
+            )
+        ):
+            raise ValueError(
+                "caller-owned --evidence-signing-key, --verifier-signing-key, "
+                "and --trust-root are required together"
+            )
         paths = _create_workspace(arguments.workspace)
+        trust_root = validate_new_trust_root(
+            arguments.trust_root.expanduser(), transaction_root=paths.workspace
+        )
+        evidence_key, _, evidence_fingerprint = load_external_key(
+            arguments.evidence_signing_key.expanduser(),
+            transaction_root=paths.workspace,
+            label="evidence signing key",
+        )
+        verifier_key, _, verifier_fingerprint = load_external_key(
+            arguments.verifier_signing_key.expanduser(),
+            transaction_root=paths.workspace,
+            label="verifier signing key",
+        )
+        if evidence_fingerprint == verifier_fingerprint:
+            raise ValueError("evidence and verifier signing keys must be distinct")
         _download(paths)
         runtime_build = paths.workspace / "runtime-build"
         runtime_build.mkdir()
@@ -279,7 +352,7 @@ def main(argv: list[str] | None = None) -> int:
             repository=paths.repository,
             build_root=runtime_build,
             container_engine=arguments.container_engine,
-            dockerfile="addins/tensorrt_llm/runtime/Dockerfile",
+            dockerfile="runtime/Dockerfile.tensorrt-llm",
             image_prefix="invarlock-tensorrt-example-runtime",
         )
         if image != digest:
@@ -308,6 +381,9 @@ def main(argv: list[str] | None = None) -> int:
             image=image,
             devices=(arguments.baseline_device, arguments.subject_device),
             container_engine=arguments.container_engine,
+            evidence_signing_key=evidence_key,
+            verifier_signing_key=verifier_key,
+            trust_root=trust_root,
         )
     except (OSError, RuntimeError, ValueError, subprocess.CalledProcessError) as exc:
         print(f"FAIL {exc}", file=sys.stderr)

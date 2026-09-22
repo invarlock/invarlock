@@ -2,9 +2,9 @@ name: Container Front Door
 
 on:
   pull_request:
-    branches: [staging/next]
+    branches: [main, staging/next]
   push:
-    branches: [staging/next, 'release/v*']
+    branches: [staging/next]
   workflow_dispatch:
 
 concurrency:
@@ -15,15 +15,31 @@ permissions:
   contents: read
 
 jobs:
-  smoke:
+  engine-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [docker, podman]
     env:
-      CONTAINER_ENGINE: docker
+      CONTAINER_ENGINE: ${{ matrix.engine }}
       INVARLOCK_RUNTIME_IMAGE: invarlock-runtime:local
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Prepare selected engine
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$CONTAINER_ENGINE" == podman ]]; then
+            sudo apt-get update
+            sudo apt-get install --yes podman
+          fi
+          mkdir -p artifacts/oci-isolation
+          "$CONTAINER_ENGINE" version > artifacts/oci-isolation/engine-version.txt
+          "$CONTAINER_ENGINE" info --format '{{json .}}' > artifacts/oci-isolation/engine-info.json
 
       - name: Setup Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
@@ -88,13 +104,41 @@ jobs:
           python -m pytest -q -m integration \
             --junitxml=artifacts/oci-isolation/results.xml \
             tests/integration/test_container_front_door_journey.py \
-            tests/integration/test_oci_isolation.py
+            tests/integration/test_oci_isolation.py \
+            tests/integration/test_container_native_judge_journey.py
+
+      - name: Require complete engine journey outcomes
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          python - <<'PYCODE'
+          from pathlib import Path
+          from xml.etree import ElementTree
+          report = Path("artifacts/oci-isolation/results.xml")
+          cases = list(ElementTree.parse(report).iter("testcase"))
+          assert cases, "container parity requires executed test cases"
+          assert not [case for case in cases if any(case.find(status) is not None for status in ("skipped", "failure", "error"))], "container parity requires every test to pass"
+          for metric in ("exact_match", "normalized_nll_per_utf8_byte"):
+              assert any(case.get("name", "").endswith(f"[{metric}]") for case in cases), metric
+          assert any(case.get("name") == "test_native_judge_container_capture_evaluate_verify_report" for case in cases), "native judge"
+          PYCODE
 
       - name: Retain OCI isolation outcomes
         if: ${{ always() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: oci-isolation-outcomes
+          name: oci-isolation-outcomes-${{ matrix.engine }}
           path: artifacts/oci-isolation
           if-no-files-found: warn
           retention-days: 30
+
+  smoke:
+    if: ${{ always() }}
+    needs: [engine-smoke]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require Docker and Podman journeys
+        env:
+          ENGINE_RESULT: ${{ needs.engine-smoke.result }}
+        run: test "$ENGINE_RESULT" = success

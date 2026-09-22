@@ -42,7 +42,10 @@ def test_hosted_guide_public_api_and_signed_commands(tmp_path):
     descriptor = identity()
     validate_service_identity(descriptor)
     scope = {"identity": copy.deepcopy(descriptor), "rows": rows}
-    exec(re.search(r"```python\n(.*?)\n```", reference, re.S)[1], scope)
+    hosted_reference = reference.split("## Hosted service identity", 1)[1].split(
+        "\n## ", 1
+    )[0]
+    exec(re.search(r"```python\n(.*?)\n```", hosted_reference, re.S)[1], scope)
     subject = scope["run"]
     assert evaluated_subject_digest(subject) == digest(descriptor)
     baseline = capture_evaluator_run(

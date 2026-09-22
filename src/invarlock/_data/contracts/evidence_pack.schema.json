@@ -17,7 +17,7 @@
     "format": {"const": "invarlock/evidence-pack-v1"},
     "comparison_id": {
       "type": "string",
-      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}(?![\\s\\S])"
     },
     "inputs": {
       "type": "object",
@@ -92,7 +92,7 @@
       "minProperties": 1,
       "maxProperties": 64,
       "propertyNames": {
-        "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}(?![\\s\\S])"
       },
       "additionalProperties": {"$ref": "#/$defs/observationReference"}
     },
@@ -104,11 +104,11 @@
   "$defs": {
     "digest": {
       "type": "string",
-      "pattern": "^sha256:[a-f0-9]{64}$"
+      "pattern": "^sha256:[a-f0-9]{64}(?![\\s\\S])"
     },
     "rawSha256": {
       "type": "string",
-      "pattern": "^[a-f0-9]{64}$"
+      "pattern": "^[a-f0-9]{64}(?![\\s\\S])"
     },
     "inputReference": {
       "type": "object",
@@ -171,12 +171,12 @@
       "properties": {
         "path": {
           "type": "string",
-          "pattern": "^observations/[A-Za-z0-9][A-Za-z0-9._-]{0,127}\\.json$"
+          "pattern": "^observations/[A-Za-z0-9][A-Za-z0-9._-]{0,127}\\.json(?![\\s\\S])"
         },
         "digest": {"$ref": "#/$defs/digest"},
         "kind": {
           "type": "string",
-          "pattern": "^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$",
+          "pattern": "^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*(?![\\s\\S])",
           "maxLength": 128
         },
         "scope": {"enum": ["baseline", "subject", "comparison"]}

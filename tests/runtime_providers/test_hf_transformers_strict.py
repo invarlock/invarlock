@@ -37,6 +37,17 @@ from tests.runtime_providers._hf_transformers_helpers import (
 )
 
 
+def _text_parts(text: str) -> tuple[EvaluationInputPart, ...]:
+    return (
+        EvaluationInputPart(
+            kind="text",
+            role="prompt",
+            text=text,
+            sha256=hashlib.sha256(text.encode("utf-8")).hexdigest(),
+        ),
+    )
+
+
 def test_hf_strict_binding_rejects_loader_initialized_live_parameters(
     tmp_path: Path,
 ) -> None:
@@ -424,7 +435,8 @@ def test_hf_owned_scorer_enables_and_restores_deterministic_algorithms() -> None
             EvaluationRecord(
                 record_id="sample",
                 input_text="hello",
-                input_sha256=hashlib.sha256(b"hello").hexdigest(),
+                input_parts=_text_parts("hello"),
+                input_sha256=evaluation_input_parts_sha256(_text_parts("hello")),
             ),
         ),
     )
@@ -478,9 +490,10 @@ def test_hf_owned_scorer_does_not_execute_future_task_contracts() -> None:
             EvaluationRecord(
                 record_id="future-1",
                 input_text="Transcribe the authenticated audio.",
-                input_sha256=hashlib.sha256(
-                    b"Transcribe the authenticated audio."
-                ).hexdigest(),
+                input_parts=_text_parts("Transcribe the authenticated audio."),
+                input_sha256=evaluation_input_parts_sha256(
+                    _text_parts("Transcribe the authenticated audio.")
+                ),
             ),
         ),
         task="audio_text_generation",
@@ -604,7 +617,8 @@ def test_hf_exact_match_stops_at_eos_and_excludes_special_tokens() -> None:
                 EvaluationRecord(
                     record_id="sample",
                     input_text="prompt",
-                    input_sha256=hashlib.sha256(b"prompt").hexdigest(),
+                    input_parts=_text_parts("prompt"),
+                    input_sha256=evaluation_input_parts_sha256(_text_parts("prompt")),
                 ),
             ),
         ),
@@ -669,7 +683,8 @@ def test_hf_owned_scorer_emits_precomputed_teacher_forced_nll_facts() -> None:
             EvaluationRecord(
                 record_id="sample",
                 input_text="prompt",
-                input_sha256=hashlib.sha256(b"prompt").hexdigest(),
+                input_parts=_text_parts("prompt"),
+                input_sha256=evaluation_input_parts_sha256(_text_parts("prompt")),
                 expected_output="é",
             ),
         ),
@@ -733,7 +748,8 @@ def test_hf_owned_scorer_rejects_boundary_unstable_target_tokenization() -> None
             EvaluationRecord(
                 record_id="sample",
                 input_text="A",
-                input_sha256=hashlib.sha256(b"A").hexdigest(),
+                input_parts=_text_parts("A"),
+                input_sha256=evaluation_input_parts_sha256(_text_parts("A")),
                 expected_output="é",
             ),
         ),

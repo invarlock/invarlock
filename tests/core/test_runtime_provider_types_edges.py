@@ -31,6 +31,17 @@ _SHA256 = "a" * 64
 _IMAGE_DIGEST = "sha256:" + "b" * 64
 
 
+def _text_parts(text: str) -> tuple[EvaluationInputPart, ...]:
+    return (
+        EvaluationInputPart(
+            kind="text",
+            role="prompt",
+            text=text,
+            sha256=hashlib.sha256(text.encode("utf-8")).hexdigest(),
+        ),
+    )
+
+
 def _capabilities() -> RuntimeProviderCapabilities:
     return RuntimeProviderCapabilities(
         provider_name="llama_cpp",
@@ -58,7 +69,8 @@ def _evaluation_record(record_id: str = "record-1") -> EvaluationRecord:
     return EvaluationRecord(
         record_id=record_id,
         input_text="prompt",
-        input_sha256=_SHA256,
+        input_parts=_text_parts("prompt"),
+        input_sha256=evaluation_input_parts_sha256(_text_parts("prompt")),
         expected_output="answer",
     )
 
@@ -246,7 +258,7 @@ def test_structured_record_binds_roles_text_and_ordered_part_digest() -> None:
         dataclasses.replace(record, input_text="different")
     with pytest.raises(ValueError, match="ordered input_parts"):
         dataclasses.replace(record, input_sha256="0" * 64)
-    with pytest.raises(ValueError, match="input_parts must be a tuple"):
+    with pytest.raises(ValueError, match="input_parts must be a non-empty tuple"):
         dataclasses.replace(record, input_parts=cast(Any, list(parts)))
 
 
@@ -430,3 +442,9 @@ def test_backend_device_and_receipt_fail_closed_on_missing_identity() -> None:
             outer_image_digest=None,
             scoring_observation_sha256=_SHA256,
         )
+
+
+@pytest.mark.parametrize("parts", [(), [], None])
+def test_evaluation_record_requires_nonempty_structured_parts(parts: object) -> None:
+    with pytest.raises(ValueError, match="input_parts must be a non-empty tuple"):
+        dataclasses.replace(_evaluation_record(), input_parts=cast(Any, parts))

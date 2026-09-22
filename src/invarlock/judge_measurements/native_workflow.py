@@ -6,7 +6,6 @@ import asyncio
 import base64
 import fcntl
 import hashlib
-import importlib
 import os
 import stat
 from collections.abc import Callable, Iterator
@@ -16,8 +15,10 @@ from typing import TYPE_CHECKING, Any
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from invarlock import __version__
 from invarlock.captured_contracts import read_file
+from invarlock.core.registry import get_registry
+from invarlock.core.runtime_provider import ModelRuntimeSpec
+from invarlock.evaluation_runtime import caller_runtime_resources_from_environment
 from invarlock.evidence_pack_contract import EvidenceObservation, RuntimeSideEvidence
 from invarlock.evidence_pack_json import parse_json_bytes
 from invarlock.filesystem.atomic_file import write_file_no_replace
@@ -31,26 +32,140 @@ from invarlock.judge_measurements.workflow import (
     JudgeWorkflowError,
     JudgeWorkflowResult,
 )
+from invarlock.security import network_policy_allows
 
 if TYPE_CHECKING:
-    from invarlock.core.evaluation_request import EvaluationRequest
+    from invarlock.core.evaluation_request import (
+        ComparisonSideRequest,
+        EvaluationRequest,
+    )
 
 
 def collection_api() -> Any:
-    """Load only the installed, optional collector through its fixed entry point."""
-    try:
-        return importlib.import_module("invarlock_addins.inspect_judge")
-    except ImportError:
+    """Load the core collector without importing optional provider SDKs."""
+    from invarlock import judge_measurements
+
+    return judge_measurements
+
+
+def _local_collection(configuration: dict[str, Any]) -> bool:
+    return configuration.get("profile") == "runtime-provider-text-frozen-answer-v1"
+
+
+def _service_collection(configuration: dict[str, Any]) -> bool:
+    return configuration.get("profile") == "openai-compatible-text-frozen-answer-v1"
+
+
+def _judge_network_authorized() -> bool:
+    return (
+        os.environ.get("INVARLOCK_ALLOW_JUDGE_NETWORK", "").strip().lower()
+        in {"1", "true", "yes", "on"}
+        or network_policy_allows()
+    )
+
+
+def _require_service_network_authorization(
+    configuration: dict[str, Any], environment: dict[str, Any]
+) -> None:
+    if (
+        not _local_collection(configuration)
+        and environment.get("network_authorized") is False
+    ):
         raise JudgeWorkflowError(
-            f'Install with: python -m pip install "invarlock[judge]=={__version__}" '
-            "to collect judge measurements"
-        ) from None
+            "service judge collection requires an allowed network policy; set "
+            "INVARLOCK_ALLOW_JUDGE_NETWORK=1 only for collection. Preflight and "
+            "retained-measurement import remain available offline"
+        )
 
 
-def collection_preflight(configuration: dict[str, Any]) -> dict[str, Any]:
+def _collection_context(
+    configuration: dict[str, Any], *, model: Any, request_root: Path | None, plan: Any
+) -> dict[str, Any]:
+    if not _local_collection(configuration) and model is not None:
+        raise JudgeWorkflowError(
+            "service judge collection cannot use a local artifact model"
+        )
+    if _local_collection(configuration) or _service_collection(configuration):
+        return {"model": model, "request_root": request_root, "plan": plan}
+    return {}
+
+
+def _runtime_provider_inputs(
+    *, model: ComparisonSideRequest, request_root: Path
+) -> tuple[Any, ModelRuntimeSpec, Any]:
+    provider = get_registry().get_runtime_provider(model.runtime.provider)
+    spec = ModelRuntimeSpec(
+        provider_name=model.runtime.provider,
+        model_id=model.artifact.model_id,
+        settings=model.runtime.settings,
+    )
+    resources = caller_runtime_resources_from_environment().resolve(
+        request_root=request_root,
+        role="judge",
+        side=model,
+        provider=provider,
+    )
+    return provider, spec, resources
+
+
+def collection_preflight(
+    configuration: dict[str, Any],
+    *,
+    integration: str | None = None,
+    model: ComparisonSideRequest | None = None,
+    request_root: Path | None = None,
+    plan: Any | None = None,
+) -> dict[str, Any]:
     api = collection_api()
+    if integration is not None and integration != (
+        "runtime-provider-judge"
+        if _local_collection(configuration)
+        else "openai-compatible-judge"
+        if _service_collection(configuration)
+        else "inspect-judge"
+    ):
+        raise JudgeWorkflowError(
+            "judge integration differs from its collection profile"
+        )
+    if _service_collection(configuration):
+        if model is not None or plan is None:
+            raise JudgeWorkflowError(
+                "endpoint judge preflight requires a plan and no local artifact model"
+            )
+        result = dict(api.preflight_openai_compatible(configuration, plan))
+        result.setdefault("network_authorized", _judge_network_authorized())
+        result.setdefault(
+            "network_authorization_variable", "INVARLOCK_ALLOW_JUDGE_NETWORK"
+        )
+        return result
+    if not _local_collection(configuration) and model is not None:
+        raise JudgeWorkflowError(
+            "service judge collection cannot use a local artifact model"
+        )
+    local = _local_collection(configuration)
+    if local:
+        if model is None or request_root is None or plan is None:
+            raise JudgeWorkflowError(
+                "runtime judge preflight requires its model, request root, and plan"
+            )
+        budgets = api.validate_runtime_provider_collection(configuration, plan)
+        provider, spec, resources = _runtime_provider_inputs(
+            model=model, request_root=request_root
+        )
+        result = dict(
+            api.preflight_runtime_provider(
+                plan, provider=provider, spec=spec, resources=resources
+            )
+        )
+        result["budgets"] = budgets
+        return result
     options = api.CollectionOptions(**configuration)
-    return dict(api.validate_collection_environment(options))
+    result = dict(api.validate_collection_environment(options))
+    result.update(
+        network_authorized=_judge_network_authorized(),
+        network_authorization_variable="INVARLOCK_ALLOW_JUDGE_NETWORK",
+    )
+    return result
 
 
 @contextmanager
@@ -142,9 +257,79 @@ def collect_frozen(
     baseline_run: dict[str, Any],
     subject_run: dict[str, Any],
     status: dict[str, str] | None = None,
+    integration: str | None = None,
+    model: ComparisonSideRequest | None = None,
+    request_root: Path | None = None,
 ) -> Any:
     """Resume only unadmitted calls against the same immutable frozen answers."""
     api = collection_api()
+    if integration is not None and integration != (
+        "runtime-provider-judge"
+        if _local_collection(collection)
+        else "openai-compatible-judge"
+        if _service_collection(collection)
+        else "inspect-judge"
+    ):
+        raise JudgeWorkflowError(
+            "judge integration differs from its collection profile"
+        )
+    if _service_collection(collection):
+        if model is not None or set(runner) != {"scorer_id"}:
+            raise JudgeWorkflowError(
+                "endpoint judge collection requires only scorer_id and no local artifact model"
+            )
+        if status is not None:
+            status.clear()
+        result = api.collect_openai_compatible(
+            plan,
+            configuration=collection,
+            baseline_run=baseline_run,
+            subject_run=subject_run,
+            options=api.OpenAICompatibleJudgeOptions(
+                scorer_id=runner["scorer_id"],
+                checkpoint_directory=workspace / "endpoint-collection",
+            ),
+        )
+        if status is not None:
+            status["stop_reason"] = "complete"
+        return result
+    if not _local_collection(collection) and model is not None:
+        raise JudgeWorkflowError(
+            "service judge collection cannot use a local artifact model"
+        )
+    local = _local_collection(collection)
+    if local:
+        if model is None or request_root is None:
+            raise JudgeWorkflowError(
+                "runtime judge collection requires its model and request root"
+            )
+        if set(runner) != {"scorer_id"}:
+            raise JudgeWorkflowError(
+                "runtime judge runner supports only scorer_id; per-record "
+                "runtime timeout_seconds is enforced by the provider"
+            )
+        api.validate_runtime_provider_collection(collection, plan)
+        provider, spec, resources = _runtime_provider_inputs(
+            model=model, request_root=request_root
+        )
+        if status is not None:
+            status.clear()
+        result = api.collect_runtime_provider(
+            plan,
+            provider=provider,
+            spec=spec,
+            resources=resources,
+            baseline_run=baseline_run,
+            subject_run=subject_run,
+            options=api.RuntimeProviderJudgeOptions(
+                source_id="runtime-provider-judge",
+                scorer_id=runner["scorer_id"],
+                checkpoint_directory=workspace / "runtime-collection",
+            ),
+        )
+        if status is not None:
+            status["stop_reason"] = "complete"
+        return result
     options = api.CollectionOptions(**collection)
     run_options = api.RunnerOptions(
         checkpoint_directory=workspace / "collection", **runner
@@ -177,7 +362,7 @@ def require_completed_collection(
     *,
     stop_reason: str | None = None,
 ) -> dict[str, Any]:
-    """Resume pending work only after an actual collector deadline."""
+    """Resume pending work after a deadline or graceful invocation stop."""
     pending = sum(not trial["attempts"] for trial in measurements["trials"])
     if not pending:
         return {"pending_trials": 0, "stop_reason": "complete", "resumable": False}
@@ -187,7 +372,7 @@ def require_completed_collection(
             "stop_reason": "retained_capacity_exhausted",
             "resumable": False,
         }
-    resumable = stop_reason == "deadline"
+    resumable = stop_reason in {"deadline", "requested"}
     message = (
         "Judge collection is incomplete; rerun the same request to resume its workspace"
         if resumable
@@ -202,7 +387,7 @@ def require_completed_collection(
             "resumable": resumable,
             "workspace": str(workspace),
             "pending_trials": pending,
-            "stop_reason": "deadline" if resumable else "unknown",
+            "stop_reason": stop_reason if resumable else "unknown",
             "evidence": None,
             "errors": [message],
         },
@@ -217,8 +402,21 @@ def preflight_native_judge(
     prepared = prepare_native_judge(policy_bytes, schedule)
     if request.comparison.judge is None:
         raise JudgeWorkflowError("native judge configuration is required")
-    metadata = {key: value for key, value in prepared.items() if key != "recipe"}
-    metadata["collection"] = collection_preflight(prepared["recipe"]["collection"])
+    metadata = {
+        key: value
+        for key, value in prepared.items()
+        if key not in {"recipe", "preflight_plan"}
+    }
+    collection = prepared["recipe"]["collection"]
+    metadata["collection"] = collection_preflight(
+        collection,
+        **_collection_context(
+            collection,
+            model=getattr(request.comparison.judge, "model", None),
+            request_root=getattr(request, "root", None),
+            plan=prepared.get("preflight_plan"),
+        ),
+    )
     metadata.update(workspace=str(request.comparison.judge.workspace), network_calls=0)
     return metadata
 
@@ -248,7 +446,16 @@ def evaluate_native_judge(
     if configuration is None:
         raise JudgeWorkflowError("native judge configuration is required")
     recipe = prepared["recipe"]
-    collection_preflight(recipe["collection"])
+    collection_environment = collection_preflight(
+        recipe["collection"],
+        **_collection_context(
+            recipe["collection"],
+            model=getattr(configuration, "model", None),
+            request_root=getattr(request, "root", None),
+            plan=prepared.get("preflight_plan"),
+        ),
+    )
+    _require_service_network_authorization(recipe["collection"], collection_environment)
     workspace = configuration.workspace
     with locked_workspace(workspace) as unchanged:
         _retain_identity(
@@ -321,15 +528,21 @@ def evaluate_native_judge(
         plan, policy = finalize_native_plan(recipe, baseline_run, subject_run)
         unchanged()
         collection_stop: dict[str, str] = {}
-        measurements = collect_frozen(
-            plan=plan,
-            collection=recipe["collection"],
-            runner=recipe["runner"],
-            workspace=workspace,
-            baseline_run=baseline_run,
-            subject_run=subject_run,
-            status=collection_stop,
-        )
+        collection_arguments = {
+            "plan": plan,
+            "collection": recipe["collection"],
+            "runner": recipe["runner"],
+            "workspace": workspace,
+            "baseline_run": baseline_run,
+            "subject_run": subject_run,
+            "status": collection_stop,
+        }
+        if _local_collection(recipe["collection"]):
+            collection_arguments.update(
+                model=configuration.model,
+                request_root=request.root,
+            )
+        measurements = collect_frozen(**collection_arguments)
         unchanged()
         collection_status = require_completed_collection(
             measurements,

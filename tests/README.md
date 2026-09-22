@@ -56,11 +56,12 @@ through `tests/integration/conftest.py`.
   repository discovery and test-only signing. Tests otherwise construct their
   inputs in pytest temporary directories or use the checked-in public
   transaction under `examples/`.
-- Optional-package tests live beside their packages under `addins/*/tests/` and
-  run together through `make addins-test`.
+- Runtime-provider, diagnostics, and judge tests live under the consolidated
+  `tests/runtime`, `tests/diagnostics`, and `tests/judge_measurements` trees and
+  run together through `make runtime-test`.
 
 Ordinary collection tests use substituted transports; they make no paid provider
-calls. The optional Inspect add-in also has a pinned-SDK gate with mocked HTTP
+calls. The optional Inspect SDK also has a pinned-SDK gate with mocked HTTP
 transport. Retained model measurements and hosted judge qualification remain
 separate evidence, with their original scopes and decisions.
 
@@ -81,7 +82,7 @@ Run the complete integration subtree separately:
 
 ```bash
 make test-integration
-make addins-test
+make runtime-test
 ```
 
 Useful trust and release checks include:
@@ -102,7 +103,7 @@ make verify
 
 `make coverage-enforce` requires at least 95% branch coverage for every
 branch-bearing maintained module and for the repository-wide aggregate across
-the core, add-ins, examples, qualification/release helpers, and repository
+the core package, examples, qualification/release helpers, and repository
 check/security scripts. It also requires at least 95% combined
 statement-and-branch coverage for each module and aggregate suite, so a
 well-covered distribution cannot mask a local gap. Each suite uses isolated
@@ -111,7 +112,7 @@ examples exemption manifest is limited to dependency-isolated or containerized
 journeys with explicit alternate execution gates; those classes are excluded
 from per-module and aggregate branch-coverage calculations instead of being
 hidden by unrelated modules.
-The complete add-in gate is Linux-authoritative because GGUF executes its pinned
+The complete runtime gate is Linux-authoritative because GGUF executes its pinned
 backend through Linux descriptor paths. CI runs that exact gate on Linux; run
 it through a Linux checkout or container when developing on another host
 operating system.

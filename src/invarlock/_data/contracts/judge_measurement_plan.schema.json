@@ -114,6 +114,12 @@
             "none",
             "per_case"
           ]
+        },
+        "runtime_format": {
+          "enum": [
+            "canonical-json-v1",
+            "chatml-v1"
+          ]
         }
       },
       "required": [
@@ -172,19 +178,46 @@
             "weights_sha256"
           ]
         },
+        "service_identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "service": {
+              "enum": [
+                "vllm",
+                "ollama",
+                "lm_studio",
+                "openai_compatible"
+              ]
+            },
+            "endpoint_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "response_format": {
+              "enum": [
+                "json_object",
+                "json_schema"
+              ]
+            }
+          },
+          "required": [
+            "service",
+            "endpoint_sha256"
+          ]
+        },
         "config": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
             "temperature": {
               "type": "string",
-              "pattern": "^(?:0|1|2|0\\.[0-9]{0,14}[1-9]|1\\.[0-9]{0,14}[1-9])$",
+              "pattern": "^(?:0|1|2|0\\.[0-9]{0,14}[1-9]|1\\.[0-9]{0,14}[1-9])(?![\\s\\S])",
               "minLength": 1,
               "maxLength": 17
             },
             "top_p": {
               "type": "string",
-              "pattern": "^(?:1|0\\.[0-9]{0,14}[1-9])$",
+              "pattern": "^(?:1|0\\.[0-9]{0,14}[1-9])(?![\\s\\S])",
               "minLength": 1,
               "maxLength": 17
             },
@@ -275,7 +308,7 @@
               },
               "value": {
                 "type": "string",
-                "pattern": "^(?:0|1|0\\.[0-9]{0,14}[1-9])$",
+                "pattern": "^(?:0|1|0\\.[0-9]{0,14}[1-9])(?![\\s\\S])",
                 "minLength": 1,
                 "maxLength": 17
               }
@@ -441,7 +474,7 @@
   "$defs": {
     "sha256": {
       "type": "string",
-      "pattern": "^[0-9a-f]{64}$",
+      "pattern": "^[0-9a-f]{64}(?![\\s\\S])",
       "minLength": 64,
       "maxLength": 64
     },
@@ -449,11 +482,11 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 128,
-      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+      "pattern": "^[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
     },
     "artifact_digest": {
       "type": "string",
-      "pattern": "^sha256:[0-9a-f]{64}$",
+      "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])",
       "minLength": 71,
       "maxLength": 71
     }

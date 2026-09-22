@@ -183,11 +183,11 @@ def test_schedule_rejects_canonical_payload_over_size_limit(monkeypatch) -> None
             [
                 {
                     "record_id": "example-1",
-                    "input_text": 7,
+                    "input_text": "prompt",
                     "expected_output": "answer",
                 }
             ],
-            "input_text must be text",
+            "unknown input_text",
         ),
     ],
 )

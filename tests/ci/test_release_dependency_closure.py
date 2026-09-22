@@ -9,18 +9,16 @@ from packaging.utils import canonicalize_name
 from packaging.version import Version
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PROJECT_FILES = (
-    REPO_ROOT / "pyproject.toml",
-    REPO_ROOT / "addins/diagnostics/pyproject.toml",
-    REPO_ROOT / "addins/inspect_judge/pyproject.toml",
-    REPO_ROOT / "addins/gguf/pyproject.toml",
-    REPO_ROOT / "addins/multimodal/pyproject.toml",
-    REPO_ROOT / "addins/tensorrt_llm/pyproject.toml",
-)
+PROJECT_FILES = (REPO_ROOT / "pyproject.toml",)
 RELEASE_INPUT = REPO_ROOT / "requirements/workflows/release-install.in"
 RELEASE_LOCKS = (
     REPO_ROOT / "requirements/workflows/release-install-py312.txt",
     REPO_ROOT / "requirements/workflows/release-install-py313.txt",
+)
+OPTIONAL_INPUT = REPO_ROOT / "requirements/workflows/release-options.in"
+OPTIONAL_LOCKS = (
+    REPO_ROOT / "requirements/workflows/release-options-py312.txt",
+    REPO_ROOT / "requirements/workflows/release-options-py313.txt",
 )
 PIN = re.compile(r"^([A-Za-z0-9_.-]+)==([^\s\\]+)")
 
@@ -64,9 +62,11 @@ def _external_base_dependencies() -> dict[str, tuple[tuple[str, ...], str, str |
     return dependencies
 
 
-def _release_input_dependencies() -> dict[str, tuple[tuple[str, ...], str, str | None]]:
+def _input_dependencies(
+    path: Path,
+) -> dict[str, tuple[tuple[str, ...], str, str | None]]:
     dependencies: dict[str, tuple[tuple[str, ...], str, str | None]] = {}
-    for raw_line in RELEASE_INPUT.read_text(encoding="utf-8").splitlines():
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
         line = raw_line.strip()
         if not line or line.startswith("#"):
             continue
@@ -91,10 +91,10 @@ def _release_lock_pins(path: Path) -> dict[str, Version]:
 
 def test_release_input_equals_every_first_party_external_base_dependency() -> None:
     expected = _external_base_dependencies()
-    actual = _release_input_dependencies()
+    actual = _input_dependencies(RELEASE_INPUT)
 
     assert actual == expected
-    assert "pillow" in actual
+    assert "pillow" not in actual
 
 
 def test_release_lock_contains_compatible_pins_for_the_dependency_closure() -> None:
@@ -113,7 +113,27 @@ def test_release_lock_contains_compatible_pins_for_the_dependency_closure() -> N
 
         lock = path.read_text(encoding="utf-8")
         assert "--hash=sha256:" in lock
-        assert "pillow==" in lock
+        assert "pillow==" not in lock
+        assert "numpy==" not in lock
+
+
+def test_optional_release_input_matches_lightweight_host_extras() -> None:
+    project = _project(REPO_ROOT / "pyproject.toml")
+    optional = project["optional-dependencies"]
+    expected = {
+        canonicalize_name(requirement.name): _fingerprint(requirement)
+        for extra in ("diagnostics", "vision-text")
+        for requirement in map(Requirement, optional[extra])
+    }
+
+    assert _input_dependencies(OPTIONAL_INPUT) == expected
+    for path in OPTIONAL_LOCKS:
+        pins = _release_lock_pins(path)
+        assert set(pins) == expected.keys()
+        for name, (_, specifier, marker) in expected.items():
+            assert marker is None
+            assert pins[name] in Requirement(f"{name}{specifier}").specifier
+        assert "--hash=sha256:" in path.read_text(encoding="utf-8")
 
 
 def test_release_lock_refresh_uses_the_audited_dependency_input() -> None:
@@ -125,4 +145,5 @@ def test_release_lock_refresh_uses_the_audited_dependency_input() -> None:
         "run_workflow_locks()", 1
     )[0]
     assert "requirements/workflows/release-install.in" in release_function
+    assert "requirements/workflows/release-options.in" in refresh
     assert "addins/diagnostics/pyproject.toml" not in release_function

@@ -10,17 +10,17 @@
   "$defs": {
     "sha256": {
       "type": "string",
-      "pattern": "^[a-f0-9]{64}$"
+      "pattern": "^[a-f0-9]{64}(?![\\s\\S])"
     },
     "logicalName": {
       "type": "string",
       "minLength": 1,
-      "pattern": "^(?!/)(?![A-Za-z]:)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\\\\\u0000-\\u001f]+$"
+      "pattern": "^(?!/)(?![A-Za-z]:)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\\\\\u0000-\\u001f]+(?![\\s\\S])"
     },
     "basename": {
       "type": "string",
       "minLength": 1,
-      "pattern": "^[^/\\\\\\u0000-\\u001f]+$",
+      "pattern": "^[^/\\\\\\u0000-\\u001f]+(?![\\s\\S])",
       "not": {"enum": [".", ".."]}
     },
     "hfSnapshot": {
@@ -40,7 +40,7 @@
         "immutable_revision": {
           "anyOf": [
             {"type": "null"},
-            {"type": "string", "pattern": "^[0-9a-f]{40,64}$"}
+            {"type": "string", "pattern": "^[0-9a-f]{40,64}(?![\\s\\S])"}
           ]
         },
         "checkpoint_tree_sha256": {
@@ -105,7 +105,7 @@
         "engine_metadata_sha256": {"$ref": "#/$defs/sha256"},
         "target_compute_capability": {
           "type": "string",
-          "pattern": "^(0|[1-9][0-9]?)\\.(0|[1-9][0-9]?)$"
+          "pattern": "^(0|[1-9][0-9]?)\\.(0|[1-9][0-9]?)(?![\\s\\S])"
         }
       },
       "additionalProperties": false

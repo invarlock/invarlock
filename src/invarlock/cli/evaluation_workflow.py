@@ -13,8 +13,13 @@ if TYPE_CHECKING:  # pragma: no cover - imports exist only for static analysis
         CapturedEvaluationPreflightResult,
         CapturedEvaluationTransactionResult,
     )
-    from invarlock.cli.runtime_profile import ResolvedRuntimeProfile, RuntimeProfile
+    from invarlock.cli.runtime_profile import RuntimeProfile
     from invarlock.evaluation_oci import OciEvaluationLaunch
+    from invarlock.evaluation_runtime import (
+        CallerRuntimeResources,
+        ResolvedRuntimeConfig,
+        RuntimeResourceRole,
+    )
     from invarlock.evaluation_transaction import (
         EvaluationPreflightResult,
         EvaluationTransactionResult,
@@ -107,8 +112,114 @@ class EvaluationOutcome:
     result: EvaluationResult
     request_mode: RequestMode
     profile: RuntimeProfile | None = None
-    profile_context: ResolvedRuntimeProfile | None = None
+    profile_context: ResolvedRuntimeConfig | None = None
     launch: OciEvaluationLaunch | None = None
+
+
+def _direct_judge_runtime_resources(
+    profile: ResolvedRuntimeConfig, environment: Mapping[str, str]
+) -> tuple[CallerRuntimeResources, dict[str, str]]:
+    """Bind one strict container for native baseline, subject, and local judge."""
+
+    from invarlock import runtime_security_helpers
+    from invarlock.cli.runtime_profile import RuntimeProfileError
+    from invarlock.evaluation_runtime import (
+        CallerRuntimeResources,
+        caller_runtime_resources_from_environment,
+    )
+
+    enabled_runtime_opt_ins = sorted(
+        name
+        for name in (
+            "INVARLOCK_ALLOW_NETWORK",
+            "INVARLOCK_ALLOW_REMOTE_CODE",
+            "INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS",
+        )
+        if environment.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+    )
+    if (
+        not runtime_security_helpers.strict_container_boundary_present()
+        or enabled_runtime_opt_ins
+    ):
+        detail = (
+            "; enabled runtime opt-ins: " + ", ".join(enabled_runtime_opt_ins)
+            if enabled_runtime_opt_ins
+            else ""
+        )
+        raise RuntimeProfileError(
+            "direct local judge run requires the current strict offline container "
+            "before model authentication" + detail
+        )
+    configured_oci_controls = sorted(
+        key
+        for key in (
+            "runtime.engine",
+            "runtime.cpus",
+            "runtime.memory_mib",
+            "runtime.user",
+            "baseline.entrypoint",
+            "subject.entrypoint",
+        )
+        if profile.sources.get(key) != "default"
+    )
+    if configured_oci_controls:
+        raise RuntimeProfileError(
+            "direct local judge run executes inside the current strict container; "
+            "OCI-only controls are not valid: " + ", ".join(configured_oci_controls)
+        )
+    try:
+        inherited = caller_runtime_resources_from_environment(environment)
+    except (OSError, RuntimeError, TypeError, ValueError) as exc:
+        raise RuntimeProfileError(
+            f"direct local judge runtime resources are invalid: {exc}"
+        ) from exc
+    declared_digest = inherited.container_image_digest
+    declared_image = environment.get("INVARLOCK_RUNTIME_IMAGE", "").strip()
+    selected_images = {
+        profile.baseline.image_ref,
+        profile.subject.image_ref,
+    }
+    if selected_images - {declared_image, ""}:
+        raise RuntimeProfileError(
+            "direct local judge runtime image references must equal the current "
+            "container's INVARLOCK_RUNTIME_IMAGE"
+        )
+    direct_devices: dict[RuntimeResourceRole, str] = {
+        "baseline": profile.baseline.device,
+        "subject": profile.subject.device,
+        "judge": inherited.side_devices.get("judge", inherited.default_device),
+    }
+    invalid_devices = sorted(
+        f"{role}={device}"
+        for role, device in direct_devices.items()
+        if device not in {"cpu", "cuda"}
+    )
+    if invalid_devices:
+        raise RuntimeProfileError(
+            "direct local judge devices must be cpu or cuda: "
+            + ", ".join(invalid_devices)
+        )
+    runtime_digests = {
+        "baseline": profile.baseline.image_digest,
+        "subject": profile.subject.image_digest,
+    }
+    if set(runtime_digests.values()) != {declared_digest}:
+        raise RuntimeProfileError(
+            "direct local judge run requires baseline, subject, and judge to use "
+            "the current container's INVARLOCK_RUNTIME_IMAGE_DIGEST"
+        )
+    try:
+        resources = CallerRuntimeResources(
+            container_image_digest=declared_digest,
+            default_device=inherited.default_device,
+            side_devices=direct_devices,
+            provider_bindings=inherited.provider_bindings,
+        )
+    except (OSError, RuntimeError, TypeError, ValueError) as exc:
+        raise RuntimeProfileError(
+            f"direct local judge runtime resources are invalid: {exc}"
+        ) from exc
+    return resources, runtime_digests
 
 
 def execute_evaluation(
@@ -136,7 +247,7 @@ def execute_evaluation(
     from invarlock.core.scorer_extension import ScorerExtensionRegistry
     from invarlock.evaluation_oci import (
         OciRuntimeExecutor,
-        launch_from_environment,
+        launch_from_resolved_config,
         preflight_oci_launch,
     )
     from invarlock.evaluation_transaction import (
@@ -175,7 +286,10 @@ def execute_evaluation(
                 "runtime and bootstrap options do not apply to bounded judge requests"
             )
         judge_request = load_judge_request(
-            request_path, request_root=options.request_root, **overrides
+            request_path,
+            request_root=options.request_root,
+            provider_resolver=lambda name: CoreRegistry().get_runtime_provider(name),
+            **overrides,
         )
         if judge_request.mode != detected_mode:
             raise JudgeWorkflowError(
@@ -198,6 +312,7 @@ def execute_evaluation(
         loaded_request = load_evaluation_request(
             request_path,
             request_root=options.request_root,
+            provider_resolver=lambda name: CoreRegistry().get_runtime_provider(name),
             **overrides,
         )
         request_mode: RequestMode = (
@@ -213,6 +328,9 @@ def execute_evaluation(
             loaded_request = load_evaluation_request(
                 request_path,
                 request_root=options.request_root,
+                provider_resolver=lambda name: CoreRegistry().get_runtime_provider(
+                    name
+                ),
                 **overrides,
             )
         if not isinstance(loaded_request, CapturedEvaluationRequest):
@@ -290,8 +408,10 @@ def execute_evaluation(
 
     profile = None
     profile_context = None
+    environment_snapshot = dict(os.environ if environment is None else environment)
     if options.runtime_profile is not None:
         profile = load_runtime_profile(options.runtime_profile)
+    if loaded_mode == "run":
         explicit = {
             name: value
             for name, value in options.runtime_strings().items()
@@ -300,35 +420,31 @@ def execute_evaluation(
         profile_context = resolve_runtime_profile(
             profile,
             explicit=explicit,
-            environment=dict(os.environ if environment is None else environment),
+            environment=environment_snapshot,
         )
 
     launch = None
     runtime_executor = None
+    resource_resolver = None
+    runtime_digests = None
     if loaded_mode == "run":
-        if profile_context is not None:
-            launch = launch_from_environment(**profile_context.arguments)
-        else:
-            launch = launch_from_environment(
-                engine=options.container_engine,
-                image_ref=options.runtime_image,
-                image_digest=options.runtime_image_digest,
-                baseline_image_ref=options.baseline_runtime_image,
-                baseline_image_digest=options.baseline_runtime_image_digest,
-                subject_image_ref=options.subject_runtime_image,
-                subject_image_digest=options.subject_runtime_image_digest,
-                default_device=options.runtime_device,
-                baseline_device=options.baseline_runtime_device,
-                subject_device=options.subject_runtime_device,
-                runtime_entrypoint=options.runtime_entrypoint,
-                baseline_entrypoint=options.baseline_runtime_entrypoint,
-                subject_entrypoint=options.subject_runtime_entrypoint,
-                runtime_cpus=options.runtime_cpus,
-                runtime_memory_mib=options.runtime_memory_mib,
-                runtime_user=options.runtime_user,
+        assert profile_context is not None
+        judge = loaded_runtime_request.comparison.judge
+        direct_runtime_judge = (
+            loaded_runtime_request.comparison.metric == "judge"
+            and judge is not None
+            and judge.model is not None
+        )
+        if direct_runtime_judge:
+            resource_resolver, runtime_digests = _direct_judge_runtime_resources(
+                profile_context, environment_snapshot
             )
-        runtime_executor = OciRuntimeExecutor(launch)
-    runtime_digests = preflight_oci_launch(launch) if launch else None
+        else:
+            launch = launch_from_resolved_config(profile_context)
+            runtime_executor = OciRuntimeExecutor(
+                launch, environment=environment_snapshot
+            )
+            runtime_digests = preflight_oci_launch(launch)
     runtime_result: (
         EvaluationPreflightResult | EvaluationTransactionResult | JudgeWorkflowResult
     )
@@ -338,7 +454,7 @@ def execute_evaluation(
             signing_key_path=options.signing_key,
             scorer_registry=scorer_registry,
             runtime_image_digests=runtime_digests,
-            resource_resolver=runtime_executor,
+            resource_resolver=resource_resolver or runtime_executor,
             registry=registry,
         )
     else:
@@ -346,6 +462,7 @@ def execute_evaluation(
             loaded_runtime_request,
             signing_key_path=options.signing_key,
             runtime_executor=runtime_executor,
+            resource_resolver=resource_resolver,
             runtime_image_digests=runtime_digests,
             scorer_registry=scorer_registry,
             registry=registry,

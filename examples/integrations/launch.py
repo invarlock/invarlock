@@ -27,10 +27,16 @@ from invarlock.evidence_pack_json import (
 
 try:
     from examples.integrations.bounded_command import run_bounded_command
+    from examples.integrations.evaluator_transaction.image_cleanup import (
+        normalize_image_id,
+    )
 except ModuleNotFoundError as exc:  # pragma: no cover - flat-script compatibility
     if not exc.name or not exc.name.startswith("examples"):
         raise
     from bounded_command import run_bounded_command  # type: ignore[no-redef]
+    from evaluator_transaction.image_cleanup import (  # type: ignore[no-redef]
+        normalize_image_id,
+    )
 
 _COMMAND_TIMEOUT_SECONDS = 24 * 60 * 60
 _COMMAND_STDOUT_LIMIT = 4 * 1024 * 1024
@@ -61,31 +67,14 @@ try:
 except ModuleNotFoundError as exc:  # pragma: no cover - flat-script compatibility
     if not exc.name or not exc.name.startswith("examples"):
         raise
-    try:
-        from evaluator_transaction.build_attestation import (
-            EvaluatorBuildAttestationError,
-            load_evaluator_build_attestation,
-            make_evaluator_build_attestation,
-            sign_evaluator_build_attestation,
-            verify_evaluator_build_attestation,
-            write_evaluator_build_attestation,
-        )
-    except (
-        ModuleNotFoundError
-    ) as nested_exc:  # pragma: no cover - flat-script compatibility
-        if nested_exc.name not in {
-            "evaluator_transaction",
-            "evaluator_transaction.build_attestation",
-        }:
-            raise
-        from evaluator_transaction import (  # type: ignore[no-redef]
-            EvaluatorBuildAttestationError,
-            load_evaluator_build_attestation,
-            make_evaluator_build_attestation,
-            sign_evaluator_build_attestation,
-            verify_evaluator_build_attestation,
-            write_evaluator_build_attestation,
-        )
+    from evaluator_transaction.build_attestation import (  # type: ignore[no-redef]
+        EvaluatorBuildAttestationError,
+        load_evaluator_build_attestation,
+        make_evaluator_build_attestation,
+        sign_evaluator_build_attestation,
+        verify_evaluator_build_attestation,
+        write_evaluator_build_attestation,
+    )
 
 
 _INTEGRATIONS = (
@@ -230,6 +219,8 @@ def _verify_runtime_image_identity(
         capture_output=True,
     ).stdout.strip()
     fields = inspected.split("\t")
+    if len(fields) == 3:
+        fields[0] = normalize_image_id(fields[0])
     if fields != [runtime_image_id, source_commit, source_bundle_sha256]:
         raise RuntimeError(
             "authenticated runtime image identity is not bound to the source"
@@ -536,7 +527,7 @@ def inspect_evaluator_image(
             cwd=repository,
             capture_output=True,
         ).stdout.strip()
-        if actual_id != image:
+        if normalize_image_id(actual_id) != image:
             raise EvaluatorBuildAttestationError(
                 "engine image identity changed after build"
             )
@@ -855,7 +846,7 @@ def main(argv: list[str] | None = None) -> int:
                         repository=repository,
                         build_root=vision_build,
                         container_engine=arguments.container_engine,
-                        dockerfile="addins/multimodal/runtime/Dockerfile",
+                        dockerfile="runtime/Dockerfile.hf-vision-text",
                         image_prefix="invarlock-example-hf-vision-text",
                         authenticated_base_image=published_base,
                     )

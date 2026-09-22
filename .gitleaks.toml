@@ -151,3 +151,15 @@ paths = [
 regexes = [
   '''^\n? {12}(?:path|Path\(value\)), label="judge evidence signing key", max_bytes=65536$''',
 ]
+
+[[allowlists]]
+description = "The retained ModelKit tokenizer revision identifies the public Mistral source commit."
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "match"
+paths = [
+  '''^examples/integrations/modelkit-handoff/references/mistral-7b/provenance\.json$''',
+]
+regexes = [
+  '''^tokenizer_revision": "27d67f1b5f57dc0953326b2601d68371d40ea8da"$''',
+]

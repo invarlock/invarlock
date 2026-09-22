@@ -20,22 +20,40 @@ or part of InvarLock's installed evaluator-neutral API. Each signed evaluator
 launcher also removes the exact temporary base and child image tags it created
 after the journey, including when a retained workspace is requested.
 
-For an evaluator workflow that already runs elsewhere, use the separate
-[captured-results journey](../captured-results/README.md). Installed parsers
-accept selected Inspect, Harness and Promptfoo export shapes; the public
-`capture_evaluator_run` SDK accepts explicitly mapped records from any evaluator.
-The [shortlist capture helper](../evaluator-qualification/maintained/CAPTURE.md)
-preserves original cases and distinguishes capture support from historical
-qualification.
+For an evaluator workflow that already runs elsewhere, save its original per-case
+SDK results as JSON and use `adapter: evaluator-native-json` in the
+[captured-results journey](../captured-results/README.md). Dedicated mappings
+cover all 19 maintained ecosystems through the same evaluation, verification and
+reporting interface. Keep your evaluator environment separate; the recipient
+needs only core InvarLock, with no evaluator SDK or account. The
+[native shape recipes](../evaluator-qualification/maintained/CAPTURE.md#dedicated-native-shapes)
+show the required SDK fields, result tables and per-case wrappers.
+
+When dependencies permit co-installation, `invarlock.engine.export_evaluator_result`
+is an optional convenience for SDK objects and writes an envelope for
+`adapter: evaluator-json`. Both routes preserve the same native facts. Preserve
+independently planned IDs, actual model/source identities and metadata slices;
+optional numeric metrics require explicit recorded-score provenance.
+`capture_evaluator_run` remains the public route for explicitly mapped canonical
+records.
 
 Captured comparisons can select InvarLock exact match, normalized NLL or judge
 scoring when the required facts are available. Explicit projections preserve
 structured task inputs, typed likelihoods bind actual reference measurements,
 and judge evidence retains complete calls under the declared recipe. An aggregate
 score cannot supply missing cases or establish any of these measurements.
-The [real Harness likelihood reference](../captured-results/references/harness-likelihood/README.md)
-retains six same-model CPU pairs and a signed captured handoff. It is separate
-from the native signed OCI profiles listed below.
+The [Mistral 7B sentinel](evaluator-live/references/mistral-7b-sentinel/README.md)
+retains real two-model execution across all 19 profiles and independently
+replayable results for all three scorers. The smaller
+[Harness likelihood control](../captured-results/references/harness-likelihood/README.md)
+retains six same-model CPU pairs. Both are separate from the native signed OCI
+profiles listed below.
+
+The [priority workflow reference](evaluator-live/references/priority-workflows/README.md)
+adds 64-case local comparisons, controlled HTTP-service comparisons and live judge
+stop/resume and budget checks for Inspect, Harness, Promptfoo and Langfuse. It
+preserves policy rejections and insufficient-evidence outcomes alongside the
+independently verified results.
 
 | Integration | Command | Execution |
 | --- | --- | --- |
@@ -50,7 +68,7 @@ from the native signed OCI profiles listed below.
 | [LM Evaluation Harness](lm-evaluation-harness/) | `make example-lm-evaluation-harness` | Real upstream per-record output across compact CPU and retained CUDA profiles |
 | [Inspect AI](inspect-ai/) | `make example-inspect-ai` | Native Inspect Task/scorer execution across compact CPU and retained CUDA profiles |
 | [OpenAI Evals](openai-evals/) | `make example-openai-evals` | CPU, example-owned OpenAI Evals Match adapter; no retained signed transaction |
-| [TensorRT-LLM](tensorrt-llm/) | `make example-tensorrt-llm` | Linux, Docker, two H100 GPUs, and a Qwen3-0.6B compatibility fixture for the pinned runtime |
+| [TensorRT-LLM](tensorrt-llm/) | `make example-tensorrt-llm` | Linux, Docker, two compatible CUDA GPUs, and a Qwen3-0.6B compatibility fixture for the pinned runtime |
 
 ## Before running a model example
 
@@ -96,10 +114,10 @@ outputs are never authoritative.
 
 All maintained commands obtain or create their artifacts and complete the transaction
 from a clean committed checkout. The TensorRT-LLM showcase builds its engines
-on the target H100s and authenticates the resulting engine identities; it does
+on the selected compatible GPUs and authenticates the resulting engine identities; it does
 not assume that independently compiled engine bytes will be identical. The
-first-party runtime packages also expose conformance and real-model
-qualification commands beside their implementations under `addins/`.
+first-party runtime providers also expose conformance and real-model
+qualification commands beside their implementations in the core package.
 
 The GPU-backed checkpoint examples accept `--runtime-device cuda:1` when several
 accelerators are available. The three evaluator bridges use `--device cuda:1`

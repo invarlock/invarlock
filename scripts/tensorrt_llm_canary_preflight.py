@@ -9,11 +9,12 @@ import re
 import stat
 from pathlib import Path
 
-from invarlock_addins.tensorrt_llm.execution import TensorRTLLMExecutionError
-from invarlock_addins.tensorrt_llm.inspection import (
+from invarlock.runtime_providers._tensorrt_llm_execution import (
+    TensorRTLLMExecutionError,
+)
+from invarlock.runtime_providers._tensorrt_llm_inspection import (
     authenticate_tensorrt_llm_tokenizer_contract,
 )
-
 from invarlock.runtime_providers.tensorrt_llm_identity import (
     TensorRTLLMIdentityError,
     read_tensorrt_llm_engine_tree_sha256,

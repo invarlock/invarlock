@@ -29,17 +29,17 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 4096,
-      "pattern": "^(?!/)(?!~)(?![A-Za-z]:)(?!.*://)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*(?:^|/)\\.(?:/|$))(?!.*//)(?!\\s)(?!.*\\s$)(?!.*\\/$)[^\\u0000-\\u001f]+$"
+      "pattern": "^(?!/)(?!~)(?![A-Za-z]:)(?!.*://)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*(?:^|/)\\.(?:/|$))(?!.*//)(?!\\s)(?!.*\\s$)(?!.*\\/$)[^\\u0000-\\u001f]+(?![\\s\\S])"
     },
     "text": {
       "type": "string",
       "minLength": 1,
       "maxLength": 4096,
-      "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+      "pattern": "^[^\\u0000-\\u001f\\u007f]+(?![\\s\\S])"
     },
     "digest": {
       "type": "string",
-      "pattern": "^sha256:[a-f0-9]{64}$"
+      "pattern": "^sha256:[a-f0-9]{64}(?![\\s\\S])"
     },
     "source": {
       "type": "object",
@@ -117,7 +117,10 @@
             "jsonl",
             "inspect-json",
             "lm-eval-samples",
-            "promptfoo-jsonl"
+            "promptfoo-jsonl",
+            "langfuse-json",
+            "evaluator-json",
+            "evaluator-native-json"
           ]
         },
         "source": {
@@ -130,7 +133,7 @@
           "anyOf": [
             {
               "type": "string",
-              "pattern": "^sha256:[a-f0-9]{64}$"
+              "pattern": "^sha256:[a-f0-9]{64}(?![\\s\\S])"
             },
             {
               "type": "null"
@@ -314,7 +317,7 @@
             "properties": {
               "artifact_digest": {
                 "type": "string",
-                "pattern": "^sha256:[a-f0-9]{64}$"
+                "pattern": "^sha256:[a-f0-9]{64}(?![\\s\\S])"
               }
             }
           }
@@ -438,8 +441,136 @@
         },
         "measurements": {
           "$ref": "#/$defs/reference"
+        },
+        "model": {
+          "$ref": "#/$defs/localModel"
         }
+      },
+      "not": {
+        "required": [
+          "model",
+          "measurements"
+        ]
       }
+    },
+    "safeReference": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?!/)(?!~)(?![A-Za-z]:)(?!.*://)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*(?:^|/)\\.(?:/|$))(?!.*//)(?!\\s)(?!.*\\s$)(?!.*\\/$)[^\\u0000-\\u001f]+(?![\\s\\S])"
+    },
+    "providerName": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,63}(?![\\s\\S])"
+    },
+    "settingName": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,63}(?![\\s\\S])"
+    },
+    "modelId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?!\\s)(?!.*\\s$)(?!.*://)[^\\u0000-\\u001f]+(?![\\s\\S])"
+    },
+    "artifactLocator": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "pattern": "^(?!\\s)(?!.*\\s$)[^\\u0000-\\u001f]+(?![\\s\\S])"
+    },
+    "jsonScalar": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "integer"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "string",
+          "maxLength": 4096
+        }
+      ]
+    },
+    "artifact": {
+      "type": "object",
+      "required": [
+        "model_id",
+        "locator"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/safeReference"
+        },
+        "model_id": {
+          "$ref": "#/$defs/modelId"
+        },
+        "locator": {
+          "$ref": "#/$defs/artifactLocator"
+        }
+      },
+      "additionalProperties": false
+    },
+    "runtime": {
+      "type": "object",
+      "required": [
+        "provider",
+        "settings"
+      ],
+      "properties": {
+        "provider": {
+          "$ref": "#/$defs/providerName"
+        },
+        "settings": {
+          "type": "object",
+          "propertyNames": {
+            "$ref": "#/$defs/settingName"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/jsonScalar"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "comparisonSide": {
+      "type": "object",
+      "required": [
+        "artifact",
+        "runtime"
+      ],
+      "properties": {
+        "artifact": {
+          "$ref": "#/$defs/artifact"
+        },
+        "runtime": {
+          "$ref": "#/$defs/runtime"
+        }
+      },
+      "additionalProperties": false
+    },
+    "localModel": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/comparisonSide"
+        },
+        {
+          "properties": {
+            "artifact": {
+              "required": [
+                "path"
+              ]
+            }
+          }
+        }
+      ]
     }
   }
 }
