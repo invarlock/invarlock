@@ -86,7 +86,8 @@
                 "integration": {
                   "enum": [
                     "inspect-judge",
-                    "runtime-provider-judge"
+                    "runtime-provider-judge",
+                    "openai-compatible-judge"
                   ]
                 },
                 "configuration": {
@@ -135,7 +136,25 @@
                     "model"
                   ]
                 }
-              }
+              },
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "integration": {
+                        "const": "openai-compatible-judge"
+                      }
+                    }
+                  },
+                  "then": {
+                    "not": {
+                      "required": [
+                        "invocation_timeout_seconds"
+                      ]
+                    }
+                  }
+                }
+              ]
             }
           },
           "required": [

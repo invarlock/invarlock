@@ -85,15 +85,16 @@ def _recipe(value: object) -> dict[str, Any]:
         error = next(Draft202012Validator(schema).iter_errors(item), None)
         if error is not None:
             raise ValueError(f"{label} is invalid: {error.message[:240]}")
-    local_collection = (
-        isinstance(result["collection"], dict)
-        and result["collection"].get("profile")
-        == "runtime-provider-text-frozen-answer-v1"
-    )
+    collector_manages_timeout = isinstance(result["collection"], dict) and result[
+        "collection"
+    ].get("profile") in {
+        "runtime-provider-text-frozen-answer-v1",
+        "openai-compatible-text-frozen-answer-v1",
+    }
     runner = _object(
         result["runner"],
         {"scorer_id"}
-        if local_collection
+        if collector_manages_timeout
         else {"scorer_id", "invocation_timeout_seconds"},
         "judge runner",
     )
@@ -107,7 +108,7 @@ def _recipe(value: object) -> dict[str, Any]:
         )
     ):
         raise ValueError("judge scorer_id must be a bounded identifier")
-    if not local_collection:
+    if not collector_manages_timeout:
         timeout = runner["invocation_timeout_seconds"]
         if type(timeout) is not int or not 1 <= timeout <= 604800:
             raise ValueError(
@@ -220,6 +221,19 @@ def prepare_native_judge(
         )
 
         budgets = validate_runtime_provider_collection(recipe["collection"], plan)
+        capacity = min(
+            budgets["max_calls"],
+            budgets["max_output_tokens"]
+            // plan["judge"]["config"]["max_output_tokens"],
+        )
+    elif (
+        recipe["collection"].get("profile") == "openai-compatible-text-frozen-answer-v1"
+    ):
+        from invarlock.judge_measurements.openai_compatible import (
+            validate_openai_compatible_collection,
+        )
+
+        budgets = validate_openai_compatible_collection(recipe["collection"], plan)
         capacity = min(
             budgets["max_calls"],
             budgets["max_output_tokens"]

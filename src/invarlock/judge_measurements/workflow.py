@@ -100,7 +100,10 @@ class JudgeEvaluationRequest:
     signer_identity: str
     workspace: Path | None = None
     runner: Mapping[str, Any] | None = None
-    integration: Literal["inspect-judge", "runtime-provider-judge"] | None = None
+    integration: (
+        Literal["inspect-judge", "runtime-provider-judge", "openai-compatible-judge"]
+        | None
+    ) = None
     model: ComparisonSideRequest | None = None
 
 
@@ -293,7 +296,7 @@ def _validate_request_binding(request: JudgeEvaluationRequest) -> None:
             set(request.runner) - allowed_runner
             or "measurements" in request.inputs
             or (
-                request.integration == "runtime-provider-judge"
+                request.integration != "inspect-judge"
                 and set(request.runner) != {"scorer_id"}
             )
         ):
@@ -548,6 +551,19 @@ def _prepare(request: JudgeEvaluationRequest) -> tuple[dict[str, Any], dict[str,
                     budgets["max_output_tokens"]
                     // plan["judge"]["config"]["max_output_tokens"],
                 )
+            elif request.integration == "openai-compatible-judge":
+                from invarlock.judge_measurements.openai_compatible import (
+                    validate_openai_compatible_collection,
+                )
+
+                budgets = validate_openai_compatible_collection(
+                    values["collection"], plan
+                )
+                capacity = min(
+                    budgets["max_calls"],
+                    budgets["max_output_tokens"]
+                    // plan["judge"]["config"]["max_output_tokens"],
+                )
             else:
                 budgets = _collection_budgets(values["collection"], plan)
                 capacity = min(
@@ -580,6 +596,8 @@ def _prepare(request: JudgeEvaluationRequest) -> tuple[dict[str, Any], dict[str,
             "package": "invarlock",
             "api": "invarlock.judge_measurements.collect_runtime_provider"
             if request.integration == "runtime-provider-judge"
+            else "invarlock.judge_measurements.collect_openai_compatible"
+            if request.integration == "openai-compatible-judge"
             else "invarlock.judge_measurements.collect_configured",
             "execution": "installed_evaluate",
             "core_cli_execution": True,
@@ -599,7 +617,7 @@ def _prepare(request: JudgeEvaluationRequest) -> tuple[dict[str, Any], dict[str,
                         "request_root": request.root,
                         "plan": values["plan"],
                     }
-                    if request.integration == "runtime-provider-judge"
+                    if request.integration != "inspect-judge"
                     else {}
                 ),
             )
@@ -648,6 +666,7 @@ def evaluate_judge_request(
         if request.mode == "judge_collect":
             from invarlock.judge_measurements.evidence import object_sha256
             from invarlock.judge_measurements.native_workflow import (
+                _require_service_network_authorization,
                 _retain_identity,
                 collect_frozen,
                 locked_workspace,
@@ -655,6 +674,9 @@ def evaluate_judge_request(
             )
 
             assert request.workspace is not None and request.runner is not None
+            _require_service_network_authorization(
+                values["collection"], preflight["collection_environment"]
+            )
             local_binding = {}
             if request.integration == "runtime-provider-judge":
                 from invarlock.evaluation_transaction import _normalized_side
@@ -664,6 +686,8 @@ def evaluate_judge_request(
                     "integration": request.integration,
                     "model": _normalized_side(request.model),
                 }
+            elif request.integration == "openai-compatible-judge":
+                local_binding = {"integration": request.integration}
             with locked_workspace(request.workspace) as unchanged:
                 _retain_identity(
                     request.workspace / "identity.json",
@@ -693,7 +717,7 @@ def evaluate_judge_request(
                             "model": request.model,
                             "request_root": request.root,
                         }
-                        if request.integration == "runtime-provider-judge"
+                        if request.integration != "inspect-judge"
                         else {},
                     ),
                 )

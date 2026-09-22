@@ -17,7 +17,8 @@
       "enum": [
         "retained-judge-json-v1",
         "retained-inspect-model-events-v1",
-        "retained-runtime-provider-judge-v1"
+        "retained-runtime-provider-judge-v1",
+        "retained-openai-compatible-judge-v1"
       ]
     },
     "sources": {
@@ -33,7 +34,8 @@
             "enum": [
               "retained-judge-json-v1",
               "retained-inspect-model-events-v1",
-              "retained-runtime-provider-judge-v1"
+              "retained-runtime-provider-judge-v1",
+              "retained-openai-compatible-judge-v1"
             ]
           },
           "encoding": {

@@ -223,6 +223,17 @@ def _prepare(
                 budgets["max_output_tokens"]
                 // plan["judge"]["config"]["max_output_tokens"],
             )
+        elif native_workflow._service_collection(recipe["collection"]):
+            from invarlock.judge_measurements.openai_compatible import (
+                validate_openai_compatible_collection,
+            )
+
+            budgets = validate_openai_compatible_collection(recipe["collection"], plan)
+            capacity = min(
+                budgets["max_calls"],
+                budgets["max_output_tokens"]
+                // plan["judge"]["config"]["max_output_tokens"],
+            )
         else:
             budgets = _collection_budgets(recipe["collection"], plan)
             capacity = min(
@@ -240,13 +251,12 @@ def _prepare(
             raise JudgeWorkflowError(
                 "Judge cases have fewer independent units than the analysis minimum"
             )
-        preflight_arguments: dict[str, Any] = {}
-        if local:
-            preflight_arguments = {
-                "model": judge.model,
-                "request_root": request.root,
-                "plan": plan,
-            }
+        preflight_arguments = native_workflow._collection_context(
+            recipe["collection"],
+            model=judge.model,
+            request_root=request.root,
+            plan=plan,
+        )
         metadata.update(
             budgets=budgets,
             maximum_admitted_calls=capacity,
@@ -277,11 +287,15 @@ def evaluate_captured_judge(
 ) -> JudgeWorkflowResult:
     """Collect or import judgments on existing answers, then publish once."""
     try:
-        values, _, key = _prepare(request, signing_key_path, unsigned)
+        values, preparation, key = _prepare(request, signing_key_path, unsigned)
         judge = request.judge
         assert judge is not None
         status = None
         if "measurements" not in values:
+            native_workflow._require_service_network_authorization(
+                values["recipe"]["collection"],
+                preparation["collection_environment"],
+            )
             with native_workflow.locked_workspace(judge.workspace) as unchanged:
                 native_workflow._retain_identity(
                     judge.workspace / "identity.json", values

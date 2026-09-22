@@ -51,6 +51,7 @@ from .contracts import (
     expected_trial_id,
     measurement_plan_digest,
     render_judge_request,
+    render_runtime_prompt,
     validate_measurement_plan,
     validate_measurements,
 )
@@ -669,9 +670,11 @@ def collect_runtime_provider(
 ) -> JudgeMeasurements:
     """Collect one complete frozen-answer schedule without network access.
 
-    The exact normalized judge request JSON is the model prompt. The retained
-    source embeds the provider's artifact identity, scoring observation and
-    receipt so later verification requires no provider installation.
+    The retained attempt keeps the exact normalized judge request JSON. The
+    plan-selected runtime format deterministically produces the model prompt,
+    whose digest is bound by the scoring observation. The retained source embeds
+    the provider's artifact identity, observation and receipt so later
+    verification requires no provider installation.
     """
 
     options.validate()
@@ -700,9 +703,10 @@ def collect_runtime_provider(
                     answer_text=frozen.get("output"),
                     reference_text=frozen.get("expected"),
                 )
+                runtime_prompt = render_runtime_prompt(plan, request)
                 context_length = cast(int, spec.settings["context_length"])
                 if (
-                    len(request) + plan["judge"]["config"]["max_output_tokens"]
+                    len(runtime_prompt) + plan["judge"]["config"]["max_output_tokens"]
                     > context_length
                 ):
                     raise RuntimeProviderJudgeError(
@@ -723,7 +727,7 @@ def collect_runtime_provider(
                             "plan_sha256": plan_digest,
                         },
                         request,
-                        _input_record(trial_id, request),
+                        _input_record(trial_id, runtime_prompt),
                     )
                 )
 

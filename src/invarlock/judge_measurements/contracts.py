@@ -39,6 +39,16 @@ from invarlock.judge_measurement_types import (
     JudgeMeasurementPlan,
     JudgeMeasurements,
 )
+from invarlock.judge_measurements.openai_compatible_contract import (
+    OpenAICompatibleContractError,
+    decode_http_blob,
+    failure_details,
+    has_credential_field,
+    normalize_configuration,
+    response_facts,
+    service_identity,
+    wire_request,
+)
 from invarlock.public_contracts import (
     load_judge_measurement_plan_schema,
     load_judge_measurements_schema,
@@ -59,6 +69,8 @@ MEASUREMENTS_FORMAT = "invarlock/judge-measurements-v1"
 SOURCE_FORMAT = "invarlock/retained-judge-json-v1"
 INSPECT_SOURCE_FORMAT = "invarlock/retained-inspect-model-events-v1"
 RUNTIME_PROVIDER_SOURCE_FORMAT = "retained-runtime-provider-judge-v1"
+OPENAI_COMPATIBLE_SOURCE_PROFILE = "retained-openai-compatible-judge-v1"
+OPENAI_COMPATIBLE_SOURCE_FORMAT = "invarlock/retained-openai-compatible-judge-v1"
 TRIAL_ID_SCHEME = "plan-case-side-repetition-sha256-v1"
 JUDGE_REQUEST_MAX_BYTES = 1024 * 1024
 _INSPECT_0_3_263_REASONING_EFFORTS = {
@@ -240,6 +252,52 @@ def render_judge_request(
     )
 
 
+def render_runtime_prompt(
+    plan: JudgeMeasurementPlan, normalized_request: bytes
+) -> bytes:
+    """Render one plan-bound direct-runtime prompt without tokenizer execution."""
+
+    runtime_format = plan["prompt"].get("runtime_format", "canonical-json-v1")
+    if runtime_format == "canonical-json-v1":
+        return normalized_request
+    if runtime_format != "chatml-v1":
+        _fail("unsupported direct judge runtime prompt format")
+    try:
+        request = parse_json_bytes(
+            normalized_request, label="normalized direct judge request"
+        )
+    except StrictJsonError as exc:
+        raise JudgeMeasurementContractError(str(exc)) from exc
+    if not isinstance(request, dict) or not isinstance(request.get("messages"), list):
+        _fail("normalized direct judge request must contain messages")
+    messages = request["messages"]
+    if not messages or not isinstance(messages[-1], dict):
+        _fail("normalized direct judge request must end with a user message")
+    reserved = ("<|im_start|>", "<|im_end|>", "<|im_sep|>")
+    rendered: list[str] = []
+    for message in messages:
+        if not isinstance(message, dict) or set(message) != {"role", "content"}:
+            _fail("normalized direct judge messages have an unsupported shape")
+        role = message["role"]
+        content = message["content"]
+        if (
+            not isinstance(role, str)
+            or role not in {"system", "user", "assistant"}
+            or not isinstance(content, str)
+        ):
+            _fail("normalized direct judge messages require closed text roles")
+        if any(marker in content for marker in reserved):
+            _fail("direct judge prompt content contains a reserved ChatML delimiter")
+        rendered.append(f"<|im_start|>{role}\n{content}<|im_end|>\n")
+    if messages[-1]["role"] != "user":
+        _fail("normalized direct judge request must end with a user message")
+    rendered.append("<|im_start|>assistant\n")
+    payload = "".join(rendered).encode("utf-8")
+    if len(payload) > JUDGE_REQUEST_MAX_BYTES:
+        _fail(f"direct judge prompt exceeds the {JUDGE_REQUEST_MAX_BYTES}-byte limit")
+    return payload
+
+
 @lru_cache(maxsize=2)
 def _validator(kind: str) -> Draft202012Validator:
     if kind == "plan":
@@ -408,6 +466,18 @@ def validate_measurement_plan(value: JudgeMeasurementPlan) -> None:
         _fail("hosted API judge identity must not claim a weights digest")
     if identity["kind"] == "local_weights" and identity["weights_sha256"] is None:
         _fail("local judge identity requires a weights digest")
+    service_identity = judge.get("service_identity")
+    if judge["provider"] == "openai_compatible":
+        if service_identity is None:
+            _fail("OpenAI-compatible judge plans require a service identity")
+    elif service_identity is not None:
+        _fail("service identity is only valid for OpenAI-compatible judge plans")
+    runtime_format = raw["prompt"].get("runtime_format")
+    if runtime_format is not None and judge["provider"] not in {
+        "hf_transformers",
+        "llama_cpp",
+    }:
+        _fail("runtime prompt format is only valid for direct runtime judge plans")
 
     case_units: dict[str, str] = {}
     for item in raw["sampling"]["case_units"]:
@@ -440,7 +510,10 @@ def validate_measurement_plan(value: JudgeMeasurementPlan) -> None:
         _fail("multiple attempts require transport_error as the sole retry condition")
     # Reject plans whose fixed prompt material already exceeds the request
     # envelope. Frozen case inputs and answers are checked when rendered.
-    render_judge_request(value, input_text="", answer_text="", reference_text="")
+    request = render_judge_request(
+        value, input_text="", answer_text="", reference_text=""
+    )
+    render_runtime_prompt(value, request)
 
 
 def _load_object(path: Path, *, maximum: int, label: str) -> dict[str, Any]:
@@ -1188,6 +1261,7 @@ def _source_trials(
     *,
     inspect_collections: list[dict[str, Any]],
     runtime_sources: list[dict[str, Any]],
+    openai_compatible_sources: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     content = source["content"]
     encoded = content.encode("utf-8")
@@ -1233,6 +1307,32 @@ def _source_trials(
             for trial in trials
         ):
             _fail("retained runtime-provider trials must contain attempt objects")
+        return trials
+    if source["profile"] == OPENAI_COMPATIBLE_SOURCE_PROFILE:
+        required = {
+            "format",
+            "collection",
+            "http",
+            "service_identity",
+            "trials",
+        }
+        if (
+            set(decoded) != required
+            or decoded.get("format") != OPENAI_COMPATIBLE_SOURCE_FORMAT
+            or not isinstance(decoded.get("trials"), list)
+        ):
+            _fail(
+                f"source {source['source_id']!r} has an unsupported OpenAI-compatible profile"
+            )
+        openai_compatible_sources.append(decoded)
+        trials = cast(list[Any], decoded["trials"])
+        if any(
+            not isinstance(trial, dict)
+            or not isinstance(trial.get("attempts"), list)
+            or any(not isinstance(attempt, dict) for attempt in trial["attempts"])
+            for trial in trials
+        ):
+            _fail("retained OpenAI-compatible trials must contain attempt objects")
         return trials
     if (
         set(decoded) != {"format", "trials"}
@@ -1371,11 +1471,18 @@ def _runtime_provider_source_errors(
             errors.append("retained runtime judge request is invalid")
             continue
         prompt = request["text"]
+        try:
+            runtime_prompt = render_runtime_prompt(
+                cast(JudgeMeasurementPlan, plan), prompt.encode("utf-8")
+            )
+        except (UnicodeError, ValueError) as exc:
+            errors.append(f"retained runtime judge prompt is invalid: {str(exc)[:240]}")
+            continue
         part = EvaluationInputPart(
             kind="text",
             role="prompt",
-            text=prompt,
-            sha256=_text_sha256(prompt),
+            text=runtime_prompt.decode("utf-8"),
+            sha256=_sha256(runtime_prompt),
         )
         if (
             record.record_id != trial.get("trial_id")
@@ -1440,6 +1547,258 @@ def _check_runtime_provider_sources(
         errors = _runtime_provider_source_errors(source, plan)
         if errors:
             _fail(errors[0])
+
+
+def _compatible_credential_field(value: Any) -> bool:
+    return has_credential_field(value)
+
+
+def _openai_compatible_source_errors(
+    source: dict[str, Any], plan: dict[str, Any]
+) -> list[str]:
+    """Replay one compatible-service source without contacting its endpoint."""
+
+    errors: list[str] = []
+    collection = source.get("collection")
+    http = source.get("http")
+    identity = source.get("service_identity")
+    trials = source.get("trials")
+    if (
+        not isinstance(collection, dict)
+        or not isinstance(http, dict)
+        or set(http)
+        != {
+            "outcome",
+            "request",
+            "response_status",
+            "response_headers",
+            "response_body",
+        }
+        or not isinstance(identity, dict)
+        or set(identity)
+        != {
+            "service",
+            "endpoint_sha256",
+            "requested_model",
+            "response_model",
+            "request_id",
+            "system_fingerprint",
+        }
+        or not isinstance(trials, list)
+        or len(trials) != 1
+        or not isinstance(trials[0], dict)
+    ):
+        return ["retained OpenAI-compatible source has an unsupported shape"]
+    try:
+        checked = normalize_configuration(
+            collection, maximum_input_bytes=MEASUREMENTS_MAX_BYTES
+        )
+    except OpenAICompatibleContractError:
+        return ["retained compatible endpoint configuration is invalid"]
+    if checked != collection:
+        errors.append("retained compatible endpoint is not canonical")
+    judge = plan["judge"]
+    config = judge["config"]
+    schedule = plan["schedule"]
+    expected_identity = service_identity(checked)
+    if (
+        identity["service"] != expected_identity["service"]
+        or identity["endpoint_sha256"] != expected_identity["endpoint_sha256"]
+        or identity["requested_model"] != collection["model"]
+    ):
+        errors.append("retained compatible endpoint identity is invalid")
+    if (
+        judge["provider"] != "openai_compatible"
+        or judge["requested_model"] != collection["model"]
+        or collection["model"] not in judge["approved_resolved_models"]
+        or judge["model_identity"] != {"kind": "hosted_api", "weights_sha256": None}
+        or judge.get("service_identity") != expected_identity
+        or config["reasoning_effort"] is not None
+        or config["seed"] is None
+        or schedule["max_attempts"] != 1
+        or schedule["retry_on"]
+        or schedule["cache"] != "forbid"
+    ):
+        errors.append("retained compatible source differs from the strict plan")
+    trial = cast(dict[str, Any], trials[0])
+    attempts = trial.get("attempts")
+    if not isinstance(attempts, list) or len(attempts) != 1:
+        errors.append("retained compatible trial must contain one attempt")
+        return errors
+    attempt = attempts[0]
+    request_blob = attempt.get("request")
+    response_body = http.get("response_body")
+    if not isinstance(request_blob, dict) or not isinstance(
+        request_blob.get("text"), str
+    ):
+        errors.append("retained compatible request material is invalid")
+        return errors
+    try:
+        normalized = parse_json_bytes(
+            request_blob["text"].encode("utf-8"), label="retained compatible request"
+        )
+    except (StrictJsonError, UnicodeEncodeError) as exc:
+        return [f"retained compatible request material is invalid: {str(exc)[:240]}"]
+    if not isinstance(normalized, dict):
+        return ["retained compatible normalized request must be an object"]
+    expected_wire = wire_request(
+        response_format_profile=collection.get("response_format", "json_object"),
+        model=collection["model"],
+        messages=normalized.get("messages"),
+        temperature=config["temperature"],
+        top_p=config["top_p"],
+        max_tokens=config["max_output_tokens"],
+        seed=config["seed"],
+        rating_labels=[item["label"] for item in plan["scale"]["ratings"]],
+    )
+    try:
+        wire_matches = canonical_payload(http["request"]) == canonical_payload(
+            expected_wire
+        )
+    except (TypeError, ValueError):
+        wire_matches = False
+    if not wire_matches or _compatible_credential_field(http["request"]):
+        errors.append(
+            "retained compatible wire request differs from the approved request"
+        )
+
+    headers = http.get("response_headers")
+    if not isinstance(headers, dict) or any(
+        name not in {"content-type", "server", "x-request-id"}
+        or not isinstance(value, str)
+        or len(value) > 512
+        or any(
+            ord(character) < 32 or 127 <= ord(character) <= 159 for character in value
+        )
+        for name, value in headers.items()
+    ):
+        errors.append("retained compatible response headers are invalid")
+    status = http.get("response_status")
+    outcome = http.get("outcome")
+    allowed_outcomes = {
+        "success",
+        "http_error",
+        "transport_error",
+        "malformed_response",
+        "response_too_large",
+        "credential_echo",
+    }
+    if not isinstance(outcome, str) or outcome not in allowed_outcomes:
+        errors.append("retained compatible HTTP outcome is invalid")
+        return errors
+    if outcome == "transport_error":
+        valid_status = status is None
+    else:
+        valid_status = type(status) is int and 100 <= status <= 599
+    if not valid_status:
+        errors.append("retained compatible HTTP status is invalid")
+        return errors
+
+    raw_response: bytes | None = None
+    decoded_response: Any = None
+    if response_body is not None:
+        try:
+            raw_response = decode_http_blob(response_body)
+        except OpenAICompatibleContractError:
+            errors.append("retained compatible response body is invalid")
+            return errors
+        if len(raw_response) > 2 * 1024 * 1024:
+            errors.append("retained compatible response body exceeds its byte limit")
+            return errors
+        try:
+            decoded_response = parse_json_bytes(
+                raw_response, label="retained compatible response"
+            )
+        except StrictJsonError:
+            decoded_response = None
+        if _compatible_credential_field(decoded_response):
+            errors.append("retained compatible response contains credential material")
+
+    if outcome == "success":
+        if status != 200 or raw_response is None:
+            errors.append("retained compatible success response is incomplete")
+            return errors
+        try:
+            facts = response_facts(
+                decoded_response,
+                approved_models=judge["approved_resolved_models"],
+            )
+        except OpenAICompatibleContractError:
+            errors.append("retained compatible success response is invalid")
+            return errors
+        content = facts["content"]
+        response = attempt.get("response")
+        if (
+            attempt.get("status") != "completed"
+            or not isinstance(response, dict)
+            or response.get("text") != content
+            or response.get("sha256") != _text_sha256(content)
+            or attempt.get("resolved_model") != facts["model"]
+            or attempt.get("request_id") != facts["request_id"]
+            or attempt.get("finish_reason") != facts["finish_reason"]
+            or attempt.get("usage") != facts["usage"]
+            or identity["response_model"] != facts["model"]
+            or identity["request_id"] != facts["request_id"]
+            or identity["system_fingerprint"] != facts["system_fingerprint"]
+        ):
+            errors.append("retained compatible completion identity is invalid")
+    else:
+        if outcome == "http_error" and (
+            status == 200
+            or (response_body is None and not 300 <= cast(int, status) <= 399)
+        ):
+            errors.append("retained compatible HTTP error outcome is invalid")
+        if outcome in {"transport_error", "response_too_large", "credential_echo"} and (
+            response_body is not None
+        ):
+            errors.append("retained compatible unsafe failure retained a response body")
+        if outcome in {"transport_error", "credential_echo"} and headers:
+            errors.append(
+                "retained compatible unsafe failure retained response headers"
+            )
+        expected_code, expected_message = failure_details(outcome, status)
+        error = attempt.get("error")
+        if (
+            attempt.get("status") != "cancelled"
+            or attempt.get("response") is not None
+            or not isinstance(error, dict)
+            or error.get("code") != expected_code
+            or error.get("message") != expected_message
+            or attempt.get("resolved_model") is not None
+            or attempt.get("request_id") is not None
+            or attempt.get("finish_reason") is not None
+            or attempt.get("usage") is not None
+            or identity["response_model"] is not None
+            or identity["request_id"] is not None
+            or identity["system_fingerprint"] is not None
+        ):
+            errors.append("retained compatible failed outcome is invalid")
+    return errors
+
+
+def _check_openai_compatible_sources(
+    sources: list[dict[str, Any]], plan: dict[str, Any]
+) -> None:
+    if not sources:
+        return
+    collection = sources[0].get("collection")
+    spent_input_bytes = 0
+    for source in sources:
+        if source.get("collection") != collection:
+            _fail("retained compatible shards have inconsistent endpoint configuration")
+        errors = _openai_compatible_source_errors(source, plan)
+        if errors:
+            _fail(errors[0])
+        spent_input_bytes += len(canonical_payload(source["http"]["request"]))
+    assert isinstance(collection, dict)
+    spent_calls = len(sources)
+    if (
+        spent_calls > collection["max_calls"]
+        or spent_input_bytes > collection["max_input_bytes"]
+        or spent_calls * plan["judge"]["config"]["max_output_tokens"]
+        > collection["max_output_tokens"]
+    ):
+        _fail("retained compatible shards exceed their aggregate resource reservations")
 
 
 def _frozen_run_records(
@@ -1574,6 +1933,7 @@ def validate_measurements(
     replayed: dict[str, dict[str, Any]] = {}
     inspect_collections: list[dict[str, Any]] = []
     runtime_sources: list[dict[str, Any]] = []
+    openai_compatible_sources: list[dict[str, Any]] = []
     for source in raw["sources"]:
         source_id = source["source_id"]
         if source_id in sources:
@@ -1584,6 +1944,7 @@ def validate_measurements(
                 source,
                 inspect_collections=inspect_collections,
                 runtime_sources=runtime_sources,
+                openai_compatible_sources=openai_compatible_sources,
             )
         ):
             _check_trial_integer_types(trial)
@@ -1602,6 +1963,7 @@ def validate_measurements(
 
     _check_inspect_shard_budgets(inspect_collections, replayed, plan_raw)
     _check_runtime_provider_sources(runtime_sources, plan_raw)
+    _check_openai_compatible_sources(openai_compatible_sources, plan_raw)
 
     bindings = {item["case_id"]: item for item in plan_raw["answer_bindings"]}
     repetitions = plan_raw["schedule"]["repetitions"]
@@ -1663,9 +2025,11 @@ def validate_measurements(
             # It cannot represent independent calls in separate retained shards.
             # Generic retained JSON does not promise this identity semantics.
             response_id = attempt["request_id"]
-            if inspect_collections and response_id is not None:
+            if (
+                inspect_collections or openai_compatible_sources
+            ) and response_id is not None:
                 if response_id in provider_response_ids:
-                    _fail("retained Inspect provider response IDs must be unique")
+                    _fail("retained provider response IDs must be unique")
                 provider_response_ids.add(response_id)
         if trial_raw["status"] == "complete":
             completed += 1
@@ -1727,6 +2091,7 @@ __all__ = [
     "load_measurements",
     "measurement_plan_digest",
     "render_judge_request",
+    "render_runtime_prompt",
     "validate_measurement_plan",
     "validate_measurements",
 ]

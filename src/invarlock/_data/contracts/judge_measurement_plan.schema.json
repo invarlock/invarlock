@@ -114,6 +114,12 @@
             "none",
             "per_case"
           ]
+        },
+        "runtime_format": {
+          "enum": [
+            "canonical-json-v1",
+            "chatml-v1"
+          ]
         }
       },
       "required": [
@@ -170,6 +176,33 @@
           "required": [
             "kind",
             "weights_sha256"
+          ]
+        },
+        "service_identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "service": {
+              "enum": [
+                "vllm",
+                "ollama",
+                "lm_studio",
+                "openai_compatible"
+              ]
+            },
+            "endpoint_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "response_format": {
+              "enum": [
+                "json_object",
+                "json_schema"
+              ]
+            }
+          },
+          "required": [
+            "service",
+            "endpoint_sha256"
           ]
         },
         "config": {

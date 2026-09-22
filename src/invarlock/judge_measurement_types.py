@@ -28,6 +28,7 @@ class JudgeReference(TypedDict):
 
 class JudgePrompt(TypedDict):
     reference_mode: NotRequired[Literal["none", "per_case"]]
+    runtime_format: NotRequired[Literal["canonical-json-v1", "chatml-v1"]]
     system: str
     template: str
     demonstrations: list[JudgeDemonstration]
@@ -37,6 +38,12 @@ class JudgePrompt(TypedDict):
 class JudgeModelIdentity(TypedDict):
     kind: Literal["hosted_api", "local_weights"]
     weights_sha256: str | None
+
+
+class JudgeServiceIdentity(TypedDict):
+    service: Literal["vllm", "ollama", "lm_studio", "openai_compatible"]
+    endpoint_sha256: str
+    response_format: NotRequired[Literal["json_object", "json_schema"]]
 
 
 class JudgeConfig(TypedDict):
@@ -54,6 +61,7 @@ class JudgeIdentity(TypedDict):
     requested_model: str
     approved_resolved_models: list[str]
     model_identity: JudgeModelIdentity
+    service_identity: NotRequired[JudgeServiceIdentity]
     config: JudgeConfig
     tools: Literal[False]
 
@@ -185,6 +193,7 @@ class JudgeRetainedSource(TypedDict):
         "retained-judge-json-v1",
         "retained-inspect-model-events-v1",
         "retained-runtime-provider-judge-v1",
+        "retained-openai-compatible-judge-v1",
     ]
     encoding: Literal["utf-8"]
     byte_size: int
@@ -208,6 +217,7 @@ class JudgeMeasurements(TypedDict):
         "retained-judge-json-v1",
         "retained-inspect-model-events-v1",
         "retained-runtime-provider-judge-v1",
+        "retained-openai-compatible-judge-v1",
     ]
     sources: list[JudgeRetainedSource]
     trials: list[JudgeTrial]
