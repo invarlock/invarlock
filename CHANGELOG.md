@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.16.2] - 2026-09-20
+## [0.16.2] - 2026-09-22
 
 ### Added
 
@@ -114,6 +114,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Scope explicitly authorized judge network access to collection, preserving
   native execution isolation and restoring the guard after failures or cancellation.
+- Execute native local-judge comparisons inside the declared offline container,
+  with matching image and device bindings for the baseline, subject and judge.
+  Reject incompatible runtime controls before model execution.
 
 - Accept complete Podman image IDs in authenticated builds and example workflows
   while retaining strict source, image and filesystem checks. Temporary registry
@@ -134,6 +137,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   columns visible in desktop reports without changing retained results. Show
   capture-bound model identities and multiple recorded datasets when available,
   rejecting contradictions with attributed artifacts or legacy identity fields.
+  Show the judge's model, service endpoint, response format and local prompt
+  format where applicable, distinguishing service-reported identities from
+  authenticated local artifacts.
 - Reject exact-match reports whose side means contradict their paired outcome
   counts, even when the reported difference remains consistent. Reject captured
   reports whose recorded pass contradicts an available displayed requirement.
