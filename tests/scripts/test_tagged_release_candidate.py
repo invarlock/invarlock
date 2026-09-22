@@ -208,7 +208,7 @@ def test_authenticate_tagged_run_closes_network_and_json_failures() -> None:
         )
 
 
-def test_verify_distribution_ledger_accepts_exact_ten_file_candidate(
+def test_verify_distribution_ledger_accepts_exact_release_candidate(
     tmp_path: Path,
 ) -> None:
     expected = _dist_tree(tmp_path)
@@ -255,6 +255,22 @@ def test_verify_distribution_ledger_rejects_missing_unexpected_and_changed_files
     first_relative = sorted(candidate.expected_distribution_paths("1.2.3"))[0]
     (tmp_path / first_relative).write_bytes(b"changed")
     with pytest.raises(candidate.CandidateError, match="digest mismatch"):
+        candidate.verify_distribution_ledger(tmp_path, TAG)
+
+
+@pytest.mark.parametrize("extra_kind", ["empty_directory", "directory_symlink"])
+def test_verify_distribution_ledger_rejects_extra_directory_entries(
+    tmp_path: Path, extra_kind: str
+) -> None:
+    _dist_tree(tmp_path)
+    extra = tmp_path / "extra"
+    if extra_kind == "empty_directory":
+        extra.mkdir()
+    else:
+        target = tmp_path.parent / f"{tmp_path.name}-target"
+        target.mkdir()
+        extra.symlink_to(target, target_is_directory=True)
+    with pytest.raises(candidate.CandidateError, match="wrong file set"):
         candidate.verify_distribution_ledger(tmp_path, TAG)
 
 

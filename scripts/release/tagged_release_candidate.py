@@ -219,7 +219,7 @@ def _hash_regular_file(path: Path) -> str:
 
 
 def verify_distribution_ledger(dist_dir: Path, release_tag: str) -> str:
-    """Verify the closed ten-file archive set and return its ledger digest."""
+    """Verify the closed release archive set and return its ledger digest."""
 
     version = _validated_release_tag(release_tag).removeprefix("v")
     expected_paths = expected_distribution_paths(version)
@@ -253,11 +253,10 @@ def verify_distribution_ledger(dist_dir: Path, release_tag: str) -> str:
     if set(entries) != expected_paths:
         raise CandidateError("distribution digest ledger has the wrong file set")
 
-    actual_files = {
-        path.relative_to(dist_dir).as_posix()
-        for path in dist_dir.rglob("*")
-        if not path.is_dir()
-    }
+    # Release distributions and their ledger are all at the artifact root.
+    # A recursive file-only inventory would silently accept empty directories
+    # and directory symlinks alongside the authenticated files.
+    actual_files = {path.name for path in dist_dir.iterdir()}
     if actual_files != expected_paths | {"SHA256SUMS"}:
         raise CandidateError("candidate artifact has the wrong file set")
     for relative, expected_digest in sorted(entries.items()):
