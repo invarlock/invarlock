@@ -2153,7 +2153,7 @@
 
 
 <h1 id="optional-diagnostics">Optional diagnostics<a class="headerlink" href="#optional-diagnostics" title="Permanent link">&para;</a></h1>
-<p><code>invarlock-diagnostics</code> is a standalone first-party package for descriptive
+<p><code>invarlock[diagnostics]</code> is the optional feature for descriptive
 numeric observations. It is useful when a paired decision needs supporting
 engineering context. Its canonical JSON can travel inside the authenticated
 <code>evaluate -&gt; verify -&gt; report</code> evidence transaction while remaining outside
@@ -2196,7 +2196,7 @@ policy remains authoritative.</p>
 </tbody>
 </table>
 <p>Install it independently of the core runtime providers:</p>
-<div class="codehilite"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>invarlock-diagnostics
+<div class="codehilite"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;invarlock[diagnostics]&#39;</span>
 </code></pre></div>
 
 <p>The package has no provider hook or policy threshold. Its canonical JSON output
@@ -2242,7 +2242,7 @@ limit will be operationally cheap.</p>
 </table>
 <p>Catch <code>DiagnosticInputError</code> when a caller needs to distinguish an invalid
 investigation input from an unexpected implementation failure:</p>
-<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">invarlock_addins.diagnostics</span><span class="w"> </span><span class="kn">import</span> <span class="n">DiagnosticInputError</span><span class="p">,</span> <span class="n">rmt_observation</span>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.diagnostics</span><span class="w"> </span><span class="kn">import</span> <span class="n">DiagnosticInputError</span><span class="p">,</span> <span class="n">rmt_observation</span>
 
 <span class="k">try</span><span class="p">:</span>
     <span class="n">observation</span> <span class="o">=</span> <span class="n">rmt_observation</span><span class="p">([[</span><span class="mf">1.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">]])</span>
@@ -2256,7 +2256,7 @@ one finite matrix:</p>
 <div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">invarlock_addins.diagnostics</span><span class="w"> </span><span class="kn">import</span> <span class="n">spectral_observation</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.diagnostics</span><span class="w"> </span><span class="kn">import</span> <span class="n">spectral_observation</span>
 
 <span class="n">matrix</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">diag</span><span class="p">([</span><span class="mf">3.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">])</span>
 <span class="n">observation</span> <span class="o">=</span> <span class="n">spectral_observation</span><span class="p">(</span><span class="n">matrix</span><span class="p">)</span>
@@ -2273,7 +2273,7 @@ the full calculation is not operationally justified, and record that choice.</p>
 by population deviation, computes covariance eigenvalues, and reports theoretical
 Marchenko--Pastur reference edges:</p>
 <div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">invarlock_addins.diagnostics</span><span class="w"> </span><span class="kn">import</span> <span class="n">rmt_observation</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.diagnostics</span><span class="w"> </span><span class="kn">import</span> <span class="n">rmt_observation</span>
 
 <span class="n">samples</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
     <span class="p">[</span>
@@ -2293,7 +2293,7 @@ layers, preprocessing, and low sample counts can all dominate the result.</p>
 <h3 id="scalar-variance-summary">Scalar variance summary<a class="headerlink" href="#scalar-variance-summary" title="Permanent link">&para;</a></h3>
 <p><code>variance_observation</code> reports population and sample variance for a finite
 sequence:</p>
-<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">invarlock_addins.diagnostics</span><span class="w"> </span><span class="kn">import</span> <span class="n">variance_observation</span>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.diagnostics</span><span class="w"> </span><span class="kn">import</span> <span class="n">variance_observation</span>
 
 <span class="n">observation</span> <span class="o">=</span> <span class="n">variance_observation</span><span class="p">([</span><span class="mf">0.9</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.1</span><span class="p">,</span> <span class="mf">1.2</span><span class="p">])</span>
 <span class="k">assert</span> <span class="n">observation</span><span class="p">[</span><span class="s2">&quot;status&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;observation&quot;</span>
@@ -2322,7 +2322,7 @@ v1 evaluation request. Captured v2 requests do not accept this <code>observation
 field:</p>
 <div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">invarlock_addins.diagnostics</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.diagnostics</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">canonical_observation_bytes</span><span class="p">,</span>
     <span class="n">spectral_observation</span><span class="p">,</span>
 <span class="p">)</span>

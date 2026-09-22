@@ -2307,18 +2307,50 @@ tolerance, structured fields and token F1 when independent reference text is
 available for recomputation. Existing retained matrix rows continue to prove
 their declared exact-match profiles; they are not evidence for every new metric.</p>
 <h2 id="capture-for-exact-match-likelihood-and-judge-scoring">Capture for exact match, likelihood and judge scoring<a class="headerlink" href="#capture-for-exact-match-likelihood-and-judge-scoring" title="Permanent link">&para;</a></h2>
-<p>The installed <code>load_run</code> parsers support canonical JSON, generic JSONL,
-<code>inspect-json</code>, <code>lm-eval-samples</code> and <code>promptfoo-jsonl</code>. Other workflows can map
-original per-case facts through <code>invarlock.engine.capture_evaluator_run</code> and
-inspect <code>evaluator_input_capabilities</code>. These are captured-input interfaces,
-separate from qualification and the example-owned signed OCI bridges.</p>
-<p>The <a href="https://github.com/invarlock/invarlock/blob/main/examples/evaluator-qualification/maintained/CAPTURE.md">maintained capture helper</a>
-covers all 19 ecosystems through explicit canonical records. It can also join
-17 retained deterministic exports to their original cases and independent
-schedule. MLflow aggregate observations and Garak detector summaries cannot
-supply original per-case predictions, references or likelihoods; those workflows
-must capture the actual records separately. Historical matrix identities and
-authority remain unchanged.</p>
+<p>Dedicated native mappings cover all 19 ecosystems below. Export supported JSON
+cases, reports, prediction tables or attempts from your existing environment,
+then import them with <code>adapter: evaluator-native-json</code>. The optional installed
+<code>invarlock.engine.export_evaluator_result</code> helper prepares a common envelope for
+<code>adapter: evaluator-json</code> when SDK/core dependencies permit co-installation.
+Every profile uses the same captured <code>evaluate</code>, independent <code>verify</code> and
+<code>report</code> flow, with per-case metadata slices and attributed numeric metrics when
+supplied. Recipients need no evaluator SDK or account. The
+<a href="https://github.com/invarlock/invarlock/blob/main/examples/evaluator-qualification/maintained/CAPTURE.md#dedicated-native-shapes">native shape recipes</a>
+and <a href="../evaluation-records/#dedicated-evaluator-exports">public API example</a>
+describe the capture boundary. Canonical JSON, generic JSONL and the existing
+Inspect, Harness, Promptfoo and Langfuse parser names remain available.</p>
+<p>The evidence sources have different scopes. Tests that place retained model
+answers and likelihoods, plus synthetic complete judge-call fixtures, into each
+native shape exercise the
+shared export/import, scoring and recipient flow; they do not establish that
+each SDK measured those facts. Pinned SDK checks also serialize these retained records through actual upstream
+data objects and serializers, then pass the resulting files through a separately
+installed recipient for all three scorers and both import routes. Local evaluator
+smokes exercise their public APIs without a new model campaign. SDK-required
+wrapper fields are identified as serialization fixtures, not extra measurements. The
+historical qualification matrix retains its original 17 per-case deterministic
+exports and two observation-only profiles: MLflow aggregate results and Garak
+detector summaries. Their identities and authority do not change. New native
+MLflow prediction-table and Garak attempt capture paths require the actual rows;
+the historical summaries cannot supply them.</p>
+<p>The <a href="https://github.com/invarlock/invarlock/blob/main/examples/integrations/evaluator-live/references/mistral-7b-sentinel/README.md">fresh Mistral 7B sentinel</a>
+executes both models through all 19 maintained profiles, retaining 304 model
+executions and 114 scorer/import journeys. Eight fixed cases cover narrative
+continuation, answerable questions and unanswerable questions. Its 992 usable
+judge ratings were collected against those retained answers; the original 32
+blocked attempts remain separate. Independent recipients authenticate and replay
+the resulting comparisons. These small-sample integration checks preserve policy
+failures and insufficient-evidence outcomes; they do not establish production
+model quality, hosted storage support or arbitrary evaluator configurations.</p>
+<p>The <a href="https://github.com/invarlock/invarlock/blob/main/examples/integrations/evaluator-live/references/priority-workflows/README.md">priority workflow reference</a>
+extends Inspect, Harness, Promptfoo and Langfuse with 64-case local comparisons
+and eight-case controlled HTTP-service comparisons. Its 576 model executions
+support 32 independently verified exact-match/NLL comparisons and 24 judge
+comparisons, including reference-free, repetition and budget controls. All 1,288
+admitted judge calls produced usable ratings; four stop/resume checks preserved
+the original checkpoint bytes. The HTTP profile qualifies the declared task
+service, not arbitrary cloud APIs or hosted evaluator storage. Policy rejections
+and insufficient-evidence outcomes remain visible in the retained references.</p>
 <p>InvarLock owns the selected scorer. Exact match requires string answers and
 references. Judge requires task and answer text plus a declared recipe and
 complete retained judge calls; a scalar rating is insufficient. Structured task
@@ -2327,12 +2359,23 @@ Per-case judge references are opt-in and stay separate from the model input.
 Normalized NLL requires typed reference-continuation log probabilities, byte and
 token counts, and bound source, artifact, configuration and tokenizer identities.
 Naming an evaluator cannot supply these facts.</p>
-<p>The separate <a href="https://github.com/invarlock/invarlock/blob/main/examples/captured-results/references/harness-likelihood/README.md">Harness likelihood reference</a>
-retains real unmodified Harness <code>0.4.12</code> <code>HFLM</code> measurements on six authored
-same-model CPU pairs, followed by signed evaluation and independent replay.
-It establishes that likelihood compatibility profile. Synthetic canonical NLL
-tests exercise the shared contract across the shortlist; neither those tests nor
-the retained exact-match matrix qualify all 19 native likelihood or judge paths.</p>
+<p>The <a href="https://github.com/invarlock/invarlock/blob/main/examples/captured-results/references/mistral-7b-likelihood/README.md">Mistral 7B likelihood reference</a>
+retains actual baseline-to-Instruct measurements for 400 paired narrative
+continuations, both model identities, and signed evaluation and independent
+recipient replay. The smaller <a href="https://github.com/invarlock/invarlock/blob/main/examples/captured-results/references/harness-likelihood/README.md">Harness likelihood control</a>
+retains the earlier six same-model CPU pairs. Both establish their declared
+measurement profiles. The 19-profile contract replays adapt retained facts and
+source bindings into each native shape to test the shared interface; they do
+not claim new SDK likelihood measurements. Their synthetic complete judge calls
+exercise recipe and replay contracts, not a newly measured judge campaign.</p>
+<p>The installed gate also evaluates unchanged real Luna measurements from the
+grounded-QA held-out study (422 cases, 2,532 ratings, pass) and corrected pilot
+(40 cases, 240 ratings, insufficient evidence). Both complete preflight,
+signed evaluation, independent verification, reporting and measurement-tamper
+rejection. Their original canonical runs and policies remain bound to the
+ratings. These separate journeys establish real retained-judge execution;
+they do not relabel old calls as new evaluator-specific measurements. See the
+<a href="https://github.com/invarlock/invarlock/blob/main/examples/integrations/evaluator-parity/README.md">runnable real judge journey</a>.</p>
 <h2 id="three-independent-status-axes">Three independent status axes<a class="headerlink" href="#three-independent-status-axes" title="Permanent link">&para;</a></h2>
 <p>The repository does not assign one cumulative “integration level.” Support,
 replay authority, and retained transaction evidence answer different questions
@@ -2357,7 +2400,7 @@ and cannot safely substitute for one another.</p>
 <td>Whether complete ordered facts can be independently recomputed and imported, or only retained as authenticated context</td>
 </tr>
 <tr>
-<td>Signed-journey maturity</td>
+<td>Signed OCI-journey maturity</td>
 <td>Retained with a named corpus and record count, or <code>None retained</code></td>
 <td>Whether a model-running, signed <code>evaluate</code> → <code>verify</code> → <code>report</code> OCI transaction has completed and been retained as release evidence</td>
 </tr>
@@ -2673,7 +2716,7 @@ new signed transactions.</p>
 <th>Executed upstream entry point</th>
 <th>Adapter support</th>
 <th>Replay authority</th>
-<th>Retained signed transactions</th>
+<th>Retained signed OCI transactions</th>
 </tr>
 </thead>
 <tbody>
@@ -2744,7 +2787,7 @@ new signed transactions.</p>
 <th>Executed upstream entry point</th>
 <th>Adapter support</th>
 <th>Replay authority</th>
-<th>Retained signed transactions</th>
+<th>Retained signed OCI transactions</th>
 </tr>
 </thead>
 <tbody>
@@ -2791,7 +2834,7 @@ new signed transactions.</p>
 <th>Executed upstream entry point</th>
 <th>Adapter support</th>
 <th>Replay authority</th>
-<th>Retained signed transactions</th>
+<th>Retained signed OCI transactions</th>
 </tr>
 </thead>
 <tbody>
@@ -2854,7 +2897,7 @@ new signed transactions.</p>
 <th>Executed upstream entry point</th>
 <th>Adapter support</th>
 <th>Replay authority</th>
-<th>Retained signed transactions</th>
+<th>Retained signed OCI transactions</th>
 </tr>
 </thead>
 <tbody>
@@ -2877,7 +2920,7 @@ new signed transactions.</p>
 <th>Executed upstream entry point</th>
 <th>Adapter support</th>
 <th>Replay authority</th>
-<th>Retained signed transactions</th>
+<th>Retained signed OCI transactions</th>
 </tr>
 </thead>
 <tbody>

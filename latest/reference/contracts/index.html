@@ -2857,7 +2857,7 @@ to retain complete text outputs; normalized NLL requires its own likelihood
 facts. A scorer extension uses that authenticated collection so that expected and
 observed text are authenticated for verifier replay. The built-in
 <code>hf_transformers</code> provider declares exact-match and normalized-NLL collection. The
-first-party <code>llama_cpp</code>, <code>tensorrt_llm</code>, and <code>hf_vision_text</code> add-ins currently
+the built-in <code>llama_cpp</code>, <code>tensorrt_llm</code>, and <code>hf_vision_text</code> providers currently
 declare exact match for their tasks.</p>
 <h3 id="deterministic-scorer-extension">Deterministic scorer extension<a class="headerlink" href="#deterministic-scorer-extension" title="Permanent link">&para;</a></h3>
 <p><code>comparison.scorer_extension</code> is a closed
@@ -3323,9 +3323,9 @@ request-level executable binding. A supplied request digest selects receipt v2.
 GGUF verification requires that external request anchor because the normalized
 request authorizes the exact llama.cpp binary, source, version, execution
 settings, and GGUF identity reconciled with provider evidence.</p>
-<p>Core and first-party add-ins are released at the same package version. Provider
-add-ins declare the exact coordinated core release, while the provider ABI remains
-the runtime compatibility gate. See <a href="../release-verification/">Release verification</a>.</p>
+<p>All maintained providers are released inside the same <code>invarlock</code> package. The
+provider ABI remains the runtime compatibility gate, while optional backend
+dependencies remain separate user-facing extras. See <a href="../release-verification/">Release verification</a>.</p>
 <h2 id="related-documentation">Related documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../artifacts/">Evidence artifacts</a> maps contract roles to fixed bundle paths.</li>

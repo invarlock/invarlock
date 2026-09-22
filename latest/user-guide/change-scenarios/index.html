@@ -2164,17 +2164,17 @@ identities.</p>
 <tr>
 <td>GGUF artifact</td>
 <td>Run mode</td>
-<td>Optional <a href="https://github.com/invarlock/invarlock/tree/main/addins/gguf"><code>invarlock-runtime-gguf</code></a> package; <a href="https://github.com/invarlock/invarlock/tree/main/examples/integrations/gguf-llama-cpp">runnable llama.cpp journey</a></td>
+<td>Built-in <code>llama_cpp</code> provider; <a href="https://github.com/invarlock/invarlock/tree/main/examples/integrations/gguf-llama-cpp">runnable llama.cpp journey</a></td>
 </tr>
 <tr>
 <td>Vision-text checkpoint</td>
 <td>Run mode</td>
-<td>Optional <a href="https://github.com/invarlock/invarlock/tree/main/addins/multimodal"><code>invarlock-runtime-hf-vision-text</code></a> package</td>
+<td>Built-in <code>hf_vision_text</code> provider</td>
 </tr>
 <tr>
 <td>TensorRT-LLM engine</td>
 <td>Run mode</td>
-<td>Optional <a href="https://github.com/invarlock/invarlock/tree/main/addins/tensorrt_llm"><code>invarlock-runtime-tensorrt-llm</code></a> package</td>
+<td>Built-in <code>tensorrt_llm</code> provider</td>
 </tr>
 <tr>
 <td>Complete InvarLock provider sidecars produced by a harness</td>
@@ -2290,7 +2290,7 @@ and separately authenticated operational observations.</p>
 </code></pre></div>
 
 <p>The TensorRT-LLM showcase downloads one pinned Qwen3-0.6B revision and builds
-BF16 and ModelOpt-calibrated FP8 engines on separate H100 GPUs before
+BF16 and ModelOpt-calibrated FP8 engines on separate compatible CUDA GPUs before
 completing the signed transaction.
 It remains a backend-compatibility fixture because the pinned TensorRT-LLM
 1.2.1 runtime supports Qwen3 but does not provide a Qwen3.5 adapter; the other
@@ -2298,7 +2298,7 @@ compact examples use Qwen3.5 0.8B.
 Its README also documents the lower-level command for qualified,
 caller-prepared engines. Both paths bind the observed engine identities rather
 than assuming independently compiled engine bytes will be identical. Optional
-runtime packages also expose conformance and evidence-qualification targets
+runtime providers also expose conformance and evidence-qualification targets
 beside their implementations.</p>
 
 

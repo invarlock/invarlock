@@ -2445,12 +2445,14 @@ multi-metric comparison, evidence publication, independent verification, and
 scoped receipt handling through the same evaluation transaction surface. Their
 evidence and recorded-score semantics are described in <a href="../evaluation-records/">evaluation records</a>.</p>
 <h2 id="transactions">Transactions<a class="headerlink" href="#transactions" title="Permanent link">&para;</a></h2>
-<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
 
+<span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.cli.runtime_profile</span><span class="w"> </span><span class="kn">import</span> <span class="n">resolve_runtime_profile</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.engine</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">OciRuntimeExecutor</span><span class="p">,</span>
     <span class="n">evaluate_request_file</span><span class="p">,</span>
-    <span class="n">launch_from_environment</span><span class="p">,</span>
+    <span class="n">launch_from_resolved_config</span><span class="p">,</span>
     <span class="n">render_evidence</span><span class="p">,</span>
     <span class="n">verify_evidence</span><span class="p">,</span>
     <span class="n">verify_signed_verification_receipt</span><span class="p">,</span>
@@ -2468,7 +2470,21 @@ evidence and recorded-score semantics are described in <a href="../evaluation-re
 <span class="n">evaluation</span> <span class="o">=</span> <span class="n">evaluate_request_file</span><span class="p">(</span>
     <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;request.yaml&quot;</span><span class="p">),</span>
     <span class="n">signing_key_path</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;keys/evidence-signer.pem&quot;</span><span class="p">),</span>
-    <span class="n">runtime_executor</span><span class="o">=</span><span class="n">OciRuntimeExecutor</span><span class="p">(</span><span class="n">launch_from_environment</span><span class="p">()),</span>
+    <span class="n">runtime_executor</span><span class="o">=</span><span class="n">OciRuntimeExecutor</span><span class="p">(</span>
+        <span class="n">launch_from_resolved_config</span><span class="p">(</span>
+            <span class="n">resolve_runtime_profile</span><span class="p">(</span>
+                <span class="kc">None</span><span class="p">,</span>
+                <span class="n">explicit</span><span class="o">=</span><span class="p">{</span>
+                    <span class="s2">&quot;container_engine&quot;</span><span class="p">:</span> <span class="s2">&quot;docker&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;baseline_runtime_image&quot;</span><span class="p">:</span> <span class="s2">&quot;registry.example/baseline:local&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;baseline_runtime_image_digest&quot;</span><span class="p">:</span> <span class="s2">&quot;sha256:&quot;</span> <span class="o">+</span> <span class="s2">&quot;1&quot;</span> <span class="o">*</span> <span class="mi">64</span><span class="p">,</span>
+                    <span class="s2">&quot;subject_runtime_image&quot;</span><span class="p">:</span> <span class="s2">&quot;registry.example/subject:local&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;subject_runtime_image_digest&quot;</span><span class="p">:</span> <span class="s2">&quot;sha256:&quot;</span> <span class="o">+</span> <span class="s2">&quot;2&quot;</span> <span class="o">*</span> <span class="mi">64</span><span class="p">,</span>
+                <span class="p">},</span>
+                <span class="n">environment</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">),</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+    <span class="p">),</span>
     <span class="n">runtime_image_digests</span><span class="o">=</span><span class="p">{</span>
         <span class="s2">&quot;baseline&quot;</span><span class="p">:</span> <span class="s2">&quot;sha256:&quot;</span> <span class="o">+</span> <span class="s2">&quot;1&quot;</span> <span class="o">*</span> <span class="mi">64</span><span class="p">,</span>
         <span class="s2">&quot;subject&quot;</span><span class="p">:</span> <span class="s2">&quot;sha256:&quot;</span> <span class="o">+</span> <span class="s2">&quot;2&quot;</span> <span class="o">*</span> <span class="mi">64</span><span class="p">,</span>
@@ -2538,10 +2554,6 @@ trust inputs. This example is for native deterministic evidence.</p>
 <td><code>evidence_path</code>, <code>payload</code>, <code>receipt_path</code>, <code>summary</code>, <code>as_json()</code></td>
 </tr>
 <tr>
-<td><code>EvidenceReport</code></td>
-<td><code>text</code>, <code>html_path</code>, <code>evidence_signer</code>, <code>pack_manifest_digest</code>, <code>observations</code></td>
-</tr>
-<tr>
 <td><code>EvidenceReportV2</code></td>
 <td><code>text</code>, <code>kind</code>, <code>pack_manifest_digest</code>, <code>requested_outputs</code>, <code>written_outputs</code>, <code>failed_output</code>, <code>errors</code>, <code>as_json()</code></td>
 </tr>
@@ -2570,7 +2582,7 @@ trust inputs. This example is for native deterministic evidence.</p>
 <p><code>EvaluationTransactionResult.policy_verdict</code> is optional presentation metadata
 from publication. It is not added to <code>as_json()</code> and does not establish
 recipient acceptance. Use independent verification for that decision.
-<code>EvidenceReport.text</code> is Markdown presentation content; console and HTML
+<code>EvidenceReportV2.text</code> is Markdown presentation content; console and HTML
 layouts are not stable parsing interfaces. Use canonical evidence and verifier
 payloads for automation.</p>
 <p><code>EvaluationPreflightError</code>, <code>EvaluationTransactionError</code>,
@@ -2693,7 +2705,7 @@ policy.</p>
     <span class="n">markdown_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">junit_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">case_ids</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">(),</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">EvidenceReport</span> <span class="o">|</span> <span class="n">EvidenceReportV2</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">EvidenceReportV2</span>
 </code></pre></div>
 
 <p>Native deterministic requests return native results. Native judge evaluation
@@ -2783,12 +2795,12 @@ automatically. Bindings still pin the scorer's version and configuration schema.
 <code>CapturedEvaluationRequest</code> whose paths are resolved
 beneath the request root. Its default provider resolver exposes only the
 built-in Hugging Face provider. <code>evaluate_request_file</code> uses the core registry,
-which also discovers installed first-party add-ins.</p>
+which also discovers the maintained built-in providers.</p>
 <p>Loading validates structure and path confinement; the evaluation transaction
 repeats no-follow reads at the point of use to detect later filesystem changes.</p>
 <h2 id="host-coordinated-oci-evaluations">Host-coordinated OCI evaluations<a class="headerlink" href="#host-coordinated-oci-evaluations" title="Permanent link">&para;</a></h2>
 <p>The stable facade exports <code>OciEvaluationLaunch</code>, <code>OciSideLaunch</code>,
-<code>OciRuntimeExecutor</code>, and <code>launch_from_environment</code>. The public CLI constructs
+<code>OciRuntimeExecutor</code>, and <code>launch_from_resolved_config</code>. The public CLI constructs
 this executor for every run-mode request. The host prepares the schedule,
 launches one independently pinned worker per side, validates both closed side
 results, and keeps the evidence-signing key outside the workers.</p>
@@ -2835,10 +2847,14 @@ selection, a shared index, and CPU/CUDA pairs run sequentially. CUDA selection
 exposes a device but does not make a CPU-only image CUDA-capable; use the x86_64
 image built from <code>runtime/Dockerfile.cuda</code> for canonical CUDA Hugging Face
 execution.</p>
-<p><code>launch_from_environment</code> resolves the common and per-side image, digest,
-device, entrypoint, and common worker-limit variables documented in <a href="../environment/">Environment
-variables</a>. Explicit function arguments take precedence over
-environment values.</p>
+<p><code>launch_from_resolved_config</code> accepts one <code>ResolvedRuntimeConfig</code> from
+<code>invarlock.evaluation_runtime</code>, with complete baseline/subject settings and
+resource limits, including the engine executable selected from the supplied
+<code>PATH</code> snapshot. <code>resolve_runtime_profile</code> produces that immutable typed value
+for profile and no-profile callers. The constructor accepts no raw setting
+keywords and applies no fallback defaults. Environment and profile precedence belong to the CLI
+resolver, so later environment changes cannot alter the launch or its recorded
+provenance.</p>
 <h2 id="direct-executed-evaluations-and-caller-resources">Direct executed evaluations and caller resources<a class="headerlink" href="#direct-executed-evaluations-and-caller-resources" title="Permanent link">&para;</a></h2>
 <p><code>evaluate_request_file</code> accepts an optional <code>resource_resolver</code> implementing
 the runtime resource resolver protocol. This is a lower-level programmatic hook
@@ -2952,8 +2968,8 @@ exported: <code>ProviderResolver</code> and <code>RuntimeResourceResolver</code>
 </tr>
 <tr>
 <td><code>EvaluationRecord</code></td>
-<td><code>record_id</code>, first <code>input_text</code>, bare <code>input_sha256</code></td>
-<td><code>expected_output=None</code>; <code>input_parts=()</code> retains the provider-construction compatibility path</td>
+<td><code>record_id</code>, first-text projection <code>input_text</code>, canonical bare <code>input_sha256</code>, nonempty canonical <code>input_parts</code></td>
+<td>Only <code>expected_output</code> is optional, defaulting to <code>None</code>; text and digest must match the ordered input parts</td>
 </tr>
 <tr>
 <td><code>EvaluationBatch</code></td>

@@ -2365,7 +2365,7 @@ the selected Docker or Podman executable and both digest-pinned images are
 already available locally. It resolves the same frozen, caller-owned per-side
 provider resources used by execution. Providers with the optional input hook
 then authenticate every selected schedule-bound external object before a worker
-or model starts. The vision-text add-in validates the content ID, regular
+or model starts. The vision-text provider validates the content ID, regular
 no-follow file, length, SHA-256, media type, safe decode, frame count,
 dimensions, and aggregate media limits. When a scorer extension is selected, preflight loads
 the explicitly authorized scorer descriptor and configuration schema, then
@@ -2607,7 +2607,7 @@ which must be a positive JSON integer; <code>cpus</code> is a decimal string. Ex
 validation still enforces pinned local images, supported devices and
 entrypoints, resource limits, and a non-root user. Profiles cannot authorize
 network access, signing keys, or installed scorers.</p>
-<p>For each side's field, profile mode uses this precedence:</p>
+<p>For each side's field, all run requests use this precedence:</p>
 <ol>
 <li>Explicit side-specific command-line option.</li>
 <li>Explicit common command-line option.</li>
@@ -2618,10 +2618,15 @@ network access, signing keys, or installed scorers.</p>
 <li>The existing default.</li>
 </ol>
 <p>Engine and resource fields use the applicable common steps. Without a profile,
-existing option and environment resolution stays unchanged. Image and digest
+the profile steps are omitted. Explicit common command-line options now take
+precedence over side-specific environment variables even without a profile. This
+corrects the former no-profile ordering; there is no legacy precedence mode. Image and digest
 are resolved independently: if an overridden image embeds a digest that
 conflicts with the selected separate digest, the command fails and asks you to
 update the matching value. It never silently repairs the mismatch.</p>
+<p>The engine executable is selected from the same environment snapshot as the
+settings. Later changes to <code>PATH</code> do not select a different Docker or Podman
+executable. An engine absent during resolution remains unavailable for that run.</p>
 <p>Profiles must be regular, non-symlink files of at most <strong>16 KiB</strong>. This is a
 configuration-file limit. Unknown fields, duplicate JSON keys, non-finite
 numbers, and invalid value types are rejected. Run <code>evaluate REQUEST
@@ -2953,10 +2958,8 @@ their own contracts. None of these paths performs recipient acceptance.</p>
 <p>Every output option refuses to overwrite an existing file. By default, <code>report</code>
 emits the text view to standard output and prints the written path when HTML is
 requested. With <code>--json</code>, it instead emits one compact
-<code>invarlock/evidence-report-v1</code> object containing <code>ok</code>, the pack-manifest digest,
-and <code>html</code> (a path or <code>null</code>) for native default/HTML-only calls. Captured calls,
-and native calls requesting Markdown or JUnit, emit
-<code>invarlock/evidence-report-v2</code> with <code>kind</code>, <code>ok</code>, <code>pack_manifest_digest</code>,
+<code>invarlock/evidence-report-v2</code> object for native and captured evidence, for every
+output selection. It contains <code>kind</code>, <code>ok</code>, <code>pack_manifest_digest</code>,
 <code>requested_outputs</code>, <code>written_outputs</code>, <code>failed_output</code>, and <code>errors</code>.
 Judge reports emit <code>invarlock/judge-evidence-report-v1</code> with <code>kind: judge</code>
 and <code>evidence_digest</code>; evidence-set reports emit

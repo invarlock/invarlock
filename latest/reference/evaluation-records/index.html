@@ -1293,6 +1293,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#dedicated-evaluator-exports" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dedicated evaluator exports
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#langfuse-experiments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Langfuse experiments
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#hosted-service-identity" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2022,6 +2044,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#dedicated-evaluator-exports" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dedicated evaluator exports
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#langfuse-experiments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Langfuse experiments
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#hosted-service-identity" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2135,6 +2179,11 @@ copies under <code>src/invarlock/_data/contracts/</code>.</p>
 </thead>
 <tbody>
 <tr>
+<td><code>evaluator_export.schema.json</code></td>
+<td><code>invarlock/evaluator-export-v1</code></td>
+<td>Source-specific native payload with explicit evaluator version and run ID</td>
+</tr>
+<tr>
 <td><code>evaluation_run.schema.json</code></td>
 <td><code>invarlock/evaluation-run-v1</code></td>
 <td>Complete canonical run with records and score provenance</td>
@@ -2174,8 +2223,10 @@ prove inference. <code>source_digest</code> binds raw imported bytes when applic
 part of the complete run. Canonical <code>run_digest</code> covers the whole normalized run,
 including provenance and all records, not just its model or schedule. Do not
 substitute a raw export checksum for a complete-run pin.</p>
-<p><code>load_run</code> supports <code>invarlock</code>, <code>jsonl</code>, <code>inspect-json</code>, <code>lm-eval-samples</code>, and
-<code>promptfoo-jsonl</code>. These adapters normalize recorded outputs, never register a
+<p><code>load_run</code> supports <code>invarlock</code>, <code>jsonl</code>, <code>evaluator-native-json</code>, <code>evaluator-json</code>,
+<code>inspect-json</code>,
+<code>lm-eval-samples</code>, <code>promptfoo-jsonl</code>, and <code>langfuse-json</code>.
+These adapters normalize recorded outputs, never register a
 runtime provider or import execution authority. Original upstream bytes and
 their <code>source_digest</code> remain unchanged. A canonical <code>invarlock</code> run supplies its
 own metadata; external adapters require explicit source, run ID and artifact
@@ -2184,6 +2235,107 @@ are used. External captured request sources accept <code>artifact_digest: null</
 with the complete <code>service_identity</code> descriptor. Canonical <code>adapter: invarlock</code>
 runs carry their own descriptor and reject source identity overrides. The
 external parser also binds the original file bytes through <code>source_digest</code>.</p>
+<h2 id="dedicated-evaluator-exports">Dedicated evaluator exports<a class="headerlink" href="#dedicated-evaluator-exports" title="Permanent link">&para;</a></h2>
+<p>For an existing pipeline, save its native cases or results as JSON and use
+<code>adapter: evaluator-native-json</code> in the captured request. Dedicated mappings
+cover all 19 maintained ecosystems. Your pipeline keeps its current evaluator environment;
+evaluation, verification and reporting run in a separate core InvarLock
+environment without the upstream SDK. No common export envelope or SDK-side
+InvarLock installation is required; the file follows its evaluator's documented JSON profile.</p>
+<p>For example, use Ragas's own explicit serializer after retaining your
+<code>SingleTurnSample</code> objects and their planned IDs:</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+
+<span class="n">rows</span> <span class="o">=</span> <span class="p">[{</span><span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="n">case_id</span><span class="p">,</span> <span class="s2">&quot;sample&quot;</span><span class="p">:</span> <span class="n">sample</span><span class="o">.</span><span class="n">model_dump</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;json&quot;</span><span class="p">)}</span>
+        <span class="k">for</span> <span class="n">case_id</span><span class="p">,</span> <span class="n">sample</span> <span class="ow">in</span> <span class="n">captured_samples</span><span class="p">]</span>
+<span class="k">if</span> <span class="p">[</span><span class="n">row</span><span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">]</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">rows</span><span class="p">]</span> <span class="o">!=</span> <span class="n">planned_ids</span><span class="p">:</span>
+    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;capture differs from the complete planned schedule&quot;</span><span class="p">)</span>
+<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;subject-native.json&quot;</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">stream</span><span class="p">:</span>
+    <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">rows</span><span class="p">,</span> <span class="n">stream</span><span class="p">,</span> <span class="n">ensure_ascii</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">allow_nan</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</code></pre></div>
+
+<p><code>captured_samples</code> and the independently frozen <code>planned_ids</code> belong to your
+workflow. Export the baseline in the same way, preserving failed cases. Declare
+the raw file, actual SDK version, run ID and evaluated model identity in each
+captured request source:</p>
+<div class="codehilite"><pre><span></span><code><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">subject-native.json</span>
+<span class="nt">adapter</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">evaluator-native-json</span>
+<span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="nv">ragas</span><span class="p p-Indicator">,</span><span class="nt"> version</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;0.4.3&quot;</span><span class="p p-Indicator">}</span>
+<span class="nt">run_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">subject-campaign</span>
+<span class="nt">artifact_digest</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;actual</span><span class="nv"> </span><span class="s">model</span><span class="nv"> </span><span class="s">artifact</span><span class="nv"> </span><span class="s">digest&gt;&quot;</span>
+</code></pre></div>
+
+<p>Use the version actually captured. For hosted models, declare
+<code>artifact_digest: null</code> and the <a href="#hosted-service-identity">complete service descriptor</a>.
+Pin an independently reviewed <code>expected_case_set_digest</code> in policy to reject
+missing or changed scheduled cases, and an approved <code>expected_run_digest</code> on
+each source when required. Raw-file digests bind the imported bytes; the source
+name and version remain explicit attribution rather than proof of execution.</p>
+<p>When the evaluator SDK and InvarLock dependency requirements are compatible,
+the shared Python exporter also accepts native SDK objects directly:</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">importlib.metadata</span><span class="w"> </span><span class="kn">import</span> <span class="n">version</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.engine</span><span class="w"> </span><span class="kn">import</span> <span class="n">export_evaluator_result</span><span class="p">,</span> <span class="n">evaluator_input_capabilities</span>
+
+<span class="n">run</span> <span class="o">=</span> <span class="n">export_evaluator_result</span><span class="p">(</span>
+    <span class="s2">&quot;ragas&quot;</span><span class="p">,</span>
+    <span class="p">[{</span><span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="n">case_id</span><span class="p">,</span> <span class="s2">&quot;sample&quot;</span><span class="p">:</span> <span class="n">sample</span><span class="p">}</span> <span class="k">for</span> <span class="n">case_id</span><span class="p">,</span> <span class="n">sample</span> <span class="ow">in</span> <span class="n">captured_samples</span><span class="p">],</span>
+    <span class="s2">&quot;subject-export.json&quot;</span><span class="p">,</span>
+    <span class="n">expected_ids</span><span class="o">=</span><span class="n">planned_ids</span><span class="p">,</span>
+    <span class="n">source_version</span><span class="o">=</span><span class="n">version</span><span class="p">(</span><span class="s2">&quot;ragas&quot;</span><span class="p">),</span>
+    <span class="n">run_id</span><span class="o">=</span><span class="s2">&quot;subject-campaign&quot;</span><span class="p">,</span>
+    <span class="n">artifact_digest</span><span class="o">=</span><span class="n">model_artifact_digest</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">evaluator_input_capabilities</span><span class="p">(</span><span class="n">run</span><span class="p">))</span>
+</code></pre></div>
+
+<p>This convenience API checks complete case membership before writing, refuses
+an existing destination, and returns a validated canonical run. Its output is
+an <code>invarlock/evaluator-export-v1</code> envelope consumed with
+<code>adapter: evaluator-json</code>, using the same source/run/model declarations. For
+hosted models pass <code>artifact_digest=None, service_identity=identity</code>.
+Both adapters use the same source-specific mapping and downstream scorers.</p>
+<p>Keep pinned MLflow 3.14.0 in a separate environment: it requires
+<code>cryptography&lt;49</code>, while core InvarLock requires <code>cryptography&gt;=50</code>. Export the
+original prediction table as JSON and use <code>evaluator-native-json</code>; no core
+dependency change is needed. SDK serializer smoke tests run from source with
+minimal test dependencies and do not establish SDK/core co-installation.</p>
+<p>The <a href="https://github.com/invarlock/invarlock/blob/main/examples/evaluator-qualification/maintained/CAPTURE.md#dedicated-native-shapes">native shape recipes</a>
+cover Harness, Inspect, Promptfoo, DeepEval, Ragas, LightEval, Hugging Face
+Evaluate, Pydantic Evals, AutoEvals, OpenEvals, MLflow, Garak, OpenAI Evals,
+Phoenix Evals, Langfuse, Opik, Azure AI Evaluation, Evidently and TruLens.
+With compatible co-installation, Inspect EvalLog and Langfuse ExperimentResult
+objects can be passed directly to the Python exporter. The raw-file route uses
+Inspect's JSON log or bare public Langfuse ExperimentResult fields, including
+<code>item_results</code>; it does not require a Langfuse-specific InvarLock envelope. Original outputs can be captured before
+upstream grading. Scalar SDK wrappers
+accept an optional <code>metric_result</code>; no extra evaluator call is required to use
+InvarLock's scorers. Reference fields may be omitted for reference-free judge
+tasks where the native profile permits them; exact match and NLL still require
+a reference. Structured outputs remain JSON for compatible policies; text-only
+scorers do not stringify them. Aggregate-only reports still need the original per-case
+prediction table or attempts.</p>
+<p>Per-case string metadata supplies policy slices. Optional
+<code>metadata.invarlock_scores</code> selects named finite numeric observations; native
+per-case numeric metrics are also retained where the profile defines them.
+Recorded-score policies require explicit <code>score_provenance</code> at export/import
+and matching <code>accepted_provenance</code> in policy. Numeric metrics do not become
+likelihoods or judge calls. Preserve actual continuation facts under
+<code>metadata.invarlock_likelihood</code> for NLL, and supply the separate complete judge
+measurement contract for judging. See <a href="#capture-and-explicit-input-projections">scorer selection</a>
+and <a href="#policy-and-identity">policy requirements</a>.</p>
+<h2 id="langfuse-experiments">Langfuse experiments<a class="headerlink" href="#langfuse-experiments" title="Permanent link">&para;</a></h2>
+<p><code>langfuse-json</code> imports the explicit <code>invarlock/langfuse-export-v1</code> capture
+produced from a Langfuse Python experiment. It does not parse arbitrary dashboard
+exports. The maintained exporter uses <code>langfuse==4.14.1</code>; the installed parser,
+verification and reporting need no Langfuse SDK, account or network access.</p>
+<p>Preserve a stable item ID and the complete independently selected case list.
+The exporter rejects missing or duplicate results instead of accepting only
+successful tasks. Structured inputs require an explicit text projection for
+judge scoring. Exact match needs original answers and references; NLL requires
+explicit continuation measurements; judging requires a recipe and complete
+judge measurements. Numeric Langfuse scores alone do not establish those facts.</p>
+<p>Follow the <a href="https://github.com/invarlock/invarlock/blob/main/examples/integrations/langfuse/README.md">Langfuse handoff example</a>
+for capture, source identities, failed records and scorer-specific requirements.</p>
 <h2 id="hosted-service-identity">Hosted service identity<a class="headerlink" href="#hosted-service-identity" title="Permanent link">&para;</a></h2>
 <p>A canonical run may include <code>service_identity</code> only with <code>artifact_digest: null</code>.
 Local artifact runs retain their existing digest contract and need no new field.
@@ -2342,10 +2494,14 @@ the comparison is the ratio of subject and baseline means, with the same paired
 resampling method as native NLL. Interval width is measured in ratio units.
 Reference and configuration bindings and the declared tokenizer identities are
 checked before scoring. Replay does not execute the model or tokenizer, so their
-measurement claims remain source assertions. The separate
-<a href="https://github.com/invarlock/invarlock/blob/main/examples/captured-results/references/harness-likelihood/README.md">real Harness likelihood reference</a>
-retains six same-model CPU pairs; synthetic contract tests and historical
-exact-match qualifications do not establish other native likelihood profiles.</p>
+measurement claims remain source assertions. The
+<a href="https://github.com/invarlock/invarlock/blob/main/examples/integrations/evaluator-live/references/mistral-7b-sentinel/README.md">retained Mistral 7B sentinel</a>
+contains fresh generation and reference-likelihood measurements across all 19
+maintained evaluator profiles, both import routes and two model artifacts. The
+<a href="https://github.com/invarlock/invarlock/blob/main/examples/captured-results/references/harness-likelihood/README.md">Harness likelihood reference</a>
+is a smaller six-pair, same-model CPU control. Each reference qualifies its
+recorded profile; synthetic contract tests and exact-match results alone do not
+establish likelihood measurement support.</p>
 <p>Judge selection uses the separate judge recipe and retained measurement contract
 through the same captured request. It does not reinterpret a <code>recorded</code> scalar
 score as a native judge trial. <code>prompt.reference_mode: per_case</code> explicitly adds

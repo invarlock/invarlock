@@ -2301,42 +2301,42 @@ and caller-owned runtime-image and device configuration.</p>
 <tr>
 <td>Local Hugging Face vision-text checkpoint</td>
 <td><code>hf_vision_text</code></td>
-<td><code>invarlock-runtime-hf-vision-text</code> add-in</td>
+<td>Built into <code>invarlock</code>; Pillow is in the <code>vision-text</code> extra and inference dependencies are in the runtime image</td>
 <td>Run mode with authenticated image content store</td>
 </tr>
 <tr>
 <td>GGUF file used by <code>llama.cpp</code></td>
 <td><code>llama_cpp</code></td>
-<td><code>invarlock-runtime-gguf</code> add-in</td>
+<td>Built into <code>invarlock</code>; native backend is in the runtime image</td>
 <td>Run mode after runtime inspection</td>
 </tr>
 <tr>
 <td>TensorRT-LLM engine bundle</td>
 <td><code>tensorrt_llm</code></td>
-<td><code>invarlock-runtime-tensorrt-llm</code> add-in</td>
+<td>Built into <code>invarlock</code>; native backend is in the runtime image</td>
 <td>Run mode after GPU-bound inspection</td>
 </tr>
 <tr>
 <td>Complete provider sidecars produced elsewhere</td>
 <td>Provider named by the sidecars</td>
-<td>Matching provider package must be installed</td>
+<td>Matching built-in or explicitly allowed third-party provider must be available</td>
 <td>Import mode</td>
 </tr>
 </tbody>
 </table>
-<p>The text integrations declare <code>text_causal</code>; the vision-text add-in declares
+<p>The text integrations declare <code>text_causal</code>; the vision-text provider declares
 <code>vision_text_generation</code>. All shipped integrations declare <code>exact_match</code>. The
 built-in <code>hf_transformers</code> integration also declares
 <code>normalized_nll_per_utf8_byte</code>, using teacher-forced expected-continuation
 likelihoods over the authenticated local checkpoint. When authenticated
 tokenizer contracts and paired token counts are comparable, the verifier may
 render a token-weighted perplexity ratio as interpretation only. The GGUF,
-TensorRT-LLM, and vision-text add-ins expose exact-match text collection.
+TensorRT-LLM, and vision-text providers expose exact-match text collection.
 The built-in <code>judge</code> scorer and deterministic extensions use that same
 authenticated text-output surface, then score the frozen answers separately.
 They do not require the provider to advertise a <code>judge</code> metric. Native judging
 currently requires exactly one text input part, so it cannot grade the
-vision-text add-in's image schedules.</p>
+vision-text provider's image schedules.</p>
 <table>
 <thead>
 <tr>
@@ -2370,6 +2370,13 @@ vision-text add-in's image schedules.</p>
 <p>For native judging, follow the <a href="../evaluation-request/#judge">judge request workflow</a>.
 Judge collection, evidence and recipient verification have separate contracts;
 the provider still owns the original artifact and answer-capture provenance.</p>
+<p>The judge itself can also use a native runtime. The <code>runtime-provider-judge</code>
+collection profile supports <code>hf_transformers</code> and <code>llama_cpp</code> with authenticated
+local artifacts and a pinned, network-disabled runtime. This is a separate
+selection from the providers that generate baseline and subject answers. It does
+not add local judge support to the vision-text or TensorRT-LLM providers. Follow
+the <a href="https://github.com/invarlock/invarlock/blob/main/examples/native-local-judge/README.md">local judge setup</a> for artifact
+identity, exact prompt bytes, collection bounds and offline recipient replay.</p>
 <h2 id="common-provider-workflow">Common provider workflow<a class="headerlink" href="#common-provider-workflow" title="Permanent link">&para;</a></h2>
 <p>Every run-mode provider follows the same operator sequence:</p>
 <ol>
@@ -2438,21 +2445,21 @@ never a strict qualification identity.</p>
 </tr>
 <tr>
 <td><code>hf_vision_text</code></td>
-<td><code>make -C addins/multimodal qualify-canary</code></td>
-<td><code>make -C addins/multimodal qualify-preflight</code></td>
-<td><code>make -C addins/multimodal qualify-evidence</code></td>
+<td><code>make qualify-canary</code></td>
+<td><code>make qualify-preflight</code></td>
+<td><code>make qualify-evidence</code></td>
 </tr>
 <tr>
 <td><code>llama_cpp</code></td>
-<td><code>make -C addins/gguf qualify-canary</code></td>
-<td><code>make -C addins/gguf qualify-preflight</code></td>
-<td><code>make -C addins/gguf qualify-evidence</code></td>
+<td><code>make qualify-canary</code></td>
+<td><code>make qualify-preflight</code></td>
+<td><code>make qualify-evidence</code></td>
 </tr>
 <tr>
 <td><code>tensorrt_llm</code></td>
-<td><code>make -C addins/tensorrt_llm qualify-canary</code></td>
-<td><code>make -C addins/tensorrt_llm qualify-preflight</code></td>
-<td><code>make -C addins/tensorrt_llm qualify-evidence</code></td>
+<td><code>make qualify-canary</code></td>
+<td><code>make qualify-preflight</code></td>
+<td><code>make qualify-evidence</code></td>
 </tr>
 </tbody>
 </table>
@@ -2460,7 +2467,7 @@ never a strict qualification identity.</p>
 <code>QUALIFICATION_DEVICE</code>, <code>QUALIFICATION_CPUS</code>,
 <code>QUALIFICATION_MEMORY_MIB</code>, and <code>QUALIFICATION_USER</code>. Set them once and keep
 them unchanged across canary, readiness, and evidence. The root wrapper
-requires an explicit device. The add-in wrappers have provider-appropriate
+requires an explicit device. The provider wrappers have provider-appropriate
 device defaults, but an explicit <code>cpu</code> or <code>cuda:&lt;index&gt;</code> keeps the execution
 contract reviewable. Vision-text additionally requires <code>RESOURCE_ROOT</code> and
 <code>CONTENT_STORE</code>; GGUF and TensorRT-LLM use the provider resource variables
@@ -2592,18 +2599,24 @@ CUDA-capable image.</p>
 digest, normalized build arguments, requested platform and base image, and
 final immutable image ID. Retain it beside the image digest used by
 qualification.</p>
-<p>The final image ID is a local OCI config identity. It can be used directly for
-local inspection, smoke, and qualification, but it is not a valid Dockerfile
-<code>FROM</code> reference. A layered runtime such as the vision-text add-in requires a
-named <code>repository@sha256:...</code> manifest reference for its base; publish or obtain
-that exact manifest through the operator's registry process before building the
-layer.</p>
+<p>The final image ID is the immutable local identity reported by the selected
+engine. Depending on its image store, it can be a configuration digest or a
+manifest digest; different engines can report different local IDs for the same
+image contents. Use the ID reported by the engine that will execute the image
+for local inspection, smoke, and qualification. A bare local image ID is not a
+valid Dockerfile <code>FROM</code> reference. A layered runtime such as the vision-text
+provider requires a named <code>repository@sha256:...</code> manifest reference for its base;
+publish or obtain that exact manifest through the operator's registry process
+before building the layer.</p>
 <p>The default local tag is a mutable build handle. Strict execution accepts an
 exact content-addressed local image ID or <code>repository@sha256:...</code> reference and
 requires the same digest through <code>INVARLOCK_RUNTIME_IMAGE_DIGEST</code>. For portable
 public evidence, publish or obtain the pinned image through the operator's
 registry process and record its registry manifest reference; a local image ID
-identifies local bytes but does not give another verifier a fetchable runtime.</p>
+identifies local bytes but does not give another verifier a fetchable runtime.
+The repository manifest digest and the local image ID are not interchangeable:
+local execution checks the engine-reported ID, while a repository reference must
+match an exact entry in that image's inspected <code>RepoDigests</code>.</p>
 <p>Select exactly one image and resolve it before qualification. For a local CPU
 image:</p>
 <div class="codehilite"><pre><span></span><code><span class="nv">IMAGE_TAG</span><span class="o">=</span>invarlock-runtime:local
@@ -2738,30 +2751,28 @@ command.</p>
 <p><code>CANDIDATE_WHEEL_MANIFEST</code> is a strict
 <code>invarlock/qualification-candidate-wheels-v1</code> JSON object whose <code>wheels</code> array
 contains an absolute or manifest-relative <code>path</code> and expected <code>sha256</code> for the
-core wheel and any maintained add-in wheels used by the request. Qualification
+core wheel and the selected provider runtime inputs used by the request. Qualification
 matches their package sources to the authenticated Git archive, extracts them
 privately, and executes them with an isolated interpreter bootstrap. Dependencies
 may be installed in the selected interpreter, but an older installed InvarLock
-core or maintained add-in is not used as the qualification candidate.</p>
+core runtime is not used as the qualification candidate.</p>
 <p>The signed canary prevents image-wide fan-out after a basic image, provider, or
 end-to-end transaction failure. It does not establish that every model fits
 memory, loads under that provider, supports its tokenizer or processor, or
 completes successfully. Readiness remains request-specific configuration
 qualification, and each model run can still fail closed.</p>
 <h2 id="hugging-face-vision-text">Hugging Face vision-text<a class="headerlink" href="#hugging-face-vision-text" title="Permanent link">&para;</a></h2>
-<p>Install the optional provider into the interpreter used by the host
-qualification transaction. Its base wheel includes the Pillow dependency
-needed for execution-free media preflight:</p>
+<p>Install the core wheel with the vision-text extra into the interpreter used by
+the host qualification transaction:</p>
 <div class="codehilite"><pre><span></span><code><span class="s2">&quot;</span><span class="nv">$PYTHON</span><span class="s2">&quot;</span><span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>/wheelhouse/Pillow-EXACT.whl<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>/wheelhouse/invarlock_runtime_hf_vision_text-EXACT.whl
-<span class="s2">&quot;</span><span class="nv">$PYTHON</span><span class="s2">&quot;</span><span class="w"> </span>-m<span class="w"> </span>invarlock_addins.multimodal.conformance
+<span class="w">  </span><span class="s1">&#39;/wheelhouse/invarlock-EXACT.whl[vision-text]&#39;</span>
+<span class="s2">&quot;</span><span class="nv">$PYTHON</span><span class="s2">&quot;</span><span class="w"> </span>-m<span class="w"> </span>invarlock.runtime_providers.hf_vision_text_conformance
 </code></pre></div>
 
 <p>The heavier Torch and Transformers inference dependencies belong in the
 digest-pinned runtime image, which derives and hash-checks the hardened
-Accelerate dependency during its build. The base add-in has no full inference
-extra.</p>
+Accelerate dependency during its build. The base wheel has no full inference
+dependency set.</p>
 <p><code>hf_vision_text</code> evaluates <code>vision_text_generation</code> schedules containing one
 <code>prompt</code> text part and one <code>image</code> content part per record. Schedule content
 parts carry a canonical content ID, media type, positive byte length, and
@@ -2795,14 +2806,14 @@ closed, empty reasoning block in the prompt; prompt tokens are excluded from
 the decoded exact-match output. For a newly qualified model family, render a
 frozen record from the exact offline processor snapshot before GPU allocation and
 confirm the template is deterministic and binds exactly one image placeholder.</p>
-<p>Build the add-in image from the exact digest of the canonical CUDA image and
+<p>Build the provider image from the exact digest of the canonical CUDA image and
 qualify it through <code>evaluate</code>, <code>verify</code>, and <code>report</code> on the target GPU. The
-<a href="https://github.com/invarlock/invarlock/blob/main/addins/multimodal/README.md">add-in guide</a>
+<a href="https://github.com/invarlock/invarlock/blob/main/docs/reference/runtime-providers.md">runtime provider guide</a>
 contains the build, content-contract, and qualification commands.</p>
 <h2 id="gguf-and-llamacpp">GGUF and <code>llama.cpp</code><a class="headerlink" href="#gguf-and-llamacpp" title="Permanent link">&para;</a></h2>
-<p>Install and check the optional provider:</p>
-<div class="codehilite"><pre><span></span><code><span class="s2">&quot;</span><span class="nv">$PYTHON</span><span class="s2">&quot;</span><span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>/wheelhouse/invarlock_runtime_gguf-EXACT.whl
-<span class="s2">&quot;</span><span class="nv">$PYTHON</span><span class="s2">&quot;</span><span class="w"> </span>-m<span class="w"> </span>invarlock_addins.gguf.conformance
+<p>Install and check the built-in provider:</p>
+<div class="codehilite"><pre><span></span><code><span class="s2">&quot;</span><span class="nv">$PYTHON</span><span class="s2">&quot;</span><span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>/wheelhouse/invarlock-EXACT.whl
+<span class="s2">&quot;</span><span class="nv">$PYTHON</span><span class="s2">&quot;</span><span class="w"> </span>-m<span class="w"> </span>invarlock.runtime_providers.llama_cpp_conformance
 </code></pre></div>
 
 <p>The provider authenticates the GGUF file, its structured metadata and tensor
@@ -2811,11 +2822,16 @@ archive for the backend. The upstream
 <a href="https://github.com/ggml-org/ggml/blob/master/docs/gguf.md">GGUF specification</a>
 defines the file structure, while
 <a href="https://github.com/ggml-org/llama.cpp"><code>llama.cpp</code></a> is the native executor.</p>
+<p>This provider starts a fresh CPU process and loads the model for each record.
+An evaluation session retains authenticated file handles, not a resident model.
+Model size, prompt length and the selected CPU and prompt-batching settings
+affect total runtime. Measure a short pilot with the intended settings before
+starting a larger comparison; adding a GPU does not accelerate this CPU path.</p>
 <p>Derive the request settings inside the exact runtime image:</p>
 <div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">invarlock_addins.gguf.provider</span><span class="w"> </span><span class="kn">import</span> <span class="n">LlamaCppProvider</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">invarlock_addins.gguf.session</span><span class="w"> </span><span class="kn">import</span> <span class="n">LlamaCppRuntimeBindings</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.runtime_providers.llama_cpp</span><span class="w"> </span><span class="kn">import</span> <span class="n">LlamaCppProvider</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.runtime_providers.llama_cpp_session</span><span class="w"> </span><span class="kn">import</span> <span class="n">LlamaCppRuntimeBindings</span>
 
 <span class="n">bindings</span> <span class="o">=</span> <span class="n">LlamaCppRuntimeBindings</span><span class="p">(</span>
     <span class="n">gguf_path</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;model.gguf&quot;</span><span class="p">),</span>
@@ -2852,9 +2868,9 @@ request-resolved GGUF artifact as well as both support files. The GGUF artifact
 itself is the request-side <code>artifact.path</code>; backend paths are not published as
 host paths in the canonical bundle.</p>
 <h2 id="tensorrt-llm">TensorRT-LLM<a class="headerlink" href="#tensorrt-llm" title="Permanent link">&para;</a></h2>
-<p>Install and check the optional provider in a compatible CUDA environment:</p>
-<div class="codehilite"><pre><span></span><code><span class="s2">&quot;</span><span class="nv">$PYTHON</span><span class="s2">&quot;</span><span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>/wheelhouse/invarlock_runtime_tensorrt_llm-EXACT.whl
-<span class="s2">&quot;</span><span class="nv">$PYTHON</span><span class="s2">&quot;</span><span class="w"> </span>-m<span class="w"> </span>invarlock_addins.tensorrt_llm.conformance
+<p>Install and check the built-in provider in a compatible CUDA environment:</p>
+<div class="codehilite"><pre><span></span><code><span class="s2">&quot;</span><span class="nv">$PYTHON</span><span class="s2">&quot;</span><span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>/wheelhouse/invarlock-EXACT.whl
+<span class="s2">&quot;</span><span class="nv">$PYTHON</span><span class="s2">&quot;</span><span class="w"> </span>-m<span class="w"> </span>invarlock.runtime_providers.tensorrt_llm_conformance
 </code></pre></div>
 
 <p>The provider binds the engine tree and inventory, builder configuration,
@@ -2866,8 +2882,8 @@ and <a href="https://nvidia.github.io/TensorRT-LLM/architecture/overview.html">a
 <p>Inspect the exact engine on the target GPU inside the pinned image:</p>
 <div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">invarlock_addins.tensorrt_llm.provider</span><span class="w"> </span><span class="kn">import</span> <span class="n">TensorRTLLMProvider</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">invarlock_addins.tensorrt_llm.session</span><span class="w"> </span><span class="kn">import</span> <span class="n">TensorRTLLMRuntimeBindings</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.runtime_providers.tensorrt_llm</span><span class="w"> </span><span class="kn">import</span> <span class="n">TensorRTLLMProvider</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.runtime_providers.tensorrt_llm_session</span><span class="w"> </span><span class="kn">import</span> <span class="n">TensorRTLLMRuntimeBindings</span>
 
 <span class="n">bindings</span> <span class="o">=</span> <span class="n">TensorRTLLMRuntimeBindings</span><span class="p">(</span>
     <span class="n">engine_bundle_path</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;engine&quot;</span><span class="p">),</span>
@@ -2982,7 +2998,7 @@ the comparison request or from a later evidence bundle:</p>
         <span class="n">tasks</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;text_causal&quot;</span><span class="p">,),</span>
         <span class="n">metrics</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;exact_match&quot;</span><span class="p">,),</span>
         <span class="n">execution_modes</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;in_process&quot;</span><span class="p">,),</span>
-        <span class="n">required_extra</span><span class="o">=</span><span class="s2">&quot;hf&quot;</span><span class="p">,</span>
+        <span class="n">required_extra</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
         <span class="n">required_image</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="p">),</span>
     <span class="n">execution_settings</span><span class="o">=</span><span class="n">RuntimeExecutionSettings</span><span class="p">(</span>
@@ -3026,7 +3042,7 @@ runtime-image identities, evidence signer, and verifier signer.</p>
 <tbody>
 <tr>
 <td>Provider is not discovered</td>
-<td>Install the matching add-in and run its conformance command in the same environment as <code>invarlock</code>.</td>
+<td>Install the matching optional backend dependencies and run its conformance command in the same environment as <code>invarlock</code>.</td>
 </tr>
 <tr>
 <td>Artifact identity mismatch</td>

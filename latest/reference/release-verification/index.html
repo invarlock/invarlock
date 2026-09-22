@@ -2219,10 +2219,10 @@
 
 
 <h1 id="release-and-distribution-verification">Release and distribution verification<a class="headerlink" href="#release-and-distribution-verification" title="Permanent link">&para;</a></h1>
-<p>InvarLock ships six coordinated Python distributions:</p>
+<p>InvarLock ships one Python distribution with public optional-dependency extras:</p>
 <blockquote>
 <p><strong>Reference</strong></p>
-<p><strong>Surface:</strong> Core and first-party add-in distributions, release checks, provenance, and installation verification</p>
+<p><strong>Surface:</strong> The core distribution, release checks, provenance, and installation verification</p>
 <p><strong>Stability:</strong> Coordinated version and ABI compatibility rules are public; the release workflow may evolve while preserving those checks</p>
 <p><strong>Use this page when:</strong> Building, publishing, installing, or independently checking an InvarLock release set</p>
 </blockquote>
@@ -2236,34 +2236,19 @@
 <tbody>
 <tr>
 <td><code>invarlock</code></td>
-<td>Core engine, contracts, Hugging Face provider, verifier, renderer</td>
-</tr>
-<tr>
-<td><code>invarlock-runtime-gguf</code></td>
-<td>Optional GGUF/<code>llama.cpp</code> provider</td>
-</tr>
-<tr>
-<td><code>invarlock-runtime-tensorrt-llm</code></td>
-<td>Optional TensorRT-LLM provider</td>
-</tr>
-<tr>
-<td><code>invarlock-runtime-hf-vision-text</code></td>
-<td>Optional Hugging Face vision-text provider</td>
-</tr>
-<tr>
-<td><code>invarlock-diagnostics</code></td>
-<td>Optional observation-only numeric diagnostics</td>
-</tr>
-<tr>
-<td><code>invarlock-inspect-judge</code></td>
-<td>Optional bounded collection and import adapter; install <code>invarlock[judge]</code> to include the pinned provider SDKs</td>
+<td>Engine, contracts, all maintained runtime providers, bounded judge collection/import, observation-only diagnostics, verifier, and renderer</td>
 </tr>
 </tbody>
 </table>
-<p>Each add-in wheel and source distribution includes the repository license text;
-the coordinated distribution gate checks its contents and wheel metadata.</p>
-<p>All six use the same release version. Provider add-ins declare that exact core
-dependency and must also match runtime-provider ABI <code>1</code> when loaded.</p>
+<p>The wheel and source distribution include the repository license text; the
+distribution gate checks their contents and metadata.</p>
+<p>Live judge collection uses the core <code>invarlock[judge]</code> extra, which installs
+pinned Inspect, OpenAI/OpenRouter, Anthropic, Google, and <code>httpx</code> dependencies.
+Offline judge import and replay require only the core wheel.</p>
+<p>All built-in providers are versioned with <code>invarlock</code> and must match
+runtime-provider ABI <code>1</code> when loaded. Optional third-party providers remain
+independently versioned and are accepted only through the explicit extension
+policy.</p>
 <table>
 <thead>
 <tr>
@@ -2274,11 +2259,11 @@ dependency and must also match runtime-provider ABI <code>1</code> when loaded.<
 <tbody>
 <tr>
 <td>Package version</td>
-<td>Core and selected first-party distributions use the same release version</td>
+<td>The wheel and source distribution use the same release version</td>
 </tr>
 <tr>
 <td>Dependency metadata</td>
-<td>Add-in's bounded <code>invarlock</code> requirement contains that version</td>
+<td>Optional extras contain only user-facing runtime dependencies</td>
 </tr>
 <tr>
 <td>Provider ABI</td>
@@ -2302,29 +2287,32 @@ repository workflow:</p>
    version, or resolves the exact tag commit for a tag build or publication;</li>
 <li>requires a tag build or publication event commit to equal the resolved tag
    commit;</li>
-<li>runs the complete repository, coverage, documentation, contract, and
-   workflow gates;</li>
+<li>runs behavioral tests once under coverage, plus supplemental core tests
+   outside the routine coverage selection, and enforces the complete
+   documentation, contract, static and workflow gates;</li>
 <li>scans the release history range for secrets;</li>
-<li>builds one wheel and source distribution for the core and every first-party
-   add-in;</li>
+<li>builds exactly one wheel and source distribution for <code>invarlock</code>;</li>
 <li>validates every archive against the exact checkout and runs the release
    preflight again from a clean detached checkout, including full replay of
    all seven retained public signed evidence packs and all four retained
    evaluator-qualification transactions through the isolated candidate-wheel
    CLI;</li>
-<li>runs <code>twine check</code> on every distribution;</li>
-<li>installs the core wheel alone in a clean environment outside the checkout,
-   exercises its native quickstart, captured consumer, and offline judge
-   evaluation/verification/report consumer, then installs the coordinated add-ins;</li>
+<li>exercises all 19 maintained evaluator profiles and both import routes through
+   an independently installed recipient, then replays the 184 signed packs from
+   the retained evaluator campaigns without new model or judge calls;</li>
+<li>runs <code>twine check</code> on both archives;</li>
+<li>installs the wheel alone in a clean environment outside the checkout and
+   exercises the CLI, captured consumer, offline judge consumer, diagnostics,
+   and provider entry-point discovery;</li>
 <li>exercises the public CLI, all provider conformance commands, diagnostics,
    and entry-point discovery;</li>
 <li>audits the installed dependency surface and generates an SBOM;</li>
-<li>records all twelve archives in one SHA-256 ledger and attaches build-provenance
+<li>records the wheel and source archive in one SHA-256 ledger and attaches build-provenance
     attestations during the tag run;</li>
-<li>after a complete TestPyPI or PyPI publication, verifies every hosted
-    archive against that tag-run ledger, installs the hosted wheels together,
-    and repeats the conformance smoke; and</li>
-<li>after a verified production PyPI <code>complete</code> or <code>finish</code> run, publishes the
+<li>after a complete TestPyPI or PyPI publication, verifies both hosted
+    archives against that tag-run ledger, installs the hosted wheel,
+   and repeats the conformance smoke; and</li>
+<li>after a verified production PyPI run, publishes the
     documentation from that exact tag source to its immutable version path,
     <code>latest</code>, and <code>stable</code> in one serialized <code>gh-pages</code> commit.</li>
 </ol>
@@ -2340,8 +2328,8 @@ read-only repository permissions. Attestation write access and the OIDC token
 used for provenance are granted only to the short tag-only job that downloads
 the already validated archive set, rechecks its ledger, and creates the
 provenance statement.
-Publication preparation likewise runs without an identity token. Each
-environment-gated publish job downloads only its two previously validated archives,
+Publication preparation likewise runs without an identity token. The
+environment-gated publish job downloads the two previously validated archives,
 rechecks the immutable tag, and invokes the pinned trusted-publishing action;
 it does not check out or execute candidate Python code.</p>
 <p>For a tag build or publication, the workflow resolves and checks out the
@@ -2360,10 +2348,10 @@ An attestation is useful only when the release verifier validates its subject di
 signer/workflow identity, and trusted transparency or provenance policy.</p>
 <h2 id="local-preflight-before-a-tag">Local preflight before a tag<a class="headerlink" href="#local-preflight-before-a-tag" title="Permanent link">&para;</a></h2>
 <p>Run the release checks from a clean checkout whose <code>HEAD</code> is the candidate
-commit. The coordinated install smoke builds the core and all five optional
-packages, installs their pinned base dependency closure and all six wheels in
-a disposable virtual environment, runs <code>pip check</code>, and exercises provider
-discovery and conformance without the checkout or user site on <code>sys.path</code>.
+commit. The install smoke builds the one distribution, installs its pinned base
+dependency closure and candidate wheel in a disposable virtual environment,
+runs <code>pip check</code>, and exercises diagnostics, provider discovery, and conformance
+without the checkout or user site on <code>sys.path</code>.
 The smoke selects the maintained Python 3.12 or 3.13 lock for the invoking
 interpreter and fails closed when no matching lock exists.
 The read-only preflight then inspects the core wheel and source distribution
@@ -2383,7 +2371,7 @@ transactions, or <code>make release-retained-evidence-compatibility</code> for b
 sets. The release preflight remains authoritative for the isolated
 candidate-wheel path.</p>
 <p>Run the local release gates with:</p>
-<div class="codehilite"><pre><span></span><code>make<span class="w"> </span>addins-install-smoke
+<div class="codehilite"><pre><span></span><code>make<span class="w"> </span>install-smoke
 
 <span class="nv">HASH_MANIFEST</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>mktemp<span class="k">)</span><span class="s2">&quot;</span>
 <span class="nb">trap</span><span class="w"> </span><span class="s1">&#39;rm -f -- &quot;$HASH_MANIFEST&quot;&#39;</span><span class="w"> </span>EXIT
@@ -2416,25 +2404,37 @@ to other artifacts or policies. A passing result is release-candidate
 compatibility evidence, not recipient authorization to deploy. Run the
 non-publishing branch workflow after these local checks to exercise the same
 release surface on the hosted Linux runner before creating a release tag.</p>
-<p>Local preflight validates the core wheel/sdist pair and all five add-in pairs
-against the checkout, including versions, source contents and licenses. Its JSON
-result includes <code>first_party_addins</code>. The external hash manifest and isolated
-execution/replay consumer cover the core pair and core wheel respectively;
-<code>make dist-check</code> also validates the archives against the checkout. Archive
-validation alone does not exercise every add-in. Keep
-<code>make addins-install-smoke</code> and the release workflow's coordinated six-package
-installation checks alongside preflight.</p>
-<p>The captured core-wheel consumer checks the exact three-command root before
-add-ins, all three synthetic starters, signed trust-v2 handoffs and receipt-v3
+<p>Local preflight validates the one wheel/sdist pair against the checkout,
+including version, source contents, metadata and license. The external hash
+manifest and isolated execution/replay consumer cover that same pair;
+<code>make dist-check</code> also validates the archives against the checkout. Provider
+discovery runs from the minimal installed wheel in <code>make install-smoke</code>, where
+NumPy and Pillow are asserted absent. The same target creates a second isolated
+environment from the hash-pinned optional-feature lock and runs diagnostics and
+vision-text conformance there.</p>
+<p>The captured wheel consumer checks the exact three-command root, all three
+synthetic starters, signed trust-v2 handoffs and receipt-v3
 authentication, unsigned rejection, adverse policy gates, repeated destinations,
 unchanged evidence bytes, and report-v2 <code>requested_outputs</code>/<code>written_outputs</code>.
 The judge core-wheel consumer imports the committed bounded fixture, publishes
 signed evidence, computes independent recipient pins before publication, and
 replays verification and all three report formats. It preserves the fixture's
 <code>insufficient_evidence</code> decision and checks wrong signer, plan, subject, and
-unsigned evidence rejection. It runs before any add-in install and requires
+unsigned evidence rejection. It runs without provider SDK extras and requires
 Inspect and OpenAI SDK modules to be absent. Provider SDK collection is qualified
-separately by <code>make inspect-judge-sdk-test</code>; offline replay needs only core.</p>
+separately by <code>make inspect-judge-sdk-test</code>; Langfuse export is qualified by
+<code>make langfuse-sdk-test</code>. Offline replay needs only core.</p>
+<p><code>make evaluator-parity-test</code> installs the candidate wheel into an independent
+recipient, exercises all 19 maintained evaluator profiles across the supported
+scorer and import routes, and replays the four retained fresh-campaign archives.
+Those archives contain 76 sentinel exact-match/NLL packs, 52 sentinel judge
+packs, 32 priority exact-match/NLL packs and 24 priority judge packs. The gate
+authenticates and preserves their original outcomes; it does not rerun models or
+call judge providers.</p>
+<p>Routine pull-request jobs run the same 114 installed profile journeys on Python
+3.12 and 3.13 with retained campaign replay disabled. The interpreter-independent
+campaign archives replay once in the full release workflow, avoiding duplicate
+work while keeping the release gate complete.</p>
 <p>The three-scorer consumer additionally exercises exact-match, normalized-NLL and
 judge selection through captured v2 requests and public SDK capture/import helpers.
 Its copied fixture inventory includes <code>collection.json</code>; tests exercise that
@@ -2444,7 +2444,8 @@ retains real CPU measurements and an installed signed journey for one pinned
 same-model profile. Its file hashes, executed capture source, regenerated anchors,
 receipt and model identity in reports are replayed by the example tests.</p>
 <p>Retained native release consumers request HTML and Markdown and validate report
-v2 with <code>kind: runtime</code>; ordinary native default/HTML-only callers keep v1 JSON.
+v2 with <code>kind: runtime</code>; native console-only and HTML-only callers use the same
+result contract.
 Validation preserves historical native receipts, upstream fixture bytes, and
 recorded K2 qualification status. Optional runtime tests are not
 substitutes for observed inference.</p>
@@ -2462,9 +2463,9 @@ release tag, select <code>testpypi</code>, and provide the successful tag workfl
 numeric ID as <code>candidate_run_id</code>. The workflow authenticates that the supplied
 run is a successful tag-push execution of the release workflow at the exact tag
 and commit. It then downloads that run's immutable distribution artifact,
-checks the closed twelve-file set and its ledger, publishes through the six
-project-scoped TestPyPI identities, verifies all hosted archives, installs the
-six hosted wheels together, and reruns the CLI, diagnostics,
+checks the closed two-file set and its ledger, publishes through the
+project-scoped TestPyPI identity, verifies both hosted archives, installs the
+hosted wheel, and reruns the CLI, diagnostics,
 provider-conformance, and entry-point smoke.</p>
 <p>A successful upload does not check presentation. Extract the description from
 both the wheel and source archive, confirm their parity, and render the exact
@@ -2473,53 +2474,41 @@ workflow diagram are image elements, rather than escaped HTML code. Inspect the
 actual version-specific TestPyPI pages for those images, headings, tables, code
 and release links, then repeat the page check on production. Record these manual
 checks separately from CI; the workflow does not enforce the visual review.</p>
-<p>Check each distribution's trusted publisher and matching GitHub environment on
-both indexes before dispatch. A working core publisher does not establish add-in
-readiness, and TestPyPI registrations are separate from production registrations.
+<p>Check the distribution's trusted publisher and matching GitHub environment on
+both indexes before dispatch. TestPyPI registration is separate from production
+registration.
 Submitting a publisher registration, satisfying a deployment approval and
 successfully publishing are separate steps.</p>
 <p>Production uses the same tagged candidate directly. Once local preflight,
 tag-to-commit checks, release notes, security review, provenance, and the tag
 workflow are complete, dispatch the workflow again from the release tag,
 select <code>pypi</code>, and provide the same tag workflow run ID as <code>candidate_run_id</code>.
-Use the default <code>complete</code> publication phase for an ordinary release.
-The production jobs consume the exact archives built by the tag run; they do
+The production job consumes the exact archives built by the tag run; it does
 not rebuild them or depend on TestPyPI state. A stale, incomplete, or
 filename-colliding TestPyPI project therefore cannot silently select or alter a
-production candidate. Before upload, each publication job downloads and checks
+production candidate. Before upload, the publication job downloads and checks
 any already hosted files for its exact version against the candidate ledger.
 Absent files may be uploaded and ledger-identical files may be skipped, making
-an interrupted multi-project publication safe to resume. Any conflicting
+an interrupted publication safe to resume. Any conflicting
 filename, metadata digest, or downloaded bytes fail before upload, and the
-post-publication verifier cannot turn a mixed or partially replaced release
+post-publication verifier cannot turn a partial or replaced release
 into a successful run.</p>
-<p>PyPI permits only three pending trusted publishers at once. When a coordinated
-release needs to create several new add-in projects, first check which projects
-already have established publishers. The production
-<code>bootstrap</code> phase publishes the core plus diagnostics, Inspect judge, GGUF, and
-vision-text distributions. It requires at most three of those project publishers
-to be pending; provision existing projects first when needed. After those pending
-publishers become ordinary project publishers, register the TensorRT-LLM
-publisher and dispatch the
-<code>finish</code> phase with the same release tag and <code>candidate_run_id</code>. The finish run
-first confirms that all ten bootstrap archives are hosted byte-for-byte from
-that ledger, publishes only TensorRT-LLM, then verifies all twelve hosted archives
-and installs all six wheels together. The two special phases are rejected for
-TestPyPI; later releases use <code>complete</code> and publish all six projects in one
-dispatch.</p>
+<p>Every publication follows one complete path: upload, hosted digest verification,
+installed-wheel smoke, and, for production, documentation publication. A retry
+uses that same path and the same authenticated candidate.</p>
 <p>Configure a protected <code>v*</code> tag ruleset that blocks updates and deletion. Protect
 each project-scoped PyPI environment with an appropriate release authorization
 and deployment policy. These repository controls provide the authorization layer
 around the workflow's commit, tag-run artifact, ledger, and trusted-publisher
 identity.</p>
-<p>After production publication, the workflow downloads all twelve archives from
-PyPI, compares their hashes with the tag-run ledger, installs the six hosted
-wheels together in a clean environment, and repeats the conformance smoke.
+<p>After production publication, the workflow downloads both archives from PyPI,
+compares their hashes with the tag-run ledger, installs the hosted wheel in a
+clean environment, and repeats the conformance smoke.
 Only after that smoke succeeds does the production workflow invoke the reusable
 documentation publisher. The publisher removes the leading <code>v</code> from the
 validated release tag, builds from the caller's exact tag commit, and updates
 the versioned path plus <code>latest</code> while making <code>stable</code> redirect to the immutable
-version. TestPyPI and bootstrap publication cannot update Pages, and one global
+version. TestPyPI publication cannot update Pages, and one global
 documentation concurrency group prevents release and branch publishers from
 racing their <code>gh-pages</code> pushes.
 Reconcile the published filenames, version, source tag, provenance subjects,
@@ -2527,19 +2516,19 @@ and release assets before announcing completion.</p>
 <h2 id="installation-and-provenance-checks">Installation and provenance checks<a class="headerlink" href="#installation-and-provenance-checks" title="Permanent link">&para;</a></h2>
 <p>Before installing a release in a controlled environment:</p>
 <ol>
-<li>select one exact version for core and any first-party add-ins;</li>
+<li>select one exact <code>invarlock</code> version;</li>
 <li>obtain hashes from a trusted release record or package index response;</li>
 <li>download artifacts without installing them;</li>
 <li>verify every downloaded SHA-256 digest;</li>
 <li>install with hash enforcement where the package-management workflow supports
    it; and</li>
-<li>run <code>invarlock --version</code> and the conformance command for each installed
-   runtime add-in.</li>
+<li>run <code>invarlock --version</code> and the provider conformance commands exposed by
+   the installed package.</li>
 </ol>
 <p>Example discovery checks after installation:</p>
 <div class="codehilite"><pre><span></span><code>invarlock<span class="w"> </span>--version
-invarlock-gguf-conformance
-invarlock-tensorrt-llm-conformance
+python<span class="w"> </span>-m<span class="w"> </span>invarlock.runtime_providers.llama_cpp_conformance<span class="w"> </span>--help
+python<span class="w"> </span>-m<span class="w"> </span>invarlock.runtime_providers.tensorrt_llm_conformance<span class="w"> </span>--help
 </code></pre></div>
 
 <p>Each conformance command must report <code>ok: true</code>, its expected provider name,
@@ -2554,12 +2543,7 @@ see <a href="../runtime-providers/">canary compatibility</a>. A canary does not 
 model-specific load, memory, backend, or execution success.</p>
 <p>An example hash-enforced download/install flow is:</p>
 <div class="codehilite"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>download<span class="w"> </span>--only-binary<span class="o">=</span>:all:<span class="w"> </span>--dest<span class="w"> </span>wheelhouse<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span><span class="s1">&#39;invarlock==X.Y.Z&#39;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span><span class="s1">&#39;invarlock-diagnostics==X.Y.Z&#39;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span><span class="s1">&#39;invarlock-runtime-hf-vision-text==X.Y.Z&#39;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span><span class="s1">&#39;invarlock-runtime-gguf==X.Y.Z&#39;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span><span class="s1">&#39;invarlock-runtime-tensorrt-llm==X.Y.Z&#39;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span><span class="s1">&#39;invarlock-inspect-judge==X.Y.Z&#39;</span>
+<span class="w">  </span><span class="s1">&#39;invarlock==X.Y.Z&#39;</span>
 
 <span class="c1"># Populate requirements.lock with the independently verified hashes, then:</span>
 python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--require-hashes<span class="w"> </span>-r<span class="w"> </span>requirements.lock
@@ -2594,8 +2578,8 @@ verified.</p>
 <td>Generated for the installed release surface and associated with the same build</td>
 </tr>
 <tr>
-<td>First-party set</td>
-<td>Exactly one coordinated version of core and selected add-ins</td>
+<td>Package set</td>
+<td>Exactly one coordinated <code>invarlock</code> wheel/source pair</td>
 </tr>
 </tbody>
 </table>
@@ -2619,7 +2603,7 @@ offline release verifier:</p>
 <p>This script assembles existing material; it does not fetch or manufacture
 provenance. Supply the independently approved certificate identity of the actual
 signing workflow; a repository OIDC subject is not its certificate identity.
-The assembler inventories nested directories, including <code>dist/addins</code>. Every
+The assembler inventories the release distribution directory. Every
 distribution must have its own adjacent Sigstore sidecar; unlisted files and
 symbolic links are rejected. When the release <code>SHA256SUMS</code> ledger is present,
 its entries must match every distribution path and digest; the manifest retains
@@ -2636,8 +2620,8 @@ version.</p>
 <p>If a defect is discovered after publication:</p>
 <ol>
 <li>stop recommending and promoting the affected coordinated version;</li>
-<li>assess whether all six distributions or only selected files require an index
-   yank, and record the user-visible reason;</li>
+<li>assess whether the release files require an index yank, and record the
+   user-visible reason;</li>
 <li>preserve the tag, provenance, hashes, and incident record needed to explain
    existing installations;</li>
 <li>fix forward under a new version rather than overwriting published files;</li>
@@ -2661,7 +2645,7 @@ verification receipt does not attest how a Python wheel was built.</p>
 <p>Do not infer compatibility from package names alone. Confirm all of:</p>
 <ul>
 <li>coordinated first-party package versions;</li>
-<li>the add-in's declared core version range;</li>
+<li>the package's declared optional dependency boundaries;</li>
 <li>exact runtime-provider ABI equality;</li>
 <li>conformance-command success; and</li>
 <li>for native providers, compatibility of the authenticated artifact, pinned
@@ -2683,7 +2667,7 @@ verification.</p>
 <h2 id="related-documentation">Related documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../runtime-providers/">Runtime providers</a> defines provider ABI compatibility
-  and first-party add-in conformance.</li>
+  and built-in provider conformance.</li>
 <li><a href="../contracts/">Public contracts</a> separates evidence-format versioning from
   package releases.</li>
 <li><a href="../architecture/">Architecture</a> distinguishes distribution provenance from

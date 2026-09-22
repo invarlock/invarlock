@@ -2625,13 +2625,13 @@ length, and SHA-256. The schedule contains no host path or URI. The selected
 provider resolves content IDs inside its separately authorized content store
 and authenticates the bytes before use. <code>vision_text_generation</code> requires role
 <code>image</code>; another canonical future task may declare its own role through its
-provider/add-in contract.</p>
+provider contract.</p>
 <h2 id="task-and-structured-input-contract">Task and structured-input contract<a class="headerlink" href="#task-and-structured-input-contract" title="Permanent link">&para;</a></h2>
 <p><code>comparison.task</code> is a canonical provider capability identifier. The request,
 canonical schedule, both provider capability declarations, both evaluation
 batches, and both receipts must agree on it. <code>text_causal</code> is the built-in
 Hugging Face task. <code>vision_text_generation</code> is implemented by the optional
-Hugging Face vision-text add-in. The contract also reserves canonical
+Hugging Face vision-text provider. The contract also reserves canonical
 <code>masked_language</code> and <code>text_seq2seq</code> identifiers so future providers can share
 the same schedule and evidence boundaries; no built-in execution path is
 assigned to those identifiers.</p>
@@ -2715,9 +2715,11 @@ Its illustrative model digests and two cases must be replaced before use.</p>
 inputs are rejected. Run mode first collects authenticated answers through the
 provider's text-output surface and freezes the runtime capture. Import mode
 authenticates complete provider sidecars bound to the same judge policy. Both then collect ratings
-through the separately installed collector. Preflight validates prerequisites
+through the built-in collector, using the optional <code>invarlock[judge]</code> dependencies. Preflight validates prerequisites
 and complete reservations without model or judge calls. The model workers remain
-network-disabled; judge collection has its own explicit authorization and limits.</p>
+network-disabled. Set <code>INVARLOCK_ALLOW_JUDGE_NETWORK=1</code> only for the evaluation
+command to authorize the bounded judge phase; preflight and offline replay need
+no network permission. Judge collection retains its own call and cost limits.</p>
 <p>The private judge workspace supports resuming admitted trials against the same
 frozen answers. Changed models, data, rubric, policy or runtime identities need
 a new workspace. Repeated ratings do not create more independent tasks. Unless
@@ -2744,7 +2746,7 @@ unavailable reason.</p>
 selectable metric and has no policy threshold, confidence interval, or verdict
 authority.</p>
 <p>The built-in HF provider supports exact-match and normalized-NLL collection for <code>text_causal</code>. The
-first-party GGUF, TensorRT-LLM, and Hugging Face vision-text add-ins currently
+built-in GGUF, TensorRT-LLM, and Hugging Face vision-text providers currently
 support exact match for their declared tasks. Import execution support remains
 provider-specific: both imported provider receipts must declare the selected
 task and collection metric. Judge and deterministic scorer extensions collect authenticated text outputs
@@ -2818,7 +2820,7 @@ removing, or changing a native pack-v1 observation changes the request-bound
 comparison ID and therefore creates a different signed transaction, but cannot
 alter the paired statistics or verdict for otherwise identical inputs. Any byte change
 after publication invalidates bundle integrity. Spectral, random-matrix, and
-variance summaries from <code>invarlock-diagnostics</code> use this path. The
+variance summaries from <code>invarlock[diagnostics]</code> use this path. The
 <a href="https://github.com/invarlock/invarlock/tree/main/examples/integrations/spdx-ai-observation">SPDX 3.0.1 AI observation example</a>
 shows how to retain an external document, its exact source digest, validation
 status, and an artifact cross-binding without granting it acceptance authority.</p>

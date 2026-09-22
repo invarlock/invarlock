@@ -2477,7 +2477,7 @@ during preflight and uses it to sign the validated evidence bundle.</p>
 <p>Import requests do not launch OCI workers and do not require these image,
 engine, device, or entrypoint inputs.</p>
 <h2 id="optional-provider-resources">Optional provider resources<a class="headerlink" href="#optional-provider-resources" title="Permanent link">&para;</a></h2>
-<p>The GGUF (<code>llama_cpp</code>) add-in requires all three values together:</p>
+<p>The GGUF (<code>llama_cpp</code>) provider requires all three values together:</p>
 <table>
 <thead>
 <tr>
@@ -2500,7 +2500,7 @@ engine, device, or entrypoint inputs.</p>
 </tr>
 </tbody>
 </table>
-<p>The TensorRT-LLM add-in requires both values together:</p>
+<p>The TensorRT-LLM provider requires both values together:</p>
 <table>
 <thead>
 <tr>
@@ -2519,7 +2519,7 @@ engine, device, or entrypoint inputs.</p>
 </tr>
 </tbody>
 </table>
-<p>The Hugging Face vision-text add-in requires both values together:</p>
+<p>The Hugging Face vision-text provider requires both values together:</p>
 <table>
 <thead>
 <tr>
@@ -2558,22 +2558,45 @@ inputs apply only when new judge ratings are collected:</p>
 </thead>
 <tbody>
 <tr>
+<td><code>INVARLOCK_ALLOW_JUDGE_NETWORK=1</code></td>
+<td>Allows network only in the configured judge lifecycle; native capture and other tasks retain the default guard</td>
+</tr>
+<tr>
 <td><code>OPENAI_API_KEY</code></td>
-<td>Required nonempty credential for the configured collector; never retain it in a request or evidence</td>
+<td>Credential selected by an <code>openai/...</code> grader</td>
 </tr>
 <tr>
-<td><code>OPENAI_BASE_URL</code>, <code>OPENAI_API_BASE</code></td>
-<td>Presence is rejected, including an empty value; custom endpoints are unsupported</td>
+<td><code>ANTHROPIC_API_KEY</code></td>
+<td>Credential selected by an <code>anthropic/...</code> grader</td>
 </tr>
 <tr>
-<td><code>OPENAI_SAFETY_IDENTIFIER</code></td>
-<td>Presence is rejected; inherited identifier controls are unsupported</td>
+<td><code>GOOGLE_API_KEY</code>, <code>GEMINI_API_KEY</code></td>
+<td>Credential aliases selected by a <code>google/...</code> grader; <code>GOOGLE_API_KEY</code> takes precedence when both are present</td>
+</tr>
+<tr>
+<td><code>OPENROUTER_API_KEY</code></td>
+<td>Credential selected by an <code>openrouter/...</code> grader</td>
+</tr>
+<tr>
+<td>Provider base-URL variables</td>
+<td>Presence is rejected, including an empty value; configured collection uses the provider's official endpoint</td>
+</tr>
+<tr>
+<td>Provider alternate-auth variables</td>
+<td>OpenAI safety identifiers, Anthropic auth tokens, and Google Vertex/ADC controls are rejected for this key-only collection path</td>
 </tr>
 </tbody>
 </table>
-<p>Collection preflight checks this environment and the pinned optional
-dependencies without making calls. Offline retained-measurement import,
-verification and reporting need neither credentials nor these SDKs. See
+<p>The grader prefix selects exactly one credential; judge code does not assume an
+OpenAI key. Credentials are never retained in requests or evidence. Collection
+reads <code>INVARLOCK_ALLOW_JUDGE_NETWORK</code> only from the process environment, accepting
+<code>1</code>, <code>true</code>, <code>yes</code>, or <code>on</code>. It grants a temporary context-local permission during
+judge initialization, collection and cleanup; it does not remove the global
+socket guard or change strict native execution switches. Request fields and
+credential mappings cannot grant this permission. Collection
+preflight checks this environment and the pinned optional dependencies without
+making calls. Offline retained-measurement import, verification and reporting
+need neither credentials nor these SDKs. See
 <a href="../judge-measurements/#frozen-answer-requests-and-preflight">judge measurements</a>
 for the configuration and reservation limits.</p>
 <h2 id="security-switches">Security switches<a class="headerlink" href="#security-switches" title="Permanent link">&para;</a></h2>
@@ -2669,7 +2692,7 @@ must make its own authorization decision.</p>
 <li>Record the exact image digest and engine/device selection with the comparison
   record; do not infer them from a mutable shell profile later.</li>
 </ul>
-<p>Variables used only by repository tests, image builds, or add-in runner
+<p>Variables used only by repository tests, image builds, or provider runner
 internals are not part of this public inventory. Treat this page and
 <code>invarlock COMMAND --help</code> as the supported operator surface.</p>
 <h2 id="related-documentation">Related documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>

@@ -2582,7 +2582,7 @@ mistakes as well as intentional substitution. They can be maintained within one
 team; independence does not require different organizations.</p>
 <p>The model considers accidental corruption, unsafe input, a malicious evidence
 submitter, compromised evidence signer or verifier environments, compromised provider
-add-ins, key theft, and a decision owner who obtains trust anchors from the submitted
+optional backends, key theft, and a decision owner who obtains trust anchors from the submitted
 evidence. It also considers nonmalicious selection bias and numerical drift.</p>
 <p>The model does not assume that an evidence signature makes the evidence signer honest.
 The verifier treats the bundle as untrusted until replay succeeds, but replay
@@ -2724,7 +2724,7 @@ pack-v1. Captured and judge evidence use the distinct bindings described below.<
 <tr>
 <td>Malicious model or provider code executes during evaluation</td>
 <td>Built-in strict HF path authenticates checkpoint/tokenizer material, validates canonical safetensors shard references and regular files before native weight loading, and disables remote code and network access</td>
-<td>Native libraries, container runtime, kernel, driver, add-ins, and optional backends can contain vulnerabilities. InvarLock is not a sandbox.</td>
+<td>Native libraries, container runtime, kernel, driver, and optional backends can contain vulnerabilities. InvarLock is not a sandbox.</td>
 </tr>
 <tr>
 <td>Report differs from machine evidence</td>
