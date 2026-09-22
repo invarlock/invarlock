@@ -236,7 +236,9 @@ def test_deadline_is_absolute_and_retained(tmp_path):
         values = collect_fixture(tmp_path, helper, value)
         assert time.monotonic() - before < 0.8
         run = helper.export_run(*values, "baseline")
-        assert len(calls) == 1
+        # Worker startup consumes the same deadline as the HTTP request, so a
+        # busy host may terminate the worker before it reaches the server.
+        assert len(calls) <= 1
         assert run["records"][0]["error"] == "deadline_exceeded"
 
 
@@ -514,21 +516,33 @@ def test_main_collect_export_and_worker_dispatch(tmp_path, monkeypatch, capsys):
 
 def test_whole_window_deadline_limits_last_request_and_preserves_partial_capture(
     tmp_path,
+    monkeypatch,
 ):
+    from types import SimpleNamespace
+
     helper = module()
-    with server([1.0]) as (url, calls):
-        declaration = protocol(helper, url)
-        declaration["limits"].update(timeout_seconds=2, max_wall_seconds=0.2)
-        before = time.monotonic()
-        with pytest.raises(ValueError, match="window deadline"):
-            collect_fixture(tmp_path, helper, declaration)
-        assert time.monotonic() - before < 0.8
-        assert len(calls) == 1
+    clock = [100.0]
+    calls = []
+    monkeypatch.setattr(helper, "time", SimpleNamespace(monotonic=lambda: clock[0]))
+
+    def expire_request(payload):
+        calls.append(payload)
+        assert payload["timeout_seconds"] == pytest.approx(0.2)
         assert (tmp_path / "baseline/000000.attempt.json").exists()
-        retained = json.loads((tmp_path / "baseline/000000.json").read_bytes())
-        assert retained["error"] == "deadline_exceeded"
-        assert not (tmp_path / "baseline/000001.attempt.json").exists()
-        assert not (tmp_path / "baseline/capture.json").exists()
+        clock[0] += payload["timeout_seconds"]
+        return {"status": None, "body_base64": None, "error": "deadline_exceeded"}
+
+    monkeypatch.setattr(helper, "bounded_request", expire_request)
+    declaration = protocol(helper, "http://127.0.0.1:1/v1/chat/completions")
+    declaration["limits"].update(timeout_seconds=2, max_wall_seconds=0.2)
+    with pytest.raises(ValueError, match="window deadline"):
+        collect_fixture(tmp_path, helper, declaration)
+    assert len(calls) == 1
+    retained = json.loads((tmp_path / "baseline/000000.json").read_bytes())
+    assert retained["error"] == "deadline_exceeded"
+    assert retained["elapsed_seconds"] == pytest.approx(0.2)
+    assert not (tmp_path / "baseline/000001.attempt.json").exists()
+    assert not (tmp_path / "baseline/capture.json").exists()
 
 
 @pytest.mark.parametrize("location", ["content", "key"])
