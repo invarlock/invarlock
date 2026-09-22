@@ -77,6 +77,14 @@ _INSPECT_0_3_263_REASONING_EFFORTS = {
     "openai/gpt-5.6-sol": {"none", "low", "medium", "high", "xhigh", "max"},
     "openai/gpt-5.6-luna": {"none", "low", "medium", "high", "xhigh", "max"},
 }
+_INSPECT_BRIDGED_REASONING_TOKENS = {
+    "minimal": 2048,
+    "low": 4096,
+    "medium": 10000,
+    "high": 16000,
+    "xhigh": 32000,
+    "max": 32000,
+}
 
 
 class JudgeMeasurementContractError(ValueError):
@@ -375,6 +383,25 @@ def _validate_inspect_plan_collection_identity(
         _fail(f"the pinned Inspect {provider} adapter does not support seed")
     if provider == "anthropic" and Decimal(config["top_p"]) != Decimal(1):
         _fail("the configured Anthropic profile requires top_p=1")
+    effort = config["reasoning_effort"]
+    if provider in {"anthropic", "google"} and effort not in (None, "none"):
+        model_name = str(grader).split("/", 1)[1]
+        supported = (
+            model_name.startswith(
+                ("claude-sonnet-4-5", "claude-opus-4-5", "claude-haiku-4-5")
+            )
+            if provider == "anthropic"
+            else model_name.startswith("gemini-2.5-")
+        )
+        budget = _INSPECT_BRIDGED_REASONING_TOKENS.get(effort)
+        if not supported or budget is None:
+            _fail(
+                f"the pinned Inspect {provider} reasoning effort is not qualified for this model"
+            )
+        if config["max_output_tokens"] <= budget:
+            _fail(
+                f"the pinned Inspect {provider} output limit must exceed its reasoning budget"
+            )
     supported_efforts = _INSPECT_0_3_263_REASONING_EFFORTS.get(grader)
     if supported_efforts is not None:
         if (
@@ -1722,6 +1749,7 @@ def _openai_compatible_source_errors(
             facts = response_facts(
                 decoded_response,
                 approved_models=judge["approved_resolved_models"],
+                max_output_tokens=judge["config"]["max_output_tokens"],
             )
         except OpenAICompatibleContractError:
             errors.append("retained compatible success response is invalid")

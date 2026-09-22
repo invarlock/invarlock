@@ -22,7 +22,7 @@ from .collector import (
     InspectJudgeError,
     _check_options,
 )
-from .runner import RunnerOptions, collect
+from .runner import RunnerOptions, _require_qualified_live_provider_model, collect
 
 _BASE_SDK_VERSIONS = {
     "inspect-ai": INSPECT_VERSION,
@@ -221,7 +221,7 @@ async def _close_model(model: Any) -> None:
     task.result()
 
 
-def _bound_google_client(model: Any) -> None:
+def _bound_google_client(model: Any, *, expected_model: str) -> None:
     """Bound the pinned provider's SDK and malformed-function retry loops."""
     api = model.api
     original_client = api.model_client
@@ -237,19 +237,23 @@ def _bound_google_client(model: Any) -> None:
 
         async def generate_once(*args: Any, **kwargs: Any) -> Any:
             nonlocal called
-            if called:
-                raise InspectJudgeError(
-                    "Google provider attempted an unreserved internal retry"
-                )
-            called = True
-            kwargs["config"] = kwargs["config"].model_copy(
-                update={
-                    "automatic_function_calling": types.AutomaticFunctionCallingConfig(
-                        disable=True
-                    )
-                }
-            )
             try:
+                if called:
+                    raise InspectJudgeError(
+                        "Google provider attempted an unreserved internal retry"
+                    )
+                called = True
+                if args or kwargs.get("model") != expected_model:
+                    raise InspectJudgeError(
+                        "Google provider selected a model outside the approved grader"
+                    )
+                kwargs["config"] = kwargs["config"].model_copy(
+                    update={
+                        "automatic_function_calling": types.AutomaticFunctionCallingConfig(
+                            disable=True
+                        )
+                    }
+                )
                 return await generate(*args, **kwargs)
             finally:
                 client.close()
@@ -346,6 +350,7 @@ async def _collect_configured(
 ) -> JudgeMeasurements:
     """Keep model initialization, collection and cleanup inside the judge scope."""
     _check_options(plan, options)
+    _require_qualified_live_provider_model(options.grader)
     runner.validate()
     if plan["schedule"]["max_attempts"] != 1:
         raise InspectJudgeError(
@@ -380,7 +385,7 @@ async def _collect_configured(
     try:
         api = getattr(model, "api", None)
         if provider == "google":
-            _bound_google_client(model)
+            _bound_google_client(model, expected_model=options.grader.split("/", 1)[1])
         elif provider == "anthropic":
             _configure_anthropic_sampling(model, plan)
         client = getattr(api, "client", None)

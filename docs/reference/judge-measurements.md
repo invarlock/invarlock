@@ -101,9 +101,11 @@ recipe, and a private `comparison.judge.workspace` with an explicit
 [captured-results guide](../user-guide/captured-results.md#judge-captured-answers)
 shows source mapping, explicit text projection and offline measurement import.
 
-Hosted collection uses the optional pinned Inspect SDK. Native local collection
-uses the separate `runtime-provider-judge` profile described below.
-Neither requires an upstream evaluator to use Inspect or change versions.
+For frozen answers from an existing evaluator, select the pinned Inspect SDK
+collector for supported hosted providers, `openai-compatible-judge` for an
+explicitly configured Chat Completions service, or `runtime-provider-judge` for
+an authenticated local HF or GGUF artifact. Neither the service nor the local
+route requires the upstream evaluator to use Inspect or change versions.
 Existing evaluators supply frozen case facts; InvarLock applies its own scorer.
 Core import, verification and reporting work without Inspect. A caller-owned
 collector can use `invarlock.engine.prepare_evaluator_judge` and
@@ -229,7 +231,8 @@ checkpoint. Installed live collection requires exactly Inspect `0.3.263`,
 OpenAI `3.13.0`, Anthropic `1.6.0`, Google Gen AI `2.24.0`, and
 `httpx==0.28.1` and `httpx2==2.12.0`. It supports pinned Inspect integrations for `openai/`,
 `anthropic/`, `google/`, and `openrouter/` graders with one attempt per trial,
-zero collector retries, no tools or cache, and no inherited model settings.
+zero collector retries, no tools or Inspect result cache, and no inherited model
+settings.
 An admitted call without a retained result is an ambiguous timeout that cannot
 be retried. `verify` and `report` make no provider calls.
 
@@ -250,12 +253,28 @@ automatic function calling, and stops Inspect's internal malformed-function
 retry before a second request. Configured direct providers reject alternate
 service paths such as `google/vertex/...`; OpenRouter retains its routed model
 names. The pinned Google and Anthropic adapters require a null `seed` because
-they do not forward it. Anthropic requires `top_p=1` and sends temperature
-alone; models that discard temperature require approved temperature `1`.
+they do not forward it. Anthropic requires `top_p=1`. Without extended
+reasoning, its qualified request sends the approved temperature. With supported extended
+reasoning, Inspect sends its mapped thinking budget instead of temperature,
+and InvarLock checks that request against the approved effort and output limit.
+The pinned projection supports nondefault effort for Claude 4.5 and Gemini 2.5
+model families when the output limit exceeds the mapped thinking budget.
+All live Claude 4.6-and-newer, Gemini 3-and-newer, and unrecognized model names
+are rejected during preflight until their pinned SDK request shapes are
+qualified, regardless of effort. Historical evidence for those models remains
+subject to its original offline verification contract.
+The pinned Google adapter sends `BLOCK_NONE` for five provider safety
+categories; this fixed SDK setting is checked against the retained request.
+The judge result is a quality measurement under the declared rubric, not a
+content-safety assessment.
 The configured Anthropic client also stops automatic `pause_turn` continuations
 before another request. For all four providers, raw response content, model,
 finish reason and token usage are checked against the SDK output before the
 retained response is normalized.
+During collection, the pinned SDK request is checked against the approved plan.
+The retained evidence contains its normalized request and response; offline
+verification checks those retained facts and the analysis, not the original
+provider HTTP bytes.
 
 Each available provider response ID must identify exactly one retained Inspect
 call across trials, source segments and resumed collection. Reusing a response
@@ -306,9 +325,10 @@ selected provider's base-URL variables and alternate-auth controls; their
 presence is rejected even when empty. OpenAI calls explicitly select
 `service_tier=default` for standard processing. Historical OpenAI requests
 without the field replay unchanged without acquiring a standard-tier claim.
-Disabled Inspect response caching does
-not disable provider prompt caching; cost reservations must cover applicable
-cache-write charges. Missing credentials, missing or mismatched SDK dependencies, and dependency
+Disabled Inspect response caching does not disable provider prompt caching;
+cost reservations must cover applicable cache-write charges. The Anthropic
+adapter's prompt-cache marker is bound into each recorded provider request.
+Missing credentials, missing or mismatched SDK dependencies, and dependency
 import failures stop collection preflight. These requirements do not apply to
 offline import. The optional `execution.collection.scorer_id` defaults to `judge` and
 `invocation_timeout_seconds` defaults to 3600. An omitted workspace defaults to
@@ -460,6 +480,10 @@ of request files. Bearer authentication requires HTTPS except on an explicit
 loopback endpoint. Ambient OpenAI endpoint variables do not redirect this route.
 Input-byte limits count aggregate canonical transmitted JSON bodies, excluding
 authorization headers; output-token limits reserve the planned calls.
+When a service reports token usage, collection and replay reject a completion
+count above the approved per-call output limit. If it omits usage, the retained
+request proves the requested cap, but the actual token count cannot be checked
+independently; response-byte and measurement-size limits still apply.
 
 This collector retains one source shard per call, so the evidence format's
 1,000-shard limit allows at most 1,000 planned calls: 500 paired cases with one

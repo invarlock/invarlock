@@ -7,6 +7,7 @@ import fcntl
 import importlib
 import importlib.metadata
 import os
+import re
 import stat
 import time
 from collections import deque
@@ -27,6 +28,7 @@ from invarlock.filesystem.paths import (
 )
 from invarlock.judge_measurement_types import JudgeMeasurementPlan, JudgeMeasurements
 from invarlock.judge_measurements.contracts import (
+    _INSPECT_BRIDGED_REASONING_TOKENS,
     JudgeMeasurementContractError,
     _check_inspect_provider_projection,
     _check_inspect_provider_response,
@@ -520,6 +522,11 @@ def _require_clean_model_configuration(model: Any) -> None:
             "Inspect model configuration must not contain inherited settings"
         )
     api = getattr(model, "api", None)
+    grader = str(model)
+    if grader.startswith(("openai/", "anthropic/", "google/", "openrouter/")) and (
+        getattr(api, "model_name", None) != grader.split("/", 1)[1]
+    ):
+        raise InspectJudgeError("Inspect provider model differs from its grader")
     responses_api = getattr(api, "responses_api", None)
     if responses_api not in (None, False):
         raise InspectJudgeError(
@@ -582,6 +589,265 @@ def _check_openai_wire_call(
         raise InspectJudgeError(
             "provider response contains an unsupported service tier"
         )
+
+
+def _check_trace_headers(headers: Any) -> None:
+    # Inspect adds this opaque tracing ID to each pinned provider call. It is
+    # transport metadata, not an authorization to add provider routing headers.
+    if not isinstance(headers, dict) or set(headers) != {"x-irid"}:
+        raise InspectJudgeError("provider request contains unsupported headers")
+    trace_id = headers["x-irid"]
+    if (
+        not isinstance(trace_id, str)
+        or not 1 <= len(trace_id) <= 128
+        or not trace_id.isascii()
+        or not trace_id.isalnum()
+    ):
+        raise InspectJudgeError("provider request contains an invalid trace ID")
+
+
+def _same_wire_number(value: Any, expected: Any) -> bool:
+    return type(value) in (int, float) and Decimal(str(value)) == Decimal(str(expected))
+
+
+def _check_anthropic_wire_call(
+    request: dict[str, Any], expected_request: dict[str, Any]
+) -> None:
+    config = expected_request["config"]
+    messages = expected_request["messages"]
+    system = [message for message in messages if message["role"] == "system"]
+    expected_system = [
+        {
+            "type": "text",
+            "text": message["content"],
+            "cache_control": {"type": "ephemeral"},
+        }
+        for message in system
+    ]
+    expected_messages = [
+        message.copy() for message in messages if message["role"] != "system"
+    ]
+    assistant_positions = [
+        index
+        for index, message in enumerate(expected_messages)
+        if message["role"] == "assistant"
+    ]
+    for index in assistant_positions:
+        block: dict[str, Any] = {
+            "type": "text",
+            "text": expected_messages[index]["content"],
+        }
+        if index == assistant_positions[-1]:
+            block["cache_control"] = {"type": "ephemeral"}
+        expected_messages[index]["content"] = [block]
+    reasoning_budget = _INSPECT_BRIDGED_REASONING_TOKENS.get(config["reasoning_effort"])
+    expected_fields = {
+        "cache_control",
+        "extra_headers",
+        "max_tokens",
+        "messages",
+        "model",
+        "tools",
+        "thinking" if reasoning_budget is not None else "extra_body",
+    }
+    if system:
+        expected_fields.add("system")
+    if (
+        set(request) != expected_fields
+        or request["model"] != expected_request["model"].split("/", 1)[1]
+        or request["messages"] != expected_messages
+        or (system and request["system"] != expected_system)
+        or request["max_tokens"] != config["max_output_tokens"]
+        or type(request["max_tokens"]) is not int
+        or request["tools"] != []
+        or request["cache_control"] != {"type": "ephemeral"}
+    ):
+        raise InspectJudgeError(
+            "Anthropic provider request differs from the approved request"
+        )
+    headers = request["extra_headers"]
+    if reasoning_budget is None:
+        if (
+            not isinstance(request["extra_body"], dict)
+            or set(request["extra_body"]) != {"temperature"}
+            or not _same_wire_number(
+                request["extra_body"]["temperature"], config["temperature"]
+            )
+        ):
+            raise InspectJudgeError(
+                "Anthropic provider sampling differs from the approved request"
+            )
+        _check_trace_headers(headers)
+    else:
+        expected_betas = (
+            ["output-128k-2025-02-19"] if config["max_output_tokens"] > 8192 else []
+        ) + ["interleaved-thinking-2025-05-14"]
+        if (
+            request["thinking"]
+            != {
+                "type": "enabled",
+                "budget_tokens": reasoning_budget,
+                "display": "summarized",
+            }
+            or not isinstance(headers, dict)
+            or set(headers) != {"x-irid", "anthropic-version", "anthropic-beta"}
+            or headers["anthropic-version"] != "2023-06-01"
+            or headers["anthropic-beta"] != ",".join(expected_betas)
+        ):
+            raise InspectJudgeError(
+                "Anthropic provider reasoning differs from the approved request"
+            )
+        _check_trace_headers({"x-irid": headers["x-irid"]})
+
+
+_GOOGLE_SAFETY_CATEGORIES = frozenset(
+    {
+        "HARM_CATEGORY_CIVIC_INTEGRITY",
+        "HARM_CATEGORY_DANGEROUS_CONTENT",
+        "HARM_CATEGORY_HARASSMENT",
+        "HARM_CATEGORY_HATE_SPEECH",
+        "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+    }
+)
+
+
+_CLAUDE_MODEL_VERSION = re.compile(r"^claude-(?:[a-z]+-)?(\d+)(?:-(\d+))?(?:-|$)")
+_GEMINI_MODEL_VERSION = re.compile(r"^gemini-(\d+)(?:\.(\d+))?(?:-|$)")
+
+
+def _require_qualified_live_provider_model(grader: str) -> None:
+    """Reject provider families whose pinned SDK wire shape is not qualified."""
+    provider, _, model_name = grader.partition("/")
+    if provider == "anthropic":
+        match = _CLAUDE_MODEL_VERSION.match(model_name)
+        if match is None or tuple(int(part or 0) for part in match.groups()) >= (
+            4,
+            6,
+        ):
+            raise InspectJudgeError(
+                "the pinned Inspect anthropic live wire shape is not qualified for this model"
+            )
+    elif provider == "google":
+        match = _GEMINI_MODEL_VERSION.match(model_name)
+        if match is None or int(match.group(1)) >= 3:
+            raise InspectJudgeError(
+                "the pinned Inspect google live wire shape is not qualified for this model"
+            )
+
+
+def _check_google_wire_call(
+    request: dict[str, Any], expected_request: dict[str, Any]
+) -> None:
+    config = expected_request["config"]
+    messages = expected_request["messages"]
+    generation = request.get("generation_config")
+    expected_contents = [
+        {
+            "role": "model" if message["role"] == "assistant" else "user",
+            "parts": [{"text": message["content"]}],
+        }
+        for message in messages
+        if message["role"] != "system"
+    ]
+    effort = config["reasoning_effort"]
+    if effort == "none":
+        expected_thinking = {"includeThoughts": False, "thinkingBudget": 0}
+    elif effort in _INSPECT_BRIDGED_REASONING_TOKENS:
+        expected_thinking = {
+            "includeThoughts": True,
+            "thinkingBudget": _INSPECT_BRIDGED_REASONING_TOKENS[effort],
+        }
+    else:
+        expected_thinking = {"includeThoughts": True}
+    if (
+        set(request)
+        != {
+            "contents",
+            "generation_config",
+            "safety_settings",
+            "system_instruction",
+            "tool_config",
+            "tools",
+        }
+        or request["contents"] != expected_contents
+        or request["system_instruction"]
+        != (
+            [message["content"] for message in messages if message["role"] == "system"]
+            or None
+        )
+        or request["tool_config"] is not None
+        or request["tools"] is not None
+        or not isinstance(generation, dict)
+        or set(generation)
+        != {
+            "candidateCount",
+            "httpOptions",
+            "maxOutputTokens",
+            "temperature",
+            "thinkingConfig",
+            "topP",
+        }
+        or type(generation["candidateCount"]) is not int
+        or generation["candidateCount"] != 1
+        or type(generation["maxOutputTokens"]) is not int
+        or generation["maxOutputTokens"] != config["max_output_tokens"]
+        or not _same_wire_number(generation["temperature"], config["temperature"])
+        or not _same_wire_number(generation["topP"], config["top_p"])
+        or generation["thinkingConfig"] != expected_thinking
+        or not isinstance(generation["httpOptions"], dict)
+        or set(generation["httpOptions"]) != {"headers"}
+    ):
+        raise InspectJudgeError(
+            "Google provider request differs from the approved request"
+        )
+    _check_trace_headers(generation["httpOptions"]["headers"])
+    safety = request["safety_settings"]
+    if (
+        not isinstance(safety, list)
+        or len(safety) != len(_GOOGLE_SAFETY_CATEGORIES)
+        or any(
+            not isinstance(setting, dict)
+            or set(setting) != {"category", "threshold"}
+            or setting["threshold"] != "BLOCK_NONE"
+            or not isinstance(setting["category"], str)
+            for setting in safety
+        )
+        or {setting["category"] for setting in safety} != _GOOGLE_SAFETY_CATEGORIES
+    ):
+        raise InspectJudgeError(
+            "Google provider request contains unsupported safety settings"
+        )
+
+
+def _check_provider_wire_call(
+    request: dict[str, Any],
+    response: Any,
+    expected_request: dict[str, Any],
+) -> None:
+    provider = expected_request["model"].partition("/")[0]
+    if (
+        provider in {"openai", "anthropic", "google", "openrouter"}
+        and request.get("format") == "invarlock/judge-request-v1"
+    ):
+        raise InspectJudgeError(
+            f"{provider} live provider request must retain its native SDK shape"
+        )
+    if provider in {"openai", "openrouter"}:
+        _check_openai_wire_call(request, response, expected_request)
+        if provider == "openrouter":
+            if request.get("model") != expected_request["model"].split("/", 1)[1]:
+                raise InspectJudgeError(
+                    "OpenRouter provider model differs from the approved request"
+                )
+            _check_trace_headers(request.get("extra_headers"))
+        elif "extra_headers" in request:
+            _check_trace_headers(request.get("extra_headers"))
+    elif provider == "anthropic":
+        _check_anthropic_wire_call(request, expected_request)
+    elif provider == "google":
+        _check_google_wire_call(request, expected_request)
+    else:
+        _check_openai_wire_call(request, response, expected_request)
 
 
 def _wire_tokens(usage: dict[str, Any], name: str, *, optional: bool = False) -> int:
@@ -778,12 +1044,7 @@ def _project_event(
         raise InspectJudgeError("Inspect did not retain the provider request")
     if call_response is not None and not isinstance(call_response, dict):
         raise InspectJudgeError("Inspect provider response must be a JSON object")
-    if (
-        options.grader.startswith("openai/")
-        and failure_status is None
-        and getattr(event, "error", None) is None
-    ):
-        _check_openai_wire_call(call_request, call_response, expected_request)
+    _check_provider_wire_call(call_request, call_response, expected_request)
     usage = getattr(output, "usage", None)
     projected_usage = None
     if usage is not None:
@@ -1068,6 +1329,7 @@ async def _collect_pinned(
     This function never accepts or writes credentials, provider URLs, or headers.
     """
     _check_options(plan, options)
+    _require_qualified_live_provider_model(options.grader)
     runner.validate()
     if plan["schedule"]["max_attempts"] != 1:
         raise InspectJudgeError(
@@ -1282,6 +1544,7 @@ async def collect(
 ) -> JudgeMeasurements:
     """Collect through a checkpoint whose directory ancestry remains pinned."""
     _check_options(plan, options)
+    _require_qualified_live_provider_model(options.grader)
     runner.validate()
     if options.inspect_version != INSPECT_VERSION:
         raise InspectJudgeError("live collection requires current Inspect version")

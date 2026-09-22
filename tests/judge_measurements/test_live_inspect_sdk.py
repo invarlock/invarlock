@@ -8,6 +8,7 @@ import importlib.metadata
 import json
 import os
 import socket
+import sys
 from dataclasses import asdict, replace
 from pathlib import Path
 
@@ -62,13 +63,54 @@ def _corrupt_wire_response(response, provider, outcome):
         response["choices"][0]["message"]["content"] = '{"rating":"incorrect"}'
 
 
+def _corrupt_wire_request(request, provider, outcome):
+    if outcome == "request_messages":
+        if provider == "google":
+            request["contents"][-1]["parts"][0]["text"] = "different task"
+        else:
+            request["messages"][-1]["content"] = "different task"
+    elif outcome == "request_controls":
+        if provider == "google":
+            request["generation_config"]["maxOutputTokens"] += 1
+        else:
+            request["max_tokens"] += 1
+    elif outcome == "request_sampling":
+        if provider == "google":
+            request["generation_config"]["temperature"] = 0.5
+        elif provider == "anthropic":
+            if "extra_body" in request:
+                request["extra_body"]["temperature"] = 0.5
+            else:
+                request["thinking"]["budget_tokens"] += 1
+        else:
+            request["temperature"] = 0.5
+    elif outcome == "request_hidden":
+        if provider == "google":
+            request["generation_config"]["httpOptions"]["headers"]["x-route"] = "other"
+        else:
+            request["extra_headers"]["x-route"] = "other"
+    elif outcome == "request_model":
+        request["model"] = "different-model"
+    else:
+        if provider == "google":
+            request["tools"] = [{"functionDeclarations": []}]
+        elif provider == "anthropic":
+            request["tools"] = [{"name": "call"}]
+        else:
+            request["tool_choice"] = "auto"
+
+
 @pytest.mark.parametrize(
-    ("provider", "model_name", "credential"),
+    ("provider", "model_name", "credential", "reasoning_effort"),
     [
-        ("openai", "gpt-4o-2024-08-06", "OPENAI_API_KEY"),
-        ("anthropic", "claude-sonnet-4-5", "ANTHROPIC_API_KEY"),
-        ("google", "gemini-2.5-flash", "GOOGLE_API_KEY"),
-        ("openrouter", "openai/gpt-4o-mini", "OPENROUTER_API_KEY"),
+        ("openai", "gpt-4o-2024-08-06", "OPENAI_API_KEY", None),
+        ("anthropic", "claude-sonnet-4-5", "ANTHROPIC_API_KEY", None),
+        ("anthropic", "claude-sonnet-4-5", "ANTHROPIC_API_KEY", "none"),
+        ("anthropic", "claude-sonnet-4-5", "ANTHROPIC_API_KEY", "high"),
+        ("google", "gemini-2.5-flash", "GOOGLE_API_KEY", None),
+        ("google", "gemini-2.5-flash", "GOOGLE_API_KEY", "none"),
+        ("google", "gemini-2.5-flash", "GOOGLE_API_KEY", "high"),
+        ("openrouter", "openai/gpt-4o-mini", "OPENROUTER_API_KEY", None),
     ],
 )
 @pytest.mark.parametrize(
@@ -80,10 +122,17 @@ def _corrupt_wire_response(response, provider, outcome):
         "response_model",
         "response_content",
         "response_usage",
+        "request_messages",
+        "request_controls",
+        "request_sampling",
+        "request_hidden",
+        "request_model",
+        "request_tools",
+        "request_normalized",
     ],
 )
 def test_configured_provider_wire_collection_replays_without_network(
-    tmp_path, monkeypatch, provider, model_name, credential, outcome
+    tmp_path, monkeypatch, provider, model_name, credential, reasoning_effort, outcome
 ):
     from invarlock.judge_measurements import configured
 
@@ -135,6 +184,12 @@ def test_configured_provider_wire_collection_replays_without_network(
         requested_model=grader,
         approved_resolved_models=[model_name],
     )
+    if reasoning_effort is not None:
+        documents["plan"]["judge"]["config"].update(
+            reasoning_effort=reasoning_effort,
+            temperature="1" if reasoning_effort == "high" else "0",
+            **({"max_output_tokens": 20000} if reasoning_effort == "high" else {}),
+        )
     plan = bind_requests(documents["plan"], documents["frozen"])
     options = replace(
         CollectionOptions.from_mapping(documents["export"]["collection"]),
@@ -142,7 +197,7 @@ def test_configured_provider_wire_collection_replays_without_network(
         requests_per_minute=10000,
         max_calls=2,
         max_input_tokens=200,
-        max_output_tokens=256,
+        max_output_tokens=40000 if reasoning_effort == "high" else 256,
         max_cost_microusd=200,
     )
     requests = []
@@ -241,6 +296,12 @@ def test_configured_provider_wire_collection_replays_without_network(
         if outcome.startswith("response_"):
             assert event.error is None
             _corrupt_wire_response(event.call.response, provider, outcome)
+        if outcome == "request_normalized":
+            assert event.error is None
+            event.call.request = copy.deepcopy(kwargs["expected_request"])
+        elif outcome.startswith("request_"):
+            assert event.error is None
+            _corrupt_wire_request(event.call.request, provider, outcome)
         return original_project(event, **kwargs)
 
     monkeypatch.setattr(live_runner, "_project_event", project)
@@ -299,10 +360,14 @@ def test_configured_provider_wire_collection_replays_without_network(
             for client in original_clients:
                 await client.close()
 
-    if outcome.startswith("response_"):
+    rejects_wire = outcome.startswith(("response_", "request_"))
+    if rejects_wire:
         from invarlock.judge_measurements import InspectJudgeError
 
-        with pytest.raises(InspectJudgeError, match="contradicts"):
+        with pytest.raises(
+            InspectJudgeError,
+            match="contradicts|provider|approved|unsupported|headers",
+        ):
             asyncio.run(run())
         assert 1 <= len(requests) <= 2
         assert not list(runner.checkpoint_directory.glob("result-*.json"))
@@ -317,12 +382,18 @@ def test_configured_provider_wire_collection_replays_without_network(
         wire = json.loads(request.content)
         assert wire.get("tools") in (None, [])
         if provider == "google":
-            assert wire["generationConfig"]["maxOutputTokens"] == 128
+            assert wire["generationConfig"]["maxOutputTokens"] == (
+                20000 if reasoning_effort == "high" else 128
+            )
         else:
             assert wire["model"] == model_name
             if provider == "anthropic":
                 assert "top_p" not in wire
-                assert wire["temperature"] == 0
+                if reasoning_effort == "high":
+                    assert wire["thinking"]["budget_tokens"] == 16000
+                    assert "temperature" not in wire
+                else:
+                    assert wire["temperature"] == 0
     successful = outcome != "rate_limit" and not (
         provider in {"google", "anthropic"} and outcome == "malformed_function"
     )
@@ -335,6 +406,78 @@ def test_configured_provider_wire_collection_replays_without_network(
                 "output_tokens": 5,
             }
             assert trial["attempts"][0]["request_id"]
+
+
+@pytest.mark.parametrize(
+    ("provider", "model_name", "credential"),
+    [
+        ("openai", "gpt-4o-2024-08-06", "OPENAI_API_KEY"),
+        ("anthropic", "claude-sonnet-4-5", "ANTHROPIC_API_KEY"),
+        ("google", "gemini-2.5-flash", "GOOGLE_API_KEY"),
+        ("openrouter", "openai/gpt-4o-mini", "OPENROUTER_API_KEY"),
+    ],
+)
+@pytest.mark.parametrize("prompt_variant", ["no_system", "one_demo", "two_demos"])
+def test_configured_provider_binds_optional_prompt_shapes(
+    tmp_path, monkeypatch, provider, model_name, credential, prompt_variant
+):
+    original_bind = bind_requests
+
+    def bind_variant(plan, frozen):
+        if prompt_variant == "no_system":
+            plan["prompt"]["system"] = ""
+        else:
+            plan["prompt"]["demonstrations"] = [
+                {"input": f"Example {index}", "answer": "Answer", "rating": "correct"}
+                for index in range(1 if prompt_variant == "one_demo" else 2)
+            ]
+        return original_bind(plan, frozen)
+
+    monkeypatch.setattr(sys.modules[__name__], "bind_requests", bind_variant)
+    test_configured_provider_wire_collection_replays_without_network(
+        tmp_path,
+        monkeypatch,
+        provider,
+        model_name,
+        credential,
+        None,
+        "success",
+    )
+
+
+def test_google_client_rejects_model_target_outside_approved_grader():
+    from invarlock.judge_measurements import InspectJudgeError, configured, runner
+
+    required = os.environ.get("INVARLOCK_REQUIRE_INSPECT_SDK") == "1"
+    try:
+        installed = importlib.metadata.version("inspect-ai")
+    except importlib.metadata.PackageNotFoundError:
+        installed = None
+    if installed != configured._SDK_VERSIONS["inspect-ai"]:
+        if required:
+            pytest.fail("required pinned Inspect SDK is not installed")
+        pytest.skip("pinned Inspect SDK is not installed")
+    import inspect_ai.model
+
+    model = inspect_ai.model.get_model(
+        "google/gemini-2.5-flash",
+        api_key="offline-test-key",
+        base_url="https://generativelanguage.googleapis.com",
+        memoize=False,
+    )
+    runner._require_clean_model_configuration(model)
+    configured._bound_google_client(model, expected_model="gemini-2.5-flash")
+    model.api.model_name = "different-model"
+    client = model.api.model_client()
+    try:
+
+        async def run():
+            await client.aio.models.generate_content(model="different-model")
+
+        with pytest.raises(InspectJudgeError, match="outside the approved grader"):
+            asyncio.run(run())
+    finally:
+        client.close()
 
 
 @pytest.mark.parametrize("reference_mode", [None, "per_case"])

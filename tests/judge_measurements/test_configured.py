@@ -7,7 +7,7 @@ import importlib.metadata
 import json
 import os
 import socket
-from dataclasses import replace
+from dataclasses import asdict, replace
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
@@ -428,6 +428,99 @@ def test_anthropic_profile_rejects_combined_sampling_controls(inputs, sdk):
     sdk[0].get_model.assert_not_called()
 
 
+@pytest.mark.parametrize(
+    ("provider", "model", "limit", "message"),
+    [
+        ("anthropic", "claude-sonnet-4-5", 128, "reasoning budget"),
+        ("google", "gemini-2.5-flash", 128, "reasoning budget"),
+        (
+            "anthropic",
+            "claude-sonnet-4-6",
+            20000,
+            "not qualified for this model",
+        ),
+        ("google", "gemini-3-flash", 20000, "not qualified for this model"),
+    ],
+)
+def test_provider_reasoning_preflight_rejects_unbound_or_impossible_profiles(
+    inputs, sdk, provider, model, limit, message
+):
+    grader = f"{provider}/{model}"
+    inputs["plan"]["judge"].update(
+        provider=provider,
+        requested_model=grader,
+        approved_resolved_models=[model],
+    )
+    inputs["plan"]["judge"]["config"].update(
+        reasoning_effort="high", max_output_tokens=limit, temperature="1"
+    )
+    inputs["options"] = replace(
+        inputs["options"], grader=grader, max_output_tokens=40000
+    )
+    with pytest.raises(InspectJudgeError, match=message):
+        asyncio.run(collect_configured(**inputs, environment={}))
+    sdk[0].get_model.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("provider", "model"),
+    [
+        ("anthropic", "claude-sonnet-4-7"),
+        ("google", "gemini-3-flash"),
+        ("anthropic", "custom-alias"),
+        ("google", "custom-alias"),
+    ],
+)
+@pytest.mark.parametrize("reasoning_effort", [None, "none"])
+def test_unqualified_provider_family_stops_before_model_construction(
+    inputs, sdk, provider, model, reasoning_effort
+):
+    grader = f"{provider}/{model}"
+    inputs["plan"]["judge"].update(
+        provider=provider,
+        requested_model=grader,
+        approved_resolved_models=[model],
+    )
+    inputs["plan"]["judge"]["config"].update(
+        reasoning_effort=reasoning_effort, temperature="1"
+    )
+    inputs["options"] = replace(inputs["options"], grader=grader)
+    with pytest.raises(InspectJudgeError, match="live wire shape is not qualified"):
+        asyncio.run(collect_configured(**inputs, environment={}))
+    sdk[0].get_model.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("provider", "model"),
+    [
+        ("anthropic", "claude-sonnet-4-7"),
+        ("google", "gemini-3-flash"),
+        ("anthropic", "custom-alias"),
+        ("google", "custom-alias"),
+    ],
+)
+@pytest.mark.parametrize("reasoning_effort", [None, "none"])
+def test_public_preflights_reject_unqualified_provider_before_collection(
+    inputs, provider, model, reasoning_effort
+):
+    from invarlock.judge_measurements import native_workflow, workflow
+
+    grader = f"{provider}/{model}"
+    inputs["plan"]["judge"].update(
+        provider=provider,
+        requested_model=grader,
+        approved_resolved_models=[model],
+    )
+    inputs["plan"]["judge"]["config"].update(
+        reasoning_effort=reasoning_effort, temperature="1"
+    )
+    configuration = asdict(replace(inputs["options"], grader=grader))
+    with pytest.raises(workflow.JudgeWorkflowError, match="not qualified"):
+        workflow._collection_budgets(configuration, inputs["plan"])
+    with pytest.raises(native_workflow.JudgeWorkflowError, match="not qualified"):
+        native_workflow.collection_preflight(configuration)
+
+
 def test_unbounded_google_client_is_rejected_before_calls():
     class Model:
         api = SimpleNamespace()
@@ -625,11 +718,15 @@ def test_configured_collection_constructs_selected_provider(
     extra_model_args,
 ):
     module, model, client = sdk
-    grader = f"{provider}/approved-model"
+    model_name = {
+        "anthropic": "claude-sonnet-4-5",
+        "google": "gemini-2.5-flash",
+    }.get(provider, "approved-model")
+    grader = f"{provider}/{model_name}"
     inputs["plan"]["judge"].update(
         provider=provider,
         requested_model=grader,
-        approved_resolved_models=["approved-model"],
+        approved_resolved_models=[model_name],
     )
     inputs["options"] = replace(inputs["options"], grader=grader)
     model.api.service_tier = None
@@ -862,9 +959,7 @@ def test_cancelled_provider_cleanup_preserves_cancellation():
         asyncio.run(configured._close_model(model))
 
 
-def test_anthropic_implicit_temperature_change_cannot_dispatch(
-    inputs, sdk, monkeypatch
-):
+def test_anthropic_unqualified_model_cannot_dispatch(inputs, sdk, monkeypatch):
     grader = "anthropic/claude-sonnet-4-7"
     inputs["plan"]["judge"].update(
         provider="anthropic",
@@ -876,14 +971,14 @@ def test_anthropic_implicit_temperature_change_cannot_dispatch(
     sdk[1].api.is_claude_4_7_or_later = lambda: True
     collect = AsyncMock()
     monkeypatch.setattr(configured, "collect", collect)
-    with pytest.raises(InspectJudgeError, match="approved temperature=1"):
+    with pytest.raises(InspectJudgeError, match="live wire shape is not qualified"):
         asyncio.run(
             collect_configured(**inputs, environment={"ANTHROPIC_API_KEY": KEY})
         )
+    sdk[0].get_model.assert_not_called()
     collect.assert_not_called()
     sdk[1].api.generate.assert_not_called()
     sdk[2].messages.create.assert_not_called()
-    sdk[2].close.assert_awaited_once()
 
 
 def test_configured_graceful_batch_stop_preserves_runner_and_closes_client(

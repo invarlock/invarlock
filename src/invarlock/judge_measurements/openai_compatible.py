@@ -271,7 +271,9 @@ def _safe_headers(response: Any, credential: str | None) -> dict[str, str]:
 def _response_facts(value: Any, *, plan: JudgeMeasurementPlan) -> dict[str, Any]:
     try:
         return response_facts(
-            value, approved_models=plan["judge"]["approved_resolved_models"]
+            value,
+            approved_models=plan["judge"]["approved_resolved_models"],
+            max_output_tokens=plan["judge"]["config"]["max_output_tokens"],
         )
     except OpenAICompatibleContractError as exc:
         raise OpenAICompatibleJudgeError(str(exc)) from None
