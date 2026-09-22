@@ -570,6 +570,11 @@ def test_http_capture_keeps_capability_out_of_retained_records(tmp_path, monkeyp
 def test_capability_file_requires_private_regular_file(tmp_path):
     private = capability_file(tmp_path / "private")
     assert HTTP.read_capability(private) == CAPABILITY
+    private.write_text(CAPABILITY + "\n", encoding="ascii")
+    assert HTTP.read_capability(private) == CAPABILITY
+    private.write_text("A" * HTTP.CAPABILITY_HEX_LENGTH, encoding="ascii")
+    with pytest.raises(ValueError, match="32 random bytes"):
+        HTTP.read_capability(private)
     private.chmod(0o644)
     with pytest.raises(ValueError, match="owner-private"):
         HTTP.read_capability(private)
@@ -698,6 +703,38 @@ def test_http_service_cli_preserves_completion_and_deadline(
             "requests": 2,
         }
     assert closed == ([] if failure == "pin" else [True])
+
+
+@pytest.mark.parametrize("invalid_seconds", [0, 86401, 1.5, True])
+def test_http_service_cli_refuses_invalid_process_deadline(
+    tmp_path, monkeypatch, invalid_seconds
+):
+    protocol, _ = setup(tmp_path)
+    protocol["limits"]["max_seconds"] = invalid_seconds
+    source = tmp_path / "protocol.json"
+    COMMON.write(source, protocol)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "http_service.py",
+            "--protocol",
+            str(source),
+            "--protocol-sha256",
+            COMMON.digest(protocol),
+            "--role",
+            "baseline",
+            "--socket",
+            "unused",
+            "--output",
+            str(tmp_path / "server"),
+            "--capability-file",
+            str(capability_file(tmp_path / "capability")),
+        ],
+    )
+    with pytest.raises(ValueError, match="bounded whole-process deadline"):
+        HTTP.main()
+    assert not (tmp_path / "server").exists()
 
 
 def test_client_refuses_endpoint_drift_and_oversized_task_before_http(

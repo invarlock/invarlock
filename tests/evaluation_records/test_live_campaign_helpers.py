@@ -651,6 +651,31 @@ def test_capture_refuses_unadmitted_profiles_before_creating_output(
     assert not output.exists()
 
 
+@pytest.mark.parametrize("hosted", [False, True])
+def test_capture_refuses_mismatched_http_capability_before_sdk_loading(
+    modules, tmp_path, hosted
+):
+    protocol = {"evaluators": ["inspect-ai"]}
+    if hosted:
+        protocol["http_services"] = {}
+    output = tmp_path / "must-not-exist"
+    with pytest.raises(
+        ValueError,
+        match="requires a private capability file"
+        if hosted
+        else "does not use an HTTP capability file",
+    ):
+        modules.capture.capture(
+            protocol,
+            "baseline",
+            "inspect-ai",
+            None if hosted else "unused",
+            output,
+            http_capability_file=None if hosted else tmp_path / "capability",
+        )
+    assert not output.exists()
+
+
 def test_promptfoo_capture_checks_actual_package_pin(modules, monkeypatch, tmp_path):
     protocol = _capture_setup(modules, monkeypatch)
     version = modules.common.versions()["promptfoo"]

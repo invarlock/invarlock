@@ -63,6 +63,31 @@ def test_selected_inputs_stay_with_the_request(tmp_path):
         journey._selected_source(source, "outside/policy.json", directory=False)
 
 
+@pytest.mark.parametrize("selected", [None, "", "bad\x00path", 42])
+def test_selected_inputs_require_a_valid_path(tmp_path, selected):
+    with pytest.raises(ValueError, match="nonempty path"):
+        journey._selected_source(tmp_path, selected, directory=False)
+
+
+@pytest.mark.parametrize(
+    ("selected", "directory", "expected"),
+    [("evidence", False, "regular file"), ("policy.json", True, "directory")],
+)
+def test_selected_inputs_require_the_declared_kind(
+    tmp_path, selected, directory, expected
+):
+    (tmp_path / "evidence").mkdir()
+    (tmp_path / "policy.json").write_text("{}")
+    with pytest.raises(ValueError, match=expected):
+        journey._selected_source(tmp_path, selected, directory=directory)
+
+
+@pytest.mark.parametrize("selected", [None, {}, []])
+def test_trusted_keys_require_at_least_one_fingerprint(tmp_path, selected):
+    with pytest.raises(ValueError, match="nonempty mapping"):
+        journey._selected_keys(tmp_path, selected)
+
+
 @pytest.mark.parametrize(
     "fingerprint", ["../outside", "sha256:bad", "sha256:" + "a" * 64 + "/x"]
 )
