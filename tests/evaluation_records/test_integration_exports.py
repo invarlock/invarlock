@@ -15,6 +15,74 @@ from invarlock.engine import (
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
+@pytest.mark.parametrize(
+    "native_ids,expected_error",
+    [
+        (("declared-run", "declared-run"), None),
+        ((None, None), None),
+        (("other-run", "other-run"), None),
+        (("declared-run", None), "mixed run IDs"),
+        (("declared-run", "other-run"), "multiple runs"),
+    ],
+)
+def test_openai_evals_native_and_capture_run_identities_remain_distinct(
+    tmp_path, native_ids, expected_error
+):
+    events = [
+        {
+            "sample_id": "case-a",
+            "type": "sampling",
+            "data": {"prompt": "Question", "sampled": "Answer"},
+        },
+        {
+            "sample_id": "case-a",
+            "type": "match",
+            "data": {"correct": True, "expected": "Answer"},
+        },
+    ]
+    for event, native_id in zip(events, native_ids, strict=True):
+        if native_id is not None:
+            event["run_id"] = native_id
+    result = {"events": events}
+    options = {
+        "source_version": "1",
+        "run_id": "declared-run",
+        "artifact_digest": "sha256:" + "a" * 64,
+    }
+    raw_path = tmp_path / "native.json"
+    raw_path.write_text(json.dumps(result), encoding="utf-8")
+    for capture in (
+        lambda: export_evaluator_result(
+            "openai-evals",
+            result,
+            tmp_path / "export.json",
+            expected_ids=["case-a"],
+            **options,
+        ),
+        lambda: load_run(
+            raw_path,
+            adapter="evaluator-native-json",
+            source={"name": "openai-evals", "version": "1"},
+            run_id=options["run_id"],
+            artifact_digest=options["artifact_digest"],
+        ),
+    ):
+        if expected_error is None:
+            run = capture()
+            assert run["run_id"] == "declared-run"
+            assert (
+                run["records"][0]["context"]["upstream_record"]["events"][0].get(
+                    "run_id"
+                )
+                == native_ids[0]
+            )
+        else:
+            with pytest.raises(EvaluationRecordsError, match=expected_error):
+                capture()
+    if expected_error is not None:
+        assert not (tmp_path / "export.json").exists()
+
+
 def test_export_capacity_and_nesting_fail_before_publication(tmp_path, monkeypatch):
     from invarlock.evaluation_records import integrations
 

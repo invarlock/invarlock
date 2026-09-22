@@ -114,13 +114,18 @@ those cases as unavailable rather than implicitly converting them to text.
 | `openevals` | List of `{id, inputs, outputs, reference_outputs}` | Original arguments; optional EvaluatorResult or list in `metric_result` |
 | `mlflow` | EvaluationResult with `tables.eval_results_table`, or `{prediction_table: rows, metrics: {...}}` | `record_id`, `input`, `prediction`, `target`; explicit `columns` can rename fields |
 | `garak` | `{attempts: [Attempt, ...], source_cases: [...]}` or report `entries` | Native `uuid:generation_index`; independently join planned IDs and references with `source_cases` |
-| `openai-evals` | `{events: [...]}` from the recorder | Join events by `sample_id`; actual prompt/sampled output; optional match expected value |
+| `openai-evals` | `{events: [...]}` from the recorder | Join events by `sample_id`; actual prompt/sampled output; optional match expected value; native `Event.run_id` must be consistent across sample events, run spec and final report when present |
 | `arize-phoenix-evals` | List of `{id, record: {input, output, expected}}` | Original evaluation arguments; optional Score or list in `metric_result` |
 | `langfuse` | Bare ExperimentResult JSON fields: `name`, `run_name`, `item_results`, `run_evaluations`, and captured experiment/dataset fields | Hosted dataset item ID or local `metadata.invarlock_id`; see the dedicated handoff example |
 | `opik` | List of `{id, dataset_item: {input, output, reference}}` | Original dataset fields; optional ScoreResult or list in `metric_result` |
 | `azure-ai-evaluation` | Native `evaluate()` result containing `rows` | `inputs.record_id`, `inputs.query`, `inputs.response`, `inputs.ground_truth`; `inputs.id`, `inputs.input`, `outputs.response` aliases supported |
 | `evidently` | Dataset/DataFrame or `{rows: [...], score_columns: [...]}` | `record_id`, `input`, `output`, `reference`; explicit `columns` can rename fields |
 | `trulens` | `(records_dataframe, feedback_columns)` or `{records: [...], feedback_results: [...]}` | `record_id`, `main_input`, `main_output`, `ground_truth`; feedback joined by record ID |
+
+OpenAI Evals' native `Event.run_id` identifies its recorder run. The InvarLock
+capture `run_id` names the retained comparison input and may differ. Preserve
+the native ID in the original events; the importer checks its consistency
+across sample events and any retained run spec or final report.
 
 For table profiles, `columns` maps the canonical roles `id`, `input`, `output`
 and `expected` to your actual column names. MLflow also recognizes
