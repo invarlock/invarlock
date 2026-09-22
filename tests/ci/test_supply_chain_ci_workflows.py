@@ -370,8 +370,18 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
         )
         + 1
     )
-    assert _step(build["steps"], "Enforce release coverage")["run"] == (
+    coverage = jobs["coverage_check"]
+    assert coverage["needs"] == "resolve_release_ref"
+    assert coverage["if"] == build["if"]
+    assert coverage["permissions"] == {"contents": "read"}
+    assert coverage["steps"][0]["with"]["ref"] == (
+        "${{ needs.resolve_release_ref.outputs.release_sha }}"
+    )
+    assert _step(coverage["steps"], "Enforce release coverage")["run"] == (
         "make coverage-enforce"
+    )
+    assert not any(
+        step.get("name") == "Enforce release coverage" for step in build["steps"]
     )
     assert (
         "make workflow-lint" in _step(build["steps"], "Lint release workflows")["run"]
@@ -511,7 +521,11 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     assert sbom_upload["with"]["if-no-files-found"] == "warn"
 
     attestation = jobs["attest_candidate"]
-    assert set(attestation["needs"]) == {"build_check", "resolve_release_ref"}
+    assert set(attestation["needs"]) == {
+        "build_check",
+        "coverage_check",
+        "resolve_release_ref",
+    }
     assert attestation["if"] == "${{ github.event_name == 'push' }}"
     assert attestation["permissions"] == {
         "actions": "read",
