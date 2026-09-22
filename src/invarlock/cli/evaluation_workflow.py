@@ -176,7 +176,10 @@ def execute_evaluation(
                 "runtime and bootstrap options do not apply to bounded judge requests"
             )
         judge_request = load_judge_request(
-            request_path, request_root=options.request_root, **overrides
+            request_path,
+            request_root=options.request_root,
+            provider_resolver=lambda name: CoreRegistry().get_runtime_provider(name),
+            **overrides,
         )
         if judge_request.mode != detected_mode:
             raise JudgeWorkflowError(
@@ -199,6 +202,7 @@ def execute_evaluation(
         loaded_request = load_evaluation_request(
             request_path,
             request_root=options.request_root,
+            provider_resolver=lambda name: CoreRegistry().get_runtime_provider(name),
             **overrides,
         )
         request_mode: RequestMode = (
@@ -214,6 +218,9 @@ def execute_evaluation(
             loaded_request = load_evaluation_request(
                 request_path,
                 request_root=options.request_root,
+                provider_resolver=lambda name: CoreRegistry().get_runtime_provider(
+                    name
+                ),
                 **overrides,
             )
         if not isinstance(loaded_request, CapturedEvaluationRequest):

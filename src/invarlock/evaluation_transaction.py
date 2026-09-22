@@ -25,6 +25,7 @@ from invarlock.core.evaluation_request import (
     EvaluationRequest,
     EvaluationRequestError,
     ImportSideRequest,
+    _validate_judge_model_binding,
     _validate_judge_workspace_inputs,
     evaluation_request_mode,
     load_evaluation_request,
@@ -715,6 +716,11 @@ def _normalized_request(
         normalized_comparison["judge"] = {
             "workspace": "judge-workspace",
             "signer_identity": request.comparison.judge.signer_identity,
+            **(
+                {"model": _normalized_side(request.comparison.judge.model)}
+                if request.comparison.judge.model is not None
+                else {}
+            ),
         }
     return normalized
 
@@ -1023,6 +1029,21 @@ def _captured_request(
     request: Path | EvaluationRequest | CapturedEvaluationRequest,
 ) -> CapturedEvaluationRequest | None:
     if isinstance(request, CapturedEvaluationRequest):
+        if (request.metric == "judge") != (request.judge is not None):
+            raise CapturedEvaluationError(
+                "judge configuration must accompany metric: judge"
+            )
+        if request.judge is not None and request.judge.model is not None:
+            if request.judge.measurements is not None:
+                raise CapturedEvaluationError(
+                    "captured judge model cannot accompany retained measurements"
+                )
+            _validate_judge_model_binding(
+                request.judge.model,
+                root=request.root,
+                workspace=request.judge.workspace,
+                evidence=request.evidence,
+            )
         return request
     if isinstance(request, EvaluationRequest):
         return None
@@ -1033,7 +1054,10 @@ def _captured_request(
     if evaluation_request_mode(request) != "captured":
         return None
     try:
-        loaded = load_evaluation_request(request)
+        loaded = load_evaluation_request(
+            request,
+            provider_resolver=lambda name: CoreRegistry().get_runtime_provider(name),
+        )
     except EvaluationRequestError as exc:
         raise CapturedEvaluationError(str(exc)) from exc
     if not isinstance(loaded, CapturedEvaluationRequest):

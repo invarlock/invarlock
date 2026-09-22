@@ -85,6 +85,30 @@ def test_optional_provider_requires_explicit_caller_owned_resources(
         )
 
 
+@pytest.mark.parametrize("judge_device", [None, "cuda"])
+def test_judge_device_is_independent_of_comparison_overrides(
+    tmp_path, monkeypatch, judge_device
+):
+    artifact = tmp_path / "judge"
+    artifact.mkdir()
+    monkeypatch.setenv("INVARLOCK_RUNTIME_IMAGE_DIGEST", _IMAGE_DIGEST)
+    monkeypatch.setenv("INVARLOCK_RUNTIME_DEVICE", "cpu")
+    monkeypatch.setenv("INVARLOCK_BASELINE_RUNTIME_DEVICE", "cuda")
+    monkeypatch.setenv("INVARLOCK_SUBJECT_RUNTIME_DEVICE", "cuda")
+    if judge_device is None:
+        monkeypatch.delenv("INVARLOCK_JUDGE_RUNTIME_DEVICE", raising=False)
+    else:
+        monkeypatch.setenv("INVARLOCK_JUDGE_RUNTIME_DEVICE", judge_device)
+    resolver = caller_runtime_resources_from_environment()
+    resources = resolver.resolve(
+        request_root=tmp_path,
+        role="judge",
+        side=_side(artifact, provider="hf_transformers"),
+        provider=_provider("hf_transformers"),
+    )
+    assert resources.device_kind == (judge_device or "cpu")
+
+
 def test_optional_provider_rejects_artifact_outside_trusted_resource_root(
     tmp_path: Path,
 ) -> None:

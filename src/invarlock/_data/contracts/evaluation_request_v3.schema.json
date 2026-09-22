@@ -84,7 +84,10 @@
               "additionalProperties": false,
               "properties": {
                 "integration": {
-                  "const": "inspect-judge"
+                  "enum": [
+                    "inspect-judge",
+                    "runtime-provider-judge"
+                  ]
                 },
                 "configuration": {
                   "$ref": "#/$defs/reference"
@@ -100,12 +103,39 @@
                   "type": "integer",
                   "minimum": 1,
                   "maximum": 604800
+                },
+                "model": {
+                  "$ref": "#/$defs/localModel"
                 }
               },
               "required": [
                 "integration",
                 "configuration"
-              ]
+              ],
+              "if": {
+                "properties": {
+                  "integration": {
+                    "const": "runtime-provider-judge"
+                  }
+                }
+              },
+              "then": {
+                "required": [
+                  "model"
+                ],
+                "not": {
+                  "required": [
+                    "invocation_timeout_seconds"
+                  ]
+                }
+              },
+              "else": {
+                "not": {
+                  "required": [
+                    "model"
+                  ]
+                }
+              }
             }
           },
           "required": [
@@ -177,6 +207,125 @@
         }
       },
       "additionalProperties": false
+    },
+    "safeReference": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?!/)(?!~)(?![A-Za-z]:)(?!.*://)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*(?:^|/)\\.(?:/|$))(?!.*//)(?!\\s)(?!.*\\s$)(?!.*\\/$)[^\\u0000-\\u001f]+(?![\\s\\S])"
+    },
+    "providerName": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,63}(?![\\s\\S])"
+    },
+    "settingName": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,63}(?![\\s\\S])"
+    },
+    "modelId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?!\\s)(?!.*\\s$)(?!.*://)[^\\u0000-\\u001f]+(?![\\s\\S])"
+    },
+    "artifactLocator": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "pattern": "^(?!\\s)(?!.*\\s$)[^\\u0000-\\u001f]+(?![\\s\\S])"
+    },
+    "jsonScalar": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "integer"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "string",
+          "maxLength": 4096
+        }
+      ]
+    },
+    "artifact": {
+      "type": "object",
+      "required": [
+        "model_id",
+        "locator"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/safeReference"
+        },
+        "model_id": {
+          "$ref": "#/$defs/modelId"
+        },
+        "locator": {
+          "$ref": "#/$defs/artifactLocator"
+        }
+      },
+      "additionalProperties": false
+    },
+    "runtime": {
+      "type": "object",
+      "required": [
+        "provider",
+        "settings"
+      ],
+      "properties": {
+        "provider": {
+          "$ref": "#/$defs/providerName"
+        },
+        "settings": {
+          "type": "object",
+          "propertyNames": {
+            "$ref": "#/$defs/settingName"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/jsonScalar"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "comparisonSide": {
+      "type": "object",
+      "required": [
+        "artifact",
+        "runtime"
+      ],
+      "properties": {
+        "artifact": {
+          "$ref": "#/$defs/artifact"
+        },
+        "runtime": {
+          "$ref": "#/$defs/runtime"
+        }
+      },
+      "additionalProperties": false
+    },
+    "localModel": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/comparisonSide"
+        },
+        {
+          "properties": {
+            "artifact": {
+              "required": [
+                "path"
+              ]
+            }
+          }
+        }
+      ]
     }
   }
 }

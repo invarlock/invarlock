@@ -13,11 +13,18 @@ from jsonschema import Draft202012Validator
 from invarlock.captured_contracts import read_file
 from invarlock.core.evaluation_request import (
     MAX_EVALUATION_REQUEST_BYTES,
+    ComparisonSideRequest,
     EvaluationRequestError,
+    ProviderResolver,
+    _build_judge_request,
+    _build_side,
+    _default_provider_resolver,
+    _judge_model_payload,
     _load_yaml,
     _reference_parts,
     _reject_include_directives,
     _resolve_output_reference,
+    _validate_judge_model_binding,
 )
 from invarlock.evidence_pack_json import parse_json_bytes
 from invarlock.judge_measurement_types import (
@@ -93,6 +100,8 @@ class JudgeEvaluationRequest:
     signer_identity: str
     workspace: Path | None = None
     runner: Mapping[str, Any] | None = None
+    integration: Literal["inspect-judge", "runtime-provider-judge"] | None = None
+    model: ComparisonSideRequest | None = None
 
 
 @dataclass(frozen=True)
@@ -114,6 +123,7 @@ def load_judge_request(
     baseline_run: Path | None = None,
     subject_run: Path | None = None,
     output: Path | None = None,
+    provider_resolver: ProviderResolver | None = None,
 ) -> JudgeEvaluationRequest:
     """Load a closed request; missing input files remain visible to preflight."""
     try:
@@ -138,6 +148,16 @@ def load_judge_request(
                     *_reference_parts(reference, label=f"comparison.{name}")
                 )
         collection = value["execution"]["collection"]
+        model = None
+        if collection is not None and "model" in collection:
+            model = _build_side(
+                collection["model"],
+                side_name="judge.model",
+                execution_mode="run",
+                root=root,
+                provider_cache={},
+                provider_resolver=provider_resolver or _default_provider_resolver,
+            )
         if collection is not None:
             inputs["collection"] = root.joinpath(
                 *_reference_parts(
@@ -179,11 +199,28 @@ def load_judge_request(
             runner = MappingProxyType(
                 {
                     "scorer_id": collection.get("scorer_id", "judge"),
-                    "invocation_timeout_seconds": collection.get(
-                        "invocation_timeout_seconds", 3600
+                    **(
+                        {
+                            "invocation_timeout_seconds": collection.get(
+                                "invocation_timeout_seconds", 3600
+                            )
+                        }
+                        if collection["integration"] == "inspect-judge"
+                        else {}
                     ),
                 }
             )
+        if model is not None:
+            artifact = model.artifact.path
+            assert artifact is not None and workspace is not None
+            if any(
+                destination.is_relative_to(artifact)
+                or artifact.is_relative_to(destination)
+                for destination in (workspace, evidence)
+            ):
+                raise EvaluationRequestError(
+                    "judge model must not overlap workspace or evidence destination"
+                )
         for source in inputs.values():
             if workspace is not None and (
                 source == workspace or source.is_relative_to(workspace)
@@ -203,11 +240,137 @@ def load_judge_request(
             value["output"]["signer_identity"],
             workspace,
             runner,
+            collection["integration"] if collection is not None else None,
+            model,
         )
     except (OSError, ValueError) as exc:
         if isinstance(exc, JudgeWorkflowError):
             raise
         raise JudgeWorkflowError(str(exc)) from exc
+
+
+def _validate_request_binding(request: JudgeEvaluationRequest) -> None:
+    """Apply the same closed authored contract to programmatic requests."""
+
+    if (
+        not isinstance(request.root, Path)
+        or not isinstance(request.inputs, Mapping)
+        or any(not isinstance(name, str) for name in request.inputs)
+    ):
+        raise JudgeWorkflowError("judge request root and input bindings are invalid")
+
+    def reference(path: Path, label: str) -> str:
+        if not isinstance(path, Path):
+            raise JudgeWorkflowError(f"{label} must be a path")
+        try:
+            value = path.relative_to(request.root).as_posix()
+        except ValueError as exc:
+            raise JudgeWorkflowError(
+                f"{label} must remain inside request root"
+            ) from exc
+        _reference_parts(value, label=label)
+        return value
+
+    comparison: dict[str, Any] = {
+        name: reference(path, name)
+        for name, path in request.inputs.items()
+        if name != "collection"
+    }
+    collection = None
+    if request.mode == "judge_collect":
+        if (
+            request.workspace is None
+            or not isinstance(request.runner, Mapping)
+            or "collection" not in request.inputs
+        ):
+            raise JudgeWorkflowError(
+                "judge collection requires workspace, runner and configuration"
+            )
+        allowed_runner = {"scorer_id"}
+        if request.integration == "inspect-judge":
+            allowed_runner.add("invocation_timeout_seconds")
+        if (
+            set(request.runner) - allowed_runner
+            or "measurements" in request.inputs
+            or (
+                request.integration == "runtime-provider-judge"
+                and set(request.runner) != {"scorer_id"}
+            )
+        ):
+            raise JudgeWorkflowError(
+                "judge collection contains ignored or misplaced settings"
+            )
+        comparison["measurements"] = None
+        collection = {
+            "integration": request.integration,
+            "configuration": reference(request.inputs["collection"], "collection"),
+            "workspace": reference(request.workspace, "workspace"),
+            **dict(request.runner),
+        }
+        if request.model is not None:
+            collection["model"] = _judge_model_payload(request.model, root=request.root)
+    elif (
+        any(
+            value is not None
+            for value in (
+                request.integration,
+                request.model,
+                request.workspace,
+                request.runner,
+            )
+        )
+        or "collection" in request.inputs
+    ):
+        raise JudgeWorkflowError(
+            "judge import must not contain ignored collection settings"
+        )
+    document: dict[str, Any] = {
+        "format_version": "invarlock/evaluation-request-v3",
+        "execution": {"mode": request.mode, "collection": collection},
+        "comparison": comparison,
+        "output": {
+            "evidence": reference(request.evidence, "evidence"),
+            "signer_identity": request.signer_identity,
+        },
+    }
+    error = next(
+        Draft202012Validator(load_judge_evaluation_request_schema()).iter_errors(
+            document
+        ),
+        None,
+    )
+    if error is not None:
+        raise JudgeWorkflowError(
+            f"judge request binding is invalid: {error.message[:240]}"
+        )
+    _resolve_output_reference(
+        request.root, document["output"]["evidence"], label="output.evidence"
+    )
+    if request.workspace is not None:
+        assert collection is not None
+        _build_judge_request(
+            {
+                "workspace": collection["workspace"],
+                "signer_identity": request.signer_identity,
+            },
+            root=request.root,
+            evidence_reference=document["output"]["evidence"],
+        )
+        if any(
+            path.is_relative_to(request.workspace)
+            or path.is_relative_to(request.evidence)
+            for path in request.inputs.values()
+        ):
+            raise JudgeWorkflowError(
+                "judge workspace and evidence must remain separate from input files"
+            )
+        if request.model is not None:
+            _validate_judge_model_binding(
+                request.model,
+                root=request.root,
+                workspace=request.workspace,
+                evidence=request.evidence,
+            )
 
 
 def _read_inputs(request: JudgeEvaluationRequest) -> tuple[dict[str, Any], list[str]]:
@@ -287,6 +450,7 @@ def _collection_budgets(
 
 
 def _prepare(request: JudgeEvaluationRequest) -> tuple[dict[str, Any], dict[str, Any]]:
+    _validate_request_binding(request)
     values, missing = _read_inputs(request)
     result: dict[str, Any] = {
         "format_version": "invarlock/judge-evaluation-preflight-v1",
@@ -371,14 +535,28 @@ def _prepare(request: JudgeEvaluationRequest) -> tuple[dict[str, Any], dict[str,
             )
         else:
             plan = cast(JudgeMeasurementPlan, values["plan"])
-            budgets = _collection_budgets(values["collection"], plan)
-            capacity = min(
-                budgets["max_calls"],
-                budgets["max_input_tokens"] // budgets["input_tokens_per_call"],
-                budgets["max_output_tokens"]
-                // plan["judge"]["config"]["max_output_tokens"],
-                budgets["max_cost_microusd"] // budgets["cost_microusd_per_call"],
-            )
+            if request.integration == "runtime-provider-judge":
+                from invarlock.judge_measurements.runtime_provider import (
+                    validate_runtime_provider_collection,
+                )
+
+                budgets = validate_runtime_provider_collection(
+                    values["collection"], plan
+                )
+                capacity = min(
+                    budgets["max_calls"],
+                    budgets["max_output_tokens"]
+                    // plan["judge"]["config"]["max_output_tokens"],
+                )
+            else:
+                budgets = _collection_budgets(values["collection"], plan)
+                capacity = min(
+                    budgets["max_calls"],
+                    budgets["max_input_tokens"] // budgets["input_tokens_per_call"],
+                    budgets["max_output_tokens"]
+                    // plan["judge"]["config"]["max_output_tokens"],
+                    budgets["max_cost_microusd"] // budgets["cost_microusd_per_call"],
+                )
             result["budgets"] = budgets
             result["budget_capacity"] = {
                 "maximum_admitted_calls": capacity,
@@ -400,7 +578,9 @@ def _prepare(request: JudgeEvaluationRequest) -> tuple[dict[str, Any], dict[str,
     if request.mode == "judge_collect":
         result["collection_integration"] = {
             "package": "invarlock",
-            "api": "invarlock.judge_measurements.collect_configured",
+            "api": "invarlock.judge_measurements.collect_runtime_provider"
+            if request.integration == "runtime-provider-judge"
+            else "invarlock.judge_measurements.collect_configured",
             "execution": "installed_evaluate",
             "core_cli_execution": True,
         }
@@ -411,7 +591,17 @@ def _prepare(request: JudgeEvaluationRequest) -> tuple[dict[str, Any], dict[str,
             )
 
             result["collection_environment"] = collection_preflight(
-                values["collection"]
+                values["collection"],
+                **(
+                    {
+                        "integration": request.integration,
+                        "model": request.model,
+                        "request_root": request.root,
+                        "plan": values["plan"],
+                    }
+                    if request.integration == "runtime-provider-judge"
+                    else {}
+                ),
             )
             result["collection_available"] = True
         result["next_action"] = (
@@ -465,6 +655,15 @@ def evaluate_judge_request(
             )
 
             assert request.workspace is not None and request.runner is not None
+            local_binding = {}
+            if request.integration == "runtime-provider-judge":
+                from invarlock.evaluation_transaction import _normalized_side
+
+                assert request.model is not None
+                local_binding = {
+                    "integration": request.integration,
+                    "model": _normalized_side(request.model),
+                }
             with locked_workspace(request.workspace) as unchanged:
                 _retain_identity(
                     request.workspace / "identity.json",
@@ -474,6 +673,7 @@ def evaluate_judge_request(
                             key: object_sha256(value) for key, value in values.items()
                         },
                         "runner": dict(request.runner),
+                        **local_binding,
                     },
                 )
                 unchanged()
@@ -486,6 +686,16 @@ def evaluate_judge_request(
                     baseline_run=values["baseline_run"],
                     subject_run=values["subject_run"],
                     status=collection_stop,
+                    **cast(
+                        dict[str, Any],
+                        {
+                            "integration": request.integration,
+                            "model": request.model,
+                            "request_root": request.root,
+                        }
+                        if request.integration == "runtime-provider-judge"
+                        else {},
+                    ),
                 )
                 unchanged()
                 collection_status = require_completed_collection(

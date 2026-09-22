@@ -23,6 +23,9 @@ from invarlock.runtime_security_helpers import resolve_runtime_image_digest
 RuntimeSideRole = TypeAliasType(  # noqa: UP040
     "RuntimeSideRole", Literal["baseline", "subject"]
 )
+RuntimeResourceRole = TypeAliasType(  # noqa: UP040
+    "RuntimeResourceRole", Literal["baseline", "subject", "judge"]
+)
 
 
 @dataclass(frozen=True)
@@ -96,14 +99,14 @@ class CallerRuntimeResources:
 
     container_image_digest: str
     default_device: str = "cpu"
-    side_devices: Mapping[RuntimeSideRole, str] = field(default_factory=dict)
+    side_devices: Mapping[RuntimeResourceRole, str] = field(default_factory=dict)
     provider_bindings: Mapping[str, ProviderResourceBinding] = field(
         default_factory=dict
     )
 
     def __post_init__(self) -> None:
         side_devices = dict(self.side_devices)
-        if set(side_devices) - {"baseline", "subject"}:
+        if set(side_devices) - {"baseline", "subject", "judge"}:
             raise RuntimeResourceResolutionError("runtime side device key is invalid")
         provider_bindings = dict(self.provider_bindings)
         object.__setattr__(self, "side_devices", MappingProxyType(side_devices))
@@ -115,7 +118,7 @@ class CallerRuntimeResources:
         self,
         *,
         request_root: Path,
-        role: RuntimeSideRole,
+        role: RuntimeResourceRole,
         side: ComparisonSideRequest,
         provider: RuntimeProvider,
     ) -> RuntimeArtifactResources:
@@ -203,10 +206,11 @@ def caller_runtime_resources_from_environment() -> CallerRuntimeResources:
             "INVARLOCK_RUNTIME_IMAGE_DIGEST must bind the executing image"
         )
     default_device = os.environ.get("INVARLOCK_RUNTIME_DEVICE", "cpu")
-    side_devices: dict[RuntimeSideRole, str] = {}
-    device_variables: tuple[tuple[RuntimeSideRole, str], ...] = (
+    side_devices: dict[RuntimeResourceRole, str] = {}
+    device_variables: tuple[tuple[RuntimeResourceRole, str], ...] = (
         ("baseline", "INVARLOCK_BASELINE_RUNTIME_DEVICE"),
         ("subject", "INVARLOCK_SUBJECT_RUNTIME_DEVICE"),
+        ("judge", "INVARLOCK_JUDGE_RUNTIME_DEVICE"),
     )
     for role, variable in device_variables:
         value = os.environ.get(variable)

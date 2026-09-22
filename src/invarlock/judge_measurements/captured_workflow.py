@@ -14,6 +14,7 @@ from invarlock.core.evaluation_request import (
     CapturedEvaluationRequest,
     _reference_parts,
     _resolve_output_reference,
+    _validate_judge_model_binding,
 )
 from invarlock.evaluation_record_contracts.contracts import MAX_INPUT_BYTES
 from invarlock.evaluation_records.io import run_digest
@@ -71,6 +72,17 @@ def _locations(request: CapturedEvaluationRequest, signing_key: Path | None) -> 
     ):
         raise JudgeWorkflowError("Judge signer identity is invalid")
     workspace, evidence = judge.workspace, request.evidence
+    if judge.model is not None and judge.measurements is not None:
+        raise JudgeWorkflowError(
+            "Captured judge requests cannot combine a local model with imported measurements"
+        )
+    if judge.model is not None:
+        _validate_judge_model_binding(
+            judge.model,
+            root=request.root,
+            workspace=workspace,
+            evidence=evidence,
+        )
     for name, path in (("judge workspace", workspace), ("output.evidence", evidence)):
         reference = path.relative_to(request.root).as_posix()
         _reference_parts(reference, label=name)
@@ -196,14 +208,30 @@ def _prepare(
         metadata["collection_available"] = False
         metadata["measurements"] = measurements["completeness"]
     else:
-        budgets = _collection_budgets(recipe["collection"], plan)
-        capacity = min(
-            budgets["max_calls"],
-            budgets["max_input_tokens"] // budgets["input_tokens_per_call"],
-            budgets["max_output_tokens"]
-            // plan["judge"]["config"]["max_output_tokens"],
-            budgets["max_cost_microusd"] // budgets["cost_microusd_per_call"],
+        local = (
+            recipe["collection"].get("profile")
+            == "runtime-provider-text-frozen-answer-v1"
         )
+        if local:
+            from invarlock.judge_measurements.runtime_provider import (
+                validate_runtime_provider_collection,
+            )
+
+            budgets = validate_runtime_provider_collection(recipe["collection"], plan)
+            capacity = min(
+                budgets["max_calls"],
+                budgets["max_output_tokens"]
+                // plan["judge"]["config"]["max_output_tokens"],
+            )
+        else:
+            budgets = _collection_budgets(recipe["collection"], plan)
+            capacity = min(
+                budgets["max_calls"],
+                budgets["max_input_tokens"] // budgets["input_tokens_per_call"],
+                budgets["max_output_tokens"]
+                // plan["judge"]["config"]["max_output_tokens"],
+                budgets["max_cost_microusd"] // budgets["cost_microusd_per_call"],
+            )
         if capacity < plan["schedule"]["expected_trials"]:
             raise JudgeWorkflowError(
                 "Judge collection budgets must reserve every planned call"
@@ -212,11 +240,19 @@ def _prepare(
             raise JudgeWorkflowError(
                 "Judge cases have fewer independent units than the analysis minimum"
             )
+        preflight_arguments: dict[str, Any] = {}
+        if local:
+            preflight_arguments = {
+                "model": judge.model,
+                "request_root": request.root,
+                "plan": plan,
+            }
         metadata.update(
             budgets=budgets,
             maximum_admitted_calls=capacity,
             collection_environment=native_workflow.collection_preflight(
-                recipe["collection"]
+                recipe["collection"],
+                **preflight_arguments,
             ),
             collection_available=True,
         )
@@ -252,6 +288,12 @@ def evaluate_captured_judge(
                 )
                 unchanged()
                 stop: dict[str, str] = {}
+                collect_arguments: dict[str, Any] = {}
+                if native_workflow._local_collection(values["recipe"]["collection"]):
+                    collect_arguments = {
+                        "model": judge.model,
+                        "request_root": request.root,
+                    }
                 values["measurements"] = native_workflow.collect_frozen(
                     plan=values["plan"],
                     collection=values["recipe"]["collection"],
@@ -260,6 +302,7 @@ def evaluate_captured_judge(
                     baseline_run=values["baseline"],
                     subject_run=values["subject"],
                     status=stop,
+                    **collect_arguments,
                 )
                 unchanged()
                 status = native_workflow.require_completed_collection(

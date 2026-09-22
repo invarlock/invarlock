@@ -16,6 +16,9 @@ from typing import TYPE_CHECKING, Any
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from invarlock.captured_contracts import read_file
+from invarlock.core.registry import get_registry
+from invarlock.core.runtime_provider import ModelRuntimeSpec
+from invarlock.evaluation_runtime import caller_runtime_resources_from_environment
 from invarlock.evidence_pack_contract import EvidenceObservation, RuntimeSideEvidence
 from invarlock.evidence_pack_json import parse_json_bytes
 from invarlock.filesystem.atomic_file import write_file_no_replace
@@ -31,7 +34,10 @@ from invarlock.judge_measurements.workflow import (
 )
 
 if TYPE_CHECKING:
-    from invarlock.core.evaluation_request import EvaluationRequest
+    from invarlock.core.evaluation_request import (
+        ComparisonSideRequest,
+        EvaluationRequest,
+    )
 
 
 def collection_api() -> Any:
@@ -41,8 +47,54 @@ def collection_api() -> Any:
     return judge_measurements
 
 
-def collection_preflight(configuration: dict[str, Any]) -> dict[str, Any]:
+def _local_collection(configuration: dict[str, Any]) -> bool:
+    return configuration.get("profile") == "runtime-provider-text-frozen-answer-v1"
+
+
+def _runtime_provider_inputs(
+    *, model: ComparisonSideRequest, request_root: Path
+) -> tuple[Any, ModelRuntimeSpec, Any]:
+    provider = get_registry().get_runtime_provider(model.runtime.provider)
+    spec = ModelRuntimeSpec(
+        provider_name=model.runtime.provider,
+        model_id=model.artifact.model_id,
+        settings=model.runtime.settings,
+    )
+    resources = caller_runtime_resources_from_environment().resolve(
+        request_root=request_root,
+        role="judge",
+        side=model,
+        provider=provider,
+    )
+    return provider, spec, resources
+
+
+def collection_preflight(
+    configuration: dict[str, Any],
+    *,
+    integration: str | None = None,
+    model: ComparisonSideRequest | None = None,
+    request_root: Path | None = None,
+    plan: Any | None = None,
+) -> dict[str, Any]:
     api = collection_api()
+    local = integration == "runtime-provider-judge" or _local_collection(configuration)
+    if local:
+        if model is None or request_root is None or plan is None:
+            raise JudgeWorkflowError(
+                "runtime judge preflight requires its model, request root, and plan"
+            )
+        budgets = api.validate_runtime_provider_collection(configuration, plan)
+        provider, spec, resources = _runtime_provider_inputs(
+            model=model, request_root=request_root
+        )
+        result = dict(
+            api.preflight_runtime_provider(
+                plan, provider=provider, spec=spec, resources=resources
+            )
+        )
+        result["budgets"] = budgets
+        return result
     options = api.CollectionOptions(**configuration)
     return dict(api.validate_collection_environment(options))
 
@@ -136,9 +188,45 @@ def collect_frozen(
     baseline_run: dict[str, Any],
     subject_run: dict[str, Any],
     status: dict[str, str] | None = None,
+    integration: str | None = None,
+    model: ComparisonSideRequest | None = None,
+    request_root: Path | None = None,
 ) -> Any:
     """Resume only unadmitted calls against the same immutable frozen answers."""
     api = collection_api()
+    local = integration == "runtime-provider-judge" or _local_collection(collection)
+    if local:
+        if model is None or request_root is None:
+            raise JudgeWorkflowError(
+                "runtime judge collection requires its model and request root"
+            )
+        if set(runner) != {"scorer_id"}:
+            raise JudgeWorkflowError(
+                "runtime judge runner supports only scorer_id; per-record "
+                "runtime timeout_seconds is enforced by the provider"
+            )
+        api.validate_runtime_provider_collection(collection, plan)
+        provider, spec, resources = _runtime_provider_inputs(
+            model=model, request_root=request_root
+        )
+        if status is not None:
+            status.clear()
+        result = api.collect_runtime_provider(
+            plan,
+            provider=provider,
+            spec=spec,
+            resources=resources,
+            baseline_run=baseline_run,
+            subject_run=subject_run,
+            options=api.RuntimeProviderJudgeOptions(
+                source_id="runtime-provider-judge",
+                scorer_id=runner["scorer_id"],
+                checkpoint_directory=workspace / "runtime-collection",
+            ),
+        )
+        if status is not None:
+            status["stop_reason"] = "complete"
+        return result
     options = api.CollectionOptions(**collection)
     run_options = api.RunnerOptions(
         checkpoint_directory=workspace / "collection", **runner
@@ -211,8 +299,21 @@ def preflight_native_judge(
     prepared = prepare_native_judge(policy_bytes, schedule)
     if request.comparison.judge is None:
         raise JudgeWorkflowError("native judge configuration is required")
-    metadata = {key: value for key, value in prepared.items() if key != "recipe"}
-    metadata["collection"] = collection_preflight(prepared["recipe"]["collection"])
+    metadata = {
+        key: value
+        for key, value in prepared.items()
+        if key not in {"recipe", "preflight_plan"}
+    }
+    collection = prepared["recipe"]["collection"]
+    if _local_collection(collection):
+        metadata["collection"] = collection_preflight(
+            collection,
+            model=request.comparison.judge.model,
+            request_root=request.root,
+            plan=prepared["preflight_plan"],
+        )
+    else:
+        metadata["collection"] = collection_preflight(collection)
     metadata.update(workspace=str(request.comparison.judge.workspace), network_calls=0)
     return metadata
 
@@ -242,7 +343,15 @@ def evaluate_native_judge(
     if configuration is None:
         raise JudgeWorkflowError("native judge configuration is required")
     recipe = prepared["recipe"]
-    collection_preflight(recipe["collection"])
+    if _local_collection(recipe["collection"]):
+        collection_preflight(
+            recipe["collection"],
+            model=configuration.model,
+            request_root=request.root,
+            plan=prepared["preflight_plan"],
+        )
+    else:
+        collection_preflight(recipe["collection"])
     workspace = configuration.workspace
     with locked_workspace(workspace) as unchanged:
         _retain_identity(
@@ -315,15 +424,21 @@ def evaluate_native_judge(
         plan, policy = finalize_native_plan(recipe, baseline_run, subject_run)
         unchanged()
         collection_stop: dict[str, str] = {}
-        measurements = collect_frozen(
-            plan=plan,
-            collection=recipe["collection"],
-            runner=recipe["runner"],
-            workspace=workspace,
-            baseline_run=baseline_run,
-            subject_run=subject_run,
-            status=collection_stop,
-        )
+        collection_arguments = {
+            "plan": plan,
+            "collection": recipe["collection"],
+            "runner": recipe["runner"],
+            "workspace": workspace,
+            "baseline_run": baseline_run,
+            "subject_run": subject_run,
+            "status": collection_stop,
+        }
+        if _local_collection(recipe["collection"]):
+            collection_arguments.update(
+                model=configuration.model,
+                request_root=request.root,
+            )
+        measurements = collect_frozen(**collection_arguments)
         unchanged()
         collection_status = require_completed_collection(
             measurements,

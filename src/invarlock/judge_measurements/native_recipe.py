@@ -85,8 +85,17 @@ def _recipe(value: object) -> dict[str, Any]:
         error = next(Draft202012Validator(schema).iter_errors(item), None)
         if error is not None:
             raise ValueError(f"{label} is invalid: {error.message[:240]}")
+    local_collection = (
+        isinstance(result["collection"], dict)
+        and result["collection"].get("profile")
+        == "runtime-provider-text-frozen-answer-v1"
+    )
     runner = _object(
-        result["runner"], {"scorer_id", "invocation_timeout_seconds"}, "judge runner"
+        result["runner"],
+        {"scorer_id"}
+        if local_collection
+        else {"scorer_id", "invocation_timeout_seconds"},
+        "judge runner",
     )
     scorer = runner["scorer_id"]
     if (
@@ -98,11 +107,12 @@ def _recipe(value: object) -> dict[str, Any]:
         )
     ):
         raise ValueError("judge scorer_id must be a bounded identifier")
-    timeout = runner["invocation_timeout_seconds"]
-    if type(timeout) is not int or not 1 <= timeout <= 604800:
-        raise ValueError(
-            "judge invocation timeout must be between 1 and 604800 seconds"
-        )
+    if not local_collection:
+        timeout = runner["invocation_timeout_seconds"]
+        if type(timeout) is not int or not 1 <= timeout <= 604800:
+            raise ValueError(
+                "judge invocation timeout must be between 1 and 604800 seconds"
+            )
     return result
 
 
@@ -204,16 +214,29 @@ def prepare_native_judge(
         "score_provenance": {},
     }
     plan, policy = finalize_native_plan(recipe, preview, preview)
-    from invarlock.judge_measurements.workflow import _collection_budgets
+    if recipe["collection"].get("profile") == "runtime-provider-text-frozen-answer-v1":
+        from invarlock.judge_measurements.runtime_provider import (
+            validate_runtime_provider_collection,
+        )
 
-    budgets = _collection_budgets(recipe["collection"], plan)
+        budgets = validate_runtime_provider_collection(recipe["collection"], plan)
+        capacity = min(
+            budgets["max_calls"],
+            budgets["max_output_tokens"]
+            // plan["judge"]["config"]["max_output_tokens"],
+        )
+    else:
+        from invarlock.judge_measurements.workflow import _collection_budgets
+
+        budgets = _collection_budgets(recipe["collection"], plan)
+        capacity = min(
+            budgets["max_calls"],
+            budgets["max_input_tokens"] // budgets["input_tokens_per_call"],
+            budgets["max_output_tokens"]
+            // plan["judge"]["config"]["max_output_tokens"],
+            budgets["max_cost_microusd"] // budgets["cost_microusd_per_call"],
+        )
     planned = plan["schedule"]["expected_trials"]
-    capacity = min(
-        budgets["max_calls"],
-        budgets["max_input_tokens"] // budgets["input_tokens_per_call"],
-        budgets["max_output_tokens"] // plan["judge"]["config"]["max_output_tokens"],
-        budgets["max_cost_microusd"] // budgets["cost_microusd_per_call"],
-    )
     if capacity < planned:
         raise ValueError("judge collection budgets must reserve every planned call")
     units = len({unit["unit_id"] for unit in plan["sampling"]["case_units"]})
@@ -223,6 +246,7 @@ def prepare_native_judge(
         )
     return {
         "recipe": recipe,
+        "preflight_plan": plan,
         "cases": len(records),
         "independent_units": units,
         "minimum_units": policy["minimum_units"],
