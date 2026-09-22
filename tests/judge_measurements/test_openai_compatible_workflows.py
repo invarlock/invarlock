@@ -168,11 +168,7 @@ def install_functional_control_transport(monkeypatch, config, outcome):
             rating = (
                 "unknown"
                 if outcome == "incomplete" and len(calls) == 1
-                else (
-                    "incorrect"
-                    if baseline == (outcome == "accepted")
-                    else "correct"
-                )
+                else ("incorrect" if baseline == (outcome == "accepted") else "correct")
             )
             response_bytes = canonical_payload(
                 {
@@ -538,13 +534,11 @@ def test_endpoint_functional_controls_collect_replay_verify_and_report(
     assert len(calls) == 32
     replayed = replay_judge_evidence(request.evidence)
     assert replayed.analysis_result.decision == decision
-    completeness = json.loads(
-        (request.evidence / "measurements.json").read_bytes()
-    )["completeness"]
+    completeness = json.loads((request.evidence / "measurements.json").read_bytes())[
+        "completeness"
+    ]
     assert completeness["expected_trials"] == 32
-    assert completeness["completed_trials"] == (
-        31 if outcome == "incomplete" else 32
-    )
+    assert completeness["completed_trials"] == (31 if outcome == "incomplete" else 32)
 
     envelope = json.loads((request.evidence / "envelope.json").read_bytes())
     recipient = {
@@ -553,18 +547,17 @@ def test_endpoint_functional_controls_collect_replay_verify_and_report(
         "intended_subject": envelope["intended_subject"],
         "required_metric_name": "factual-correctness",
         "trusted_signer": {
-            name: envelope["signer"][name]
-            for name in ("identity", "public_key_sha256")
+            name: envelope["signer"][name] for name in ("identity", "public_key_sha256")
         },
         "bindings": copy.deepcopy(envelope["bindings"]),
         "required_decision": "pass",
     }
     recipient_path = tmp_path / "recipient.json"
     recipient_path.write_bytes(canonical_payload(recipient))
-    verification = verify_judge_evidence_with_policy(
-        request.evidence, recipient_path
+    verification = verify_judge_evidence_with_policy(request.evidence, recipient_path)
+    assert (
+        verification.authenticated and verification.replayed and verification.verified
     )
-    assert verification.authenticated and verification.replayed and verification.verified
     assert verification.decision == decision
     assert verification.accepted is accepted
 
