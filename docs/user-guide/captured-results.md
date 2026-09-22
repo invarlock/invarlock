@@ -139,6 +139,10 @@ the ordinary host CLI does not launch a judge container. The
 model inspection, plan preparation and recipient verification. This local model
 selection cannot be combined with a retained `comparison.judge.measurements`
 file; retained-measurement import does not need model resources.
+For a configured Chat Completions service, select
+[`openai-compatible-judge`](../reference/judge-measurements.md#openai-compatible-judge-services)
+without a local model binding. The service's returned model label is retained
+as an observation rather than treated as an authenticated model artifact.
 
 Keep the captured request's baseline and subject source definitions and replace
 its comparison policy selection with:

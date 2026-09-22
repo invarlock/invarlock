@@ -83,6 +83,31 @@ def test_pinned_file_rejects_unsupported_invalid_and_closed_use(
         pinned.recheck()
 
 
+@pytest.mark.skipif(
+    not hasattr(os, "mkfifo") or not hasattr(os, "O_NONBLOCK"),
+    reason="nonblocking named pipes unavailable",
+)
+def test_pinned_file_rejects_named_pipe_without_blocking(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pipe = tmp_path / "model.pipe"
+    os.mkfifo(pipe)
+    real_open = os.open
+
+    def checked_open(path, flags, *args, **kwargs):  # noqa: ANN001, ANN002, ANN003
+        if path == pipe.name:
+            assert flags & os.O_NONBLOCK
+        return real_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(session.os, "open", checked_open)
+    with pytest.raises(
+        session.LlamaCppExecutionError, match="changed while being opened"
+    ):
+        session._PinnedFile.open(  # noqa: SLF001
+            pipe, expected_sha256=None, require_executable=False
+        )
+
+
 def test_pinned_file_fd_path_and_digest_drift_fail_closed(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

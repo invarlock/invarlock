@@ -10,7 +10,7 @@ block the repository; it is not a declaration that the dependency is safe.
 >
 > **Objective:** Keep `pip-audit` exceptions narrow, accountable, and self-expiring while preserving a fail-closed dependency gate.
 >
-> **Assets or boundary:** Core and first-party add-in Python dependency sets audited by `make security`.
+> **Assets or boundary:** Core, optional feature, and maintained runtime Python dependency sets audited by `make security`.
 >
 > **Use this page when:** Assessing a new advisory, authorizing a temporary exception, reviewing an existing entry, or removing a remediated exception.
 

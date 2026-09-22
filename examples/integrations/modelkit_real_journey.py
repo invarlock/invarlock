@@ -77,6 +77,45 @@ def transfer(source: Path, destination: Path) -> None:
     shutil.copytree(source, destination)
 
 
+def _selected_source(root: Path, value: object, *, directory: bool) -> Path:
+    """Resolve a caller-selected input without letting relative paths leave its request."""
+    if not isinstance(value, str) or not value or "\x00" in value:
+        raise ValueError("selected input path must be a nonempty path")
+    selected = Path(value)
+    if ".." in selected.parts:
+        raise ValueError("selected input path must not traverse parent directories")
+    source = selected if selected.is_absolute() else root / selected
+    if not selected.is_absolute():
+        component = root
+        for part in selected.parts:
+            component /= part
+            if component.is_symlink():
+                raise ValueError("selected input must not traverse a symlink")
+    if not selected.is_absolute() and not source.resolve().is_relative_to(
+        root.resolve()
+    ):
+        raise ValueError("relative input path must stay beside the request")
+    if source.is_symlink() or (
+        not source.is_dir() if directory else not source.is_file()
+    ):
+        kind = "directory" if directory else "regular file"
+        raise ValueError(f"selected input must be a {kind} without a symlink")
+    return source
+
+
+def _selected_keys(root: Path, value: object) -> dict[str, Path]:
+    if not isinstance(value, dict) or not value:
+        raise ValueError("trusted public keys must be a nonempty mapping")
+    selected = {}
+    for fingerprint, path in value.items():
+        if not isinstance(fingerprint, str) or not re.fullmatch(
+            r"sha256:[0-9a-f]{64}", fingerprint
+        ):
+            raise ValueError("trusted public key fingerprint must be a SHA-256 digest")
+        selected[fingerprint] = _selected_source(root, path, directory=False)
+    return selected
+
+
 def inference_smoke(
     request: Path,
     decision: dict,
@@ -210,9 +249,38 @@ def run(args) -> dict:
     logs = workspace / "logs"
     logs.mkdir()
     kit = args.kit.resolve()
-    check_kit(kit, args.kit_sha256, logs)
     original = read_json(args.request)
     source_root = args.request.absolute().parent
+    inputs = {
+        "evidence": _selected_source(source_root, original["evidence"], directory=True),
+        "technical_policy": _selected_source(
+            source_root, original["technical_policy"], directory=False
+        ),
+        "envelope": _selected_source(
+            source_root, original["envelope"], directory=False
+        ),
+        "recipient_policy": _selected_source(
+            source_root, original["recipient_policy"], directory=False
+        ),
+    }
+    keys = _selected_keys(source_root, original["trusted_public_keys"])
+    candidates = {
+        role: _selected_source(
+            source_root, original["sides"][role]["candidate"], directory=True
+        )
+        for role in ("baseline", "subject")
+    }
+    from examples.integrations.modelkit_handoff import _relative
+
+    selected_files = {}
+    for role in ("baseline", "subject"):
+        selected = original["sides"][role].get("artifact_file")
+        if selected is not None:
+            member = _relative(selected)
+            if member.suffix != ".gguf":
+                raise ValueError("artifact_file must select a GGUF file")
+            selected_files[role] = member
+    check_kit(kit, args.kit_sha256, logs)
     recipient = workspace / "recipient"
     recipient.mkdir()
     publisher = workspace / "publisher-store"
@@ -222,7 +290,7 @@ def run(args) -> dict:
     request = copy.deepcopy(original)
     # Technical choices come from the caller's independent input, never the pack.
     for key in ("evidence", "technical_policy", "envelope", "recipient_policy"):
-        source = source_root / original[key]
+        source = inputs[key]
         target = recipient / key
         if source.is_dir():
             transfer(source, target)
@@ -231,9 +299,9 @@ def run(args) -> dict:
         request[key] = key
     request["trusted_public_keys"] = {}
     (recipient / "trust").mkdir()
-    for fingerprint, value in original["trusted_public_keys"].items():
+    for fingerprint, source in keys.items():
         name = "trust/" + fingerprint.removeprefix("sha256:") + ".pem"
-        shutil.copy2(source_root / value, recipient / name)
+        shutil.copy2(source, recipient / name)
         request["trusted_public_keys"][fingerprint] = name
     packages = {}
 
@@ -246,16 +314,10 @@ def run(args) -> dict:
 
     for role in ("baseline", "subject"):
         side = original["sides"][role]
-        source = source_root / side["candidate"]
+        source = candidates[role]
         observation = checkpoint_tree_observation(source.absolute())
-        selected = side.get("artifact_file")
-        if selected:
-            # Reject unsafe selectors before any external pack or inference.
-            from examples.integrations.modelkit_handoff import _relative
-
-            member = _relative(selected)
-            if member.suffix != ".gguf":
-                raise ValueError("artifact_file must select a GGUF file")
+        member = selected_files.get(role)
+        if member is not None:
             actual = digest(source.joinpath(*member.parts))
         else:
             actual = observation.digest

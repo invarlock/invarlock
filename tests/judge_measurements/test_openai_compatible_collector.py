@@ -332,15 +332,29 @@ def test_recursive_secret_and_credential_detection():
 def test_pure_response_projection_rejects_hostile_shapes(mutation):
     value = json.loads(_success_payload())
     with pytest.raises(OpenAICompatibleContractError):
-        response_facts(mutation(value), approved_models=["test/judge"])
+        response_facts(
+            mutation(value), approved_models=["test/judge"], max_output_tokens=128
+        )
 
 
 def test_pure_response_projection_handles_optional_usage_and_model_approval():
     value = json.loads(_success_payload())
     value.pop("usage")
-    assert response_facts(value, approved_models=["test/judge"])["usage"] is None
+    assert (
+        response_facts(value, approved_models=["test/judge"], max_output_tokens=128)[
+            "usage"
+        ]
+        is None
+    )
     with pytest.raises(OpenAICompatibleContractError, match="not approved"):
-        response_facts(value, approved_models=["other"])
+        response_facts(value, approved_models=["other"], max_output_tokens=128)
+
+
+def test_pure_response_projection_rejects_usage_above_approved_output_limit():
+    value = json.loads(_success_payload())
+    value["usage"]["completion_tokens"] = 129
+    with pytest.raises(OpenAICompatibleContractError, match="output-token limit"):
+        response_facts(value, approved_models=["test/judge"], max_output_tokens=128)
 
 
 @pytest.mark.parametrize(
@@ -665,6 +679,15 @@ def test_checkpoint_parser_rejects_every_ambiguous_layout(tmp_path):
             True,
         ),
         (
+            {
+                "body": _success_payload(
+                    usage={"prompt_tokens": 20, "completion_tokens": 129}
+                )
+            },
+            "malformed_response",
+            True,
+        ),
+        (
             {"headers": {"content-encoding": "gzip"}, "body": gzip.compress(b"{}")},
             "malformed_response",
             False,
@@ -888,6 +911,15 @@ def test_pure_replay_rejects_closed_endpoint_source_failure_shapes(
     assert any(
         "success response is invalid" in error
         for error in _openai_compatible_source_errors(invalid_success, plan)
+    )
+
+    over_budget_success = deepcopy(success)
+    over_budget_success["http"]["response_body"] = _response_blob(
+        _success_payload(usage={"prompt_tokens": 20, "completion_tokens": 129})
+    )
+    assert any(
+        "success response is invalid" in error
+        for error in _openai_compatible_source_errors(over_budget_success, plan)
     )
 
     failure_root = tmp_path / "failure"

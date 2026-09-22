@@ -626,7 +626,16 @@ def test_live_collection_checkpoints_and_resumes(data, monkeypatch, tmp_path):
         use_model_event_sink=use_model_event_sink,
     )
     monkeypatch.setattr(importlib.metadata, "version", lambda _: "0.3.263")
-    monkeypatch.setattr(importlib, "import_module", lambda _: fake_module)
+    original_import = importlib.import_module
+    monkeypatch.setattr(
+        importlib,
+        "import_module",
+        lambda name, *args, **kwargs: (
+            fake_module
+            if name in {"inspect_ai.model", "inspect_ai.model._model"}
+            else original_import(name, *args, **kwargs)
+        ),
+    )
 
     class Model:
         name = "example-judge"

@@ -658,6 +658,10 @@ def test_tensorrt_llm_scores_in_order_and_emits_bound_receipt(
         "OUT:alpha",
         "OUT:beta",
     )
+    with pytest.raises(ValueError, match="configured batch_size"):
+        session.score(
+            _batch(*(_record(f"extra/{index}", "prompt") for index in range(5)))
+        )
     assert observation.aggregate_source_sha256 == runtime_scoring_records_sha256(
         [asdict(record) for record in observation.records]
     )

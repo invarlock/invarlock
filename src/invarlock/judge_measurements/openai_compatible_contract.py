@@ -6,7 +6,7 @@ import base64
 import hashlib
 import ipaddress
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, cast
 from urllib.parse import urlsplit, urlunsplit
 
 COLLECTION_PROFILE = "openai-compatible-text-frozen-answer-v1"
@@ -257,7 +257,9 @@ def contains_secret(value: Any, secret: str) -> bool:
     return False
 
 
-def response_facts(value: Any, *, approved_models: list[str]) -> dict[str, Any]:
+def response_facts(
+    value: Any, *, approved_models: list[str], max_output_tokens: int
+) -> dict[str, Any]:
     if not isinstance(value, dict) or has_credential_field(value):
         raise OpenAICompatibleContractError(
             "compatible response is not a safe JSON object"
@@ -325,6 +327,11 @@ def response_facts(value: Any, *, approved_models: list[str]) -> dict[str, Any]:
             for item in (prompt_tokens, completion_tokens)
         ):
             raise OpenAICompatibleContractError("compatible usage counts are invalid")
+        completion_tokens = cast(int, completion_tokens)
+        if completion_tokens > max_output_tokens:
+            raise OpenAICompatibleContractError(
+                "compatible completion exceeds the approved output-token limit"
+            )
         normalized_usage = {
             "input_tokens": prompt_tokens,
             "output_tokens": completion_tokens,

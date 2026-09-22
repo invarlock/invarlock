@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Bind live judge provider requests to the approved model, prompt, tools,
+  sampling and output controls before retaining their measurements. Reject
+  unqualified provider model families during preflight, before paid calls. Reject
+  compatible-service completions whose reported token use exceeds the approved
+  per-call limit in both collection and offline replay.
+- Require a private per-run capability before the local HTTP example dispatches
+  a task, while preserving offline replay of its earlier retained captures.
+- Validate ModelKit journey source paths, trusted key identities and GGUF
+  selectors before transferring files or invoking the kit.
+- Close the release artifact inventory over all files and directories, and lock
+  the required Promptfoo SDK test dependency closure.
+- Reject overlong Hugging Face text and vision inputs before generation, enforce
+  TensorRT-LLM batch capacity, and avoid blocking on non-regular pinned files.
+- Require internally consistent native OpenAI Evals run identities while
+  preserving the separate InvarLock capture identity.
+
 ## [0.16.2] - 2026-09-22
 
 ### Added

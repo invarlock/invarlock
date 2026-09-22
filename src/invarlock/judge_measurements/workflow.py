@@ -34,7 +34,6 @@ from invarlock.judge_measurement_types import (
 )
 from invarlock.judge_measurements.analysis import decode_analysis_policy
 from invarlock.judge_measurements.contracts import (
-    JudgeMeasurementContractError,
     _validate_frozen_answer_bindings,
     _validate_inspect_plan_collection_identity,
     canonical_payload,
@@ -447,7 +446,12 @@ def _collection_budgets(
             grader=value["grader"],
             inspect_version=value["inspect_version"],
         )
-    except JudgeMeasurementContractError as exc:
+        from invarlock.judge_measurements.runner import (
+            _require_qualified_live_provider_model,
+        )
+
+        _require_qualified_live_provider_model(value["grader"])
+    except ValueError as exc:
         raise JudgeWorkflowError(str(exc)) from exc
     return budgets
 

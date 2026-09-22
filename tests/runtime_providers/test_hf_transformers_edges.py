@@ -255,6 +255,18 @@ def test_model_input_authentication_and_tokenizer_shape_fail_closed() -> None:
             device="cpu",
         )
 
+    def overlong_tokenizer(_text: str, **kwargs: object) -> dict[str, _EncodedIds]:
+        assert kwargs["truncation"] is False
+        return {"input_ids": _EncodedIds(shape=(1, settings.context_length + 1))}
+
+    with pytest.raises(ValueError, match="exceeds the authenticated context"):
+        provider._hf_model_inputs(
+            record=record,
+            tokenizer_call=overlong_tokenizer,
+            settings=settings,
+            device="cpu",
+        )
+
 
 def test_causal_logits_reject_missing_model_output() -> None:
     torch = SimpleNamespace(ones_like=lambda window: window)

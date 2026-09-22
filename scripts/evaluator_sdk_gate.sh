@@ -45,7 +45,17 @@ case "$SDK_NAME" in
 esac
 SDK_RECIPE_DEPS=(--with pytest==9.1.1 --with jsonschema==4.26.0)
 SDK_TEMP="$(mktemp -d)"
-trap 'rm -rf "$SDK_TEMP"' EXIT
+cleanup_sdk_temp() {
+  # macOS may briefly repopulate npm's large module tree during removal.
+  for attempt in 1 2 3; do
+    if rm -rf "$SDK_TEMP" 2>/dev/null; then
+      return 0
+    fi
+    sleep 1
+  done
+  rm -rf "$SDK_TEMP"
+}
+trap cleanup_sdk_temp EXIT
 if [ "$SDK_NAME" = "deepeval" ]; then
   SDK_TESTS+=("tests/evaluation_records/test_scalar_integrations.py::test_documented_deepeval_python_capture")
   # Literal recipes import captured-file verification and request parsing.
@@ -115,21 +125,39 @@ test -f "$SDK_LOCK"
 # The top-level SDK versions are pinned by the maintained evaluator inventory.
 # These isolated test environments are not dependencies of the distributed core.
 if [ "$SDK_NAME" = "promptfoo" ]; then
-  # The maintained npm lock pins the package archive's SHA-512 and SHA-1.
-  # Install verified bytes into a disposable evaluator environment only.
+  # The reviewed npm lock pins the required dependency tree. Unused optional
+  # integrations are omitted. Check its
+  # Promptfoo archive against the separate maintained SDK identity before
+  # installing the locked tree in the disposable evaluator environment.
   if [ -z "${INVARLOCK_PROMPTFOO_PACKAGE:-}" ]; then
-    SDK_PACKAGE="$(node -e 'const fs=require("fs"); const line=fs.readFileSync(process.argv[1],"utf8").split("\n").find(x=>x.startsWith("package=")); if(!line)throw Error("missing package pin"); process.stdout.write(line.slice(8));' "$SDK_LOCK")"
-    npm pack "$SDK_PACKAGE" --json --pack-destination "$SDK_TEMP" > "$SDK_TEMP/archive.json"
-    SDK_ARCHIVE="$(node -e '
-      const fs=require("fs"), path=require("path"), crypto=require("crypto");
+    SDK_NPM_LOCK="$SDK_ROOT/examples/evaluator-qualification/locks/promptfoo"
+    node -e '
+      const fs=require("fs"), path=require("path");
       const pins=Object.fromEntries(fs.readFileSync(process.argv[1],"utf8").trim().split("\n").map(line=>{const i=line.indexOf("=");return [line.slice(0,i),line.slice(i+1)];}));
-      const root=process.argv[2], packed=JSON.parse(fs.readFileSync(path.join(root,"archive.json"),"utf8"));
-      if(packed.length!==1 || path.basename(packed[0].filename)!==packed[0].filename)throw Error("invalid npm archive result");
-      const file=path.join(root,packed[0].filename), bytes=fs.readFileSync(file);
-      if("sha512-"+crypto.createHash("sha512").update(bytes).digest("base64")!==pins.integrity || crypto.createHash("sha1").update(bytes).digest("hex")!==pins.shasum)throw Error("Promptfoo archive differs from maintained integrity pins");
-      process.stdout.write(file);
-    ' "$SDK_LOCK" "$SDK_TEMP")"
-    npm install --prefix "$SDK_TEMP" --ignore-scripts --no-audit --no-fund "$SDK_ARCHIVE"
+      const root=process.argv[2], manifest=JSON.parse(fs.readFileSync(path.join(root,"package.json"),"utf8"));
+      const lock=JSON.parse(fs.readFileSync(path.join(root,"package-lock.json"),"utf8"));
+      const name=pins.package, version=name?.split("@")[1], archive=lock.packages?.["node_modules/promptfoo"];
+      if(name!==`promptfoo@${version}` || !version || manifest.dependencies?.promptfoo!==version ||
+         lock.packages?.[""].dependencies?.promptfoo!==version || archive?.version!==version ||
+         archive?.integrity!==pins.integrity || lock.lockfileVersion!==3) {
+        throw Error("Promptfoo npm lock differs from its maintained identity pin");
+      }
+      if(manifest.overrides?.promptfoo?.["js-yaml"]!=="5.2.2" ||
+         lock.packages?.["node_modules/js-yaml"]?.version!=="5.2.2") {
+        throw Error("Promptfoo npm lock is missing the reviewed js-yaml patch");
+      }
+      for(const [entry, pkg] of Object.entries(lock.packages)) {
+        if(pkg.optional===true || pkg.optionalDependencies) {
+          throw Error("Promptfoo npm lock includes an unused optional dependency");
+        }
+        if(entry && (!pkg.integrity || !pkg.resolved?.startsWith("https://registry.npmjs.org/"))) {
+          throw Error("Promptfoo npm lock has an unpinned dependency");
+        }
+      }
+    ' "$SDK_LOCK" "$SDK_NPM_LOCK"
+    npm audit --package-lock-only --omit=dev --omit=optional --audit-level=high --prefix "$SDK_NPM_LOCK"
+    cp "$SDK_NPM_LOCK/package.json" "$SDK_NPM_LOCK/package-lock.json" "$SDK_TEMP/"
+    npm ci --prefix "$SDK_TEMP" --omit=optional --ignore-scripts --no-audit --no-fund
     export INVARLOCK_PROMPTFOO_PACKAGE="$SDK_TEMP/node_modules/promptfoo"
   fi
   uv run --no-project --isolated --python 3.12 \

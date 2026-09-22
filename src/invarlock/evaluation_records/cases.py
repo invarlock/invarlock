@@ -28,7 +28,7 @@ def canonical_case_set(value: dict[str, Any]) -> dict[str, Any]:
 
 
 def case_set_digest(value: dict[str, Any]) -> str:
-    """Hash a validated, ID-sorted case set using the pipeline canonical rules."""
+    """Hash a validated, ID-sorted case set using the evidence canonical rules."""
     return digest(canonical_case_set(value))
 
 

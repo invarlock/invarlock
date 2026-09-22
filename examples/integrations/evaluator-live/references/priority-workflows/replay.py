@@ -11,6 +11,10 @@ import tempfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+HISTORICAL_HTTP_HELPER = HERE / "http_service.py.txt"
+HISTORICAL_HTTP_HELPER_SHA256 = (
+    "sha256:3356817238c0d6a7632d3369fe744efeb4fd40a2cba4586187d69cab4ec81dda"
+)
 ARCHIVES = {
     "captures.zip": "f0cc24c07ea81306efae3146176e28b1416b427df1730fff3d1eba3497be9cd5",
     "exact-match.zip": "05268c70a541552a24e08784a941ea4535eb677737d87d17ab54f06a01c18faf",
@@ -34,6 +38,16 @@ def module(name, path):
 SHARED = module(
     "priority_shared_reference", HERE.parent / "mistral-7b-sentinel/replay.py"
 )
+
+
+def verify_historical_http_helper(protocol, role):
+    """Bind the archived source bytes to the original HTTP protocol pin."""
+    source_digest = "sha256:" + SHARED.sha(HISTORICAL_HTTP_HELPER.read_bytes())
+    if (
+        source_digest != HISTORICAL_HTTP_HELPER_SHA256
+        or protocol["http_services"][role]["helper_sha256"] != source_digest
+    ):
+        raise ValueError("historical HTTP helper source differs from its pin")
 
 
 def validate_reference(reference):
@@ -171,6 +185,8 @@ def verify_sources(root, reference):
         if SHARED.sha(raw) != profile["protocol_sha256"]:
             raise ValueError("source protocol hash differs")
         protocol = json.loads(raw)
+        if row["profile"] == "http":
+            verify_historical_http_helper(protocol, row["role"])
         native, _, results = recipient.capture(
             root / row["directory"], protocol, row["role"], row["evaluator"]
         )

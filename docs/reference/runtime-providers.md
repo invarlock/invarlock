@@ -179,6 +179,8 @@ The closed set is the Hugging Face text contract plus
 vision-text request. The provider authenticates the checkpoint, tokenizer, and
 processor before execution and resolves image bytes through the caller-owned
 content store described in the user guide.
+Both Hugging Face providers reject a tokenized input that exceeds the declared
+`context_length`; they do not silently shorten the input before scoring.
 
 ### `llama_cpp`
 
@@ -209,6 +211,8 @@ binds the engine tree, build configuration, file inventory, runner, backend,
 tokenizer, engine metadata, and GPU target. See NVIDIA's [TensorRT-LLM
 documentation](https://nvidia.github.io/TensorRT-LLM/) for backend concepts;
 the InvarLock provider defines the evidence bindings above.
+Submitted batches must fit the declared `batch_size` and authenticated engine
+capacity; oversized batches are rejected before generation.
 
 ## Scoring obligations
 

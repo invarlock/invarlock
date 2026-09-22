@@ -46,6 +46,136 @@ def test_transfer_rejects_symlink(tmp_path):
         journey.transfer(publisher, tmp_path / "recipient")
 
 
+def test_selected_inputs_stay_with_the_request(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    selected = source / "policy.json"
+    selected.write_text("{}")
+    assert journey._selected_source(source, "policy.json", directory=False) == selected
+    assert journey._selected_source(source, str(selected), directory=False) == selected
+    with pytest.raises(ValueError, match="parent directories"):
+        journey._selected_source(source, "../policy.json", directory=False)
+    (source / "linked.json").symlink_to(selected)
+    with pytest.raises(ValueError, match="symlink"):
+        journey._selected_source(source, "linked.json", directory=False)
+    (source / "outside").symlink_to(tmp_path, target_is_directory=True)
+    with pytest.raises(ValueError, match="symlink"):
+        journey._selected_source(source, "outside/policy.json", directory=False)
+
+
+@pytest.mark.parametrize("selected", [None, "", "bad\x00path", 42])
+def test_selected_inputs_require_a_valid_path(tmp_path, selected):
+    with pytest.raises(ValueError, match="nonempty path"):
+        journey._selected_source(tmp_path, selected, directory=False)
+
+
+@pytest.mark.parametrize(
+    ("selected", "directory", "expected"),
+    [("evidence", False, "regular file"), ("policy.json", True, "directory")],
+)
+def test_selected_inputs_require_the_declared_kind(
+    tmp_path, selected, directory, expected
+):
+    (tmp_path / "evidence").mkdir()
+    (tmp_path / "policy.json").write_text("{}")
+    with pytest.raises(ValueError, match=expected):
+        journey._selected_source(tmp_path, selected, directory=directory)
+
+
+@pytest.mark.parametrize("selected", [None, {}, []])
+def test_trusted_keys_require_at_least_one_fingerprint(tmp_path, selected):
+    with pytest.raises(ValueError, match="nonempty mapping"):
+        journey._selected_keys(tmp_path, selected)
+
+
+@pytest.mark.parametrize(
+    "fingerprint", ["../outside", "sha256:bad", "sha256:" + "a" * 64 + "/x"]
+)
+def test_trusted_key_name_must_be_a_digest(tmp_path, fingerprint):
+    key = tmp_path / "key.pem"
+    key.write_text("public key")
+    with pytest.raises(ValueError, match="fingerprint"):
+        journey._selected_keys(tmp_path, {fingerprint: str(key)})
+
+
+def test_run_validates_selected_sources_before_external_execution(
+    tmp_path, monkeypatch
+):
+    (tmp_path / "evidence").mkdir()
+    (tmp_path / "baseline").mkdir()
+    (tmp_path / "subject").mkdir()
+    for name in ("technical.json", "envelope.json", "recipient.json", "key.pem"):
+        (tmp_path / name).write_text("{}")
+    request = tmp_path / "request.json"
+    journey.write_json(
+        request,
+        {
+            "evidence": "evidence",
+            "technical_policy": "technical.json",
+            "envelope": "envelope.json",
+            "recipient_policy": "recipient.json",
+            "trusted_public_keys": {"../outside": "key.pem"},
+            "sides": {
+                "baseline": {"candidate": "baseline"},
+                "subject": {"candidate": "subject"},
+            },
+        },
+    )
+    monkeypatch.setattr(
+        journey,
+        "check_kit",
+        lambda *args: pytest.fail("external kit executed before input validation"),
+    )
+    with pytest.raises(ValueError, match="fingerprint"):
+        journey.run(
+            SimpleNamespace(
+                output=tmp_path / "output",
+                request=request,
+                kit=tmp_path / "kit",
+                kit_sha256="0" * 64,
+            )
+        )
+
+
+def test_run_rejects_unsafe_artifact_selector_before_external_execution(
+    tmp_path, monkeypatch
+):
+    (tmp_path / "evidence").mkdir()
+    (tmp_path / "baseline").mkdir()
+    (tmp_path / "subject").mkdir()
+    for name in ("technical.json", "envelope.json", "recipient.json", "key.pem"):
+        (tmp_path / name).write_text("{}")
+    request = tmp_path / "request.json"
+    journey.write_json(
+        request,
+        {
+            "evidence": "evidence",
+            "technical_policy": "technical.json",
+            "envelope": "envelope.json",
+            "recipient_policy": "recipient.json",
+            "trusted_public_keys": {"sha256:" + "a" * 64: "key.pem"},
+            "sides": {
+                "baseline": {"candidate": "baseline", "artifact_file": "../x.gguf"},
+                "subject": {"candidate": "subject"},
+            },
+        },
+    )
+    monkeypatch.setattr(
+        journey,
+        "check_kit",
+        lambda *args: pytest.fail("external kit executed before input validation"),
+    )
+    with pytest.raises(ValueError, match="unsafe package path"):
+        journey.run(
+            SimpleNamespace(
+                output=tmp_path / "output",
+                request=request,
+                kit=tmp_path / "kit",
+                kit_sha256="0" * 64,
+            )
+        )
+
+
 def test_smoke_rejects_failed_acceptance_before_loading(tmp_path):
     with pytest.raises(ValueError, match="acceptance"):
         journey.inference_smoke(
@@ -616,7 +746,9 @@ def test_run_rejects_unsafe_or_changed_source_before_pack(
     monkeypatch.setattr(journey, "command", record)
     with pytest.raises(ValueError):
         journey.run(args)
-    assert commands == [[str(args.kit), "version"]]
+    assert commands == (
+        [[str(args.kit), "version"]] if member == "weights.gguf" else []
+    )
     assert not (args.output / "result.json").exists()
 
 
