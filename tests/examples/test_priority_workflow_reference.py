@@ -95,6 +95,24 @@ def test_real_source_profiles_and_original_signed_results_replay():
         )
 
 
+def test_historical_http_helper_source_matches_frozen_capture(
+    retained, tmp_path, monkeypatch
+):
+    files, reference = retained
+    path = reference["source_profiles"]["http"]["protocol"]
+    protocol = json.loads(files[path])
+    REPLAY.verify_historical_http_helper(protocol, "baseline")
+    altered = copy.deepcopy(protocol)
+    altered["http_services"]["baseline"]["helper_sha256"] = "sha256:" + "0" * 64
+    with pytest.raises(ValueError, match="historical HTTP helper source"):
+        REPLAY.verify_historical_http_helper(altered, "baseline")
+    changed_source = tmp_path / "historical-helper.py.txt"
+    changed_source.write_bytes(REPLAY.HISTORICAL_HTTP_HELPER.read_bytes() + b"\n")
+    monkeypatch.setattr(REPLAY, "HISTORICAL_HTTP_HELPER", changed_source)
+    with pytest.raises(ValueError, match="historical HTTP helper source"):
+        REPLAY.verify_historical_http_helper(protocol, "baseline")
+
+
 def test_catalog_pins_profiles_and_original_failures(retained):
     files, reference = retained
     catalog = json.loads((REFERENCE / "reference.json").read_bytes())

@@ -9,11 +9,8 @@ from __future__ import annotations
 import argparse
 import base64
 import hashlib
-import hmac
 import http.client
-import os
 import signal
-import stat
 import time
 from copy import deepcopy
 from datetime import UTC, datetime
@@ -27,71 +24,10 @@ PRIORITY = {"inspect-ai", "lm-evaluation-harness", "promptfoo", "langfuse"}
 PATH = "/v1/tasks"
 TIMEOUT = 180
 MAX_CAPTURE_BYTES = 128 * 1024 * 1024
-CAPABILITY_HEX_LENGTH = 64
-HISTORICAL_HELPER_SHA256 = (
-    "sha256:3356817238c0d6a7632d3369fe744efeb4fd40a2cba4586187d69cab4ec81dda"
-)
-HISTORICAL_HELPER = (
-    Path(__file__).parent / "references/priority-workflows/http_service.py.txt"
-)
 
 
 def sha(raw):
     return "sha256:" + hashlib.sha256(raw).hexdigest()
-
-
-def _capability(value):
-    if (
-        not isinstance(value, str)
-        or len(value) != CAPABILITY_HEX_LENGTH
-        or any(character not in "0123456789abcdef" for character in value)
-    ):
-        raise ValueError("HTTP task capability must be 32 random bytes encoded as hex")
-    return value
-
-
-def read_capability(path):
-    """Read one private, bounded capability without retaining its bytes elsewhere."""
-    descriptor = os.open(
-        Path(path),
-        os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | getattr(os, "O_CLOEXEC", 0),
-    )
-    try:
-        before = os.fstat(descriptor)
-        if (
-            not stat.S_ISREG(before.st_mode)
-            or before.st_uid != os.geteuid()
-            or stat.S_IMODE(before.st_mode) & 0o077
-            or before.st_size not in {CAPABILITY_HEX_LENGTH, CAPABILITY_HEX_LENGTH + 1}
-        ):
-            raise ValueError(
-                "HTTP task capability must be an owner-private regular file"
-            )
-        with os.fdopen(descriptor, "rb", closefd=False) as stream:
-            raw = stream.read(CAPABILITY_HEX_LENGTH + 2)
-        after = os.fstat(descriptor)
-
-        def identity(value):
-            return (
-                value.st_dev,
-                value.st_ino,
-                value.st_mode,
-                value.st_uid,
-                value.st_size,
-                value.st_mtime_ns,
-                value.st_ctime_ns,
-            )
-
-        if identity(before) != identity(after):
-            raise ValueError("HTTP task capability changed while being read")
-    finally:
-        os.close(descriptor)
-    if raw.endswith(b"\n"):
-        raw = raw[:-1]
-    try:
-        return _capability(raw.decode("ascii"))
-    except UnicodeDecodeError as exc:
-        raise ValueError("HTTP task capability must contain lowercase hex") from exc
 
 
 def timestamp():
@@ -116,7 +52,7 @@ def endpoint(value):
     return "127.0.0.1", parsed.port
 
 
-def service(protocol, role, *, require_current_source=True):
+def service(protocol, role):
     value = protocol["http_services"][role]
     if not isinstance(value, dict) or set(value) != {
         "provider",
@@ -136,23 +72,8 @@ def service(protocol, role, *, require_current_source=True):
         for v in value.values()
     ):
         raise ValueError("HTTP service declaration contains invalid values")
-    helper_digest = value["helper_sha256"]
-    if (
-        len(helper_digest) != len("sha256:") + 64
-        or not helper_digest.startswith("sha256:")
-        or any(character not in "0123456789abcdef" for character in helper_digest[7:])
-    ):
-        raise ValueError("HTTP helper digest must be a SHA-256 source pin")
-    current_digest = sha(Path(__file__).read_bytes())
-    if helper_digest != current_digest:
-        if require_current_source or helper_digest != HISTORICAL_HELPER_SHA256:
-            raise ValueError("HTTP helper differs from its independently frozen source")
-        try:
-            archived_digest = sha(HISTORICAL_HELPER.read_bytes())
-        except OSError as exc:
-            raise ValueError("historical HTTP helper source is unavailable") from exc
-        if archived_digest != HISTORICAL_HELPER_SHA256:
-            raise ValueError("historical HTTP helper differs from its frozen source")
+    if value["helper_sha256"] != sha(Path(__file__).read_bytes()):
+        raise ValueError("HTTP helper differs from its independently frozen source")
     if not set(protocol["evaluators"]) <= PRIORITY:
         raise ValueError("HTTP qualification is limited to its four declared SDKs")
     return value
@@ -210,19 +131,9 @@ class TaskClient(common.TaskClient):
     """Keep original HTTP request/response bodies alongside normal task journals."""
 
     def __init__(
-        self,
-        path,
-        evaluator,
-        protocol_digest,
-        planned,
-        output,
-        *,
-        protocol,
-        role,
-        capability,
+        self, path, evaluator, protocol_digest, planned, output, *, protocol, role
     ):
         self.protocol, self.role = protocol, role
-        self.capability = _capability(capability)
         self.service = service(protocol, role)
         if path != self.service["endpoint"]:
             raise ValueError("HTTP endpoint differs from the admitted deployment")
@@ -249,10 +160,7 @@ class TaskClient(common.TaskClient):
                 "POST",
                 PATH,
                 body=raw_request,
-                headers={
-                    "Authorization": "Bearer " + self.capability,
-                    "Content-Type": "application/json",
-                },
+                headers={"Content-Type": "application/json"},
             )
             response = connection.getresponse()
             raw_response = response.read(common.MAX_MESSAGE + 1)
@@ -284,8 +192,8 @@ class TaskClient(common.TaskClient):
         return identity(self.protocol, self.role, min(starts), max(ends))
 
 
-def identity(protocol, role, started, ended, *, require_current_source=True):
-    declared = service(protocol, role, require_current_source=require_current_source)
+def identity(protocol, role, started, ended):
+    declared = service(protocol, role)
     return {
         "kind": "hosted_service",
         **{
@@ -339,13 +247,6 @@ def verify_capture(
 ):
     """Recompute every HTTP observation and final-window derivation offline."""
     directory = Path(directory)
-    declared = service(protocol, role, require_current_source=False)
-    drivers = manifest.get("driver_files")
-    if (
-        not isinstance(drivers, dict)
-        or drivers.get("http_service") != declared["helper_sha256"]
-    ):
-        raise ValueError("HTTP helper identity differs from its original capture")
     descriptor = manifest.get("service_identity")
     raw_native, original_raw = read(
         directory / "native-original.json", MAX_CAPTURE_BYTES
@@ -388,7 +289,7 @@ def verify_capture(
             received["response_body_base64"], validate=True
         )
         if (
-            sent["endpoint"] != declared["endpoint"]
+            sent["endpoint"] != service(protocol, role)["endpoint"]
             or sent["method"] != "POST"
             or received["status"] != 200
             or actual_request != common.encoded(body(protocol, role, request))
@@ -413,17 +314,14 @@ def verify_capture(
         ends.append(end)
     if {p.name for p in (directory / "http").iterdir()} != expected_files:
         raise ValueError("HTTP journal differs from the complete schedule")
-    if descriptor != identity(
-        protocol, role, min(starts), max(ends), require_current_source=False
-    ):
+    if descriptor != identity(protocol, role, min(starts), max(ends)):
         raise ValueError("HTTP service descriptor differs from observed capture window")
     return descriptor
 
 
-def make_server(protocol, role, socket_path, output, *, capability):
+def make_server(protocol, role, socket_path, output):
     """Create one bounded single-request-at-a-time loopback deployment."""
     declared = service(protocol, role)
-    capability = _capability(capability)
     output = Path(output)
     output.mkdir(mode=0o700, parents=True, exist_ok=False)
     clients = {
@@ -437,7 +335,6 @@ def make_server(protocol, role, socket_path, output, *, capability):
         for name in protocol["evaluators"]
     }
     planned = {row["id"]: row for row in protocol["cases"]}
-    expected_authorization = ("Bearer " + capability).encode("ascii")
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):
@@ -448,15 +345,6 @@ def make_server(protocol, role, socket_path, output, *, capability):
             self.connection.settimeout(TIMEOUT)
 
         def do_POST(self):
-            authorization = self.headers.get_all("Authorization", [])
-            if len(authorization) != 1 or not hmac.compare_digest(
-                authorization[0].encode("utf-8"), expected_authorization
-            ):
-                self.close_connection = True
-                self.send_response(403)
-                self.send_header("Content-Length", "0")
-                self.end_headers()
-                return
             try:
                 lengths = self.headers.get_all("Content-Length", [])
                 if (
@@ -510,7 +398,6 @@ def main():
     parser.add_argument("--role", choices=("baseline", "subject"), required=True)
     parser.add_argument("--socket", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
-    parser.add_argument("--capability-file", required=True, type=Path)
     args = parser.parse_args()
     protocol = common.read(args.protocol)
     if common.digest(protocol) != args.protocol_sha256:
@@ -518,13 +405,7 @@ def main():
     seconds = protocol["limits"]["max_seconds"]
     if type(seconds) is not int or not 1 <= seconds <= 86400:
         raise ValueError("HTTP deployment requires a bounded whole-process deadline")
-    server, clients = make_server(
-        protocol,
-        args.role,
-        args.socket,
-        args.output,
-        capability=read_capability(args.capability_file),
-    )
+    server, clients = make_server(protocol, args.role, args.socket, args.output)
     deadline = time.monotonic() + seconds
 
     def expired(*_):

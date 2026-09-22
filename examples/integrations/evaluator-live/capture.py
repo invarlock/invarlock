@@ -54,6 +54,7 @@ def capture(
     socket_path,
     output,
     *,
+    http_capability_file=None,
     recover_from=None,
     worker_ledger=None,
     recovery_sha256=None,
@@ -63,8 +64,12 @@ def capture(
     if "http_services" in protocol:
         if socket_path is not None:
             raise ValueError("HTTP capture uses the protocol endpoint; omit --socket")
+        if http_capability_file is None:
+            raise ValueError("HTTP capture requires a private capability file")
     elif socket_path is None:
         raise ValueError("local capture requires --socket")
+    elif http_capability_file is not None:
+        raise ValueError("local capture does not use an HTTP capability file")
     if set(protocol["versions"]) != set(protocol["evaluators"]):
         raise ValueError("every admitted evaluator requires a version pin")
     expected = common.versions()[evaluator]
@@ -102,6 +107,9 @@ def capture(
     if http and recovery:
         raise ValueError("HTTP captures cannot reuse Unix transport recoveries")
     http_service = http.service(protocol, role) if http else None
+    http_capability = (
+        http.read_capability(http_capability_file) if http is not None else None
+    )
     if http:
         local_environment(
             evaluator, http_endpoint=http.endpoint(http_service["endpoint"])
@@ -124,7 +132,15 @@ def capture(
         protocol["cases"],
         output / "tasks",
         **({"recovery": recovery} if recovery else {}),
-        **({"protocol": protocol, "role": role} if http else {}),
+        **(
+            {
+                "protocol": protocol,
+                "role": role,
+                "capability": http_capability,
+            }
+            if http
+            else {}
+        ),
     )
     if recovery:
         recovery.stage(output)
@@ -211,6 +227,7 @@ def main():
     parser.add_argument("--recover-from", type=Path)
     parser.add_argument("--worker-ledger", type=Path)
     parser.add_argument("--recovery-sha256")
+    parser.add_argument("--http-capability-file", type=Path)
     args = parser.parse_args()
     protocol = common.read(args.protocol)
     if common.digest(protocol) != args.protocol_sha256:
@@ -223,6 +240,7 @@ def main():
                 args.evaluator,
                 args.socket,
                 args.output,
+                http_capability_file=args.http_capability_file,
                 **(
                     {
                         "recover_from": args.recover_from,

@@ -682,7 +682,9 @@ def test_capture_cli_checks_digest_before_invoking_capture(
     monkeypatch.setattr(
         modules.capture,
         "capture",
-        lambda *args: calls.append(args) or {"status": "synthetic-test"},
+        lambda *args, **kwargs: (
+            calls.append((args, kwargs)) or {"status": "synthetic-test"}
+        ),
     )
     arguments = [
         "capture.py",
@@ -705,7 +707,8 @@ def test_capture_cli_checks_digest_before_invoking_capture(
     assert calls == []
     arguments[4] = modules.common.digest(protocol)
     modules.capture.main()
-    assert calls[0][:3] == (protocol, "baseline", "deepeval")
+    assert calls[0][0][:3] == (protocol, "baseline", "deepeval")
+    assert calls[0][1] == {"http_capability_file": None}
     assert json.loads(capsys.readouterr().out) == {"status": "synthetic-test"}
 
 

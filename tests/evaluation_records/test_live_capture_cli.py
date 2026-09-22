@@ -23,6 +23,7 @@ SPEC = importlib.util.spec_from_file_location("live_cli_common", HERE / "common.
 COMMON = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(COMMON)
 PINS = COMMON.versions()
+HTTP_CAPABILITY = "a" * 64
 
 SDK_CLI = r"""
 import importlib.abc, runpy, socket, sys
@@ -163,7 +164,11 @@ def _http_gateway(protocol, address, directory):
         http = COMMON.module("http_service")
     with temporarily_allow_network():
         gateway, _ = http.make_server(
-            protocol, "baseline", address, directory / "gateway"
+            protocol,
+            "baseline",
+            address,
+            directory / "gateway",
+            capability=HTTP_CAPABILITY,
         )
     failures = []
     stop = threading.Event()
@@ -244,6 +249,9 @@ def _capture_cli(evaluator, tmp_path, *, http):
                 + hashlib.sha256((HERE / "http_service.py").read_bytes()).hexdigest(),
             }
         }
+        capability = directory / "http-capability"
+        capability.write_text(HTTP_CAPABILITY, encoding="ascii")
+        capability.chmod(0o600)
     COMMON.write(directory / "protocol.json", protocol)
     request = {
         "evaluator": evaluator,
@@ -349,6 +357,11 @@ def _capture_cli(evaluator, tmp_path, *, http):
                             "--evaluator",
                             evaluator,
                             *([] if http else ["--socket", address]),
+                            *(
+                                ["--http-capability-file", str(capability)]
+                                if http
+                                else []
+                            ),
                             "--output",
                             str(directory / "capture"),
                         ],

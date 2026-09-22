@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import copy
+import hashlib
 import importlib.util
 import json
 import socket
@@ -25,6 +26,13 @@ COMMON = FIXTURE.COMMON
 HTTP = COMMON.module("http_service")
 CAPTURE = COMMON.module("capture")
 RECIPIENT = FIXTURE.LIVE
+CAPABILITY = hashlib.sha256(b"private test-only HTTP capability").hexdigest()
+
+
+def capability_file(path):
+    path.write_text(CAPABILITY, encoding="ascii")
+    path.chmod(0o600)
+    return path
 
 
 def unused_port():
@@ -165,7 +173,11 @@ def captured(tmp_path, monkeypatch, evaluator="inspect-ai"):
             ),
         )
         server, clients = HTTP.make_server(
-            protocol, role, "unused", tmp_path / (role + "-server")
+            protocol,
+            role,
+            "unused",
+            tmp_path / (role + "-server"),
+            capability=CAPABILITY,
         )
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
@@ -176,7 +188,14 @@ def captured(tmp_path, monkeypatch, evaluator="inspect-ai"):
 
             with temporarily_allow_network():
                 manifests[role] = CAPTURE.capture(
-                    protocol, role, evaluator, None, tmp_path / role
+                    protocol,
+                    role,
+                    evaluator,
+                    None,
+                    tmp_path / role,
+                    http_capability_file=capability_file(
+                        tmp_path / (role + "-capability")
+                    ),
                 )
             assert len(clients[evaluator].complete()) == 2
         finally:
@@ -272,6 +291,8 @@ def test_endpoint_cannot_enable_external_or_ambiguous_transport(url):
         "fields",
         "result",
         "identity",
+        "helper",
+        "helper-fields",
         "native",
         "missing",
         "extra",
@@ -308,6 +329,14 @@ def test_recipient_refuses_http_observation_or_derivation_tampering(
         path = root / "capture.json"
         value = COMMON.read(path)
         value["service_identity"]["deployment"] = "changed"
+    elif fault == "helper":
+        path = root / "capture.json"
+        value = COMMON.read(path)
+        value["driver_files"]["http_service"] = "sha256:" + "0" * 64
+    elif fault == "helper-fields":
+        path = root / "capture.json"
+        value = COMMON.read(path)
+        value["driver_files"] = None
     elif fault == "native":
         path = root / "native-original.json"
         value = COMMON.read(path)
@@ -432,7 +461,7 @@ def test_gateway_rejects_prompt_changes_and_duplicate_tasks_before_worker(
 
     monkeypatch.setattr(COMMON.TaskClient, "exchange", exchange)
     server, clients = HTTP.make_server(
-        protocol, "baseline", "unused", tmp_path / "server"
+        protocol, "baseline", "unused", tmp_path / "server", capability=CAPABILITY
     )
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -463,7 +492,10 @@ def test_gateway_rejects_prompt_changes_and_duplicate_tasks_before_worker(
                         "POST",
                         "/wrong" if fault == "framing" else HTTP.PATH,
                         COMMON.encoded(value),
-                        {"Content-Type": "application/json"},
+                        {
+                            "Authorization": "Bearer " + CAPABILITY,
+                            "Content-Type": "application/json",
+                        },
                     )
                     response = connection.getresponse()
                     response.read()
@@ -475,6 +507,96 @@ def test_gateway_rejects_prompt_changes_and_duplicate_tasks_before_worker(
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
+
+
+def test_gateway_requires_private_capability_before_worker(tmp_path, monkeypatch):
+    from invarlock.security import temporarily_allow_network
+
+    protocol, original = setup(tmp_path)
+    calls = []
+
+    def exchange(self, request):
+        calls.append(request)
+        return COMMON.encoded(observation(protocol, original, "baseline", request))
+
+    monkeypatch.setattr(COMMON.TaskClient, "exchange", exchange)
+    server, clients = HTTP.make_server(
+        protocol, "baseline", "unused", tmp_path / "server", capability=CAPABILITY
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    request = {
+        "evaluator": "inspect-ai",
+        "case_id": "0",
+        "protocol_digest": COMMON.digest({**protocol, "role": "baseline"}),
+    }
+    body = COMMON.encoded(HTTP.body(protocol, "baseline", request))
+    try:
+        for authorization, expected in (
+            (None, 403),
+            ("Bearer " + "b" * HTTP.CAPABILITY_HEX_LENGTH, 403),
+            ("Bearer é", 403),
+            ("Bearer " + CAPABILITY, 200),
+        ):
+            connection = HTTP.http.client.HTTPConnection(*server.server_address)
+            headers = {"Content-Type": "application/json"}
+            if authorization is not None:
+                headers["Authorization"] = authorization
+            try:
+                with temporarily_allow_network():
+                    connection.request("POST", HTTP.PATH, body, headers)
+                    response = connection.getresponse()
+                    response.read()
+                assert response.status == expected
+            finally:
+                connection.close()
+            assert len(calls) == (1 if expected == 200 else 0)
+        assert len(clients["inspect-ai"].results) == 1
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def test_http_capture_keeps_capability_out_of_retained_records(tmp_path, monkeypatch):
+    captured(tmp_path, monkeypatch)
+    for role in ("baseline", "subject"):
+        for directory in (tmp_path / role, tmp_path / (role + "-server")):
+            for path in directory.rglob("*"):
+                if path.is_file():
+                    assert CAPABILITY.encode() not in path.read_bytes(), path
+
+
+def test_capability_file_requires_private_regular_file(tmp_path):
+    private = capability_file(tmp_path / "private")
+    assert HTTP.read_capability(private) == CAPABILITY
+    private.chmod(0o644)
+    with pytest.raises(ValueError, match="owner-private"):
+        HTTP.read_capability(private)
+    private.chmod(0o600)
+    link = tmp_path / "link"
+    link.symlink_to(private)
+    with pytest.raises(OSError):
+        HTTP.read_capability(link)
+
+
+def test_direct_http_replay_rejects_unrecognized_helper_source(tmp_path, monkeypatch):
+    protocol, manifests, _ = captured(tmp_path, monkeypatch)
+    altered = copy.deepcopy(protocol)
+    altered["http_services"]["subject"]["helper_sha256"] = "sha256:" + "0" * 64
+    manifest = copy.deepcopy(manifests["subject"])
+    manifest["driver_files"]["http_service"] = "sha256:" + "0" * 64
+    with pytest.raises(ValueError, match="independently frozen source"):
+        HTTP.verify_capture(
+            tmp_path / "subject",
+            manifest,
+            altered,
+            "subject",
+            "inspect-ai",
+            {},
+            {},
+            lambda *args: None,
+        )
 
 
 @pytest.mark.parametrize("failure", ["status", "size", "disconnect"])
@@ -507,6 +629,7 @@ def test_failed_http_exchange_keeps_admission_and_never_retries(
         tmp_path / "capture/tasks",
         protocol=protocol,
         role="baseline",
+        capability=CAPABILITY,
     )
     with pytest.raises((ValueError, ConnectionResetError)):
         task(protocol["cases"][0])
@@ -539,7 +662,7 @@ def test_http_service_cli_preserves_completion_and_deadline(
 
     closed = []
 
-    def make(*args):
+    def make(*args, **kwargs):
         output.mkdir()
         return Server(), {"inspect-ai": client}
 
@@ -560,6 +683,8 @@ def test_http_service_cli_preserves_completion_and_deadline(
             "unused",
             "--output",
             str(output),
+            "--capability-file",
+            str(capability_file(tmp_path / "capability")),
         ],
     )
     if failure:
@@ -579,7 +704,7 @@ def test_client_refuses_endpoint_drift_and_oversized_task_before_http(
     tmp_path, monkeypatch
 ):
     protocol, _ = setup(tmp_path)
-    options = {"protocol": protocol, "role": "baseline"}
+    options = {"protocol": protocol, "role": "baseline", "capability": CAPABILITY}
     args = (
         "inspect-ai",
         COMMON.digest({**protocol, "role": "baseline"}),
@@ -633,6 +758,8 @@ def test_absolute_deployment_deadline_interrupts_partial_http_body(tmp_path):
             "unused",
             "--output",
             str(output),
+            "--capability-file",
+            str(capability_file(tmp_path / "capability")),
         ],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -649,7 +776,9 @@ def test_absolute_deployment_deadline_interrupts_partial_http_body(tmp_path):
                 HTTP.endpoint(protocol["http_services"]["baseline"]["endpoint"])
             )
             channel.sendall(
-                b"POST /v1/tasks HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: 100\r\n\r\n{"
+                b"POST /v1/tasks HTTP/1.1\r\nHost: 127.0.0.1\r\n"
+                + ("Authorization: Bearer " + CAPABILITY + "\r\n").encode()
+                + b"Content-Type: application/json\r\nContent-Length: 100\r\n\r\n{"
             )
         _, error = process.communicate(timeout=4)
         assert process.returncode != 0
@@ -746,7 +875,9 @@ def test_http_capture_cli_does_not_require_a_dummy_socket(
     COMMON.write(source, protocol)
     calls = []
     monkeypatch.setattr(
-        CAPTURE, "capture", lambda *args: calls.append(args) or {"ok": True}
+        CAPTURE,
+        "capture",
+        lambda *args, **kwargs: calls.append((args, kwargs)) or {"ok": True},
     )
     monkeypatch.setattr(
         sys,
@@ -763,8 +894,11 @@ def test_http_capture_cli_does_not_require_a_dummy_socket(
             "inspect-ai",
             "--output",
             str(tmp_path / "output"),
+            "--http-capability-file",
+            str(tmp_path / "capability"),
         ],
     )
     CAPTURE.main()
-    assert calls[0][3] is None
+    assert calls[0][0][3] is None
+    assert calls[0][1]["http_capability_file"] == tmp_path / "capability"
     assert json.loads(capsys.readouterr().out) == {"ok": True}

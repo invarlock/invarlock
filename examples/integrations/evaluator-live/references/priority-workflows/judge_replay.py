@@ -263,6 +263,11 @@ def verify_capture_bindings(
     )
     recipient = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(recipient)
+    source_spec = importlib.util.spec_from_file_location(
+        "priority_http_source_reference", HERE / "replay.py"
+    )
+    source_replay = importlib.util.module_from_spec(source_spec)
+    source_spec.loader.exec_module(source_replay)
     with tempfile.TemporaryDirectory(prefix="judge-capture-replay-") as temporary:
         staging = Path(temporary).resolve()
         for companion, files in companions.items():
@@ -278,6 +283,10 @@ def verify_capture_bindings(
                 link["role"]: staging / link["companion"] / link["directory"]
                 for link in pack["capture_links"]
             }
+            for role, path in links.items():
+                source_protocol = json.loads((path / "protocol.json").read_bytes())
+                if "http_services" in source_protocol:
+                    source_replay.verify_historical_http_helper(source_protocol, role)
             _, runs = recipient.prepare(
                 protocol_path,
                 recipient.common.digest(protocol),
