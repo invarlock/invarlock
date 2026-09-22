@@ -60,8 +60,10 @@ that job's `cache-dependency-path`.
 The release workflow builds, validates, attests, and publishes one Python
 distribution: `invarlock`. Judge collection, diagnostics, and all maintained
 runtime providers are in core; optional dependencies are installed through the
-`judge`, `diagnostics`, `vision-text`, and `hf` extras. Provider-specific native
-runtime dependencies stay outside the base wheel.
+`judge`, `diagnostics`, and `vision-text` extras. Hugging Face execution
+dependencies come from the source-only `hf` dependency group and maintained
+runtime environments. Provider-specific native runtime dependencies stay
+outside the base wheel.
 Candidate and published core wheels use `scripts/release/core_wheel_consumers.py`,
 the same consumer suite as local installed-wheel validation. It stages quickstart,
 captured, judge, three-scorer and retained approval journeys outside the checkout
