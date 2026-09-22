@@ -163,7 +163,9 @@ def test_runtime_coverage_requires_pinned_sdk_tests_in_its_measured_interpreter(
         step for step in sdk_steps if step["if"] == "${{ matrix.shard == 'runtime' }}"
     )
     examples = next(
-        step for step in sdk_steps if step["if"] == "${{ matrix.shard == 'examples' }}"
+        step
+        for step in sdk_steps
+        if step["if"] == "${{ startsWith(matrix.shard, 'examples') }}"
     )
     assert (
         "--require-hashes -r requirements/workflows/langfuse-sdk-tests-py313.txt"
@@ -179,7 +181,7 @@ def test_runtime_coverage_requires_pinned_sdk_tests_in_its_measured_interpreter(
     assert steps.index(install) < steps.index(collect)
     assert steps.index(examples) < steps.index(collect)
     assert collect["env"]["INVARLOCK_REQUIRE_INSPECT_SDK"] == (
-        "${{ (matrix.shard == 'runtime' || matrix.shard == 'examples') && '1' || '0' }}"
+        "${{ (matrix.shard == 'runtime' || startsWith(matrix.shard, 'examples')) && '1' || '0' }}"
     )
     assert "INVARLOCK_REQUIRE_INSPECT_SDK" not in jobs["coverage"].get("env", {})
 
@@ -219,7 +221,9 @@ def test_release_requires_sdk_tests_in_its_measured_interpreter():
     ]
 
     verify = next(
-        item for item in steps if item.get("name") == "Run complete repository gates"
+        item
+        for item in steps
+        if item.get("name") == "Run repository and supplemental behavior gates"
     )
     coverage = next(
         item for item in steps if item.get("name") == "Enforce release coverage"
@@ -254,3 +258,19 @@ def test_release_replays_installed_evaluator_campaigns_from_frozen_wheel():
     assert replay["run"] == "PYTHON=python bash scripts/evaluator_parity_gate.sh"
     assert steps.index(build) < steps.index(ledger) < steps.index(replay)
     assert steps.index(replay) < steps.index(digest_check)
+
+
+@pytest.mark.parametrize(
+    "name", ["ci.yml", "docs-ci.yml", "codeql.yml", "container-front-door-smoke.yml"]
+)
+def test_promotion_uses_pr_checks_without_duplicate_branch_push(name):
+    events = _load(WORKFLOWS / name)["on"]
+    assert "release/v*" not in events["push"]["branches"]
+    assert "staging/next" in events["push"]["branches"]
+    assert "pull_request" in events
+    destinations = (events["pull_request"] or {}).get("branches")
+    assert destinations is None or "main" in destinations
+    if name == "codeql.yml":
+        assert "schedule" in events and "workflow_dispatch" in events
+    if name == "ci.yml":
+        assert events["push"]["tags"] == ["v*"]

@@ -2,7 +2,7 @@ name: Documentation CI
 
 on:
   push:
-    branches: [main, staging/next, 'release/v*']
+    branches: [main, staging/next]
     paths:
       - '*.md'
       - '*.MD'

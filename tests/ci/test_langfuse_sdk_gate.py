@@ -46,7 +46,7 @@ def test_langfuse_sdk_gate_uses_two_installed_environments_and_hashed_closures()
 
 def test_langfuse_sdk_is_required_only_for_examples_coverage_and_installed_gates():
     jobs = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text())["jobs"]
-    for job in ("verify-fast", "minimum-python", "verify-full"):
+    for job in ("verify-fast", "minimum-python-packages", "verify-full"):
         assert any(
             "make install-smoke inspect-judge-sdk-test langfuse-sdk-test"
             == step.get("run")
@@ -60,7 +60,7 @@ def test_langfuse_sdk_is_required_only_for_examples_coverage_and_installed_gates
         and "langfuse-sdk-tests-py313.txt" in step["run"]
     ]
     assert len(install) == 1
-    assert install[0]["if"] == "${{ matrix.shard == 'examples' }}"
+    assert install[0]["if"] == "${{ startsWith(matrix.shard, 'examples') }}"
     assert install[0]["run"].strip().endswith("python -m pip check")
     collect = next(
         step for step in steps if "make coverage-collect-" in step.get("run", "")
@@ -68,7 +68,7 @@ def test_langfuse_sdk_is_required_only_for_examples_coverage_and_installed_gates
     assert steps.index(install[0]) < steps.index(collect)
     assert (
         collect["env"]["INVARLOCK_REQUIRE_LANGFUSE_SDK"]
-        == "${{ matrix.shard == 'examples' && '1' || '0' }}"
+        == "${{ startsWith(matrix.shard, 'examples') && '1' || '0' }}"
     )
     full = jobs["verify-full"]["steps"]
     verify = next(step for step in full if step.get("run") == "make verify")

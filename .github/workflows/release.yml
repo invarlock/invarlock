@@ -177,8 +177,10 @@ jobs:
           npm audit --audit-level=high
       - name: Install actionlint
         run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
-      - name: Run complete repository gates
-        run: make verify
+      - name: Run repository and supplemental behavior gates
+        run: |
+          make verify-checks docs-check
+          python scripts/ci/coverage_runner.py supplement --workers 2
       - name: Audit maintained dependency locks
         id: dependency_audit
         run: |

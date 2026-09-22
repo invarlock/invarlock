@@ -43,8 +43,9 @@ repository workflow:
    version, or resolves the exact tag commit for a tag build or publication;
 2. requires a tag build or publication event commit to equal the resolved tag
    commit;
-3. runs the complete repository, coverage, documentation, contract, and
-   workflow gates;
+3. runs behavioral tests once under coverage, plus supplemental core tests
+   outside the routine coverage selection, and enforces the complete
+   documentation, contract, static and workflow gates;
 4. scans the release history range for secrets;
 5. builds exactly one wheel and source distribution for `invarlock`;
 6. validates every archive against the exact checkout and runs the release
