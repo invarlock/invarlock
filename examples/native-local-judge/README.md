@@ -72,9 +72,11 @@ docker run --rm -it --pull=never --network none --read-only \
 ```
 
 Run as a non-root user. Select memory and CPU limits appropriate for your model.
-For an approved HF CUDA image, add the corresponding GPU exposure and select
-the exact CUDA device; a CPU image cannot become a CUDA runtime through a device
-flag. The current llama.cpp profile uses CPU execution. Keep all network,
+For an approved HF CUDA image, expose the intended GPU through the container
+engine and set both device variables to `cuda`. These direct-provider resource
+variables accept `cpu` or `cuda`, not an indexed value such as `cuda:0`.
+A CPU image cannot become a CUDA runtime through a device flag.
+The current llama.cpp profile uses CPU execution. Keep all network,
 remote-code and third-party-provider permission switches disabled.
 `INVARLOCK_JUDGE_RUNTIME_DEVICE` selects the judge device and otherwise defaults
 to `INVARLOCK_RUNTIME_DEVICE`; baseline and subject device overrides do not

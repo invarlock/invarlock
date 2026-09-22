@@ -27,6 +27,5 @@ def test_local_judge_identity_claim_requires_runtime_source(tmp_path, runtime_ba
         assert ("Judge artifact identity" in rendered) is runtime_backed
     if runtime_backed:
         assert dict(view.identity)["Judge artifact identity"] == identity
-        assert "does not rerun the judge" in dict(view.assurance)[
-            "Judge execution evidence"
-        ]
+        execution_note = dict(view.assurance)["Judge execution evidence"]
+        assert "does not rerun the judge" in execution_note
