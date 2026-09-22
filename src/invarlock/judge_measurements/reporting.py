@@ -11,6 +11,7 @@ from xml.etree.ElementTree import Element, SubElement, tostring
 
 from invarlock.engine import run_digest
 from invarlock.evaluation_record_contracts.contracts import digest as record_digest
+from invarlock.evidence_pack_json import parse_json_bytes
 from invarlock.evidence_reporting import EvidenceReportError, EvidenceReportV2
 from invarlock.judge_measurements.contracts import canonical_payload
 from invarlock.record_reporting import (
@@ -548,6 +549,46 @@ def _view(
         artifacts["measurements"]["source_profile"]
         == "retained-runtime-provider-judge-v1"
     )
+    compatible_service_judge = (
+        artifacts["measurements"]["source_profile"]
+        == "retained-openai-compatible-judge-v1"
+    )
+    service_context: tuple[tuple[str, str], ...] = ()
+    service_identity: tuple[tuple[str, str], ...] = ()
+    service_facts: dict[str, str] | None = None
+    if compatible_service_judge:
+        # Replay has already checked every source against the same collection.
+        source = parse_json_bytes(
+            artifacts["measurements"]["sources"][0]["content"].encode("utf-8"),
+            label="retained judge service",
+        )
+        collection = source["collection"]
+        service_names = {
+            "vllm": "vLLM",
+            "ollama": "Ollama",
+            "lm_studio": "LM Studio",
+            "openai_compatible": "OpenAI-compatible service",
+        }
+        service_context = (
+            ("Judge service", service_names[collection["service"]]),
+            ("Judge endpoint", collection["base_url"]),
+            (
+                "Judge response format",
+                "JSON schema"
+                if collection.get("response_format", "json_object") == "json_schema"
+                else "JSON object",
+            ),
+        )
+        service_identity = (
+            ("Judge endpoint digest", source["service_identity"]["endpoint_sha256"]),
+        )
+        service_facts = {
+            "service": collection["service"],
+            "base_url": collection["base_url"],
+            "endpoint_sha256": source["service_identity"]["endpoint_sha256"],
+            "model_identity_basis": "service_assertion",
+            "response_format": collection.get("response_format", "json_object"),
+        }
     resolved_models = sorted(
         {
             attempt["resolved_model"]
@@ -575,6 +616,15 @@ def _view(
         "judge": plan["judge"],
         "prompt": {
             **({"reference_mode": "per_case"} if per_case_references else {}),
+            **(
+                {
+                    "runtime_format": plan["prompt"].get(
+                        "runtime_format", "canonical-json-v1"
+                    )
+                }
+                if local_runtime_judge
+                else {}
+            ),
             "system_excerpt": plan["prompt"]["system"][:TEXT_DETAIL_LIMIT],
             "template_excerpt": plan["prompt"]["template"][:TEXT_DETAIL_LIMIT],
             "demonstrations": len(plan["prompt"]["demonstrations"]),
@@ -604,6 +654,8 @@ def _view(
             "case_ids": list(selected_case_ids),
         },
     }
+    if service_facts is not None:
+        facts["judge_service"] = service_facts
     if per_case_references:
         facts["per_case_references"] = [
             {
@@ -787,6 +839,16 @@ def _view(
         )
         + (
             (
+                (
+                    "Judge service evidence",
+                    "The configured endpoint, model labels, requests and responses are retained. Model labels are service assertions; the judge's model files and execution environment are not authenticated. Offline verification does not call the service again.",
+                ),
+            )
+            if compatible_service_judge
+            else ()
+        )
+        + (
+            (
                 "Authentication",
                 "Signature present; recipient signer authorization has not been performed."
                 if signed
@@ -803,6 +865,19 @@ def _view(
         if captured_subjects is not None
         else (("Baseline", facts["baseline"]), ("Subject", facts["subject"])),
         context=tuple(native_context)
+        + service_context
+        + (
+            (
+                (
+                    "Judge prompt format",
+                    "ChatML"
+                    if plan["prompt"].get("runtime_format") == "chatml-v1"
+                    else "Canonical JSON",
+                ),
+            )
+            if local_runtime_judge
+            else ()
+        )
         + (
             (
                 (
@@ -814,7 +889,18 @@ def _view(
             else ()
         )
         + (
-            ("Judge provider", plan["judge"]["provider"]),
+            (
+                "Judge provider",
+                {
+                    "hf_transformers": "Hugging Face Transformers",
+                    "llama_cpp": "llama.cpp",
+                    "openai_compatible": "OpenAI-compatible service",
+                    "openai": "OpenAI",
+                    "anthropic": "Anthropic",
+                    "google": "Google",
+                    "openrouter": "OpenRouter",
+                }.get(plan["judge"]["provider"], plan["judge"]["provider"]),
+            ),
             ("Requested judge", plan["judge"]["requested_model"]),
             ("Resolved judges", ", ".join(resolved_models) or "Unavailable"),
             (
@@ -835,6 +921,7 @@ def _view(
             ("Coverage", _count_label(counts["scheduled_cases"], "case")),
         ),
         identity=tuple(native_identity)
+        + service_identity
         + (
             (
                 (
