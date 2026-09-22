@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from dataclasses import asdict
 from decimal import Decimal
 from functools import lru_cache
 from pathlib import Path
@@ -16,6 +17,15 @@ from typing import Any, NoReturn, cast
 
 from jsonschema import Draft202012Validator
 
+from invarlock.core.runtime_provider import (
+    EvaluationInputPart,
+    ModelRuntimeSpec,
+    artifact_identity_sha256,
+    evaluation_input_parts_sha256,
+)
+from invarlock.core.runtime_provider.behavioral_observation import (
+    runtime_scoring_records_sha256,
+)
 from invarlock.evaluation_comparison.comparison import _check_run
 from invarlock.evaluation_records.cases import validate_run_case_set
 from invarlock.evaluation_records.io import run_digest
@@ -33,6 +43,14 @@ from invarlock.public_contracts import (
     load_judge_measurement_plan_schema,
     load_judge_measurements_schema,
 )
+from invarlock.runtime_provider_evidence import (
+    RuntimeProviderEvidenceError,
+    decode_artifact_identity,
+    decode_runtime_provider_receipt,
+    decode_scoring_observation,
+    runtime_provider_evidence_errors,
+    runtime_request_binding_errors,
+)
 
 PLAN_MAX_BYTES = 64 * 1024 * 1024
 MEASUREMENTS_MAX_BYTES = 384 * 1024 * 1024
@@ -40,6 +58,7 @@ PLAN_FORMAT = "invarlock/judge-measurement-plan-v1"
 MEASUREMENTS_FORMAT = "invarlock/judge-measurements-v1"
 SOURCE_FORMAT = "invarlock/retained-judge-json-v1"
 INSPECT_SOURCE_FORMAT = "invarlock/retained-inspect-model-events-v1"
+RUNTIME_PROVIDER_SOURCE_FORMAT = "retained-runtime-provider-judge-v1"
 TRIAL_ID_SCHEME = "plan-case-side-repetition-sha256-v1"
 JUDGE_REQUEST_MAX_BYTES = 1024 * 1024
 _INSPECT_0_3_263_REASONING_EFFORTS = {
@@ -334,6 +353,18 @@ def _check_trial_integer_types(trial: dict[str, Any]) -> None:
                 _fail("attempt usage must be an object or null")
             _require_integer(usage.get("input_tokens"), "usage input_tokens")
             _require_integer(usage.get("output_tokens"), "usage output_tokens")
+
+
+def _validate_measurement_trial_shape(trial: dict[str, Any]) -> None:
+    schema = load_judge_measurements_schema()["properties"]["trials"]["items"]
+    error = next(
+        _validator("measurements").evolve(schema=schema).iter_errors(trial), None
+    )
+    if error is not None:
+        path = "/".join(str(part) for part in error.absolute_path)
+        location = f" at {path}" if path else ""
+        _fail(f"retained judge trial is invalid{location}: {error.message[:240]}")
+    _check_trial_integer_types(trial)
 
 
 def validate_measurement_plan(value: JudgeMeasurementPlan) -> None:
@@ -1153,7 +1184,10 @@ def _check_inspect_provider_projection(
 
 
 def _source_trials(
-    source: dict[str, Any], *, inspect_collections: list[dict[str, Any]]
+    source: dict[str, Any],
+    *,
+    inspect_collections: list[dict[str, Any]],
+    runtime_sources: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     content = source["content"]
     encoded = content.encode("utf-8")
@@ -1173,6 +1207,33 @@ def _source_trials(
         trials = _inspect_source_trials(decoded)
         inspect_collections.append(decoded["collection"])
         return trials
+    if source["profile"] == RUNTIME_PROVIDER_SOURCE_FORMAT:
+        required = {
+            "format",
+            "runtime_spec",
+            "artifact_identity",
+            "scoring_observation",
+            "provider_receipt",
+            "trials",
+        }
+        if (
+            set(decoded) != required
+            or decoded.get("format") != RUNTIME_PROVIDER_SOURCE_FORMAT
+            or not isinstance(decoded.get("trials"), list)
+        ):
+            _fail(
+                f"source {source['source_id']!r} has an unsupported runtime-provider profile"
+            )
+        runtime_sources.append(decoded)
+        trials = cast(list[Any], decoded["trials"])
+        if any(
+            not isinstance(trial, dict)
+            or not isinstance(trial.get("attempts"), list)
+            or any(not isinstance(attempt, dict) for attempt in trial["attempts"])
+            for trial in trials
+        ):
+            _fail("retained runtime-provider trials must contain attempt objects")
+        return trials
     if (
         set(decoded) != {"format", "trials"}
         or decoded.get("format") != SOURCE_FORMAT
@@ -1185,6 +1246,200 @@ def _source_trials(
         if any(not isinstance(attempt, dict) for attempt in trial["attempts"]):
             _fail("retained source attempts must be objects")
     return cast(list[dict[str, Any]], decoded["trials"])
+
+
+def _runtime_provider_source_errors(
+    source: dict[str, Any], plan: dict[str, Any]
+) -> list[str]:
+    """Replay one local runtime source without importing its provider."""
+
+    errors: list[str] = []
+    raw_spec = source.get("runtime_spec")
+    if not isinstance(raw_spec, dict) or set(raw_spec) != {
+        "provider_name",
+        "model_id",
+        "settings",
+    }:
+        return ["retained runtime judge spec has an unsupported shape"]
+    try:
+        spec = ModelRuntimeSpec(
+            provider_name=raw_spec["provider_name"],
+            model_id=raw_spec["model_id"],
+            settings=raw_spec["settings"],
+        )
+        artifact_bytes = canonical_payload(source["artifact_identity"])
+        observation_bytes = canonical_payload(source["scoring_observation"])
+        receipt_bytes = canonical_payload(source["provider_receipt"])
+        artifact = decode_artifact_identity(artifact_bytes)
+        observation = decode_scoring_observation(observation_bytes)
+        receipt = decode_runtime_provider_receipt(receipt_bytes)
+    except (KeyError, TypeError, ValueError, RuntimeProviderEvidenceError) as exc:
+        return [f"retained runtime judge evidence is invalid: {str(exc)[:240]}"]
+
+    judge = plan["judge"]
+    if spec.provider_name not in {"hf_transformers", "llama_cpp"}:
+        errors.append("retained runtime judge provider is unsupported")
+    if spec.provider_name != judge["provider"]:
+        errors.append("retained runtime judge provider differs from the plan")
+    if spec.model_id != judge["requested_model"] or judge[
+        "approved_resolved_models"
+    ] != [spec.model_id]:
+        errors.append("retained runtime judge model differs from the plan")
+    identity = judge["model_identity"]
+    if identity.get("kind") != "local_weights" or identity.get(
+        "weights_sha256"
+    ) != artifact_identity_sha256(artifact):
+        errors.append("retained runtime judge artifact identity differs from the plan")
+    if receipt.plugin.distribution != "invarlock":
+        errors.append("retained runtime judge provider is not first-party")
+    if receipt.outer_image_digest is None:
+        errors.append("retained runtime judge lacks a pinned outer image")
+    errors.extend(
+        runtime_provider_evidence_errors(
+            artifact_identity=artifact,
+            scoring_observation=observation,
+            receipt=receipt,
+            scoring_observation_bytes=observation_bytes,
+            expected_outer_image_digest=receipt.outer_image_digest,
+        )
+    )
+    errors.extend(
+        runtime_request_binding_errors(
+            provider_name=spec.provider_name,
+            settings=spec.settings,
+            artifact_identity=artifact,
+            receipt=receipt,
+        )
+    )
+    if (
+        "text_causal" not in receipt.capabilities.tasks
+        or "exact_match" not in receipt.capabilities.metrics
+    ):
+        errors.append("retained runtime judge lacks required text capabilities")
+    execution = receipt.execution_settings
+    config = judge["config"]
+    settings = spec.settings
+    context_length = settings.get("context_length")
+    max_output_tokens = settings.get("max_output_tokens")
+    timeout_seconds = settings.get("timeout_seconds")
+    if (
+        execution.allow_network
+        or execution.seed != config["seed"]
+        or execution.max_output_tokens != config["max_output_tokens"]
+        or config["temperature"] != "0"
+        or config["top_p"] != "1"
+        or config["reasoning_effort"] is not None
+    ):
+        errors.append("retained runtime judge generation settings differ from the plan")
+    if (
+        type(settings.get("seed")) is not int
+        or settings.get("seed") != config["seed"]
+        or type(max_output_tokens) is not int
+        or max_output_tokens != config["max_output_tokens"]
+        or type(settings.get("batch_size")) is not int
+        or settings.get("batch_size") != 1
+        or type(context_length) is not int
+        or not 1 <= context_length <= 1024 * 1024
+        or max_output_tokens > context_length
+        or type(timeout_seconds) is not int
+        or not 1 <= timeout_seconds <= 604800
+    ):
+        errors.append("retained runtime judge spec violates strict execution bounds")
+    plan_digest = _sha256(canonical_payload(plan))
+    if observation.schedule_sha256 != plan_digest:
+        errors.append("retained runtime judge observation differs from the plan")
+    aggregate = runtime_scoring_records_sha256(
+        [cast(dict[str, object], asdict(record)) for record in observation.records]
+    )
+    if observation.aggregate_source_sha256 != aggregate:
+        errors.append("retained runtime judge observation aggregate is invalid")
+
+    trials = cast(list[dict[str, Any]], source["trials"])
+    if len(observation.records) != len(trials):
+        errors.append("retained runtime judge observation coverage is incomplete")
+        return errors
+    for index, (record, trial) in enumerate(
+        zip(observation.records, trials, strict=True)
+    ):
+        attempts = trial.get("attempts")
+        if not isinstance(attempts, list) or len(attempts) != 1:
+            errors.append("retained runtime judge trial must contain one attempt")
+            continue
+        attempt = attempts[0]
+        request = attempt.get("request")
+        if not isinstance(request, dict) or not isinstance(request.get("text"), str):
+            errors.append("retained runtime judge request is invalid")
+            continue
+        prompt = request["text"]
+        part = EvaluationInputPart(
+            kind="text",
+            role="prompt",
+            text=prompt,
+            sha256=_text_sha256(prompt),
+        )
+        if (
+            record.record_id != trial.get("trial_id")
+            or record.input_sha256 != evaluation_input_parts_sha256((part,))
+            or attempt.get("source", {}).get("record_index") != index
+            or attempt.get("source", {}).get("model_event_id") != record.record_id
+        ):
+            errors.append("retained runtime judge record does not match its trial")
+        if record.status == "ok":
+            response = attempt.get("response")
+            if (
+                attempt.get("status") != "completed"
+                or record.output_text is None
+                or not isinstance(response, dict)
+                or response.get("text") != record.output_text
+                or response.get("sha256") != record.output_sha256
+            ):
+                errors.append("retained runtime judge output differs from its attempt")
+        elif (
+            attempt.get("status") != "cancelled"
+            or attempt.get("response") is not None
+            or not isinstance(attempt.get("error"), dict)
+        ):
+            errors.append("retained runtime judge error differs from its attempt")
+    return errors
+
+
+def _check_runtime_provider_sources(
+    runtime_sources: list[dict[str, Any]], plan: dict[str, Any]
+) -> None:
+    if not runtime_sources:
+        return
+    judge = plan["judge"]
+    config = judge["config"]
+    schedule = plan["schedule"]
+    if (
+        judge["model_identity"]["kind"] != "local_weights"
+        or judge["provider"] not in {"hf_transformers", "llama_cpp"}
+        or judge["approved_resolved_models"] != [judge["requested_model"]]
+        or config["temperature"] != "0"
+        or config["top_p"] != "1"
+        or config["seed"] is None
+        or config["reasoning_effort"] is not None
+        or schedule["max_attempts"] != 1
+        or schedule["retry_on"]
+        or schedule["cache"] != "forbid"
+    ):
+        _fail("runtime judge plan does not satisfy the strict local profile")
+    expected_spec = runtime_sources[0]["runtime_spec"]
+    expected_artifact = runtime_sources[0]["artifact_identity"]
+    expected_receipt = dict(runtime_sources[0]["provider_receipt"])
+    expected_receipt.pop("scoring_observation_sha256", None)
+    for source in runtime_sources:
+        receipt = dict(source["provider_receipt"])
+        receipt.pop("scoring_observation_sha256", None)
+        if (
+            source["runtime_spec"] != expected_spec
+            or source["artifact_identity"] != expected_artifact
+            or receipt != expected_receipt
+        ):
+            _fail("retained runtime judge shards have inconsistent runtime identity")
+        errors = _runtime_provider_source_errors(source, plan)
+        if errors:
+            _fail(errors[0])
 
 
 def _frozen_run_records(
@@ -1318,13 +1573,18 @@ def validate_measurements(
     sources: dict[str, dict[str, Any]] = {}
     replayed: dict[str, dict[str, Any]] = {}
     inspect_collections: list[dict[str, Any]] = []
+    runtime_sources: list[dict[str, Any]] = []
     for source in raw["sources"]:
         source_id = source["source_id"]
         if source_id in sources:
             _fail("measurement source IDs must be unique")
         sources[source_id] = source
         for record_index, trial in enumerate(
-            _source_trials(source, inspect_collections=inspect_collections)
+            _source_trials(
+                source,
+                inspect_collections=inspect_collections,
+                runtime_sources=runtime_sources,
+            )
         ):
             _check_trial_integer_types(trial)
             trial_id = trial.get("trial_id")
@@ -1341,6 +1601,7 @@ def validate_measurements(
             replayed[trial_id] = trial
 
     _check_inspect_shard_budgets(inspect_collections, replayed, plan_raw)
+    _check_runtime_provider_sources(runtime_sources, plan_raw)
 
     bindings = {item["case_id"]: item for item in plan_raw["answer_bindings"]}
     repetitions = plan_raw["schedule"]["repetitions"]

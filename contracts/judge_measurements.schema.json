@@ -16,7 +16,8 @@
     "source_profile": {
       "enum": [
         "retained-judge-json-v1",
-        "retained-inspect-model-events-v1"
+        "retained-inspect-model-events-v1",
+        "retained-runtime-provider-judge-v1"
       ]
     },
     "sources": {
@@ -31,7 +32,8 @@
           "profile": {
             "enum": [
               "retained-judge-json-v1",
-              "retained-inspect-model-events-v1"
+              "retained-inspect-model-events-v1",
+              "retained-runtime-provider-judge-v1"
             ]
           },
           "encoding": {

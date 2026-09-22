@@ -544,6 +544,10 @@ def _view(
         if signer is not None
         else None,
     }
+    local_runtime_judge = (
+        artifacts["measurements"]["source_profile"]
+        == "retained-runtime-provider-judge-v1"
+    )
     resolved_models = sorted(
         {
             attempt["resolved_model"]
@@ -773,6 +777,16 @@ def _view(
         assurance=native_assurance
         + (
             (
+                (
+                    "Judge execution evidence",
+                    "Local artifact, runtime receipt, prompts and responses replayed offline. This does not rerun the judge or establish rating correctness.",
+                ),
+            )
+            if local_runtime_judge
+            else ()
+        )
+        + (
+            (
                 "Authentication",
                 "Signature present; recipient signer authorization has not been performed."
                 if signed
@@ -821,6 +835,16 @@ def _view(
             ("Coverage", _count_label(counts["scheduled_cases"], "case")),
         ),
         identity=tuple(native_identity)
+        + (
+            (
+                (
+                    "Judge artifact identity",
+                    plan["judge"]["model_identity"]["weights_sha256"],
+                ),
+            )
+            if local_runtime_judge
+            else ()
+        )
         + tuple(
             (side.title() + " artifact", artifacts[f"{side}_run"]["artifact_digest"])
             for side in ("baseline", "subject")

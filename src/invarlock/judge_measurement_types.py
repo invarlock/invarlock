@@ -181,7 +181,11 @@ class JudgeTrial(TypedDict):
 
 class JudgeRetainedSource(TypedDict):
     source_id: str
-    profile: Literal["retained-judge-json-v1", "retained-inspect-model-events-v1"]
+    profile: Literal[
+        "retained-judge-json-v1",
+        "retained-inspect-model-events-v1",
+        "retained-runtime-provider-judge-v1",
+    ]
     encoding: Literal["utf-8"]
     byte_size: int
     media_type: Literal["application/json"]
@@ -201,7 +205,9 @@ class JudgeMeasurements(TypedDict):
     profile_id: Literal["text-frozen-answer-v1"]
     plan_sha256: str
     source_profile: Literal[
-        "retained-judge-json-v1", "retained-inspect-model-events-v1"
+        "retained-judge-json-v1",
+        "retained-inspect-model-events-v1",
+        "retained-runtime-provider-judge-v1",
     ]
     sources: list[JudgeRetainedSource]
     trials: list[JudgeTrial]
