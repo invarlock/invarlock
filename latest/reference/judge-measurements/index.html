@@ -2259,9 +2259,11 @@ recipe, and a private <code>comparison.judge.workspace</code> with an explicit
 <code>comparison.judge.signer_identity</code>. The
 <a href="../../user-guide/captured-results/#judge-captured-answers">captured-results guide</a>
 shows source mapping, explicit text projection and offline measurement import.</p>
-<p>Hosted collection uses the optional pinned Inspect SDK. Native local collection
-uses the separate <code>runtime-provider-judge</code> profile described below.
-Neither requires an upstream evaluator to use Inspect or change versions.
+<p>For frozen answers from an existing evaluator, select the pinned Inspect SDK
+collector for supported hosted providers, <code>openai-compatible-judge</code> for an
+explicitly configured Chat Completions service, or <code>runtime-provider-judge</code> for
+an authenticated local HF or GGUF artifact. Neither the service nor the local
+route requires the upstream evaluator to use Inspect or change versions.
 Existing evaluators supply frozen case facts; InvarLock applies its own scorer.
 Core import, verification and reporting work without Inspect. A caller-owned
 collector can use <code>invarlock.engine.prepare_evaluator_judge</code> and
@@ -2373,7 +2375,8 @@ checkpoint. Installed live collection requires exactly Inspect <code>0.3.263</co
 OpenAI <code>3.13.0</code>, Anthropic <code>1.6.0</code>, Google Gen AI <code>2.24.0</code>, and
 <code>httpx==0.28.1</code> and <code>httpx2==2.12.0</code>. It supports pinned Inspect integrations for <code>openai/</code>,
 <code>anthropic/</code>, <code>google/</code>, and <code>openrouter/</code> graders with one attempt per trial,
-zero collector retries, no tools or cache, and no inherited model settings.
+zero collector retries, no tools or Inspect result cache, and no inherited model
+settings.
 An admitted call without a retained result is an ambiguous timeout that cannot
 be retried. <code>verify</code> and <code>report</code> make no provider calls.</p>
 <p>Python collection callers can set <code>RunnerOptions.stop_after_batches</code> to a
@@ -2392,12 +2395,28 @@ automatic function calling, and stops Inspect's internal malformed-function
 retry before a second request. Configured direct providers reject alternate
 service paths such as <code>google/vertex/...</code>; OpenRouter retains its routed model
 names. The pinned Google and Anthropic adapters require a null <code>seed</code> because
-they do not forward it. Anthropic requires <code>top_p=1</code> and sends temperature
-alone; models that discard temperature require approved temperature <code>1</code>.
+they do not forward it. Anthropic requires <code>top_p=1</code>. Without extended
+reasoning, its qualified request sends the approved temperature. With supported extended
+reasoning, Inspect sends its mapped thinking budget instead of temperature,
+and InvarLock checks that request against the approved effort and output limit.
+The pinned projection supports nondefault effort for Claude 4.5 and Gemini 2.5
+model families when the output limit exceeds the mapped thinking budget.
+All live Claude 4.6-and-newer, Gemini 3-and-newer, and unrecognized model names
+are rejected during preflight until their pinned SDK request shapes are
+qualified, regardless of effort. Historical evidence for those models remains
+subject to its original offline verification contract.
+The pinned Google adapter sends <code>BLOCK_NONE</code> for five provider safety
+categories; this fixed SDK setting is checked against the retained request.
+The judge result is a quality measurement under the declared rubric, not a
+content-safety assessment.
 The configured Anthropic client also stops automatic <code>pause_turn</code> continuations
 before another request. For all four providers, raw response content, model,
 finish reason and token usage are checked against the SDK output before the
-retained response is normalized.</p>
+retained response is normalized.
+During collection, the pinned SDK request is checked against the approved plan.
+The retained evidence contains its normalized request and response; offline
+verification checks those retained facts and the analysis, not the original
+provider HTTP bytes.</p>
 <p>Each available provider response ID must identify exactly one retained Inspect
 call across trials, source segments and resumed collection. Reusing a response
 under a new local event ID is rejected. Generic retained-record imports keep
@@ -2441,9 +2460,10 @@ selected provider's base-URL variables and alternate-auth controls; their
 presence is rejected even when empty. OpenAI calls explicitly select
 <code>service_tier=default</code> for standard processing. Historical OpenAI requests
 without the field replay unchanged without acquiring a standard-tier claim.
-Disabled Inspect response caching does
-not disable provider prompt caching; cost reservations must cover applicable
-cache-write charges. Missing credentials, missing or mismatched SDK dependencies, and dependency
+Disabled Inspect response caching does not disable provider prompt caching;
+cost reservations must cover applicable cache-write charges. The Anthropic
+adapter's prompt-cache marker is bound into each recorded provider request.
+Missing credentials, missing or mismatched SDK dependencies, and dependency
 import failures stop collection preflight. These requirements do not apply to
 offline import. The optional <code>execution.collection.scorer_id</code> defaults to <code>judge</code> and
 <code>invocation_timeout_seconds</code> defaults to 3600. An omitted workspace defaults to
@@ -2578,7 +2598,11 @@ the latter reads only <code>INVARLOCK_OPENAI_COMPATIBLE_API_KEY</code>. Keep cre
 of request files. Bearer authentication requires HTTPS except on an explicit
 loopback endpoint. Ambient OpenAI endpoint variables do not redirect this route.
 Input-byte limits count aggregate canonical transmitted JSON bodies, excluding
-authorization headers; output-token limits reserve the planned calls.</p>
+authorization headers; output-token limits reserve the planned calls.
+When a service reports token usage, collection and replay reject a completion
+count above the approved per-call output limit. If it omits usage, the retained
+request proves the requested cap, but the actual token count cannot be checked
+independently; response-byte and measurement-size limits still apply.</p>
 <p>This collector retains one source shard per call, so the evidence format's
 1,000-shard limit allows at most 1,000 planned calls: 500 paired cases with one
 rating per side, or fewer cases with repetitions. Preflight rejects a larger

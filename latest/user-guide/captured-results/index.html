@@ -2235,7 +2235,11 @@ the ordinary host CLI does not launch a judge container. The
 <a href="https://github.com/invarlock/invarlock/blob/main/examples/native-local-judge/README.md">local judge example</a> demonstrates
 model inspection, plan preparation and recipient verification. This local model
 selection cannot be combined with a retained <code>comparison.judge.measurements</code>
-file; retained-measurement import does not need model resources.</p>
+file; retained-measurement import does not need model resources.
+For a configured Chat Completions service, select
+<a href="../../reference/judge-measurements/#openai-compatible-judge-services"><code>openai-compatible-judge</code></a>
+without a local model binding. The service's returned model label is retained
+as an observation rather than treated as an authenticated model artifact.</p>
 <p>Keep the captured request's baseline and subject source definitions and replace
 its comparison policy selection with:</p>
 <div class="codehilite"><pre><span></span><code><span class="nt">comparison</span><span class="p">:</span>

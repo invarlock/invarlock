@@ -2736,7 +2736,9 @@ InvarLock additionally binds its own strict runtime and receipt conditions.</p>
 <code>processor_metadata_sha256</code>, with <code>checkpoint_tree_sha256</code> mandatory for every
 vision-text request. The provider authenticates the checkpoint, tokenizer, and
 processor before execution and resolves image bytes through the caller-owned
-content store described in the user guide.</p>
+content store described in the user guide.
+Both Hugging Face providers reject a tokenized input that exceeds the declared
+<code>context_length</code>; they do not silently shorten the input before scoring.</p>
 <h3 id="llama_cpp"><code>llama_cpp</code><a class="headerlink" href="#llama_cpp" title="Permanent link">&para;</a></h3>
 <p>Newly inspected specifications use the current closed set and require every
 key: <code>artifact_byte_length</code>, <code>artifact_sha256</code>,
@@ -2762,7 +2764,9 @@ and <code>tokenizer_metadata_sha256</code>. The target compute capability uses
 binds the engine tree, build configuration, file inventory, runner, backend,
 tokenizer, engine metadata, and GPU target. See NVIDIA's <a href="https://nvidia.github.io/TensorRT-LLM/">TensorRT-LLM
 documentation</a> for backend concepts;
-the InvarLock provider defines the evidence bindings above.</p>
+the InvarLock provider defines the evidence bindings above.
+Submitted batches must fit the declared <code>batch_size</code> and authenticated engine
+capacity; oversized batches are rejected before generation.</p>
 <h2 id="scoring-obligations">Scoring obligations<a class="headerlink" href="#scoring-obligations" title="Permanent link">&para;</a></h2>
 <p>For every schedule record, a provider emits one record with the same
 <code>record_id</code> and <code>input_sha256</code>, in exactly the same order. Successful records

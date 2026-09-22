@@ -2582,7 +2582,16 @@ the retained model outputs:</p>
 Promptfoo runs the same commands with the repository Python environment and
 requires Node.js with <code>npm</code> and <code>npx</code>; its runner verifies the exact package
 version and registry integrity in <code>locks/promptfoo.txt</code>. Every output path
-must be new. The differential observation covers 34 boundary cases, including
+must be new. The separate SDK capture gate installs the locked dependencies
+needed for its Promptfoo profile from <code>locks/promptfoo/package-lock.json</code> with
+<code>npm ci --omit=optional</code>. Unused optional integrations are outside this SDK
+test. The gate checks the top-level archive against the same registry integrity pin. The
+isolated SDK environment pins the patched <code>js-yaml</code> 5.2.2 dependency, and its
+CI gate checks the lock for current high-severity advisories. The
+differential and retained qualification records still identify the original
+Promptfoo 0.121.19 package; the SDK gate's dependency override applies only to
+its disposable test installation. The differential observation covers 34
+boundary cases, including
 explicitly unsupported inputs; it always has <code>authority: none</code> and returns
 exit 2 for drift. A candidate Python environment can run this observation,
 but the current qualification runner rejects a changed package/profile until
