@@ -171,6 +171,15 @@ def test_existing_and_partial_outputs_are_preserved(tmp_path, monkeypatch):
     assert before == {p.name: p.read_bytes() for p in tmp_path.glob("*.json")}
 
 
+def test_dangling_generated_destination_symlink_is_rejected(tmp_path):
+    path, _, _ = model_fixture(tmp_path, "hf_transformers")
+    destination = tmp_path / "request.json"
+    destination.symlink_to(tmp_path / "missing-request.json")
+    with pytest.raises(ValueError, match="must be new"):
+        EXAMPLE.prepare(tmp_path, path)
+    assert destination.is_symlink()
+
+
 def test_cli_reports_identity_and_refuses_completed_setup(
     tmp_path, monkeypatch, capsys
 ):

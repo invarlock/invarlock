@@ -94,8 +94,10 @@ For hosted judge collection, install `python -m pip install "invarlock[judge]"`.
 This extra adds the pinned provider SDKs. Native local judging uses core InvarLock
 with authenticated `hf_transformers` or `llama_cpp` runtime resources and local
 model artifacts. Offline import, verification and reporting need only the core.
-See [judge setup](https://github.com/invarlock/invarlock/blob/v0.16.2/docs/reference/judge-measurements.md#frozen-answer-requests-and-preflight)
-or the [native local judge example](https://github.com/invarlock/invarlock/blob/v0.16.2/examples/native-local-judge/README.md).
+See [judge setup](https://github.com/invarlock/invarlock/blob/v0.16.2/docs/reference/judge-measurements.md#frozen-answer-requests-and-preflight),
+the [native local judge example](https://github.com/invarlock/invarlock/blob/v0.16.2/examples/native-local-judge/README.md), or the
+[OpenAI-compatible endpoint example](https://github.com/invarlock/invarlock/blob/v0.16.2/examples/openai-compatible-judge/README.md)
+for vLLM, Ollama and LM Studio services.
 
 ## What can you use it for?
 
@@ -170,8 +172,11 @@ Judge collection is built into core. Hosted collection uses the pinned SDKs in
 `invarlock[judge]`; `runtime-provider-judge` runs an authenticated local HF or GGUF
 artifact offline. The local profile binds the complete artifact identity, runtime,
 canonical request and retained output, without a hidden chat template or HTTP
-endpoint. Collection uses explicit limits and durable checkpoints. Importing
-retained ratings, verification and reporting work offline in the core wheel. Start with
+endpoint. `openai-compatible-judge` instead collects through an explicitly
+configured Chat Completions service and retains endpoint identity without
+claiming authenticated local weights. Collection uses explicit limits and durable
+checkpoints. Importing retained ratings, verification and reporting work offline
+in the core wheel. Start with
 `invarlock evaluate --init my-judge --example native-judge` and replace the
 illustrative model pins with your actual runtime inputs. See
 [judge scoring](https://github.com/invarlock/invarlock/blob/v0.16.2/docs/reference/judge-measurements.md)

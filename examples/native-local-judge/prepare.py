@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+from typing import cast
 
 from invarlock.core.runtime_provider import artifact_identity_sha256
 from invarlock.engine import ModelRuntimeSpec, prepare_evaluator_judge
@@ -22,11 +23,12 @@ def prepare(workspace: Path, model_path: Path) -> dict:
     workspace = workspace.resolve(strict=True)
     model = json.loads(model_path.read_bytes())
     provider_name = model["runtime"]["provider"]
-    providers = {
-        "hf_transformers": HFTransformersProvider,
-        "llama_cpp": LlamaCppProvider,
-    }
-    if provider_name not in providers:
+    provider: HFTransformersProvider | LlamaCppProvider
+    if provider_name == "hf_transformers":
+        provider = HFTransformersProvider()
+    elif provider_name == "llama_cpp":
+        provider = LlamaCppProvider()
+    else:
         raise ValueError("choose hf_transformers or llama_cpp")
     reference = model["artifact"]["path"]
     relative = Path(reference)
@@ -38,9 +40,8 @@ def prepare(workspace: Path, model_path: Path) -> dict:
     ):
         raise ValueError("judge artifact must be beneath the workspace")
     artifact_path = workspace / relative
-    for part in (artifact_path, *artifact_path.parents):
-        if part == workspace:
-            break
+    for depth in range(1, len(relative.parts) + 1):
+        part = workspace.joinpath(*relative.parts[:depth])
         if part.is_symlink():
             raise ValueError("judge artifact path must not contain symlinks")
     spec = ModelRuntimeSpec(
@@ -48,7 +49,7 @@ def prepare(workspace: Path, model_path: Path) -> dict:
         model_id=model["artifact"]["model_id"],
         settings=model["runtime"]["settings"],
     )
-    artifact = providers[provider_name]().authenticate_artifact(spec, artifact_path)
+    artifact = provider.authenticate_artifact(spec, artifact_path)
     artifact_digest = artifact_identity_sha256(artifact)
     recipe = json.loads((HERE / "recipe-template.json").read_bytes())
     recipe["plan"]["judge"].update(
@@ -65,9 +66,9 @@ def prepare(workspace: Path, model_path: Path) -> dict:
     subject = json.loads((HERE / "subject_run.json").read_bytes())
     plan, policy = prepare_evaluator_judge(recipe, baseline, subject)
     recipe["collection"]["max_calls"] = plan["schedule"]["expected_trials"]
-    recipe["collection"]["max_output_tokens"] = (
-        plan["schedule"]["expected_trials"] * spec.settings["max_output_tokens"]
-    )
+    recipe["collection"]["max_output_tokens"] = plan["schedule"][
+        "expected_trials"
+    ] * cast(int, spec.settings["max_output_tokens"])
     request = {
         "format_version": "invarlock/evaluation-request-v3",
         "execution": {

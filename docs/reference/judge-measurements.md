@@ -362,14 +362,28 @@ small. If another source cannot fit, collection stops before the next admission,
 preserves completed shards, and does not publish incomplete evidence.
 
 The InvarLock process must already be inside the strict offline container for
-local collection, with the judge artifact and backend resources mounted. Existing
-baseline and subject OCI settings do not launch or select a third judge image.
-Normal host execution cannot use this profile by supplying a local path alone.
+local collection, with the judge artifact and backend resources mounted. For a
+native v1 `mode: run` request with an explicit local judge model, the CLI runs
+the baseline, subject and judge sequentially inside that one container. All
+three roles must bind the container's declared `INVARLOCK_RUNTIME_IMAGE_DIGEST`;
+the CLI does not start nested OCI workers or require an engine socket. Explicit
+OCI engine, worker CPU/memory/user or entrypoint controls are rejected for this
+inline path instead of being ignored. Other native run requests retain normal
+host-orchestrated OCI execution. Normal host execution cannot use the local
+profile by supplying a model path alone.
+The boundary check confirms container intent plus a kernel-visible container
+marker and rejects network, remote-code and third-party-plugin opt-ins. It does
+not inspect the surrounding engine configuration or independently identify the
+running image. The operator must launch the declared image with external network
+isolation, a read-only root and reduced capabilities, and must verify its digest
+before launch; the evidence binds that declared digest.
 `INVARLOCK_JUDGE_RUNTIME_DEVICE` selects its device, falling back to
-`INVARLOCK_RUNTIME_DEVICE`; baseline and subject overrides are not used. A signing
-key mounted into this container is available to the trusted runtime process.
-To keep that key on a separate host, collect unsigned and publish the unchanged
-retained measurements through `judge_import` there.
+`INVARLOCK_RUNTIME_DEVICE`; baseline and subject device overrides do not select
+the judge device. A signing key mounted into this container is available to the
+trusted runtime process; native v1 run mode does not provide host-separated
+signing or an unsigned switch. To keep the signing key on a separate host, use
+the frozen-answer collection and existing `judge_import` route, transferring the
+unchanged runs, plan, measurements and analysis policy for publication.
 See the
 [runnable local judge example](https://github.com/invarlock/invarlock/blob/main/examples/native-local-judge/README.md)
 for both providers, container setup and generation of complete frozen-answer v3
@@ -384,10 +398,22 @@ name, a mutable model directory path, or just one weight shard. Retain the
 runtime image and backend identity separately; a model digest cannot substitute
 for execution provenance.
 
-Each prompt is the exact canonical normalized judge-request JSON. There is no
-implicit chat-template application or conversion into a provider-specific
-conversation. Select an artifact that can follow this declared prompt and return
-the plan's JSON rating format. Generation uses temperature `0`, top-p `1`, an
+The plan's `prompt.runtime_format` selects the exact input sent to the direct
+runtime. Omit it or use `canonical-json-v1` to send the complete canonical
+normalized judge-request JSON. Set it to `chatml-v1` for a model that expects
+ChatML: the declared system, user and assistant messages are rendered with
+explicit role delimiters and a final assistant prefix. No tokenizer-selected
+chat template is applied. Other chat formats are not supported by this profile.
+
+The selected format is part of the approved plan. Replay reconstructs the exact
+rendered bytes and checks their runtime input digest. ChatML rejects embedded
+role delimiters in message content before inference. Its system prompt and
+rubric must explicitly describe the allowed JSON ratings; the separate API
+response-format object is not sent as a ChatML message. Changing formats requires
+a new plan and workspace, not reuse of a previous collection checkpoint.
+
+Select an artifact that can follow the declared input and return the plan's
+JSON rating format. Generation uses temperature `0`, top-p `1`, an
 explicit seed, `reasoning_effort: null`, no tools, no response cache, and one
 attempt without retries.
 Context and output bounds must fit the complete rendered request. A malformed
@@ -402,6 +428,114 @@ or contacting a service. Signature authentication and replay do not independentl
 attest the host or guarantee identical results from a future runtime. Ordinary
 judge precision, coverage, independent-unit and recipient trust requirements
 still apply; local execution does not turn an insufficient result into a pass.
+
+## OpenAI-compatible judge services
+
+Use `openai-compatible-judge` for a vLLM, Ollama, LM Studio or explicitly selected
+compatible service exposing `/v1/chat/completions`. The v3 collection block
+references a configuration file and workspace, with an optional `scorer_id`.
+It has no local `model` artifact binding and no `invocation_timeout_seconds`.
+The native and captured judge recipes use the same collection configuration
+with a runner containing only `scorer_id`.
+
+```json
+{
+  "profile": "openai-compatible-text-frozen-answer-v1",
+  "service": "vllm",
+  "base_url": "http://127.0.0.1:8000/v1",
+  "model": "judge-model",
+  "authentication": "none",
+  "request_timeout_seconds": 300,
+  "max_calls": 2,
+  "max_input_bytes": 131072,
+  "max_output_tokens": 256
+}
+```
+
+`service` accepts `vllm`, `ollama`, `lm_studio` or `openai_compatible`. The base
+URL explicitly selects HTTP or HTTPS and a `/v1` path, without credentials,
+query parameters or fragments. Authentication is either `none` or `bearer_env`;
+the latter reads only `INVARLOCK_OPENAI_COMPATIBLE_API_KEY`. Keep credentials out
+of request files. Bearer authentication requires HTTPS except on an explicit
+loopback endpoint. Ambient OpenAI endpoint variables do not redirect this route.
+Input-byte limits count aggregate canonical transmitted JSON bodies, excluding
+authorization headers; output-token limits reserve the planned calls.
+
+This collector retains one source shard per call, so the evidence format's
+1,000-shard limit allows at most 1,000 planned calls: 500 paired cases with one
+rating per side, or fewer cases with repetitions. Preflight rejects a larger
+schedule. The 384 MiB measurement limit can bind earlier when responses are
+large. Input-byte reservations are enforced while requests are prepared, before
+any call is admitted.
+
+The optional `response_format` is `json_object` by default or `json_schema` for
+services that require an explicit strict schema. The endpoint example selects
+`json_schema` for LM Studio and derives the rating enum from the frozen plan.
+This choice is included in `judge.service_identity`, so changing it requires a
+new plan and collection workspace.
+
+The plan uses `judge.provider: openai_compatible`, the exact requested model,
+an explicit approved response-model list, and
+`model_identity: {kind: hosted_api, weights_sha256: null}`. It fixes one attempt,
+no retry or response cache, and no reasoning effort. Its `service_identity`
+binds the authored service family and the bare SHA-256 digest of the canonical
+normalized base URL, including the trailing slash. The service may apply a chat
+template; transmitted settings do not prove its internal implementation.
+
+Preflight does not contact the endpoint. Authorize actual collection with the
+process-scoped `INVARLOCK_ALLOW_JUDGE_NETWORK=1` switch, including for loopback
+HTTP. Retained `retained-openai-compatible-judge-v1` sources bind the exact wire
+request, response, endpoint and normalized ratings to the frozen plan. Completed
+checkpoints can be reused unchanged; an admitted request without its retained
+result is ambiguous and cannot be automatically repeated. Replay, verification
+and reporting remain offline and need only core InvarLock.
+
+The authored service family and returned model identifiers or fingerprints are
+service observations. They do not establish the underlying weights, backend
+binary or host identity. Use `runtime-provider-judge` for authenticated direct
+artifact execution. The
+[endpoint example](https://github.com/invarlock/invarlock/blob/main/examples/openai-compatible-judge/README.md)
+covers preparation, bounded collection, signing and independent verification.
+It does not establish real-model qualification for every server version.
+
+### Tested local configurations
+
+Real execution checks used Qwen2.5-7B-Instruct to judge eight frozen answer pairs
+from two distinct Mistral 7B models. Each configuration used separate plans for
+per-case references and reference-free judging, with 16 ratings per plan.
+The counts below describe valid rating responses, not correct judgments.
+
+| Route | Tested configuration | Valid ratings across both plans |
+| --- | --- | --- |
+| Direct HF | Qwen2.5-7B-Instruct, explicit ChatML | 32/32 |
+| Direct GGUF | Qwen2.5-7B-Instruct Q4_K_M, llama.cpp b10015, explicit ChatML | 27/32 |
+| Ollama | 0.34.2, JSON-object responses | 32/32 |
+| vLLM | 0.30.0, JSON-object responses | 32/32 |
+| LM Studio | llmster 0.0.25+1, JSON-schema responses | 32/32 |
+
+The HF checkpoint revision was
+`a09a35458c702b33eeacc393d103063234e8bc28`; the GGUF file SHA-256 was
+`65b8fcd92af6b4fefa935c625d1ac27ea29dcb6ee14589c55a8f115ceaaa1423`.
+The five invalid GGUF responses contained fenced JSON and were rejected by the
+strict rating parser. An earlier direct canonical-JSON plan produced 0/16 valid
+ratings. Earlier LM Studio configurations failed because of a missing runtime
+library and an unsupported JSON-object response format. Those failures were
+retained separately from the corrected configurations.
+
+A separate native run executed baseline, subject and local judge in one offline
+container, produced signed evidence and completed both scheduled ratings.
+An independently installed recipient replayed the fresh evidence, including
+the native signature and verification receipt. These small studies all returned
+`insufficient_evidence`; they establish execution and replay for the stated
+configurations, not statistical acceptance or general judge accuracy.
+
+For real passing comparisons, the existing
+[Luna held-out reference](https://github.com/invarlock/invarlock/blob/main/examples/judge-measurements/references/k2-32b-luna-xhigh-heldout/README.md)
+contains 422 grounded-QA cases and 1,288 extraction cases, totaling 10,260 ratings.
+Both recorded policies pass independent replay. That reference exercises the
+shared analysis and verification workflow with a hosted judge; it does not
+qualify a local judge's rating quality. Full local campaign records are retained
+separately from the product source and are not distributed with these examples.
 
 ## Replay, authentication and acceptance
 

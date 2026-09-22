@@ -10,15 +10,24 @@ It demonstrates setup and cannot satisfy the example's minimum of 20 units.
 It is not a retained real-model qualification or evidence of judge accuracy.
 Replace the answers, rubric and sampling assignments with reviewed data for an
 actual decision. Repeated ratings do not create additional independent units.
+For a retained, powered campaign whose two declared policies pass, see the
+[K2 Luna held-out reference](../judge-measurements/references/k2-32b-luna-xhigh-heldout/README.md).
 
-The judge receives the exact canonical normalized judge-request JSON. The
-runtime does not silently apply a chat template. Choose a model capable of
-following that input and returning exactly `{"rating":"correct"}` or
-`{"rating":"incorrect"}`. Other output is retained as an invalid rating.
+Choose the input format before preparing the request. The default sends the
+complete canonical judge-request JSON. For a model that expects ChatML, set
+`plan.prompt.runtime_format` to `chatml-v1` in your copied
+`starter/recipe-template.json`. This renders the declared messages with explicit
+ChatML role delimiters. The runtime does not silently choose a tokenizer template.
+The format is bound into the plan and checked during offline replay.
+
+Choose a model that follows the selected format and returns exactly
+`{"rating":"correct"}` or `{"rating":"incorrect"}`, as instructed by this
+starter's system prompt. Other output is retained as an invalid rating. A format
+change requires a new workspace; it does not replace unsuccessful earlier runs.
 
 ## Prepare the runtime and local files
 
-Use a matching core wheel, example checkout and authenticated runtime image.
+Use a matching core wheel, example checkout and operator-verified runtime image.
 HF execution dependencies or the pinned llama.cpp backend belong in that image;
 the host does not need `invarlock[judge]`. Follow the
 [runtime provider guide](../../docs/user-guide/runtime-providers.md) to build and
@@ -46,6 +55,18 @@ container. Running the host CLI with `--runtime-profile` does not launch a third
 judge container. The native baseline/subject image overrides do not select a
 judge image. This starter uses frozen-answer v3 requests to make that boundary
 explicit.
+
+Native v1 `mode: run` requests with an explicit local judge model use the same
+boundary without nested Docker. The CLI runs baseline, subject and judge in this
+one container and requires the same declared `INVARLOCK_RUNTIME_IMAGE_DIGEST`
+for all three. It rejects explicit OCI engine, worker CPU/memory/user and
+entrypoint controls on that inline path. Native v1 still requires a signing key
+inside the trusted process; use the frozen-answer `judge_import` route when the
+signer must remain on a separate host.
+The CLI checks container intent, a kernel-visible container marker and disabled
+runtime opt-ins. It does not inspect the engine's network, filesystem or
+capability settings or independently derive the current image digest. Apply the
+`docker run` isolation below and verify the image digest before launch.
 
 Start the selected, already-built CPU image. Replace the image and signing-key
 paths with independently pinned local resources:
@@ -85,9 +106,9 @@ select the judge device.
 The signing key is available to this trusted runtime process through its
 read-only mount. It is outside the published workspace, but this in-container
 collector does not provide the native host orchestrator's worker/key separation.
-If you require that separation, omit the key mount, collect with `--unsigned`,
-then transfer the unchanged frozen runs, plan, measurements and analysis policy
-to a trusted host and sign through the existing
+For this frozen-answer v3 starter, if you require that separation, omit the key
+mount, collect with `--unsigned`, then transfer the unchanged frozen runs, plan,
+measurements and analysis policy to a trusted host and sign through the existing
 [`judge_import` workflow](../judge-measurements/README.md). Verification still
 checks the retained local runtime evidence; no second inference is required.
 
