@@ -7,6 +7,7 @@ import json
 import os
 import re
 import stat
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -121,8 +122,11 @@ def current_execution_mode() -> str:
     return "container" if running_inside_container() else "host"
 
 
-def _declared_runtime_image_digest(image_ref: str) -> str | None:
-    explicit_raw = os.environ.get(RUNTIME_IMAGE_DIGEST_ENV, "").strip()
+def _declared_runtime_image_digest(
+    image_ref: str, environment: Mapping[str, str] | None = None
+) -> str | None:
+    values = os.environ if environment is None else environment
+    explicit_raw = values.get(RUNTIME_IMAGE_DIGEST_ENV, "").strip()
     embedded_raw = image_ref.rsplit("@", 1)[1] if "@" in image_ref else ""
     for label, value in (
         (RUNTIME_IMAGE_DIGEST_ENV, explicit_raw),
@@ -137,9 +141,12 @@ def _declared_runtime_image_digest(image_ref: str) -> str | None:
     return explicit_raw or embedded_raw or None
 
 
-def resolve_runtime_image_digest() -> str | None:
-    image_ref = os.environ.get(RUNTIME_IMAGE_ENV, "").strip()
-    return _declared_runtime_image_digest(image_ref)
+def resolve_runtime_image_digest(
+    environment: Mapping[str, str] | None = None,
+) -> str | None:
+    values = os.environ if environment is None else environment
+    image_ref = values.get(RUNTIME_IMAGE_ENV, "").strip()
+    return _declared_runtime_image_digest(image_ref, values)
 
 
 def resolve_runtime_image() -> str:

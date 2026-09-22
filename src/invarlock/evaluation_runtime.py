@@ -173,12 +173,13 @@ def _optional_provider_binding(
     *,
     root_variable: str,
     support_variables: Mapping[str, str],
+    environment: Mapping[str, str],
 ) -> ProviderResourceBinding | None:
-    root_value = os.environ.get(root_variable)
+    root_value = environment.get(root_variable)
     observed_support = {
         name: value
         for name, variable in support_variables.items()
-        if (value := os.environ.get(variable)) is not None
+        if (value := environment.get(variable)) is not None
     }
     if root_value is None:
         if observed_support:
@@ -197,15 +198,18 @@ def _optional_provider_binding(
     )
 
 
-def caller_runtime_resources_from_environment() -> CallerRuntimeResources:
+def caller_runtime_resources_from_environment(
+    environment: Mapping[str, str] | None = None,
+) -> CallerRuntimeResources:
     """Load the small trusted runtime context exposed by the public CLI."""
 
-    image_digest = resolve_runtime_image_digest()
+    values = os.environ if environment is None else environment
+    image_digest = resolve_runtime_image_digest(values)
     if image_digest is None:
         raise RuntimeResourceResolutionError(
             "INVARLOCK_RUNTIME_IMAGE_DIGEST must bind the executing image"
         )
-    default_device = os.environ.get("INVARLOCK_RUNTIME_DEVICE", "cpu")
+    default_device = values.get("INVARLOCK_RUNTIME_DEVICE", "cpu")
     side_devices: dict[RuntimeResourceRole, str] = {}
     device_variables: tuple[tuple[RuntimeResourceRole, str], ...] = (
         ("baseline", "INVARLOCK_BASELINE_RUNTIME_DEVICE"),
@@ -213,7 +217,7 @@ def caller_runtime_resources_from_environment() -> CallerRuntimeResources:
         ("judge", "INVARLOCK_JUDGE_RUNTIME_DEVICE"),
     )
     for role, variable in device_variables:
-        value = os.environ.get(variable)
+        value = values.get(variable)
         if value is not None:
             side_devices[role] = value
     provider_bindings: dict[str, ProviderResourceBinding] = {}
@@ -221,6 +225,7 @@ def caller_runtime_resources_from_environment() -> CallerRuntimeResources:
         binding = _optional_provider_binding(
             root_variable=profile.resource_root_environment,
             support_variables=dict(profile.support_resource_environment),
+            environment=values,
         )
         if binding is not None:
             provider_bindings[profile.provider_name] = binding
