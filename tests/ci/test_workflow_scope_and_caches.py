@@ -225,15 +225,40 @@ def test_release_requires_sdk_tests_in_its_measured_interpreter():
         for item in steps
         if item.get("name") == "Run repository and supplemental behavior gates"
     )
-    coverage = next(
-        item for item in steps if item.get("name") == "Enforce release coverage"
-    )
-    assert steps.index(verify) < steps.index(install) < steps.index(coverage)
+    assert steps.index(verify) < steps.index(install)
     assert "env" not in verify
-    assert coverage["env"] == {
-        "INVARLOCK_REQUIRE_INSPECT_SDK": "1",
-        "INVARLOCK_REQUIRE_LANGFUSE_SDK": "1",
-    }
+    release_jobs = _load(WORKFLOWS / "release.yml")["jobs"]
+    coverage_job = release_jobs["coverage_shards"]
+    coverage_steps = coverage_job["steps"]
+    coverage_install = next(
+        item
+        for item in coverage_steps
+        if item.get("name") == "Install measured coverage dependencies"
+    )
+    for lock in (
+        "requirements/workflows/inspect-judge-tests-py313.txt",
+        "requirements/workflows/langfuse-sdk-tests-py313.txt",
+    ):
+        assert (
+            f"python -m pip install --require-hashes -r {lock}"
+            in coverage_install["run"]
+        )
+    coverage = next(
+        item
+        for item in coverage_steps
+        if item.get("name") == "Collect release coverage"
+    )
+    assert coverage_steps.index(coverage_install) < coverage_steps.index(coverage)
+    assert coverage_job["env"]["INVARLOCK_REQUIRE_INSPECT_SDK"] == "1"
+    assert coverage_job["env"]["INVARLOCK_REQUIRE_LANGFUSE_SDK"] == "1"
+    assert (
+        next(
+            item
+            for item in release_jobs["coverage_check"]["steps"]
+            if item.get("name") == "Enforce release coverage"
+        )["run"]
+        == "make coverage-report"
+    )
 
 
 def test_release_replays_installed_evaluator_campaigns_from_frozen_wheel():

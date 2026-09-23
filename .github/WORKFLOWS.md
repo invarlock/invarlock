@@ -56,6 +56,9 @@ that job's `cache-dependency-path`.
   bootstrap runs cannot publish documentation. A manual run with publication
   disabled and a candidate version exercises the Linux release gates without
   creating or moving a tag.
+  Six disjoint coverage shards run alongside artifact, integration and security
+  validation. The coverage reports are combined and enforced before a tagged
+  candidate can be attested.
 
 The release workflow builds, validates, attests, and publishes one Python
 distribution: `invarlock`. Judge collection, diagnostics, and all maintained
