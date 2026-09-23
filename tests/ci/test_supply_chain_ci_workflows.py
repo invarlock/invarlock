@@ -370,15 +370,40 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
         )
         + 1
     )
+    shards = jobs["coverage_shards"]
+    assert shards["needs"] == "resolve_release_ref"
+    assert shards["if"] == build["if"]
+    assert shards["strategy"]["fail-fast"] is False
+    assert set(shards["strategy"]["matrix"]["shard"]) == {
+        "core",
+        "examples",
+        "examples-comparisons",
+        "examples-judge",
+        "support",
+        "runtime",
+    }
+    assert shards["steps"][0]["with"]["ref"] == (
+        "${{ needs.resolve_release_ref.outputs.release_sha }}"
+    )
+    assert _step(shards["steps"], "Collect release coverage")["run"] == (
+        "make coverage-collect-${{ matrix.shard }} PYTEST_WORKERS=2"
+    )
+    upload = _step(shards["steps"], "Retain release coverage measurements")
+    assert upload["with"]["if-no-files-found"] == "error"
+    assert upload["with"]["include-hidden-files"] is True
+
     coverage = jobs["coverage_check"]
-    assert coverage["needs"] == "resolve_release_ref"
+    assert set(coverage["needs"]) == {"resolve_release_ref", "coverage_shards"}
     assert coverage["if"] == build["if"]
     assert coverage["permissions"] == {"contents": "read"}
     assert coverage["steps"][0]["with"]["ref"] == (
         "${{ needs.resolve_release_ref.outputs.release_sha }}"
     )
+    download = _step(coverage["steps"], "Download release coverage measurements")
+    assert download["with"]["pattern"] == "release-coverage-shard-*"
+    assert download["with"]["merge-multiple"] is True
     assert _step(coverage["steps"], "Enforce release coverage")["run"] == (
-        "make coverage-enforce"
+        "make coverage-report"
     )
     assert not any(
         step.get("name") == "Enforce release coverage" for step in build["steps"]

@@ -227,7 +227,8 @@ def test_release_requires_sdk_tests_in_its_measured_interpreter():
     )
     assert steps.index(verify) < steps.index(install)
     assert "env" not in verify
-    coverage_job = _load(WORKFLOWS / "release.yml")["jobs"]["coverage_check"]
+    release_jobs = _load(WORKFLOWS / "release.yml")["jobs"]
+    coverage_job = release_jobs["coverage_shards"]
     coverage_steps = coverage_job["steps"]
     coverage_install = next(
         item
@@ -245,11 +246,19 @@ def test_release_requires_sdk_tests_in_its_measured_interpreter():
     coverage = next(
         item
         for item in coverage_steps
-        if item.get("name") == "Enforce release coverage"
+        if item.get("name") == "Collect release coverage"
     )
     assert coverage_steps.index(coverage_install) < coverage_steps.index(coverage)
     assert coverage_job["env"]["INVARLOCK_REQUIRE_INSPECT_SDK"] == "1"
     assert coverage_job["env"]["INVARLOCK_REQUIRE_LANGFUSE_SDK"] == "1"
+    assert (
+        next(
+            item
+            for item in release_jobs["coverage_check"]["steps"]
+            if item.get("name") == "Enforce release coverage"
+        )["run"]
+        == "make coverage-report"
+    )
 
 
 def test_release_replays_installed_evaluator_campaigns_from_frozen_wheel():
