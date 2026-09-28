@@ -59,6 +59,47 @@ escalation, repeat-confirmation and multiple-alert policy before repeated looks
 at results. Per-campaign intervals are not a joint guarantee across repeated
 campaigns, and incidental alerts do not establish an incident detector.
 
+## Rehearse a later assessment without rewriting history
+
+The [reassessment example](https://github.com/invarlock/invarlock/blob/main/examples/hosted-service/reassessment.py)
+exercises an initial assessment A, a declared incident, and a later assessment B:
+
+```bash
+python examples/hosted-service/reassessment.py --output reassessment-example
+```
+
+This is an offline integration fixture with 32 synthetic cases and fixed example
+observation windows. It makes no service calls and does not establish production
+quality, incident causality, or trustworthy event time. In a real campaign, replace
+the synthetic captures with independently reviewed retained service observations.
+
+A passes the fixed comparison policy. After the declared trigger, B compares new
+subject observations against the same frozen baseline and records a regression.
+Each has its own request, subject run, complete-run pins, signed evidence directory
+and independently signed verification receipt. The example hashes every file in
+A before producing B and checks that all original bytes remain unchanged. An
+existing output directory is refused. Inspect `scenario.json`, `a/verification.json`
+and `b/verification.json`; a signed B rejection does not invalidate A's historical
+pass. The new receipt is a new verification statement, not proof that old service
+observations are fresh. These receipt formats do not authenticate issuance time.
+
+`trigger.json` and `scenario.json` are explanatory records outside the evidence
+packs, not new InvarLock contracts or sources of verdict authority. The generated
+keys are disposable example keys; a real handoff uses independently controlled
+signer and verifier keys. Keep private keys out of recipient evidence packages.
+
+| What changed | Required record | Meaning of A |
+| --- | --- | --- |
+| Later observed service behavior | New capture, reviewed inputs, signed comparison and receipt B | A still describes its original window and cases; B does not establish when or why the service changed |
+| Recipient trust or acceptance policy | A separate recipient decision referencing the unchanged evidence and current policy | The technical result is unchanged, even if use is now declined |
+| An actually erroneous earlier assessment | Preserve A, identify the specific error and affected conclusion, and issue an explicitly linked correction with independently verified replacement evidence | A remains the historical record of what was asserted; preservation does not require continued reliance on a known error |
+
+The fixture exercises the first row. Recipient acceptance and any correction are
+separate decisions; it does not automatically supersede earlier approvals. Its
+[tests](https://github.com/invarlock/invarlock/blob/main/tests/examples/test_hosted_reassessment.py)
+authenticate both receipts, require distinct input bindings, detect historical
+mutation, and verify refusal to overwrite a previous campaign.
+
 ## Capture fresh executions
 
 The [HTTP capture and handoff example](https://github.com/invarlock/invarlock/blob/main/examples/hosted-service/README.md)

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add an offline hosted-service reassessment example that produces two signed
+  comparisons and independent receipts while preserving the earlier evidence
+  byte-for-byte. Document the separate meanings of later observations, changed
+  recipient acceptance and correction of an erroneous assessment.
+
 ## [0.16.3] - 2026-09-22
 
 The v0.16.2 tag was not published to package indexes; v0.16.3 is the first

@@ -12,6 +12,14 @@ You must supply a running endpoint and approve the cases and limits first. To
 inspect a result without making calls, start with the
 [retained Mistral HTTP comparison](references/mistral-7b-http/README.md).
 
+For an offline A → incident → B exercise, run
+`python examples/hosted-service/reassessment.py --output reassessment-example`.
+It signs and independently verifies two synthetic comparisons, preserves A
+byte-for-byte, and retains the declared trigger outside both evidence packs.
+See [reassessing without rewriting history](../../docs/user-guide/hosted-service-requalification.md#rehearse-a-later-assessment-without-rewriting-history)
+for its scope and the distinction between new observations, recipient policy
+changes, and corrections.
+
 ## What this example supports
 
 These helpers collect bounded text completions from an OpenAI-compatible HTTP
