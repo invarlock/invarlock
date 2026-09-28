@@ -86,7 +86,7 @@ jobs:
             requirements/workflows/release-install-py313.txt
             requirements/workflows/release-options-py313.txt
       - name: Set up uv
-        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7
         with:
           version: "0.10.10"
       - name: Install dependencies
@@ -157,7 +157,7 @@ jobs:
             requirements/workflows/release-install-py312.txt
             requirements/workflows/release-options-py312.txt
       - name: Set up uv
-        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7
         with:
           version: "0.10.10"
       - name: Install dependencies
@@ -344,7 +344,7 @@ jobs:
             requirements/workflows/release-install-py313.txt
             requirements/workflows/release-options-py313.txt
       - name: Set up uv
-        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7
         with:
           version: "0.10.10"
       - name: Set up Node.js
