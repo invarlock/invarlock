@@ -115,3 +115,20 @@ def test_incomplete_verification_does_not_publish_a_successful_scenario(
         helper.rehearse(root)
     assert not (root / "scenario.json").exists()
     assert not (root / "b").exists()
+
+
+def test_missing_regression_does_not_publish_the_expected_scenario(
+    tmp_path, monkeypatch
+):
+    helper = module()
+    original = helper.captured_run
+    # A misconfigured capture that keeps returning the original answer must not
+    # claim to have demonstrated later regression.
+    monkeypatch.setattr(
+        helper, "captured_run", lambda name, day, answer: original(name, day, "yes")
+    )
+    root = tmp_path / "no-regression"
+    with pytest.raises(ValueError, match="unexpected rehearsal decisions"):
+        helper.rehearse(root)
+    assert not (root / "scenario.json").exists()
+    assert json.loads((root / "b/verification.json").read_bytes())["decision"] == "pass"
