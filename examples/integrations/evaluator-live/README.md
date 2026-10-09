@@ -120,6 +120,13 @@ Use separate, pinned SDK environments. The normal locks are in
 `examples/evaluator-qualification/locks/`. LightEval also needs this example's
 `locks/lighteval.txt` for a compatible `xxhash` version. Promptfoo uses the verified npm archive;
 LightEval requires checksum-verified NLTK resources staged before execution.
+Its pinned registry imports an unrelated judge definition that still uses the
+Hub `model_name` query argument. During registry construction, the isolated
+capture process maps that argument to `search`, forwards the real API result
+without consuming it, and restores the original API binding on success or
+failure. Combined legacy and modern queries are refused. This compatibility
+adapter does not replace SDK tasks, scoring or model execution, and avoids a
+downgrade to older dependencies.
 `scripts/evaluator_sdk_gate.sh` demonstrates setup and tests it without model calls.
 
 ```bash

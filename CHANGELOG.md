@@ -38,6 +38,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Adapt the pinned LightEval registry to the current Hub search argument during
+  isolated capture setup, preserving actual API results and SDK execution
+  without downgrading dependencies.
+
 - Pin hosted Linux CI and release workflows to Ubuntu 24.04 so the scheduled
   `ubuntu-latest` migration cannot silently change their operating system.
 

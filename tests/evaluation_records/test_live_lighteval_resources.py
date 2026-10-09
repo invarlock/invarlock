@@ -2,8 +2,9 @@
 
 import hashlib
 import importlib.util
+import sys
 from pathlib import Path
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 
 import pytest
 
@@ -70,3 +71,32 @@ def test_missing_resource_or_sdk_has_actionable_error(resource, monkeypatch):
     monkeypatch.setattr(LIVE.importlib.util, "find_spec", lambda name: None)
     with pytest.raises(ValueError, match="install the pinned"):
         LIVE.lighteval_resource()
+
+
+@pytest.mark.parametrize("fail", [False, True])
+def test_registry_bridge_forwards_real_results_and_restores_api(monkeypatch, fail):
+    calls = []
+    result = iter([object()])
+
+    class Api:
+        def list_models(self, *, search=None, **kwargs):
+            calls.append((search, kwargs))
+            return result
+
+    metrics = ModuleType("lighteval.metrics")
+    metrics.metrics_sample = SimpleNamespace(HfApi=Api)
+    monkeypatch.setitem(sys.modules, "lighteval.metrics", metrics)
+    try:
+        with LIVE._lighteval_registry_api():
+            client = metrics.metrics_sample.HfApi()
+            assert client.list_models(model_name="example/model", limit=2) is result
+            assert client.list_models(search="modern-query", limit=1) is result
+            with pytest.raises(ValueError, match="cannot combine"):
+                client.list_models(model_name="legacy", search="modern")
+            if fail:
+                raise RuntimeError("registry import failed")
+    except RuntimeError as exc:
+        assert fail and str(exc) == "registry import failed"
+    assert metrics.metrics_sample.HfApi is Api
+    assert calls == [("example/model", {"limit": 2}), ("modern-query", {"limit": 1})]
+    assert len(list(result)) == 1  # The bridge neither consumes nor replaces results.
