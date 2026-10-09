@@ -24,7 +24,10 @@ def check_boundaries(centers, accepts, *, relaxing_down):
                 math.nextafter(center, math.inf),
             ]
         outcomes = [accepts({key: point}) for point in points]
-        assert outcomes[1], (key, "equality must pass")
+        # Monotonicity alone also permits an always-accepting, disabled gate.
+        # These centers are exact active boundaries with all other gates relaxed.
+        expected = [True, True, False] if key in relaxing_down else [False, True, True]
+        assert outcomes == expected, (key, "boundary enforcement", outcomes, expected)
         relaxed = list(reversed(outcomes)) if key in relaxing_down else outcomes
         assert all(not a or b for a, b in zip(relaxed, relaxed[1:], strict=False)), key
         single[key] = points, outcomes
