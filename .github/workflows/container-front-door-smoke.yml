@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   engine-smoke:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     strategy:
       fail-fast: false
@@ -135,7 +135,7 @@ jobs:
   smoke:
     if: ${{ always() }}
     needs: [engine-smoke]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Require Docker and Podman journeys

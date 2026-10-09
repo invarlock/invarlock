@@ -38,6 +38,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Pin hosted Linux CI and release workflows to Ubuntu 24.04 so the scheduled
+  `ubuntu-latest` migration cannot silently change their operating system.
+
 - Bound captured-file read allocations by the checked file size plus one byte,
   preserving payload ceilings and file-change detection. This reduces temporary
   allocation for small files without promising a total-memory bound.

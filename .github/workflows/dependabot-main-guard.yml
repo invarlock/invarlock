@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   enforce-staging-first:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Block direct Dependabot PRs to main
         shell: bash

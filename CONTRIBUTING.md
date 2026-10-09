@@ -24,8 +24,13 @@ format.
 ## Development setup
 
 InvarLock requires Python 3.12 or newer. Use Python 3.13 to match the main CI
-jobs; Python 3.12 has a separate minimum-version gate. Documentation tooling
-requires Node.js 22.18 or newer and npm. Clone the repository, create a virtual
+jobs; Python 3.12 has a separate minimum-version gate. Hosted Linux workflows select Ubuntu 24.04 explicitly.
+GitHub is [moving the `ubuntu-latest` label to Ubuntu 26.04](https://github.blog/changelog/2026-09-17-ubuntu-26-generally-available-and-latest-migration/)
+between October 19 and November 19, 2026. Validate the CI, container and
+distribution paths on a newer OS before changing this pin. The OS label does not
+freeze the runner image or its preinstalled tools.
+
+Documentation tooling requires Node.js 22.18 or newer and npm. Clone the repository, create a virtual
 environment, and install the development dependencies:
 
 ```bash
@@ -53,7 +58,7 @@ dependency groups; published extras contain only optional product features.
 Add Go's binary directory to `PATH`. These tools are not installed by the
 Python development dependency group.
 
-For an exact Linux x86_64 CI reproduction, create a separate Python 3.13
+For the Linux x86_64 CI dependency setup on Ubuntu 24.04, create a separate Python 3.13
 environment and run:
 
 ```bash
