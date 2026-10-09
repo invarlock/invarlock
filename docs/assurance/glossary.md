@@ -113,6 +113,15 @@ observations or a changed recipient policy. Digest links alone do not establish
 correction authority or revoke downstream approvals. See the
 [correction example](../user-guide/hosted-service-requalification.md#rehearse-a-correction-of-an-actual-error).
 
+**Score contribution explanation**
+
+A separate arithmetic breakdown of one additive metric using supplied complete
+paired case means and declared unit weights. Visible contributions, an omitted
+remainder and the gap to the supplied report total reconcile exactly. The gap
+alone does not prove a rounding error, and the explanation does not authenticate
+inputs, infer independence or alter a verdict. See the
+[contribution recipe](../reference/evaluation-records.md#explain-an-additive-score-change).
+
 **Exact-match edit sensitivity**
 
 A bounded search for the fewest subject-outcome flips that change a current
@@ -152,10 +161,13 @@ identity-management decision.
 
 **Exact-match delta**
 
-For native pack-v1, `100 * (subject mean - baseline mean)` for per-record
-scores of zero or one, expressed in percentage points. Captured exact-match
-comparison values use score units, `subject mean - baseline mean`; reports may
-display their percentage-point equivalent.
+For native pack-v1, sum the paired `subject_i - baseline_i` binary score
+differences with `math.fsum`, divide by the record count, then multiply by
+`100.0` to obtain percentage points. Captured exact-match comparisons instead
+subtract the separately rounded side means in score units; reports may display
+their percentage-point equivalent. These formulas are mathematically related,
+but changing the floating-point operation order can change replayed values.
+See [arithmetic and replay](decision-semantics.md#arithmetic-and-replay).
 
 **Execution attestation**
 

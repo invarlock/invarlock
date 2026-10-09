@@ -85,8 +85,11 @@ change must preserve the historical replay contract.
 
 The optional [contribution recipe](../reference/evaluation-records.md#explain-an-additive-score-change)
 can separately reconcile exact retained-score contributions, the omitted
-remainder and the original report's rounding residual. It neither replaces
-canonical values nor grants acceptance or verification authority.
+remainder and the gap to the original report's total. Its `rounding_residual`
+field is that arithmetic gap; reconciliation alone does not prove rounding was
+its cause. First validate the complete source workflow, metric scope, weights
+and numeric units. The recipe neither replaces canonical values nor grants
+acceptance or verification authority.
 
 A fixed seed or binary64 dtype alone does not promise identical results across
 all Python builds, math libraries or numerical backends. Preserve the package,

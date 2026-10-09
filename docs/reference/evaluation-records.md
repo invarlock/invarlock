@@ -392,10 +392,21 @@ repetitions within each case first, and preserve the plan's declared unit IDs.
 The recipe gives units equal weight and cases equal weight within their unit;
 it does not infer independence or validate a judging plan.
 
+Use the same numeric units for case means and `reported_delta`. For a native
+exact-match or scorer-extension report, the reported comparison is in percentage
+points: convert its stored float with `Fraction.from_float`, then divide by
+`100` when the supplied case scores remain in `[0, 1]`. Captured scalar deltas
+and judge effect means already use score units. Contributions always describe
+subject minus baseline; a negative contribution can be an improvement for a
+lower-is-better metric. The recipe does not classify that change.
+
 Each selected case has an exact rational weight and signed contribution. The
-visible contributions plus the omitted contribution equal the exact delta; add
-the rounding residual to recover the original reported delta. All rational
-values are strings so JSON conversion does not introduce another rounding step.
+visible contributions plus the omitted contribution equal the exact delta. The
+`rounding_residual` field is the supplied reported delta minus that exact delta;
+adding it recovers the reported total. This equality holds even if the caller
+supplies the wrong total, weights or units, so it does not prove rounding caused
+the gap. Investigate discrepancies against the validated source workflow. All
+rational values are strings so JSON conversion introduces no further rounding.
 The output has no verification authority. It does not explain uncertainty,
 causality, missing observations or a normalized-NLL ratio, and rankings apply
 only within one additive metric and scope. Validate the complete source workflow

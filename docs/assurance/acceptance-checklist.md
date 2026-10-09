@@ -122,6 +122,10 @@ suppress a verifier error, or reinterpret a failed policy result.
       retain its supplied input order, policy and search limits. Distinguish an
       exact witness from a lower bound; do not treat it as rerun probability or
       as authentication of the outcomes.
+- [ ] If using a [score contribution explanation](../reference/evaluation-records.md#explain-an-additive-score-change),
+      validate the complete source workflow and retain its scope, unit mapping,
+      repetition averaging and numeric units. Reconcile to that report's total;
+      a residual alone does not prove rounding or authenticate the inputs.
 - [ ] If using optional diagnostics, retain array provenance, alignment,
       preprocessing, numerical method and environment. A reference-edge distance
       is not an error bound, and an observation cannot override a policy verdict.

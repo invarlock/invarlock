@@ -256,6 +256,12 @@ new authentication, rerun probability or acceptance authority. Likewise,
 [NumPy diagnostics](../user-guide/diagnostics.md) describe retained arrays;
 authenticating their bytes does not calibrate their reference edges as policy.
 
+The [score contribution recipe](../reference/evaluation-records.md#explain-an-additive-score-change)
+explains a supplied additive total using exact weights and a residual. It cannot
+establish that the inputs are complete, their units match the report, or the
+residual is caused only by rounding. Validate those facts in the source workflow;
+the explanation does not supply a new verdict, interval or causal claim.
+
 For judge evidence, unique unit labels do not establish independence. Review
 shared source documents, sessions or subjects before relying on an interval;
 [the duplication example](../reference/judge-measurements.md#statistical-scope)

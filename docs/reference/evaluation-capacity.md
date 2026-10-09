@@ -43,6 +43,13 @@ decision or integrity finding. Retry with a reviewed adequate allowance. Raising
 the evaluation allowance does not raise the verifier allowance or change signed
 policy. SDK `None` explicitly removes only this local work limit.
 
+These ceilings bound serialized material and planned work, not peak process
+memory. Captured readers check the file's byte allowance, read at most its
+observed size plus one byte, and recheck descriptor/path identity and length.
+This avoids allocating against the full allowance for a small file. Parsed
+objects, validation, statistical work and rendering can require additional
+memory; reducing the read allocation does not raise any contract limit.
+
 Per-role and aggregate byte checks apply to physical bytes as well as bounded
 canonical serialization. Oversized missing-ID arrays are refused before costly
 comparison work, and diagnostics are bounded. Do not drop cases, truncate IDs,

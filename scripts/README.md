@@ -66,7 +66,9 @@ would not repair that conflict.
 
 The `QualificationQuotaError.conflict` mapping retains the complete group quotas,
 usable capacity per answer, shortfall, requested count and maximum feasible
-allocation. The exception message bounds the displayed group labels. This is a
+partial allocation under the requested quota ceilings. That partial flow is not
+a promise that requesting that smaller count would satisfy its newly balanced
+quotas. The exception message bounds the displayed group labels. This is a
 capacity witness from the allocator's residual cut; it does not relax quotas,
 change selection order, or certify that a benchmark is representative.
 
