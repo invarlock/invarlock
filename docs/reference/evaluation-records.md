@@ -350,6 +350,30 @@ even when equal to the derived run digest. Relocating a request tree changes no
 portable identity; changing a source, provenance, policy or pin can change it.
 Use these SDK helpers, not a handwritten YAML/JSON hash recipe.
 
+### Scoring equivalence and input identity
+
+A scorer can treat two answers as equivalent while their complete-run pins
+remain different. Apply each transformation at its own boundary:
+
+| Change to a validated canonical run | Scoring effect | Complete-run pin | Planned case-set pin |
+| --- | --- | --- | --- |
+| Reorder JSON object keys only | Unchanged | Unchanged | Unchanged |
+| Reorder records, keeping the same IDs and facts | Captured comparison still pairs by ID | Changes | Unchanged; cases are ordered canonically by ID |
+| Change an output's letter case or whitespace under `normalized_match` with case folding enabled | Unchanged when normalized text is identical | Changes | Unchanged; outputs are not case-set inputs |
+| Make the same equivalent reference-text change on both sides under that scorer | Per-record score unchanged | Changes | Changes; references are case-set inputs |
+| Change metadata on both sides | Can change slice membership; an unused key does not affect scores | Changes | Changes |
+| Change input text on both sides without changing retained answers | Scoring retained answers can stay unchanged; this does not establish equivalent model behavior | Changes | Changes |
+
+These rows assume all other run fields remain fixed. A raw export's physical
+checksum can change when its JSON formatting changes, even if the parsed
+object is equivalent. If an import retains that new checksum in `source_digest`,
+the complete-run pin changes too. These captured-run rules do not relax native
+provider requirements for an identical ordered schedule.
+
+Keep scorer normalization inside scoring. Do not normalize retained answers or
+references merely to preserve an old pin. A changed complete run requires its
+own reviewed identity, even if every score and the final verdict stay the same.
+
 ## Pack boundary
 
 Captured pack v2 has exactly `manifest.json`, `checksums.sha256`, `request.json`,

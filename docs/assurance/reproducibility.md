@@ -40,6 +40,12 @@ workflow.
 This separation follows the practical distinction in ML reproducibility work
 between disclosing experimental material and actually reproducing a result.
 
+Captured scorer equivalence is also separate from input identity. For example,
+case folding can preserve a label score while the retained output bytes and
+complete-run pin change. The [transformation table](../reference/evaluation-records.md#scoring-equivalence-and-input-identity)
+distinguishes scoring, complete-run and planned case-set identities; unchanged
+scores do not authorize substitution under old recipient pins.
+
 ## Bound identity vector
 
 For one side $X \in \{B,S\}$, define the recorded identity vector:
