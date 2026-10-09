@@ -412,6 +412,12 @@ signature and a null signing-key fingerprint. The signature uses the existing
 There is no second signed comparison envelope, embedded verification receipt,
 or implicit legacy migration.
 
+Captured readers check each file against its byte allowance before opening it,
+then bound the read request by the observed file size plus one byte. They still
+recheck descriptor and path identity and reject growth, truncation or replacement.
+This avoids a ceiling-sized read allocation for a small file; it is not a bound
+on total parsing, validation or report-rendering memory.
+
 The normalized request, policy, records and report are canonical JSON with a
 final LF. The checksum ledger uses fixed payload paths. `comparison_id` hashes
 the canonical object containing `kind: captured`, the normalized request digest,
