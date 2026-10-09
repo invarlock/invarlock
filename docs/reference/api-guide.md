@@ -33,14 +33,42 @@ The facade deliberately groups these stable surfaces:
 | Captured subject identity | `digest`, `validate_service_identity`, `evaluated_subject_digest` |
 
 Imports from other `invarlock.*` modules are not stable merely because they are
-importable. Use the facade unless implementing the provider protocol documented
-in [Runtime providers](runtime-providers.md).
+importable. Use the facade for transactions; separate documented imports cover
+[advisory helpers](#advisory-python-helpers) and the provider protocol in
+[Runtime providers](runtime-providers.md).
 
 The captured evaluation helpers are part of the documented SDK for
 captured-result comparisons. They expose normalized run construction and loading,
 multi-metric comparison, evidence publication, independent verification, and
 scoped receipt handling through the same evaluation transaction surface. Their
 evidence and recorded-score semantics are described in [evaluation records](evaluation-records.md).
+
+## Advisory Python helpers
+
+These documented imports sit outside the transaction facade and do not authorize
+acceptance. They are not automatically added to comparison reports.
+
+| Import | Call and scope |
+| --- | --- |
+| `invarlock.diagnostics.rmt_observation` | `rmt_observation(values, *, method="covariance", max_gram_bytes=134217728)`; requires the NumPy diagnostics extra and a finite two-dimensional array with at least two rows and one varying column |
+| `invarlock.exact_match_sensitivity.exact_match_sensitivity` | `exact_match_sensitivity(baseline, subject, *, policy, max_changes=8, max_states=2048)`; core-only hypothetical subject flips for current native v3 exact-match decisions |
+
+The RMT helper returns a `RmtObservation` and raises `DiagnosticInputError` for
+invalid inputs, methods, budgets or numerical failures. Its five-million-value
+input limit and square-matrix byte budget are separate bounds. Both methods
+apply the budget; `smaller_gram` is an explicit selection with its own method
+identifier and extra result fields. See [diagnostics](../user-guide/diagnostics.md#bound-the-covariance-allocation)
+for rounding, memory and interpretation limits.
+
+The sensitivity helper takes equal-length, nonempty binary outcome sequences
+and only the fields under native `metrics.exact_match` as `policy`. It returns
+an advisory dictionary with `status`, `original_verdict`, `minimum_changes`,
+`checked_through_changes`, `states_examined`, `witness` and input/policy bindings.
+Input and policy errors raise `ValueError`; disagreement with native report
+arithmetic or witness replay raises `RuntimeError` instead of returning an
+advisory. See [hypothetical edits](../assurance/decision-semantics.md#explore-hypothetical-exact-match-edits)
+for exact/lower-bound interpretation, all search limits and a runnable example.
+The helper does not authenticate supplied outcomes or estimate rerun risk.
 
 ## Transactions
 
@@ -224,6 +252,12 @@ policy.
 
 ## Function signatures
 
+These forms show the native transaction arguments and the shared request loader.
+Captured arguments and omission rules follow the block. The `None` defaults
+shown here describe native calls; captured callers must omit those native
+keywords entirely. The selected facade parameters are not an exhaustive listing
+of internal implementation controls.
+
 ```python
 evaluate_request_file(
     request_path: Path | EvaluationRequest | CapturedEvaluationRequest,
@@ -253,9 +287,9 @@ load_evaluation_request(
     *,
     provider_resolver: ProviderResolver | None = None,
     request_root: Path | None = None,
-    baseline_run: Path | None = None,
-    subject_run: Path | None = None,
-    output: Path | None = None,
+    baseline_run: str | Path | None = None,
+    subject_run: str | Path | None = None,
+    output: str | Path | None = None,
 ) -> EvaluationRequest | CapturedEvaluationRequest
 
 verify_evidence(
@@ -398,9 +432,13 @@ repeats no-follow reads at the point of use to detect later filesystem changes.
 
 The stable facade exports `OciEvaluationLaunch`, `OciSideLaunch`,
 `OciRuntimeExecutor`, and `launch_from_resolved_config`. The public CLI constructs
-this executor for every run-mode request. The host prepares the schedule,
+this executor for host-orchestrated run requests. The host prepares the schedule,
 launches one independently pinned worker per side, validates both closed side
 results, and keeps the evidence-signing key outside the workers.
+
+The [inline local-judge route](judge-measurements.md#native-local-judge-collection)
+instead requires an already running strict container and runs all three model
+roles there; it does not provide host-separated signing.
 
 An embedding can build the same launch explicitly:
 
@@ -745,8 +783,9 @@ request. It retains the normal native resource and signing-key requirements and
 returns `JudgeWorkflowResult`, whose JSON has `kind: judge`, the evidence path,
 analysis decision and collection stop state. Native preflight retains
 `EvaluationPreflightResult` and adds judge model, unit, trial and budget metadata.
-The installed optional collector reads credentials from its process environment;
-callers do not pass keys in the request or plan. Recipient replay requires only
+Hosted collectors read any required credentials from their process environment;
+callers do not pass keys in the request or plan. The selected profile determines
+SDK and runtime requirements; local collection needs no provider credentials. Recipient replay requires only
 the core package. Native judge evidence includes a bound runtime capture, whereas
 ordinary frozen-answer import makes no runtime-provenance claim.
 

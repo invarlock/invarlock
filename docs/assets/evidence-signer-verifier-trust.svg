@@ -10,7 +10,7 @@
   <desc id="desc">
     The evidence signer signs a canonical bundle after evaluation. A verifier
     reads that unchanged bundle with independently supplied artifact, schedule,
-    policy, runtime, and signer expectations, then signs a separate verification
+    policy, runtime, signer, and required GGUF request expectations, then signs a separate verification
     receipt.
   </desc>
   <defs>
@@ -133,7 +133,8 @@
   <text x="1322" y="158" text-anchor="middle" class="box-title">Independent trust inputs</text>
   <text x="1322" y="191" text-anchor="middle" class="box-text">artifact digests · schedule digest</text>
   <text x="1322" y="221" text-anchor="middle" class="box-text">policy bytes · runtime digests</text>
-  <text x="1322" y="251" text-anchor="middle" class="box-text">evidence-signer fingerprint</text>
+  <text x="1322" y="247" text-anchor="middle" class="box-text">evidence-signer fingerprint</text>
+  <text x="1322" y="275" text-anchor="middle" class="box-text">request digest for GGUF</text>
 
   <rect x="1150" y="325" width="345" height="95" rx="12" class="box-verifier" />
   <text x="1322" y="362" text-anchor="middle" class="box-title">invarlock verify</text>

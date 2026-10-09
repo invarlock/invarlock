@@ -228,8 +228,8 @@ code. A deterministic extension scorer must not use a network, external model, e
 ratings, or LLM judge. InvarLock checks the authenticated scorer identity and
 deterministic replay; it does not sandbox extension code or prove those
 operational restrictions. The native `judge` scorer collects or imports bounded
-ratings under a separate evidence and recipient-policy contract. Only live
-collection requires the installed collector and provider credentials; verification
+ratings under a separate evidence and recipient-policy contract. New collection
+requires the selected collector and any credentials that its profile requires; verification
 replays retained measurements offline. Native judge evidence binds its runtime
 capture, while imported answers retain their supplied-source provenance. Judging
 does not execute through the deterministic scorer-extension trust boundary.
@@ -253,7 +253,7 @@ were authorized for their distinct roles at the decision time.
 ### Runtime and provider
 
 For native model execution, runtime receipts bind an integration implementation,
-artifact identity, scoring observation, execution settings, device facts, and outer image digest. The host
+artifact identity, scoring observation, execution settings, device facts, and outer image digest. In the host-orchestrated path, the host
 prepares the canonical schedule, then launches a separately digest-pinned
 Docker or Podman worker for each side. Each worker runs with network disabled,
 a read-only container root, reduced privileges, read-only job, artifact, and
@@ -268,6 +268,11 @@ indexes may run in parallel. Strict execution also requires offline local
 material, remote code disabled, and authenticated checkpoint/tokenizer inputs.
 These controls reduce ambiguity and exposure; the container engine, host,
 kernel, accelerator, and host-side signing process remain trusted boundaries.
+
+The [inline local-judge path](../reference/judge-measurements.md#native-local-judge-collection)
+runs all three roles in one already running strict container. Its mounted signing key
+is available to that trusted runtime process. Use frozen-answer collection and
+separate import/signing when the deployment requires host-separated signing.
 
 ### Schedule and policy selection
 
@@ -337,9 +342,11 @@ contracts.
 
 This boundary authenticates and policy-evaluates the portable projection; it
 does not replace full evidence replay with `invarlock verify`. The envelope is
-standards-shaped in-toto/DSSE transport, but interoperability with an external
-CUE, Open Policy Agent, or other policy engine requires a separately validated
-integration.
+standards-shaped in-toto/DSSE transport. The maintained
+[OPA/Rego and CUE example](../reference/policy-engine-interop.md) authenticates
+the envelope and embedded receipt before checking a bounded recipient-policy
+subset. It does not implement the full recipient-acceptance contract or qualify
+arbitrary external policy-engine configurations.
 
 ## Non-goals
 
@@ -351,8 +358,8 @@ The trust model does not provide:
 - representative sampling or population-level statistical assurance;
 - correctness, safety, alignment, or provenance of the baseline itself;
 - model-content safety, prompt-attack defense, or deployment authorization;
-- external policy-engine authentication or policy-evaluation interoperability
-  for the acceptance envelope; or
+- guaranteed authentication or policy correctness for arbitrary external
+  policy-engine integrations; or
 - host hardening, container-engine security, GPU isolation, or secret
   management.
 

@@ -53,6 +53,12 @@ a stronger signing boundary can create complete records in isolated execution,
 then use import mode in a controlled signing environment until an external
 signer interface is available.
 
+The inline native local-judge route is an exception to host-separated signing:
+all three roles run in one already running strict container, and a mounted signing
+key is available to its trusted runtime process. Use frozen-answer collection
+and separate `judge_import` publication when the key must remain outside model
+execution. See the [local judge boundary](../reference/judge-measurements.md#native-local-judge-collection).
+
 ## Separate roles and keys
 
 Use different Ed25519 keys for evidence production and independent

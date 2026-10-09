@@ -53,6 +53,82 @@ Strict verification continues to replay v2 reports without side-accuracy qualifi
 reports with their original exact-match interval method, so signed historical
 evidence keeps its original meaning.
 
+## Arithmetic and replay
+
+Native and captured numerical comparisons use Python `float` arithmetic for
+means, intervals and policy comparisons. On the supported conventional Python
+builds this is binary64 arithmetic. The exact operation order, interval method,
+resampling stream, interpolation and whether threshold equality passes are part of replay;
+an algebraically equivalent expression need not round identically.
+
+Native NLL and deterministic-extension resampling use their schedule-bound
+SHA-256 index generation. Captured continuous-score comparisons use a separate
+SHAKE-256 stream with rejection sampling. Both use `math.fsum` for relevant
+sums and linear interpolation between ordered bootstrap draws. These methods
+are distinct; substituting one stream, summation algorithm or percentile rule
+would change the numerical contract. Exact match uses the versioned paired
+Newcombe method described below, not either bootstrap.
+
+For native exact-match and scorer-extension point deltas, the implementation
+sums per-pair `subject - baseline` differences with `math.fsum`, divides by the
+record count, then multiplies by `100.0`. Subtracting the separately computed
+side means is algebraically equivalent but can round differently. Use the
+native report builder when reproducing canonical values.
+
+A fixed seed or binary64 dtype alone does not promise identical results across
+all Python builds, math libraries or numerical backends. Preserve the package,
+Python and platform identities when investigating a replay discrepancy near a
+threshold. Do not relax comparison tolerances or round a report until it passes.
+The optional NumPy diagnostics have their own numerical method identifiers and
+remain outside these acceptance calculations. Switching from covariance to the
+explicit smaller-Gram method can change a strict reference-edge count through
+rounding. Preserve the method and environment; the reported edge distance is
+not a numerical error bound. See [diagnostic limits](../user-guide/diagnostics.md#bound-the-covariance-allocation).
+
+Bounded judge measurements use a different arithmetic path: exact rational
+aggregation and controlled Decimal calculations with outward-rounded interval
+endpoints. Their wire numbers and method are documented in the
+[judge reference](../reference/judge-measurements.md#statistical-scope).
+This distinction matters when auditing rounding; a float-based reconstruction
+is not a replacement for judge replay.
+
+## Explore hypothetical exact-match edits
+
+The optional Python helper below asks how many subject outcomes would need to
+flip to change a current native v3 exact-match verdict, with the baseline,
+policy and record count fixed:
+
+```python
+from invarlock.exact_match_sensitivity import exact_match_sensitivity
+
+baseline = [1] * 75 + [0] * 25
+subject = [1] * 72 + [0] * 3 + [1] * 3 + [0] * 22
+advisory = exact_match_sensitivity(
+    baseline, subject, policy={"delta_min_pp": -10.0}, max_changes=8
+)
+assert advisory["status"] == "exact"
+assert advisory["minimum_changes"] == 4
+```
+
+The `policy` argument contains exactly the native `metrics.exact_match` fields.
+Count, interval width and side-accuracy qualification still apply. Even an
+improved subject outcome can widen an interval enough to fail a width gate.
+
+`exact` means all smaller edit distances were ruled out and a witness was
+replayed through the native report builder. `subject_flip_indices` are zero-based
+positions in the supplied input order. `lower_bound` means only distances through
+`checked_through_changes` were completely searched; `minimum_changes` stays
+`null`. If all possible distances were checked without a witness,
+`no_flip_possible` applies to this fixed edit model. A search stopped partway
+through a distance does not claim that distance was ruled out.
+
+The default search examines at most 2,048 candidate tables through eight edits.
+The supported upper bounds are 5,000 tables, 32 edits and 10,000 paired records.
+The input digest binds the supplied outcomes and policy, not their provenance.
+Keep this advisory separate from signed evidence and the official decision.
+It does not authenticate outcomes, estimate rerun risk, support historical v1/v2
+arithmetic, or apply to captured multi-slice, continuous or judge comparisons.
+
 ## Notation
 
 | Symbol | Meaning |
@@ -90,9 +166,11 @@ Replay proceeds only when:
 6. the schedule and both providers declare the selected task and provider
    collection metric;
 7. the verifier's independently supplied baseline artifact, subject artifact,
-   and canonical schedule digests match the identities bound into the signed
-   evidence; and
-8. the verifier's policy bytes have the same digest as the policy bound into
+   canonical schedule and both runtime digests match the bound identities;
+8. the evidence signature authenticates against the independently supplied
+   evidence-signer fingerprint, and any request-digest anchor matches; that
+   request anchor is required when either provider is `llama_cpp`; and
+9. the verifier's policy bytes have the same digest as the policy bound into
    the signed evidence.
 
 Failure of a precondition is a verification error, not a poor metric score.
@@ -399,8 +477,11 @@ $$
 \land (q_U-q_L) \le w_{\max}.
 $$
 
-Potential separately implemented scorers include deterministic token F1,
-structured-field extraction, and VQA answer normalization. The scorer-extension v1 contract
+The core already ships `invarlock.normalized_match`,
+`invarlock.numeric_tolerance`, `invarlock.json_fields`, `invarlock.json_exact`
+and `invarlock.token_f1` through this extension contract. A separately supplied
+scorer, such as VQA answer normalization, needs explicit authorization. See the
+[scorer reference](../reference/reports.md#authorized-deterministic-scorer-extension). The scorer-extension v1 contract
 does not admit SQL or code execution, model-based semantic similarity, network
 services, externally assigned ratings, external models, or LLM judges. Those sources do not
 execute through the deterministic extension contract.
@@ -459,6 +540,13 @@ assumption; it is not the schedule-composition bootstrap described above.
 Bonferroni adjustment uses the declared family size and error budget, including
 published advisory intervals. Constant observed ratings still have positive
 interval width unless the declared support itself is constant.
+
+Judge preflight also reports an advisory precision forecast from the declared
+scale, error budget, comparison-family size and independent-unit count. It
+assumes complete trials and independent units; it does not predict acceptance
+or change execution readiness. Additional repetitions in the same units do not
+improve this forecast. See [judge preflight](../reference/judge-measurements.md#frozen-answer-requests-and-preflight)
+for guaranteed-width counts and unattainable-width limits.
 
 Judge gates distinguish `pass`, `regression` and `insufficient_evidence`.
 Within each judge gate, minimum-unit and maximum-width checks take precedence:

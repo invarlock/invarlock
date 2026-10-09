@@ -159,8 +159,30 @@ Maintain that provenance outside the pack with, at minimum:
 - applicable artifact, schedule, and runtime scope; and
 - exception and rollback procedure.
 
-A policy edit changes its digest and requires a new evidence pack. The current
-contract does not re-evaluate one existing pack under different policy bytes.
+Changing the evaluated policy changes its digest and requires a new evidence
+pack. Native verification does not re-evaluate an existing pack under different
+evaluated-policy bytes. A separate recipient policy can decline the unchanged
+technical result, as described below.
+
+## Portable receipt and current recipient acceptance
+
+The implemented [acceptance-attestation wrapper](../reference/acceptance-attestations.md)
+transports a native pack-v1 technical result in an in-toto/DSSE envelope. It
+supports native receipt v1/v2, including comparison-report v3; it does not wrap
+captured or judge receipts. The original receipt bytes and format are preserved.
+
+`verify_acceptance_attestation` authenticates the envelope and embedded receipt,
+binds the subject to an independently supplied artifact digest or artifact path,
+and applies the recipient's current signer, contract-version and freshness
+requirements. This verifies the transported statement; it does not repeat full
+evidence replay. Use `invarlock verify` for that replay.
+
+An authentic historical pass can be declined today without changing its
+technical verdict. A fresh envelope cannot establish evidence freshness when
+the receipt lacks an authenticated issuance time. Source labels and metric
+context supplied by the envelope signer are not independently replayed facts.
+Neither envelope acceptance nor full technical verification by itself grants
+deployment approval or establishes execution attestation.
 
 ## What a passing result establishes
 
@@ -224,6 +246,28 @@ assumptions above and complementary evidence determine how far a decision can
 rely on those authenticated facts. See
 [Reproducibility and provenance](reproducibility.md) and the
 [Threat model](../security/threat-model.md) for the corresponding controls.
+
+## Supplementary review and corrections
+
+The [exact-match edit advisory](decision-semantics.md#explore-hypothetical-exact-match-edits)
+measures hypothetical changes to supplied outcomes under a fixed policy.
+A replayed witness supports that edit-distance statement only. It supplies no
+new authentication, rerun probability or acceptance authority. Likewise,
+[NumPy diagnostics](../user-guide/diagnostics.md) describe retained arrays;
+authenticating their bytes does not calibrate their reference edges as policy.
+
+For judge evidence, unique unit labels do not establish independence. Review
+shared source documents, sessions or subjects before relying on an interval;
+[the duplication example](../reference/judge-measurements.md#statistical-scope)
+shows why repeating dependent observations can create false apparent precision.
+
+If an earlier assessment contains an actual error, preserve its bytes, identify
+the affected claim and issue linked replacement evidence for independent
+verification. The [offline correction example](../user-guide/hosted-service-requalification.md#rehearse-a-correction-of-an-actual-error)
+exercises those links and review of a supplied dependency graph. Its explanatory
+notice is not an authenticated correction contract. Correction authority,
+notice delivery and downstream reliance decisions remain external; the graph
+cannot discover unknown consumers or automatically revoke approvals.
 
 ## Evidence ownership
 

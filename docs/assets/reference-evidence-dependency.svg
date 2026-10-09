@@ -11,7 +11,8 @@
     Bound request inputs, runtime sidecars, and one ordered schedule
     feed paired records and the canonical report. Checksums and references feed
     the signed evidence manifest. Independent trust anchors and the manifest
-    then feed a separately signed verification receipt.
+    then feed a separately signed verification receipt. GGUF additionally requires
+    an independently approved normalized-request digest.
   </desc>
   <defs>
     <marker
@@ -108,6 +109,7 @@
   <text x="920" y="605" text-anchor="middle" class="box-text">policy bytes · schedule digest</text>
   <text x="920" y="627" text-anchor="middle" class="box-text">artifact + runtime digests</text>
   <text x="920" y="649" text-anchor="middle" class="box-text">signer fingerprints</text>
+  <text x="920" y="685" text-anchor="middle" class="box-text">GGUF: also pin request digest</text>
 
   <rect x="1160" y="535" width="350" height="126" rx="14" class="trust" />
   <text x="1335" y="577" text-anchor="middle" class="box-title">Signed receipt</text>
