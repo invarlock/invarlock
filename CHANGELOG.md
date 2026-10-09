@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   guarantee. Forecasts are advisory and preserve existing readiness and policy
   decisions.
 
+### Changed
+
+- Update CSpell to 10.3.5 and KaTeX to 0.18.9, and refresh the pinned workflow
+  action releases.
+
 ### Security
 
 - Replaced the documentation lint CLI to remove its unpatched `braces` dependency
