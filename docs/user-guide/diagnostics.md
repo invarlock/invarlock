@@ -113,6 +113,109 @@ The theoretical edges rely on idealized independent-sample assumptions. They
 are reference values, not anomaly thresholds. Correlated activations, chosen
 layers, preprocessing, and low sample counts can all dominate the result.
 
+### Bound the covariance allocation
+
+The default `method="covariance"` retains the original feature-covariance
+calculation and result fields. Both methods check `max_gram_bytes` before
+allocating the square Gram matrix. The default budget is 128 MiB; callers can
+supply a positive integer byte budget. This bounds that matrix alone, not peak
+process memory or decomposition workspace.
+
+For wide inputs, explicitly select the smaller Gram calculation:
+
+```python
+import numpy as np
+from invarlock.diagnostics import rmt_observation
+
+samples = np.tile([[-1.0], [1.0]], (8, 64))
+observation = rmt_observation(samples, method="smaller_gram")
+assert observation["gram_dimension"] == 16
+assert observation["gram_matrix_bytes"] == 2048
+assert observation["empirical_eigenvalue_min"] == 0.0
+```
+
+For `n` samples and `p` varying features, this method decomposes an
+`n` by `n` matrix when `p > n`; otherwise it uses the feature covariance.
+The full covariance's omitted zero eigenvalues still determine its minimum,
+and the fraction above the edge still uses all `p` varying features.
+The result identifies `column_standardized_smaller_gram_eigh` and adds
+`gram_dimension`, `gram_matrix_bytes` and `minimum_upper_edge_distance`.
+
+The two calculations have the same nonzero eigenvalues in exact arithmetic.
+Floating-point differences can change the strict count above a reference edge.
+The distance field reports the smallest absolute distance to the upper edge,
+including omitted zeros. A small gap helps identify numerical sensitivity; it
+is neither an error bound nor a significance level. No tolerance is applied to
+the count. Keep the method and numerical environment with the result; do not
+silently replace a historical observation with a newly calculated one.
+
+### Compare aligned arrays directly
+
+Separate summaries can miss changes in matrix action. Retain both input
+observations and also summarize `subject - baseline`:
+
+```python
+import numpy as np
+from invarlock.diagnostics import spectral_observation
+
+baseline = np.array([[0.0, 2.0], [0.0, 0.0]])
+subject = np.array([[2.0, 0.0], [0.0, 0.0]])
+# The caller must establish identical row and column meanings on both sides.
+assert baseline.shape == subject.shape
+left = spectral_observation(baseline)
+right = spectral_observation(subject)
+change = spectral_observation(subject - baseline)
+relative_change = (
+    change["singular_value_max"] / left["singular_value_max"]
+    if left["singular_value_max"] > 0 else None
+)
+assert left["singular_value_max"] == right["singular_value_max"] == 2.0
+assert change["singular_value_max"] > 2.8
+```
+
+Equal shapes do not establish alignment. Retain the row/column identities,
+selection, ordering and preprocessing separately. A basis change or permutation
+can create a large difference while preserving model behavior. A zero baseline
+has no defined relative change; report `null`, not an infinite value. Use finite
+float arrays before subtraction so integer arithmetic cannot wrap; the diagnostic
+rejects non-finite differences. Neither norm is a quality verdict.
+
+Covariance eigenvalues also omit feature orientation. For a small, fixed set of
+aligned features, compare the covariance matrices themselves. The following
+correlation recipe requires every selected feature to vary on both sides:
+
+```python
+import numpy as np
+from invarlock.diagnostics import spectral_observation
+
+baseline = np.array([[-1., -1.], [1., 1.], [-1., 1.], [1., -1.]])
+subject = baseline.copy()
+subject[:, 1] += 0.5 * subject[:, 0]
+assert baseline.shape == subject.shape
+assert baseline.shape[1] <= 256  # Fixed feature selection bounds this recipe.
+
+
+def correlation(values):
+    centered = values - values.mean(axis=0)
+    scale = np.sqrt(np.mean(centered * centered, axis=0))
+    if not np.isfinite(scale).all() or np.any(scale == 0):
+        raise ValueError("selected features must have finite, nonzero deviation")
+    standardized = centered / scale
+    return standardized.T @ standardized / len(values)
+
+
+change = spectral_observation(correlation(subject) - correlation(baseline))
+assert change["frobenius_norm"] > 0.0
+```
+
+For raw population covariance, omit division by `scale` and use centered values
+in the matrix product. Raw covariance retains scale changes; correlation removes
+each feature's scale. Declare this choice and the selected feature identities
+before comparison. Never drop a different set of columns on each side. This
+small-matrix recipe has quadratic feature cost; it does not inherit the smaller
+Gram method's memory saving. Report its input digests and preparation alongside
+the change observation.
+
 ### Scalar variance summary
 
 `variance_observation` reports population and sample variance for a finite
