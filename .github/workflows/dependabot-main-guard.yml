@@ -11,6 +11,8 @@ jobs:
   enforce-staging-first:
     runs-on: ubuntu-24.04
     steps:
+      - name: Use disk-backed temporary storage
+        run: printf 'TMPDIR=%s\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - name: Block direct Dependabot PRs to main
         shell: bash
         env:

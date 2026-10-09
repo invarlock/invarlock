@@ -21,11 +21,15 @@ jobs:
       security-events: write
     steps:
       - name: Checkout repository
+        env:
+          TMPDIR: ${{ runner.temp }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
       # scorecard-action publish mode rejects extra steps in this job.
       - name: Run OpenSSF Scorecard analysis
+        env:
+          TMPDIR: ${{ runner.temp }}
         uses: ossf/scorecard-action@2d1146689b8cda280b9bc96326124645441f03bc
         with:
           # Prefer a dedicated PAT when configured so classic branch protection

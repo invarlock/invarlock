@@ -36,6 +36,8 @@ jobs:
       CONTAINER_ENGINE: ${{ matrix.engine }}
       INVARLOCK_RUNTIME_IMAGE: invarlock-runtime:local
     steps:
+      - name: Use disk-backed temporary storage
+        run: printf 'TMPDIR=%s\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
@@ -149,6 +151,8 @@ jobs:
     runs-on: ${{ inputs.runner == 'ubuntu-26.04' && 'ubuntu-26.04' || 'ubuntu-24.04' }}
     timeout-minutes: 5
     steps:
+      - name: Use disk-backed temporary storage
+        run: printf 'TMPDIR=%s\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - name: Require Docker and Podman journeys
         env:
           ENGINE_RESULT: ${{ needs.engine-smoke.result }}

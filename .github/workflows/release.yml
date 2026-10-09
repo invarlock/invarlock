@@ -40,6 +40,8 @@ jobs:
       release_tag: ${{ steps.resolve_release_ref.outputs.release_tag }}
       release_sha: ${{ steps.resolve_release_ref.outputs.release_sha }}
     steps:
+      - name: Use disk-backed temporary storage
+        run: printf 'TMPDIR=%s\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - name: Resolve release ref
         id: resolve_release_ref
         shell: bash
@@ -148,6 +150,8 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Use disk-backed temporary storage
+        run: printf 'TMPDIR=%s\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ needs.resolve_release_ref.outputs.release_sha }}
@@ -195,6 +199,8 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Use disk-backed temporary storage
+        run: printf 'TMPDIR=%s\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ needs.resolve_release_ref.outputs.release_sha }}
@@ -232,6 +238,8 @@ jobs:
     outputs:
       dist_ledger_sha256: ${{ steps.dist_digests.outputs.ledger_sha256 }}
     steps:
+      - name: Use disk-backed temporary storage
+        run: printf 'TMPDIR=%s\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ needs.resolve_release_ref.outputs.release_sha }}
@@ -567,6 +575,8 @@ jobs:
       contents: read
       id-token: write
     steps:
+      - name: Use disk-backed temporary storage
+        run: printf 'TMPDIR=%s\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - name: Download validated distributions
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
@@ -610,6 +620,8 @@ jobs:
       artifact_run_id: ${{ steps.authenticate.outputs.artifact_run_id }}
       dist_ledger_sha256: ${{ steps.verify_candidate.outputs.dist_ledger_sha256 }}
     steps:
+      - name: Use disk-backed temporary storage
+        run: printf 'TMPDIR=%s\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - name: Checkout release source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -685,6 +697,8 @@ jobs:
         inputs.release_tag != ''
       }}
     steps:
+      - name: Use disk-backed temporary storage
+        run: printf 'TMPDIR=%s\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ needs.resolve_release_ref.outputs.release_sha }}
@@ -826,6 +840,8 @@ jobs:
         inputs.release_tag != ''
       }}
     steps:
+      - name: Use disk-backed temporary storage
+        run: printf 'TMPDIR=%s\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - name: Download verified publication files
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
@@ -875,6 +891,8 @@ jobs:
       actions: read
       contents: read
     steps:
+      - name: Use disk-backed temporary storage
+        run: printf 'TMPDIR=%s\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ needs.resolve_release_ref.outputs.release_sha }}
@@ -915,6 +933,8 @@ jobs:
       actions: read
       contents: read
     steps:
+      - name: Use disk-backed temporary storage
+        run: printf 'TMPDIR=%s\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ needs.resolve_release_ref.outputs.release_sha }}

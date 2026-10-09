@@ -153,7 +153,7 @@ def test_stable_smoke_status_requires_all_engine_lanes_to_succeed():
         + alternate_runner
         + " / ' || '' }}smoke"
     )
-    step = summary["steps"][0]
+    step = summary["steps"][-1]
     assert step["env"]["ENGINE_RESULT"] == "${{ needs.engine-smoke.result }}"
     assert step["run"] == 'test "$ENGINE_RESULT" = success'
 

@@ -38,6 +38,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Keep hosted workflow temporary files on the runner's work disk to avoid
+  Ubuntu 26.04's quota-limited `/tmp` RAM disk during combined test and build runs.
+
 - Locate the workspace interpreter with shell built-ins when `PATH` contains only
   candidate interpreters, including when invoked from outside the repository.
 

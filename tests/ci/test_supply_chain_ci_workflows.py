@@ -351,7 +351,9 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     assert "inputs.publish != true" in build["if"]
     assert build["timeout-minutes"] >= 120
     assert build["permissions"] == {"contents": "read"}
-    checkout = build["steps"][0]
+    # Temporary-storage setup precedes the first repository action.
+    checkout = build["steps"][1]
+    assert checkout["uses"].startswith("actions/checkout@")
     assert checkout["with"]["ref"] == (
         "${{ needs.resolve_release_ref.outputs.release_sha }}"
     )
@@ -400,7 +402,7 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
         "support",
         "runtime",
     }
-    assert shards["steps"][0]["with"]["ref"] == (
+    assert shards["steps"][1]["with"]["ref"] == (
         "${{ needs.resolve_release_ref.outputs.release_sha }}"
     )
     assert _step(shards["steps"], "Collect release coverage")["run"] == (
@@ -414,7 +416,7 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     assert set(coverage["needs"]) == {"resolve_release_ref", "coverage_shards"}
     assert coverage["if"] == build["if"]
     assert coverage["permissions"] == {"contents": "read"}
-    assert coverage["steps"][0]["with"]["ref"] == (
+    assert coverage["steps"][1]["with"]["ref"] == (
         "${{ needs.resolve_release_ref.outputs.release_sha }}"
     )
     download = _step(coverage["steps"], "Download release coverage measurements")
@@ -804,7 +806,7 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     }
     assert hosted_job["permissions"] == {"actions": "read", "contents": "read"}
     assert "inputs.publish == true" in hosted_job["if"]
-    hosted_checkout = hosted_job["steps"][0]
+    hosted_checkout = hosted_job["steps"][1]
     assert hosted_checkout["with"]["ref"] == (
         "${{ needs.resolve_release_ref.outputs.release_sha }}"
     )
@@ -836,7 +838,7 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     }
     assert published_smoke["permissions"] == {"actions": "read", "contents": "read"}
     assert "inputs.publish == true" in published_smoke["if"]
-    published_checkout = published_smoke["steps"][0]
+    published_checkout = published_smoke["steps"][1]
     assert published_checkout["with"]["ref"] == (
         "${{ needs.resolve_release_ref.outputs.release_sha }}"
     )
