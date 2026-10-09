@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Show judge interval-width forecasts before collection, including unattainable
+  precision limits and the independent-unit count sufficient for a width
+  guarantee. Forecasts are advisory and preserve existing readiness and policy
+  decisions.
+
 ## [0.16.3] - 2026-09-22
 
 The v0.16.2 tag was not published to package indexes; v0.16.3 is the first
