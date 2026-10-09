@@ -21,17 +21,27 @@ on:
       - 'Makefile'
       - '.github/workflows/evaluator-sdk.yml'
   workflow_dispatch:
+    inputs:
+      runner:
+        description: "Hosted OS for manual compatibility checks"
+        required: false
+        default: ubuntu-24.04
+        type: choice
+        options:
+          - ubuntu-24.04
+          - ubuntu-26.04
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.runner == 'ubuntu-26.04' && 'ubuntu-26.04' || 'ubuntu-24.04' }}
   cancel-in-progress: true
 
 jobs:
   capture:
-    runs-on: ubuntu-24.04
+    name: "${{ inputs.runner == 'ubuntu-26.04' && 'ubuntu-26.04 / ' || '' }}capture (${{ matrix.evaluator }})"
+    runs-on: ${{ inputs.runner == 'ubuntu-26.04' && 'ubuntu-26.04' || 'ubuntu-24.04' }}
     timeout-minutes: 20
     strategy:
       fail-fast: false

@@ -29,6 +29,14 @@ GitHub is [moving the `ubuntu-latest` label to Ubuntu 26.04](https://github.blog
 between October 19 and November 19, 2026. Validate the CI, container and
 distribution paths on a newer OS before changing this pin. The OS label does not
 freeze the runner image or its preinstalled tools.
+Manual runs of CI, evaluator SDK capture, container smoke and documentation
+workflows accept a `runner` choice of `ubuntu-24.04` or `ubuntu-26.04`. Pull requests,
+pushes and scheduled runs keep the Ubuntu 24.04 default. Ubuntu 26.04 check names
+and concurrency groups are separate so exploratory failures cannot replace
+required default-runner results. Run both standard CI (`full=false`) and full CI
+(`full=true`) to cover minimum-Python/coverage shards and complete distribution
+checks; also run the SDK, Docker/Podman and documentation workflows. These checks
+do not exercise release publication credentials, GPU hosts or every release job.
 
 Documentation tooling requires Node.js 22.18 or newer and npm. Clone the repository, create a virtual
 environment, and install the development dependencies:

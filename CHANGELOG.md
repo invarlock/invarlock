@@ -38,6 +38,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Allow manual Ubuntu 26.04 compatibility checks for CI, evaluator SDKs,
+  containers and documentation while retaining the Ubuntu 24.04 default.
+
 - Adapt the pinned LightEval registry to the current Hub search argument during
   isolated capture setup, preserving actual API results and SDK execution
   without downgrading dependencies.

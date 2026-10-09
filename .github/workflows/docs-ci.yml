@@ -21,9 +21,18 @@ on:
   schedule:
     - cron: '0 2 * * 1'
   workflow_dispatch:
+    inputs:
+      runner:
+        description: "Hosted OS for manual compatibility checks"
+        required: false
+        default: ubuntu-24.04
+        type: choice
+        options:
+          - ubuntu-24.04
+          - ubuntu-26.04
 
 concurrency:
-  group: docs-${{ github.ref }}
+  group: docs-${{ github.ref }}-${{ inputs.runner == 'ubuntu-26.04' && 'ubuntu-26.04' || 'ubuntu-24.04' }}
   cancel-in-progress: true
 
 permissions:
@@ -31,8 +40,9 @@ permissions:
 
 jobs:
   docs:
+    name: "${{ inputs.runner == 'ubuntu-26.04' && 'ubuntu-26.04 / ' || '' }}docs"
     if: ${{ github.event_name != 'schedule' }}
-    runs-on: ubuntu-24.04
+    runs-on: ${{ inputs.runner == 'ubuntu-26.04' && 'ubuntu-26.04' || 'ubuntu-24.04' }}
     timeout-minutes: 20
     env:
       PYTHONPATH: ${{ github.workspace }}/src
@@ -71,8 +81,9 @@ jobs:
           git diff --exit-code
 
   external-links:
+    name: "${{ inputs.runner == 'ubuntu-26.04' && 'ubuntu-26.04 / ' || '' }}external-links"
     if: ${{ github.event_name == 'schedule' }}
-    runs-on: ubuntu-24.04
+    runs-on: ${{ inputs.runner == 'ubuntu-26.04' && 'ubuntu-26.04' || 'ubuntu-24.04' }}
     timeout-minutes: 15
     steps:
       - name: Checkout repository

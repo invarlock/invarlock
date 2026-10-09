@@ -6,9 +6,18 @@ on:
   push:
     branches: [staging/next]
   workflow_dispatch:
+    inputs:
+      runner:
+        description: "Hosted OS for manual compatibility checks"
+        required: false
+        default: ubuntu-24.04
+        type: choice
+        options:
+          - ubuntu-24.04
+          - ubuntu-26.04
 
 concurrency:
-  group: container-front-door-${{ github.ref }}
+  group: container-front-door-${{ github.ref }}-${{ inputs.runner == 'ubuntu-26.04' && 'ubuntu-26.04' || 'ubuntu-24.04' }}
   cancel-in-progress: true
 
 permissions:
@@ -16,7 +25,8 @@ permissions:
 
 jobs:
   engine-smoke:
-    runs-on: ubuntu-24.04
+    name: "${{ inputs.runner == 'ubuntu-26.04' && 'ubuntu-26.04 / ' || '' }}engine-smoke (${{ matrix.engine }})"
+    runs-on: ${{ inputs.runner == 'ubuntu-26.04' && 'ubuntu-26.04' || 'ubuntu-24.04' }}
     timeout-minutes: 45
     strategy:
       fail-fast: false
@@ -133,9 +143,10 @@ jobs:
           retention-days: 30
 
   smoke:
+    name: "${{ inputs.runner == 'ubuntu-26.04' && 'ubuntu-26.04 / ' || '' }}smoke"
     if: ${{ always() }}
     needs: [engine-smoke]
-    runs-on: ubuntu-24.04
+    runs-on: ${{ inputs.runner == 'ubuntu-26.04' && 'ubuntu-26.04' || 'ubuntu-24.04' }}
     timeout-minutes: 5
     steps:
       - name: Require Docker and Podman journeys
