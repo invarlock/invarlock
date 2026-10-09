@@ -75,6 +75,19 @@ record count, then multiplies by `100.0`. Subtracting the separately computed
 side means is algebraically equivalent but can round differently. Use the
 native report builder when reproducing canonical values.
 
+Captured point deltas subtract the separately rounded side means. For large
+common scores, that subtraction can lose a small paired change: baseline
+`[2**54, 0]` and subject `[2**54, 1]` have an exact mean change of `0.5`, while the
+captured point delta is `0.0`. Captured continuous intervals already use paired
+differences; the point delta does not override their policy checks. Moving the
+subtraction inside the sum is not universally exact either, so an arithmetic
+change must preserve the historical replay contract.
+
+The optional [contribution recipe](../reference/evaluation-records.md#explain-an-additive-score-change)
+can separately reconcile exact retained-score contributions, the omitted
+remainder and the original report's rounding residual. It neither replaces
+canonical values nor grants acceptance or verification authority.
+
 A fixed seed or binary64 dtype alone does not promise identical results across
 all Python builds, math libraries or numerical backends. Preserve the package,
 Python and platform identities when investigating a replay discrepancy near a

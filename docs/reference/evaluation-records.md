@@ -374,6 +374,33 @@ Keep scorer normalization inside scoring. Do not normalize retained answers or
 references merely to preserve an old pin. A changed complete run requires its
 own reviewed identity, even if every score and the final verdict stay the same.
 
+## Explain an additive score change
+
+The standalone `examples/score_contributions.py` recipe produces a descriptive
+breakdown without changing a report, policy, interval or signed evidence. Run
+its synthetic example from the checkout:
+
+```bash
+python examples/score_contributions.py
+```
+
+For a complete additive scalar metric, supply one `PairedCase` per case and the
+reported delta to `mean_contributions`. Convert retained captured scores with
+`Fraction.from_float(float(score))`. Give each case its own unit for the ordinary
+equal-case mean. For judge scores, use `Fraction(decimal_score_string)`, average
+repetitions within each case first, and preserve the plan's declared unit IDs.
+The recipe gives units equal weight and cases equal weight within their unit;
+it does not infer independence or validate a judging plan.
+
+Each selected case has an exact rational weight and signed contribution. The
+visible contributions plus the omitted contribution equal the exact delta; add
+the rounding residual to recover the original reported delta. All rational
+values are strings so JSON conversion does not introduce another rounding step.
+The output has no verification authority. It does not explain uncertainty,
+causality, missing observations or a normalized-NLL ratio, and rankings apply
+only within one additive metric and scope. Validate the complete source workflow
+before constructing its inputs; do not use a favorable subset to replace it.
+
 ## Pack boundary
 
 Captured pack v2 has exactly `manifest.json`, `checksums.sha256`, `request.json`,
