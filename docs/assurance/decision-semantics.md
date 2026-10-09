@@ -69,6 +69,12 @@ are distinct; substituting one stream, summation algorithm or percentile rule
 would change the numerical contract. Exact match uses the versioned paired
 Newcombe method described below, not either bootstrap.
 
+For native exact-match and scorer-extension point deltas, the implementation
+sums per-pair `subject - baseline` differences with `math.fsum`, divides by the
+record count, then multiplies by `100.0`. Subtracting the separately computed
+side means is algebraically equivalent but can round differently. Use the
+native report builder when reproducing canonical values.
+
 A fixed seed or binary64 dtype alone does not promise identical results across
 all Python builds, math libraries or numerical backends. Preserve the package,
 Python and platform identities when investigating a replay discrepancy near a
@@ -160,9 +166,11 @@ Replay proceeds only when:
 6. the schedule and both providers declare the selected task and provider
    collection metric;
 7. the verifier's independently supplied baseline artifact, subject artifact,
-   and canonical schedule digests match the identities bound into the signed
-   evidence; and
-8. the verifier's policy bytes have the same digest as the policy bound into
+   canonical schedule and both runtime digests match the bound identities;
+8. the evidence signature authenticates against the independently supplied
+   evidence-signer fingerprint, and any request-digest anchor matches; that
+   request anchor is required when either provider is `llama_cpp`; and
+9. the verifier's policy bytes have the same digest as the policy bound into
    the signed evidence.
 
 Failure of a precondition is a verification error, not a poor metric score.
@@ -469,8 +477,11 @@ $$
 \land (q_U-q_L) \le w_{\max}.
 $$
 
-Potential separately implemented scorers include deterministic token F1,
-structured-field extraction, and VQA answer normalization. The scorer-extension v1 contract
+The core already ships `invarlock.normalized_match`,
+`invarlock.numeric_tolerance`, `invarlock.json_fields`, `invarlock.json_exact`
+and `invarlock.token_f1` through this extension contract. A separately supplied
+scorer, such as VQA answer normalization, needs explicit authorization. See the
+[scorer reference](../reference/reports.md#authorized-deterministic-scorer-extension). The scorer-extension v1 contract
 does not admit SQL or code execution, model-based semantic similarity, network
 services, externally assigned ratings, external models, or LLM judges. Those sources do not
 execute through the deterministic extension contract.
@@ -529,6 +540,13 @@ assumption; it is not the schedule-composition bootstrap described above.
 Bonferroni adjustment uses the declared family size and error budget, including
 published advisory intervals. Constant observed ratings still have positive
 interval width unless the declared support itself is constant.
+
+Judge preflight also reports an advisory precision forecast from the declared
+scale, error budget, comparison-family size and independent-unit count. It
+assumes complete trials and independent units; it does not predict acceptance
+or change execution readiness. Additional repetitions in the same units do not
+improve this forecast. See [judge preflight](../reference/judge-measurements.md#frozen-answer-requests-and-preflight)
+for guaranteed-width counts and unattainable-width limits.
 
 Judge gates distinguish `pass`, `regression` and `insufficient_evidence`.
 Within each judge gate, minimum-unit and maximum-width checks take precedence:

@@ -175,6 +175,28 @@ The composition result is a local computation, not a new signed attestation;
 component receipts keep their separate scopes. The conjunction does not create
 a joint statistical confidence guarantee. See [evidence sets](../reference/evidence-sets.md).
 
+## Portable acceptance attestations
+
+Apply these checks when receiving a native receipt in an
+[acceptance-attestation envelope](../reference/acceptance-attestations.md), in
+addition to the applicable technical-evidence checks above. The wrapper supports
+native receipt v1/v2; captured and judge receipts use their own handoff paths.
+
+- [ ] Supply a recipient-controlled policy and independently trusted envelope
+      public keys, with separate authorization for the embedded receipt verifier.
+- [ ] Bind the subject using exactly one independent expected artifact digest or
+      artifact path; a matching name alone is insufficient.
+- [ ] Confirm `envelope_authenticated`, `receipt_authenticated`, `subject_bound`
+      and `accepted`. Inspect `historical_technical_verdict` separately.
+- [ ] Check allowed contract versions, signer status, countersigning and any
+      receipt trust-profile pin. Retain the exact original receipt bytes.
+- [ ] Apply envelope-age and evidence-age limits separately. A new envelope or
+      wrapper-supplied evaluation time cannot refresh undated evidence; a missing
+      receipt-authenticated time fails a configured evidence-age requirement.
+- [ ] Treat source descriptions and metric context as envelope-signer assertions
+      unless checked against complete evidence. Envelope verification does not
+      repeat full replay or confer deployment approval.
+
 ## Present and retain
 
 - [ ] Use `invarlock report evidence/ --html evidence.html --explain` for a

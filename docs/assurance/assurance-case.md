@@ -159,8 +159,30 @@ Maintain that provenance outside the pack with, at minimum:
 - applicable artifact, schedule, and runtime scope; and
 - exception and rollback procedure.
 
-A policy edit changes its digest and requires a new evidence pack. The current
-contract does not re-evaluate one existing pack under different policy bytes.
+Changing the evaluated policy changes its digest and requires a new evidence
+pack. Native verification does not re-evaluate an existing pack under different
+evaluated-policy bytes. A separate recipient policy can decline the unchanged
+technical result, as described below.
+
+## Portable receipt and current recipient acceptance
+
+The implemented [acceptance-attestation wrapper](../reference/acceptance-attestations.md)
+transports a native pack-v1 technical result in an in-toto/DSSE envelope. It
+supports native receipt v1/v2, including comparison-report v3; it does not wrap
+captured or judge receipts. The original receipt bytes and format are preserved.
+
+`verify_acceptance_attestation` authenticates the envelope and embedded receipt,
+binds the subject to an independently supplied artifact digest or artifact path,
+and applies the recipient's current signer, contract-version and freshness
+requirements. This verifies the transported statement; it does not repeat full
+evidence replay. Use `invarlock verify` for that replay.
+
+An authentic historical pass can be declined today without changing its
+technical verdict. A fresh envelope cannot establish evidence freshness when
+the receipt lacks an authenticated issuance time. Source labels and metric
+context supplied by the envelope signer are not independently replayed facts.
+Neither envelope acceptance nor full technical verification by itself grants
+deployment approval or establishes execution attestation.
 
 ## What a passing result establishes
 

@@ -41,7 +41,12 @@ where:
 | $\mathcal{O}_B$, $\mathcal{O}_S$ | Ordered baseline and subject observations |
 | $C_0(z)$ | InvarLock's contract-defined canonical JSON bytes for $z$, without a final line feed |
 | $H(z)$ | SHA-256 of bytes $z$ |
-| $d_{\mathcal S}$ | Canonical schedule digest, $H(C_0(\mathcal S))$ |
+| $S_{\mathrm{doc}}$ | Complete schedule document: format version, task, dataset identity and ordered records |
+| $d_{\mathcal S}$ | Canonical schedule digest, $H(C_0(S_{\mathrm{doc}}))$ |
+
+The sequence $\mathcal S$ abbreviates the record-level pairing facts. The digest
+covers the complete $S_{\mathrm{doc}}$, including its dataset identity and task;
+hashing only the record sequence does not produce `schedule_sha256`.
 
 The notation $C_0$ is the no-final-line-feed form used for canonical schedules
 and scoring-record arrays: UTF-8, sorted keys, compact separators, finite

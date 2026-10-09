@@ -23,6 +23,23 @@ Native pack-v1 comparisons bind the original policy bytes. Captured comparisons 
 canonical policy JSON. Judge evidence binds its analysis policy and is
 accepted under an independently supplied recipient policy.
 
+**Acceptance attestation**
+
+An in-toto/DSSE envelope carrying a native pack-v1 technical result and its exact
+signed receipt bytes. The implemented v2 predicate supports native receipt
+v1/v2, not captured or judge receipts. Its verifier authenticates the envelope,
+embedded receipt and exact subject binding under current recipient policy; it
+does not repeat full evidence replay or attest model execution. See
+[acceptance attestations](../reference/acceptance-attestations.md).
+
+**Recipient acceptance**
+
+The result of applying independently controlled requirements to authenticated
+evidence or a transported receipt. Its policy is distinct from the evaluated
+metric policy. A historical technical pass can be declined under current signer,
+contract or freshness requirements without rewriting that result. Acceptance
+remains scoped to its contract and is not by itself deployment approval.
+
 **Anchor**
 
 A value controlled by the verifier rather than selected from submitted

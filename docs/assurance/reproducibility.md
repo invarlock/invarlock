@@ -157,9 +157,13 @@ comparison rather than a strict reproduction.
 
 ## Numerical and output drift
 
-The paired interval is reproduced exactly from the same authenticated records,
-built-in metric or scorer binding, report format, and algorithm version. Exact
-match replays the report-version-specific paired Newcombe 95%
+Verification recomputes the paired interval from the authenticated records,
+built-in metric or scorer binding, report format and algorithm version, and
+requires exact agreement with the stored report. This is a replay requirement,
+not a promise that every numerical environment will satisfy it. A differing
+result fails replay; preserve the package, Python and platform identities and
+investigate rather than relaxing equality. See [arithmetic and replay](decision-semantics.md#arithmetic-and-replay).
+Exact match replays the report-version-specific paired Newcombe 95%
 interval, regression and improvement counts, and exact McNemar probability.
 Normalized NLL also binds the schedule digest used to derive 2,048 resampling
 index sequences without a platform random-number generator. A scorer extension
@@ -259,6 +263,14 @@ provenance interpretation.
 
 Keep external records outside the already signed evidence directory and bind
 them to its manifest digest.
+
+InvarLock's own [acceptance-attestation wrapper](../reference/acceptance-attestations.md)
+provides in-toto/DSSE transport for a native technical receipt, not measured
+execution attestation. It preserves the receipt bytes and distinguishes
+receipt-authenticated anchors from envelope-signer context. Its envelope
+issuance time establishes transport metadata, not a new model observation or
+an authoritative issuance time for an undated receipt. Current recipient
+acceptance can change while the original technical result remains unchanged.
 
 ## Sampling and run selection
 
