@@ -100,6 +100,15 @@ def test_workflow_pip_installs_use_hashed_lock_files() -> None:
     assert offenders == []
 
 
+def test_documentation_dependencies_are_audited() -> None:
+    steps = _steps(_load(WORKFLOWS / "docs-ci.yml"))
+    install = _step(steps, "Install documentation linters")
+    audit = _step(steps, "Audit documentation dependencies")
+    assert steps.index(install) < steps.index(audit)
+    assert audit["run"] == "npm audit --audit-level=low"
+    assert not audit.get("continue-on-error", False)
+
+
 def test_promptfoo_sdk_gate_uses_a_required_dependency_lock() -> None:
     lock_root = Path("examples/evaluator-qualification/locks/promptfoo")
     manifest = json.loads((lock_root / "package.json").read_text(encoding="utf-8"))
@@ -113,12 +122,21 @@ def test_promptfoo_sdk_gate_uses_a_required_dependency_lock() -> None:
     version = pins["package"].removeprefix("promptfoo@")
     assert pins["package"] == f"promptfoo@{version}"
     assert manifest["dependencies"] == {"promptfoo": version}
-    assert manifest["overrides"] == {"promptfoo": {"js-yaml": "5.2.2"}}
+    assert manifest["overrides"] == {
+        "promptfoo": {"js-yaml": "5.4.2", "simple-git": "4.0.2"},
+        "get-uri": {"basic-ftp": "6.2.1"},
+    }
     assert lock["lockfileVersion"] == 3
     assert lock["packages"][""]["dependencies"] == manifest["dependencies"]
     assert lock["packages"]["node_modules/promptfoo"]["version"] == version
     assert lock["packages"]["node_modules/promptfoo"]["integrity"] == pins["integrity"]
-    assert lock["packages"]["node_modules/js-yaml"]["version"] == "5.2.2"
+    for package, version in {
+        "js-yaml": "5.4.2",
+        "simple-git": "4.0.2",
+        "@simple-git/argv-parser": "2.0.1",
+        "basic-ftp": "6.2.1",
+    }.items():
+        assert lock["packages"][f"node_modules/{package}"]["version"] == version
     assert all(
         package.get("integrity")
         and package.get("resolved", "").startswith("https://registry.npmjs.org/")

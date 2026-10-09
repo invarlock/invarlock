@@ -61,7 +61,7 @@ CUDA_LOCKS = {
     "openai-evals": "requirements/workflows/openai-evals-runtime-py312-cu129.txt",
 }
 EVALUATOR_VERSIONS = {
-    "inspect-ai": "0.3.254",
+    "inspect-ai": "0.3.263",
     "openai-evals": "3.0.1.post1+invarlock.match.1",
 }
 try:

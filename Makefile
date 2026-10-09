@@ -674,8 +674,8 @@ evaluator-docs-matrix-check:  ## Reject evaluator documentation drift
 
 docs-lint: docs-lint-markdown docs-lint-spell docs-lint-public-text  ## Run documentation linters and public-text checks
 
-docs-lint-markdown:  ## Run markdownlint-cli2
-	@git ls-files -z -- ':(icase,glob)**/*.md' | xargs -0 npx --no-install markdownlint-cli2 --
+docs-lint-markdown:  ## Run markdownlint
+	@git ls-files -z -- ':(icase,glob)**/*.md' | xargs -0 npx --no-install markdownlint --
 
 docs-lint-spell:  ## Run cspell
 	@git ls-files -z -- ':(icase,glob)**/*.md' | xargs -0 npx --no-install cspell --no-progress --
