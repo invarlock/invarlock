@@ -7,7 +7,6 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any, Literal
 
-import click
 import typer
 from rich.console import Console
 from rich.markdown import Markdown
@@ -20,7 +19,7 @@ from invarlock.security import enforce_default_security
 class CoreCommandGroup(TyperGroup):
     """Keep the public journey in semantic order."""
 
-    def list_commands(self, ctx: click.Context) -> list[str]:
+    def list_commands(self, ctx: object) -> list[str]:
         del ctx
         return ["evaluate", "verify", "report"]
 
