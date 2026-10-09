@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Show judge interval-width forecasts before collection, including unattainable
+  precision limits and the independent-unit count sufficient for a width
+  guarantee. Forecasts are advisory and preserve existing readiness and policy
+  decisions.
+
 ### Changed
 
 - Update CSpell to 10.3.5 and KaTeX to 0.18.9, and refresh the pinned workflow

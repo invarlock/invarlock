@@ -189,6 +189,31 @@ establish independent recipient acceptance. `output.signer_identity` names the
 identity placed in a signed envelope; a recipient still has to pin that identity
 and its public-key fingerprint independently. Unsigned output retains no signer.
 
+Judge preflight also reports `precision` for the complete planned schedule, before
+any ratings are collected. It uses the existing Hoeffding method, declared rating
+scale, alpha, comparison-family size and number of independent units. Repetitions
+and additional cases inside an existing unit do not narrow this forecast.
+
+For the paired effect and subject score, the forecast gives conservative lower
+and upper bounds on interval width, including support clipping and outward
+rounding. `within_limit` means every score outcome meets the width requirement;
+`unattainable` means no score outcome can meet it; `not_guaranteed` means the
+forecast cannot guarantee it. The latter can also occur at a rounding boundary.
+The subject width is descriptive when there is no subject-bound decision gate.
+
+`units_for_guaranteed_width` is the smallest count whose conservative upper
+bound meets the width limit, searched up to the 10,000-unit plan capacity. A
+`null` result means no such count was found within that capacity. For a 0-to-1
+scale, alpha 0.05 and comparison-family size four, a paired-effect width of at
+most 0.32 requires 397 units for this guarantee; a width of 0.18 requires 1,254.
+The policy's separate `minimum_units` requirement still applies.
+
+This is advisory planning information. It assumes all trials complete and the
+declared units are independent; it does not predict acceptance, establish judge
+accuracy or justify replacing the benchmark with a smaller subset. It changes
+neither execution readiness nor the retained analysis or policy. A pilot or
+replay may intentionally produce insufficient evidence.
+
 Hosted `judge_collect` mode instead declares
 `execution.collection: {integration: inspect-judge, configuration: collector.json, workspace: judge-work}`
 and `comparison.measurements: null`. The configuration is closed and contains no

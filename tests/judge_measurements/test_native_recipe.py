@@ -67,6 +67,15 @@ def test_text_profile_rejects_ambiguous_prompt_projection(frozen):
         prepare_native_judge(canonical_payload(frozen["recipe"]), frozen["schedule"])
 
 
+def test_native_preflight_forecasts_precision_before_answers(frozen):
+    recipe = copy.deepcopy(frozen["recipe"])
+    recipe["analysis"]["maximum_interval_width"] = "0.1"
+    result = prepare_native_judge(canonical_payload(recipe), frozen["schedule"])
+    assert result["precision"]["paired_effect"]["status"] == "unattainable"
+    assert result["precision"]["independent_units"] == 2
+    assert recipe["analysis"]["maximum_interval_width"] == "0.1"
+
+
 def test_changed_answers_are_bound_and_failed_answers_cannot_be_judged(frozen):
     baseline, subject = validate_native_capture(frozen)
     original = finalize_native_plan(frozen["recipe"], baseline, subject)[0]
