@@ -182,23 +182,7 @@ def rehearse(output):
     keys.mkdir(mode=0o700)
     signer, verifier = keypair(keys, "evidence-signer"), keypair(keys, "verifier")
     baseline = captured_run("approved-frozen-baseline", 20, "yes")
-    policy = {
-        "format": "invarlock/comparison-policy-v1",
-        "slices": [],
-        "metrics": [
-            {
-                "name": "quality",
-                "kind": "exact_match",
-                "configuration": {},
-                "direction": "higher",
-                "unit": "score",
-                "aggregation": "mean",
-                "minimum_count": 32,
-                "maximum_regression": 0.25,
-                "maximum_interval_width": 1,
-            }
-        ],
-    }
+    policy = example_policy()
     first = assess(
         output / "a",
         baseline=baseline,
@@ -238,10 +222,151 @@ def rehearse(output):
     return result
 
 
+def example_policy():
+    return {
+        "format": "invarlock/comparison-policy-v1",
+        "slices": [],
+        "metrics": [
+            {
+                "name": "quality",
+                "kind": "exact_match",
+                "configuration": {},
+                "direction": "higher",
+                "unit": "score",
+                "aggregation": "mean",
+                "minimum_count": 32,
+                "maximum_regression": 0.25,
+                "maximum_interval_width": 1,
+            }
+        ],
+    }
+
+
+def correction_impact(graph, corrected):
+    """Find downstream consumers in this supplied graph, not a global registry."""
+    if corrected not in graph or any(
+        dep not in graph for deps in graph.values() for dep in deps
+    ):
+        raise ValueError("dependency graph contains an unknown node")
+    visited, active = set(), set()
+
+    def visit(node):
+        if node in active:
+            raise ValueError("dependency graph contains a cycle")
+        if node in visited:
+            return
+        active.add(node)
+        for dependency in graph[node]:
+            visit(dependency)
+        active.remove(node)
+        visited.add(node)
+
+    for node in graph:
+        visit(node)
+    affected = {corrected}
+    while True:
+        expanded = affected | {
+            node for node, deps in graph.items() if set(deps) & affected
+        }
+        if expanded == affected:
+            return sorted(affected - {corrected})
+        affected = expanded
+
+
+def rehearse_correction(output):
+    """Correct a synthetic source-mapping error for the same observed window."""
+    output = Path(output).absolute()
+    output.mkdir(parents=True, exist_ok=False)
+    keys = output / "keys"
+    keys.mkdir(mode=0o700)
+    signer, verifier = keypair(keys, "evidence-signer"), keypair(keys, "verifier")
+    baseline = captured_run("approved-frozen-baseline", 20, "yes")
+    policy = example_policy()
+    # The retained source says no. A deliberately erroneous first import says
+    # yes; signatures cannot establish that an importer copied the source well.
+    source = [{"id": f"case-{i}", "output": "no"} for i in range(32)]
+    write(output / "source-export.json", source)
+    first = assess(
+        output / "a",
+        baseline=baseline,
+        subject=captured_run("erroneous-import", 21, "yes"),
+        policy=policy,
+        signer=signer,
+        verifier=verifier,
+    )
+    historical = snapshot(output / "a")
+    corrected_subject = captured_run("corrected-import", 21, "no")
+    if [(r["id"], r["output"]) for r in corrected_subject["records"]] != [
+        (r["id"], r["output"]) for r in source
+    ]:
+        raise ValueError("replacement does not match retained source")
+    replacement = assess(
+        output / "replacement",
+        baseline=baseline,
+        subject=corrected_subject,
+        policy=policy,
+        signer=signer,
+        verifier=verifier,
+    )
+    if snapshot(output / "a") != historical:
+        raise ValueError("historical assessment changed")
+    if (first["decision"], replacement["decision"]) != ("pass", "regression"):
+        raise ValueError("unexpected correction decisions")
+    graph = {
+        "assessment-a": [],
+        "release-review": ["assessment-a"],
+        "deployment-approval": ["release-review"],
+        "unrelated-review": [],
+    }
+    correction = {
+        "status": "advisory_requires_recipient_review",
+        "error": "The synthetic first import mapped all subject outputs from no to yes.",
+        "affected_claim": "Reliance on assessment A's pass is unsupported by the retained source outputs.",
+        "source_export_sha256": sha((output / "source-export.json").read_bytes()),
+        "original_receipt_sha256": first["receipt_sha256"],
+        "replacement_receipt_sha256": replacement["receipt_sha256"],
+        "replacement_evidence": replacement["evidence"],
+        "dependency_scope": "supplied_graph_only",
+        "requires_review": correction_impact(graph, "assessment-a"),
+        "unassessed_consumers": "unknown",
+        "authority": "Explanatory fixture record; recipient approval, correction authenticity and completeness require separate handling.",
+    }
+    result = {
+        "qualification": "synthetic_correction_fixture",
+        "assessments": {"a": first, "replacement": replacement},
+        "historical_files_sha256": historical,
+        "verifier_fingerprint": verifier[1],
+        "dependency_graph": graph,
+        "correction": correction,
+    }
+    write(output / "correction.json", correction)
+    write(output / "scenario.json", result)
+    return result
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
-    result = rehearse(parser.parse_args().output)
+    parser.add_argument(
+        "--scenario",
+        choices=("later-observations", "correction"),
+        default="later-observations",
+    )
+    args = parser.parse_args()
+    if args.scenario == "correction":
+        result = rehearse_correction(args.output)
+        print(
+            json.dumps(
+                {
+                    "original": result["assessments"]["a"]["decision"],
+                    "replacement": result["assessments"]["replacement"]["decision"],
+                    "requires_review": result["correction"]["requires_review"],
+                    "qualification": result["qualification"],
+                }
+            )
+        )
+        return
+    result = rehearse(args.output)
     print(
         json.dumps(
             {

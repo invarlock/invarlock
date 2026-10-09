@@ -100,6 +100,37 @@ separate decisions; it does not automatically supersede earlier approvals. Its
 authenticate both receipts, require distinct input bindings, detect historical
 mutation, and verify refusal to overwrite a previous campaign.
 
+## Rehearse a correction of an actual error
+
+The same offline example can exercise the third row of the table above:
+
+```bash
+python examples/hosted-service/reassessment.py \
+  --scenario correction --output correction-example
+```
+
+The synthetic source export says `no`, but the deliberately erroneous first
+import maps those outputs to `yes`. Assessment A consequently passes. The
+replacement imports the retained `no` outputs correctly for the same observation
+window and independently verifies a regression under the same policy. Both
+signed packs and receipts are retained; every original file is checked unchanged.
+This illustrates a source-mapping error, not a discovered bug in the importer.
+
+`correction.json` identifies the specific error, affected claim, retained source
+digest, original receipt digest and replacement receipt digest. `scenario.json`
+also retains a small dependency graph: the release review depends on A, and a
+deployment approval depends on that review. Both are marked for review; an
+unrelated review is untouched. Missing graph nodes and cycles are rejected.
+
+This impact list covers only the supplied graph. Unknown consumers remain
+unknown, and the record does not automatically revoke or reissue approvals.
+The explanatory correction file is outside the authenticated evidence contracts;
+a digest link is not proof of correction authority or complete distribution.
+A real recipient must establish who can issue corrections, authenticate the
+notice, verify the replacement using independent trust inputs, and reconsider
+its own affected decisions. Preserving erroneous evidence maintains history;
+it does not justify continued reliance on the erroneous conclusion.
+
 ## Capture fresh executions
 
 The [HTTP capture and handoff example](https://github.com/invarlock/invarlock/blob/main/examples/hosted-service/README.md)
