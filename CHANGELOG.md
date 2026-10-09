@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- Replaced the documentation lint CLI to remove its unpatched `braces` dependency
+  and pinned patched YAML, TOML, Markdown, and nested KaTeX dependencies.
+
+- Refresh maintained Python and Promptfoo dependency locks to patched releases.
+  Update the Inspect evaluator image to the supported 0.3.263 release so its
+  dependency requirements permit the filesystem fix. Preserve historical
+  evidence and existing dependency-audit enforcement.
+
 ## [0.16.3] - 2026-09-22
 
 The v0.16.2 tag was not published to package indexes; v0.16.3 is the first
