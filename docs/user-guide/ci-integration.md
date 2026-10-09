@@ -80,7 +80,7 @@ from an independently managed approval system.
 Pin the action to a pinned InvarLock commit rather than a mutable branch.
 Replace `PINNED_INVARLOCK_COMMIT` with its full commit SHA.
 
-The example selects Ubuntu 24.04 explicitly to avoid an automatic operating-system
+The example selects Ubuntu 26.04 explicitly to avoid an automatic operating-system
 upgrade through the moving `ubuntu-latest` label. This pins the OS release, not
 the complete runner image; installed tools still receive image updates.
 
@@ -95,7 +95,7 @@ permissions:
 
 jobs:
   verify-evidence:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     environment: release-review
     steps:
       - name: Use disk-backed temporary storage

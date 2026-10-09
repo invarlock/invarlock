@@ -25,23 +25,23 @@ on:
       runner:
         description: "Hosted OS for manual compatibility checks"
         required: false
-        default: ubuntu-24.04
+        default: ubuntu-26.04
         type: choice
         options:
-          - ubuntu-24.04
           - ubuntu-26.04
+          - ubuntu-24.04
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.runner == 'ubuntu-26.04' && 'ubuntu-26.04' || 'ubuntu-24.04' }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04' || 'ubuntu-26.04' }}
   cancel-in-progress: true
 
 jobs:
   capture:
-    name: "${{ inputs.runner == 'ubuntu-26.04' && 'ubuntu-26.04 / ' || '' }}capture (${{ matrix.evaluator }})"
-    runs-on: ${{ inputs.runner == 'ubuntu-26.04' && 'ubuntu-26.04' || 'ubuntu-24.04' }}
+    name: "${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04 / ' || '' }}capture (${{ matrix.evaluator }})"
+    runs-on: ${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04' || 'ubuntu-26.04' }}
     timeout-minutes: 20
     strategy:
       fail-fast: false

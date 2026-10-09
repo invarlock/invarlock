@@ -43,7 +43,7 @@ jobs:
   publish:
     name: Publish Versioned Docs
     if: github.repository == 'invarlock/invarlock'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     env:
       PYTHONPATH: ${{ github.workspace }}/src

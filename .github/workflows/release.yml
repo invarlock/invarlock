@@ -33,7 +33,7 @@ permissions:
 
 jobs:
   resolve_release_ref:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
     outputs:
@@ -135,7 +135,7 @@ jobs:
   coverage_shards:
     needs: resolve_release_ref
     if: ${{ github.event_name == 'push' || inputs.publish != true }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -191,7 +191,7 @@ jobs:
   coverage_check:
     needs: [resolve_release_ref, coverage_shards]
     if: ${{ github.event_name == 'push' || inputs.publish != true }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     env:
       PYTHON: python
@@ -227,7 +227,7 @@ jobs:
   build_check:
     needs: resolve_release_ref
     if: ${{ github.event_name == 'push' || inputs.publish != true }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 120
     env:
       PYTHON: python
@@ -567,7 +567,7 @@ jobs:
   attest_candidate:
     needs: [build_check, coverage_check, resolve_release_ref]
     if: ${{ github.event_name == 'push' }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     permissions:
       actions: read
@@ -611,7 +611,7 @@ jobs:
         inputs.publish == true &&
         inputs.release_tag != ''
       }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     permissions:
       actions: read
@@ -685,7 +685,7 @@ jobs:
 
   prepare_publication:
     needs: [authorize_candidate, resolve_release_ref]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     permissions:
       actions: read
@@ -827,7 +827,7 @@ jobs:
 
   publish:
     needs: [prepare_publication, resolve_release_ref]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     environment: ${{ inputs.target }}
     permissions:
@@ -886,7 +886,7 @@ jobs:
         github.event_name == 'workflow_dispatch' &&
         inputs.publish == true
       }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     # Hosted verification can consume about 20 minutes at its documented
     # 12 attempts, 3 serial requests per attempt, and 30-second request timeout.
     timeout-minutes: 130
@@ -929,7 +929,7 @@ jobs:
         github.event_name == 'workflow_dispatch' &&
         inputs.publish == true
       }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     # Leave the same bounded verification budget plus installation headroom.
     timeout-minutes: 130
     permissions:

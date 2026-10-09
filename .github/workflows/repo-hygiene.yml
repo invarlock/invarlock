@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   lockfile-sync:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     steps:
       - name: Use disk-backed temporary storage
@@ -28,7 +28,7 @@ jobs:
         run: make lock-sync
 
   no-generated-artifacts:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     steps:
       - name: Use disk-backed temporary storage
@@ -50,7 +50,7 @@ jobs:
           fi
 
   large-files:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     steps:
       - name: Use disk-backed temporary storage

@@ -10,11 +10,11 @@ on:
       runner:
         description: "Hosted OS for manual compatibility checks"
         required: false
-        default: ubuntu-24.04
+        default: ubuntu-26.04
         type: choice
         options:
-          - ubuntu-24.04
           - ubuntu-26.04
+          - ubuntu-24.04
       full:
         description: "Run the complete repository and distribution gates"
         required: false
@@ -22,7 +22,7 @@ on:
         type: boolean
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.runner == 'ubuntu-26.04' && 'ubuntu-26.04' || 'ubuntu-24.04' }}-${{ inputs.full && 'full' || 'standard' }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04' || 'ubuntu-26.04' }}-${{ inputs.full && 'full' || 'standard' }}
   # Standard and full compatibility checks may run together on the same OS.
   cancel-in-progress: true
 
@@ -31,8 +31,8 @@ permissions:
 
 jobs:
   policy-engine-interop:
-    name: "${{ inputs.runner == 'ubuntu-26.04' && 'ubuntu-26.04 / ' || '' }}policy-engine-interop"
-    runs-on: ${{ inputs.runner == 'ubuntu-26.04' && 'ubuntu-26.04' || 'ubuntu-24.04' }}
+    name: "${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04 / ' || '' }}policy-engine-interop"
+    runs-on: ${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04' || 'ubuntu-26.04' }}
     timeout-minutes: 15
     env:
       PYTHON: python
@@ -75,9 +75,9 @@ jobs:
           make acceptance-policy-interop OPA="${gopath}/bin/opa" CUE="${gopath}/bin/cue"
 
   verify-fast:
-    name: "${{ inputs.runner == 'ubuntu-26.04' && 'ubuntu-26.04 / ' || '' }}verify-fast"
+    name: "${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04 / ' || '' }}verify-fast"
     if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.full) }}
-    runs-on: ${{ inputs.runner == 'ubuntu-26.04' && 'ubuntu-26.04' || 'ubuntu-24.04' }}
+    runs-on: ${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04' || 'ubuntu-26.04' }}
     timeout-minutes: 30
     env:
       PYTHON: python
@@ -149,9 +149,9 @@ jobs:
           make workflow-lint
 
   minimum-python-packages:
-    name: "${{ inputs.runner == 'ubuntu-26.04' && 'ubuntu-26.04 / ' || '' }}minimum-python-packages"
+    name: "${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04 / ' || '' }}minimum-python-packages"
     if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.full) }}
-    runs-on: ${{ inputs.runner == 'ubuntu-26.04' && 'ubuntu-26.04' || 'ubuntu-24.04' }}
+    runs-on: ${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04' || 'ubuntu-26.04' }}
     timeout-minutes: 35
     env:
       PYTHON: python
@@ -195,9 +195,9 @@ jobs:
           bash scripts/evaluator_parity_gate.sh
 
   minimum-python-tests:
-    name: "${{ inputs.runner == 'ubuntu-26.04' && 'ubuntu-26.04 / ' || '' }}minimum-python-tests (${{ matrix.shard }})"
+    name: "${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04 / ' || '' }}minimum-python-tests (${{ matrix.shard }})"
     if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.full) }}
-    runs-on: ${{ inputs.runner == 'ubuntu-26.04' && 'ubuntu-26.04' || 'ubuntu-24.04' }}
+    runs-on: ${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04' || 'ubuntu-26.04' }}
     timeout-minutes: 25
     env:
       PYTHON: python
@@ -228,10 +228,10 @@ jobs:
         run: python scripts/ci/coverage_runner.py test ${{ matrix.shard }} --workers 2
 
   minimum-python:
-    name: "${{ inputs.runner == 'ubuntu-26.04' && 'ubuntu-26.04 / ' || '' }}minimum-python"
+    name: "${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04 / ' || '' }}minimum-python"
     if: ${{ always() && !(github.event_name == 'workflow_dispatch' && inputs.full) }}
     needs: [minimum-python-tests, minimum-python-packages]
-    runs-on: ${{ inputs.runner == 'ubuntu-26.04' && 'ubuntu-26.04' || 'ubuntu-24.04' }}
+    runs-on: ${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04' || 'ubuntu-26.04' }}
     timeout-minutes: 2
     steps:
       - name: Use disk-backed temporary storage
@@ -243,9 +243,9 @@ jobs:
         run: test "$TEST_RESULT" = success && test "$PACKAGE_RESULT" = success
 
   coverage-tests:
-    name: "${{ inputs.runner == 'ubuntu-26.04' && 'ubuntu-26.04 / ' || '' }}coverage-tests (${{ matrix.shard }})"
+    name: "${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04 / ' || '' }}coverage-tests (${{ matrix.shard }})"
     if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.full) }}
-    runs-on: ${{ inputs.runner == 'ubuntu-26.04' && 'ubuntu-26.04' || 'ubuntu-24.04' }}
+    runs-on: ${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04' || 'ubuntu-26.04' }}
     timeout-minutes: 35
     strategy:
       fail-fast: false
@@ -302,10 +302,10 @@ jobs:
           retention-days: 7
 
   coverage:
-    name: "${{ inputs.runner == 'ubuntu-26.04' && 'ubuntu-26.04 / ' || '' }}coverage"
+    name: "${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04 / ' || '' }}coverage"
     if: ${{ always() && !(github.event_name == 'workflow_dispatch' && inputs.full) }}
     needs: [coverage-tests, verify-fast]
-    runs-on: ${{ inputs.runner == 'ubuntu-26.04' && 'ubuntu-26.04' || 'ubuntu-24.04' }}
+    runs-on: ${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04' || 'ubuntu-26.04' }}
     timeout-minutes: 10
     env:
       PYTHON: python
@@ -350,9 +350,9 @@ jobs:
           retention-days: 7
 
   verify-full:
-    name: "${{ inputs.runner == 'ubuntu-26.04' && 'ubuntu-26.04 / ' || '' }}verify-full"
+    name: "${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04 / ' || '' }}verify-full"
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.full }}
-    runs-on: ${{ inputs.runner == 'ubuntu-26.04' && 'ubuntu-26.04' || 'ubuntu-24.04' }}
+    runs-on: ${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04' || 'ubuntu-26.04' }}
     timeout-minutes: 60
     env:
       PYTHON: python
@@ -434,9 +434,9 @@ jobs:
           df -i /tmp "$TMPDIR"
 
   supply-chain:
-    name: "${{ inputs.runner == 'ubuntu-26.04' && 'ubuntu-26.04 / ' || '' }}supply-chain"
+    name: "${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04 / ' || '' }}supply-chain"
     if: ${{ startsWith(github.ref, 'refs/tags/') }}
-    runs-on: ${{ inputs.runner == 'ubuntu-26.04' && 'ubuntu-26.04' || 'ubuntu-24.04' }}
+    runs-on: ${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04' || 'ubuntu-26.04' }}
     timeout-minutes: 15
     steps:
       - name: Use disk-backed temporary storage
