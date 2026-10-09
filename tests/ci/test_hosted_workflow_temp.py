@@ -20,10 +20,8 @@ def test_hosted_ubuntu_jobs_use_runner_temporary_storage(path: Path) -> None:
         if path.stem == "scorecards":
             # Publishing mode permits only the checkout and scorecard actions.
             assert len(job["steps"]) == 2
-            assert all(
-                step.get("env", {}).get("TMPDIR") == "${{ runner.temp }}"
-                for step in job["steps"]
-            )
+            assert job["steps"][0]["env"]["TMPDIR"] == "${{ runner.temp }}"
+            assert job["steps"][1]["env"]["TMPDIR"] == "/tmp"
         else:
             setup = job["steps"][0]
             assert "if" not in setup
@@ -58,3 +56,13 @@ def test_temporary_storage_setup_exports_a_usable_path(tmp_path: Path) -> None:
         text=True,
     )
     assert Path(observed.strip()).resolve() == runner_temp.resolve()
+
+
+def test_publishing_container_uses_its_own_temporary_directory() -> None:
+    workflow = yaml.safe_load((WORKFLOWS / "release.yml").read_text())
+    publication = next(
+        step
+        for step in workflow["jobs"]["publish"]["steps"]
+        if step.get("uses", "").startswith("pypa/gh-action-pypi-publish@")
+    )
+    assert publication["env"]["TMPDIR"] == "/tmp"

@@ -33,7 +33,8 @@ Hosted jobs set `TMPDIR` to the runner's temporary directory on disk. Ubuntu 26.
 can mount `/tmp` as a quota-limited RAM disk; see the
 [runner-image report](https://github.com/actions/runner-images/issues/14777).
 Keep this setting when adding hosted jobs so combined build and test workloads
-have disk-backed temporary storage.
+have disk-backed temporary storage. Docker actions use a temporary path inside
+their own filesystem instead of inheriting the host path.
 
 Manual runs of CI, evaluator SDK capture, container smoke and documentation
 workflows accept a `runner` choice of `ubuntu-24.04` or `ubuntu-26.04`. Pull requests,

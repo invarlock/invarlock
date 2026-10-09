@@ -870,6 +870,9 @@ jobs:
             echo "publish_repository_url=" >> "$GITHUB_OUTPUT"
           fi
       - name: Publish to TestPyPI/PyPI
+        # The action launches a Docker container with its own temporary filesystem.
+        env:
+          TMPDIR: /tmp
         uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33
         with:
           packages-dir: publish-dist

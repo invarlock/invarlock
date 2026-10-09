@@ -28,8 +28,9 @@ jobs:
           persist-credentials: false
       # scorecard-action publish mode rejects extra steps in this job.
       - name: Run OpenSSF Scorecard analysis
+        # The Docker action needs a path inside its own filesystem.
         env:
-          TMPDIR: ${{ runner.temp }}
+          TMPDIR: /tmp
         uses: ossf/scorecard-action@2d1146689b8cda280b9bc96326124645441f03bc
         with:
           # Prefer a dedicated PAT when configured so classic branch protection
