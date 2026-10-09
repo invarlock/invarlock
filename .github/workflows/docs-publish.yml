@@ -43,12 +43,14 @@ jobs:
   publish:
     name: Publish Versioned Docs
     if: github.repository == 'invarlock/invarlock'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     env:
       PYTHONPATH: ${{ github.workspace }}/src
 
     steps:
+    - name: Use disk-backed temporary storage
+      run: printf 'TMPDIR=%s\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
     - name: Checkout
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       with:

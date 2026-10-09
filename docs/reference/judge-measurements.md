@@ -77,10 +77,32 @@ trials, evaluation returns an incomplete result and leaves the final evidence
 destination absent. Rerun the same request to continue without regenerating
 answers or retrying admitted calls. Changed artifacts, runtime images, policy,
 rubric or data require a new workspace. An interrupted native answer capture is
-marked as unfinished and cannot silently execute again. If retained storage
-capacity is exhausted, evaluation publishes terminal `insufficient_evidence`
-with `collection.stop_reason: retained_capacity_exhausted`; it does not promise
-that another identical invocation can continue.
+marked as unfinished and cannot silently execute again. If a collection resource
+allowance is exhausted, evaluation publishes terminal `insufficient_evidence`
+with `collection.stop_reason: retained_capacity_exhausted`; this existing label
+covers admission limits as well as retained storage and does not promise that
+another identical invocation can continue.
+
+For Inspect-backed collection, the JSON evaluation result also includes
+`collection.capacity`. Its `remaining_admissions` mapping expresses each limit
+in additional calls: `calls`, `input_token_reservation`,
+`output_token_reservation`, `cost_reservation`, `retained_sources` and
+`retained_bytes`. `capacity` is their nonnegative minimum;
+`limiting_resources` lists all terms attaining the minimum, and
+`exhausted_resources` lists every term at or below zero. Storage bounds are
+conservative, so a negative remainder can describe reserved capacity rather
+than an oversized retained file. These details explain the existing stop; they
+never authorize more calls. They are local diagnostics outside signed evidence,
+not observed token usage, a reconciled bill, or a statistical result.
+
+For example, calls may remain while `retained_bytes` admits zero further calls;
+increasing the call budget alone cannot help. The SDK functions `collect` and
+`collect_configured` accept an optional mutable `status` dictionary for the
+same stop reason and capacity details. It is cleared at invocation start; the
+existing `on_stop` callback values and returned measurements remain unchanged.
+Capacity details are emitted only for a capacity stop, not successful completion,
+a deadline or a requested pause. Other collector profiles retain their own
+capacity handling.
 
 The profile supports exactly one text part per scheduled input. It grades the
 task input and answer under the declared rubric and optional global references.

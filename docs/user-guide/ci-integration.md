@@ -80,6 +80,10 @@ from an independently managed approval system.
 Pin the action to a pinned InvarLock commit rather than a mutable branch.
 Replace `PINNED_INVARLOCK_COMMIT` with its full commit SHA.
 
+The example selects Ubuntu 26.04 explicitly to avoid an automatic operating-system
+upgrade through the moving `ubuntu-latest` label. This pins the OS release, not
+the complete runner image; installed tools still receive image updates.
+
 ```yaml
 name: Verify InvarLock evidence
 
@@ -91,9 +95,11 @@ permissions:
 
 jobs:
   verify-evidence:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     environment: release-review
     steps:
+      - name: Use disk-backed temporary storage
+        run: printf 'TMPDIR=%s\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - name: Check out review inputs
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
 

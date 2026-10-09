@@ -1478,6 +1478,7 @@ def test_live_incremental_storage_reservation_bounds_replayed_bytes(data, monkey
     assert state.capacity() > 0
     monkeypatch.setattr(collector, "MEASUREMENTS_MAX_BYTES", state.retained_bytes)
     assert state.capacity() == 0
+    assert state.capacity_details()["exhausted_resources"] == ["retained_bytes"]
 
 
 def test_live_incremental_reservations_charge_admissions_once(data):
@@ -1580,3 +1581,73 @@ def test_live_checkpoint_allows_unavailable_response_ids(data):
         event["output"]["request_id"] = None
         state.replace_event(sample["id"], event)
     assert state.response_owners == {}
+
+
+def test_admission_explanations_match_integer_resource_feasibility(data, monkeypatch):
+    import random
+
+    import invarlock.judge_measurements.collector as collector
+
+    checkpoint = ingest(data)
+    state = collector._LiveCheckpoint(
+        plan=data[0],
+        options=data[3],
+        exported=copy.deepcopy(data[1]),
+        checkpoint=checkpoint,
+        frozen_inputs=data[2],
+    )
+    retained, sources = state._storage_bounds()
+    rng = random.Random(907)
+    original = data[3]
+    output_per_call = data[0]["judge"]["config"]["max_output_tokens"]
+    # Includes ties, residual reservations below one complete call, and all six limits.
+    cases = [
+        [0] * 6,
+        [3] * 6,
+        *[[0 if j == i else 4 for j in range(6)] for i in range(6)],
+    ]
+    cases += [[rng.randrange(-1, 8) for _ in range(6)] for _ in range(80)]
+    for allowance in cases:
+        state.options = replace(
+            original,
+            max_calls=state.spent_calls + allowance[0],
+            max_input_tokens=(state.spent_calls + allowance[1])
+            * original.input_tokens_per_call,
+            max_output_tokens=(state.spent_calls + allowance[2]) * output_per_call,
+            max_cost_microusd=(state.spent_calls + allowance[3])
+            * original.cost_microusd_per_call,
+        )
+        monkeypatch.setattr(collector, "MAX_SOURCES", sources + 2 * allowance[4] + 1)
+        monkeypatch.setattr(
+            collector,
+            "MEASUREMENTS_MAX_BYTES",
+            retained
+            + collector.MAX_ADMISSION_GROWTH_BYTES * allowance[5]
+            + collector.MAX_ADMISSION_GROWTH_BYTES
+            - 1,
+        )
+        feasible = [
+            n
+            for n in range(10)
+            if state.spent_calls + n <= state.options.max_calls
+            and (state.spent_calls + n) * original.input_tokens_per_call
+            <= state.options.max_input_tokens
+            and (state.spent_calls + n) * output_per_call
+            <= state.options.max_output_tokens
+            and (state.spent_calls + n) * original.cost_microusd_per_call
+            <= state.options.max_cost_microusd
+            and sources + 2 * n <= collector.MAX_SOURCES
+            and retained + n * collector.MAX_ADMISSION_GROWTH_BYTES
+            <= collector.MEASUREMENTS_MAX_BYTES
+        ]
+        details = state.capacity_details()
+        assert details["capacity"] == state.capacity() == max(feasible, default=0)
+        assert list(details["remaining_admissions"].values()) == allowance
+        assert details["exhausted_resources"] == [
+            key for key, n in details["remaining_admissions"].items() if n <= 0
+        ]
+        assert details["limiting_resources"] == [
+            key
+            for key, n in details["remaining_admissions"].items()
+            if n == min(allowance)
+        ]

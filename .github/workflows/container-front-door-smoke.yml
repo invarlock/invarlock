@@ -6,9 +6,18 @@ on:
   push:
     branches: [staging/next]
   workflow_dispatch:
+    inputs:
+      runner:
+        description: "Hosted OS for manual compatibility checks"
+        required: false
+        default: ubuntu-26.04
+        type: choice
+        options:
+          - ubuntu-26.04
+          - ubuntu-24.04
 
 concurrency:
-  group: container-front-door-${{ github.ref }}
+  group: container-front-door-${{ github.ref }}-${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04' || 'ubuntu-26.04' }}
   cancel-in-progress: true
 
 permissions:
@@ -16,7 +25,8 @@ permissions:
 
 jobs:
   engine-smoke:
-    runs-on: ubuntu-latest
+    name: "${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04 / ' || '' }}engine-smoke (${{ matrix.engine }})"
+    runs-on: ${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04' || 'ubuntu-26.04' }}
     timeout-minutes: 45
     strategy:
       fail-fast: false
@@ -26,6 +36,8 @@ jobs:
       CONTAINER_ENGINE: ${{ matrix.engine }}
       INVARLOCK_RUNTIME_IMAGE: invarlock-runtime:local
     steps:
+      - name: Use disk-backed temporary storage
+        run: printf 'TMPDIR=%s\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
@@ -133,11 +145,14 @@ jobs:
           retention-days: 30
 
   smoke:
+    name: "${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04 / ' || '' }}smoke"
     if: ${{ always() }}
     needs: [engine-smoke]
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04' || 'ubuntu-26.04' }}
     timeout-minutes: 5
     steps:
+      - name: Use disk-backed temporary storage
+        run: printf 'TMPDIR=%s\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - name: Require Docker and Podman journeys
         env:
           ENGINE_RESULT: ${{ needs.engine-smoke.result }}

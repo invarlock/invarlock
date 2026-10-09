@@ -21,9 +21,18 @@ on:
   schedule:
     - cron: '0 2 * * 1'
   workflow_dispatch:
+    inputs:
+      runner:
+        description: "Hosted OS for manual compatibility checks"
+        required: false
+        default: ubuntu-26.04
+        type: choice
+        options:
+          - ubuntu-26.04
+          - ubuntu-24.04
 
 concurrency:
-  group: docs-${{ github.ref }}
+  group: docs-${{ github.ref }}-${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04' || 'ubuntu-26.04' }}
   cancel-in-progress: true
 
 permissions:
@@ -31,12 +40,15 @@ permissions:
 
 jobs:
   docs:
+    name: "${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04 / ' || '' }}docs"
     if: ${{ github.event_name != 'schedule' }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04' || 'ubuntu-26.04' }}
     timeout-minutes: 20
     env:
       PYTHONPATH: ${{ github.workspace }}/src
     steps:
+      - name: Use disk-backed temporary storage
+        run: printf 'TMPDIR=%s\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Set up Python
@@ -71,10 +83,13 @@ jobs:
           git diff --exit-code
 
   external-links:
+    name: "${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04 / ' || '' }}external-links"
     if: ${{ github.event_name == 'schedule' }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04' || 'ubuntu-26.04' }}
     timeout-minutes: 15
     steps:
+      - name: Use disk-backed temporary storage
+        run: printf 'TMPDIR=%s\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Set up Python

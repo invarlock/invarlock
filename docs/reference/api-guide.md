@@ -70,6 +70,11 @@ advisory. See [hypothetical edits](../assurance/decision-semantics.md#explore-hy
 for exact/lower-bound interpretation, all search limits and a runnable example.
 The helper does not authenticate supplied outcomes or estimate rerun risk.
 
+The checkout also includes the standalone
+[score contribution recipe](evaluation-records.md#explain-an-additive-score-change).
+It is an example rather than an exported `invarlock.engine` function; use the
+matching source checkout and validate the inputs through their normal workflow.
+
 ## Transactions
 
 ```python

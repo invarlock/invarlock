@@ -7,6 +7,14 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
+      runner:
+        description: "Hosted OS for manual compatibility checks"
+        required: false
+        default: ubuntu-26.04
+        type: choice
+        options:
+          - ubuntu-26.04
+          - ubuntu-24.04
       full:
         description: "Run the complete repository and distribution gates"
         required: false
@@ -14,7 +22,8 @@ on:
         type: boolean
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04' || 'ubuntu-26.04' }}-${{ inputs.full && 'full' || 'standard' }}
+  # Standard and full compatibility checks may run together on the same OS.
   cancel-in-progress: true
 
 permissions:
@@ -22,12 +31,15 @@ permissions:
 
 jobs:
   policy-engine-interop:
-    runs-on: ubuntu-latest
+    name: "${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04 / ' || '' }}policy-engine-interop"
+    runs-on: ${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04' || 'ubuntu-26.04' }}
     timeout-minutes: 15
     env:
       PYTHON: python
       PYTHONPATH: ${{ github.workspace }}/src
     steps:
+      - name: Use disk-backed temporary storage
+        run: printf 'TMPDIR=%s\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Set up Python
@@ -63,14 +75,17 @@ jobs:
           make acceptance-policy-interop OPA="${gopath}/bin/opa" CUE="${gopath}/bin/cue"
 
   verify-fast:
+    name: "${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04 / ' || '' }}verify-fast"
     if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.full) }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04' || 'ubuntu-26.04' }}
     timeout-minutes: 30
     env:
       PYTHON: python
       PYTHONPATH: ${{ github.workspace }}/src
       PYTHONWARNINGS: default
     steps:
+      - name: Use disk-backed temporary storage
+        run: printf 'TMPDIR=%s\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Set up Python
@@ -134,14 +149,17 @@ jobs:
           make workflow-lint
 
   minimum-python-packages:
+    name: "${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04 / ' || '' }}minimum-python-packages"
     if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.full) }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04' || 'ubuntu-26.04' }}
     timeout-minutes: 35
     env:
       PYTHON: python
       PYTHONPATH: ${{ github.workspace }}/src
       PYTHONWARNINGS: default
     steps:
+      - name: Use disk-backed temporary storage
+        run: printf 'TMPDIR=%s\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Set up Python
@@ -177,8 +195,9 @@ jobs:
           bash scripts/evaluator_parity_gate.sh
 
   minimum-python-tests:
+    name: "${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04 / ' || '' }}minimum-python-tests (${{ matrix.shard }})"
     if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.full) }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04' || 'ubuntu-26.04' }}
     timeout-minutes: 25
     env:
       PYTHON: python
@@ -189,6 +208,8 @@ jobs:
       matrix:
         shard: [core, examples, examples-comparisons, examples-judge, support, runtime]
     steps:
+      - name: Use disk-backed temporary storage
+        run: printf 'TMPDIR=%s\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Set up Python
@@ -207,11 +228,14 @@ jobs:
         run: python scripts/ci/coverage_runner.py test ${{ matrix.shard }} --workers 2
 
   minimum-python:
+    name: "${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04 / ' || '' }}minimum-python"
     if: ${{ always() && !(github.event_name == 'workflow_dispatch' && inputs.full) }}
     needs: [minimum-python-tests, minimum-python-packages]
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04' || 'ubuntu-26.04' }}
     timeout-minutes: 2
     steps:
+      - name: Use disk-backed temporary storage
+        run: printf 'TMPDIR=%s\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - name: Require every minimum-Python check
         env:
           TEST_RESULT: ${{ needs.minimum-python-tests.result }}
@@ -219,8 +243,9 @@ jobs:
         run: test "$TEST_RESULT" = success && test "$PACKAGE_RESULT" = success
 
   coverage-tests:
+    name: "${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04 / ' || '' }}coverage-tests (${{ matrix.shard }})"
     if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.full) }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04' || 'ubuntu-26.04' }}
     timeout-minutes: 35
     strategy:
       fail-fast: false
@@ -231,6 +256,8 @@ jobs:
       PYTHONPATH: ${{ github.workspace }}/src
       PYTHONWARNINGS: default
     steps:
+      - name: Use disk-backed temporary storage
+        run: printf 'TMPDIR=%s\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Set up Python
@@ -275,14 +302,17 @@ jobs:
           retention-days: 7
 
   coverage:
+    name: "${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04 / ' || '' }}coverage"
     if: ${{ always() && !(github.event_name == 'workflow_dispatch' && inputs.full) }}
     needs: [coverage-tests, verify-fast]
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04' || 'ubuntu-26.04' }}
     timeout-minutes: 10
     env:
       PYTHON: python
       PYTHONPATH: ${{ github.workspace }}/src
     steps:
+      - name: Use disk-backed temporary storage
+        run: printf 'TMPDIR=%s\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - name: Require successful test and capacity checks
         env:
           SHARD_RESULT: ${{ needs.coverage-tests.result }}
@@ -320,14 +350,17 @@ jobs:
           retention-days: 7
 
   verify-full:
+    name: "${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04 / ' || '' }}verify-full"
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.full }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04' || 'ubuntu-26.04' }}
     timeout-minutes: 60
     env:
       PYTHON: python
       PYTHONPATH: ${{ github.workspace }}/src
       PYTHONWARNINGS: default
     steps:
+      - name: Use disk-backed temporary storage
+        run: printf 'TMPDIR=%s\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Set up Python
@@ -373,6 +406,13 @@ jobs:
         run: |
           python -m pip install --require-hashes -r requirements/workflows/langfuse-sdk-tests-py313.txt
           python -m pip check
+      - name: Report temporary storage before full verification
+        run: |
+          df -hT /tmp "$TMPDIR"
+          df -i /tmp "$TMPDIR"
+          findmnt --target /tmp
+          findmnt --target "$TMPDIR"
+          python -c 'import tempfile; print("Python temporary directory:", tempfile.gettempdir())'
       - name: Run complete repository gates
         env:
           INVARLOCK_REQUIRE_INSPECT_SDK: "1"
@@ -387,12 +427,20 @@ jobs:
         run: make install-smoke inspect-judge-sdk-test langfuse-sdk-test
       - name: Check all dedicated evaluator profiles with an installed recipient
         run: make evaluator-parity-test
+      - name: Report temporary storage after full verification
+        if: ${{ always() }}
+        run: |
+          df -hT /tmp "$TMPDIR"
+          df -i /tmp "$TMPDIR"
 
   supply-chain:
+    name: "${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04 / ' || '' }}supply-chain"
     if: ${{ startsWith(github.ref, 'refs/tags/') }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04' || 'ubuntu-26.04' }}
     timeout-minutes: 15
     steps:
+      - name: Use disk-backed temporary storage
+        run: printf 'TMPDIR=%s\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Set up Python

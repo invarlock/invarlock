@@ -427,6 +427,12 @@ returns a separate Python advisory. It is not a comparison-report field or a
 signed verification result. Preserve the recorded verdict and interpret its
 hypothetical edits and search limits separately.
 
+The standalone [score contribution recipe](evaluation-records.md#explain-an-additive-score-change)
+produces a separate explanation of an additive total. It is not emitted by
+`invarlock report` or added to a signed comparison. Validate source completeness,
+unit weights and score-versus-percentage-point units before using it; its residual
+is a gap from a supplied total, not proof of numerical error or causality.
+
 ## Verification result
 
 Native deterministic `invarlock verify --json` emits an `invarlock/evidence-pack-verify-v1` result. Important

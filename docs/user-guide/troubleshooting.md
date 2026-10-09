@@ -317,6 +317,15 @@ requires a new workspace. Offline imports need retained calls and source
 bindings; scalar ratings alone cannot supply them. See the
 [judge workflow and recovery rules](evaluation-request.md#judge).
 
+For `collection.stop_reason: retained_capacity_exhausted`, inspect
+`collection.capacity` on Inspect-backed evaluations. The limiting allowance may
+be calls, token/cost reservations, retained sources or retained bytes. Another
+identical invocation cannot replenish it, and increasing one budget cannot fix
+a different exhausted limit. This is a terminal insufficient-evidence result,
+not a resumable deadline or a provider bill. Review the workload and allowances
+before a new campaign; preserve the stopped evidence. See the
+[capacity fields](../reference/judge-measurements.md#native-scorer).
+
 ## Normalized NLL fails closed
 
 Each successful record needs finite `logprob_sum`, positive `token_count`, and

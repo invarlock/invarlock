@@ -21,17 +21,27 @@ on:
       - 'Makefile'
       - '.github/workflows/evaluator-sdk.yml'
   workflow_dispatch:
+    inputs:
+      runner:
+        description: "Hosted OS for manual compatibility checks"
+        required: false
+        default: ubuntu-26.04
+        type: choice
+        options:
+          - ubuntu-26.04
+          - ubuntu-24.04
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04' || 'ubuntu-26.04' }}
   cancel-in-progress: true
 
 jobs:
   capture:
-    runs-on: ubuntu-latest
+    name: "${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04 / ' || '' }}capture (${{ matrix.evaluator }})"
+    runs-on: ${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04' || 'ubuntu-26.04' }}
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -58,6 +68,8 @@ jobs:
           - evidently
           - trulens
     steps:
+      - name: Use disk-backed temporary storage
+        run: printf 'TMPDIR=%s\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Set up Python

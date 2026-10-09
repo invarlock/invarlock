@@ -186,3 +186,20 @@ profile. All existing standalone requests, evidence and receipts remain valid.
 
 For the individual contracts, see [captured results](../user-guide/captured-results.md)
 and [bounded judge measurements](judge-measurements.md).
+
+### Diagnosing shared-input mismatches
+
+A combined report rejects components with different frozen runs, case sets or
+subject identities. Its error names the first mismatched binding and shows its
+expected and observed digest. Here, expected means the identity derived from the
+deterministic component; observed means the identity bound by the judge component.
+This comparison does not establish recipient authorization.
+
+Recipient verification also identifies the first mismatched binding when the
+captured component differs from the shared recipient pins. In that error,
+expected comes from the external recipient policy. Missing fields are reported
+as `<missing>`, separately from `null` for a hosted subject's artifact identity.
+Errors report one mismatch at a time; they do not enumerate all inconsistencies.
+Preserve the rejected evidence and compare the named runs or policies before
+creating a corrected submission. Diagnostic detail does not change acceptance,
+component replay, signatures or the signed evidence formats.

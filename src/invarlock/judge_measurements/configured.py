@@ -311,12 +311,15 @@ async def collect_configured(
     environment: Mapping[str, str] | None = None,
     *,
     on_stop: Callable[[str], None] | None = None,
+    status: dict[str, Any] | None = None,
 ) -> JudgeMeasurements:
     """Collect frozen judgments with pinned SDKs and an environment-only key.
 
     ``runner.stop_after_batches`` requests a graceful invocation stop after
     durable results, without changing the plan or checkpoint budget identity.
     """
+    if status is not None:
+        status.clear()
     allow_judge_network = os.environ.get(
         "INVARLOCK_ALLOW_JUDGE_NETWORK", ""
     ).strip().lower() in {"1", "true", "yes", "on"}
@@ -335,6 +338,7 @@ async def collect_configured(
             subject_run,
             environment,
             on_stop=on_stop,
+            **({"status": status} if status is not None else {}),
         )
 
 
@@ -347,6 +351,7 @@ async def _collect_configured(
     environment: Mapping[str, str] | None,
     *,
     on_stop: Callable[[str], None] | None,
+    status: dict[str, Any] | None = None,
 ) -> JudgeMeasurements:
     """Keep model initialization, collection and cleanup inside the judge scope."""
     _check_options(plan, options)
@@ -410,6 +415,7 @@ async def _collect_configured(
             baseline_run=baseline_run,
             subject_run=subject_run,
             on_stop=on_stop,
+            **({"status": status} if status is not None else {}),
         )
         succeeded = True
         return result

@@ -708,7 +708,7 @@ def evaluate_judge_request(
                     },
                 )
                 unchanged()
-                collection_stop: dict[str, str] = {}
+                collection_stop: dict[str, Any] = {}
                 values["measurements"] = collect_frozen(
                     plan=values["plan"],
                     collection=values["collection"],
@@ -733,6 +733,7 @@ def evaluate_judge_request(
                     values["measurements"],
                     request.workspace,
                     stop_reason=collection_stop.get("stop_reason"),
+                    capacity=collection_stop.get("capacity"),
                 )
 
         publication = publish_judge_evidence(

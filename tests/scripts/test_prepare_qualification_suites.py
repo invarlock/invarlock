@@ -788,3 +788,97 @@ def test_public_evidence_is_bound_to_a_qualified_400_record_suite() -> None:
             "observed": manifest["record_count"],
             "passed": True,
         }
+
+
+def test_quota_conflict_identifies_joint_shortfall_and_repair():
+    rows = [
+        {"group": group, "answer": answer}
+        for group, answer in [("A", "X"), ("B", "X"), ("C", "Y"), ("C", "Z")]
+        for _ in range(2)
+    ]
+    with pytest.raises(suites.QualificationQuotaError) as caught:
+        suites._cell_allocation(rows, count=6)
+    assert caught.value.conflict == {
+        "group_quotas": {"A": 2, "B": 2},
+        "usable_by_answer": {"X": 2, "Y": 0, "Z": 0},
+        "required": 4,
+        "available": 2,
+        "shortfall": 2,
+        "requested": 6,
+        "maximum_feasible": 4,
+    }
+    assert "require 4 rows" in str(caught.value)
+    assert "shortfall 2" in str(caught.value)
+    repaired = [*rows, {"group": "A", "answer": "Y"}, {"group": "B", "answer": "Z"}]
+    assert sum(suites._cell_allocation(repaired, count=6).values()) == 6
+
+
+def test_quota_witness_matches_independent_small_selection_oracle():
+    from itertools import combinations, product
+
+    # Enumerate actual row subsets, independently of flow and residual graphs.
+    checked_failures = 0
+    for cells in product(range(3), repeat=6):
+        rows = [
+            {"group": f"g{g}", "answer": f"a{a}"}
+            for (g, a), capacity in zip(product(range(2), range(3)), cells, strict=True)
+            for _ in range(capacity)
+        ]
+        if {r["group"] for r in rows} != {"g0", "g1"} or {
+            r["answer"] for r in rows
+        } != {"a0", "a1", "a2"}:
+            continue
+        for count in (3, 4, 5):
+            if len(rows) < count:
+                continue
+            group_quota = {f"g{g}": count // 2 + (g < count % 2) for g in range(2)}
+            answer_quota = {f"a{a}": count // 3 + (a < count % 3) for a in range(3)}
+            feasible = any(
+                Counter(row["group"] for row in subset) == group_quota
+                and Counter(row["answer"] for row in subset) == answer_quota
+                for subset in combinations(rows, count)
+            )
+            try:
+                allocation = suites._cell_allocation(rows, count=count)
+            except suites.QualificationQuotaError as error:
+                assert not feasible
+                witness = error.conflict
+                groups = witness["group_quotas"]
+                required = sum(group_quota[g] for g in groups)
+                usable = {
+                    a: min(
+                        quota,
+                        sum(r["group"] in groups and r["answer"] == a for r in rows),
+                    )
+                    for a, quota in answer_quota.items()
+                }
+                assert witness["required"] == required
+                assert witness["usable_by_answer"] == usable
+                assert witness["available"] == sum(usable.values()) < required
+                assert witness["shortfall"] == required - sum(usable.values())
+                checked_failures += 1
+            else:
+                assert feasible
+                assert {
+                    g: sum(n for (group, _), n in allocation.items() if group == g)
+                    for g in group_quota
+                } == group_quota
+                assert {
+                    a: sum(n for (_, answer), n in allocation.items() if answer == a)
+                    for a in answer_quota
+                } == answer_quota
+    assert checked_failures > 0
+
+
+def test_quota_conflict_bounds_display_without_truncating_witness():
+    groups = [f"group{i:02d}" + "z" * 200 for i in range(12)]
+    conflict = {
+        "required": 24,
+        "available": 2,
+        "shortfall": 22,
+        "group_quotas": dict.fromkeys(groups, 2),
+    }
+    error = suites.QualificationQuotaError(conflict, groups=groups)
+    assert len(str(error)) < 1200
+    assert "+2 more" in str(error)
+    assert error.conflict["group_quotas"] == dict.fromkeys(groups, 2)

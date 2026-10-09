@@ -133,13 +133,26 @@ ambiguous outcome.
 Retained sources are deterministically divided at whole-trial boundaries. Each
 source is at most 16 MiB, with at most 1,000 sources and 384 MiB of canonical
 measurements in total. Each expanded event is at most 2 MiB. Admission reserves
-20 MiB of possible retained growth and one possible additional source per active
-call, plus mapping overhead for every slot; storage may reduce concurrency below
-the requested value and stops further calls before the reserve is exhausted.
+20 MiB of possible retained growth per active call, plus mapping overhead for
+every slot. `prepare_collection` uses the actual checkpoint source count and one
+possible additional source per call. The live incremental collector instead
+uses a conservative source-count bound and reserves two source slots per call.
+Its capacity can therefore be lower than the preparation preview. Storage may
+reduce concurrency below the requested value and stop further admissions.
 The maximum supported trial count therefore depends on retained content, not
 only the plan's slot limit. The maintained capacity fixture retains 7,728 short
 completed trials across multiple sources. This does not promise that 7,728
 maximum-size responses fit the aggregate allowance.
+
+Pass an optional mutable `status` dictionary to `collect` or `collect_configured`
+to inspect the invocation's stop reason. It is cleared at invocation start.
+A `capacity_exhausted` stop also includes `capacity` with the remaining call,
+token/cost reservation and storage allowances, their limiting terms and all
+exhausted terms. These diagnostics are outside signed measurements and do not
+report actual provider billing. The evaluation workflow exposes them as
+`collection.capacity`; its terminal stop label remains
+`retained_capacity_exhausted` even when a call or reservation allowance is the
+limiting resource. See the [capacity fields](../../docs/reference/judge-measurements.md#native-scorer).
 
 `prepare_inspect_config` optionally constructs the pinned SDK's generation
 configuration. Install `invarlock[judge]` to use that helper. Ordinary

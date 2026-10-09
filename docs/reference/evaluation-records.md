@@ -350,6 +350,68 @@ even when equal to the derived run digest. Relocating a request tree changes no
 portable identity; changing a source, provenance, policy or pin can change it.
 Use these SDK helpers, not a handwritten YAML/JSON hash recipe.
 
+### Scoring equivalence and input identity
+
+A scorer can treat two answers as equivalent while their complete-run pins
+remain different. Apply each transformation at its own boundary:
+
+| Change to a validated canonical run | Scoring effect | Complete-run pin | Planned case-set pin |
+| --- | --- | --- | --- |
+| Reorder JSON object keys only | Unchanged | Unchanged | Unchanged |
+| Reorder records, keeping the same IDs and facts | Captured comparison still pairs by ID | Changes | Unchanged; cases are ordered canonically by ID |
+| Change an output's letter case or whitespace under `normalized_match` with case folding enabled | Unchanged when normalized text is identical | Changes | Unchanged; outputs are not case-set inputs |
+| Make the same equivalent reference-text change on both sides under that scorer | Per-record score unchanged | Changes | Changes; references are case-set inputs |
+| Change metadata on both sides | Can change slice membership; an unused key does not affect scores | Changes | Changes |
+| Change input text on both sides without changing retained answers | Scoring retained answers can stay unchanged; this does not establish equivalent model behavior | Changes | Changes |
+
+These rows assume all other run fields remain fixed. A raw export's physical
+checksum can change when its JSON formatting changes, even if the parsed
+object is equivalent. If an import retains that new checksum in `source_digest`,
+the complete-run pin changes too. These captured-run rules do not relax native
+provider requirements for an identical ordered schedule.
+
+Keep scorer normalization inside scoring. Do not normalize retained answers or
+references merely to preserve an old pin. A changed complete run requires its
+own reviewed identity, even if every score and the final verdict stay the same.
+
+## Explain an additive score change
+
+The standalone `examples/score_contributions.py` recipe produces a descriptive
+breakdown without changing a report, policy, interval or signed evidence. Run
+its synthetic example from the checkout:
+
+```bash
+python examples/score_contributions.py
+```
+
+For a complete additive scalar metric, supply one `PairedCase` per case and the
+reported delta to `mean_contributions`. Convert retained captured scores with
+`Fraction.from_float(float(score))`. Give each case its own unit for the ordinary
+equal-case mean. For judge scores, use `Fraction(decimal_score_string)`, average
+repetitions within each case first, and preserve the plan's declared unit IDs.
+The recipe gives units equal weight and cases equal weight within their unit;
+it does not infer independence or validate a judging plan.
+
+Use the same numeric units for case means and `reported_delta`. For a native
+exact-match or scorer-extension report, the reported comparison is in percentage
+points: convert its stored float with `Fraction.from_float`, then divide by
+`100` when the supplied case scores remain in `[0, 1]`. Captured scalar deltas
+and judge effect means already use score units. Contributions always describe
+subject minus baseline; a negative contribution can be an improvement for a
+lower-is-better metric. The recipe does not classify that change.
+
+Each selected case has an exact rational weight and signed contribution. The
+visible contributions plus the omitted contribution equal the exact delta. The
+`rounding_residual` field is the supplied reported delta minus that exact delta;
+adding it recovers the reported total. This equality holds even if the caller
+supplies the wrong total, weights or units, so it does not prove rounding caused
+the gap. Investigate discrepancies against the validated source workflow. All
+rational values are strings so JSON conversion introduces no further rounding.
+The output has no verification authority. It does not explain uncertainty,
+causality, missing observations or a normalized-NLL ratio, and rankings apply
+only within one additive metric and scope. Validate the complete source workflow
+before constructing its inputs; do not use a favorable subset to replace it.
+
 ## Pack boundary
 
 Captured pack v2 has exactly `manifest.json`, `checksums.sha256`, `request.json`,
@@ -360,6 +422,12 @@ signature and a null signing-key fingerprint. The signature uses the existing
 `invarlock/evidence-pack-signature-v1` envelope over the canonical manifest.
 There is no second signed comparison envelope, embedded verification receipt,
 or implicit legacy migration.
+
+Captured readers check each file against its byte allowance before opening it,
+then bound the read request by the observed file size plus one byte. They still
+recheck descriptor and path identity and reject growth, truncation or replacement.
+This avoids a ceiling-sized read allocation for a small file; it is not a bound
+on total parsing, validation or report-rendering memory.
 
 The normalized request, policy, records and report are canonical JSON with a
 final LF. The checksum ledger uses fixed payload paths. `comparison_id` hashes

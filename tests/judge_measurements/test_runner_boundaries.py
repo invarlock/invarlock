@@ -885,7 +885,11 @@ def test_graceful_stop_retains_entire_batch_and_resumes_original_budget(
         assert len(list(runner.checkpoint_directory.glob("admission-*.json"))) == 2
         stops.append(reason)
 
-    first = asyncio.run(collect(**arguments, runner=runner, on_stop=stopped))
+    status = {"stale": True}
+    first = asyncio.run(
+        collect(**arguments, runner=runner, on_stop=stopped, status=status)
+    )
+    assert status == {"stop_reason": "requested"}
     assert stops == ["requested"]
     assert len(calls) == 2
     assert first["completeness"]["completed_trials"] == 2
@@ -901,16 +905,31 @@ def test_graceful_stop_retains_entire_batch_and_resumes_original_budget(
             **arguments,
             runner=replace(runner, stop_after_batches=resume_limit),
             on_stop=resumed_stops.append,
+            status=status,
         )
     )
     assert len(calls) == expected_calls
     assert resumed_stops == [expected_stop]
+    assert status["stop_reason"] == expected_stop
+    if expected_stop == "capacity_exhausted":
+        resource = {
+            "max_calls": "calls",
+            "max_cost_microusd": "cost_reservation",
+            "max_input_tokens": "input_token_reservation",
+            "max_output_tokens": "output_token_reservation",
+        }[next(iter(budget))]
+        assert status["capacity"]["capacity"] == 0
+        assert status["capacity"]["exhausted_resources"] == [resource]
+        assert status["capacity"]["remaining_admissions"][resource] == 0
+    else:
+        assert "capacity" not in status
     assert resumed["completeness"]["completed_trials"] == expected_calls
     assert all(
         (runner.checkpoint_directory / name).read_bytes() == raw
         for name, raw in original.items()
     )
     assert all(len(trial["attempts"]) <= 1 for trial in resumed["trials"])
+    # Diagnostics are external to measurements and do not change resumed evidence.
     replayed = asyncio.run(collect(**arguments, runner=runner))
     assert replayed == resumed
     assert len(calls) == expected_calls
@@ -949,3 +968,20 @@ def test_terminal_collection_reason_precedes_graceful_request(
         )
     )
     assert stops == [reason]
+
+
+def test_failed_invocation_clears_stale_collection_diagnostics(inputs, runner_options):
+    status = {"stop_reason": "capacity_exhausted", "capacity": {"capacity": 0}}
+    with pytest.raises(InspectJudgeError):
+        asyncio.run(
+            collect(
+                plan=inputs["plan"],
+                options=replace(inputs["options"], max_calls=0),
+                runner=runner_options,
+                model=NoCallModel(),
+                baseline_run=inputs["baseline_run"],
+                subject_run=inputs["subject_run"],
+                status=status,
+            )
+        )
+    assert status == {}

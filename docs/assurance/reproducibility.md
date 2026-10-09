@@ -40,6 +40,12 @@ workflow.
 This separation follows the practical distinction in ML reproducibility work
 between disclosing experimental material and actually reproducing a result.
 
+Captured scorer equivalence is also separate from input identity. For example,
+case folding can preserve a label score while the retained output bytes and
+complete-run pin change. The [transformation table](../reference/evaluation-records.md#scoring-equivalence-and-input-identity)
+distinguishes scoring, complete-run and planned case-set identities; unchanged
+scores do not authorize substitution under old recipient pins.
+
 ## Bound identity vector
 
 For one side $X \in \{B,S\}$, define the recorded identity vector:
@@ -227,6 +233,17 @@ independent units. Independence across declared units and fixing the benchmark
 and policy before judging are assumptions, not properties established by replay.
 Optional reference-label studies can test judge agreement; they do not change the
 replay claim or become runtime prerequisites.
+
+### Collection capacity explanations
+
+Inspect collection can return local capacity diagnostics identifying the call,
+reserved token/cost, retained-source or retained-byte allowance that stopped
+admission. These explain the existing conservative resource limits; they do not
+change the frozen plan, measurement selection, replay arithmetic or signed
+judgment evidence. Remaining reservations are not independent evidence, observed
+usage or a guarantee about provider billing. See the
+[judge measurement reference](../reference/judge-measurements.md) for fields and
+collector scope.
 
 ## Worked classification
 

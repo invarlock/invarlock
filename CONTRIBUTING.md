@@ -24,8 +24,30 @@ format.
 ## Development setup
 
 InvarLock requires Python 3.12 or newer. Use Python 3.13 to match the main CI
-jobs; Python 3.12 has a separate minimum-version gate. Documentation tooling
-requires Node.js 22.18 or newer and npm. Clone the repository, create a virtual
+jobs; Python 3.12 has a separate minimum-version gate. Hosted Linux CI and release
+workflows select Ubuntu 26.04 explicitly. This avoids following automatic OS changes
+when GitHub [moves the `ubuntu-latest` label](https://github.blog/changelog/2026-09-17-ubuntu-26-generally-available-and-latest-migration/)
+between October 19 and November 19, 2026. The OS label does not freeze runner image
+updates or preinstalled tools.
+
+Hosted jobs use the runner's temporary directory on disk because Ubuntu 26.04 can
+mount `/tmp` as a quota-limited RAM disk; see the
+[runner-image report](https://github.com/actions/runner-images/issues/14777).
+Keep the temporary-storage setup when adding hosted jobs. Docker actions use a
+temporary path inside their own filesystem instead of inheriting the host path.
+
+Manual runs of CI, evaluator SDK capture, container smoke and documentation
+workflows accept `ubuntu-26.04` (the default) or `ubuntu-24.04` for comparison and
+fallback checks. Pull requests, pushes and scheduled runs use Ubuntu 26.04.
+Manual Ubuntu 24.04 check names and concurrency groups stay separate from required
+default-runner results. To qualify a runner change, run standard CI (`full=false`)
+and full CI (`full=true`) for minimum-Python/coverage shards and complete
+repository/distribution checks, plus the SDK, Docker/Podman and documentation
+workflows. Use the release workflow's non-publishing branch validation to check
+release-specific packaging and audits. These checks do not exercise production
+publication credentials, tagged attestations or GPU hosts.
+
+Documentation tooling requires Node.js 22.18 or newer and npm. Clone the repository, create a virtual
 environment, and install the development dependencies:
 
 ```bash
@@ -39,6 +61,9 @@ npm ci
 
 Install `uv` for lock, distribution, and dependency-audit targets; CI currently
 uses version `0.10.10`. Workflow changes also require `actionlint` on `PATH`.
+The exact label entry in `.github/actionlint.yaml` lets the pinned linter recognize
+Ubuntu 26.04 while its upstream runner list catches up. GitHub still selects its
+hosted image from `runs-on`.
 With Go installed:
 
 ```bash
@@ -53,7 +78,7 @@ dependency groups; published extras contain only optional product features.
 Add Go's binary directory to `PATH`. These tools are not installed by the
 Python development dependency group.
 
-For an exact Linux x86_64 CI reproduction, create a separate Python 3.13
+For the Linux x86_64 CI dependency setup on Ubuntu 26.04, create a separate Python 3.13
 environment and run:
 
 ```bash

@@ -678,6 +678,36 @@ def _lighteval(capture):
         return _lighteval_pipeline(capture)
 
 
+@contextmanager
+def _lighteval_registry_api():
+    """Bridge the pinned registry's legacy Hub query without replacing its results.
+
+    LightEval 0.13 imports MT-Bench during custom-task registration. Its judge
+    constructor still passes model_name, which Hub 1.x replaced with search.
+    Keep this adaptation inside registry construction in the isolated capture
+    process; do not downgrade dependencies or change SDK scoring/model calls.
+    """
+    from lighteval.metrics import metrics_sample
+
+    original = metrics_sample.HfApi
+
+    class RegistryApi(original):
+        def list_models(self, *, model_name=None, **kwargs):
+            if model_name:
+                if kwargs.get("search"):
+                    raise ValueError(
+                        "registry query cannot combine model_name and search"
+                    )
+                kwargs["search"] = model_name
+            return super().list_models(**kwargs)
+
+    metrics_sample.HfApi = RegistryApi
+    try:
+        yield
+    finally:
+        metrics_sample.HfApi = original
+
+
 def _lighteval_pipeline(capture):
     from lighteval.logging.evaluation_tracker import EvaluationTracker
     from lighteval.metrics.metrics import Metrics
@@ -759,17 +789,18 @@ def _lighteval_pipeline(capture):
     tracker = EvaluationTracker(
         output_dir=str(capture.workdir / "lighteval"), save_details=True
     )
-    pipeline = Pipeline(
-        tasks="local_live_capture",
-        pipeline_parameters=PipelineParameters(
-            launcher_type=ParallelismManager.NONE,
-            custom_tasks_directory=custom,
-            remove_reasoning_tags=False,
-            bootstrap_iters=0,
-        ),
-        evaluation_tracker=tracker,
-        model=CallbackModel(),
-    )
+    with _lighteval_registry_api():
+        pipeline = Pipeline(
+            tasks="local_live_capture",
+            pipeline_parameters=PipelineParameters(
+                launcher_type=ParallelismManager.NONE,
+                custom_tasks_directory=custom,
+                remove_reasoning_tags=False,
+                bootstrap_iters=0,
+            ),
+            evaluation_tracker=tracker,
+            model=CallbackModel(),
+        )
     pipeline.evaluate()
     pipeline.save_and_push_results()
     records = []

@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add an offline contribution recipe that preserves exact unit weights and
+  explains the difference between retained-score arithmetic and a supplied
+  report total without changing signed evidence or acceptance.
+- Explain infeasible qualification quotas with a group-capacity witness, report
+  the resource allowances limiting Inspect judge admissions, and identify the
+  first conflicting evidence-set binding without relaxing existing checks.
+
 - Add an explicit smaller-Gram covariance diagnostic for wide arrays, with
   allocation size and distance from the theoretical upper reference edge.
   Document aligned-array and covariance-difference recipes and their limits.
@@ -29,7 +36,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   guarantee. Forecasts are advisory and preserve existing readiness and policy
   decisions.
 
+### Fixed
+
+- Keep hosted workflow temporary files on the runner's work disk to avoid
+  Ubuntu 26.04's quota-limited `/tmp` RAM disk during combined test and build runs.
+
+- Locate the workspace interpreter with shell built-ins when `PATH` contains only
+  candidate interpreters, including when invoked from outside the repository.
+
 ### Changed
+
+- Select Ubuntu 26.04 explicitly for hosted Linux CI and release workflows.
+  Keep Ubuntu 24.04 available for manual CI, evaluator SDK, container and
+  documentation comparison runs with separate check names and concurrency.
+
+- Adapt the pinned LightEval registry to the current Hub search argument during
+  isolated capture setup, preserving actual API results and SDK execution
+  without downgrading dependencies.
+
+- Bound captured-file read allocations by the checked file size plus one byte,
+  preserving payload ceilings and file-change detection. This reduces temporary
+  allocation for small files without promising a total-memory bound.
+- Require rejection beyond active policy boundaries in regression tests, alongside
+  equality, monotonicity and paired-gate checks. Exercise collector accounting
+  across admissions, completions, reconstruction and rejected mutations.
 
 - Limit the RMT diagnostic's square Gram allocation to 128 MiB by default.
   Inputs that previously exceeded this allocation now raise `DiagnosticInputError`;
