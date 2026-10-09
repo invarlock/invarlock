@@ -55,6 +55,21 @@ Ruff, mypy, pytest/pytest-cov, MkDocs, markdownlint, cspell, actionlint, build,
 twine, pip-audit, and OSV provide the general lint, test, documentation,
 packaging, and security gates. The Makefile composes those established tools.
 
+## Qualification quota failures
+
+`prepare_qualification_suites.py` preserves balanced group and answer quotas.
+When their joint capacities are infeasible, it reports a conflicting set of
+groups, the required row count, the count usable under the answer quotas, and
+the shortfall. For example, groups A and B may jointly need four rows while all
+their rows have answer X and only two X rows are allowed. Adding more X rows
+would not repair that conflict.
+
+The `QualificationQuotaError.conflict` mapping retains the complete group quotas,
+usable capacity per answer, shortfall, requested count and maximum feasible
+allocation. The exception message bounds the displayed group labels. This is a
+capacity witness from the allocator's residual cut; it does not relax quotas,
+change selection order, or certify that a benchmark is representative.
+
 ## Public evidence
 
 `scripts/checks/check_public_evidence.py` validates the closed publication
