@@ -11,7 +11,7 @@ LABEL org.invarlock.example.base-image-id="${BASE_IMAGE_ID}"
 LABEL org.invarlock.example.source-commit="${SOURCE_COMMIT}"
 LABEL org.invarlock.example.source-bundle-sha256="${SOURCE_BUNDLE_SHA256}"
 LABEL org.invarlock.example.evaluator="inspect-ai"
-LABEL org.invarlock.example.evaluator-version="0.3.254"
+LABEL org.invarlock.example.evaluator-version="0.3.263"
 LABEL org.invarlock.example.evaluator-lock-sha256="sha256:${EVALUATOR_LOCK_SHA256}"
 LABEL org.invarlock.example.evaluator-runtime="${EVALUATOR_RUNTIME}"
 
@@ -33,7 +33,7 @@ RUN case "${EVALUATOR_RUNTIME}" in cpu|cu129) ;; *) exit 2 ;; esac \
       --find-links /opt/invarlock/runtime-wheels \
       -r /opt/invarlock/evaluator-locks/inspect-ai-runtime-requirements.txt \
     && python -m pip check \
-    && python -c 'import importlib.metadata; assert importlib.metadata.version("inspect-ai") == "0.3.254"'
+    && python -c 'import importlib.metadata; assert importlib.metadata.version("inspect-ai") == "0.3.263"'
 
 # Ship the evaluator transaction as a package and keep its caller-owned trust
 # and image-inspection helpers beside it for direct module execution.

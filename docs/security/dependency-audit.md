@@ -31,6 +31,16 @@ When `make security` reports an advisory:
 Do not add an exception merely because exploitation was not reproduced. Lack
 of a local proof is not evidence that a vulnerability is unreachable.
 
+## Documentation dependencies
+
+Documentation CI runs `npm audit --audit-level=low` after installing the root
+lock. The Markdown CLI uses the existing rule configuration while avoiding the
+unpatched `braces` dependency. Root overrides select patched YAML, TOML,
+Markdown, and nested KaTeX releases. The `run-con` override preserves support
+for the documented Node.js minimum; newer parser dependencies require a newer
+Node.js release. Recheck both lint behavior and the audit when changing these
+constraints.
+
 ## Restricted evaluator images
 
 The maintained LM Evaluation Harness and OpenAI Evals example images support

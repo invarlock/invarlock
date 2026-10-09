@@ -501,6 +501,8 @@ def _prepare(request: JudgeEvaluationRequest) -> tuple[dict[str, Any], dict[str,
             scale=plan["scale"],
         )
         if "policy" in values:
+            from invarlock.judge_measurements.precision import plan_precision
+
             policy = decode_analysis_policy(
                 cast(JudgeAnalysisPolicyDocument, values["policy"]), plan=plan
             )
@@ -511,6 +513,7 @@ def _prepare(request: JudgeEvaluationRequest) -> tuple[dict[str, Any], dict[str,
                 "minimum_units": policy.minimum_units,
                 "maximum_interval_width": str(policy.maximum_interval_width),
             }
+            result["precision"] = plan_precision(plan, policy)
         if {"baseline_run", "subject_run"} <= values.keys():
             from invarlock.judge_measurements.native_capture import NATIVE_RUN_SOURCE
 

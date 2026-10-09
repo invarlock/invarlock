@@ -39,7 +39,7 @@ def worker_timeout_seconds(profile: CorpusProfile) -> int:
 EVALUATORS: dict[str, dict[str, str]] = {
     "inspect-ai": {
         "distribution": "inspect-ai",
-        "version": "0.3.254",
+        "version": "0.3.263",
         "entrypoint": "inspect_ai.eval -> inspect_ai.scorer.match",
         "lock": "requirements/workflows/inspect-ai-runtime-py312.txt",
         "cuda_lock": "requirements/workflows/inspect-ai-runtime-py312-cu129.txt",

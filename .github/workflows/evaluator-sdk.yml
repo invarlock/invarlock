@@ -65,7 +65,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Set up uv
-        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7
         with:
           version: '0.10.10'
       - name: Set up Node for Promptfoo
