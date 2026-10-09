@@ -33,7 +33,7 @@ def test_verify_fast_includes_the_example_contract() -> None:
 
 
 def test_docs_are_checked_by_established_tools() -> None:
-    assert "npx --no-install markdownlint-cli2" in MAKEFILE
+    assert "npx --no-install markdownlint" in MAKEFILE
     assert "npx --no-install cspell" in MAKEFILE
     assert "scripts/checks/check_public_text.py" in MAKEFILE
     assert "$(MKDOCS) build --strict" in MAKEFILE

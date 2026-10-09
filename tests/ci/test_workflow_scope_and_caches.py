@@ -90,7 +90,7 @@ def test_docs_workflow_builds_and_lints_once_and_checks_commands() -> None:
     )
     for gate in (
         "-m mkdocs build --strict",
-        "markdownlint-cli2 --",
+        "markdownlint --",
         "cspell --no-progress",
         "scripts/checks/check_public_text.py",
         "render_docs_matrix.py --check",

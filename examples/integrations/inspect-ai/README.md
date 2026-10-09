@@ -50,6 +50,10 @@ behavior; they do not establish a new hosted judge result.
 
 ## Run the integration
 
+New evaluator images use Inspect `0.3.263` and the current dependency locks.
+The retained results below describe their original frozen images and versions;
+a rebuilt image requires a fresh evaluation before making new result claims.
+
 Complete the [shared setup](../README.md#before-running-a-model-example): a clean
 committed checkout, Git, Make, Python, `uv`, Docker or Podman, and external
 evidence/verifier/builder keys. Initial model and image preparation needs network
