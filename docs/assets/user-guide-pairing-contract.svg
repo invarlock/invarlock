@@ -12,7 +12,7 @@
     InvarLock requires identical ordered record IDs and input digests, derives
     paired records and built-in scores or replays an authorized text scorer,
     derives the paired interval, then applies the fixed policy threshold and
-    any configured record-count and interval-width requirements.
+    any configured record-count, interval-width and side-accuracy requirements.
   </desc>
   <defs>
     <marker
@@ -129,8 +129,8 @@
   <path d="M 800 448 L 800 472" class="arrow" />
 
   <rect x="70" y="565" width="1460" height="170" rx="22" class="band-decision" />
-  <text x="105" y="640" class="section-label" fill="#b56a3d">3. Deterministic</text>
-  <text x="105" y="674" class="section-label" fill="#b56a3d">decision</text>
+  <text x="105" y="640" class="section-label" fill="#b56a3d">3. Apply</text>
+  <text x="105" y="674" class="section-label" fill="#b56a3d">policy</text>
 
   <rect x="245" y="595" width="330" height="100" rx="12" class="box-decision" />
   <text x="410" y="632" text-anchor="middle" class="box-title">Core arithmetic</text>
@@ -142,10 +142,11 @@
   <text x="800" y="653" text-anchor="middle" class="small-text">Newcombe v2 · paired resampling</text>
   <text x="800" y="678" text-anchor="middle" class="small-text">legacy v1 replay by report format</text>
 
-  <rect x="1025" y="595" width="330" height="100" rx="12" class="box-decision" />
+  <rect x="1025" y="595" width="330" height="125" rx="12" class="box-decision" />
   <text x="1190" y="626" text-anchor="middle" class="box-title">Policy verdict</text>
   <text x="1190" y="653" text-anchor="middle" class="small-text">metric bound · record count</text>
   <text x="1190" y="678" text-anchor="middle" class="small-text">interval-width precision</text>
+  <text x="1190" y="702" text-anchor="middle" class="small-text">optional side-accuracy floor</text>
 
   <path d="M 800 522 C 700 550 520 560 410 595" class="arrow" />
   <path d="M 575 645 L 635 645" class="arrow" />

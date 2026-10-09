@@ -385,10 +385,10 @@ exits `2` without a receipt; retry with an explicitly reviewed
 and can still carry a valid rejection receipt. Do not treat receipt authenticity
 as a passing technical verdict.
 
-Captured reports and native reports requesting Markdown or JUnit emit
-`invarlock/evidence-report-v2`. Inspect `requested_outputs`, `written_outputs`,
+Captured and native reports emit `invarlock/evidence-report-v2` for every output
+selection, including default and HTML-only calls. Inspect `requested_outputs`, `written_outputs`,
 `failed_output`, and `errors` after a write failure; earlier completed outputs
-may remain. Default and HTML-only native report calls retain v1 JSON. Never
+may remain. Never
 render stale evidence after a failed evaluation publication.
 
 ## Before escalating a bug

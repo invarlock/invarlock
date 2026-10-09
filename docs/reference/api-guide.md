@@ -252,6 +252,12 @@ policy.
 
 ## Function signatures
 
+These forms show the native transaction arguments and the shared request loader.
+Captured arguments and omission rules follow the block. The `None` defaults
+shown here describe native calls; captured callers must omit those native
+keywords entirely. The selected facade parameters are not an exhaustive listing
+of internal implementation controls.
+
 ```python
 evaluate_request_file(
     request_path: Path | EvaluationRequest | CapturedEvaluationRequest,
@@ -281,9 +287,9 @@ load_evaluation_request(
     *,
     provider_resolver: ProviderResolver | None = None,
     request_root: Path | None = None,
-    baseline_run: Path | None = None,
-    subject_run: Path | None = None,
-    output: Path | None = None,
+    baseline_run: str | Path | None = None,
+    subject_run: str | Path | None = None,
+    output: str | Path | None = None,
 ) -> EvaluationRequest | CapturedEvaluationRequest
 
 verify_evidence(
@@ -426,9 +432,13 @@ repeats no-follow reads at the point of use to detect later filesystem changes.
 
 The stable facade exports `OciEvaluationLaunch`, `OciSideLaunch`,
 `OciRuntimeExecutor`, and `launch_from_resolved_config`. The public CLI constructs
-this executor for every run-mode request. The host prepares the schedule,
+this executor for host-orchestrated run requests. The host prepares the schedule,
 launches one independently pinned worker per side, validates both closed side
 results, and keeps the evidence-signing key outside the workers.
+
+The [inline local-judge route](judge-measurements.md#native-local-judge-collection)
+instead requires an already running strict container and runs all three model
+roles there; it does not provide host-separated signing.
 
 An embedding can build the same launch explicitly:
 
@@ -773,8 +783,9 @@ request. It retains the normal native resource and signing-key requirements and
 returns `JudgeWorkflowResult`, whose JSON has `kind: judge`, the evidence path,
 analysis decision and collection stop state. Native preflight retains
 `EvaluationPreflightResult` and adds judge model, unit, trial and budget metadata.
-The installed optional collector reads credentials from its process environment;
-callers do not pass keys in the request or plan. Recipient replay requires only
+Hosted collectors read any required credentials from their process environment;
+callers do not pass keys in the request or plan. The selected profile determines
+SDK and runtime requirements; local collection needs no provider credentials. Recipient replay requires only
 the core package. Native judge evidence includes a bound runtime capture, whereas
 ordinary frozen-answer import makes no runtime-provenance claim.
 

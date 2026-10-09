@@ -237,7 +237,7 @@ point comparison, interval bounds, threshold, or verdict.
 }
 ```
 
-`value = 100 * (subject_mean - baseline_mean)`. The metric-bound check passes when
+`value = math.fsum(subject_i - baseline_i) / record_count * 100.0`. The metric-bound check passes when
 `uncertainty.lower >= comparison.minimum`, where `minimum` comes from
 `resolved_policy.metrics.exact_match.delta_min_pp`. If sample qualification is
 present, its count and width checks must also pass. If side-accuracy
@@ -257,6 +257,12 @@ the canonical `uncertainty` object in a v2 or v3 report. The policy uses its
 lower bound; the McNemar probability does not control the verdict. A v1 report keeps
 method `newcombe_hybrid_score_paired_v1` and is replayed only with that original
 method.
+
+Here `math.fsum(subject_i - baseline_i)` denotes summing every paired
+record difference with `math.fsum`. Divide by the record count, then multiply
+by `100.0`, in that order. Computing the same mathematical delta by subtracting
+separately rounded side means can produce different floating-point bytes.
+See [exact replay arithmetic](../assurance/decision-semantics.md) for the contract.
 
 ### Sample and precision qualification
 
@@ -380,7 +386,7 @@ For each side, an explicitly authorized deterministic scorer replays exactly
 the authenticated expected output, output text, and output digest for every
 record and returns one higher-is-better value in `[0, 1]`. The engine owns the
 arithmetic mean and computes
-`value = 100 * (subject_mean - baseline_mean)`. It then applies the same fixed
+`value = math.fsum(subject_i - baseline_i) / record_count * 100.0`. It then applies the same fixed
 2,048-replicate paired schedule-resampling method to the paired record values.
 The metric-bound check passes only when
 `uncertainty.lower >= comparison.minimum`, where
@@ -512,7 +518,8 @@ are true, `policy_verdict` is not `fail`, and `verification_status` is zero.
 
 Downstream readers use
 `invarlock.engine.verify_signed_verification_receipt`. The stable API returns a
-`ReceiptVerification`; acceptance requires its `ok` field to be true.
+`ReceiptVerification`. Its `ok` authenticates the receipt, including an authentic
+rejection; acceptance additionally requires `statement["verdict"]["ok"]` to be true.
 
 Captured packs use only `invarlock/evidence-verification-receipt-v3`. Its
 `verification_scope: captured_comparison` cannot authorize native acceptance or
@@ -743,8 +750,8 @@ Configuration previews use indented text with explicit limits and truncation
 markers; the renderer does not reinterpret them as executable content or
 complete configuration. Small screens stack each requirement with labelled Observed, Required and
 Result values. All checks remain visible without horizontal scrolling. HTML
-follows the system light or dark appearance; printed reports use the light
-color scheme.
+uses the light color scheme regardless of system appearance, including when
+printed.
 
 Use `invarlock verify` with recipient-owned policy and complete-run digests for
 independent authentication and replay. Successful captured report

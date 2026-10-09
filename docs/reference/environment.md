@@ -222,11 +222,21 @@ reads `INVARLOCK_ALLOW_JUDGE_NETWORK` only from the process environment, accepti
 judge initialization, collection and cleanup; it does not remove the global
 socket guard or change strict native execution switches. Request fields and
 credential mappings cannot grant this permission. Collection
-preflight checks this environment and the pinned optional dependencies without
-making calls. Offline retained-measurement import, verification and reporting
+preflight checks credential and endpoint configuration and the pinned optional
+dependencies without making calls. The network opt-in is required for collection,
+not for offline preflight. Offline retained-measurement import, verification and reporting
 need neither credentials nor these SDKs. See
 [judge measurements](judge-measurements.md#frozen-answer-requests-and-preflight)
 for the configuration and reservation limits.
+
+Other collector profiles have different inputs.
+`INVARLOCK_JUDGE_RUNTIME_DEVICE` selects the native local judge device, falling
+back to `INVARLOCK_RUNTIME_DEVICE`; it does not change either answer model's
+device. The OpenAI-compatible service profile reads
+`INVARLOCK_OPENAI_COMPATIBLE_API_KEY` only for `authentication: bearer_env` and
+also requires the scoped network opt-in for actual collection. Neither profile
+requires the Inspect SDK extra. See [local judges](judge-measurements.md#native-local-judge-collection)
+and [compatible services](judge-measurements.md#openai-compatible-judge-services).
 
 ## Security switches
 

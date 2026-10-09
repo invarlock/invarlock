@@ -254,10 +254,10 @@ statistical power, equivalence, non-inferiority, or production safety.
 {"resolved_policy":{"metrics":{"exact_match":{"delta_min_pp":-2.0,"maximum_interval_width_pp":10.0,"minimum_record_count":400}}}}
 ```
 
-For baseline accuracy `B` and subject accuracy `S`:
+For paired baseline and subject binary record scores:
 
 ```text
-point_delta_pp = 100 * (S - B)
+point_delta_pp = math.fsum(subject_i - baseline_i) / record_count * 100.0
 pass when interval.lower >= delta_min_pp
   and record_count >= minimum_record_count
   and interval.width <= maximum_interval_width_pp
@@ -285,6 +285,12 @@ interval; precision is known only after execution.
 | `+1 pp` | `[-1, +3]` | `-2 pp` | pass |
 | `0 pp` | `[-2, +2]` | `-2 pp` | pass at boundary |
 | `0 pp` | `[-3, +3]` | `-2 pp` | fail |
+
+Here `math.fsum(subject_i - baseline_i)` denotes summing every paired
+record difference with `math.fsum`. Divide by the record count, then multiply
+by `100.0`, in that order. Computing the same mathematical delta by subtracting
+separately rounded side means can produce different floating-point bytes.
+See [exact replay arithmetic](../assurance/decision-semantics.md) for the contract.
 
 ## Normalized-NLL policy
 
@@ -352,7 +358,7 @@ higher-is-better value in `[0,1]`. Core owns the remaining arithmetic:
 ```text
 baseline_mean = arithmetic_mean(baseline_record_scores)
 subject_mean = arithmetic_mean(subject_record_scores)
-delta_pp = 100 * (subject_mean - baseline_mean)
+delta_pp = math.fsum(subject_i - baseline_i) / record_count * 100.0
 pass when interval.lower >= delta_min_pp
   and record_count >= minimum_record_count
   and interval.width <= maximum_interval_width_pp
@@ -366,9 +372,11 @@ aggregation, direction, interval, or verdict semantics.
 As with exact match, scorer count and percentage-point width controls are
 optional but coupled and use the same ranges.
 
-Separately installed scorer packages may implement deterministic token F1,
-structured-field extraction, and VQA answer normalization and require explicit
-authorization. Executable SQL/code tests, model-based semantic similarity,
+Core ships `invarlock.normalized_match`, `invarlock.numeric_tolerance`,
+`invarlock.json_fields`, `invarlock.json_exact` and `invarlock.token_f1`. The CLI
+enables these without installed-scorer authorization; SDK callers supply an
+explicit registry. Separately supplied scorers, such as VQA answer normalization,
+require explicit authorization. Executable SQL/code tests, model-based semantic similarity,
 network services or externally assigned ratings, and external-model calls are outside this extension
 contract. The built-in `metric: judge` has its own bounded collection, retained
 measurement, analysis-policy and recipient contracts. Other judge summaries may
