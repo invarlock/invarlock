@@ -74,7 +74,7 @@ def delegated(monkeypatch):
         }
     )
 
-    async def collected(*args, on_stop):
+    async def collected(*args, on_stop, status=None):
         on_stop("complete")
         return {"retained": True}
 
@@ -290,8 +290,13 @@ def test_pending_collection_distinguishes_resumable_stop_from_retained_capacity(
     pending = _incomplete_measurements(plan=plan)
     outcomes = iter((pending, completed))
 
-    async def collect(*_args, on_stop):
+    async def collect(*_args, on_stop, status=None):
         value = next(outcomes)
+        if reason == "capacity_exhausted" and value is pending:
+            status["capacity"] = {
+                "capacity": 0,
+                "exhausted_resources": ["retained_bytes"],
+            }
         on_stop(reason if value is pending else "complete")
         return value
 
@@ -305,6 +310,7 @@ def test_pending_collection_distinguishes_resumable_stop_from_retained_capacity(
             "pending_trials": 2,
             "stop_reason": "retained_capacity_exhausted",
             "resumable": False,
+            "capacity": {"capacity": 0, "exhausted_resources": ["retained_bytes"]},
         }
         assert result.payload["decision"] == "insufficient_evidence"
     else:

@@ -651,15 +651,21 @@ def test_retry_plan_cannot_construct_live_model(inputs, sdk):
     sdk[0].get_model.assert_not_called()
 
 
+@pytest.mark.parametrize("with_status", [False, True])
 def test_explicit_construction_passes_strict_checks_and_closes(
-    inputs, sdk, monkeypatch
+    inputs, sdk, monkeypatch, with_status
 ):
     module, model, client = sdk
     result = {"retained": "measurement"}
     stops = []
+    status = {"stale": True} if with_status else None
+    extra = {"status": status} if with_status else {}
 
     async def collect(**kwargs):
-        assert kwargs == {**inputs, "model": model, "on_stop": stops.append}
+        assert kwargs == {**inputs, "model": model, "on_stop": stops.append, **extra}
+        if with_status:
+            assert status == {}
+            status["stop_reason"] = "complete"
         kwargs["on_stop"]("complete")
         _require_clean_model_configuration(model)
         _require_provider_retries_disabled(model)
@@ -670,7 +676,10 @@ def test_explicit_construction_passes_strict_checks_and_closes(
     assert (
         asyncio.run(
             collect_configured(
-                **inputs, environment={"OPENAI_API_KEY": KEY}, on_stop=stops.append
+                **inputs,
+                environment={"OPENAI_API_KEY": KEY},
+                on_stop=stops.append,
+                **extra,
             )
         )
         is result

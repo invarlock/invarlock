@@ -228,6 +228,17 @@ and policy before judging are assumptions, not properties established by replay.
 Optional reference-label studies can test judge agreement; they do not change the
 replay claim or become runtime prerequisites.
 
+### Collection capacity explanations
+
+Inspect collection can return local capacity diagnostics identifying the call,
+reserved token/cost, retained-source or retained-byte allowance that stopped
+admission. These explain the existing conservative resource limits; they do not
+change the frozen plan, measurement selection, replay arithmetic or signed
+judgment evidence. Remaining reservations are not independent evidence, observed
+usage or a guarantee about provider billing. See the
+[judge measurement reference](../reference/judge-measurements.md) for fields and
+collector scope.
+
 ## Worked classification
 
 Suppose a rerun uses identical artifact, schedule, policy, provider, and image

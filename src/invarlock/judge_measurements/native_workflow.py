@@ -264,7 +264,7 @@ def collect_frozen(
     workspace: Path,
     baseline_run: dict[str, Any],
     subject_run: dict[str, Any],
-    status: dict[str, str] | None = None,
+    status: dict[str, Any] | None = None,
     integration: str | None = None,
     model: ComparisonSideRequest | None = None,
     request_root: Path | None = None,
@@ -359,7 +359,13 @@ def collect_frozen(
 
     return asyncio.run(
         api.collect_configured(
-            plan, options, run_options, baseline_run, subject_run, on_stop=stopped
+            plan,
+            options,
+            run_options,
+            baseline_run,
+            subject_run,
+            on_stop=stopped,
+            **({"status": status} if status is not None else {}),
         )
     )
 
@@ -369,6 +375,7 @@ def require_completed_collection(
     workspace: Path,
     *,
     stop_reason: str | None = None,
+    capacity: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Resume pending work after a deadline or graceful invocation stop."""
     pending = sum(not trial["attempts"] for trial in measurements["trials"])
@@ -379,6 +386,7 @@ def require_completed_collection(
             "pending_trials": pending,
             "stop_reason": "retained_capacity_exhausted",
             "resumable": False,
+            **({"capacity": capacity} if capacity is not None else {}),
         }
     resumable = stop_reason in {"deadline", "requested"}
     message = (
@@ -535,7 +543,7 @@ def evaluate_native_judge(
                 )
         plan, policy = finalize_native_plan(recipe, baseline_run, subject_run)
         unchanged()
-        collection_stop: dict[str, str] = {}
+        collection_stop: dict[str, Any] = {}
         collection_arguments = {
             "plan": plan,
             "collection": recipe["collection"],
@@ -556,6 +564,7 @@ def evaluate_native_judge(
             measurements,
             workspace,
             stop_reason=collection_stop.get("stop_reason"),
+            capacity=collection_stop.get("capacity"),
         )
         publication = publish_judge_evidence(
             request.output.evidence,
