@@ -703,6 +703,26 @@ ships Hoeffding rather than empirical Bernstein. Repetitions and cases within an
 independent unit are averaged before inference and do not increase the sample
 size. Baseline and subject remain paired within each unit.
 
+A unique `unit_id` is a declaration, not proof of independence. Before collection,
+retain the reason cases count as separate units and inspect shared source
+identities, such as several questions from one document or turns from one
+conversation. Shared text is a reason to review the design; it does not by itself
+prove dependence. Repeated ratings within a case and repeated cases within a unit
+are already collapsed by the shipped method.
+
+Balanced duplication can keep the same mean while making an incorrectly declared
+sample size larger. For example, four effect units `[0.4, 0.4, 0, 0]` on support
+`[-1, 1]`, with alpha `0.05` and one interval claim, give a clipped interval
+`[-1, 1]`. Declaring 25 identical copies of each as 100 independent units gives
+approximately `[-0.07162, 0.47162]`. The latter can pass a `0.1` degradation margin
+while the former remains insufficient. This illustrative single-interval example
+is not a complete judge policy, whose family must include all required claims.
+
+Do not choose a favorable grouping after observing scores. Regrouping can change
+both the quantity being estimated and its uncertainty because the method gives equal weight to
+units. An alternative grouping requires a separately declared analysis with its
+own interpretation, while the original evidence remains intact.
+
 The declared `comparison_family_size` applies a Bonferroni adjustment to the
 family error budget `alpha`. It is at least two for the subject and paired-effect
 intervals and must cover all enclosing claims; combining metrics requires the
