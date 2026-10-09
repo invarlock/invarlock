@@ -36,6 +36,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   guarantee. Forecasts are advisory and preserve existing readiness and policy
   decisions.
 
+### Fixed
+
+- Locate the workspace interpreter with shell built-ins when `PATH` contains only
+  candidate interpreters, including when invoked from outside the repository.
+
 ### Changed
 
 - Allow manual Ubuntu 26.04 compatibility checks for CI, evaluator SDKs,

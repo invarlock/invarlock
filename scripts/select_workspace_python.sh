@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# Locate the repository even when PATH contains only candidate interpreters.
+case "${BASH_SOURCE[0]}" in
+  */*) SCRIPT_DIR="${BASH_SOURCE[0]%/*}" ;;
+  *) SCRIPT_DIR="." ;;
+esac
+SCRIPT_DIR="$(cd -- "$SCRIPT_DIR" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 
 is_python_312() {

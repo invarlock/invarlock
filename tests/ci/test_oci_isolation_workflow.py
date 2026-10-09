@@ -142,7 +142,17 @@ def test_stable_smoke_status_requires_all_engine_lanes_to_succeed():
     assert summary["if"] == "${{ always() }}"
     assert summary["needs"] == ["engine-smoke"]
     assert "strategy" not in summary
-    assert "name" not in summary
+    inputs = workflow.get("on", workflow.get(True))["workflow_dispatch"]["inputs"]
+    default_runner = inputs["runner"]["default"]
+    (alternate_runner,) = set(inputs["runner"]["options"]) - {default_runner}
+    # Default runs keep the stable context; manual alternate runs are distinct.
+    assert summary["name"] == (
+        "${{ inputs.runner == '"
+        + alternate_runner
+        + "' && '"
+        + alternate_runner
+        + " / ' || '' }}smoke"
+    )
     step = summary["steps"][0]
     assert step["env"]["ENGINE_RESULT"] == "${{ needs.engine-smoke.result }}"
     assert step["run"] == 'test "$ENGINE_RESULT" = success'
