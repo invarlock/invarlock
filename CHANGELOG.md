@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add an explicit smaller-Gram covariance diagnostic for wide arrays, with
+  allocation size and distance from the theoretical upper reference edge.
+  Document aligned-array and covariance-difference recipes and their limits.
+- Add a bounded Python helper for hypothetical subject-outcome edits under the
+  current native exact-match policy. It reports a replayed minimum-distance
+  witness or an explicit search limit without changing the official verdict.
+- Add an offline source-error correction scenario with linked original and
+  replacement receipts and a review list for a supplied dependency graph.
+  Clarify correction authority and independent-unit provenance in assurance docs.
+
 - Add an offline hosted-service reassessment example that produces two signed
   comparisons and independent receipts while preserving the earlier evidence
   byte-for-byte. Document the separate meanings of later observations, changed
@@ -20,6 +30,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   decisions.
 
 ### Changed
+
+- Limit the RMT diagnostic's square Gram allocation to 128 MiB by default.
+  Inputs that previously exceeded this allocation now raise `DiagnosticInputError`;
+  callers can select `smaller_gram`, reduce the input, or set an explicit larger
+  `max_gram_bytes` budget. The limit does not bound total process memory.
 
 - Update CSpell to 10.3.6 and KaTeX to 0.19.0, and refresh the pinned workflow
   action releases.

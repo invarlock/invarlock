@@ -242,6 +242,12 @@ def rmt_observation(
     Rows are samples and columns are features. Constant columns are reported and
     excluded before column standardization. The MP edges are theoretical
     references only; the function does not classify the observation.
+
+    ``method="smaller_gram"`` uses the sample Gram matrix for wide input and
+    reports its dimension, byte size and distance from the upper reference edge.
+    Rounding can change strict edge counts between methods. Both methods reject
+    a square allocation above ``max_gram_bytes`` (128 MiB by default); this
+    budget does not bound total process memory or decomposition workspace.
     """
 
     if not isinstance(method, str) or method not in {"covariance", "smaller_gram"}:

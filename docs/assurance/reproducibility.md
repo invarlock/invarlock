@@ -206,6 +206,14 @@ schedule and collect those observations; InvarLock does not provide a hosted
 runtime or continuous monitoring service. See
 [hosted requalification](../user-guide/hosted-service-requalification.md).
 
+Correcting a source-mapping error can instead change the assessment without a
+new service execution or observation window. Retain the source export, original
+assessment and receipt, exact mapping error, and independently verified
+replacement. This establishes a correction history, not fresh service behavior
+or proof that every consumer received an authorized correction. The
+[offline correction rehearsal](../user-guide/hosted-service-requalification.md#rehearse-a-correction-of-an-actual-error)
+keeps those claims separate.
+
 Judge verification replays retained requests, responses, attempts, parsing and
 fixed-benchmark analysis offline. A fresh collection can produce different
 ratings under the same model name and configuration. Preserve the plan, frozen

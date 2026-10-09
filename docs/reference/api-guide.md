@@ -33,14 +33,42 @@ The facade deliberately groups these stable surfaces:
 | Captured subject identity | `digest`, `validate_service_identity`, `evaluated_subject_digest` |
 
 Imports from other `invarlock.*` modules are not stable merely because they are
-importable. Use the facade unless implementing the provider protocol documented
-in [Runtime providers](runtime-providers.md).
+importable. Use the facade for transactions; separate documented imports cover
+[advisory helpers](#advisory-python-helpers) and the provider protocol in
+[Runtime providers](runtime-providers.md).
 
 The captured evaluation helpers are part of the documented SDK for
 captured-result comparisons. They expose normalized run construction and loading,
 multi-metric comparison, evidence publication, independent verification, and
 scoped receipt handling through the same evaluation transaction surface. Their
 evidence and recorded-score semantics are described in [evaluation records](evaluation-records.md).
+
+## Advisory Python helpers
+
+These documented imports sit outside the transaction facade and do not authorize
+acceptance. They are not automatically added to comparison reports.
+
+| Import | Call and scope |
+| --- | --- |
+| `invarlock.diagnostics.rmt_observation` | `rmt_observation(values, *, method="covariance", max_gram_bytes=134217728)`; requires the NumPy diagnostics extra and a finite two-dimensional array with at least two rows and one varying column |
+| `invarlock.exact_match_sensitivity.exact_match_sensitivity` | `exact_match_sensitivity(baseline, subject, *, policy, max_changes=8, max_states=2048)`; core-only hypothetical subject flips for current native v3 exact-match decisions |
+
+The RMT helper returns a `RmtObservation` and raises `DiagnosticInputError` for
+invalid inputs, methods, budgets or numerical failures. Its five-million-value
+input limit and square-matrix byte budget are separate bounds. Both methods
+apply the budget; `smaller_gram` is an explicit selection with its own method
+identifier and extra result fields. See [diagnostics](../user-guide/diagnostics.md#bound-the-covariance-allocation)
+for rounding, memory and interpretation limits.
+
+The sensitivity helper takes equal-length, nonempty binary outcome sequences
+and only the fields under native `metrics.exact_match` as `policy`. It returns
+an advisory dictionary with `status`, `original_verdict`, `minimum_changes`,
+`checked_through_changes`, `states_examined`, `witness` and input/policy bindings.
+Input and policy errors raise `ValueError`; disagreement with native report
+arithmetic or witness replay raises `RuntimeError` instead of returning an
+advisory. See [hypothetical edits](../assurance/decision-semantics.md#explore-hypothetical-exact-match-edits)
+for exact/lower-bound interpretation, all search limits and a runnable example.
+The helper does not authenticate supplied outcomes or estimate rerun risk.
 
 ## Transactions
 

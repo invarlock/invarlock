@@ -225,6 +225,28 @@ rely on those authenticated facts. See
 [Reproducibility and provenance](reproducibility.md) and the
 [Threat model](../security/threat-model.md) for the corresponding controls.
 
+## Supplementary review and corrections
+
+The [exact-match edit advisory](decision-semantics.md#explore-hypothetical-exact-match-edits)
+measures hypothetical changes to supplied outcomes under a fixed policy.
+A replayed witness supports that edit-distance statement only. It supplies no
+new authentication, rerun probability or acceptance authority. Likewise,
+[NumPy diagnostics](../user-guide/diagnostics.md) describe retained arrays;
+authenticating their bytes does not calibrate their reference edges as policy.
+
+For judge evidence, unique unit labels do not establish independence. Review
+shared source documents, sessions or subjects before relying on an interval;
+[the duplication example](../reference/judge-measurements.md#statistical-scope)
+shows why repeating dependent observations can create false apparent precision.
+
+If an earlier assessment contains an actual error, preserve its bytes, identify
+the affected claim and issue linked replacement evidence for independent
+verification. The [offline correction example](../user-guide/hosted-service-requalification.md#rehearse-a-correction-of-an-actual-error)
+exercises those links and review of a supplied dependency graph. Its explanatory
+notice is not an authenticated correction contract. Correction authority,
+notice delivery and downstream reliance decisions remain external; the graph
+cannot discover unknown consumers or automatically revoke approvals.
+
 ## Evidence ownership
 
 `evaluate` owns evidence creation, `verify` owns the scoped acceptance result,

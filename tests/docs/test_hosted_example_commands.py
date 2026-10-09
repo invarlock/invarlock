@@ -21,7 +21,8 @@ def test_hosted_example_protocol_and_literal_commands(tmp_path):
     blocks = re.findall(
         r"```bash\n(.*?)\n```", (EXAMPLE / "README.md").read_text(), re.S
     )
-    assert len(blocks) == 5
+    assert len(blocks) == 6
+    blocks = blocks[1:]  # The offline correction command has its own test below.
     subprocess.run(
         ["bash", "-n"],
         input=blocks[4],
@@ -106,3 +107,38 @@ def test_hosted_example_protocol_and_literal_commands(tmp_path):
         policy=protocol["policy"],
     )
     assert compared["decision"] == "insufficient_evidence"
+
+
+def test_hosted_correction_literal_command(tmp_path):
+    command = re.findall(
+        r"```bash\n(.*?)\n```", (EXAMPLE / "README.md").read_text(), re.S
+    )[0]
+    assert "--scenario correction" in command
+    copied = tmp_path / "examples/hosted-service"
+    copied.mkdir(parents=True)
+    shutil.copyfile(EXAMPLE / "reassessment.py", copied / "reassessment.py")
+    environment = {
+        "PATH": str(Path(sys.executable).parent)
+        + os.pathsep
+        + os.environ.get("PATH", ""),
+        "PYTHONPATH": str(ROOT / "src"),
+        "LANG": "C.UTF-8",
+    }
+    result = subprocess.run(
+        ["bash", "-eu", "-c", command],
+        cwd=tmp_path.resolve(),
+        env=environment,
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    output = json.loads(result.stdout)
+    assert output["original"] == "pass"
+    assert output["replacement"] == "regression"
+    assert output["requires_review"] == ["deployment-approval", "release-review"]
+    correction = json.loads(
+        (tmp_path / "correction-example/correction.json").read_text()
+    )
+    assert correction["dependency_scope"] == "supplied_graph_only"
+    assert correction["unassessed_consumers"] == "unknown"

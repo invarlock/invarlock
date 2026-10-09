@@ -118,7 +118,11 @@ layers, preprocessing, and low sample counts can all dominate the result.
 The default `method="covariance"` retains the original feature-covariance
 calculation and result fields. Both methods check `max_gram_bytes` before
 allocating the square Gram matrix. The default budget is 128 MiB; callers can
-supply a positive integer byte budget. This bounds that matrix alone, not peak
+supply a positive integer byte budget. Inputs previously accepted above this
+allocation now raise `DiagnosticInputError`, even if they fit the separate
+five-million-value limit. Choose a smaller input, explicitly select
+`smaller_gram`, or approve a larger budget for the available resources.
+This bounds that matrix alone, not peak
 process memory or decomposition workspace.
 
 For wide inputs, explicitly select the smaller Gram calculation:

@@ -210,7 +210,11 @@ mapping and every case/side/repetition slot. It retains attempts, parses and
 source locations; a failed or incomplete scheduled trial cannot be replaced
 by a favorable extra sample. Repetitions are averaged within each case and cases
 within each unit. The independently declared units determine the inference
-sample size. Native judge evidence additionally retains and replays its provider
+sample size. Distinct labels do not establish independence: cases can still
+share a source document, session or subject. Review the mapping against retained
+provenance before analysis; duplicated dependent cases can narrow a computed
+interval without adding independent information. See [statistical scope](../reference/judge-measurements.md#statistical-scope).
+Native judge evidence additionally retains and replays its provider
 capture; captured or frozen-answer imports retain supplied-source provenance.
 
 See [captured records](../reference/evaluation-records.md) and

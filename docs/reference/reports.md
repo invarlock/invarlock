@@ -406,6 +406,21 @@ report shows both evaluated model identities, runtime settings and digests,
 judge model/configuration, rubric, counts and uncertainty. Other recorded judge
 results may be authenticated as observations, where they have no verdict authority.
 
+## Supplementary diagnostics and review
+
+Optional NumPy diagnostics can be published as authenticated observations;
+verification checks their retained bytes and bindings without making them
+verdict inputs. An RMT observation keeps its numerical method identifier. The
+explicit `column_standardized_smaller_gram_eigh` method additionally reports
+`gram_dimension`, `gram_matrix_bytes` and `minimum_upper_edge_distance` inside
+its payload. The distance is descriptive, not an error bound or a significance
+level. See [diagnostics](../user-guide/diagnostics.md#bound-the-covariance-allocation).
+
+The [exact-match sensitivity helper](../assurance/decision-semantics.md#explore-hypothetical-exact-match-edits)
+returns a separate Python advisory. It is not a comparison-report field or a
+signed verification result. Preserve the recorded verdict and interpret its
+hypothetical edits and search limits separately.
+
 ## Verification result
 
 Native deterministic `invarlock verify --json` emits an `invarlock/evidence-pack-verify-v1` result. Important

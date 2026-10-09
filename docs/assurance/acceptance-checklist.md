@@ -118,6 +118,13 @@ suppress a verifier error, or reinterpret a failed policy result.
       attestation limitations before approving downstream use.
 - [ ] If the result lies on or near a policy boundary, independently rerun it
       or record why one run is sufficient for this decision.
+- [ ] If using an [exact-match edit advisory](decision-semantics.md#explore-hypothetical-exact-match-edits),
+      retain its supplied input order, policy and search limits. Distinguish an
+      exact witness from a lower bound; do not treat it as rerun probability or
+      as authentication of the outcomes.
+- [ ] If using optional diagnostics, retain array provenance, alignment,
+      preprocessing, numerical method and environment. A reference-edge distance
+      is not an error bound, and an observation cannot override a policy verdict.
 
 ## Captured and judge evidence
 
@@ -137,6 +144,12 @@ and `required_decision: pass`. Hosted subjects use the service descriptor
 identity rather than a model-weight digest. Check the exact run, case-set, plan,
 measurement, analysis-policy and analysis-result pins, plus
 `native_capture_sha256` for native judge evidence.
+
+Review the case-to-unit mapping against source provenance, including shared
+source documents, sessions or subjects. Unique `unit_id` values and extra
+repetitions do not establish independent evidence. Fix the grouping before
+inspecting ratings and record unresolved dependence; replay checks the declared
+mapping, not the independence assumption. See [statistical scope](../reference/judge-measurements.md#statistical-scope).
 
 Confirm `authenticated`, `replayed`, `verified` and `accepted`, and inspect
 `decision` separately. Recipient acceptance requires a required judge policy
@@ -171,6 +184,12 @@ a joint statistical confidence guarantee. See [evidence sets](../reference/evide
       decision beside the bundle without modifying it.
 - [ ] Re-evaluate when any artifact, schedule, policy, provider, runtime, or
       execution setting changes.
+- [ ] If correcting an actual error, preserve the original pack and receipt,
+      record the error and affected claim, and link independently verified
+      replacement evidence. Establish correction authority and authenticate the
+      notice separately. Review known dependent decisions and record unknown
+      consumers; a digest link does not revoke their approvals. See the
+      [correction example](../user-guide/hosted-service-requalification.md#rehearse-a-correction-of-an-actual-error).
 
 ## Minimal decision record
 

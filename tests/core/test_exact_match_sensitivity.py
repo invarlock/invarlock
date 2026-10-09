@@ -4,6 +4,7 @@ import itertools
 
 import pytest
 
+import invarlock.exact_match_sensitivity as sensitivity_module
 from invarlock.evidence_pack_contract import (
     PAIRED_RECORDS_FORMAT,
     build_comparison_report,
@@ -167,3 +168,33 @@ def test_improving_subject_can_fail_the_width_gate():
     assert (
         result["witness"]["sample_qualification"]["interval_width"]["passed"] is False
     )
+
+
+@pytest.mark.parametrize("divergent_call", [1, 2], ids=["original", "witness"])
+def test_rejects_drift_from_native_report_arithmetic(monkeypatch, divergent_call):
+    # Future report changes must not silently leave a valid-looking advisory
+    # whose starting verdict or purported opposite-verdict witness is stale.
+    native_builder = sensitivity_module.build_comparison_report
+    calls = 0
+
+    def divergent_report(**kwargs):
+        nonlocal calls
+        calls += 1
+        report = native_builder(**kwargs)
+        if calls == divergent_call:
+            report["verdict"] = "fail" if report["verdict"] == "pass" else "pass"
+        return report
+
+    monkeypatch.setattr(sensitivity_module, "build_comparison_report", divergent_report)
+    message = (
+        "arithmetic disagrees with the native report"
+        if divergent_call == 1
+        else "witness failed native replay"
+    )
+    with pytest.raises(RuntimeError, match=message):
+        exact_match_sensitivity(
+            [1] * 75 + [0] * 25,
+            [1] * 72 + [0] * 3 + [1] * 3 + [0] * 22,
+            policy={"delta_min_pp": -10},
+        )
+    assert calls == divergent_call

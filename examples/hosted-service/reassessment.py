@@ -1,8 +1,11 @@
-"""Offline A -> declared incident -> B rehearsal using synthetic hosted captures.
+"""Offline later-assessment and source-error correction rehearsals.
 
-No service is called. Fixed observation times and answers illustrate distinct
-campaigns; signatures authenticate retained inputs, not their execution or time.
-The scenario index is explanatory context, not an evidence or incident contract.
+The default scenario illustrates A -> declared incident -> B. Select
+``--scenario correction`` to correct a deliberately erroneous import of the
+same retained source. No service is called. Synthetic answers and fixed times
+illustrate the workflows; signatures do not attest execution or event time.
+Scenario and correction records are explanatory, not authenticated contracts
+or automatic revocations of downstream approvals.
 """
 
 from __future__ import annotations

@@ -74,7 +74,10 @@ all Python builds, math libraries or numerical backends. Preserve the package,
 Python and platform identities when investigating a replay discrepancy near a
 threshold. Do not relax comparison tolerances or round a report until it passes.
 The optional NumPy diagnostics have their own numerical method identifiers and
-remain outside these acceptance calculations.
+remain outside these acceptance calculations. Switching from covariance to the
+explicit smaller-Gram method can change a strict reference-edge count through
+rounding. Preserve the method and environment; the reported edge distance is
+not a numerical error bound. See [diagnostic limits](../user-guide/diagnostics.md#bound-the-covariance-allocation).
 
 Bounded judge measurements use a different arithmetic path: exact rational
 aggregation and controlled Decimal calculations with outward-rounded interval

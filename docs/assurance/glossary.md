@@ -88,6 +88,22 @@ across units, and applies a declared family error budget. Replay checks the
 declared grouping and arithmetic; it does not establish independence, judge
 agreement with reference labels, or population-wide model quality.
 
+**Correction of an assessment**
+
+A record identifying an actual error in an earlier assessment and linking
+replacement evidence, while retaining the original bytes. It differs from new
+observations or a changed recipient policy. Digest links alone do not establish
+correction authority or revoke downstream approvals. See the
+[correction example](../user-guide/hosted-service-requalification.md#rehearse-a-correction-of-an-actual-error).
+
+**Exact-match edit sensitivity**
+
+A bounded search for the fewest subject-outcome flips that change a current
+native v3 verdict, with baseline, policy and record count fixed. The result is
+an exact replayed witness, a lower bound through fully searched distances, or
+no possible flip after exhaustive search. It is an advisory over supplied
+outcomes, not rerun risk or authenticated evidence. See [hypothetical edits](decision-semantics.md#explore-hypothetical-exact-match-edits).
+
 **Evidence pack**
 
 For native exact-match, NLL and deterministic extensions, the immutable
