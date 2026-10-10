@@ -46,15 +46,13 @@ mount `/tmp` as a quota-limited RAM disk; see the
 Keep the temporary-storage setup when adding hosted jobs. Docker actions use a
 temporary path inside their own filesystem instead of inheriting the host path.
 
-Manual runs of CI, evaluator SDK capture, container smoke and documentation
-workflows accept `ubuntu-26.04` (the default) or `ubuntu-24.04` for comparison and
-fallback checks. Pull requests, pushes and scheduled runs use Ubuntu 26.04.
-Manual Ubuntu 24.04 check names and concurrency groups stay separate from required
-default-runner results. To qualify a runner change, run standard CI (`full=false`)
-and full CI (`full=true`) for minimum-Python/coverage shards and complete
-repository/distribution checks, plus the SDK, Docker/Podman and documentation
-workflows. Use the release workflow's non-publishing branch validation to check
-release-specific packaging and audits. These checks do not exercise production
+All automatic and manual CI, evaluator SDK capture, container smoke and
+documentation workflows use Ubuntu 26.04. Manual CI retains `full=false`
+for standard checks, including minimum-Python and coverage shards, and
+`full=true` for complete repository and distribution checks. Standard and full
+runs use separate concurrency groups. To qualify a future runner change, exercise both CI modes,
+SDK capture, Docker/Podman and documentation, plus the release workflow's
+non-publishing branch validation. These checks do not exercise production
 publication credentials, tagged attestations or GPU hosts.
 
 Documentation tooling requires Node.js 22.18 or newer and npm. Clone the repository, create a virtual
