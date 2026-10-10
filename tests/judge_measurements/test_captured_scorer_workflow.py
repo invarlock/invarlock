@@ -99,6 +99,8 @@ def test_captured_judge_preflight_text_and_json_agree(
     assert f"maximum attempts: {expected_attempts}" in text.output
     assert "Judge preflight complete" in text.output
     assert payload["network_calls"] == 0
+    assert payload["precision"]["independent_units"] == 2
+    assert payload["precision"]["paired_effect"]["status"] == "within_limit"
     collector[1].assert_not_called()
     assert not (tmp_path / "evidence").exists()
     assert not (tmp_path / "judge-work").exists()

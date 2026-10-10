@@ -917,23 +917,41 @@ class _LiveCheckpoint:
         )
         return retained, source_bound
 
-    def capacity(self) -> int:
+    def _remaining_admissions(self) -> dict[str, int]:
         retained, source_bound = self._storage_bounds()
-        return max(
-            0,
-            min(
-                self.options.max_calls - self.spent_calls,
-                self.options.max_input_tokens // self.options.input_tokens_per_call
-                - self.spent_calls,
-                self.options.max_output_tokens
-                // self.plan["judge"]["config"]["max_output_tokens"]
-                - self.spent_calls,
-                self.options.max_cost_microusd // self.options.cost_microusd_per_call
-                - self.spent_calls,
-                (MAX_SOURCES - source_bound) // 2,
-                (MEASUREMENTS_MAX_BYTES - retained) // MAX_ADMISSION_GROWTH_BYTES,
-            ),
-        )
+        return {
+            "calls": self.options.max_calls - self.spent_calls,
+            "input_token_reservation": self.options.max_input_tokens
+            // self.options.input_tokens_per_call
+            - self.spent_calls,
+            "output_token_reservation": self.options.max_output_tokens
+            // self.plan["judge"]["config"]["max_output_tokens"]
+            - self.spent_calls,
+            "cost_reservation": self.options.max_cost_microusd
+            // self.options.cost_microusd_per_call
+            - self.spent_calls,
+            "retained_sources": (MAX_SOURCES - source_bound) // 2,
+            "retained_bytes": (MEASUREMENTS_MAX_BYTES - retained)
+            // MAX_ADMISSION_GROWTH_BYTES,
+        }
+
+    def capacity_details(self) -> dict[str, Any]:
+        """Explain the existing conservative admission bounds, not provider billing."""
+        remaining = self._remaining_admissions()
+        minimum = min(remaining.values())
+        return {
+            "remaining_admissions": remaining,
+            "capacity": max(0, minimum),
+            "limiting_resources": [
+                name for name, value in remaining.items() if value == minimum
+            ],
+            "exhausted_resources": [
+                name for name, value in remaining.items() if value <= 0
+            ],
+        }
+
+    def capacity(self) -> int:
+        return max(0, min(self._remaining_admissions().values()))
 
     def replace_event(self, trial_id: str, event: dict[str, Any]) -> None:
         sample = self.samples[trial_id]

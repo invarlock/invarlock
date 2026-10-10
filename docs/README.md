@@ -111,13 +111,14 @@ rather than interpreting a rendered report's successful exit as policy approval.
 
 The native and captured entry points expose these three scorer choices.
 Native judging first retains runtime-bound answers; captured judging binds
-supplied answer records. Live collection uses the optional Inspect judge
-package with explicit budgets. Offline import and replay need no provider SDK
+supplied answer records. New ratings use a selected, explicitly bounded
+collector: Inspect with its optional SDK extra, an authenticated local runtime,
+or an OpenAI-compatible service. Offline import and replay need no provider SDK
 or credentials. Per-case references are an explicit judge-profile choice and
 remain separate from the evaluated model input.
 
 Captured requests without an explicit `comparison.metric` can combine policy
-metrics and slices under the captured bootstrap contract. Selecting a built-in
+metrics and slices under the captured comparison contract. Selecting a built-in
 scorer dispatches to that scorer's evidence and statistical treatment. Native
 exact match uses its paired Newcombe interval, normalized NLL uses paired
 schedule resampling, and bounded judging uses its declared independent-unit
@@ -132,12 +133,15 @@ claiming a joint confidence bound. Consult [schedule and policy](user-guide/sche
 
 ## Run here or integrate your workflow
 
-**Native execution** prepares an ordered schedule from pinned local data and
+**Host-orchestrated native execution** prepares an ordered schedule from pinned local data and
 runs baseline and subject in authorized Docker or Podman images. Workers receive
 scoped artifact and support mounts; the evidence-signing key stays on the host.
 A [runtime profile](reference/cli.md#reusable-runtime-profiles) supplies reusable
 execution settings without choosing policy or signer trust. Authenticated
 provider import uses complete existing sidecars instead of rerunning answers.
+The [inline local-judge route](reference/judge-measurements.md#native-local-judge-collection)
+runs all three model roles in one already running container and has a different
+signing-key boundary.
 
 ![Native comparisons, captured records and frozen answers feed evaluation, followed by independent verification and reporting](assets/evaluation-verification-flow.svg)
 

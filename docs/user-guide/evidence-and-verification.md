@@ -153,6 +153,7 @@ override a profile, and the signed receipt records its canonical digest.
 | Artifact-identity digests | Approved build or artifact-registry record over the canonical provider identity bytes | Baseline or subject digest read from the submitted manifest |
 | Canonical schedule digest | Approved evaluation-plan record over the exact canonical schedule bytes | Dataset digest read from the submitted manifest |
 | Runtime digests | Pinned image build or deployment record | Runtime manifest inside the pack |
+| Normalized-request digest (required for GGUF) | Independently reviewed normalized request or approved preflight record | Request digest copied from the submitted pack |
 | Evidence-signer fingerprint | Authorized signer registry or authenticated handoff | Public key embedded in the pack signature |
 | Verifier key and identity | Verifier-owned configuration | Values proposed by the evidence signer |
 
@@ -322,9 +323,9 @@ The HTML starts with the recorded policy decision and named baseline and
 subject. Each configured check shows its own status; expandable sections hold
 exact values, identities and technical details. Display rounding does not
 change the underlying evidence. The self-contained report works offline.
-`report --json` returns rendering status. Default and HTML-only native calls
-retain the v1 JSON shape; adding `--markdown` or `--junit` selects v2 with
-requested, written, and failed output details. All destinations are no-clobber
+`report --json` returns `invarlock/evidence-report-v2` for every native and
+captured output selection, including default and HTML-only calls, with requested,
+written and failed output details. All destinations are no-clobber
 and must remain outside evidence. A successful render exits `0` for both
 passing and failing recorded policies. See the
 [report reference](../reference/reports.md) for output contracts and partial-write

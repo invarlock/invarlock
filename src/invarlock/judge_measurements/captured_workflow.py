@@ -23,6 +23,7 @@ from invarlock.judge_measurement_types import (
     JudgeMeasurementPlan,
     JudgeMeasurements,
 )
+from invarlock.judge_measurements.analysis import decode_analysis_policy
 from invarlock.judge_measurements.contracts import (
     MEASUREMENTS_MAX_BYTES,
     validate_measurements,
@@ -34,6 +35,7 @@ from invarlock.judge_measurements.native_recipe import (
     _recipe,
     finalize_native_plan,
 )
+from invarlock.judge_measurements.precision import plan_precision
 from invarlock.judge_measurements.workflow import (
     MAX_WORKFLOW_BYTES,
     JudgeWorkflowError,
@@ -191,6 +193,7 @@ def _prepare(
         "baseline_run_digest": run_digest(baseline),
         "subject_run_digest": run_digest(subject),
         "source_assurance": "captured_inputs",
+        "precision": plan_precision(plan, decode_analysis_policy(policy, plan=plan)),
         "errors": [],
     }
     if judge.measurements is not None:

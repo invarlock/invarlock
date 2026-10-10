@@ -6,7 +6,7 @@ import hashlib
 import json
 import math
 from collections.abc import Mapping
-from typing import Any, Literal, TypedDict
+from typing import Any, Literal, NotRequired, TypedDict
 
 import numpy as np
 import numpy.typing as npt
@@ -41,7 +41,12 @@ class RmtObservation(TypedDict):
     format: Literal["invarlock/diagnostic-observation-v1"]
     kind: Literal["rmt"]
     status: Literal["observation"]
-    method: Literal["column_standardized_covariance_eigh"]
+    method: Literal[
+        "column_standardized_covariance_eigh", "column_standardized_smaller_gram_eigh"
+    ]
+    gram_dimension: NotRequired[int]
+    gram_matrix_bytes: NotRequired[int]
+    minimum_upper_edge_distance: NotRequired[float]
     input_sha256: str
     sample_count: int
     feature_count: int
@@ -226,14 +231,29 @@ def spectral_observation(values: object) -> SpectralObservation:
     }
 
 
-def rmt_observation(values: object) -> RmtObservation:
+def rmt_observation(
+    values: object,
+    *,
+    method: Literal["covariance", "smaller_gram"] = "covariance",
+    max_gram_bytes: int = 128 * 1024 * 1024,
+) -> RmtObservation:
     """Return standardized covariance eigenvalues relative to MP edges.
 
     Rows are samples and columns are features. Constant columns are reported and
     excluded before column standardization. The MP edges are theoretical
     references only; the function does not classify the observation.
+
+    ``method="smaller_gram"`` uses the sample Gram matrix for wide input and
+    reports its dimension, byte size and distance from the upper reference edge.
+    Rounding can change strict edge counts between methods. Both methods reject
+    a square allocation above ``max_gram_bytes`` (128 MiB by default); this
+    budget does not bound total process memory or decomposition workspace.
     """
 
+    if not isinstance(method, str) or method not in {"covariance", "smaller_gram"}:
+        raise DiagnosticInputError("RMT method must be covariance or smaller_gram")
+    if type(max_gram_bytes) is not int or max_gram_bytes < 1:
+        raise DiagnosticInputError("max_gram_bytes must be a positive integer")
     matrix = _matrix(values, label="RMT input")
     sample_count, feature_count = (int(value) for value in matrix.shape)
     if sample_count < 2:
@@ -248,7 +268,21 @@ def rmt_observation(values: object) -> RmtObservation:
     if varying_count == 0:
         raise DiagnosticInputError("RMT input has no varying feature columns")
     standardized = centered[:, varying] / scales[varying]
-    covariance = (standardized.T @ standardized) / float(sample_count)
+    use_dual = method == "smaller_gram" and varying_count > sample_count
+    gram_dimension = sample_count if use_dual else varying_count
+    gram_bytes = gram_dimension * gram_dimension * np.dtype(np.float64).itemsize
+    if gram_bytes > max_gram_bytes:
+        raise DiagnosticInputError(
+            f"RMT Gram matrix requires {gram_bytes} bytes, exceeding "
+            f"max_gram_bytes={max_gram_bytes}; select smaller_gram, a smaller "
+            "input, or an explicit larger budget"
+        )
+    with np.errstate(over="ignore", invalid="ignore"):
+        covariance = (
+            standardized @ standardized.T if use_dual else standardized.T @ standardized
+        ) / float(sample_count)
+    if not bool(np.isfinite(covariance).all()):
+        raise DiagnosticInputError("RMT Gram matrix is not representable as float64")
     try:
         eigenvalues = np.linalg.eigvalsh(covariance)
     except np.linalg.LinAlgError as exc:
@@ -267,7 +301,7 @@ def rmt_observation(values: object) -> RmtObservation:
     lower_edge = (1.0 - root_ratio) ** 2
     upper_edge = (1.0 + root_ratio) ** 2
     above = int(np.count_nonzero(eigenvalues > upper_edge))
-    return {
+    result: RmtObservation = {
         "format": _FORMAT,
         "kind": "rmt",
         "status": "observation",
@@ -285,7 +319,7 @@ def rmt_observation(values: object) -> RmtObservation:
             upper_edge, label="Marchenko-Pastur upper edge"
         ),
         "empirical_eigenvalue_min": _finite_float(
-            eigenvalues[0], label="minimum empirical eigenvalue"
+            0.0 if use_dual else eigenvalues[0], label="minimum empirical eigenvalue"
         ),
         "empirical_eigenvalue_max": _finite_float(
             eigenvalues[-1], label="maximum empirical eigenvalue"
@@ -295,6 +329,20 @@ def rmt_observation(values: object) -> RmtObservation:
             above / float(varying_count), label="fraction above upper edge"
         ),
     }
+
+    if method == "smaller_gram":
+        # Omitted eigenvalues are zeros in the full feature covariance. Include
+        # their distance, without allocating a vector of length varying_count.
+        edge_distance = float(np.min(np.abs(eigenvalues - upper_edge)))
+        if use_dual:
+            edge_distance = min(edge_distance, upper_edge)
+        result["method"] = "column_standardized_smaller_gram_eigh"
+        result["gram_dimension"] = gram_dimension
+        result["gram_matrix_bytes"] = gram_bytes
+        result["minimum_upper_edge_distance"] = _finite_float(
+            edge_distance, label="minimum upper-edge distance"
+        )
+    return result
 
 
 def variance_observation(values: object) -> VarianceObservation:

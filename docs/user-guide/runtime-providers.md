@@ -90,21 +90,23 @@ engine ran successfully.
 The maintained qualification targets use two Python variables with different
 roles. `QUALIFICATION_DRIVER_PYTHON` launches the orchestration driver;
 `PYTHON` runs provider discovery, preflight, `evaluate`, `verify`, and
-`report`. The environment selected by `PYTHON` must contain the
-matching-version InvarLock core wheel and the exact wheel for every optional
-provider used by the request. Install those wheels into that interpreter, for
-example with `"$PYTHON" -m pip install /path/to/wheel.whl`.
+`report` through an isolated bootstrap. `PYTHON` supplies the required
+third-party dependency environment. `CANDIDATE_WHEEL_MANIFEST` selects the exact
+core wheel, which includes all maintained providers; the driver authenticates
+and privately extracts it before execution. An installed InvarLock version
+cannot substitute for that candidate. Vision-text host preflight additionally
+requires Pillow; model inference dependencies belong in the pinned runtime image.
 
 ```bash
 export PYTHON=/path/to/qualification-venv/bin/python
 export QUALIFICATION_DRIVER_PYTHON="$PYTHON"
 ```
 
-Adding package source directories to `PYTHONPATH` is not an installation and
-is not sufficient. First-party provider authorization checks installed
-distribution and `invarlock.runtime_providers` entry-point metadata in addition
-to importing provider code. Using one isolated environment for `PYTHON` and
-`QUALIFICATION_DRIVER_PYTHON` avoids interpreter drift.
+Adding package source directories to `PYTHONPATH` cannot select a candidate.
+First-party provider authorization checks the extracted distribution and
+`invarlock.runtime_providers` entry-point metadata in addition to provider code.
+Using one isolated environment for `PYTHON` and `QUALIFICATION_DRIVER_PYTHON`
+avoids interpreter drift.
 
 Use the wrapper maintained beside the selected provider. Optional-provider
 wrappers add the installed entry-point check and required provider resources;
@@ -450,9 +452,9 @@ command.
 `CANDIDATE_WHEEL_MANIFEST` is a strict
 `invarlock/qualification-candidate-wheels-v1` JSON object whose `wheels` array
 contains an absolute or manifest-relative `path` and expected `sha256` for the
-core wheel and the selected provider runtime inputs used by the request. Qualification
-matches their package sources to the authenticated Git archive, extracts them
-privately, and executes them with an isolated interpreter bootstrap. Dependencies
+single core wheel containing all maintained providers. Qualification
+matches its package sources to the authenticated Git archive, extracts it
+privately, and executes its code with an isolated interpreter bootstrap. Dependencies
 may be installed in the selected interpreter, but an older installed InvarLock
 core runtime is not used as the qualification candidate.
 

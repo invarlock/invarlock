@@ -7,6 +7,94 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-10-10
+
+### Added
+
+- Add an offline contribution recipe that preserves exact unit weights and
+  explains the difference between retained-score arithmetic and a supplied
+  report total without changing signed evidence or acceptance.
+- Explain infeasible qualification quotas with a group-capacity witness, report
+  the resource allowances limiting Inspect judge admissions, and identify the
+  first conflicting evidence-set binding without relaxing existing checks.
+
+- Add an explicit smaller-Gram covariance diagnostic for wide arrays, with
+  allocation size and distance from the theoretical upper reference edge.
+  Document aligned-array and covariance-difference recipes and their limits.
+- Add a bounded Python helper for hypothetical subject-outcome edits under the
+  current native exact-match policy. It reports a replayed minimum-distance
+  witness or an explicit search limit without changing the official verdict.
+- Add an offline source-error correction scenario with linked original and
+  replacement receipts and a review list for a supplied dependency graph.
+  Clarify correction authority and independent-unit provenance in assurance docs.
+
+- Add an offline hosted-service reassessment example that produces two signed
+  comparisons and independent receipts while preserving the earlier evidence
+  byte-for-byte. Document the separate meanings of later observations, changed
+  recipient acceptance and correction of an erroneous assessment.
+
+- Show judge interval-width forecasts before collection, including unattainable
+  precision limits and the independent-unit count sufficient for a width
+  guarantee. Forecasts are advisory and preserve existing readiness and policy
+  decisions.
+
+### Changed
+
+- Require the GitHub Actions `release-branch` check for main promotions. Accept
+  only versioned release branches from the same repository; route other changes
+  through staging while preserving existing code-owner reviews and CI gates.
+
+- Run release artifact checks alongside six coverage groups, then enforce
+  combined coverage before attesting a tagged candidate.
+- Align user guides, assurance pages, tables and diagrams with current
+  verification contracts and the limits of advisory diagnostics and examples.
+
+- Select Ubuntu 26.04 explicitly for all automatic and manual hosted Linux CI
+  and release workflows. Keep standard and full manual CI runs in separate
+  concurrency groups.
+
+- Adapt the pinned LightEval registry to the current Hub search argument during
+  isolated capture setup, preserving actual API results and SDK execution
+  without downgrading dependencies.
+
+- Bound captured-file read allocations by the checked file size plus one byte,
+  preserving payload ceilings and file-change detection. This reduces temporary
+  allocation for small files without promising a total-memory bound.
+- Require rejection beyond active policy boundaries in regression tests, alongside
+  equality, monotonicity and paired-gate checks. Exercise collector accounting
+  across admissions, completions, reconstruction and rejected mutations.
+
+- Limit the RMT diagnostic's square Gram allocation to 128 MiB by default.
+  Inputs that previously exceeded this allocation now raise `DiagnosticInputError`;
+  callers can select `smaller_gram`, reduce the input, or set an explicit larger
+  `max_gram_bytes` budget. The limit does not bound total process memory.
+
+- Update CSpell to 10.3.6 and KaTeX to 0.19.0, and refresh the pinned workflow
+  action releases.
+
+### Fixed
+
+- Accept both Click and Typer context types in CLI command ordering while
+  preserving the public command order.
+- Synchronize the packaged native-judge starter with the maintained example
+  guidance delivered by `evaluate --init`.
+
+- Keep hosted workflow temporary files on the runner's work disk to avoid
+  Ubuntu 26.04's quota-limited `/tmp` RAM disk during combined test and build runs.
+
+- Locate the workspace interpreter with shell built-ins when `PATH` contains only
+  candidate interpreters, including when invoked from outside the repository.
+
+### Security
+
+- Replace the documentation lint CLI to remove its unpatched `braces` dependency
+  and pin patched YAML, TOML, Markdown, and nested KaTeX dependencies.
+
+- Refresh maintained Python and Promptfoo dependency locks to patched releases.
+  Update the Inspect evaluator image to the supported 0.3.263 release so its
+  dependency requirements permit the filesystem fix. Preserve historical
+  evidence and existing dependency-audit enforcement.
+
 ## [0.16.3] - 2026-09-22
 
 The v0.16.2 tag was not published to package indexes; v0.16.3 is the first

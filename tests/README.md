@@ -70,6 +70,21 @@ helpers should use an explicit support name such as `_support_*.py`. Stable,
 maintainer-reviewed public fixtures belong under `examples/`; test-specific
 material should normally be constructed under `tmp_path`.
 
+## Boundary and accounting regressions
+
+The policy matrices in `tests/evaluation_comparison/test_policy_boundaries.py`
+and `tests/judge_measurements/test_judge_policy_boundary_matrix.py` hold measured
+inputs fixed and exercise active limits just below, exactly at and just above
+the boundary. Require rejection on the stricter side as well as acceptance at
+equality and on the looser side. Monotonicity alone also permits an accidentally
+disabled gate. Pairwise checks verify that the configured gates compose; they
+do not prove every input or higher-order interaction.
+
+`tests/judge_measurements/test_accounting_sequences.py` compares incremental
+admission/completion state with a fresh full import after each transition and
+requires rejected mutations to leave state unchanged. These offline cases do
+not qualify live-provider behavior, actual billing or every concurrency pattern.
+
 ## Typical invocations
 
 Run the offline fast lane:

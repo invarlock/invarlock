@@ -1,3 +1,6 @@
 self-hosted-runner:
   labels:
     - gpu
+    # Hosted image released after the pinned linter's runner list.
+    # Extends lint recognition only; GitHub still chooses the hosted image.
+    - ubuntu-26.04

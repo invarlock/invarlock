@@ -132,6 +132,32 @@ def shared_captured_inputs(payloads: dict[str, dict[str, Any]]) -> dict[str, Any
     }
 
 
+def _require_shared_inputs(
+    observed: dict[str, Any], expected: dict[str, Any], *, message: str
+) -> None:
+    """Keep exact binding equality; identify the first known mismatch on failure."""
+    if observed == expected:
+        return
+    for field in (
+        "baseline_run_sha256",
+        "subject_run_sha256",
+        "case_set_sha256",
+        "subject_artifact_sha256",
+        "subject_service_identity_sha256",
+    ):
+        if (field in observed) != (field in expected) or observed.get(
+            field
+        ) != expected.get(field):
+            # Inputs normally contain validated digests or null. Bound and quote
+            # diagnostic values even if a caller supplies an unexpected value.
+            wanted = repr(expected[field])[:80] if field in expected else "<missing>"
+            actual = repr(observed[field])[:80] if field in observed else "<missing>"
+            raise EvidenceSetError(
+                f"{message}: {field}; expected {wanted}, observed {actual}"
+            )
+    raise EvidenceSetError(f"{message}: unexpected shared input fields")
+
+
 def require_deterministic_policy(policy: dict[str, Any]) -> None:
     _check_policy(policy)
     if any(metric["kind"] not in DETERMINISTIC_KINDS for metric in policy["metrics"]):
@@ -201,10 +227,11 @@ def _verify(
         != index["members"]["deterministic"]["statement_sha256"]
     ):
         raise EvidenceSetError("captured statement changed while loading")
-    if shared_captured_inputs(payloads) != shared:
-        raise EvidenceSetError(
-            "captured runs, cases, or subject artifact differ from shared recipient pins"
-        )
+    _require_shared_inputs(
+        shared_captured_inputs(payloads),
+        shared,
+        message="captured runs, cases, or subject artifact differ from shared recipient pins",
+    )
     expected_envelope, expected_envelope_raw = read_object(
         paths["judge"] / "envelope.json"
     )

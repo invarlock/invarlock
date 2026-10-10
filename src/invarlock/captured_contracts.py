@@ -175,7 +175,9 @@ def _read_at(parent: int, name: str, limit: int) -> tuple[bytes, tuple[int, ...]
         if _identity(os.fstat(descriptor)) != identity:
             raise CapturedIntegrityError(f"{name} changed while opening")
         with os.fdopen(descriptor, "rb", closefd=False) as handle:
-            raw = handle.read(limit + 1)
+            # Allocate for the pinned file, not the entire payload allowance.
+            # The extra byte and identity checks still reject concurrent growth.
+            raw = handle.read(before.st_size + 1)
         if len(raw) > limit:
             raise CapturedContractError(f"{name} exceeds the {limit}-byte limit")
         if _identity(os.fstat(descriptor)) != identity:

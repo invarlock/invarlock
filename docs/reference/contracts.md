@@ -238,7 +238,7 @@ to retain complete text outputs; normalized NLL requires its own likelihood
 facts. A scorer extension uses that authenticated collection so that expected and
 observed text are authenticated for verifier replay. The built-in
 `hf_transformers` provider declares exact-match and normalized-NLL collection. The
-the built-in `llama_cpp`, `tensorrt_llm`, and `hf_vision_text` providers currently
+built-in `llama_cpp`, `tensorrt_llm`, and `hf_vision_text` providers currently
 declare exact match for their tasks.
 
 ### Deterministic scorer extension
@@ -611,8 +611,9 @@ request authorizes the exact llama.cpp binary, source, version, execution
 settings, and GGUF identity reconciled with provider evidence.
 
 All maintained providers are released inside the same `invarlock` package. The
-provider ABI remains the runtime compatibility gate, while optional backend
-dependencies remain separate user-facing extras. See [Release verification](release-verification.md).
+provider ABI remains the runtime compatibility gate. Optional host features use
+user-facing extras; model execution dependencies belong to the maintained runtime
+images or source-checkout dependency groups. See [Release verification](release-verification.md).
 
 ## Related documentation
 

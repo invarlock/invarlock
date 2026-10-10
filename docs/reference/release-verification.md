@@ -17,8 +17,10 @@ InvarLock ships one Python distribution with public optional-dependency extras:
 The wheel and source distribution include the repository license text; the
 distribution gate checks their contents and metadata.
 
-Live judge collection uses the core `invarlock[judge]` extra, which installs
-pinned Inspect, OpenAI/OpenRouter, Anthropic, Google, and `httpx` dependencies.
+Inspect-based hosted judge collection uses the `invarlock[judge]` extra, which
+installs pinned Inspect, OpenAI/OpenRouter, Anthropic, Google, `httpx` and
+`httpx2` dependencies. The native local and OpenAI-compatible collectors do not
+require that extra.
 Offline judge import and replay require only the core wheel.
 
 All built-in providers are versioned with `invarlock` and must match
@@ -275,6 +277,13 @@ Every publication follows one complete path: upload, hosted digest verification,
 installed-wheel smoke, and, for production, documentation publication. A retry
 uses that same path and the same authenticated candidate.
 
+Require the GitHub Actions `release-branch` check in the `main` branch ruleset,
+alongside existing code-owner reviews and required checks. The check accepts only
+versioned `release/vX.Y.Z` branches from the same repository; preparation branches
+target `staging/next`. The branch name does not prove candidate validation or
+staging ancestry, which remain separate release checks. See the
+[workflow guide](https://github.com/invarlock/invarlock/blob/main/.github/WORKFLOWS.md#security-and-release).
+
 Configure a protected `v*` tag ruleset that blocks updates and deletion. Protect
 each project-scoped PyPI environment with an appropriate release authorization
 and deployment policy. These repository controls provide the authorization layer
@@ -311,8 +320,8 @@ Example discovery checks after installation:
 
 ```bash
 invarlock --version
-python -m invarlock.runtime_providers.llama_cpp_conformance --help
-python -m invarlock.runtime_providers.tensorrt_llm_conformance --help
+python -m invarlock.runtime_providers.llama_cpp_conformance
+python -m invarlock.runtime_providers.tensorrt_llm_conformance
 ```
 
 Each conformance command must report `ok: true`, its expected provider name,

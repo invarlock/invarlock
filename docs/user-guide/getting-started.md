@@ -42,8 +42,10 @@ incident-triggered hosted evaluation, follow
 [Requalify a hosted service](hosted-service-requalification.md); the capture
 harness supplies fresh executions and the core verifies their retained evidence.
 
-For live judge collection, install `python -m pip install "invarlock[judge]"`.
-This includes the matching collector and pinned SDKs. Judge analysis, retained
+For Inspect-based hosted judge collection, install
+`python -m pip install "invarlock[judge]"` for its pinned SDKs. The native local
+and OpenAI-compatible collectors use their own runtime or service configuration
+and need no Inspect extra. Judge analysis, retained
 measurement import, verification and reporting need only the core package. See
 [judge collection](../reference/judge-measurements.md#frozen-answer-requests-and-preflight) for
 credentials, supported endpoints and collection limits.

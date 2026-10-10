@@ -141,7 +141,7 @@ def test_standard_tools_own_general_repository_gates() -> None:
         "mypy",
         "pytest",
         "mkdocs",
-        "markdownlint-cli2",
+        "markdownlint",
         "cspell",
         "actionlint",
         "python -m build",

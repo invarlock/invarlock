@@ -77,10 +77,32 @@ trials, evaluation returns an incomplete result and leaves the final evidence
 destination absent. Rerun the same request to continue without regenerating
 answers or retrying admitted calls. Changed artifacts, runtime images, policy,
 rubric or data require a new workspace. An interrupted native answer capture is
-marked as unfinished and cannot silently execute again. If retained storage
-capacity is exhausted, evaluation publishes terminal `insufficient_evidence`
-with `collection.stop_reason: retained_capacity_exhausted`; it does not promise
-that another identical invocation can continue.
+marked as unfinished and cannot silently execute again. If a collection resource
+allowance is exhausted, evaluation publishes terminal `insufficient_evidence`
+with `collection.stop_reason: retained_capacity_exhausted`; this existing label
+covers admission limits as well as retained storage and does not promise that
+another identical invocation can continue.
+
+For Inspect-backed collection, the JSON evaluation result also includes
+`collection.capacity`. Its `remaining_admissions` mapping expresses each limit
+in additional calls: `calls`, `input_token_reservation`,
+`output_token_reservation`, `cost_reservation`, `retained_sources` and
+`retained_bytes`. `capacity` is their nonnegative minimum;
+`limiting_resources` lists all terms attaining the minimum, and
+`exhausted_resources` lists every term at or below zero. Storage bounds are
+conservative, so a negative remainder can describe reserved capacity rather
+than an oversized retained file. These details explain the existing stop; they
+never authorize more calls. They are local diagnostics outside signed evidence,
+not observed token usage, a reconciled bill, or a statistical result.
+
+For example, calls may remain while `retained_bytes` admits zero further calls;
+increasing the call budget alone cannot help. The SDK functions `collect` and
+`collect_configured` accept an optional mutable `status` dictionary for the
+same stop reason and capacity details. It is cleared at invocation start; the
+existing `on_stop` callback values and returned measurements remain unchanged.
+Capacity details are emitted only for a capacity stop, not successful completion,
+a deadline or a requested pause. Other collector profiles retain their own
+capacity handling.
 
 The profile supports exactly one text part per scheduled input. It grades the
 task input and answer under the declared rubric and optional global references.
@@ -188,6 +210,31 @@ policy thresholds and missing files. Evaluation requires either explicit
 establish independent recipient acceptance. `output.signer_identity` names the
 identity placed in a signed envelope; a recipient still has to pin that identity
 and its public-key fingerprint independently. Unsigned output retains no signer.
+
+Judge preflight also reports `precision` for the complete planned schedule, before
+any ratings are collected. It uses the existing Hoeffding method, declared rating
+scale, alpha, comparison-family size and number of independent units. Repetitions
+and additional cases inside an existing unit do not narrow this forecast.
+
+For the paired effect and subject score, the forecast gives conservative lower
+and upper bounds on interval width, including support clipping and outward
+rounding. `within_limit` means every score outcome meets the width requirement;
+`unattainable` means no score outcome can meet it; `not_guaranteed` means the
+forecast cannot guarantee it. The latter can also occur at a rounding boundary.
+The subject width is descriptive when there is no subject-bound decision gate.
+
+`units_for_guaranteed_width` is the smallest count whose conservative upper
+bound meets the width limit, searched up to the 10,000-unit plan capacity. A
+`null` result means no such count was found within that capacity. For a 0-to-1
+scale, alpha 0.05 and comparison-family size four, a paired-effect width of at
+most 0.32 requires 397 units for this guarantee; a width of 0.18 requires 1,254.
+The policy's separate `minimum_units` requirement still applies.
+
+This is advisory planning information. It assumes all trials complete and the
+declared units are independent; it does not predict acceptance, establish judge
+accuracy or justify replacing the benchmark with a smaller subset. It changes
+neither execution readiness nor the retained analysis or policy. A pilot or
+replay may intentionally produce insufficient evidence.
 
 Hosted `judge_collect` mode instead declares
 `execution.collection: {integration: inspect-judge, configuration: collector.json, workspace: judge-work}`
@@ -677,6 +724,26 @@ not be identically distributed. This simple guarantee is the reason this profile
 ships Hoeffding rather than empirical Bernstein. Repetitions and cases within an
 independent unit are averaged before inference and do not increase the sample
 size. Baseline and subject remain paired within each unit.
+
+A unique `unit_id` is a declaration, not proof of independence. Before collection,
+retain the reason cases count as separate units and inspect shared source
+identities, such as several questions from one document or turns from one
+conversation. Shared text is a reason to review the design; it does not by itself
+prove dependence. Repeated ratings within a case and repeated cases within a unit
+are already collapsed by the shipped method.
+
+Balanced duplication can keep the same mean while making an incorrectly declared
+sample size larger. For example, four effect units `[0.4, 0.4, 0, 0]` on support
+`[-1, 1]`, with alpha `0.05` and one interval claim, give a clipped interval
+`[-1, 1]`. Declaring 25 identical copies of each as 100 independent units gives
+approximately `[-0.07162, 0.47162]`. The latter can pass a `0.1` degradation margin
+while the former remains insufficient. This illustrative single-interval example
+is not a complete judge policy, whose family must include all required claims.
+
+Do not choose a favorable grouping after observing scores. Regrouping can change
+both the quantity being estimated and its uncertainty because the method gives equal weight to
+units. An alternative grouping requires a separately declared analysis with its
+own interpretation, while the original evidence remains intact.
 
 The declared `comparison_family_size` applies a Bonferroni adjustment to the
 family error budget `alpha`. It is at least two for the subject and paired-effect

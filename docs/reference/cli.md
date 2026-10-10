@@ -161,12 +161,14 @@ match the request and policy bindings.
 
 A native request can select `comparison.metric: judge` with its own rubric,
 analysis policy and private collection workspace. `evaluate` captures or imports
-the native answers and calls the optional installed collector, then publishes
+the native answers and calls the selected bounded collector, then publishes
 judge evidence. Preflight makes no calls; interrupted judging retains its
 checkpoint and leaves the final output absent for continuation. Native runtime
 resources and artifact authentication still apply. `verify` replays the native
 capture and judgments offline using a judge recipient policy; `report` displays
-model, runtime, rubric, judge identity, outcomes and uncertainty. See the
+model, runtime, rubric, judge identity, outcomes and uncertainty. The native
+local-judge profile requires an already running strict container and executes
+all three model roles inline; OCI worker controls do not apply to that route. See the
 [judge reference](judge-measurements.md) for the policy and supported profile.
 
 ### Captured evaluation controls

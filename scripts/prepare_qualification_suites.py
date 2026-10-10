@@ -60,6 +60,22 @@ class QualificationSuiteError(ValueError):
     """Raised when upstream material cannot form a qualifying suite."""
 
 
+class QualificationQuotaError(QualificationSuiteError):
+    """An infeasible selection with a checkable group-capacity witness."""
+
+    def __init__(self, conflict: dict[str, object], *, groups: Sequence[str]) -> None:
+        self.conflict = conflict
+        # Keep the CLI exception bounded; the structured witness retains all labels.
+        labels = json.dumps([group[:80] for group in groups[:10]], ensure_ascii=False)
+        suffix = f" (+{len(groups) - 10} more)" if len(groups) > 10 else ""
+        super().__init__(
+            "dataset cannot satisfy balanced group and answer quotas: "
+            f"groups {labels}{suffix} require {conflict['required']} rows but "
+            f"only {conflict['available']} fit the answer quotas "
+            f"(shortfall {conflict['shortfall']})"
+        )
+
+
 def _canonical_json_bytes(value: object) -> bytes:
     return json.dumps(
         value,
@@ -146,8 +162,32 @@ def _cell_allocation(
                     parent[target] = current
                     queue.append(target)
         if sink not in parent:
-            raise QualificationSuiteError(
-                "dataset cannot satisfy balanced group and answer quotas"
+            # Reachability after the last augmenting search gives a min-cut.
+            # Its group side needs more rows than the answer quotas can admit.
+            blocked = sorted(group for group in group_quotas if f"g:{group}" in parent)
+            blocked_set = set(blocked)
+            available_by_answer: dict[str, int] = defaultdict(int)
+            for (group, answer), capacity in capacities.items():
+                if group in blocked_set:
+                    available_by_answer[answer] += capacity
+            usable = {
+                answer: min(quota, available_by_answer[answer])
+                for answer, quota in answer_quotas.items()
+            }
+            required = sum(group_quotas[group] for group in blocked)
+            available = sum(usable.values())
+            assert required - available == count - flow > 0
+            raise QualificationQuotaError(
+                {
+                    "group_quotas": {group: group_quotas[group] for group in blocked},
+                    "usable_by_answer": usable,
+                    "required": required,
+                    "available": available,
+                    "shortfall": required - available,
+                    "requested": count,
+                    "maximum_feasible": flow,
+                },
+                groups=blocked,
             )
         cursor = sink
         path_capacity = count - flow

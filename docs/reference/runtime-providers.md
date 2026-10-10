@@ -381,9 +381,9 @@ runtime canary for the exact artifact/backend/device combination.
 
 Maintained qualification executes caller-selected wheel artifacts, not an
 arbitrary first-party installation already visible to the host interpreter.
-Build the coordinated distributions, then use the maintained helper to create
-one no-clobber manifest. For example, a GGUF transaction authenticates the core
-and GGUF wheels together:
+Build the core distribution, then use the maintained helper to create
+one no-clobber manifest. The same core wheel contains all maintained providers,
+including GGUF:
 
 ```bash
 make dist-check
@@ -394,15 +394,14 @@ python scripts/qualification_candidate_wheels.py \
 export CANDIDATE_WHEEL_MANIFEST="$PWD/qualification/gguf-candidate-wheels.json"
 ```
 
-The helper accepts one `--wheel` per artifact, resolves only real `.whl` files,
-captures their SHA-256 digests, and creates a new
+The helper accepts `--wheel` paths, resolves only real `.whl` files, captures
+their SHA-256 digests, and creates a new
 `invarlock/qualification-candidate-wheels-v1` document with restrictive file
-permissions. The driver then requires the manifest to contain the core wheel
-and every maintained provider used by the request, with unique provider names, a
-single version, and contents matching the authenticated source archive. A
-built-in Hugging Face transaction needs only the core wheel; GGUF,
-TensorRT-LLM, and vision-text transactions also need their selected provider
-runtime inputs. Recreate the manifest whenever any wheel changes, and pass the same
+permissions. The current driver accepts exactly one `invarlock` distribution
+whose contents match the authenticated source archive; separate provider wheels
+are not accepted. Provider backend dependencies, artifacts and support resources
+remain separate runtime inputs. Recreate the manifest whenever the wheel changes,
+and pass the same
 `CANDIDATE_WHEEL_MANIFEST` to canary, readiness, and evidence qualification.
 
 `PYTHON` owns the third-party dependency environment used by qualification.

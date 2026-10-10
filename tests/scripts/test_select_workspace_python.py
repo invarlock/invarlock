@@ -84,7 +84,8 @@ def _run_selector(
         capture_output=True,
         text=True,
         check=False,
-        cwd=fake_repo,
+        # A restricted PATH must work from outside the repository too.
+        cwd=tmp_path,
         env=env,
     )
 
@@ -108,7 +109,8 @@ def test_select_workspace_python_prefers_repo_venv(tmp_path: Path) -> None:
         capture_output=True,
         text=True,
         check=False,
-        cwd=fake_repo,
+        cwd=tmp_path,
+        env={"PATH": str(tmp_path), "HOME": str(tmp_path)},
     )
 
     assert proc.returncode == 0, proc.stderr

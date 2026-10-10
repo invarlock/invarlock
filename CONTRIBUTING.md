@@ -21,11 +21,41 @@ Changes should make these workflows easier to understand, safer to execute,
 or easier to verify. Preserve the distinct assurance meaning of each evidence
 format.
 
+## Branches and release promotion
+
+Open implementation and release-preparation PRs from `work/` branches to
+`staging/next`. Promote reviewed staging changes through `release/vX.Y.Z` to
+`main`. The required `release-branch` check rejects other main PR heads,
+including direct staging, work and Dependabot branches, and release-named
+branches from forks. It does not replace code-owner approval or release checks.
+See the [workflow guide](.github/WORKFLOWS.md#security-and-release) for the
+matching main ruleset requirement.
+
 ## Development setup
 
 InvarLock requires Python 3.12 or newer. Use Python 3.13 to match the main CI
-jobs; Python 3.12 has a separate minimum-version gate. Documentation tooling
-requires Node.js 22.18 or newer and npm. Clone the repository, create a virtual
+jobs; Python 3.12 has a separate minimum-version gate. Hosted Linux CI and release
+workflows select Ubuntu 26.04 explicitly. This avoids following automatic OS changes
+when GitHub [moves the `ubuntu-latest` label](https://github.blog/changelog/2026-09-17-ubuntu-26-generally-available-and-latest-migration/)
+between October 19 and November 19, 2026. The OS label does not freeze runner image
+updates or preinstalled tools.
+
+Hosted jobs use the runner's temporary directory on disk because Ubuntu 26.04 can
+mount `/tmp` as a quota-limited RAM disk; see the
+[runner-image report](https://github.com/actions/runner-images/issues/14777).
+Keep the temporary-storage setup when adding hosted jobs. Docker actions use a
+temporary path inside their own filesystem instead of inheriting the host path.
+
+All automatic and manual CI, evaluator SDK capture, container smoke and
+documentation workflows use Ubuntu 26.04. Manual CI retains `full=false`
+for standard checks, including minimum-Python and coverage shards, and
+`full=true` for complete repository and distribution checks. Standard and full
+runs use separate concurrency groups. To qualify a future runner change, exercise both CI modes,
+SDK capture, Docker/Podman and documentation, plus the release workflow's
+non-publishing branch validation. These checks do not exercise production
+publication credentials, tagged attestations or GPU hosts.
+
+Documentation tooling requires Node.js 22.18 or newer and npm. Clone the repository, create a virtual
 environment, and install the development dependencies:
 
 ```bash
@@ -38,7 +68,12 @@ npm ci
 ```
 
 Install `uv` for lock, distribution, and dependency-audit targets; CI currently
-uses version `0.10.10`. Workflow changes also require `actionlint` on `PATH`.
+uses version `0.10.10`. Workflow changes also require the CI-pinned `actionlint`
+version and ShellCheck on `PATH`. A newer local linter can miss issues reported
+by the pinned version.
+The exact label entry in `.github/actionlint.yaml` lets the pinned linter recognize
+Ubuntu 26.04 while its upstream runner list catches up. GitHub still selects its
+hosted image from `runs-on`.
 With Go installed:
 
 ```bash
@@ -53,7 +88,7 @@ dependency groups; published extras contain only optional product features.
 Add Go's binary directory to `PATH`. These tools are not installed by the
 Python development dependency group.
 
-For an exact Linux x86_64 CI reproduction, create a separate Python 3.13
+For the Linux x86_64 CI dependency setup on Ubuntu 26.04, create a separate Python 3.13
 environment and run:
 
 ```bash

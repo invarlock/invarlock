@@ -41,7 +41,12 @@ where:
 | $\mathcal{O}_B$, $\mathcal{O}_S$ | Ordered baseline and subject observations |
 | $C_0(z)$ | InvarLock's contract-defined canonical JSON bytes for $z$, without a final line feed |
 | $H(z)$ | SHA-256 of bytes $z$ |
-| $d_{\mathcal S}$ | Canonical schedule digest, $H(C_0(\mathcal S))$ |
+| $S_{\mathrm{doc}}$ | Complete schedule document: format version, task, dataset identity and ordered records |
+| $d_{\mathcal S}$ | Canonical schedule digest, $H(C_0(S_{\mathrm{doc}}))$ |
+
+The sequence $\mathcal S$ abbreviates the record-level pairing facts. The digest
+covers the complete $S_{\mathrm{doc}}$, including its dataset identity and task;
+hashing only the record sequence does not produce `schedule_sha256`.
 
 The notation $C_0$ is the no-final-line-feed form used for canonical schedules
 and scoring-record arrays: UTF-8, sorted keys, compact separators, finite
@@ -210,7 +215,11 @@ mapping and every case/side/repetition slot. It retains attempts, parses and
 source locations; a failed or incomplete scheduled trial cannot be replaced
 by a favorable extra sample. Repetitions are averaged within each case and cases
 within each unit. The independently declared units determine the inference
-sample size. Native judge evidence additionally retains and replays its provider
+sample size. Distinct labels do not establish independence: cases can still
+share a source document, session or subject. Review the mapping against retained
+provenance before analysis; duplicated dependent cases can narrow a computed
+interval without adding independent information. See [statistical scope](../reference/judge-measurements.md#statistical-scope).
+Native judge evidence additionally retains and replays its provider
 capture; captured or frozen-answer imports retain supplied-source provenance.
 
 See [captured records](../reference/evaluation-records.md) and

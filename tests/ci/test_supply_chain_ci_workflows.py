@@ -100,6 +100,15 @@ def test_workflow_pip_installs_use_hashed_lock_files() -> None:
     assert offenders == []
 
 
+def test_documentation_dependencies_are_audited() -> None:
+    steps = _steps(_load(WORKFLOWS / "docs-ci.yml"))
+    install = _step(steps, "Install documentation linters")
+    audit = _step(steps, "Audit documentation dependencies")
+    assert steps.index(install) < steps.index(audit)
+    assert audit["run"] == "npm audit --audit-level=low"
+    assert not audit.get("continue-on-error", False)
+
+
 def test_promptfoo_sdk_gate_uses_a_required_dependency_lock() -> None:
     lock_root = Path("examples/evaluator-qualification/locks/promptfoo")
     manifest = json.loads((lock_root / "package.json").read_text(encoding="utf-8"))
@@ -113,12 +122,21 @@ def test_promptfoo_sdk_gate_uses_a_required_dependency_lock() -> None:
     version = pins["package"].removeprefix("promptfoo@")
     assert pins["package"] == f"promptfoo@{version}"
     assert manifest["dependencies"] == {"promptfoo": version}
-    assert manifest["overrides"] == {"promptfoo": {"js-yaml": "5.2.2"}}
+    assert manifest["overrides"] == {
+        "promptfoo": {"js-yaml": "5.4.2", "simple-git": "4.0.2"},
+        "get-uri": {"basic-ftp": "6.2.1"},
+    }
     assert lock["lockfileVersion"] == 3
     assert lock["packages"][""]["dependencies"] == manifest["dependencies"]
     assert lock["packages"]["node_modules/promptfoo"]["version"] == version
     assert lock["packages"]["node_modules/promptfoo"]["integrity"] == pins["integrity"]
-    assert lock["packages"]["node_modules/js-yaml"]["version"] == "5.2.2"
+    for package, version in {
+        "js-yaml": "5.4.2",
+        "simple-git": "4.0.2",
+        "@simple-git/argv-parser": "2.0.1",
+        "basic-ftp": "6.2.1",
+    }.items():
+        assert lock["packages"][f"node_modules/{package}"]["version"] == version
     assert all(
         package.get("integrity")
         and package.get("resolved", "").startswith("https://registry.npmjs.org/")
@@ -333,7 +351,9 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     assert "inputs.publish != true" in build["if"]
     assert build["timeout-minutes"] >= 120
     assert build["permissions"] == {"contents": "read"}
-    checkout = build["steps"][0]
+    # Temporary-storage setup precedes the first repository action.
+    checkout = build["steps"][1]
+    assert checkout["uses"].startswith("actions/checkout@")
     assert checkout["with"]["ref"] == (
         "${{ needs.resolve_release_ref.outputs.release_sha }}"
     )
@@ -370,8 +390,43 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
         )
         + 1
     )
-    assert _step(build["steps"], "Enforce release coverage")["run"] == (
-        "make coverage-enforce"
+    shards = jobs["coverage_shards"]
+    assert shards["needs"] == "resolve_release_ref"
+    assert shards["if"] == build["if"]
+    assert shards["strategy"]["fail-fast"] is False
+    assert set(shards["strategy"]["matrix"]["shard"]) == {
+        "core",
+        "examples",
+        "examples-comparisons",
+        "examples-judge",
+        "support",
+        "runtime",
+    }
+    assert shards["steps"][1]["with"]["ref"] == (
+        "${{ needs.resolve_release_ref.outputs.release_sha }}"
+    )
+    assert _step(shards["steps"], "Collect release coverage")["run"] == (
+        "make coverage-collect-${{ matrix.shard }} PYTEST_WORKERS=2"
+    )
+    upload = _step(shards["steps"], "Retain release coverage measurements")
+    assert upload["with"]["if-no-files-found"] == "error"
+    assert upload["with"]["include-hidden-files"] is True
+
+    coverage = jobs["coverage_check"]
+    assert set(coverage["needs"]) == {"resolve_release_ref", "coverage_shards"}
+    assert coverage["if"] == build["if"]
+    assert coverage["permissions"] == {"contents": "read"}
+    assert coverage["steps"][1]["with"]["ref"] == (
+        "${{ needs.resolve_release_ref.outputs.release_sha }}"
+    )
+    download = _step(coverage["steps"], "Download release coverage measurements")
+    assert download["with"]["pattern"] == "release-coverage-shard-*"
+    assert download["with"]["merge-multiple"] is True
+    assert _step(coverage["steps"], "Enforce release coverage")["run"] == (
+        "make coverage-report"
+    )
+    assert not any(
+        step.get("name") == "Enforce release coverage" for step in build["steps"]
     )
     assert (
         "make workflow-lint" in _step(build["steps"], "Lint release workflows")["run"]
@@ -511,7 +566,11 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     assert sbom_upload["with"]["if-no-files-found"] == "warn"
 
     attestation = jobs["attest_candidate"]
-    assert set(attestation["needs"]) == {"build_check", "resolve_release_ref"}
+    assert set(attestation["needs"]) == {
+        "build_check",
+        "coverage_check",
+        "resolve_release_ref",
+    }
     assert attestation["if"] == "${{ github.event_name == 'push' }}"
     assert attestation["permissions"] == {
         "actions": "read",
@@ -747,7 +806,7 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     }
     assert hosted_job["permissions"] == {"actions": "read", "contents": "read"}
     assert "inputs.publish == true" in hosted_job["if"]
-    hosted_checkout = hosted_job["steps"][0]
+    hosted_checkout = hosted_job["steps"][1]
     assert hosted_checkout["with"]["ref"] == (
         "${{ needs.resolve_release_ref.outputs.release_sha }}"
     )
@@ -779,7 +838,7 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     }
     assert published_smoke["permissions"] == {"actions": "read", "contents": "read"}
     assert "inputs.publish == true" in published_smoke["if"]
-    published_checkout = published_smoke["steps"][0]
+    published_checkout = published_smoke["steps"][1]
     assert published_checkout["with"]["ref"] == (
         "${{ needs.resolve_release_ref.outputs.release_sha }}"
     )

@@ -830,7 +830,7 @@ def test_shared_image_inspection_rechecks_the_signed_oci_observation(
         "Labels": {
             "org.invarlock.example.base-image-id": base,
             "org.invarlock.example.evaluator": "inspect-ai",
-            "org.invarlock.example.evaluator-version": "0.3.254",
+            "org.invarlock.example.evaluator-version": "0.3.263",
             "org.invarlock.example.evaluator-lock-sha256": lock,
             "org.invarlock.example.source-commit": commit,
             "org.invarlock.example.source-bundle-sha256": source,
@@ -839,7 +839,7 @@ def test_shared_image_inspection_rechecks_the_signed_oci_observation(
     signing_key = ed25519.Ed25519PrivateKey.generate()
     attestation = make_evaluator_build_attestation(
         evaluator="inspect-ai",
-        evaluator_version="0.3.254",
+        evaluator_version="0.3.263",
         runtime_image_id=image,
         base_image_id=base,
         source_commit=commit,
@@ -877,7 +877,7 @@ def test_shared_image_inspection_rechecks_the_signed_oci_observation(
         repository=tmp_path,
         attestation_path=attestation_path,
         evaluator="inspect-ai",
-        evaluator_version="0.3.254",
+        evaluator_version="0.3.263",
         lock_sha256=lock,
         expected_entrypoint=entrypoint,
         source_commit=commit,
@@ -970,7 +970,7 @@ def test_launcher_returns_the_verified_child_image_id(
             "base-setting": "preserved",
             "org.invarlock.example.base-image-id": base_id,
             "org.invarlock.example.evaluator": "inspect-ai",
-            "org.invarlock.example.evaluator-version": "0.3.254",
+            "org.invarlock.example.evaluator-version": "0.3.263",
             "org.invarlock.example.evaluator-lock-sha256": "sha256:" + "f" * 64,
             "org.invarlock.example.evaluator-runtime": "cpu",
             "org.invarlock.example.source-commit": commit,
@@ -1239,7 +1239,7 @@ def test_worker_load_run_returns_the_verified_sample_snapshot(
         "evaluator_lock_digest",
         lambda _selected, *, container=False, profile=None: "sha256:" + ("c" * 64),
     )
-    monkeypatch.setattr(module.importlib.metadata, "version", lambda _name: "0.3.254")
+    monkeypatch.setattr(module.importlib.metadata, "version", lambda _name: "0.3.263")
     monkeypatch.setattr(
         module, "checkpoint_tree_sha256", lambda _path: "sha256:" + ("a" * 64)
     )
@@ -1296,7 +1296,7 @@ def test_worker_binds_model_dataset_and_upstream_output_provenance(
     monkeypatch.setattr(
         module.importlib.metadata,
         "version",
-        lambda _name: "0.3.254",
+        lambda _name: "0.3.263",
     )
     monkeypatch.setattr(
         module,
@@ -1344,7 +1344,7 @@ def test_worker_rejects_a_dataset_outside_its_declared_corpus_profile(
     monkeypatch.setenv("INVARLOCK_RUNTIME_IMAGE_ID", "sha256:" + "a" * 64)
     monkeypatch.setenv("INVARLOCK_EVALUATOR_LOCK_SHA256", "sha256:" + "b" * 64)
     monkeypatch.setenv("INVARLOCK_CORPUS_PROFILE", "quick")
-    monkeypatch.setattr(module.importlib.metadata, "version", lambda _name: "0.3.254")
+    monkeypatch.setattr(module.importlib.metadata, "version", lambda _name: "0.3.263")
     monkeypatch.setattr(
         module, "evaluator_lock_digest", lambda *_args, **_kwargs: "sha256:" + "b" * 64
     )
@@ -1372,7 +1372,7 @@ def test_worker_rejects_symlinked_dataset(
         "evaluator_lock_digest",
         lambda _selected, *, container=False, profile=None: "sha256:" + ("c" * 64),
     )
-    monkeypatch.setattr(module.importlib.metadata, "version", lambda _name: "0.3.254")
+    monkeypatch.setattr(module.importlib.metadata, "version", lambda _name: "0.3.263")
     model = tmp_path / "model"
     model.mkdir()
     real_dataset = tmp_path / "real-records.jsonl"
@@ -1698,7 +1698,7 @@ def test_evaluator_transaction_local_cli_and_worker_validation_errors_are_bounde
     monkeypatch.setattr(module.importlib.metadata, "version", lambda _name: "wrong")
     with pytest.raises(module.BridgeError, match="must contain"):
         module.worker("baseline", tmp_path, tmp_path / "records", tmp_path / "output")
-    monkeypatch.setattr(module.importlib.metadata, "version", lambda _name: "0.3.254")
+    monkeypatch.setattr(module.importlib.metadata, "version", lambda _name: "0.3.263")
     monkeypatch.setenv("INVARLOCK_RUNTIME_IMAGE_ID", "latest")
     with pytest.raises(module.BridgeError, match="runtime image digest"):
         module.worker("baseline", tmp_path, tmp_path / "records", tmp_path / "output")
@@ -2208,7 +2208,7 @@ def test_evaluator_transaction_worker_and_main_complete_guards(
     monkeypatch.setattr(
         module, "evaluator_lock_digest", lambda *_args, **_kwargs: "sha256:" + "b" * 64
     )
-    monkeypatch.setattr(module.importlib.metadata, "version", lambda _name: "0.3.254")
+    monkeypatch.setattr(module.importlib.metadata, "version", lambda _name: "0.3.263")
     monkeypatch.setenv("INVARLOCK_EVALUATOR_LOCK_SHA256", "wrong")
     with pytest.raises(module.BridgeError, match="lock"):
         module.worker("baseline", tmp_path, tmp_path / "records", tmp_path / "output")
@@ -2439,7 +2439,7 @@ def test_evaluator_transaction_lock_and_worker_contract_mismatch_guards(
     monkeypatch.setenv("INVARLOCK_EVALUATOR", "inspect-ai")
     monkeypatch.setenv("INVARLOCK_RUNTIME_IMAGE_ID", "sha256:" + "a" * 64)
     monkeypatch.setenv("INVARLOCK_EVALUATOR_LOCK_SHA256", "sha256:" + "b" * 64)
-    monkeypatch.setattr(module.importlib.metadata, "version", lambda _name: "0.3.254")
+    monkeypatch.setattr(module.importlib.metadata, "version", lambda _name: "0.3.263")
     monkeypatch.setattr(
         module, "evaluator_lock_digest", lambda *_args, **_kwargs: "sha256:" + "b" * 64
     )

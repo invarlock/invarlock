@@ -192,7 +192,8 @@ input. InvarLock never treats overwriting an earlier result as a retry.
 | Transaction result | Evidence directory | Receipt | Rendered files | Exit |
 | --- | --- | --- | --- | --- |
 | Evaluation publishes | New immutable directory | None | None | `0`; `--fail-on-policy` returns `7` for adverse policy or `2` for an unavailable decision |
-| Evaluation fails | Absent | None | None | Nonzero |
+| Evaluation fails before publication | No new directory | None | None | Nonzero |
+| Publication or finalization fails | Completed or competing output, or private staging, may remain; authenticate before use | None | None | Nonzero |
 | Verification accepts | Unchanged | Signed success receipt | None | `0` |
 | Verification completes rejection | Unchanged | Signed rejection receipt | None | Nonzero |
 | Verification cannot complete safely | Unchanged | May be absent | None | Nonzero |

@@ -317,6 +317,15 @@ requires a new workspace. Offline imports need retained calls and source
 bindings; scalar ratings alone cannot supply them. See the
 [judge workflow and recovery rules](evaluation-request.md#judge).
 
+For `collection.stop_reason: retained_capacity_exhausted`, inspect
+`collection.capacity` on Inspect-backed evaluations. The limiting allowance may
+be calls, token/cost reservations, retained sources or retained bytes. Another
+identical invocation cannot replenish it, and increasing one budget cannot fix
+a different exhausted limit. This is a terminal insufficient-evidence result,
+not a resumable deadline or a provider bill. Review the workload and allowances
+before a new campaign; preserve the stopped evidence. See the
+[capacity fields](../reference/judge-measurements.md#native-scorer).
+
 ## Normalized NLL fails closed
 
 Each successful record needs finite `logprob_sum`, positive `token_count`, and
@@ -385,10 +394,10 @@ exits `2` without a receipt; retry with an explicitly reviewed
 and can still carry a valid rejection receipt. Do not treat receipt authenticity
 as a passing technical verdict.
 
-Captured reports and native reports requesting Markdown or JUnit emit
-`invarlock/evidence-report-v2`. Inspect `requested_outputs`, `written_outputs`,
+Captured and native reports emit `invarlock/evidence-report-v2` for every output
+selection, including default and HTML-only calls. Inspect `requested_outputs`, `written_outputs`,
 `failed_output`, and `errors` after a write failure; earlier completed outputs
-may remain. Default and HTML-only native report calls retain v1 JSON. Never
+may remain. Never
 render stale evidence after a failed evaluation publication.
 
 ## Before escalating a bug

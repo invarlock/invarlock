@@ -1322,6 +1322,7 @@ async def _collect_pinned(
     directory_fd: int,
     directory_bindings: tuple[tuple[Path, tuple[int, int, int]], ...],
     on_stop: Callable[[str], None] | None = None,
+    status: dict[str, Any] | None = None,
 ) -> JudgeMeasurements:
     """Collect or resume fixed-answer judgments with durable attempt shards.
 
@@ -1377,6 +1378,10 @@ async def _collect_pinned(
 
         def stopped(reason: str) -> JudgeMeasurements:
             result = replay()[1]
+            if status is not None:
+                status["stop_reason"] = reason
+                if reason == "capacity_exhausted":
+                    status["capacity"] = state.capacity_details()
             if on_stop is not None:
                 on_stop(reason)
             return result
@@ -1541,8 +1546,11 @@ async def collect(
     baseline_run: dict[str, Any],
     subject_run: dict[str, Any],
     on_stop: Callable[[str], None] | None = None,
+    status: dict[str, Any] | None = None,
 ) -> JudgeMeasurements:
     """Collect through a checkpoint whose directory ancestry remains pinned."""
+    if status is not None:
+        status.clear()
     _check_options(plan, options)
     _require_qualified_live_provider_model(options.grader)
     runner.validate()
@@ -1575,4 +1583,5 @@ async def collect(
             directory_fd=descriptor,
             directory_bindings=bindings,
             on_stop=on_stop,
+            **({"status": status} if status is not None else {}),
         )

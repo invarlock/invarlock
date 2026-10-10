@@ -159,6 +159,9 @@ invarlock verify artifacts/evidence/ \
   --verifier-identity release-verifier
 ```
 
+When either side uses `llama_cpp`, also pass the independently approved
+`--expected-request-digest`; it is optional for other native providers.
+
 Choose a stable verifier identity meaningful to receipt verifiers. The signed
 receipt includes that identity, the verifier public key and fingerprint, all
 external anchors, and the decision. A receipt verifier still pins the expected verifier

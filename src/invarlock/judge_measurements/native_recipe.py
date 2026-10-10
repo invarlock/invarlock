@@ -23,6 +23,7 @@ from invarlock.judge_measurements.contracts import (
     render_judge_request,
     validate_measurement_plan,
 )
+from invarlock.judge_measurements.precision import plan_precision
 from invarlock.public_contracts import (
     load_judge_analysis_policy_schema,
     load_judge_measurement_plan_schema,
@@ -269,4 +270,5 @@ def prepare_native_judge(
         "maximum_admitted_calls": capacity,
         "judge": plan["judge"],
         "metric_name": policy["metric_name"],
+        "precision": plan_precision(plan, decode_analysis_policy(policy, plan=plan)),
     }

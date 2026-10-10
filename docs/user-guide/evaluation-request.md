@@ -217,7 +217,7 @@ scheduled `expected_output`, otherwise `0`. Equality does not trim whitespace,
 case-fold, normalize Unicode, or extract an answer. The point comparison is:
 
 ```text
-delta_pp = 100 * (subject_mean - baseline_mean)
+delta_pp = math.fsum(subject_i - baseline_i) / record_count * 100.0
 ```
 
 The report also records baseline-pass to subject-fail regressions,
@@ -226,6 +226,12 @@ the exact two-sided McNemar probability. The metric-bound check passes only
 when the current v3 report's continuity-corrected paired Newcombe 95% effect-size
 interval's lower bound is at least
 `policy.metrics.exact_match.delta_min_pp`.
+
+Here `math.fsum(subject_i - baseline_i)` denotes summing every paired
+record difference with `math.fsum`. Divide by the record count, then multiply
+by `100.0`, in that order. Computing the same mathematical delta by subtracting
+separately rounded side means can produce different floating-point bytes.
+See [exact replay arithmetic](../assurance/decision-semantics.md) for the contract.
 
 ### `normalized_nll_per_utf8_byte`
 
@@ -274,11 +280,14 @@ Native judging requires exactly one text input part per record; image/content
 inputs are rejected. Run mode first collects authenticated answers through the
 provider's text-output surface and freezes the runtime capture. Import mode
 authenticates complete provider sidecars bound to the same judge policy. Both then collect ratings
-through the built-in collector, using the optional `invarlock[judge]` dependencies. Preflight validates prerequisites
-and complete reservations without model or judge calls. The model workers remain
-network-disabled. Set `INVARLOCK_ALLOW_JUDGE_NETWORK=1` only for the evaluation
-command to authorize the bounded judge phase; preflight and offline replay need
-no network permission. Judge collection retains its own call and cost limits.
+through the selected collector. Inspect-based hosted collection uses the
+optional `invarlock[judge]` SDK dependencies; native local and OpenAI-compatible
+collectors do not. Preflight validates prerequisites and complete reservations
+without model or judge calls. Native model execution remains network-disabled.
+Hosted and compatible-service collection requires
+`INVARLOCK_ALLOW_JUDGE_NETWORK=1` for the evaluation command; preflight and offline
+replay need no network permission. The local profile needs no network opt-in.
+Each collector enforces its declared reservation limits.
 
 The private judge workspace supports resuming admitted trials against the same
 frozen answers. Changed models, data, rubric, policy or runtime identities need
@@ -361,8 +370,11 @@ The scorer ID, version, descriptor digest, configuration digest, task, input
 kinds, output kind, pairing, source facts, and replay result must all agree.
 Replay runs twice and must produce byte-identical canonical results.
 
-Separately installed and explicitly authorized scorer packages may implement
-deterministic token F1, structured extraction, or VQA answer normalization. SQL
+Core supplies five deterministic scorers for normalized matching, numeric
+tolerance, JSON fields, exact JSON and token F1. Their IDs and authorization
+rules are listed in the [scorer contract](../reference/contracts.md#deterministic-scorer-extension).
+Additional implementations, such as VQA answer normalization, require explicit
+authorization. SQL
 or code execution, model-based semantic similarity, network services and externally assigned ratings,
 external models, and LLM judges are excluded from the scorer-extension contract.
 Use the built-in [`judge` scorer](#judge) for bounded rubric-based text grading
@@ -446,8 +458,12 @@ model-quality claims.
 
 ## OCI delegation for run mode
 
-When the host CLI sees `execution.mode: run` and is not already inside a strict
-container boundary, it launches the request in Docker or Podman. Caller-owned
+For host-orchestrated `execution.mode: run`, the CLI launches workers in Docker
+or Podman. An explicit native local judge instead requires the
+[inline container path](../reference/judge-measurements.md#native-local-judge-collection):
+all three model roles run sequentially in an already started strict container,
+and a mounted signing key is available to that runtime process. The host CLI
+does not automatically create that local-judge container. Caller-owned
 CLI options or environment variables provide:
 
 | Concern | CLI option |

@@ -121,13 +121,21 @@ each completed transaction because existing outputs are not overwritten.
 
 ## Resume or change the inputs
 
-If judging stops with pending trials, rerun the same request. `judge-work` retains
-the original answers and call admissions; the final evidence destination stays
-absent until all trial slots have an outcome. A failed answer capture is marked
-and cannot silently regenerate answers. Inspect that failure before explicitly
-starting a new capture in a new workspace. Changing the model, data, rubric,
-policy or runtime identity requires a new workspace. Exhausted retained-storage
-capacity publishes terminal insufficient evidence with an explicit stop reason.
+If a deadline or requested stop leaves pending trials, rerun the same request.
+`judge-work` retains the original answers and call admissions; the final evidence
+destination stays absent for this resumable stop. Admitted calls are not retried.
+A failed answer capture is marked and cannot silently regenerate answers. Inspect
+that failure before explicitly starting a new capture in a new workspace.
+Changing the model, data, rubric, policy or runtime identity requires a new
+workspace.
+
+Exhausting a call, token/cost reservation or retained-storage allowance instead
+publishes terminal insufficient evidence with
+`collection.stop_reason: retained_capacity_exhausted`. An identical invocation
+cannot gain new allowance by resuming. Inspect-backed collection also reports
+`collection.capacity` to identify the limiting resources; these are conservative
+admission reservations, not measured usage or billing. See the
+[collection capacity reference](../../docs/reference/judge-measurements.md#native-scorer).
 
 ## Start from answers collected elsewhere
 

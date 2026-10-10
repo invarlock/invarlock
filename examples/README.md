@@ -16,6 +16,7 @@ revision, as explained in [getting started](../docs/user-guide/getting-started.m
 | --- | --- | --- |
 | Check someone else's result | [CPU quickstart](quickstart/README.md) | Offline verification of included evidence, followed by a receipt and HTML report |
 | Evaluate results you already have | [Captured results](captured-results/README.md) | An offline starter, then paths for exact match, normalized NLL and judge scoring |
+| Explain contributions to an additive score change | [Contribution recipe](../docs/reference/evaluation-records.md#explain-an-additive-score-change) | Exact weights, omitted contributions and rounding residuals; no change to evidence or verdicts |
 | Collect answers from your pipeline | [Answer capture](answer-capture/README.md) | An offline demonstration you can adapt to your own pipeline executable or Python module |
 | Run a model and judge its answers | [Native judge](native-judge/README.md) | Setup for model execution and bounded judge calls; requires your runtime and judge configuration |
 | Evaluate already collected judge ratings | [Judge import](judge-measurements/README.md) | Offline replay of a small included fixture with an expected insufficient-evidence result |

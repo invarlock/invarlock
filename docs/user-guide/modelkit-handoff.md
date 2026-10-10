@@ -100,18 +100,19 @@ Paths are relative to that file. Its fields are:
 | `technical_anchors.runtime_digests` | Runtime digests for `baseline` and `subject` |
 | `technical_anchors.schedule_digest` | Independently selected evaluation schedule digest |
 | `technical_anchors.evidence_signer_fingerprint` | Trusted evidence signer fingerprint |
-| `technical_anchors.request_digest` | Optional independently selected SHA-256 digest of the complete canonical normalized evaluation request |
+| `technical_anchors.request_digest` | Independently selected SHA-256 digest of the complete canonical normalized evaluation request; required when either side uses GGUF/`llama_cpp`, optional otherwise |
 | `envelope` | The signed acceptance DSSE envelope |
 | `recipient_policy` | Current recipient policy, including signer status and freshness limits |
 | `trusted_public_keys` | A nonempty mapping from independently trusted fingerprints to public-key paths |
 | `limits` | Optional positive resource ceilings described below |
 
-Supply `request_digest` when acceptance requires the exact evaluated context,
+Supply `request_digest` whenever either side uses GGUF/`llama_cpp`, and for other
+providers when acceptance requires the exact evaluated context,
 including the request's generation settings, scorer configuration, security
 settings, and observation payload references. The example passes this expectation
 to the public verifier and rejects a mismatch even when both package mappings
 and signatures are valid. It does not infer the expected digest from the incoming
-evidence. Omitting the field preserves the existing artifact, runtime, schedule,
+evidence. For non-GGUF evidence, omitting the field preserves the existing artifact, runtime, schedule,
 policy and signer checks; omission does not establish an independently selected
 complete-request match.
 

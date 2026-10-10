@@ -142,8 +142,8 @@ def test_stable_smoke_status_requires_all_engine_lanes_to_succeed():
     assert summary["if"] == "${{ always() }}"
     assert summary["needs"] == ["engine-smoke"]
     assert "strategy" not in summary
-    assert "name" not in summary
-    step = summary["steps"][0]
+    assert summary["name"] == "smoke"
+    step = summary["steps"][-1]
     assert step["env"]["ENGINE_RESULT"] == "${{ needs.engine-smoke.result }}"
     assert step["run"] == 'test "$ENGINE_RESULT" = success'
 

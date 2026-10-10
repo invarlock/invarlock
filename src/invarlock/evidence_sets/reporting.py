@@ -23,6 +23,7 @@ from invarlock.evidence_sets.contracts import (
     read_object,
 )
 from invarlock.evidence_sets.verification import (
+    _require_shared_inputs,
     require_deterministic_policy,
     shared_captured_inputs,
 )
@@ -89,13 +90,22 @@ def build_evidence_set_view(
             expected_envelope
         ):
             raise EvidenceSetError("judge statement changed during rendering")
-        for field in ("baseline_run_sha256", "subject_run_sha256", "case_set_sha256"):
-            if publication.envelope["bindings"][field] != shared[field]:
-                raise EvidenceSetError("component runs or case sets differ")
-        if publication.envelope["intended_subject"] != shared.get(
-            "subject_service_identity_sha256", shared["subject_artifact_sha256"]
-        ):
-            raise EvidenceSetError("component subject identities differ")
+        run_fields = ("baseline_run_sha256", "subject_run_sha256", "case_set_sha256")
+        _require_shared_inputs(
+            {field: publication.envelope["bindings"][field] for field in run_fields},
+            {field: shared[field] for field in run_fields},
+            message="component runs or case sets differ",
+        )
+        subject_field = (
+            "subject_service_identity_sha256"
+            if "subject_service_identity_sha256" in shared
+            else "subject_artifact_sha256"
+        )
+        _require_shared_inputs(
+            {subject_field: publication.envelope["intended_subject"]},
+            {subject_field: shared[subject_field]},
+            message="component subject identities differ",
+        )
         if artifacts["analysis_policy"]["decision_role"] != "required":
             raise EvidenceSetError("evidence set requires a required judge policy")
         first = captured_view(manifest, payloads, signer)

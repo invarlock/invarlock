@@ -129,6 +129,41 @@ def test_preflight_names_missing_inputs(staged):
     assert payload["cases"] == 1
 
 
+def test_preflight_explains_unattainable_precision_without_blocking_replay(staged):
+    path, _ = staged
+    policy_path = path.parent / "analysis_policy.json"
+    policy = json.loads(policy_path.read_text())
+    policy["maximum_interval_width"] = "0.2"
+    policy_path.write_text(json.dumps(policy))
+    result = RUNNER.invoke(app, ["evaluate", str(path), "--preflight", "--json"])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.stdout)
+    assert payload["ready"] is True
+    assert payload["precision"]["paired_effect"]["status"] == "unattainable"
+    assert payload["network_calls"] == 0
+    assert not (path.parent / "evidence").exists()
+    text = RUNNER.invoke(app, ["evaluate", str(path), "--preflight"])
+    assert text.exit_code == 0, text.output
+    assert "cannot meet the width limit" in text.stdout
+    assert "does not predict acceptance" in " ".join(text.stdout.split())
+
+
+def test_preflight_explains_count_and_capacity_limits_for_descriptive_subject(staged):
+    path, _ = staged
+    policy_path = path.parent / "analysis_policy.json"
+    policy = json.loads(policy_path.read_text())
+    policy.update(
+        minimum_units=2, maximum_interval_width="0.000000000000001", subject_bound=None
+    )
+    policy_path.write_text(json.dumps(policy))
+    result = RUNNER.invoke(app, ["evaluate", str(path), "--preflight"])
+    assert result.exit_code == 0, result.output
+    text = " ".join(result.stdout.split())
+    assert "policy requires at least 2" in text
+    assert "No guarantee within the 10000-unit plan limit" in text
+    assert "Subject score precision" not in text
+
+
 def test_collect_preflight_shows_explicit_budgets_and_installed_runner(
     staged, monkeypatch
 ):

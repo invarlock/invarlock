@@ -7,7 +7,6 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any, Literal
 
-import click
 import typer
 from rich.console import Console
 from rich.markdown import Markdown
@@ -20,7 +19,7 @@ from invarlock.security import enforce_default_security
 class CoreCommandGroup(TyperGroup):
     """Keep the public journey in semantic order."""
 
-    def list_commands(self, ctx: click.Context) -> list[str]:
+    def list_commands(self, ctx: object) -> list[str]:
         del ctx
         return ["evaluate", "verify", "report"]
 
@@ -39,6 +38,42 @@ app = typer.Typer(
     ),
 )
 console = Console(markup=False, highlight=False)
+
+
+def _print_judge_precision(precision: dict[str, Any] | None) -> None:
+    if precision is None:
+        return
+    if not precision["minimum_units_met"]:
+        console.print(
+            f"Sample count: {precision['independent_units']} independent units; "
+            f"policy requires at least {precision['minimum_units']}."
+        )
+    for key, label in (
+        ("paired_effect", "Paired effect"),
+        ("subject_score", "Subject score"),
+    ):
+        row = precision[key]
+        if row.get("role") == "descriptive":
+            continue
+        status = {
+            "within_limit": "meets the width limit for all scores",
+            "unattainable": "cannot meet the width limit",
+            "not_guaranteed": "width limit is not guaranteed",
+        }[row["status"]]
+        console.print(
+            f"{label} precision: {status}; width <= {row['maximum_width_upper_bound']}; "
+            f"policy limit {precision['maximum_interval_width']}."
+        )
+        needed = row["units_for_guaranteed_width"]
+        if needed is None:
+            console.print(
+                f"No guarantee within the {precision['unit_search_limit']}-unit plan limit."
+            )
+        else:
+            console.print(f"Independent units for guaranteed width: {needed}.")
+    console.print(
+        "Precision assumes complete collection and independent units; it does not predict acceptance."
+    )
 
 
 def _setup_result(
@@ -764,6 +799,7 @@ def evaluate(  # noqa: C901
                     f"Maximum admitted calls: {capacity['maximum_admitted_calls']}; "
                     f"full plan reserved: {'yes' if capacity['full_plan_reserved'] else 'no'}"
                 )
+            _print_judge_precision(payload.get("precision"))
             for error in payload["errors"]:
                 console.print(_terminal_text(error), markup=False)
             console.print("No model calls, signing, or publication were performed.")
@@ -845,6 +881,7 @@ def evaluate(  # noqa: C901
                 f"Collection budgets: {_terminal_text(str(judge['budgets']))}",
                 markup=False,
             )
+            _print_judge_precision(judge.get("precision"))
         if outcome.profile_context is not None and outcome.launch is not None:
             if outcome.profile is not None:
                 console.print(

@@ -104,7 +104,7 @@ sourced copies of the policy bytes bound into that bundle.
 | Who signed the pack | Manifest signature | Compare the public-key fingerprint to the caller anchor |
 | Who accepted or rejected it | External receipt | Verify receipt signature, identity, fingerprint, anchors, and manifest digest |
 
-Runtime execution has a second boundary. Each strict executed side runs in its
+Host-orchestrated runtime execution has a second boundary. Each side runs in its
 own worker with an independently pinned image, selected device, and entrypoint
 profile. The worker has a read-only job, schedule, artifact, and closed support
 resources plus one isolated writable output directory. It never receives the
@@ -113,6 +113,11 @@ digest-bearing image identity, offline execution, disabled remote code, and
 disabled third-party plugins are required for each side. These bindings describe
 the observed execution envelope; an image digest alone is not proof of every
 property of the host or accelerator.
+
+The [inline local-judge route](judge-measurements.md#native-local-judge-collection)
+is a separate path: baseline, subject and judge run sequentially in one
+operator-started strict container. A signing key mounted there is available to
+the trusted runtime process; that route does not provide host-separated signing.
 
 ## Package boundaries
 
@@ -147,7 +152,6 @@ invarlock
 └── canonical verifier + renderer
 
 public dependency extras
-├── hf
 ├── diagnostics
 ├── vision-text
 └── judge
@@ -160,7 +164,7 @@ See [Runtime providers](runtime-providers.md) for the extension contract.
 1. The request loader resolves all file references beneath the request root,
    without following symbolic links, and authenticates the exact source bytes.
 2. In run mode, pinned local JSONL is transformed deterministically into the
-   canonical schedule. The host CLI launches one independently digest-bound
+   canonical schedule. In the host-orchestrated path, the CLI launches one independently digest-bound
    Docker or Podman worker per side. Both workers score the same schedule, and
    the host validates their complete side results. Import mode authenticates a
    supplied canonical schedule and complete runtime sidecars.
@@ -169,7 +173,7 @@ See [Runtime providers](runtime-providers.md) for the extension contract.
    counts, the exact McNemar probability and Newcombe 95% interval. Normalized
    NLL and scorer-extension deltas use the fixed 2,048-replicate schedule interval.
    Native judge freezes the exact native capture, derives answer-dependent plan
-   bindings, collects bounded ratings through the installed optional integration,
+   bindings, collects bounded ratings through the selected collector,
    and applies its fixed-benchmark analysis. Each scorer preserves its own
    statistical assumptions and conservative policy bound.
 4. Publication stages a closed inventory, signs its manifest or judge envelope,
@@ -183,7 +187,8 @@ See [Runtime providers](runtime-providers.md) for the extension contract.
    judge reports additionally replay retained measurements.
    It reports authentication and policy state separately from recipient acceptance.
 
-Run mode and import mode differ only before bundle assembly. Run mode asks each
+For native deterministic evidence, run and import differ before bundle assembly.
+Host-orchestrated run mode asks each
 isolated worker to emit the sidecars. Import mode authenticates supplied
 sidecars and re-derives their identities and pairs. Both reach the same
 canonical pack and independent verifier. CPU workers and workers assigned to

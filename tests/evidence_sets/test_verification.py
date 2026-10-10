@@ -249,7 +249,13 @@ def test_wrong_recipient_pins_reject(tmp_path, target):
         value = value[part]
     value[parts[-1]] = "sha256:" + "f" * 64
     write(path, policy)
-    assert not verify_evidence_set(root, recipient_policy=path).accepted
+    result = verify_evidence_set(root, recipient_policy=path)
+    assert not result.accepted
+    if target.startswith("shared_inputs."):
+        error = str(result.payload["errors"])
+        assert parts[-1] in error
+        assert "expected 'sha256:" in error and "observed 'sha256:" in error
+        assert not result.payload["shared_inputs_verified"]
 
 
 def test_receipt_cannot_be_written_into_any_member(tmp_path):
