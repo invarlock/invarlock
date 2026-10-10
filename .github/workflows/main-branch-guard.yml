@@ -28,6 +28,11 @@ jobs:
           BASE_REPO: ${{ github.event.pull_request.base.repo.full_name }}
         run: |
           set -euo pipefail
+          : "${BASE_REF:?Missing pull request base branch}"
+          : "${BASE_REPO:?Missing pull request base repository}"
+          : "${HEAD_REF:?Missing pull request head branch}"
+          : "${HEAD_REPO:?Missing pull request head repository}"
+          : "${GITHUB_REPOSITORY:?Missing workflow repository}"
           if [[ "${BASE_REF}" != main || -z "${BASE_REPO}" || "${BASE_REPO}" != "${GITHUB_REPOSITORY}" ]]; then
             echo "The release-branch check requires this repository's main branch as its target." >&2
             exit 1

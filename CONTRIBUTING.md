@@ -70,7 +70,9 @@ npm ci
 ```
 
 Install `uv` for lock, distribution, and dependency-audit targets; CI currently
-uses version `0.10.10`. Workflow changes also require `actionlint` on `PATH`.
+uses version `0.10.10`. Workflow changes also require the CI-pinned `actionlint`
+version and ShellCheck on `PATH`. A newer local linter can miss issues reported
+by the pinned version.
 The exact label entry in `.github/actionlint.yaml` lets the pinned linter recognize
 Ubuntu 26.04 while its upstream runner list catches up. GitHub still selects its
 hosted image from `runs-on`.

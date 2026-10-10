@@ -19,7 +19,9 @@ def _workflow() -> dict:
     return document
 
 
-def _run_guard(tmp_path: Path, **changes: str) -> subprocess.CompletedProcess[str]:
+def _run_guard(
+    tmp_path: Path, **changes: str | None
+) -> subprocess.CompletedProcess[str]:
     job = next(iter(_workflow()["jobs"].values()))
     command = job["steps"][-1]["run"]
     environment = {
@@ -36,7 +38,7 @@ def _run_guard(tmp_path: Path, **changes: str) -> subprocess.CompletedProcess[st
     return subprocess.run(
         ["bash", "--noprofile", "--norc", "-e", "-c", command],
         cwd=tmp_path,
-        env=environment,
+        env={key: value for key, value in environment.items() if value is not None},
         capture_output=True,
         text=True,
         check=False,
@@ -75,6 +77,14 @@ def test_rejects_wrong_repository_target_or_malformed_version(
     tmp_path: Path, changes: dict[str, str]
 ) -> None:
     assert _run_guard(tmp_path, **changes).returncode != 0
+
+
+@pytest.mark.parametrize(
+    "missing", ["BASE_REF", "BASE_REPO", "HEAD_REF", "HEAD_REPO", "GITHUB_REPOSITORY"]
+)
+def test_rejects_missing_environment_metadata(tmp_path: Path, missing: str) -> None:
+    result = _run_guard(tmp_path, **{missing: None})
+    assert result.returncode != 0
 
 
 def test_branch_metadata_is_never_executed(tmp_path: Path) -> None:
