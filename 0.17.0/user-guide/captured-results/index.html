@@ -1,0 +1,2466 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Paired model release-regression evaluation with independently verifiable evidence">
+      
+      
+      
+        <link rel="canonical" href="https://invarlock.github.io/invarlock/user-guide/captured-results/">
+      
+      
+        <link rel="prev" href="../getting-started/">
+      
+      
+        <link rel="next" href="../hosted-service-requalification/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/invarlock-app-icon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Captured results - InvarLock Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Sora:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Sora";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#captured-results" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="InvarLock Documentation" class="md-header__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
+      
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            InvarLock Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Captured results
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/invarlock/invarlock" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    invarlock
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Overview
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../getting-started/" class="md-tabs__link">
+          
+  
+  
+  User guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../assurance/assurance-case/" class="md-tabs__link">
+          
+  
+  
+  Assurance
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/cli/" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../security/trust-model/" class="md-tabs__link">
+          
+  
+  
+  Security
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="InvarLock Documentation" class="md-nav__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
+      
+  <img src="../../assets/invarlock-mark-dark.svg" alt="logo">
+
+    </a>
+    InvarLock Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/invarlock/invarlock" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    invarlock
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Captured results
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Captured results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#prepare-the-request" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prepare the request
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#use-the-three-built-in-scorers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Use the three built-in scorers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#judge-captured-answers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Judge captured answers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#signed-handoff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Signed handoff
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#preflight-and-local-ci" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Preflight and local CI
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#outputs-and-assurance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outputs and assurance
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hosted-service-requalification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosted-service requalification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modelkit-handoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ModelKit recipient handoff
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../change-scenarios/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Change scenarios
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../key-management/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Key management
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../runtime-providers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime providers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluation-request/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation request
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../schedule-and-policy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schedule and policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evidence-and-verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence and verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../verification-failure-lab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verification failure lab
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diagnostics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optional diagnostics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ci-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CI integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../public-evidence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Publish public evidence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assurance
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Assurance
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/assurance-case/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assurance case
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/decision-semantics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decision semantics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/pairing-and-replay/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pairing and replay
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/acceptance-checklist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Acceptance checklist
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/evaluation-records/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation records
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/evaluation-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation capacity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/compatibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compatibility covenant
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/acceptance-attestations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Acceptance attestations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/policy-engine-interop/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Policy-engine interoperability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/evaluator-qualification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluator qualification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/artifacts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifacts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/judge-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Judge measurements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/evidence-sets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence sets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/runtime-providers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime providers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/runtime-security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime-security API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/environment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/release-verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/documentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Security
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/trust-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trust model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/threat-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threat model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/best-practices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security practices
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/dependency-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dependency-audit exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#prepare-the-request" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prepare the request
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#use-the-three-built-in-scorers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Use the three built-in scorers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#judge-captured-answers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Judge captured answers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#signed-handoff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Signed handoff
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#preflight-and-local-ci" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Preflight and local CI
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#outputs-and-assurance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outputs and assurance
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="captured-results">Captured Results<a class="headerlink" href="#captured-results" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p><strong>User guide</strong></p>
+<p><strong>Outcome:</strong> Publish and independently verify captured evaluation evidence.</p>
+<p><strong>Audience:</strong> Evaluator and release-integration engineers.</p>
+<p><strong>Prerequisites:</strong> Paired records, a policy, and the core <code>invarlock</code> wheel.</p>
+</blockquote>
+<p>Use the core wheel and examples from the same source revision. For a released
+wheel, use its matching release documentation. Record the source commit and wheel
+SHA-256 when sharing a local build; see
+<a href="../getting-started/#matching-wheels-and-examples">matching wheels and examples</a>.</p>
+<p>Use the core <code>evaluate</code>, <code>verify</code>, and <code>report</code> commands when an evaluator has
+already produced paired records. The request binds the baseline, subject,
+policy, and output location without introducing a separate command namespace.</p>
+<p>Hosted captures can declare a service identity and observation window with
+<code>artifact_digest: null</code>. The <a href="../hosted-service-requalification/">hosted requalification guide</a>
+walks through baseline approval, fresh capture, evaluation, offline verification
+and the resulting decision. This is captured assurance: replay does not attest
+execution or freshly measure a service.</p>
+<h2 id="prepare-the-request">Prepare the request<a class="headerlink" href="#prepare-the-request" title="Permanent link">&para;</a></h2>
+<p><code>invarlock evaluate --init demo --example classification</code> creates synthetic
+paired runs, policy, and <code>demo/request.yaml</code>. <code>extraction</code> demonstrates structured
+extraction; <code>judge</code> demonstrates comparison of recorded scalar ratings and does
+not collect bounded judge measurements. Use <code>--example native-judge</code> for native
+answer generation followed by bounded judging. Replace illustrative inputs and
+thresholds before drawing conclusions about a model.</p>
+<div class="codehilite"><pre><span></span><code><span class="nt">format_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">invarlock/evaluation-request-v2</span>
+<span class="nt">execution</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">captured</span>
+<span class="nt">comparison</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">baseline</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">baseline.json</span>
+<span class="w">    </span><span class="nt">adapter</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">invarlock</span>
+<span class="w">  </span><span class="nt">subject</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">subject.json</span>
+<span class="w">    </span><span class="nt">adapter</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">invarlock</span>
+<span class="w">  </span><span class="nt">policy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">policy.json</span>
+<span class="nt">output</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">evidence</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">evidence</span>
+</code></pre></div>
+
+<p>Request paths resolve beneath the request's parent directory. CLI
+<code>--baseline-run</code>, <code>--subject-run</code>, and <code>--output</code> overrides resolve from the
+caller's working directory and must remain inside that request root. They change
+locations, not adapters or identity pins. A source's <code>expected_run_digest</code> still
+has to match after an override. Native runtime/container controls do not apply to captured requests. Judge
+collection uses the installed collector and explicit budgets described below.</p>
+<h2 id="use-the-three-built-in-scorers">Use the three built-in scorers<a class="headerlink" href="#use-the-three-built-in-scorers" title="Permanent link">&para;</a></h2>
+<p>An existing evaluator can supply records to all three scorers. Each scorer needs
+different facts; naming an evaluator or retaining its aggregate score cannot
+supply missing facts.</p>
+<table>
+<thead>
+<tr>
+<th>Scorer</th>
+<th>Required per-case facts</th>
+<th>Comparison</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>exact_match</code></td>
+<td>Output and reference strings</td>
+<td>Paired correctness change</td>
+</tr>
+<tr>
+<td><code>normalized_nll_per_utf8_byte</code></td>
+<td>Reference-continuation log probabilities, byte/token counts and identity bindings</td>
+<td>Ratio of mean normalized NLL, using the native paired interval</td>
+</tr>
+<tr>
+<td><code>judge</code></td>
+<td>Task text and frozen answer text, plus a declared rubric and retained judge calls</td>
+<td>Repeated ratings aggregated over declared independent units</td>
+</tr>
+</tbody>
+</table>
+<p>Set <code>comparison.metric</code> explicitly to select one scorer. For exact match or NLL,
+it must agree with the single metric in <code>comparison.policy</code>. Omitting it retains
+the existing multi-metric comparison-policy behavior. Missing likelihood facts
+produce insufficient evidence; InvarLock does not estimate them from generated
+answers, token counts alone or an evaluator's summary score.</p>
+<p>Keep your existing evaluator environment and save its original per-case results
+as JSON using the <a href="https://github.com/invarlock/invarlock/blob/main/examples/evaluator-qualification/maintained/CAPTURE.md#dedicated-native-shapes">native source recipes</a>.
+Point baseline and subject at those files with <code>adapter: evaluator-native-json</code>,
+the actual evaluator name/version, run ID, and model or hosted-service identity.
+All 19 profiles use the same policy, evaluation, verification and reporting flow.
+The capture process needs no InvarLock installation or common export envelope; the recipient
+needs only core InvarLock. Pin the independently reviewed case set in policy so
+missing cases cannot disappear from both sides. The
+<a href="../../reference/evaluation-records/#dedicated-evaluator-exports">onboarding example</a>
+shows raw JSON capture and the request source.</p>
+<p>If your SDK's dependencies are compatible with core InvarLock, the optional
+<code>invarlock.engine.export_evaluator_result</code> convenience API accepts SDK objects,
+checks the independent planned IDs, and writes an envelope for
+<code>adapter: evaluator-json</code>. Keep MLflow 3.14.0 in a separate evaluator environment
+because its cryptography dependency conflicts with core InvarLock; use the raw
+JSON route. <code>capture_evaluator_run</code> remains available for explicitly mapped
+canonical records, and <code>evaluator_input_capabilities</code> reports missing facts
+before scorer selection. Source-only SDK serializer tests do not establish
+co-installation compatibility.</p>
+<p>You can capture frozen outputs before upstream grading. Optional numeric metrics
+use their declared provenance and a <code>recorded</code> policy; per-case string metadata
+supports slices under the same policy. These observations do not replace the
+likelihood or judge measurements required above. Supply an actual typed
+likelihood under <code>metadata.invarlock_likelihood</code>; do not fabricate generated text
+for a likelihood-only case. A successful import establishes usable captured
+facts, and does not itself qualify a model or approve a release.</p>
+<p>For a measured NLL comparison between distinct checkpoints, replay the
+<a href="https://github.com/invarlock/invarlock/blob/main/examples/captured-results/references/mistral-7b-likelihood/README.md">Mistral 7B reference</a>.
+It retains 400 paired narrative continuations, both model identities and the
+complete signed handoff. The smaller
+<a href="https://github.com/invarlock/invarlock/blob/main/examples/captured-results/references/harness-likelihood/README.md">Harness likelihood control</a>
+preserves the original six-pair same-model CPU check. Both references retain exact
+continuation and tokenizer bindings, signed evaluation and independent recipient
+verification; their scope is the declared integration profile.</p>
+<p>For structured task inputs, a source may declare an explicit text projection:</p>
+<div class="codehilite"><pre><span></span><code><span class="nt">comparison</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">baseline</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">baseline.jsonl</span>
+<span class="w">    </span><span class="nt">adapter</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">jsonl</span>
+<span class="w">    </span><span class="nt">input_projection</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">json-pointer</span>
+<span class="w">      </span><span class="nt">pointer</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/input/question</span>
+</code></pre></div>
+
+<p>Apply the same projection to the subject. The pointer must select an existing
+string beneath <code>/input/</code> or <code>/context/</code>. InvarLock retains and verifies the
+original input, context and projection configuration; it never invents a prompt
+by converting a structured object to text. Canonical <code>invarlock</code> runs already contain
+their bindings and reject a projection override.</p>
+<h2 id="judge-captured-answers">Judge captured answers<a class="headerlink" href="#judge-captured-answers" title="Permanent link">&para;</a></h2>
+<p>For an offline local judge, the recipe can select <code>runtime-provider-judge</code> with
+<code>comparison.judge.model</code> binding an inspected HF or GGUF artifact and runtime.
+The InvarLock process must already run inside the strict offline container;
+the ordinary host CLI does not launch a judge container. The
+<a href="https://github.com/invarlock/invarlock/blob/main/examples/native-local-judge/README.md">local judge example</a> demonstrates
+model inspection, plan preparation and recipient verification. This local model
+selection cannot be combined with a retained <code>comparison.judge.measurements</code>
+file; retained-measurement import does not need model resources.
+For a configured Chat Completions service, select
+<a href="../../reference/judge-measurements/#openai-compatible-judge-services"><code>openai-compatible-judge</code></a>
+without a local model binding. The service's returned model label is retained
+as an observation rather than treated as an authenticated model artifact.</p>
+<p>Keep the captured request's baseline and subject source definitions and replace
+its comparison policy selection with:</p>
+<div class="codehilite"><pre><span></span><code><span class="nt">comparison</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">metric</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">judge</span>
+<span class="w">  </span><span class="nt">policy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">judge-policy.json</span>
+<span class="w">  </span><span class="nt">judge</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">workspace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">judge-work</span>
+<span class="w">    </span><span class="nt">signer_identity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">evaluation-signer</span>
+</code></pre></div>
+
+<p>This is a fragment of the complete request, not a replacement for the baseline
+and subject fields. <code>judge-policy.json</code> uses the same
+<code>invarlock/native-judge-policy-v1</code> recipe as native judging. InvarLock derives the
+plan from the captured records, checks the full call reservation and collects
+ratings through the installed collector. Preflight makes no calls. Resuming
+uses the frozen identities and admitted trials in the private workspace.</p>
+<p>Alternatively, set <code>comparison.judge.measurements: measurements.json</code> to import
+retained ratings entirely offline. <code>prepare_evaluator_judge(recipe, baseline,
+subject)</code> returns the frozen plan and analysis policy for your own collector.
+<code>import_judge_sources</code> assembles canonical retained-call shards and validates
+their requests, responses, attempts and source positions against that plan.
+Existing scalar ratings without these facts cannot be imported as judge evidence.
+Captured judging limits each run to 128 MiB, the recipe to 4 MiB and retained
+measurements to 384 MiB, with a shared 384 MiB input allowance. Each file is read
+once under the remaining allowance before parsing.
+The <a href="../../reference/judge-measurements/">judge reference</a> describes the retained
+format, optional per-case references and recipient-owned judge trust profile.</p>
+<p>Captured judging produces judge evidence and uses that judge trust profile,
+rather than the deterministic captured trust profile below. It authenticates
+captured inputs and scoring replay; it does not assert that InvarLock executed
+the original model. Reports identify the evaluator and retained model context.</p>
+<h2 id="signed-handoff">Signed handoff<a class="headerlink" href="#signed-handoff" title="Permanent link">&para;</a></h2>
+<p>The evaluation operator supplies its Ed25519 key through <code>--signing-key</code> or
+<code>INVARLOCK_SIGNING_KEY</code>. A recipient independently reviews the complete runs and
+policy, derives their pins through <code>invarlock.engine.run_digest</code>,
+<code>normalize_captured_request</code>, and <code>captured_request_digest</code>, and obtains the
+evidence-signer fingerprint through an authorized channel. Do not copy anchors out of
+the submitted pack or treat the operator's preflight output as recipient approval.</p>
+<p>Use a recipient-owned <code>trust/trust-inputs.json</code> outside the pack. Replace all
+digest placeholders with the independently approved values:</p>
+<div class="codehilite"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;format&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;invarlock/trust-inputs-v2&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;kind&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;captured&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;policy&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;policy.json&quot;</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;anchors&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;baseline_run_digest&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sha256:...&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;subject_run_digest&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sha256:...&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;request_digest&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sha256:...&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;evidence_signer_fingerprint&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sha256:...&quot;</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;verifier&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;identity&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;recipient-verifier&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;signing_key_path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;verifier.pem&quot;</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>The policy and verifier key resolve relative to the profile. The recipient owns
+that key separately from the evaluation operator. <code>evaluate --keygen keys</code> creates an
+Ed25519 demonstration key pair; do not share the private key between roles.
+Profile paths reject traversal and symlinks. Explicit trust flags cannot be
+combined with <code>--trust-profile</code>, and environment anchors cannot override it.</p>
+<div class="codehilite"><pre><span></span><code>invarlock<span class="w"> </span>evaluate<span class="w"> </span>request.yaml<span class="w"> </span>--signing-key<span class="w"> </span>evidence-signer.pem<span class="w"> </span>--json
+invarlock<span class="w"> </span>verify<span class="w"> </span>evidence/<span class="w"> </span>--trust-profile<span class="w"> </span>trust/trust-inputs.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--receipt<span class="w"> </span>verification.receipt.json<span class="w"> </span>--json
+invarlock<span class="w"> </span>report<span class="w"> </span>evidence/<span class="w"> </span>--html<span class="w"> </span>report.html<span class="w"> </span>--markdown<span class="w"> </span>report.md<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--junit<span class="w"> </span>results.xml<span class="w"> </span>--json
+</code></pre></div>
+
+<p>The equivalent explicit verification options are <code>--policy</code>,
+<code>--expected-baseline-run</code>, <code>--expected-subject-run</code>, <code>--expected-request-digest</code>,
+<code>--expected-signer</code>, <code>--verifier-identity</code>, <code>--verifier-signing-key</code>, and
+<code>--receipt</code>. All are required. Native artifact/schedule/runtime anchors are not
+substitutes. The profile's canonical digest is bound into the external signed
+receipt. Receipt authentication uses
+<code>invarlock.engine.verify_signed_verification_receipt</code> with the same independent
+run/request/policy/signer pins and expected verifier identity/fingerprint.
+Its <code>ok</code> authenticates the receipt, including an authentic rejection; separately
+require <code>statement.verdict.ok</code> for a passing technical result.</p>
+<h2 id="preflight-and-local-ci">Preflight and local CI<a class="headerlink" href="#preflight-and-local-ci" title="Permanent link">&para;</a></h2>
+<p>Before publication, <code>evaluate --preflight --json</code> checks paired inputs, reviewed case
+membership, and the planned work allowance without scoring or writing evidence.
+Both evaluation and recipient verification accept <code>--max-bootstrap-draws</code>; each
+caller owns its allowance, and increasing the evaluation allowance does not raise
+the recipient's allowance. The default is 102,400,000 draws across the complete
+policy, including overlapping slices.
+Preflight emits <code>invarlock/evaluation-preflight-v3</code>, with <code>kind: captured</code>,
+<code>requested_authentication</code>, run/policy/request digests, record/scope counts, and
+required versus allowed bootstrap draws. It emits no decision, assurance, or
+receipt fields. For key-free pin derivation, use the pure SDK normalization and
+digest helpers; signed preflight validates the supplied signing key.</p>
+<p><code>evaluate --unsigned</code> publishes an explicitly unsigned local pack. It conflicts
+with an explicit signing key and never falls back to signing implicitly.
+<code>verify</code> rejects unsigned packs with exit <code>6</code>. If the manifest was safely examined,
+it may issue a signed rejection receipt, never a positive verification receipt.
+Local rendering
+preserves the unsigned assurance label rather than presenting a verified result.</p>
+<p>Successful evaluation exits <code>0</code> when it publishes evidence, even for an adverse
+policy decision. For local CI, add <code>--fail-on-policy</code> to return <code>7</code> after publishing
+a regression or insufficient-evidence result. Reports still describe the recorded
+decision; they do not independently verify unsigned results. Preserve the gate
+status while generating JUnit output:</p>
+<div class="codehilite"><pre><span></span><code><span class="nv">evaluation_status</span><span class="o">=</span><span class="m">0</span>
+invarlock<span class="w"> </span>evaluate<span class="w"> </span>request.yaml<span class="w"> </span>--unsigned<span class="w"> </span>--fail-on-policy<span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nv">evaluation_status</span><span class="o">=</span><span class="nv">$?</span>
+<span class="k">case</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$evaluation_status</span><span class="s2">&quot;</span><span class="w"> </span><span class="k">in</span>
+<span class="w">  </span><span class="m">0</span><span class="p">|</span><span class="m">7</span><span class="o">)</span><span class="w"> </span><span class="p">;;</span>
+<span class="w">  </span>*<span class="o">)</span><span class="w"> </span><span class="nb">exit</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$evaluation_status</span><span class="s2">&quot;</span><span class="w"> </span><span class="p">;;</span>
+<span class="k">esac</span>
+invarlock<span class="w"> </span>report<span class="w"> </span>evidence/<span class="w"> </span>--junit<span class="w"> </span>results.xml<span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nb">exit</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$?</span><span class="s2">&quot;</span>
+<span class="nb">exit</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$evaluation_status</span><span class="s2">&quot;</span>
+</code></pre></div>
+
+<p>Preflight cannot be combined with <code>--fail-on-policy</code>, because it does not compute
+a policy decision. A failed publication must not trigger reporting of an older
+evidence directory.</p>
+<p><code>--fail-on-policy</code> is CLI-only: <code>pass</code> exits <code>0</code>, <code>regression</code>,
+<code>insufficient_evidence</code>, or native <code>fail</code> exits <code>7</code>, and an unknown/unavailable
+decision exits <code>2</code>. The successful publication JSON is retained on gate exits;
+SDK evaluation continues to return its publication result. Input or local budget
+refusal exits <code>2</code> without a new pack or receipt. A signed captured verification
+that completes with an adverse policy decision exits <code>7</code> with its rejection
+receipt. Structural/contract rejection exits <code>4</code>; authenticated binding or source
+integrity rejection exits <code>6</code>. Every nonzero verification
+status rejects. Retry budget refusal only after approving an adequate local
+allowance, not by weakening policy.</p>
+<h2 id="outputs-and-assurance">Outputs and assurance<a class="headerlink" href="#outputs-and-assurance" title="Permanent link">&para;</a></h2>
+<p>Captured evaluation emits <code>invarlock/evaluation-result-v2</code>, with <code>kind</code>, <code>ok</code>,
+<code>evidence</code>, <code>comparison_id</code>, baseline/subject run digests, <code>policy_digest</code>,
+<code>request_digest</code>, <code>pack_manifest_digest</code>, <code>authentication</code>, <code>decision</code>, and
+<code>policy_verdict</code>. Publication <code>ok: true</code> is not a claim of independent verification.
+Captured verification emits <code>invarlock/evidence-pack-verify-v2</code>; its signed
+<code>invarlock/evidence-verification-receipt-v3</code> has
+<code>verification_scope: captured_comparison</code>, replay status and scoring assurance.
+Only <code>invarlock/evidence-pack-v2</code> directories are captured evidence packs.</p>
+<p><code>report --json</code> emits <code>invarlock/evidence-report-v2</code> with <code>kind: captured</code>, <code>ok</code>,
+<code>pack_manifest_digest</code>, <code>requested_outputs</code>, <code>written_outputs</code>, <code>failed_output</code>,
+and <code>errors</code>. Output maps use <code>html</code>, <code>markdown</code>, and <code>junit</code> keys; an omitted
+destination is not written. Destinations are checked together for collisions
+before writing. If a later write fails, earlier outputs remain and are listed in
+<code>written_outputs</code>. JUnit represents regression as failure and insufficient
+evidence as error. See <a href="../../reference/reports/">reports</a> and
+<a href="../../reference/evaluation-capacity/">capacity</a>.</p>
+<p>The readable views show both run IDs, complete-run digests, attributed artifact
+digests and evaluator name and version. When the records provide model, workflow,
+dataset or prompt metadata, the comparison context makes those changes visible.
+This is enough to tell which inputs produced the recorded decision; use <code>verify</code>
+when a recipient also needs authenticated bindings and replay assurance.</p>
+<p>The captured record format is intentionally separate from native runtime
+receipts. It authenticates the bytes and policy decision supplied by the
+submission; it does not establish model quality, representativeness, or runtime
+truth beyond those inputs. Receipt <code>scoring_assurance</code> is an ordered array of
+<code>name</code>, <code>slice</code>, <code>kind</code>, and <code>scoring_assurance</code> entries, each <code>recomputed</code> or
+<code>recorded</code>, according to policy, or <code>null</code> after integrity rejection. A comparison
+may contain both kinds of assurance. Recorded judgments and measurements are
+attributed inputs, not rerun inference. Captured packs and receipts, even when
+signed and passing, are rejected by native-only acceptance attestations, ModelKit
+acceptance, and deployment-approval consumers.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "navigation.sections", "navigation.expand", "navigation.tabs", "navigation.top", "search.highlight", "search.suggest", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../../assets/javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
