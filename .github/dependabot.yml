@@ -4,7 +4,7 @@
 # Repo policy:
 # - Version-update PRs target staging/next directly.
 # - GitHub security-update PRs still target the default branch (main).
-# - Direct Dependabot PRs to main are blocked by the dependabot-main-guard
+# - Direct Dependabot PRs to main are blocked by the main-branch-guard
 #   workflow; maintainers must land the equivalent fix on staging/next first
 #   and carry it through the normal release flow.
 

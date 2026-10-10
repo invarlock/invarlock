@@ -38,15 +38,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   guarantee. Forecasts are advisory and preserve existing readiness and policy
   decisions.
 
-### Fixed
-
-- Keep hosted workflow temporary files on the runner's work disk to avoid
-  Ubuntu 26.04's quota-limited `/tmp` RAM disk during combined test and build runs.
-
-- Locate the workspace interpreter with shell built-ins when `PATH` contains only
-  candidate interpreters, including when invoked from outside the repository.
-
 ### Changed
+
+- Require the GitHub Actions `release-branch` check for main promotions. Accept
+  only versioned release branches from the same repository; route other changes
+  through staging while preserving existing code-owner reviews and CI gates.
+
+- Run release artifact checks alongside six coverage groups, then enforce
+  combined coverage before attesting a tagged candidate.
+- Align user guides, assurance pages, tables and diagrams with current
+  verification contracts and the limits of advisory diagnostics and examples.
 
 - Select Ubuntu 26.04 explicitly for hosted Linux CI and release workflows.
   Keep Ubuntu 24.04 available for manual CI, evaluator SDK, container and
@@ -71,10 +72,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update CSpell to 10.3.6 and KaTeX to 0.19.0, and refresh the pinned workflow
   action releases.
 
+### Fixed
+
+- Accept both Click and Typer context types in CLI command ordering while
+  preserving the public command order.
+- Synchronize the packaged native-judge starter with the maintained example
+  guidance delivered by `evaluate --init`.
+
+- Keep hosted workflow temporary files on the runner's work disk to avoid
+  Ubuntu 26.04's quota-limited `/tmp` RAM disk during combined test and build runs.
+
+- Locate the workspace interpreter with shell built-ins when `PATH` contains only
+  candidate interpreters, including when invoked from outside the repository.
+
 ### Security
 
-- Replaced the documentation lint CLI to remove its unpatched `braces` dependency
-  and pinned patched YAML, TOML, Markdown, and nested KaTeX dependencies.
+- Replace the documentation lint CLI to remove its unpatched `braces` dependency
+  and pin patched YAML, TOML, Markdown, and nested KaTeX dependencies.
 
 - Refresh maintained Python and Promptfoo dependency locks to patched releases.
   Update the Inspect evaluator image to the supported 0.3.263 release so its

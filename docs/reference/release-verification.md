@@ -277,6 +277,13 @@ Every publication follows one complete path: upload, hosted digest verification,
 installed-wheel smoke, and, for production, documentation publication. A retry
 uses that same path and the same authenticated candidate.
 
+Require the GitHub Actions `release-branch` check in the `main` branch ruleset,
+alongside existing code-owner reviews and required checks. The check accepts only
+versioned `release/vX.Y.Z` branches from the same repository; preparation branches
+target `staging/next`. The branch name does not prove candidate validation or
+staging ancestry, which remain separate release checks. See the
+[workflow guide](https://github.com/invarlock/invarlock/blob/main/.github/WORKFLOWS.md#security-and-release).
+
 Configure a protected `v*` tag ruleset that blocks updates and deletion. Protect
 each project-scoped PyPI environment with an appropriate release authorization
 and deployment policy. These repository controls provide the authorization layer

@@ -49,7 +49,15 @@ that job's `cache-dependency-path`.
   scans the pull-request delta for secrets.
 - `scorecards.yml` publishes OpenSSF Scorecard results.
 - `secret-history.yml` is the scheduled full-history secret scan.
-- `dependabot-main-guard.yml` keeps dependency updates on `staging/next`.
+- `main-branch-guard.yml` supplies the required `release-branch` check for every
+  pull request targeting `main`, including retargeted PRs. It accepts only a
+  versioned `release/vX.Y.Z` head from the same repository. Work, staging and
+  Dependabot branches must enter through `staging/next` and a release promotion.
+  The job reads branch metadata without checking out or executing PR code.
+  The main ruleset must require this check from the GitHub Actions app; a workflow
+  file alone does not make its result mandatory. Keep code-owner review and the
+  other required checks enabled. This is a branch-route restriction, not a
+  substitute for version, ancestry, artifact or release-readiness verification.
 - `release.yml` validates pre-tag candidates and builds, attests, and publishes
   tagged Python distributions. After verified production publication, it calls
   the reusable documentation publisher from the same tag; TestPyPI and

@@ -1,0 +1,45 @@
+name: Main branch guard
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: main-branch-guard-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  release-branch:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    steps:
+      - name: Use disk-backed temporary storage
+        run: printf 'TMPDIR=%s\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+      - name: Require a release branch from this repository
+        shell: bash
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          BASE_REPO: ${{ github.event.pull_request.base.repo.full_name }}
+        run: |
+          set -euo pipefail
+          : "${BASE_REF:?Missing pull request base branch}"
+          : "${BASE_REPO:?Missing pull request base repository}"
+          : "${HEAD_REF:?Missing pull request head branch}"
+          : "${HEAD_REPO:?Missing pull request head repository}"
+          : "${GITHUB_REPOSITORY:?Missing workflow repository}"
+          if [[ "${BASE_REF}" != main || -z "${BASE_REPO}" || "${BASE_REPO}" != "${GITHUB_REPOSITORY}" ]]; then
+            echo "The release-branch check requires this repository's main branch as its target." >&2
+            exit 1
+          fi
+          if [[ "${HEAD_REPO}" != "${BASE_REPO}" || ! "${HEAD_REF}" =~ ^release/v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z][0-9A-Za-z.-]*)?$ ]]; then
+            echo "Main accepts only versioned release/v branches from this repository." >&2
+            echo "Land changes on staging/next first, then promote through release/vX.Y.Z." >&2
+            exit 1
+          fi
+          printf 'Release route accepted: %s -> main\n' "${HEAD_REF}"
