@@ -1,7 +1,7 @@
 # Security-sensitive workflows, locks, docs, and helper scripts.
 .github/workflows/codeql.yml @invarlock/core-maintainers
 .github/workflows/ci.yml @invarlock/core-maintainers
-.github/workflows/dependabot-main-guard.yml @invarlock/core-maintainers
+.github/workflows/main-branch-guard.yml @invarlock/core-maintainers
 .github/workflows/release.yml @invarlock/core-maintainers
 .github/workflows/supply-chain-pr.yml @invarlock/core-maintainers
 .github/codeql/ @invarlock/core-maintainers

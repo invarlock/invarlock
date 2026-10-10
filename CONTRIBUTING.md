@@ -21,6 +21,16 @@ Changes should make these workflows easier to understand, safer to execute,
 or easier to verify. Preserve the distinct assurance meaning of each evidence
 format.
 
+## Branches and release promotion
+
+Open implementation and release-preparation PRs from `work/` branches to
+`staging/next`. Promote reviewed staging changes through `release/vX.Y.Z` to
+`main`. The required `release-branch` check rejects other main PR heads,
+including direct staging, work and Dependabot branches, and release-named
+branches from forks. It does not replace code-owner approval or release checks.
+See the [workflow guide](.github/WORKFLOWS.md#security-and-release) for the
+matching main ruleset requirement.
+
 ## Development setup
 
 InvarLock requires Python 3.12 or newer. Use Python 3.13 to match the main CI
