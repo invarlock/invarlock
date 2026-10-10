@@ -2242,8 +2242,10 @@
 </table>
 <p>The wheel and source distribution include the repository license text; the
 distribution gate checks their contents and metadata.</p>
-<p>Live judge collection uses the core <code>invarlock[judge]</code> extra, which installs
-pinned Inspect, OpenAI/OpenRouter, Anthropic, Google, and <code>httpx</code> dependencies.
+<p>Inspect-based hosted judge collection uses the <code>invarlock[judge]</code> extra, which
+installs pinned Inspect, OpenAI/OpenRouter, Anthropic, Google, <code>httpx</code> and
+<code>httpx2</code> dependencies. The native local and OpenAI-compatible collectors do not
+require that extra.
 Offline judge import and replay require only the core wheel.</p>
 <p>All built-in providers are versioned with <code>invarlock</code> and must match
 runtime-provider ABI <code>1</code> when loaded. Optional third-party providers remain
@@ -2496,6 +2498,12 @@ into a successful run.</p>
 <p>Every publication follows one complete path: upload, hosted digest verification,
 installed-wheel smoke, and, for production, documentation publication. A retry
 uses that same path and the same authenticated candidate.</p>
+<p>Require the GitHub Actions <code>release-branch</code> check in the <code>main</code> branch ruleset,
+alongside existing code-owner reviews and required checks. The check accepts only
+versioned <code>release/vX.Y.Z</code> branches from the same repository; preparation branches
+target <code>staging/next</code>. The branch name does not prove candidate validation or
+staging ancestry, which remain separate release checks. See the
+<a href="https://github.com/invarlock/invarlock/blob/main/.github/WORKFLOWS.md#security-and-release">workflow guide</a>.</p>
 <p>Configure a protected <code>v*</code> tag ruleset that blocks updates and deletion. Protect
 each project-scoped PyPI environment with an appropriate release authorization
 and deployment policy. These repository controls provide the authorization layer
@@ -2527,8 +2535,8 @@ and release assets before announcing completion.</p>
 </ol>
 <p>Example discovery checks after installation:</p>
 <div class="codehilite"><pre><span></span><code>invarlock<span class="w"> </span>--version
-python<span class="w"> </span>-m<span class="w"> </span>invarlock.runtime_providers.llama_cpp_conformance<span class="w"> </span>--help
-python<span class="w"> </span>-m<span class="w"> </span>invarlock.runtime_providers.tensorrt_llm_conformance<span class="w"> </span>--help
+python<span class="w"> </span>-m<span class="w"> </span>invarlock.runtime_providers.llama_cpp_conformance
+python<span class="w"> </span>-m<span class="w"> </span>invarlock.runtime_providers.tensorrt_llm_conformance
 </code></pre></div>
 
 <p>Each conformance command must report <code>ok: true</code>, its expected provider name,

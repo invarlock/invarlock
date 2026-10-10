@@ -1024,6 +1024,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#portable-receipt-and-current-recipient-acceptance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Portable receipt and current recipient acceptance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#what-a-passing-result-establishes" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1050,6 +1061,17 @@
     <span class="md-ellipsis">
       
         Decision scope and complementary evidence
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#supplementary-review-and-corrections" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supplementary review and corrections
       
     </span>
   </a>
@@ -2110,6 +2132,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#portable-receipt-and-current-recipient-acceptance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Portable receipt and current recipient acceptance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#what-a-passing-result-establishes" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2136,6 +2169,17 @@
     <span class="md-ellipsis">
       
         Decision scope and complementary evidence
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#supplementary-review-and-corrections" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supplementary review and corrections
       
     </span>
   </a>
@@ -2450,8 +2494,26 @@ Maintain that provenance outside the pack with, at minimum:</p>
 <li>applicable artifact, schedule, and runtime scope; and</li>
 <li>exception and rollback procedure.</li>
 </ul>
-<p>A policy edit changes its digest and requires a new evidence pack. The current
-contract does not re-evaluate one existing pack under different policy bytes.</p>
+<p>Changing the evaluated policy changes its digest and requires a new evidence
+pack. Native verification does not re-evaluate an existing pack under different
+evaluated-policy bytes. A separate recipient policy can decline the unchanged
+technical result, as described below.</p>
+<h2 id="portable-receipt-and-current-recipient-acceptance">Portable receipt and current recipient acceptance<a class="headerlink" href="#portable-receipt-and-current-recipient-acceptance" title="Permanent link">&para;</a></h2>
+<p>The implemented <a href="../../reference/acceptance-attestations/">acceptance-attestation wrapper</a>
+transports a native pack-v1 technical result in an in-toto/DSSE envelope. It
+supports native receipt v1/v2, including comparison-report v3; it does not wrap
+captured or judge receipts. The original receipt bytes and format are preserved.</p>
+<p><code>verify_acceptance_attestation</code> authenticates the envelope and embedded receipt,
+binds the subject to an independently supplied artifact digest or artifact path,
+and applies the recipient's current signer, contract-version and freshness
+requirements. This verifies the transported statement; it does not repeat full
+evidence replay. Use <code>invarlock verify</code> for that replay.</p>
+<p>An authentic historical pass can be declined today without changing its
+technical verdict. A fresh envelope cannot establish evidence freshness when
+the receipt lacks an authenticated issuance time. Source labels and metric
+context supplied by the envelope signer are not independently replayed facts.
+Neither envelope acceptance nor full technical verification by itself grants
+deployment approval or establishes execution attestation.</p>
 <h2 id="what-a-passing-result-establishes">What a passing result establishes<a class="headerlink" href="#what-a-passing-result-establishes" title="Permanent link">&para;</a></h2>
 <p>A passing signed verification receipt establishes that:</p>
 <ul>
@@ -2548,6 +2610,29 @@ assumptions above and complementary evidence determine how far a decision can
 rely on those authenticated facts. See
 <a href="../reproducibility/">Reproducibility and provenance</a> and the
 <a href="../../security/threat-model/">Threat model</a> for the corresponding controls.</p>
+<h2 id="supplementary-review-and-corrections">Supplementary review and corrections<a class="headerlink" href="#supplementary-review-and-corrections" title="Permanent link">&para;</a></h2>
+<p>The <a href="../decision-semantics/#explore-hypothetical-exact-match-edits">exact-match edit advisory</a>
+measures hypothetical changes to supplied outcomes under a fixed policy.
+A replayed witness supports that edit-distance statement only. It supplies no
+new authentication, rerun probability or acceptance authority. Likewise,
+<a href="../../user-guide/diagnostics/">NumPy diagnostics</a> describe retained arrays;
+authenticating their bytes does not calibrate their reference edges as policy.</p>
+<p>The <a href="../../reference/evaluation-records/#explain-an-additive-score-change">score contribution recipe</a>
+explains a supplied additive total using exact weights and a residual. It cannot
+establish that the inputs are complete, their units match the report, or the
+residual is caused only by rounding. Validate those facts in the source workflow;
+the explanation does not supply a new verdict, interval or causal claim.</p>
+<p>For judge evidence, unique unit labels do not establish independence. Review
+shared source documents, sessions or subjects before relying on an interval;
+<a href="../../reference/judge-measurements/#statistical-scope">the duplication example</a>
+shows why repeating dependent observations can create false apparent precision.</p>
+<p>If an earlier assessment contains an actual error, preserve its bytes, identify
+the affected claim and issue linked replacement evidence for independent
+verification. The <a href="../../user-guide/hosted-service-requalification/#rehearse-a-correction-of-an-actual-error">offline correction example</a>
+exercises those links and review of a supplied dependency graph. Its explanatory
+notice is not an authenticated correction contract. Correction authority,
+notice delivery and downstream reliance decisions remain external; the graph
+cannot discover unknown consumers or automatically revoke approvals.</p>
 <h2 id="evidence-ownership">Evidence ownership<a class="headerlink" href="#evidence-ownership" title="Permanent link">&para;</a></h2>
 <p><code>evaluate</code> owns evidence creation, <code>verify</code> owns the scoped acceptance result,
 and <code>report</code> owns presentation. Keep those transactions and their keys separate:</p>

@@ -555,6 +555,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#rehearse-a-later-assessment-without-rewriting-history" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rehearse a later assessment without rewriting history
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rehearse-a-correction-of-an-actual-error" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rehearse a correction of an actual error
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#capture-fresh-executions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2022,6 +2044,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#rehearse-a-later-assessment-without-rewriting-history" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rehearse a later assessment without rewriting history
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rehearse-a-correction-of-an-actual-error" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rehearse a correction of an actual error
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#capture-fresh-executions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2146,6 +2190,85 @@ reviewed case set relevant to the suspected behavior. Define alert routing,
 escalation, repeat-confirmation and multiple-alert policy before repeated looks
 at results. Per-campaign intervals are not a joint guarantee across repeated
 campaigns, and incidental alerts do not establish an incident detector.</p>
+<h2 id="rehearse-a-later-assessment-without-rewriting-history">Rehearse a later assessment without rewriting history<a class="headerlink" href="#rehearse-a-later-assessment-without-rewriting-history" title="Permanent link">&para;</a></h2>
+<p>The <a href="https://github.com/invarlock/invarlock/blob/main/examples/hosted-service/reassessment.py">reassessment example</a>
+exercises an initial assessment A, a declared incident, and a later assessment B:</p>
+<div class="codehilite"><pre><span></span><code>python<span class="w"> </span>examples/hosted-service/reassessment.py<span class="w"> </span>--output<span class="w"> </span>reassessment-example
+</code></pre></div>
+
+<p>This is an offline integration fixture with 32 synthetic cases and fixed example
+observation windows. It makes no service calls and does not establish production
+quality, incident causality, or trustworthy event time. In a real campaign, replace
+the synthetic captures with independently reviewed retained service observations.</p>
+<p>A passes the fixed comparison policy. After the declared trigger, B compares new
+subject observations against the same frozen baseline and records a regression.
+Each has its own request, subject run, complete-run pins, signed evidence directory
+and independently signed verification receipt. The example hashes every file in
+A before producing B and checks that all original bytes remain unchanged. An
+existing output directory is refused. Inspect <code>scenario.json</code>, <code>a/verification.json</code>
+and <code>b/verification.json</code>; a signed B rejection does not invalidate A's historical
+pass. The new receipt is a new verification statement, not proof that old service
+observations are fresh. These receipt formats do not authenticate issuance time.</p>
+<p><code>trigger.json</code> and <code>scenario.json</code> are explanatory records outside the evidence
+packs, not new InvarLock contracts or sources of verdict authority. The generated
+keys are disposable example keys; a real handoff uses independently controlled
+signer and verifier keys. Keep private keys out of recipient evidence packages.</p>
+<table>
+<thead>
+<tr>
+<th>What changed</th>
+<th>Required record</th>
+<th>Meaning of A</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Later observed service behavior</td>
+<td>New capture, reviewed inputs, signed comparison and receipt B</td>
+<td>A still describes its original window and cases; B does not establish when or why the service changed</td>
+</tr>
+<tr>
+<td>Recipient trust or acceptance policy</td>
+<td>A separate recipient decision referencing the unchanged evidence and current policy</td>
+<td>The technical result is unchanged, even if use is now declined</td>
+</tr>
+<tr>
+<td>An actually erroneous earlier assessment</td>
+<td>Preserve A, identify the specific error and affected conclusion, and issue an explicitly linked correction with independently verified replacement evidence</td>
+<td>A remains the historical record of what was asserted; preservation does not require continued reliance on a known error</td>
+</tr>
+</tbody>
+</table>
+<p>The fixture exercises the first row. Recipient acceptance and any correction are
+separate decisions; it does not automatically supersede earlier approvals. Its
+<a href="https://github.com/invarlock/invarlock/blob/main/tests/examples/test_hosted_reassessment.py">tests</a>
+authenticate both receipts, require distinct input bindings, detect historical
+mutation, and verify refusal to overwrite a previous campaign.</p>
+<h2 id="rehearse-a-correction-of-an-actual-error">Rehearse a correction of an actual error<a class="headerlink" href="#rehearse-a-correction-of-an-actual-error" title="Permanent link">&para;</a></h2>
+<p>The same offline example can exercise the third row of the table above:</p>
+<div class="codehilite"><pre><span></span><code>python<span class="w"> </span>examples/hosted-service/reassessment.py<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--scenario<span class="w"> </span>correction<span class="w"> </span>--output<span class="w"> </span>correction-example
+</code></pre></div>
+
+<p>The synthetic source export says <code>no</code>, but the deliberately erroneous first
+import maps those outputs to <code>yes</code>. Assessment A consequently passes. The
+replacement imports the retained <code>no</code> outputs correctly for the same observation
+window and independently verifies a regression under the same policy. Both
+signed packs and receipts are retained; every original file is checked unchanged.
+This illustrates a source-mapping error, not a discovered bug in the importer.</p>
+<p><code>correction.json</code> identifies the specific error, affected claim, retained source
+digest, original receipt digest and replacement receipt digest. <code>scenario.json</code>
+also retains a small dependency graph: the release review depends on A, and a
+deployment approval depends on that review. Both are marked for review; an
+unrelated review is untouched. Missing graph nodes and cycles are rejected.</p>
+<p>This impact list covers only the supplied graph. Unknown consumers remain
+unknown, and the record does not automatically revoke or reissue approvals.
+The explanatory correction file is outside the authenticated evidence contracts;
+a digest link is not proof of correction authority or complete distribution.
+A real recipient must establish who can issue corrections, authenticate the
+notice, verify the replacement using independent trust inputs, and reconsider
+its own affected decisions. Preserving erroneous evidence maintains history;
+it does not justify continued reliance on the erroneous conclusion.</p>
 <h2 id="capture-fresh-executions">Capture fresh executions<a class="headerlink" href="#capture-fresh-executions" title="Permanent link">&para;</a></h2>
 <p>The <a href="https://github.com/invarlock/invarlock/blob/main/examples/hosted-service/README.md">HTTP capture and handoff example</a>
 provides a portable protocol, bounded collection and separate installed-wheel

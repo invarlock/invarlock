@@ -1356,6 +1356,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Policy and identity">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#scoring-equivalence-and-input-identity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scoring equivalence and input identity
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#explain-an-additive-score-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Explain an additive score change
+      
+    </span>
+  </a>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2107,6 +2135,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Policy and identity">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#scoring-equivalence-and-input-identity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scoring equivalence and input identity
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#explain-an-additive-score-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Explain an additive score change
+      
+    </span>
+  </a>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2535,6 +2591,97 @@ canonical portable bytes. An explicit run pin is semantic and is not dropped
 even when equal to the derived run digest. Relocating a request tree changes no
 portable identity; changing a source, provenance, policy or pin can change it.
 Use these SDK helpers, not a handwritten YAML/JSON hash recipe.</p>
+<h3 id="scoring-equivalence-and-input-identity">Scoring equivalence and input identity<a class="headerlink" href="#scoring-equivalence-and-input-identity" title="Permanent link">&para;</a></h3>
+<p>A scorer can treat two answers as equivalent while their complete-run pins
+remain different. Apply each transformation at its own boundary:</p>
+<table>
+<thead>
+<tr>
+<th>Change to a validated canonical run</th>
+<th>Scoring effect</th>
+<th>Complete-run pin</th>
+<th>Planned case-set pin</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Reorder JSON object keys only</td>
+<td>Unchanged</td>
+<td>Unchanged</td>
+<td>Unchanged</td>
+</tr>
+<tr>
+<td>Reorder records, keeping the same IDs and facts</td>
+<td>Captured comparison still pairs by ID</td>
+<td>Changes</td>
+<td>Unchanged; cases are ordered canonically by ID</td>
+</tr>
+<tr>
+<td>Change an output's letter case or whitespace under <code>normalized_match</code> with case folding enabled</td>
+<td>Unchanged when normalized text is identical</td>
+<td>Changes</td>
+<td>Unchanged; outputs are not case-set inputs</td>
+</tr>
+<tr>
+<td>Make the same equivalent reference-text change on both sides under that scorer</td>
+<td>Per-record score unchanged</td>
+<td>Changes</td>
+<td>Changes; references are case-set inputs</td>
+</tr>
+<tr>
+<td>Change metadata on both sides</td>
+<td>Can change slice membership; an unused key does not affect scores</td>
+<td>Changes</td>
+<td>Changes</td>
+</tr>
+<tr>
+<td>Change input text on both sides without changing retained answers</td>
+<td>Scoring retained answers can stay unchanged; this does not establish equivalent model behavior</td>
+<td>Changes</td>
+<td>Changes</td>
+</tr>
+</tbody>
+</table>
+<p>These rows assume all other run fields remain fixed. A raw export's physical
+checksum can change when its JSON formatting changes, even if the parsed
+object is equivalent. If an import retains that new checksum in <code>source_digest</code>,
+the complete-run pin changes too. These captured-run rules do not relax native
+provider requirements for an identical ordered schedule.</p>
+<p>Keep scorer normalization inside scoring. Do not normalize retained answers or
+references merely to preserve an old pin. A changed complete run requires its
+own reviewed identity, even if every score and the final verdict stay the same.</p>
+<h2 id="explain-an-additive-score-change">Explain an additive score change<a class="headerlink" href="#explain-an-additive-score-change" title="Permanent link">&para;</a></h2>
+<p>The standalone <code>examples/score_contributions.py</code> recipe produces a descriptive
+breakdown without changing a report, policy, interval or signed evidence. Run
+its synthetic example from the checkout:</p>
+<div class="codehilite"><pre><span></span><code>python<span class="w"> </span>examples/score_contributions.py
+</code></pre></div>
+
+<p>For a complete additive scalar metric, supply one <code>PairedCase</code> per case and the
+reported delta to <code>mean_contributions</code>. Convert retained captured scores with
+<code>Fraction.from_float(float(score))</code>. Give each case its own unit for the ordinary
+equal-case mean. For judge scores, use <code>Fraction(decimal_score_string)</code>, average
+repetitions within each case first, and preserve the plan's declared unit IDs.
+The recipe gives units equal weight and cases equal weight within their unit;
+it does not infer independence or validate a judging plan.</p>
+<p>Use the same numeric units for case means and <code>reported_delta</code>. For a native
+exact-match or scorer-extension report, the reported comparison is in percentage
+points: convert its stored float with <code>Fraction.from_float</code>, then divide by
+<code>100</code> when the supplied case scores remain in <code>[0, 1]</code>. Captured scalar deltas
+and judge effect means already use score units. Contributions always describe
+subject minus baseline; a negative contribution can be an improvement for a
+lower-is-better metric. The recipe does not classify that change.</p>
+<p>Each selected case has an exact rational weight and signed contribution. The
+visible contributions plus the omitted contribution equal the exact delta. The
+<code>rounding_residual</code> field is the supplied reported delta minus that exact delta;
+adding it recovers the reported total. This equality holds even if the caller
+supplies the wrong total, weights or units, so it does not prove rounding caused
+the gap. Investigate discrepancies against the validated source workflow. All
+rational values are strings so JSON conversion introduces no further rounding.
+The output has no verification authority. It does not explain uncertainty,
+causality, missing observations or a normalized-NLL ratio, and rankings apply
+only within one additive metric and scope. Validate the complete source workflow
+before constructing its inputs; do not use a favorable subset to replace it.</p>
 <h2 id="pack-boundary">Pack boundary<a class="headerlink" href="#pack-boundary" title="Permanent link">&para;</a></h2>
 <p>Captured pack v2 has exactly <code>manifest.json</code>, <code>checksums.sha256</code>, <code>request.json</code>,
 <code>inputs/policy.json</code>, <code>records/baseline.json</code>, <code>records/subject.json</code>, and
@@ -2544,6 +2691,11 @@ signature and a null signing-key fingerprint. The signature uses the existing
 <code>invarlock/evidence-pack-signature-v1</code> envelope over the canonical manifest.
 There is no second signed comparison envelope, embedded verification receipt,
 or implicit legacy migration.</p>
+<p>Captured readers check each file against its byte allowance before opening it,
+then bound the read request by the observed file size plus one byte. They still
+recheck descriptor and path identity and reject growth, truncation or replacement.
+This avoids a ceiling-sized read allocation for a small file; it is not a bound
+on total parsing, validation or report-rendering memory.</p>
 <p>The normalized request, policy, records and report are canonical JSON with a
 final LF. The checksum ledger uses fixed payload paths. <code>comparison_id</code> hashes
 the canonical object containing <code>kind: captured</code>, the normalized request digest,

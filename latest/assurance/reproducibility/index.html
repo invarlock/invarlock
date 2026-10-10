@@ -1138,6 +1138,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Captured, hosted and judge reruns">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#collection-capacity-explanations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Collection capacity explanations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2162,6 +2179,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Captured, hosted and judge reruns">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#collection-capacity-explanations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Collection capacity explanations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2290,6 +2324,11 @@ workflow.</p>
 </table>
 <p>This separation follows the practical distinction in ML reproducibility work
 between disclosing experimental material and actually reproducing a result.</p>
+<p>Captured scorer equivalence is also separate from input identity. For example,
+case folding can preserve a label score while the retained output bytes and
+complete-run pin change. The <a href="../../reference/evaluation-records/#scoring-equivalence-and-input-identity">transformation table</a>
+distinguishes scoring, complete-run and planned case-set identities; unchanged
+scores do not authorize substitution under old recipient pins.</p>
 <h2 id="bound-identity-vector">Bound identity vector<a class="headerlink" href="#bound-identity-vector" title="Permanent link">&para;</a></h2>
 <p>For one side <span class="arithmatex">\(X \in \{B,S\}\)</span>, define the recorded identity vector:</p>
 <div class="arithmatex">\[
@@ -2484,9 +2523,13 @@ appears equivalent.</p>
 <p>If a material control differs, describe the rerun as a new environment or new
 comparison rather than a strict reproduction.</p>
 <h2 id="numerical-and-output-drift">Numerical and output drift<a class="headerlink" href="#numerical-and-output-drift" title="Permanent link">&para;</a></h2>
-<p>The paired interval is reproduced exactly from the same authenticated records,
-built-in metric or scorer binding, report format, and algorithm version. Exact
-match replays the report-version-specific paired Newcombe 95%
+<p>Verification recomputes the paired interval from the authenticated records,
+built-in metric or scorer binding, report format and algorithm version, and
+requires exact agreement with the stored report. This is a replay requirement,
+not a promise that every numerical environment will satisfy it. A differing
+result fails replay; preserve the package, Python and platform identities and
+investigate rather than relaxing equality. See <a href="../decision-semantics/#arithmetic-and-replay">arithmetic and replay</a>.
+Exact match replays the report-version-specific paired Newcombe 95%
 interval, regression and improvement counts, and exact McNemar probability.
 Normalized NLL also binds the schedule digest used to derive 2,048 resampling
 index sequences without a platform random-number generator. A scorer extension
@@ -2527,6 +2570,13 @@ capture is a new observation even if the endpoint name is unchanged. Callers
 schedule and collect those observations; InvarLock does not provide a hosted
 runtime or continuous monitoring service. See
 <a href="../../user-guide/hosted-service-requalification/">hosted requalification</a>.</p>
+<p>Correcting a source-mapping error can instead change the assessment without a
+new service execution or observation window. Retain the source export, original
+assessment and receipt, exact mapping error, and independently verified
+replacement. This establishes a correction history, not fresh service behavior
+or proof that every consumer received an authorized correction. The
+<a href="../../user-guide/hosted-service-requalification/#rehearse-a-correction-of-an-actual-error">offline correction rehearsal</a>
+keeps those claims separate.</p>
 <p>Judge verification replays retained requests, responses, attempts, parsing and
 fixed-benchmark analysis offline. A fresh collection can produce different
 ratings under the same model name and configuration. Preserve the plan, frozen
@@ -2536,6 +2586,15 @@ independent units. Independence across declared units and fixing the benchmark
 and policy before judging are assumptions, not properties established by replay.
 Optional reference-label studies can test judge agreement; they do not change the
 replay claim or become runtime prerequisites.</p>
+<h3 id="collection-capacity-explanations">Collection capacity explanations<a class="headerlink" href="#collection-capacity-explanations" title="Permanent link">&para;</a></h3>
+<p>Inspect collection can return local capacity diagnostics identifying the call,
+reserved token/cost, retained-source or retained-byte allowance that stopped
+admission. These explain the existing conservative resource limits; they do not
+change the frozen plan, measurement selection, replay arithmetic or signed
+judgment evidence. Remaining reservations are not independent evidence, observed
+usage or a guarantee about provider billing. See the
+<a href="../../reference/judge-measurements/">judge measurement reference</a> for fields and
+collector scope.</p>
 <h2 id="worked-classification">Worked classification<a class="headerlink" href="#worked-classification" title="Permanent link">&para;</a></h2>
 <p>Suppose a rerun uses identical artifact, schedule, policy, provider, and image
 digests but moves from one GPU model to another. The pack can establish
@@ -2566,6 +2625,13 @@ authentication envelope; SLSA similarly makes signing-environment/platform trust
 provenance interpretation.</p>
 <p>Keep external records outside the already signed evidence directory and bind
 them to its manifest digest.</p>
+<p>InvarLock's own <a href="../../reference/acceptance-attestations/">acceptance-attestation wrapper</a>
+provides in-toto/DSSE transport for a native technical receipt, not measured
+execution attestation. It preserves the receipt bytes and distinguishes
+receipt-authenticated anchors from envelope-signer context. Its envelope
+issuance time establishes transport metadata, not a new model observation or
+an authoritative issuance time for an undated receipt. Current recipient
+acceptance can change while the original technical result remains unchanged.</p>
 <h2 id="sampling-and-run-selection">Sampling and run selection<a class="headerlink" href="#sampling-and-run-selection" title="Permanent link">&para;</a></h2>
 <p>Reproducible biased evidence remains biased. InvarLock cannot determine whether
 the evaluation operator selected a favorable dataset, seed, baseline, subject

@@ -1644,6 +1644,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#supplementary-diagnostics-and-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supplementary diagnostics and review
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#verification-result" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2337,6 +2348,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#supplementary-diagnostics-and-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supplementary diagnostics and review
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#verification-result" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2706,7 +2728,7 @@ point comparison, interval bounds, threshold, or verdict.</p>
 <span class="p">}</span>
 </code></pre></div>
 
-<p><code>value = 100 * (subject_mean - baseline_mean)</code>. The metric-bound check passes when
+<p><code>value = math.fsum(subject_i - baseline_i) / record_count * 100.0</code>. The metric-bound check passes when
 <code>uncertainty.lower &gt;= comparison.minimum</code>, where <code>minimum</code> comes from
 <code>resolved_policy.metrics.exact_match.delta_min_pp</code>. If sample qualification is
 present, its count and width checks must also pass. If side-accuracy
@@ -2724,6 +2746,11 @@ the canonical <code>uncertainty</code> object in a v2 or v3 report. The policy u
 lower bound; the McNemar probability does not control the verdict. A v1 report keeps
 method <code>newcombe_hybrid_score_paired_v1</code> and is replayed only with that original
 method.</p>
+<p>Here <code>math.fsum(subject_i - baseline_i)</code> denotes summing every paired
+record difference with <code>math.fsum</code>. Divide by the record count, then multiply
+by <code>100.0</code>, in that order. Computing the same mathematical delta by subtracting
+separately rounded side means can produce different floating-point bytes.
+See <a href="../../assurance/decision-semantics/">exact replay arithmetic</a> for the contract.</p>
 <h3 id="sample-and-precision-qualification">Sample and precision qualification<a class="headerlink" href="#sample-and-precision-qualification" title="Permanent link">&para;</a></h3>
 <p>A metric policy may omit sample qualification. If it enables qualification,
 the two fields must be supplied together:</p>
@@ -2824,7 +2851,7 @@ interval, not a population confidence interval or representativeness claim.</p>
 the authenticated expected output, output text, and output digest for every
 record and returns one higher-is-better value in <code>[0, 1]</code>. The engine owns the
 arithmetic mean and computes
-<code>value = 100 * (subject_mean - baseline_mean)</code>. It then applies the same fixed
+<code>value = math.fsum(subject_i - baseline_i) / record_count * 100.0</code>. It then applies the same fixed
 2,048-replicate paired schedule-resampling method to the paired record values.
 The metric-bound check passes only when
 <code>uncertainty.lower &gt;= comparison.minimum</code>, where
@@ -2847,6 +2874,23 @@ contract and, for native run/import evidence, its retained runtime capture. Its
 report shows both evaluated model identities, runtime settings and digests,
 judge model/configuration, rubric, counts and uncertainty. Other recorded judge
 results may be authenticated as observations, where they have no verdict authority.</p>
+<h2 id="supplementary-diagnostics-and-review">Supplementary diagnostics and review<a class="headerlink" href="#supplementary-diagnostics-and-review" title="Permanent link">&para;</a></h2>
+<p>Optional NumPy diagnostics can be published as authenticated observations;
+verification checks their retained bytes and bindings without making them
+verdict inputs. An RMT observation keeps its numerical method identifier. The
+explicit <code>column_standardized_smaller_gram_eigh</code> method additionally reports
+<code>gram_dimension</code>, <code>gram_matrix_bytes</code> and <code>minimum_upper_edge_distance</code> inside
+its payload. The distance is descriptive, not an error bound or a significance
+level. See <a href="../../user-guide/diagnostics/#bound-the-covariance-allocation">diagnostics</a>.</p>
+<p>The <a href="../../assurance/decision-semantics/#explore-hypothetical-exact-match-edits">exact-match sensitivity helper</a>
+returns a separate Python advisory. It is not a comparison-report field or a
+signed verification result. Preserve the recorded verdict and interpret its
+hypothetical edits and search limits separately.</p>
+<p>The standalone <a href="../evaluation-records/#explain-an-additive-score-change">score contribution recipe</a>
+produces a separate explanation of an additive total. It is not emitted by
+<code>invarlock report</code> or added to a signed comparison. Validate source completeness,
+unit weights and score-versus-percentage-point units before using it; its residual
+is a gap from a supplied total, not proof of numerical error or causality.</p>
 <h2 id="verification-result">Verification result<a class="headerlink" href="#verification-result" title="Permanent link">&para;</a></h2>
 <p>Native deterministic <code>invarlock verify --json</code> emits an <code>invarlock/evidence-pack-verify-v1</code> result. Important
 fields include:</p>
@@ -2965,7 +3009,8 @@ successful receipt is internally consistent only when <code>ok</code> and <code>
 are true, <code>policy_verdict</code> is not <code>fail</code>, and <code>verification_status</code> is zero.</p>
 <p>Downstream readers use
 <code>invarlock.engine.verify_signed_verification_receipt</code>. The stable API returns a
-<code>ReceiptVerification</code>; acceptance requires its <code>ok</code> field to be true.</p>
+<code>ReceiptVerification</code>. Its <code>ok</code> authenticates the receipt, including an authentic
+rejection; acceptance additionally requires <code>statement["verdict"]["ok"]</code> to be true.</p>
 <p>Captured packs use only <code>invarlock/evidence-verification-receipt-v3</code>. Its
 <code>verification_scope: captured_comparison</code> cannot authorize native acceptance or
 deployment. Anchors bind the expected complete baseline/subject runs, policy,
@@ -3197,8 +3242,8 @@ Configuration previews use indented text with explicit limits and truncation
 markers; the renderer does not reinterpret them as executable content or
 complete configuration. Small screens stack each requirement with labelled Observed, Required and
 Result values. All checks remain visible without horizontal scrolling. HTML
-follows the system light or dark appearance; printed reports use the light
-color scheme.</p>
+uses the light color scheme regardless of system appearance, including when
+printed.</p>
 <p>Use <code>invarlock verify</code> with recipient-owned policy and complete-run digests for
 independent authentication and replay. Successful captured report
 regeneration exits <code>0</code> regardless of the stored policy decision. Evaluation exits

@@ -1461,6 +1461,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#advisory-python-helpers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Advisory Python helpers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#transactions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2155,6 +2166,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#advisory-python-helpers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Advisory Python helpers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#transactions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2437,13 +2459,54 @@ individual bundle files remain internal unless explicitly documented.</p>
 </tbody>
 </table>
 <p>Imports from other <code>invarlock.*</code> modules are not stable merely because they are
-importable. Use the facade unless implementing the provider protocol documented
-in <a href="../runtime-providers/">Runtime providers</a>.</p>
+importable. Use the facade for transactions; separate documented imports cover
+<a href="#advisory-python-helpers">advisory helpers</a> and the provider protocol in
+<a href="../runtime-providers/">Runtime providers</a>.</p>
 <p>The captured evaluation helpers are part of the documented SDK for
 captured-result comparisons. They expose normalized run construction and loading,
 multi-metric comparison, evidence publication, independent verification, and
 scoped receipt handling through the same evaluation transaction surface. Their
 evidence and recorded-score semantics are described in <a href="../evaluation-records/">evaluation records</a>.</p>
+<h2 id="advisory-python-helpers">Advisory Python helpers<a class="headerlink" href="#advisory-python-helpers" title="Permanent link">&para;</a></h2>
+<p>These documented imports sit outside the transaction facade and do not authorize
+acceptance. They are not automatically added to comparison reports.</p>
+<table>
+<thead>
+<tr>
+<th>Import</th>
+<th>Call and scope</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>invarlock.diagnostics.rmt_observation</code></td>
+<td><code>rmt_observation(values, *, method="covariance", max_gram_bytes=134217728)</code>; requires the NumPy diagnostics extra and a finite two-dimensional array with at least two rows and one varying column</td>
+</tr>
+<tr>
+<td><code>invarlock.exact_match_sensitivity.exact_match_sensitivity</code></td>
+<td><code>exact_match_sensitivity(baseline, subject, *, policy, max_changes=8, max_states=2048)</code>; core-only hypothetical subject flips for current native v3 exact-match decisions</td>
+</tr>
+</tbody>
+</table>
+<p>The RMT helper returns a <code>RmtObservation</code> and raises <code>DiagnosticInputError</code> for
+invalid inputs, methods, budgets or numerical failures. Its five-million-value
+input limit and square-matrix byte budget are separate bounds. Both methods
+apply the budget; <code>smaller_gram</code> is an explicit selection with its own method
+identifier and extra result fields. See <a href="../../user-guide/diagnostics/#bound-the-covariance-allocation">diagnostics</a>
+for rounding, memory and interpretation limits.</p>
+<p>The sensitivity helper takes equal-length, nonempty binary outcome sequences
+and only the fields under native <code>metrics.exact_match</code> as <code>policy</code>. It returns
+an advisory dictionary with <code>status</code>, <code>original_verdict</code>, <code>minimum_changes</code>,
+<code>checked_through_changes</code>, <code>states_examined</code>, <code>witness</code> and input/policy bindings.
+Input and policy errors raise <code>ValueError</code>; disagreement with native report
+arithmetic or witness replay raises <code>RuntimeError</code> instead of returning an
+advisory. See <a href="../../assurance/decision-semantics/#explore-hypothetical-exact-match-edits">hypothetical edits</a>
+for exact/lower-bound interpretation, all search limits and a runnable example.
+The helper does not authenticate supplied outcomes or estimate rerun risk.</p>
+<p>The checkout also includes the standalone
+<a href="../evaluation-records/#explain-an-additive-score-change">score contribution recipe</a>.
+It is an example rather than an exported <code>invarlock.engine</code> function; use the
+matching source checkout and validate the inputs through their normal workflow.</p>
 <h2 id="transactions">Transactions<a class="headerlink" href="#transactions" title="Permanent link">&para;</a></h2>
 <div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
@@ -2644,6 +2707,11 @@ closed errors. See <a href="../acceptance-attestations/">Acceptance attestations
 the TypeURI, canonical serialization, signer relationship, and reference
 policy.</p>
 <h2 id="function-signatures">Function signatures<a class="headerlink" href="#function-signatures" title="Permanent link">&para;</a></h2>
+<p>These forms show the native transaction arguments and the shared request loader.
+Captured arguments and omission rules follow the block. The <code>None</code> defaults
+shown here describe native calls; captured callers must omit those native
+keywords entirely. The selected facade parameters are not an exhaustive listing
+of internal implementation controls.</p>
 <div class="codehilite"><pre><span></span><code><span class="n">evaluate_request_file</span><span class="p">(</span>
     <span class="n">request_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="n">EvaluationRequest</span> <span class="o">|</span> <span class="n">CapturedEvaluationRequest</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
@@ -2672,9 +2740,9 @@ policy.</p>
     <span class="o">*</span><span class="p">,</span>
     <span class="n">provider_resolver</span><span class="p">:</span> <span class="n">ProviderResolver</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">request_root</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">baseline_run</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">subject_run</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">output</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">baseline_run</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">subject_run</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">output</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">EvaluationRequest</span> <span class="o">|</span> <span class="n">CapturedEvaluationRequest</span>
 
 <span class="n">verify_evidence</span><span class="p">(</span>
@@ -2801,9 +2869,12 @@ repeats no-follow reads at the point of use to detect later filesystem changes.<
 <h2 id="host-coordinated-oci-evaluations">Host-coordinated OCI evaluations<a class="headerlink" href="#host-coordinated-oci-evaluations" title="Permanent link">&para;</a></h2>
 <p>The stable facade exports <code>OciEvaluationLaunch</code>, <code>OciSideLaunch</code>,
 <code>OciRuntimeExecutor</code>, and <code>launch_from_resolved_config</code>. The public CLI constructs
-this executor for every run-mode request. The host prepares the schedule,
+this executor for host-orchestrated run requests. The host prepares the schedule,
 launches one independently pinned worker per side, validates both closed side
 results, and keeps the evidence-signing key outside the workers.</p>
+<p>The <a href="../judge-measurements/#native-local-judge-collection">inline local-judge route</a>
+instead requires an already running strict container and runs all three model
+roles there; it does not provide host-separated signing.</p>
 <p>An embedding can build the same launch explicitly:</p>
 <div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.engine</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">OciEvaluationLaunch</span><span class="p">,</span>
@@ -3151,8 +3222,9 @@ request. It retains the normal native resource and signing-key requirements and
 returns <code>JudgeWorkflowResult</code>, whose JSON has <code>kind: judge</code>, the evidence path,
 analysis decision and collection stop state. Native preflight retains
 <code>EvaluationPreflightResult</code> and adds judge model, unit, trial and budget metadata.
-The installed optional collector reads credentials from its process environment;
-callers do not pass keys in the request or plan. Recipient replay requires only
+Hosted collectors read any required credentials from their process environment;
+callers do not pass keys in the request or plan. The selected profile determines
+SDK and runtime requirements; local collection needs no provider credentials. Recipient replay requires only
 the core package. Native judge evidence includes a bound runtime capture, whereas
 ordinary frozen-answer import makes no runtime-provenance claim.</p>
 <p>Captured v2 requests also select <code>metric: judge</code>; both preflight and evaluation

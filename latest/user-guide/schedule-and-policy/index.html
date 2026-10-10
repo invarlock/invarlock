@@ -2476,8 +2476,8 @@ statistical power, equivalence, non-inferiority, or production safety.</p>
 <div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="nt">&quot;resolved_policy&quot;</span><span class="p">:{</span><span class="nt">&quot;metrics&quot;</span><span class="p">:{</span><span class="nt">&quot;exact_match&quot;</span><span class="p">:{</span><span class="nt">&quot;delta_min_pp&quot;</span><span class="p">:</span><span class="mf">-2.0</span><span class="p">,</span><span class="nt">&quot;maximum_interval_width_pp&quot;</span><span class="p">:</span><span class="mf">10.0</span><span class="p">,</span><span class="nt">&quot;minimum_record_count&quot;</span><span class="p">:</span><span class="mi">400</span><span class="p">}}}}</span>
 </code></pre></div>
 
-<p>For baseline accuracy <code>B</code> and subject accuracy <code>S</code>:</p>
-<div class="codehilite"><pre><span></span><code>point_delta_pp = 100 * (S - B)
+<p>For paired baseline and subject binary record scores:</p>
+<div class="codehilite"><pre><span></span><code>point_delta_pp = math.fsum(subject_i - baseline_i) / record_count * 100.0
 pass when interval.lower &gt;= delta_min_pp
   and record_count &gt;= minimum_record_count
   and interval.width &lt;= maximum_interval_width_pp
@@ -2527,6 +2527,11 @@ interval; precision is known only after execution.</p>
 </tr>
 </tbody>
 </table>
+<p>Here <code>math.fsum(subject_i - baseline_i)</code> denotes summing every paired
+record difference with <code>math.fsum</code>. Divide by the record count, then multiply
+by <code>100.0</code>, in that order. Computing the same mathematical delta by subtracting
+separately rounded side means can produce different floating-point bytes.
+See <a href="../../assurance/decision-semantics/">exact replay arithmetic</a> for the contract.</p>
 <h2 id="normalized-nll-policy">Normalized-NLL policy<a class="headerlink" href="#normalized-nll-policy" title="Permanent link">&para;</a></h2>
 <div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="nt">&quot;resolved_policy&quot;</span><span class="p">:{</span><span class="nt">&quot;metrics&quot;</span><span class="p">:{</span><span class="nt">&quot;normalized_nll_per_utf8_byte&quot;</span><span class="p">:{</span><span class="nt">&quot;maximum_interval_width_ratio&quot;</span><span class="p">:</span><span class="mf">0.05</span><span class="p">,</span><span class="nt">&quot;minimum_record_count&quot;</span><span class="p">:</span><span class="mi">400</span><span class="p">,</span><span class="nt">&quot;ratio_max&quot;</span><span class="p">:</span><span class="mf">1.05</span><span class="p">}}}}</span>
 </code></pre></div>
@@ -2605,7 +2610,7 @@ maps each authenticated expected-output/output-text pair to one deterministic
 higher-is-better value in <code>[0,1]</code>. Core owns the remaining arithmetic:</p>
 <div class="codehilite"><pre><span></span><code>baseline_mean = arithmetic_mean(baseline_record_scores)
 subject_mean = arithmetic_mean(subject_record_scores)
-delta_pp = 100 * (subject_mean - baseline_mean)
+delta_pp = math.fsum(subject_i - baseline_i) / record_count * 100.0
 pass when interval.lower &gt;= delta_min_pp
   and record_count &gt;= minimum_record_count
   and interval.width &lt;= maximum_interval_width_pp
@@ -2617,9 +2622,11 @@ percentage-point delta and uses its lower bound. Extension code cannot redefine
 aggregation, direction, interval, or verdict semantics.</p>
 <p>As with exact match, scorer count and percentage-point width controls are
 optional but coupled and use the same ranges.</p>
-<p>Separately installed scorer packages may implement deterministic token F1,
-structured-field extraction, and VQA answer normalization and require explicit
-authorization. Executable SQL/code tests, model-based semantic similarity,
+<p>Core ships <code>invarlock.normalized_match</code>, <code>invarlock.numeric_tolerance</code>,
+<code>invarlock.json_fields</code>, <code>invarlock.json_exact</code> and <code>invarlock.token_f1</code>. The CLI
+enables these without installed-scorer authorization; SDK callers supply an
+explicit registry. Separately supplied scorers, such as VQA answer normalization,
+require explicit authorization. Executable SQL/code tests, model-based semantic similarity,
 network services or externally assigned ratings, and external-model calls are outside this extension
 contract. The built-in <code>metric: judge</code> has its own bounded collection, retained
 measurement, analysis-policy and recipient contracts. Other judge summaries may

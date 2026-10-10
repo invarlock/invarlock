@@ -1938,6 +1938,19 @@ glossary.</p>
 Native pack-v1 comparisons bind the original policy bytes. Captured comparisons bind
 canonical policy JSON. Judge evidence binds its analysis policy and is
 accepted under an independently supplied recipient policy.</p>
+<p><strong>Acceptance attestation</strong></p>
+<p>An in-toto/DSSE envelope carrying a native pack-v1 technical result and its exact
+signed receipt bytes. The implemented v2 predicate supports native receipt
+v1/v2, not captured or judge receipts. Its verifier authenticates the envelope,
+embedded receipt and exact subject binding under current recipient policy; it
+does not repeat full evidence replay or attest model execution. See
+<a href="../../reference/acceptance-attestations/">acceptance attestations</a>.</p>
+<p><strong>Recipient acceptance</strong></p>
+<p>The result of applying independently controlled requirements to authenticated
+evidence or a transported receipt. Its policy is distinct from the evaluated
+metric policy. A historical technical pass can be declined under current signer,
+contract or freshness requirements without rewriting that result. Acceptance
+remains scoped to its contract and is not by itself deployment approval.</p>
 <p><strong>Anchor</strong></p>
 <p>A value controlled by the verifier rather than selected from submitted
 evidence. Native pack-v1 verification requires policy bytes, baseline and
@@ -1987,6 +2000,25 @@ bounded scale. Retained calls support offline parsing and analysis replay.
 across units, and applies a declared family error budget. Replay checks the
 declared grouping and arithmetic; it does not establish independence, judge
 agreement with reference labels, or population-wide model quality.</p>
+<p><strong>Correction of an assessment</strong></p>
+<p>A record identifying an actual error in an earlier assessment and linking
+replacement evidence, while retaining the original bytes. It differs from new
+observations or a changed recipient policy. Digest links alone do not establish
+correction authority or revoke downstream approvals. See the
+<a href="../../user-guide/hosted-service-requalification/#rehearse-a-correction-of-an-actual-error">correction example</a>.</p>
+<p><strong>Score contribution explanation</strong></p>
+<p>A separate arithmetic breakdown of one additive metric using supplied complete
+paired case means and declared unit weights. Visible contributions, an omitted
+remainder and the gap to the supplied report total reconcile exactly. The gap
+alone does not prove a rounding error, and the explanation does not authenticate
+inputs, infer independence or alter a verdict. See the
+<a href="../../reference/evaluation-records/#explain-an-additive-score-change">contribution recipe</a>.</p>
+<p><strong>Exact-match edit sensitivity</strong></p>
+<p>A bounded search for the fewest subject-outcome flips that change a current
+native v3 verdict, with baseline, policy and record count fixed. The result is
+an exact replayed witness, a lower bound through fully searched distances, or
+no possible flip after exhaustive search. It is an advisory over supplied
+outcomes, not rerun risk or authenticated evidence. See <a href="../decision-semantics/#explore-hypothetical-exact-match-edits">hypothetical edits</a>.</p>
 <p><strong>Evidence pack</strong></p>
 <p>For native exact-match, NLL and deterministic extensions, the immutable
 <code>invarlock/evidence-pack-v1</code> directory containing the request, identities,
@@ -2009,10 +2041,13 @@ schedule.</p>
 fingerprint identifies a key; authorization of that key is an external
 identity-management decision.</p>
 <p><strong>Exact-match delta</strong></p>
-<p>For native pack-v1, <code>100 * (subject mean - baseline mean)</code> for per-record
-scores of zero or one, expressed in percentage points. Captured exact-match
-comparison values use score units, <code>subject mean - baseline mean</code>; reports may
-display their percentage-point equivalent.</p>
+<p>For native pack-v1, sum the paired <code>subject_i - baseline_i</code> binary score
+differences with <code>math.fsum</code>, divide by the record count, then multiply by
+<code>100.0</code> to obtain percentage points. Captured exact-match comparisons instead
+subtract the separately rounded side means in score units; reports may display
+their percentage-point equivalent. These formulas are mathematically related,
+but changing the floating-point operation order can change replayed values.
+See <a href="../decision-semantics/#arithmetic-and-replay">arithmetic and replay</a>.</p>
 <p><strong>Execution attestation</strong></p>
 <p>Evidence from an independently trusted mechanism that a measured runtime
 executed a specific workload. A runtime digest in an InvarLock manifest is not

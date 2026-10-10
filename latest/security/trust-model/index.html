@@ -2652,8 +2652,8 @@ code. A deterministic extension scorer must not use a network, external model, e
 ratings, or LLM judge. InvarLock checks the authenticated scorer identity and
 deterministic replay; it does not sandbox extension code or prove those
 operational restrictions. The native <code>judge</code> scorer collects or imports bounded
-ratings under a separate evidence and recipient-policy contract. Only live
-collection requires the installed collector and provider credentials; verification
+ratings under a separate evidence and recipient-policy contract. New collection
+requires the selected collector and any credentials that its profile requires; verification
 replays retained measurements offline. Native judge evidence binds its runtime
 capture, while imported answers retain their supplied-source provenance. Judging
 does not execute through the deterministic scorer-extension trust boundary.</p>
@@ -2673,7 +2673,7 @@ lifecycle. A receipt verifier or recipient must check that the relevant keys
 were authorized for their distinct roles at the decision time.</p>
 <h3 id="runtime-and-provider">Runtime and provider<a class="headerlink" href="#runtime-and-provider" title="Permanent link">&para;</a></h3>
 <p>For native model execution, runtime receipts bind an integration implementation,
-artifact identity, scoring observation, execution settings, device facts, and outer image digest. The host
+artifact identity, scoring observation, execution settings, device facts, and outer image digest. In the host-orchestrated path, the host
 prepares the canonical schedule, then launches a separately digest-pinned
 Docker or Podman worker for each side. Each worker runs with network disabled,
 a read-only container root, reduced privileges, read-only job, artifact, and
@@ -2687,6 +2687,10 @@ indexes may run in parallel. Strict execution also requires offline local
 material, remote code disabled, and authenticated checkpoint/tokenizer inputs.
 These controls reduce ambiguity and exposure; the container engine, host,
 kernel, accelerator, and host-side signing process remain trusted boundaries.</p>
+<p>The <a href="../../reference/judge-measurements/#native-local-judge-collection">inline local-judge path</a>
+runs all three roles in one already running strict container. Its mounted signing key
+is available to that trusted runtime process. Use frozen-answer collection and
+separate import/signing when the deployment requires host-separated signing.</p>
 <h3 id="schedule-and-policy-selection">Schedule and policy selection<a class="headerlink" href="#schedule-and-policy-selection" title="Permanent link">&para;</a></h3>
 <p>Exact pairing proves that both sides used the same submitted schedule. It does
 not prove that the schedule is representative or that the selected baseline,
@@ -2746,9 +2750,11 @@ native pack-v1 receipts; captured and judge receipts retain separate handoff
 contracts.</p>
 <p>This boundary authenticates and policy-evaluates the portable projection; it
 does not replace full evidence replay with <code>invarlock verify</code>. The envelope is
-standards-shaped in-toto/DSSE transport, but interoperability with an external
-CUE, Open Policy Agent, or other policy engine requires a separately validated
-integration.</p>
+standards-shaped in-toto/DSSE transport. The maintained
+<a href="../../reference/policy-engine-interop/">OPA/Rego and CUE example</a> authenticates
+the envelope and embedded receipt before checking a bounded recipient-policy
+subset. It does not implement the full recipient-acceptance contract or qualify
+arbitrary external policy-engine configurations.</p>
 <h2 id="non-goals">Non-goals<a class="headerlink" href="#non-goals" title="Permanent link">&para;</a></h2>
 <p>The trust model does not provide:</p>
 <ul>
@@ -2758,8 +2764,8 @@ integration.</p>
 <li>representative sampling or population-level statistical assurance;</li>
 <li>correctness, safety, alignment, or provenance of the baseline itself;</li>
 <li>model-content safety, prompt-attack defense, or deployment authorization;</li>
-<li>external policy-engine authentication or policy-evaluation interoperability
-  for the acceptance envelope; or</li>
+<li>guaranteed authentication or policy correctness for arbitrary external
+  policy-engine integrations; or</li>
 <li>host hardening, container-engine security, GPU isolation, or secret
   management.</li>
 </ul>

@@ -2303,12 +2303,13 @@ rather than interpreting a rendered report's successful exit as policy approval.
 </table>
 <p>The native and captured entry points expose these three scorer choices.
 Native judging first retains runtime-bound answers; captured judging binds
-supplied answer records. Live collection uses the optional Inspect judge
-package with explicit budgets. Offline import and replay need no provider SDK
+supplied answer records. New ratings use a selected, explicitly bounded
+collector: Inspect with its optional SDK extra, an authenticated local runtime,
+or an OpenAI-compatible service. Offline import and replay need no provider SDK
 or credentials. Per-case references are an explicit judge-profile choice and
 remain separate from the evaluated model input.</p>
 <p>Captured requests without an explicit <code>comparison.metric</code> can combine policy
-metrics and slices under the captured bootstrap contract. Selecting a built-in
+metrics and slices under the captured comparison contract. Selecting a built-in
 scorer dispatches to that scorer's evidence and statistical treatment. Native
 exact match uses its paired Newcombe interval, normalized NLL uses paired
 schedule resampling, and bounded judging uses its declared independent-unit
@@ -2320,12 +2321,15 @@ claiming a joint confidence bound. Consult <a href="user-guide/schedule-and-poli
 <a href="reference/evaluation-records/">captured records</a> and
 <a href="reference/judge-measurements/">judge measurements</a> for exact requirements.</p>
 <h2 id="run-here-or-integrate-your-workflow">Run here or integrate your workflow<a class="headerlink" href="#run-here-or-integrate-your-workflow" title="Permanent link">&para;</a></h2>
-<p><strong>Native execution</strong> prepares an ordered schedule from pinned local data and
+<p><strong>Host-orchestrated native execution</strong> prepares an ordered schedule from pinned local data and
 runs baseline and subject in authorized Docker or Podman images. Workers receive
 scoped artifact and support mounts; the evidence-signing key stays on the host.
 A <a href="reference/cli/#reusable-runtime-profiles">runtime profile</a> supplies reusable
 execution settings without choosing policy or signer trust. Authenticated
-provider import uses complete existing sidecars instead of rerunning answers.</p>
+provider import uses complete existing sidecars instead of rerunning answers.
+The <a href="reference/judge-measurements/#native-local-judge-collection">inline local-judge route</a>
+runs all three model roles in one already running container and has a different
+signing-key boundary.</p>
 <p><img alt="Native comparisons, captured records and frozen answers feed evaluation, followed by independent verification and reporting" src="assets/evaluation-verification-flow.svg" /></p>
 <p><strong>Captured evaluation</strong> accepts supported Inspect AI, Harness, Promptfoo and Langfuse
 export profiles, canonical records or data prepared through the

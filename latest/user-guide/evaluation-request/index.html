@@ -2668,7 +2668,7 @@ semantics are identical beyond the bound inputs and settings.</p>
 <p>Each side receives score <code>1</code> when its authenticated <code>output_text</code> is exactly the
 scheduled <code>expected_output</code>, otherwise <code>0</code>. Equality does not trim whitespace,
 case-fold, normalize Unicode, or extract an answer. The point comparison is:</p>
-<div class="codehilite"><pre><span></span><code>delta_pp = 100 * (subject_mean - baseline_mean)
+<div class="codehilite"><pre><span></span><code>delta_pp = math.fsum(subject_i - baseline_i) / record_count * 100.0
 </code></pre></div>
 
 <p>The report also records baseline-pass to subject-fail regressions,
@@ -2677,6 +2677,11 @@ the exact two-sided McNemar probability. The metric-bound check passes only
 when the current v3 report's continuity-corrected paired Newcombe 95% effect-size
 interval's lower bound is at least
 <code>policy.metrics.exact_match.delta_min_pp</code>.</p>
+<p>Here <code>math.fsum(subject_i - baseline_i)</code> denotes summing every paired
+record difference with <code>math.fsum</code>. Divide by the record count, then multiply
+by <code>100.0</code>, in that order. Computing the same mathematical delta by subtracting
+separately rounded side means can produce different floating-point bytes.
+See <a href="../../assurance/decision-semantics/">exact replay arithmetic</a> for the contract.</p>
 <h3 id="normalized_nll_per_utf8_byte"><code>normalized_nll_per_utf8_byte</code><a class="headerlink" href="#normalized_nll_per_utf8_byte" title="Permanent link">&para;</a></h3>
 <p>For each successful record, the provider teacher-forces the authenticated
 expected continuation and supplies finite <code>logprob_sum</code>, positive <code>token_count</code>,
@@ -2715,11 +2720,14 @@ Its illustrative model digests and two cases must be replaced before use.</p>
 inputs are rejected. Run mode first collects authenticated answers through the
 provider's text-output surface and freezes the runtime capture. Import mode
 authenticates complete provider sidecars bound to the same judge policy. Both then collect ratings
-through the built-in collector, using the optional <code>invarlock[judge]</code> dependencies. Preflight validates prerequisites
-and complete reservations without model or judge calls. The model workers remain
-network-disabled. Set <code>INVARLOCK_ALLOW_JUDGE_NETWORK=1</code> only for the evaluation
-command to authorize the bounded judge phase; preflight and offline replay need
-no network permission. Judge collection retains its own call and cost limits.</p>
+through the selected collector. Inspect-based hosted collection uses the
+optional <code>invarlock[judge]</code> SDK dependencies; native local and OpenAI-compatible
+collectors do not. Preflight validates prerequisites and complete reservations
+without model or judge calls. Native model execution remains network-disabled.
+Hosted and compatible-service collection requires
+<code>INVARLOCK_ALLOW_JUDGE_NETWORK=1</code> for the evaluation command; preflight and offline
+replay need no network permission. The local profile needs no network opt-in.
+Each collector enforces its declared reservation limits.</p>
 <p>The private judge workspace supports resuming admitted trials against the same
 frozen answers. Changed models, data, rubric, policy or runtime identities need
 a new workspace. Repeated ratings do not create more independent tasks. Unless
@@ -2787,8 +2795,11 @@ caller-injected scorer.
 The scorer ID, version, descriptor digest, configuration digest, task, input
 kinds, output kind, pairing, source facts, and replay result must all agree.
 Replay runs twice and must produce byte-identical canonical results.</p>
-<p>Separately installed and explicitly authorized scorer packages may implement
-deterministic token F1, structured extraction, or VQA answer normalization. SQL
+<p>Core supplies five deterministic scorers for normalized matching, numeric
+tolerance, JSON fields, exact JSON and token F1. Their IDs and authorization
+rules are listed in the <a href="../../reference/contracts/#deterministic-scorer-extension">scorer contract</a>.
+Additional implementations, such as VQA answer normalization, require explicit
+authorization. SQL
 or code execution, model-based semantic similarity, network services and externally assigned ratings,
 external models, and LLM judges are excluded from the scorer-extension contract.
 Use the built-in <a href="#judge"><code>judge</code> scorer</a> for bounded rubric-based text grading
@@ -2859,8 +2870,12 @@ resampling over the authenticated finite schedule. They are not population
 confidence intervals, proof of dataset representativeness, or general
 model-quality claims.</p>
 <h2 id="oci-delegation-for-run-mode">OCI delegation for run mode<a class="headerlink" href="#oci-delegation-for-run-mode" title="Permanent link">&para;</a></h2>
-<p>When the host CLI sees <code>execution.mode: run</code> and is not already inside a strict
-container boundary, it launches the request in Docker or Podman. Caller-owned
+<p>For host-orchestrated <code>execution.mode: run</code>, the CLI launches workers in Docker
+or Podman. An explicit native local judge instead requires the
+<a href="../../reference/judge-measurements/#native-local-judge-collection">inline container path</a>:
+all three model roles run sequentially in an already started strict container,
+and a mounted signing key is available to that runtime process. The host CLI
+does not automatically create that local-judge container. Caller-owned
 CLI options or environment variables provide:</p>
 <table>
 <thead>

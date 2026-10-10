@@ -2246,11 +2246,18 @@ their rules are described below.</p>
 <td>SHA-256 of bytes <span class="arithmatex">\(z\)</span></td>
 </tr>
 <tr>
+<td><span class="arithmatex">\(S_{\mathrm{doc}}\)</span></td>
+<td>Complete schedule document: format version, task, dataset identity and ordered records</td>
+</tr>
+<tr>
 <td><span class="arithmatex">\(d_{\mathcal S}\)</span></td>
-<td>Canonical schedule digest, <span class="arithmatex">\(H(C_0(\mathcal S))\)</span></td>
+<td>Canonical schedule digest, <span class="arithmatex">\(H(C_0(S_{\mathrm{doc}}))\)</span></td>
 </tr>
 </tbody>
 </table>
+<p>The sequence <span class="arithmatex">\(\mathcal S\)</span> abbreviates the record-level pairing facts. The digest
+covers the complete <span class="arithmatex">\(S_{\mathrm{doc}}\)</span>, including its dataset identity and task;
+hashing only the record sequence does not produce <code>schedule_sha256</code>.</p>
 <p>The notation <span class="arithmatex">\(C_0\)</span> is the no-final-line-feed form used for canonical schedules
 and scoring-record arrays: UTF-8, sorted keys, compact separators, finite
 numbers, and preserved array order. Other public documents use the same JSON
@@ -2412,7 +2419,11 @@ mapping and every case/side/repetition slot. It retains attempts, parses and
 source locations; a failed or incomplete scheduled trial cannot be replaced
 by a favorable extra sample. Repetitions are averaged within each case and cases
 within each unit. The independently declared units determine the inference
-sample size. Native judge evidence additionally retains and replays its provider
+sample size. Distinct labels do not establish independence: cases can still
+share a source document, session or subject. Review the mapping against retained
+provenance before analysis; duplicated dependent cases can narrow a computed
+interval without adding independent information. See <a href="../../reference/judge-measurements/#statistical-scope">statistical scope</a>.
+Native judge evidence additionally retains and replays its provider
 capture; captured or frozen-answer imports retain supplied-source provenance.</p>
 <p>See <a href="../../reference/evaluation-records/">captured records</a> and
 <a href="../../reference/judge-measurements/">judge measurements</a> for these contracts.</p>

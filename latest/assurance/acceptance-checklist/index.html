@@ -1125,6 +1125,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#portable-acceptance-attestations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Portable acceptance attestations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#present-and-retain" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2055,6 +2066,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#portable-acceptance-attestations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Portable acceptance attestations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#present-and-retain" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2209,6 +2231,17 @@ suppress a verifier error, or reinterpret a failed policy result.</p>
       attestation limitations before approving downstream use.</li>
 <li>[ ] If the result lies on or near a policy boundary, independently rerun it
       or record why one run is sufficient for this decision.</li>
+<li>[ ] If using an <a href="../decision-semantics/#explore-hypothetical-exact-match-edits">exact-match edit advisory</a>,
+      retain its supplied input order, policy and search limits. Distinguish an
+      exact witness from a lower bound; do not treat it as rerun probability or
+      as authentication of the outcomes.</li>
+<li>[ ] If using a <a href="../../reference/evaluation-records/#explain-an-additive-score-change">score contribution explanation</a>,
+      validate the complete source workflow and retain its scope, unit mapping,
+      repetition averaging and numeric units. Reconcile to that report's total;
+      a residual alone does not prove rounding or authenticate the inputs.</li>
+<li>[ ] If using optional diagnostics, retain array provenance, alignment,
+      preprocessing, numerical method and environment. A reference-edge distance
+      is not an error bound, and an observation cannot override a policy verdict.</li>
 </ul>
 <h2 id="captured-and-judge-evidence">Captured and judge evidence<a class="headerlink" href="#captured-and-judge-evidence" title="Permanent link">&para;</a></h2>
 <p>For a captured comparison, use <code>invarlock/trust-inputs-v2</code> with independently
@@ -2226,6 +2259,11 @@ and <code>required_decision: pass</code>. Hosted subjects use the service descri
 identity rather than a model-weight digest. Check the exact run, case-set, plan,
 measurement, analysis-policy and analysis-result pins, plus
 <code>native_capture_sha256</code> for native judge evidence.</p>
+<p>Review the case-to-unit mapping against source provenance, including shared
+source documents, sessions or subjects. Unique <code>unit_id</code> values and extra
+repetitions do not establish independent evidence. Fix the grouping before
+inspecting ratings and record unresolved dependence; replay checks the declared
+mapping, not the independence assumption. See <a href="../../reference/judge-measurements/#statistical-scope">statistical scope</a>.</p>
 <p>Confirm <code>authenticated</code>, <code>replayed</code>, <code>verified</code> and <code>accepted</code>, and inspect
 <code>decision</code> separately. Recipient acceptance requires a required judge policy
 and <code>decision: pass</code>. Verified regression, insufficient evidence or an advisory
@@ -2247,6 +2285,27 @@ component must be required; advisory results cannot be promoted into acceptance.
 The composition result is a local computation, not a new signed attestation;
 component receipts keep their separate scopes. The conjunction does not create
 a joint statistical confidence guarantee. See <a href="../../reference/evidence-sets/">evidence sets</a>.</p>
+<h2 id="portable-acceptance-attestations">Portable acceptance attestations<a class="headerlink" href="#portable-acceptance-attestations" title="Permanent link">&para;</a></h2>
+<p>Apply these checks when receiving a native receipt in an
+<a href="../../reference/acceptance-attestations/">acceptance-attestation envelope</a>, in
+addition to the applicable technical-evidence checks above. The wrapper supports
+native receipt v1/v2; captured and judge receipts use their own handoff paths.</p>
+<ul>
+<li>[ ] Supply a recipient-controlled policy and independently trusted envelope
+      public keys, with separate authorization for the embedded receipt verifier.</li>
+<li>[ ] Bind the subject using exactly one independent expected artifact digest or
+      artifact path; a matching name alone is insufficient.</li>
+<li>[ ] Confirm <code>envelope_authenticated</code>, <code>receipt_authenticated</code>, <code>subject_bound</code>
+      and <code>accepted</code>. Inspect <code>historical_technical_verdict</code> separately.</li>
+<li>[ ] Check allowed contract versions, signer status, countersigning and any
+      receipt trust-profile pin. Retain the exact original receipt bytes.</li>
+<li>[ ] Apply envelope-age and evidence-age limits separately. A new envelope or
+      wrapper-supplied evaluation time cannot refresh undated evidence; a missing
+      receipt-authenticated time fails a configured evidence-age requirement.</li>
+<li>[ ] Treat source descriptions and metric context as envelope-signer assertions
+      unless checked against complete evidence. Envelope verification does not
+      repeat full replay or confer deployment approval.</li>
+</ul>
 <h2 id="present-and-retain">Present and retain<a class="headerlink" href="#present-and-retain" title="Permanent link">&para;</a></h2>
 <ul>
 <li>[ ] Use <code>invarlock report evidence/ --html evidence.html --explain</code> for a
@@ -2256,6 +2315,12 @@ a joint statistical confidence guarantee. See <a href="../../reference/evidence-
       decision beside the bundle without modifying it.</li>
 <li>[ ] Re-evaluate when any artifact, schedule, policy, provider, runtime, or
       execution setting changes.</li>
+<li>[ ] If correcting an actual error, preserve the original pack and receipt,
+      record the error and affected claim, and link independently verified
+      replacement evidence. Establish correction authority and authenticate the
+      notice separately. Review known dependent decisions and record unknown
+      consumers; a digest link does not revoke their approvals. See the
+      <a href="../../user-guide/hosted-service-requalification/#rehearse-a-correction-of-an-actual-error">correction example</a>.</li>
 </ul>
 <h2 id="minimal-decision-record">Minimal decision record<a class="headerlink" href="#minimal-decision-record" title="Permanent link">&para;</a></h2>
 <p>Keep this information beside the pack and receipt:</p>

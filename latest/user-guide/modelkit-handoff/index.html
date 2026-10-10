@@ -2234,7 +2234,7 @@ Paths are relative to that file. Its fields are:</p>
 </tr>
 <tr>
 <td><code>technical_anchors.request_digest</code></td>
-<td>Optional independently selected SHA-256 digest of the complete canonical normalized evaluation request</td>
+<td>Independently selected SHA-256 digest of the complete canonical normalized evaluation request; required when either side uses GGUF/<code>llama_cpp</code>, optional otherwise</td>
 </tr>
 <tr>
 <td><code>envelope</code></td>
@@ -2254,12 +2254,13 @@ Paths are relative to that file. Its fields are:</p>
 </tr>
 </tbody>
 </table>
-<p>Supply <code>request_digest</code> when acceptance requires the exact evaluated context,
+<p>Supply <code>request_digest</code> whenever either side uses GGUF/<code>llama_cpp</code>, and for other
+providers when acceptance requires the exact evaluated context,
 including the request's generation settings, scorer configuration, security
 settings, and observation payload references. The example passes this expectation
 to the public verifier and rejects a mismatch even when both package mappings
 and signatures are valid. It does not infer the expected digest from the incoming
-evidence. Omitting the field preserves the existing artifact, runtime, schedule,
+evidence. For non-GGUF evidence, omitting the field preserves the existing artifact, runtime, schedule,
 policy and signer checks; omission does not establish an independently selected
 complete-request match.</p>
 <p>The current replay checks this expectation against the evidence manifest also

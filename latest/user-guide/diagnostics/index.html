@@ -841,6 +841,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#bound-the-covariance-allocation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bound the covariance allocation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#compare-aligned-arrays-directly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compare aligned arrays directly
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#scalar-variance-summary" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2084,6 +2106,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#bound-the-covariance-allocation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bound the covariance allocation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#compare-aligned-arrays-directly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compare aligned arrays directly
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#scalar-variance-summary" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2290,6 +2334,100 @@ Marchenko--Pastur reference edges:</p>
 <p>The theoretical edges rely on idealized independent-sample assumptions. They
 are reference values, not anomaly thresholds. Correlated activations, chosen
 layers, preprocessing, and low sample counts can all dominate the result.</p>
+<h3 id="bound-the-covariance-allocation">Bound the covariance allocation<a class="headerlink" href="#bound-the-covariance-allocation" title="Permanent link">&para;</a></h3>
+<p>The default <code>method="covariance"</code> retains the original feature-covariance
+calculation and result fields. Both methods check <code>max_gram_bytes</code> before
+allocating the square Gram matrix. The default budget is 128 MiB; callers can
+supply a positive integer byte budget. Inputs previously accepted above this
+allocation now raise <code>DiagnosticInputError</code>, even if they fit the separate
+five-million-value limit. Choose a smaller input, explicitly select
+<code>smaller_gram</code>, or approve a larger budget for the available resources.
+This bounds that matrix alone, not peak
+process memory or decomposition workspace.</p>
+<p>For wide inputs, explicitly select the smaller Gram calculation:</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.diagnostics</span><span class="w"> </span><span class="kn">import</span> <span class="n">rmt_observation</span>
+
+<span class="n">samples</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">tile</span><span class="p">([[</span><span class="o">-</span><span class="mf">1.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">]],</span> <span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">64</span><span class="p">))</span>
+<span class="n">observation</span> <span class="o">=</span> <span class="n">rmt_observation</span><span class="p">(</span><span class="n">samples</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;smaller_gram&quot;</span><span class="p">)</span>
+<span class="k">assert</span> <span class="n">observation</span><span class="p">[</span><span class="s2">&quot;gram_dimension&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="mi">16</span>
+<span class="k">assert</span> <span class="n">observation</span><span class="p">[</span><span class="s2">&quot;gram_matrix_bytes&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="mi">2048</span>
+<span class="k">assert</span> <span class="n">observation</span><span class="p">[</span><span class="s2">&quot;empirical_eigenvalue_min&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="mf">0.0</span>
+</code></pre></div>
+
+<p>For <code>n</code> samples and <code>p</code> varying features, this method decomposes an
+<code>n</code> by <code>n</code> matrix when <code>p &gt; n</code>; otherwise it uses the feature covariance.
+The full covariance's omitted zero eigenvalues still determine its minimum,
+and the fraction above the edge still uses all <code>p</code> varying features.
+The result identifies <code>column_standardized_smaller_gram_eigh</code> and adds
+<code>gram_dimension</code>, <code>gram_matrix_bytes</code> and <code>minimum_upper_edge_distance</code>.</p>
+<p>The two calculations have the same nonzero eigenvalues in exact arithmetic.
+Floating-point differences can change the strict count above a reference edge.
+The distance field reports the smallest absolute distance to the upper edge,
+including omitted zeros. A small gap helps identify numerical sensitivity; it
+is neither an error bound nor a significance level. No tolerance is applied to
+the count. Keep the method and numerical environment with the result; do not
+silently replace a historical observation with a newly calculated one.</p>
+<h3 id="compare-aligned-arrays-directly">Compare aligned arrays directly<a class="headerlink" href="#compare-aligned-arrays-directly" title="Permanent link">&para;</a></h3>
+<p>Separate summaries can miss changes in matrix action. Retain both input
+observations and also summarize <code>subject - baseline</code>:</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.diagnostics</span><span class="w"> </span><span class="kn">import</span> <span class="n">spectral_observation</span>
+
+<span class="n">baseline</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">]])</span>
+<span class="n">subject</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">2.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">]])</span>
+<span class="c1"># The caller must establish identical row and column meanings on both sides.</span>
+<span class="k">assert</span> <span class="n">baseline</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="n">subject</span><span class="o">.</span><span class="n">shape</span>
+<span class="n">left</span> <span class="o">=</span> <span class="n">spectral_observation</span><span class="p">(</span><span class="n">baseline</span><span class="p">)</span>
+<span class="n">right</span> <span class="o">=</span> <span class="n">spectral_observation</span><span class="p">(</span><span class="n">subject</span><span class="p">)</span>
+<span class="n">change</span> <span class="o">=</span> <span class="n">spectral_observation</span><span class="p">(</span><span class="n">subject</span> <span class="o">-</span> <span class="n">baseline</span><span class="p">)</span>
+<span class="n">relative_change</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">change</span><span class="p">[</span><span class="s2">&quot;singular_value_max&quot;</span><span class="p">]</span> <span class="o">/</span> <span class="n">left</span><span class="p">[</span><span class="s2">&quot;singular_value_max&quot;</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">left</span><span class="p">[</span><span class="s2">&quot;singular_value_max&quot;</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="kc">None</span>
+<span class="p">)</span>
+<span class="k">assert</span> <span class="n">left</span><span class="p">[</span><span class="s2">&quot;singular_value_max&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">right</span><span class="p">[</span><span class="s2">&quot;singular_value_max&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="mf">2.0</span>
+<span class="k">assert</span> <span class="n">change</span><span class="p">[</span><span class="s2">&quot;singular_value_max&quot;</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mf">2.8</span>
+</code></pre></div>
+
+<p>Equal shapes do not establish alignment. Retain the row/column identities,
+selection, ordering and preprocessing separately. A basis change or permutation
+can create a large difference while preserving model behavior. A zero baseline
+has no defined relative change; report <code>null</code>, not an infinite value. Use finite
+float arrays before subtraction so integer arithmetic cannot wrap; the diagnostic
+rejects non-finite differences. Neither norm is a quality verdict.</p>
+<p>Covariance eigenvalues also omit feature orientation. For a small, fixed set of
+aligned features, compare the covariance matrices themselves. The following
+correlation recipe requires every selected feature to vary on both sides:</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.diagnostics</span><span class="w"> </span><span class="kn">import</span> <span class="n">spectral_observation</span>
+
+<span class="n">baseline</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="o">-</span><span class="mf">1.</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.</span><span class="p">],</span> <span class="p">[</span><span class="mf">1.</span><span class="p">,</span> <span class="mf">1.</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mf">1.</span><span class="p">,</span> <span class="mf">1.</span><span class="p">],</span> <span class="p">[</span><span class="mf">1.</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.</span><span class="p">]])</span>
+<span class="n">subject</span> <span class="o">=</span> <span class="n">baseline</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+<span class="n">subject</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">+=</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">subject</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span>
+<span class="k">assert</span> <span class="n">baseline</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="n">subject</span><span class="o">.</span><span class="n">shape</span>
+<span class="k">assert</span> <span class="n">baseline</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="mi">256</span>  <span class="c1"># Fixed feature selection bounds this recipe.</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">correlation</span><span class="p">(</span><span class="n">values</span><span class="p">):</span>
+    <span class="n">centered</span> <span class="o">=</span> <span class="n">values</span> <span class="o">-</span> <span class="n">values</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+    <span class="n">scale</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">centered</span> <span class="o">*</span> <span class="n">centered</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">scale</span><span class="p">)</span><span class="o">.</span><span class="n">all</span><span class="p">()</span> <span class="ow">or</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">scale</span> <span class="o">==</span> <span class="mi">0</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;selected features must have finite, nonzero deviation&quot;</span><span class="p">)</span>
+    <span class="n">standardized</span> <span class="o">=</span> <span class="n">centered</span> <span class="o">/</span> <span class="n">scale</span>
+    <span class="k">return</span> <span class="n">standardized</span><span class="o">.</span><span class="n">T</span> <span class="o">@</span> <span class="n">standardized</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
+
+
+<span class="n">change</span> <span class="o">=</span> <span class="n">spectral_observation</span><span class="p">(</span><span class="n">correlation</span><span class="p">(</span><span class="n">subject</span><span class="p">)</span> <span class="o">-</span> <span class="n">correlation</span><span class="p">(</span><span class="n">baseline</span><span class="p">))</span>
+<span class="k">assert</span> <span class="n">change</span><span class="p">[</span><span class="s2">&quot;frobenius_norm&quot;</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mf">0.0</span>
+</code></pre></div>
+
+<p>For raw population covariance, omit division by <code>scale</code> and use centered values
+in the matrix product. Raw covariance retains scale changes; correlation removes
+each feature's scale. Declare this choice and the selected feature identities
+before comparison. Never drop a different set of columns on each side. This
+small-matrix recipe has quadratic feature cost; it does not inherit the smaller
+Gram method's memory saving. Report its input digests and preparation alongside
+the change observation.</p>
 <h3 id="scalar-variance-summary">Scalar variance summary<a class="headerlink" href="#scalar-variance-summary" title="Permanent link">&para;</a></h3>
 <p><code>variance_observation</code> reports population and sample variance for a finite
 sequence:</p>

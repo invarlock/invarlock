@@ -2404,19 +2404,21 @@ engine ran successfully.</p>
 <p>The maintained qualification targets use two Python variables with different
 roles. <code>QUALIFICATION_DRIVER_PYTHON</code> launches the orchestration driver;
 <code>PYTHON</code> runs provider discovery, preflight, <code>evaluate</code>, <code>verify</code>, and
-<code>report</code>. The environment selected by <code>PYTHON</code> must contain the
-matching-version InvarLock core wheel and the exact wheel for every optional
-provider used by the request. Install those wheels into that interpreter, for
-example with <code>"$PYTHON" -m pip install /path/to/wheel.whl</code>.</p>
+<code>report</code> through an isolated bootstrap. <code>PYTHON</code> supplies the required
+third-party dependency environment. <code>CANDIDATE_WHEEL_MANIFEST</code> selects the exact
+core wheel, which includes all maintained providers; the driver authenticates
+and privately extracts it before execution. An installed InvarLock version
+cannot substitute for that candidate. Vision-text host preflight additionally
+requires Pillow; model inference dependencies belong in the pinned runtime image.</p>
 <div class="codehilite"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">PYTHON</span><span class="o">=</span>/path/to/qualification-venv/bin/python
 <span class="nb">export</span><span class="w"> </span><span class="nv">QUALIFICATION_DRIVER_PYTHON</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$PYTHON</span><span class="s2">&quot;</span>
 </code></pre></div>
 
-<p>Adding package source directories to <code>PYTHONPATH</code> is not an installation and
-is not sufficient. First-party provider authorization checks installed
-distribution and <code>invarlock.runtime_providers</code> entry-point metadata in addition
-to importing provider code. Using one isolated environment for <code>PYTHON</code> and
-<code>QUALIFICATION_DRIVER_PYTHON</code> avoids interpreter drift.</p>
+<p>Adding package source directories to <code>PYTHONPATH</code> cannot select a candidate.
+First-party provider authorization checks the extracted distribution and
+<code>invarlock.runtime_providers</code> entry-point metadata in addition to provider code.
+Using one isolated environment for <code>PYTHON</code> and <code>QUALIFICATION_DRIVER_PYTHON</code>
+avoids interpreter drift.</p>
 <p>Use the wrapper maintained beside the selected provider. Optional-provider
 wrappers add the installed entry-point check and required provider resources;
 do not substitute the root wrapper for them.</p>
@@ -2751,9 +2753,9 @@ command.</p>
 <p><code>CANDIDATE_WHEEL_MANIFEST</code> is a strict
 <code>invarlock/qualification-candidate-wheels-v1</code> JSON object whose <code>wheels</code> array
 contains an absolute or manifest-relative <code>path</code> and expected <code>sha256</code> for the
-core wheel and the selected provider runtime inputs used by the request. Qualification
-matches their package sources to the authenticated Git archive, extracts them
-privately, and executes them with an isolated interpreter bootstrap. Dependencies
+single core wheel containing all maintained providers. Qualification
+matches its package sources to the authenticated Git archive, extracts it
+privately, and executes its code with an isolated interpreter bootstrap. Dependencies
 may be installed in the selected interpreter, but an older installed InvarLock
 core runtime is not used as the qualification candidate.</p>
 <p>The signed canary prevents image-wide fan-out after a basic image, provider, or

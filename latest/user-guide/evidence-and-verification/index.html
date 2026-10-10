@@ -2463,6 +2463,11 @@ override a profile, and the signed receipt records its canonical digest.</p>
 <td>Runtime manifest inside the pack</td>
 </tr>
 <tr>
+<td>Normalized-request digest (required for GGUF)</td>
+<td>Independently reviewed normalized request or approved preflight record</td>
+<td>Request digest copied from the submitted pack</td>
+</tr>
+<tr>
 <td>Evidence-signer fingerprint</td>
 <td>Authorized signer registry or authenticated handoff</td>
 <td>Public key embedded in the pack signature</td>
@@ -2651,9 +2656,9 @@ signature before rendering. It shows:</p>
 subject. Each configured check shows its own status; expandable sections hold
 exact values, identities and technical details. Display rounding does not
 change the underlying evidence. The self-contained report works offline.
-<code>report --json</code> returns rendering status. Default and HTML-only native calls
-retain the v1 JSON shape; adding <code>--markdown</code> or <code>--junit</code> selects v2 with
-requested, written, and failed output details. All destinations are no-clobber
+<code>report --json</code> returns <code>invarlock/evidence-report-v2</code> for every native and
+captured output selection, including default and HTML-only calls, with requested,
+written and failed output details. All destinations are no-clobber
 and must remain outside evidence. A successful render exits <code>0</code> for both
 passing and failing recorded policies. See the
 <a href="../../reference/reports/">report reference</a> for output contracts and partial-write

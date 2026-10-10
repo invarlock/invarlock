@@ -2806,6 +2806,14 @@ answers or replace failed attempts. A changed model, input, rubric or policy
 requires a new workspace. Offline imports need retained calls and source
 bindings; scalar ratings alone cannot supply them. See the
 <a href="../evaluation-request/#judge">judge workflow and recovery rules</a>.</p>
+<p>For <code>collection.stop_reason: retained_capacity_exhausted</code>, inspect
+<code>collection.capacity</code> on Inspect-backed evaluations. The limiting allowance may
+be calls, token/cost reservations, retained sources or retained bytes. Another
+identical invocation cannot replenish it, and increasing one budget cannot fix
+a different exhausted limit. This is a terminal insufficient-evidence result,
+not a resumable deadline or a provider bill. Review the workload and allowances
+before a new campaign; preserve the stopped evidence. See the
+<a href="../../reference/judge-measurements/#native-scorer">capacity fields</a>.</p>
 <h2 id="normalized-nll-fails-closed">Normalized NLL fails closed<a class="headerlink" href="#normalized-nll-fails-closed" title="Permanent link">&para;</a></h2>
 <p>Each successful record needs finite <code>logprob_sum</code>, positive <code>token_count</code>, and
 positive <code>utf8_byte_count</code>. InvarLock derives <code>-logprob_sum / utf8_byte_count</code>.
@@ -2860,10 +2868,10 @@ exits <code>2</code> without a receipt; retry with an explicitly reviewed
 <code>--max-bootstrap-draws</code> allowance. An authenticated policy rejection exits <code>7</code>
 and can still carry a valid rejection receipt. Do not treat receipt authenticity
 as a passing technical verdict.</p>
-<p>Captured reports and native reports requesting Markdown or JUnit emit
-<code>invarlock/evidence-report-v2</code>. Inspect <code>requested_outputs</code>, <code>written_outputs</code>,
+<p>Captured and native reports emit <code>invarlock/evidence-report-v2</code> for every output
+selection, including default and HTML-only calls. Inspect <code>requested_outputs</code>, <code>written_outputs</code>,
 <code>failed_output</code>, and <code>errors</code> after a write failure; earlier completed outputs
-may remain. Default and HTML-only native report calls retain v1 JSON. Never
+may remain. Never
 render stale evidence after a failed evaluation publication.</p>
 <h2 id="before-escalating-a-bug">Before escalating a bug<a class="headerlink" href="#before-escalating-a-bug" title="Permanent link">&para;</a></h2>
 <p>Collect the smallest non-sensitive reproduction that preserves the failing

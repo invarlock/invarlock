@@ -2455,8 +2455,15 @@ input. InvarLock never treats overwriting an earlier result as a retry.</p>
 <td><code>0</code>; <code>--fail-on-policy</code> returns <code>7</code> for adverse policy or <code>2</code> for an unavailable decision</td>
 </tr>
 <tr>
-<td>Evaluation fails</td>
-<td>Absent</td>
+<td>Evaluation fails before publication</td>
+<td>No new directory</td>
+<td>None</td>
+<td>None</td>
+<td>Nonzero</td>
+</tr>
+<tr>
+<td>Publication or finalization fails</td>
+<td>Completed or competing output, or private staging, may remain; authenticate before use</td>
 <td>None</td>
 <td>None</td>
 <td>Nonzero</td>

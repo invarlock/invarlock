@@ -1603,6 +1603,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Statistical scope">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#diagnosing-shared-input-mismatches" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Diagnosing shared-input mismatches
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -2030,6 +2047,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Statistical scope">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#diagnosing-shared-input-mismatches" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Diagnosing shared-input mismatches
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -2211,6 +2245,20 @@ arbitrary member graphs and additional evidence families are outside this
 profile. All existing standalone requests, evidence and receipts remain valid.</p>
 <p>For the individual contracts, see <a href="../../user-guide/captured-results/">captured results</a>
 and <a href="../judge-measurements/">bounded judge measurements</a>.</p>
+<h3 id="diagnosing-shared-input-mismatches">Diagnosing shared-input mismatches<a class="headerlink" href="#diagnosing-shared-input-mismatches" title="Permanent link">&para;</a></h3>
+<p>A combined report rejects components with different frozen runs, case sets or
+subject identities. Its error names the first mismatched binding and shows its
+expected and observed digest. Here, expected means the identity derived from the
+deterministic component; observed means the identity bound by the judge component.
+This comparison does not establish recipient authorization.</p>
+<p>Recipient verification also identifies the first mismatched binding when the
+captured component differs from the shared recipient pins. In that error,
+expected comes from the external recipient policy. Missing fields are reported
+as <code>&lt;missing&gt;</code>, separately from <code>null</code> for a hosted subject's artifact identity.
+Errors report one mismatch at a time; they do not enumerate all inconsistencies.
+Preserve the rejected evidence and compare the named runs or policies before
+creating a corrected submission. Diagnostic detail does not change acceptance,
+component replay, signatures or the signed evidence formats.</p>
 
 
 

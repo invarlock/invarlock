@@ -2221,6 +2221,9 @@ evidence-signer anchors as protected environment variables or retrieve them
 from an independently managed approval system.</p>
 <p>Pin the action to a pinned InvarLock commit rather than a mutable branch.
 Replace <code>PINNED_INVARLOCK_COMMIT</code> with its full commit SHA.</p>
+<p>The example selects Ubuntu 26.04 explicitly to avoid an automatic operating-system
+upgrade through the moving <code>ubuntu-latest</code> label. This pins the OS release, not
+the complete runner image; installed tools still receive image updates.</p>
 <div class="codehilite"><pre><span></span><code><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Verify InvarLock evidence</span>
 
 <span class="nt">on</span><span class="p">:</span>
@@ -2231,9 +2234,11 @@ Replace <code>PINNED_INVARLOCK_COMMIT</code> with its full commit SHA.</p>
 
 <span class="nt">jobs</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">verify-evidence</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ubuntu-latest</span>
+<span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ubuntu-26.04</span>
 <span class="w">    </span><span class="nt">environment</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">release-review</span>
 <span class="w">    </span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Use disk-backed temporary storage</span>
+<span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">printf &#39;TMPDIR=%s\n&#39; &quot;$RUNNER_TEMP&quot; &gt;&gt; &quot;$GITHUB_ENV&quot;</span>
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Check out review inputs</span>
 <span class="w">        </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0</span>
 

@@ -2475,6 +2475,11 @@ Treat file-backed signing as the baseline implementation. A deployment needing
 a stronger signing boundary can create complete records in isolated execution,
 then use import mode in a controlled signing environment until an external
 signer interface is available.</p>
+<p>The inline native local-judge route is an exception to host-separated signing:
+all three roles run in one already running strict container, and a mounted signing
+key is available to its trusted runtime process. Use frozen-answer collection
+and separate <code>judge_import</code> publication when the key must remain outside model
+execution. See the <a href="../../reference/judge-measurements/#native-local-judge-collection">local judge boundary</a>.</p>
 <h2 id="separate-roles-and-keys">Separate roles and keys<a class="headerlink" href="#separate-roles-and-keys" title="Permanent link">&para;</a></h2>
 <p>Use different Ed25519 keys for evidence production and independent
 verification. Generate keys under a restrictive umask when a managed signing

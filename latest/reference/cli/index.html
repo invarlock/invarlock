@@ -2542,12 +2542,14 @@ match the request and policy bindings.</p>
 <h3 id="native-judge-scoring">Native judge scoring<a class="headerlink" href="#native-judge-scoring" title="Permanent link">&para;</a></h3>
 <p>A native request can select <code>comparison.metric: judge</code> with its own rubric,
 analysis policy and private collection workspace. <code>evaluate</code> captures or imports
-the native answers and calls the optional installed collector, then publishes
+the native answers and calls the selected bounded collector, then publishes
 judge evidence. Preflight makes no calls; interrupted judging retains its
 checkpoint and leaves the final output absent for continuation. Native runtime
 resources and artifact authentication still apply. <code>verify</code> replays the native
 capture and judgments offline using a judge recipient policy; <code>report</code> displays
-model, runtime, rubric, judge identity, outcomes and uncertainty. See the
+model, runtime, rubric, judge identity, outcomes and uncertainty. The native
+local-judge profile requires an already running strict container and executes
+all three model roles inline; OCI worker controls do not apply to that route. See the
 <a href="../judge-measurements/">judge reference</a> for the policy and supported profile.</p>
 <h3 id="captured-evaluation-controls">Captured evaluation controls<a class="headerlink" href="#captured-evaluation-controls" title="Permanent link">&para;</a></h3>
 <p>Captured requests use <code>invarlock/evaluation-request-v2</code> with
