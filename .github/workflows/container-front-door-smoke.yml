@@ -6,18 +6,9 @@ on:
   push:
     branches: [staging/next]
   workflow_dispatch:
-    inputs:
-      runner:
-        description: "Hosted OS for manual compatibility checks"
-        required: false
-        default: ubuntu-26.04
-        type: choice
-        options:
-          - ubuntu-26.04
-          - ubuntu-24.04
 
 concurrency:
-  group: container-front-door-${{ github.ref }}-${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04' || 'ubuntu-26.04' }}
+  group: container-front-door-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -25,8 +16,8 @@ permissions:
 
 jobs:
   engine-smoke:
-    name: "${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04 / ' || '' }}engine-smoke (${{ matrix.engine }})"
-    runs-on: ${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04' || 'ubuntu-26.04' }}
+    name: "engine-smoke (${{ matrix.engine }})"
+    runs-on: ubuntu-26.04
     timeout-minutes: 45
     strategy:
       fail-fast: false
@@ -145,10 +136,10 @@ jobs:
           retention-days: 30
 
   smoke:
-    name: "${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04 / ' || '' }}smoke"
+    name: "smoke"
     if: ${{ always() }}
     needs: [engine-smoke]
-    runs-on: ${{ inputs.runner == 'ubuntu-24.04' && 'ubuntu-24.04' || 'ubuntu-26.04' }}
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     steps:
       - name: Use disk-backed temporary storage

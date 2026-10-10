@@ -49,9 +49,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Align user guides, assurance pages, tables and diagrams with current
   verification contracts and the limits of advisory diagnostics and examples.
 
-- Select Ubuntu 26.04 explicitly for hosted Linux CI and release workflows.
-  Keep Ubuntu 24.04 available for manual CI, evaluator SDK, container and
-  documentation comparison runs with separate check names and concurrency.
+- Select Ubuntu 26.04 explicitly for all automatic and manual hosted Linux CI
+  and release workflows. Keep standard and full manual CI runs in separate
+  concurrency groups.
 
 - Adapt the pinned LightEval registry to the current Hub search argument during
   isolated capture setup, preserving actual API results and SDK execution
