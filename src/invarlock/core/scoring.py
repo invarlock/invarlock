@@ -233,6 +233,21 @@ def score(
     return 2 * sum((wanted & observed).values()) / denominator if denominator else 1.0
 
 
+def captured_output_available(kind: str, output: Any) -> bool:
+    """Whether a captured answer supplies the facts required by this scorer.
+
+    This is availability, not correctness: empty text and malformed numeric/JSON
+    answers still reach the scorer. JSON null is itself a valid JSON value.
+    Keep the pure scorer's zero-for-invalid-answer contract separate from the
+    captured comparison's requirement to account for unavailable observations.
+    """
+    if kind in ("exact_match", "normalized_match", "token_f1"):
+        return isinstance(output, str)
+    if kind == "numeric_tolerance":
+        return output is not None
+    return True
+
+
 __all__ = [
     "KINDS",
     "SCORER_VERSION",

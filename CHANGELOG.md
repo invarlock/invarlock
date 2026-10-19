@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Captured comparisons now classify non-string text answers and null numeric
+  answers as unavailable, retaining their IDs and returning insufficient evidence
+  for affected metrics and slices. Empty text, wrong answers, JSON null, recorded
+  zero scores, and likelihood-only records keep their metric-specific meaning.
+  Independent replay applies the same rule; older packs whose comparisons relied
+  on zero-scoring unavailable answers fail replay consistency. Preserve those
+  signed packs and produce a new assessment from the retained runs.
+
 ## [0.17.0] - 2026-10-10
 
 ### Added
