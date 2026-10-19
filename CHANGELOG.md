@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Independent replay applies the same rule; older packs whose comparisons relied
   on zero-scoring unavailable answers fail replay consistency. Preserve those
   signed packs and produce a new assessment from the retained runs.
+- Clarify native API omission errors, post-publication runtime import checks,
+  sequential report outputs, and CI artifacts after failed verification.
 
 ## [0.17.0] - 2026-10-10
 
