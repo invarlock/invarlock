@@ -86,20 +86,18 @@ can issue a separate signed receipt. It makes no model or judge calls.
 
 Explain the comparison identities, measured changes, uncertainty and every
 configured check. HTML, terminal and Markdown presentations share the result;
-JSON and JUnit support automation where available. Directory-pack reporting
-checks embedded signatures when signed. Judge reporting replays retained
-measurements but leaves signature authentication to `verify`. Rendering does
-not replace recipient verification. Explicit unsigned captured reports retain
-their local, unauthenticated status.
+JSON and JUnit support automation where available. The
+[report reference](reference/reports.md)
+explains each evidence family's integrity checks and the separate recipient
+verification step.
 
 </div>
 
 </div>
 
 Commands default to readable text; use `--json` for machine-readable status.
-Publication, recorded policy outcome and independent verification are separate
-results. Use the [CLI's exit-code contract](reference/cli.md) for automation,
-rather than interpreting a rendered report's successful exit as policy approval.
+Use the [CLI's exit-code contract](reference/cli.md) to distinguish publication,
+recorded policy outcome and independent verification in automation.
 
 ## Select a scorer and its evidence
 
@@ -172,12 +170,11 @@ recipient supplies its expected identities, policy and signer trust; a signed ve
 receipt records that recipient's check. Imported observations and native
 runtime bindings retain distinct provenance claims.
 
-The result is bounded by the supplied cases, observations and assumptions.
-Verification does not independently rerun model execution, establish production
-representativeness or authorize deployment. A valid signature alone cannot
-supply an independent trust decision, and a comparative pass can coexist with
-poor absolute task performance. Read the [assurance case](assurance/assurance-case.md)
-and [trust model](security/trust-model.md) for the complete boundaries.
+Verification replays the retained observations without rerunning the model.
+Choose cases and requirements appropriate to the intended workload, including
+an absolute quality minimum when needed. The [assurance case](assurance/assurance-case.md)
+and [trust model](security/trust-model.md) explain the result's scope and the
+independent inputs needed to rely on it.
 
 ## Find the detailed contract
 

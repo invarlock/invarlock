@@ -108,34 +108,28 @@ First-party provider authorization checks the extracted distribution and
 Using one isolated environment for `PYTHON` and `QUALIFICATION_DRIVER_PYTHON`
 avoids interpreter drift.
 
-Use the wrapper maintained beside the selected provider. Optional-provider
-wrappers add the installed entry-point check and required provider resources;
-do not substitute the root wrapper for them.
+All four providers use the repository-root qualification targets. Provider
+selection comes from the request; installed discovery checks the provider's
+entry point and required resources.
 
 Ordinary `invarlock evaluate` receives its immutable image reference and digest
-directly through CLI options or the embedding API. The first-party optional
-provider Makefile wrappers expose a mutable `IMAGE` build/smoke handle, but
-their signed `qualify-*` targets pass `QUALIFICATION_IMAGE`. That value defaults
-to `IMAGE_DIGEST`; override it with an exact `repository@sha256:...` reference
-when the qualification must remain fetchable across hosts. A mutable tag is
-never a strict qualification identity.
+through CLI options or the embedding API. The qualification targets pass
+`IMAGE` and `IMAGE_DIGEST` to those options. Set `IMAGE` to an exact
+`repository@sha256:...` reference when the image must be fetchable across hosts;
+a mutable tag is not a strict qualification identity.
 
-| Provider | Signed canary | Readiness | Evidence |
-| --- | --- | --- | --- |
-| `hf_transformers` | `make runtime-qualification-canary` | `make runtime-qualification-readiness` | `make runtime-qualification-evidence` |
-| `hf_vision_text` | `make qualify-canary` | `make qualify-preflight` | `make qualify-evidence` |
-| `llama_cpp` | `make qualify-canary` | `make qualify-preflight` | `make qualify-evidence` |
-| `tensorrt_llm` | `make qualify-canary` | `make qualify-preflight` | `make qualify-evidence` |
+| Stage | Command | Purpose |
+| --- | --- | --- |
+| Signed canary | `make runtime-qualification-canary` | Run a small representative request through the exact image |
+| Readiness | `make runtime-qualification-readiness` | Check the frozen request, resources and retained canary |
+| Evidence | `make runtime-qualification-evidence` | Evaluate, verify and report the frozen comparison |
 
-All four paths accept the same resource controls:
-`QUALIFICATION_DEVICE`, `QUALIFICATION_CPUS`,
-`QUALIFICATION_MEMORY_MIB`, and `QUALIFICATION_USER`. Set them once and keep
-them unchanged across canary, readiness, and evidence. The root wrapper
-requires an explicit device. The provider wrappers have provider-appropriate
-device defaults, but an explicit `cpu` or `cuda:<index>` keeps the execution
-contract reviewable. Vision-text additionally requires `RESOURCE_ROOT` and
-`CONTENT_STORE`; GGUF and TensorRT-LLM use the provider resource variables
-documented in their sections below.
+Each target requires an explicit `QUALIFICATION_DEVICE` and accepts
+`QUALIFICATION_CPUS`, `QUALIFICATION_MEMORY_MIB`, and `QUALIFICATION_USER`.
+Keep these values unchanged across canary, readiness and evidence. Set
+`cpu` or an explicit `cuda:<index>` according to the provider and image.
+Supply vision-text, GGUF and TensorRT-LLM resources through the
+`INVARLOCK_*` environment variables documented in their sections below.
 
 ## Hugging Face Transformers
 

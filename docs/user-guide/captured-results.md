@@ -99,8 +99,8 @@ use their declared provenance and a `recorded` policy; per-case string metadata
 supports slices under the same policy. These observations do not replace the
 likelihood or judge measurements required above. Supply an actual typed
 likelihood under `metadata.invarlock_likelihood`; do not fabricate generated text
-for a likelihood-only case. A successful import establishes usable captured
-facts, and does not itself qualify a model or approve a release.
+for a likelihood-only case. Import validates the captured facts for the selected
+scoring contract; evaluation then applies the comparison policy.
 
 For a measured NLL comparison between distinct checkpoints, replay the
 [Mistral 7B reference](https://github.com/invarlock/invarlock/blob/main/examples/captured-results/references/mistral-7b-likelihood/README.md).

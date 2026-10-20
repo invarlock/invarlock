@@ -2,9 +2,8 @@
 
 > **Assurance note**
 >
-> **In plain language:** A valid signature is only the start. A decision owner must
-> also confirm the independent anchors, decision scope, key authorization,
-> and known limitations before relying on the result.
+> **In plain language:** Confirm the independent anchors, decision scope, key
+> authorization, and known limitations before relying on a signed result.
 >
 > **Question:** Has a decision owner established every prerequisite needed to rely
 > on one signed evidence decision?
@@ -19,7 +18,6 @@ Use this checklist for one native exact-match, normalized-NLL or deterministic
 extension `invarlock/evidence-pack-v1` decision. For captured comparisons and
 bounded judge evidence, use the contract-specific checks below.
 
-This is a decision-owner checklist, not an additional runtime approval workflow.
 Apply conditional items only when relevant and record which operational checks
 your decision requires. Independent expectations can be maintained by the same
 team that evaluates models; their authority comes from approved inputs outside
@@ -198,14 +196,13 @@ native receipt v1/v2; captured and judge receipts use their own handoff paths.
       wrapper-supplied evaluation time cannot refresh undated evidence; a missing
       receipt-authenticated time fails a configured evidence-age requirement.
 - [ ] Treat source descriptions and metric context as envelope-signer assertions
-      unless checked against complete evidence. Envelope verification does not
-      repeat full replay or confer deployment approval.
+      unless checked against complete evidence. Use `invarlock verify` for full
+      evidence replay.
 
 ## Present and retain
 
 - [ ] Use `invarlock report evidence/ --html evidence.html --explain` for a
-      report; do not treat the rendered file as the signed acceptance
-      record.
+      readable view, retaining the signed receipt as the acceptance record.
 - [ ] Record any external attestation, independent rerun, exception, or decision owner
       decision beside the bundle without modifying it.
 - [ ] Re-evaluate when any artifact, schedule, policy, provider, runtime, or

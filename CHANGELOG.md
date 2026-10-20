@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Shorten onboarding, report and example guidance, consolidate repeated
+  verification boundaries, and link to detailed acceptance and security contracts.
+- Update runtime qualification commands and packaging guidance, and make the
+  native-judge starter's documentation links work outside the source checkout.
+
+### Fixed
+
+- Upgrade maintained `aiohttp` locks to 3.14.4 and its required `yarl`
+  dependency to 1.25.1, resolving three dependency audit findings.
+- Captured comparisons now classify non-string text answers and null numeric
+  answers as unavailable, retaining their IDs and returning insufficient evidence
+  for affected metrics and slices. Empty text, wrong answers, JSON null, recorded
+  zero scores, and likelihood-only records keep their metric-specific meaning.
+  Independent replay applies the same rule; older packs whose comparisons relied
+  on zero-scoring unavailable answers fail replay consistency. Preserve those
+  signed packs and produce a new assessment from the retained runs.
+- Clarify native API omission errors, post-publication runtime import checks,
+  sequential report outputs, and CI artifacts after failed verification.
+
 ## [0.17.0] - 2026-10-10
 
 ### Added

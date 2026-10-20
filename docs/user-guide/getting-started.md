@@ -366,9 +366,9 @@ The report leads with **Policy satisfied** or **Policy not met** and identifies
 the baseline and subject. It shows both side means, the point comparison, the
 selected paired interval, and every configured metric, count, precision and
 side-accuracy check. HTML details expand to show exact values and bindings.
-`report` checks the embedded
-evidence signature and bundle integrity before rendering, but it does not use
-the independent verifier anchors or replace the signed receipt.
+`report` checks the embedded evidence signature and bundle integrity before
+rendering. Retain the signed receipt from step 5 as the independent verification
+record.
 Successful rendering exits `0` even when the recorded policy failed. Use
 `--json` for a machine-readable rendering status and HTML path; do not parse
 the terminal layout to decide acceptance.
@@ -405,9 +405,9 @@ not a general model-quality measure. A displayed token-weighted perplexity
 ratio is derived interpretation only; it has no policy, interval, or verdict
 authority.
 
-This describes sensitivity to paired resampling of the fixed schedule. It is
-not a population confidence interval, statistical-power calculation, safety
-claim, or proof that the schedule represents production traffic.
+The NLL interval describes sensitivity to paired resampling of the fixed
+schedule. Broader claims require a sampling design and supporting evidence;
+see [finite-schedule interpretation](../assurance/decision-semantics.md#finite-schedule-interpretation).
 
 ## Secondary offline import smoke
 

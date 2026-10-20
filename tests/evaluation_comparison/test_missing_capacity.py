@@ -16,11 +16,13 @@ def pair(identifier="case", *, left_error=None, right_error=None, scores=True):
     left = {
         "id": identifier,
         "error": left_error,
+        "output": "answer",
         "scores": {"quality": 1} if scores else {},
     }
     right = {
         "id": identifier,
         "error": right_error,
+        "output": "answer",
         "scores": {"quality": 1} if scores else {},
     }
     return left, right
