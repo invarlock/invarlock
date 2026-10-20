@@ -83,11 +83,10 @@ The source tree has two carriers:
 | Repository-local entry | Full evidence directory, receipt, and metadata beneath `public_evidence/evidence/SLUG/` | Small packs that are appropriate for Git history |
 | External release asset | Archive available over HTTPS plus digest metadata in the index | Large packs retained outside Git while remaining content-addressed |
 
-Installed wheels contain only `evidence_index.json`. They do not silently
-embed full packs. The index is a discovery and transport-integrity surface; it
-does not replace `invarlock verify` or the caller's independent artifact,
-schedule, policy, runtime, evidence-signer, and verifier anchors, including the
-normalized-request anchor required for GGUF evidence.
+Installed wheels contain only `evidence_index.json`, which locates packs and
+records their transport hashes. Verify retrieved evidence using
+[independent anchors](evidence-and-verification.md#obtain-each-anchor-independently)
+and validate its signed receipt.
 
 ## Prepare a local entry
 
@@ -119,8 +118,7 @@ entry and cannot escape it.
 
 Before indexing, independently repeat strict verification into a fresh receipt
 destination outside the pack and validate the received receipt with
-`verify_signed_verification_receipt`. An evidence signature, a report-local pass,
-or an existing receipt alone is not sufficient.
+`verify_signed_verification_receipt`.
 
 ## Disclosure review
 
@@ -157,11 +155,10 @@ The generated entry records:
 
 This repository audit validates publication structure, local carrier bytes,
 the receipt's Ed25519 signature and embedded verifier-key fingerprint, and the
-receipt-to-manifest binding. Authorization remains with independently managed
-artifact, schedule, policy, runtime, evidence-signer, and verifier anchors,
-including the normalized-request anchor required for GGUF evidence.
-Perform strict verification and independently anchored receipt validation
-before indexing, and retain those review inputs outside the submitted pack.
+receipt-to-manifest binding. It checks publication consistency; independent
+authorization comes from the verification and receipt-validation steps in
+[Prepare a local entry](#prepare-a-local-entry). Retain those review inputs
+outside the submitted pack.
 
 The synchronizer rebuilds the source index from local metadata, preserves
 validated external-only entries, and writes the same bytes to the package-owned

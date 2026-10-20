@@ -255,9 +255,9 @@ observations.
 
 The read-only presentation of retained results in supported terminal and file
 formats. It applies the evidence family's integrity checks and preserves the
-recorded signature status; unsigned local reports do not become independently
-accepted evidence. Recipient acceptance comes from verification under
-independently controlled inputs, with a signed receipt where requested.
+recorded signature status, including unsigned local evidence. See
+[rendering and recipient acceptance](../reference/reports.md#keep-rendering-separate-from-recipient-acceptance)
+for the separate verification step.
 
 **Scorer extension**
 

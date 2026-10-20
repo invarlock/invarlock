@@ -9,9 +9,9 @@ Use it when you need to generate new model answers and assess them against a
 rubric, such as whether an answer stays within supplied context. A judge rating
 is a measurement of that rubric, not a replacement for task-specific tests. To
 try the evidence workflow without models, containers or API credentials, start
-with the [offline frozen-answer example](../judge-measurements/README.md).
+with the [offline frozen-answer example](https://github.com/invarlock/invarlock/blob/main/examples/judge-measurements/README.md).
 To run the judge itself from a local HF checkpoint or GGUF file, use the
-[native local judge example](../native-local-judge/README.md). That profile
+[native local judge example](https://github.com/invarlock/invarlock/blob/main/examples/native-local-judge/README.md). That profile
 executes the authenticated artifact directly in an offline runtime; this starter
 uses a hosted judge account.
 
@@ -31,8 +31,10 @@ Omitting the mode or setting it to `none` preserves the original request bytes.
 You need Python 3.12 or newer, two local model snapshots, Docker or Podman, a
 digest-pinned native runtime image, a supported judge account and an Ed25519
 evidence-signing key. Use core and example files from the same source
-revision. The [getting-started guide](../../docs/user-guide/getting-started.md)
+revision. The [getting-started guide](https://github.com/invarlock/invarlock/blob/main/docs/user-guide/getting-started.md)
 explains model identities, image preparation and key separation.
+Links open the repository source so they also work in a copied starter.
+For a released wheel, select its matching Git tag when reading those pages.
 
 Install the core with live judge collection:
 
@@ -78,8 +80,8 @@ Prepare these files before running the commands:
 | `runtime-profile.json` | Your pinned native images and resources; not supplied by the starter |
 | `recipient-policy.json` | Independently approved judge evidence and signer expectations; not supplied by the starter |
 
-Create the runtime profile using the [runtime-profile reference](../../docs/reference/cli.md#reusable-runtime-profiles).
-Prepare the recipient policy using the [judge recipient contract](../../docs/reference/judge-measurements.md).
+Create the runtime profile using the [runtime-profile reference](https://github.com/invarlock/invarlock/blob/main/docs/reference/cli.md#reusable-runtime-profiles).
+Prepare the recipient policy using the [judge recipient contract](https://github.com/invarlock/invarlock/blob/main/docs/reference/judge-measurements.md).
 The signing key is also supplied by you and stays outside published evidence.
 
 ## Evaluate and inspect
@@ -115,8 +117,7 @@ trust by blindly copying the submitted envelope.
 Successful publication creates `evidence/`; it does not mean the comparison
 passed. With the two illustrative cases, expect insufficient evidence under the
 example precision requirement. Inspect the recorded decision and the verifier's
-separate `verified` and `accepted` fields. A report displays the evidence; it does
-not itself authorize acceptance. Use new evidence and report destinations for
+separate `verified` and `accepted` fields. Use new evidence and report destinations for
 each completed transaction because existing outputs are not overwritten.
 
 ## Resume or change the inputs
@@ -135,7 +136,7 @@ publishes terminal insufficient evidence with
 cannot gain new allowance by resuming. Inspect-backed collection also reports
 `collection.capacity` to identify the limiting resources; these are conservative
 admission reservations, not measured usage or billing. See the
-[collection capacity reference](../../docs/reference/judge-measurements.md#native-scorer).
+[collection capacity reference](https://github.com/invarlock/invarlock/blob/main/docs/reference/judge-measurements.md#native-scorer).
 
 ## Start from answers collected elsewhere
 

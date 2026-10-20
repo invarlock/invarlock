@@ -17,9 +17,10 @@ and security checks.
   example-scenario audits, the bounded judge statistics calibration, and the
   source-tree cruft check.
 - `release/` validates a clean release checkout and built distributions.
-  `make dist-check` binds the core wheel/sdist and all four first-party
-  optional wheel/sdist pairs to their exact checkout sources, metadata, and
-  entry points. `make install-smoke` then installs the pinned base dependency
+  `make dist-check` binds the single `invarlock` wheel and source archive to
+  their exact checkout sources, metadata, and entry points. The providers,
+  diagnostics and judge implementation ship in that distribution.
+  `make install-smoke` then installs the pinned base dependency
   closure and the wheel in a disposable environment, runs
   `pip check`, and exercises provider discovery and conformance without using
   the checkout or user site. It selects the maintained Python 3.12 or 3.13
@@ -27,7 +28,7 @@ and security checks.
   stages five consumers outside the checkout: quickstart, captured evaluation,
   judge replay, the three-scorer SDK journey and a retained deployment receipt.
   Local installation checks and both release wheel jobs run this same inventory
-  before optional add-ins are installed.
+  before testing the optional dependency surface.
 - `security/` generates the SBOM and runs dependency vulnerability checks.
   `build_hardened_accelerate_wheel.py bootstrap` authenticates the upstream
   Accelerate build input and the deterministic hardened wheel in `runtime/wheels`

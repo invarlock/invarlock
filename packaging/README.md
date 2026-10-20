@@ -144,7 +144,7 @@ verifier-key and identity options. Follow the linked guide for that workflow.
 | --- | --- |
 | `evaluate` | Runs or imports a declared comparison, applies policy and publishes evidence. Preflight checks setup without execution. |
 | `verify` | Checks signatures, bound identities and supported analysis against the recipient's independent expectations; can issue a signed receipt. |
-| `report` | Explains the identities, results, uncertainty and policy checks in the retained evidence. Rendering does not replace independent verification. |
+| `report` | Explains the identities, results, uncertainty and policy checks in the retained evidence. |
 
 The HTML report supports multiple metrics and slices, with an overview and
 per-result detail. Terminal and Markdown outputs support review; JSON and JUnit
@@ -242,9 +242,8 @@ reference establishes its declared workflow and scope:
 | [Likelihood comparison](https://github.com/invarlock/invarlock/blob/v0.17.0/examples/captured-results/references/mistral-7b-likelihood/README.md) | Distinct Mistral 7B checkpoints on 400 fixed narrative continuations |
 | [Bounded judge comparison](https://github.com/invarlock/invarlock/blob/v0.17.0/examples/judge-measurements/references/k2-32b-luna-xhigh-heldout/README.md) | 10,260 retained ratings across 1,710 QA and extraction cases, with offline replay |
 
-A comparative pass is not proof of adequate task quality or representative
-production performance. The local HTTP example does not qualify an external
-provider; repeated judge ratings are not additional independent cases.
+Each reference states its cases, requirements and observed outcomes. Use those
+details to assess whether the comparison supports your intended workload.
 
 ## What verification establishes
 
@@ -253,10 +252,9 @@ channel independent of the submitted bundle. InvarLock checks the package and
 reconstructs the supported analysis against those expectations. Native runtime
 bindings and imported observations retain different provenance claims.
 
-Verification checks retained evidence; it does not independently rerun the
-original model execution. It does not establish that the chosen benchmark covers
-production traffic, that a rubric captures every requirement, or that a passing
-comparison authorizes deployment. Read the
+Verification replays retained evidence without rerunning the original model.
+Choose cases, rubrics and thresholds that cover your intended use, and record
+the release decision with its supporting evidence. Read the
 [assurance case](https://github.com/invarlock/invarlock/blob/v0.17.0/docs/assurance/assurance-case.md)
 and [trust model](https://github.com/invarlock/invarlock/blob/v0.17.0/docs/security/trust-model.md)
 for the precise guarantees and assumptions.
