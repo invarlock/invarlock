@@ -5,9 +5,7 @@
 > **In plain language:** For native exact match and NLL, InvarLock recomputes
 > scores from authenticated paired records, derives the paired interval, and
 > applies the policy to the conservative bound. When the policy qualifies sample size,
-> precision, or exact-match side accuracy, those checks must pass too. A
-> favorable point value cannot override a threshold, count, width, or side-
-> accuracy failure.
+> precision, or exact-match side accuracy, those checks must pass too.
 >
 > **Question:** How does each scoring contract turn its measurements and
 > uncertainty into a replayable policy decision?

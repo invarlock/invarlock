@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Shorten onboarding and report guidance, consolidate repeated verification
+  boundaries, and link to detailed acceptance and security contracts.
+
 ## [0.17.0] - 2026-10-10
 
 ### Added

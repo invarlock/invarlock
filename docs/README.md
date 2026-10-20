@@ -86,20 +86,18 @@ can issue a separate signed receipt. It makes no model or judge calls.
 
 Explain the comparison identities, measured changes, uncertainty and every
 configured check. HTML, terminal and Markdown presentations share the result;
-JSON and JUnit support automation where available. Directory-pack reporting
-checks embedded signatures when signed. Judge reporting replays retained
-measurements but leaves signature authentication to `verify`. Rendering does
-not replace recipient verification. Explicit unsigned captured reports retain
-their local, unauthenticated status.
+JSON and JUnit support automation where available. The
+[report reference](reference/reports.md)
+explains each evidence family's integrity checks and the separate recipient
+verification step.
 
 </div>
 
 </div>
 
 Commands default to readable text; use `--json` for machine-readable status.
-Publication, recorded policy outcome and independent verification are separate
-results. Use the [CLI's exit-code contract](reference/cli.md) for automation,
-rather than interpreting a rendered report's successful exit as policy approval.
+Use the [CLI's exit-code contract](reference/cli.md) to distinguish publication,
+recorded policy outcome and independent verification in automation.
 
 ## Select a scorer and its evidence
 

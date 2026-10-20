@@ -43,8 +43,7 @@ verification.receipt.json               evidence.html
 ```
 
 The evidence directory is the only signed evaluation artifact. The receipt is a
-separate verifier statement. HTML is a reproducible view. Keep all three roles
-distinct even when one automation job creates them in sequence.
+separate verifier statement. HTML is a reproducible view.
 
 ## Canonical evidence layout
 
@@ -191,8 +190,7 @@ Applying different policy bytes requires a new evidence transaction.
 Text output separates evidence integrity from the policy decision. A replayed
 policy rejection includes observed and required values for failed checks and
 the signed receipt path. Evidence, receipt and HTML paths remain complete
-logical lines even on narrow terminals. A readable report or an existing
-receipt file alone does not establish acceptance.
+logical lines even on narrow terminals.
 
 Use `--json` in automation. A successful result includes the core verifier
 fields plus the receipt path and verifier identity. Check the structured
@@ -331,21 +329,11 @@ passing and failing recorded policies. See the
 [report reference](../reference/reports.md) for output contracts and partial-write
 recovery.
 
-The report verifies the embedded signature without pinning that signer to an
-independent allowlist, and it does not validate a verification receipt. Treat
-it as a summary of signed evidence, not as the independent acceptance result.
-
-Use the report to answer presentation questions:
-
-- Which artifacts, built-in metric or scorer, schedule size, and evidence
-  signer does this bundle name?
-- What baseline and subject means were recorded?
-- What comparison value and threshold produced the bound verdict?
-- Which policy digest is bound into the report?
-
-Use verification and its receipt to answer the acceptance question: did an
-independent verifier replay this exact manifest under separately recorded
-anchors?
+Use the report to inspect the comparison and verification to establish
+acceptance under independent anchors. Reporting checks the embedded signature
+without pinning the signer to an independent allowlist or validating a receipt.
+See [rendering and recipient acceptance](../reference/reports.md#keep-rendering-separate-from-recipient-acceptance)
+for the distinction.
 
 ## Store and transfer
 
