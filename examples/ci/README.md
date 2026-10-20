@@ -95,6 +95,6 @@ transfer or job success alone cannot authorize deployment.
 Replace the retained evidence and demonstration anchors together with your
 independently approved policy and identities. Configure both protected
 environments before enabling the workflow, and implement the candidate resolver
-so it checks the artifact that will actually be deployed. A passing receipt
-does not establish model safety, hardware execution, or suitability for your
-application. The deployment owner remains responsible for those requirements.
+so it checks the artifact that will actually be deployed. Include the
+application-specific requirements in the deployment owner's decision; see the
+[acceptance checklist](../../docs/assurance/acceptance-checklist.md).

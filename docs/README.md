@@ -170,12 +170,11 @@ recipient supplies its expected identities, policy and signer trust; a signed ve
 receipt records that recipient's check. Imported observations and native
 runtime bindings retain distinct provenance claims.
 
-The result is bounded by the supplied cases, observations and assumptions.
-Verification does not independently rerun model execution, establish production
-representativeness or authorize deployment. A valid signature alone cannot
-supply an independent trust decision, and a comparative pass can coexist with
-poor absolute task performance. Read the [assurance case](assurance/assurance-case.md)
-and [trust model](security/trust-model.md) for the complete boundaries.
+Verification replays the retained observations without rerunning the model.
+Choose cases and requirements appropriate to the intended workload, including
+an absolute quality minimum when needed. The [assurance case](assurance/assurance-case.md)
+and [trust model](security/trust-model.md) explain the result's scope and the
+independent inputs needed to rely on it.
 
 ## Find the detailed contract
 

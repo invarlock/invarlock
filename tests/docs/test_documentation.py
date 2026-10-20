@@ -210,7 +210,7 @@ def test_readme_leads_with_a_runnable_workflow_and_scoped_capabilities() -> None
     assert "An aggregate score cannot substitute" in integrations
     assert "Verifying old evidence does not measure" in integrations
     boundary = " ".join(readme[positions[6] : positions[7]].split())
-    assert "does not independently rerun" in boundary
+    assert "without rerunning the original model" in boundary
     assert "recipient's current policy" in boundary
     assert "v0.13 evidence and receipts remain verifiable and ingestible" in boundary
 

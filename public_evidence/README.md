@@ -33,13 +33,8 @@ arrive through independent channels; verification compares them with the
 corresponding signed evidence. GGUF evidence adds an independently approved
 normalized-request digest to those inputs.
 
-Verification requires an external policy, both expected artifact-identity
-digests, the expected canonical-schedule digest, both expected runtime digests,
-the expected evidence-signer fingerprint, and a verifier identity and signing
-key. When either side uses `llama_cpp`, it also requires the independently
-approved normalized-request digest.
 See the [verification guide](../docs/user-guide/evidence-and-verification.md)
-for the trust model. A complete command is:
+for obtaining these anchors. A complete native verification command is:
 
 ```bash
 invarlock verify PATH/TO/EVIDENCE \
@@ -64,10 +59,8 @@ Render its signer-authenticated comparison report with:
 invarlock report PATH/TO/EVIDENCE
 ```
 
-Publication review must validate the pack and its receipt independently. A
-report authenticates the signed bundle; it does not authorize the verifier or
-replace the signed verification receipt. Systems relying on a receipt should
-use the Python verification facade described in the
+Publication review must validate the pack and its receipt independently.
+Validate the receipt using the Python facade described in the
 [API guide](../docs/reference/api-guide.md#verify-a-signed-receipt) with an
 independently recorded verifier identity and fingerprint.
 

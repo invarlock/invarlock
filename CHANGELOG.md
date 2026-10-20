@@ -9,8 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Shorten onboarding and report guidance, consolidate repeated verification
-  boundaries, and link to detailed acceptance and security contracts.
+- Shorten onboarding, report and example guidance, consolidate repeated
+  verification boundaries, and link to detailed acceptance and security contracts.
+- Update runtime qualification commands and packaging guidance, and make the
+  native-judge starter's documentation links work outside the source checkout.
 
 ### Fixed
 
