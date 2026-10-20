@@ -161,6 +161,13 @@ hashes come from the official NVIDIA index and FlashInfer release artifacts,
 and installation independently recomputes them. Audit the changed closure
 before replacing the maintained lock or rebuilding its image.
 
+The maintained lock upgrades `aiohttp` from 3.14.3 to 3.14.4 and `yarl` from
+1.24.5 to the required 1.25.1. The replacement hashes match PyPI, and the
+changed packages' dependencies fit the pinned Python 3.12 Linux closure.
+The frozen source, build, kernel and vendor wheel inputs are unchanged.
+This dependency update has not been built into a K2 image; repeat the image
+checks below before issuing a ready receipt for the updated lock.
+
 Before producing a ready build receipt:
 
 1. Exercise the derived source's actual installed imports and unchanged grammar

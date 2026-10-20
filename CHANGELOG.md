@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Upgrade maintained `aiohttp` locks to 3.14.4 and its required `yarl`
+  dependency to 1.25.1, resolving three dependency audit findings.
 - Captured comparisons now classify non-string text answers and null numeric
   answers as unavailable, retaining their IDs and returning insufficient evidence
   for affected metrics and slices. Empty text, wrong answers, JSON null, recorded
