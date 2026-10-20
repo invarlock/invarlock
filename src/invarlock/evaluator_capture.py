@@ -10,6 +10,7 @@ import re
 from collections.abc import Mapping
 from typing import Any
 
+from invarlock.core.scoring import captured_output_available
 from invarlock.evaluation_record_contracts.contracts import (
     MAX_RECORDS,
     EvaluationRecordsError,
@@ -214,7 +215,7 @@ def evaluator_input_capabilities(run: dict[str, Any]) -> dict[str, dict[str, Any
     }
     for row in run["records"]:
         text_reference = isinstance(row["expected"], str)
-        text_output = isinstance(row["output"], str)
+        text_output = captured_output_available("exact_match", row["output"])
         available = {
             "exact_match": text_reference and text_output,
             "normalized_nll_per_utf8_byte": "likelihood" in row,
