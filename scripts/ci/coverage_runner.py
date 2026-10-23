@@ -75,6 +75,7 @@ RUNTIME_TESTS = (
     "tests/judge_measurements",
 )
 SUPPORT_TESTS = (
+    "tests/docs/test_external_links.py",
     "tests/ci/test_coverage_branch_rate.py",
     "tests/ci/test_coverage_shards.py",
     "tests/ci/test_public_evidence_audit.py",

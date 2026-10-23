@@ -303,6 +303,7 @@ coverage-examples-report:  ## Enforce retained examples coverage measurements
 coverage-maintenance:  ## Measure maintained repository checks and security tooling
 	COVERAGE_FILE=$(COVERAGE_MAINTENANCE_FILE) $(PYTHON) -m coverage erase
 	COVERAGE_FILE=$(COVERAGE_MAINTENANCE_FILE) PYTHONPATH=src:. $(PYTEST) $(PYTEST_WORKER_ARGS) -q \
+		tests/docs/test_external_links.py \
 		tests/ci/test_coverage_branch_rate.py \
 		tests/ci/test_coverage_shards.py \
 		tests/ci/test_public_evidence_audit.py \

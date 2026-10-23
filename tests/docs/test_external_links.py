@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import runpy
 import subprocess
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -15,6 +16,18 @@ ROOT = Path(__file__).resolve().parents[2]
 def test_canonical_documentation_url_matches_published_latest_directory() -> None:
     config = yaml.safe_load((ROOT / "mkdocs.yml").read_text())
     assert config["site_url"] == "https://invarlock.github.io/invarlock/latest/"
+
+
+def test_missing_rendered_entry_fails_before_crawling(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    checker = ROOT / "scripts/checks/check_docs_links.py"
+    namespace = runpy.run_path(str(checker))
+    monkeypatch.setattr(sys, "argv", [str(checker), "--site-dir", str(tmp_path)])
+    with pytest.raises(SystemExit) as error:
+        namespace["main"]()
+    assert error.value.code == 2
+    assert "Missing rendered entry page" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize("status", [200, 404])
