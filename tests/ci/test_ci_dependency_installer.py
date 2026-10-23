@@ -63,14 +63,29 @@ def test_standard_setup_preserves_pins_bytecode_and_selected_python(name):
 
 
 def _run(command, *, env, check=True):
-    return subprocess.run(
-        command, env=env, check=check, capture_output=True, text=True, timeout=60
+    result = subprocess.run(
+        command, env=env, check=False, capture_output=True, text=True, timeout=60
     )
+    if check:
+        assert result.returncode == 0, result.stdout + result.stderr
+    return result
 
 
 @pytest.fixture
-def installation(tmp_path):
+def installation(tmp_path, monkeypatch):
+    # The CI runner exposes the checkout through PYTHONPATH. Unrelated metadata
+    # on that path must not enter the fresh installer comparison environments.
+    ambient = tmp_path / "ambient"
+    metadata = ambient / "unrelated-1.0.dist-info"
+    metadata.mkdir(parents=True)
+    (metadata / "METADATA").write_text(
+        "Metadata-Version: 2.1\nName: unrelated\nVersion: 1.0\n"
+        "Requires-Dist: deliberately-missing-dependency==1.0\n"
+    )
+    monkeypatch.setenv("PYTHONPATH", str(ambient))
     env = dict(os.environ)
+    for key in ("PYTHONPATH", "PYTHONHOME"):
+        env.pop(key, None)
     for key in tuple(env):
         if key.startswith(("COVERAGE_", "COV_CORE_", "UV_", "PIP_")):
             env.pop(key)
