@@ -14,17 +14,39 @@ from tempfile import TemporaryDirectory
 
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG = ROOT / "scripts/ci/coverage.coveragerc"
+CORE_PARTITIONS = {
+    "core-capacity": (
+        "tests/evaluation_comparison/test_capacity.py",
+        "tests/evaluation_comparison/test_default_resource_budget.py",
+    ),
+}
 EXAMPLE_PARTITIONS = {
     "examples-comparisons": (
-        "tests/integration/test_evaluator_parity.py",
         "tests/examples/test_priority_workflow_reference.py",
         "tests/examples/test_captured_reference.py",
+    ),
+    "examples-parity": ("tests/integration/test_evaluator_parity.py",),
+    "examples-journeys": (
+        "tests/examples/test_modelkit_real_journey.py",
+        "tests/examples/test_evaluator_real_judge_journey.py",
+        "tests/examples/test_judge_heldout_reference.py",
+        "tests/examples/test_live_evaluator_reference.py",
     ),
     "examples-judge": ("tests/examples/test_judge_measurements_reference.py",),
     "examples-judge-review": ("tests/examples/test_judge_measurements_review.py",),
     "examples-judge-priority": ("tests/examples/test_priority_judge_reference.py",),
 }
-SHARDS = ("core", "examples", *EXAMPLE_PARTITIONS, "support", "runtime")
+SHARDS = (
+    "core",
+    *CORE_PARTITIONS,
+    "examples",
+    *EXAMPLE_PARTITIONS,
+    "support",
+    "runtime",
+)
+# The minimum-Python marker policy excludes every integration parity case.
+# Keep those paths in its comparison group instead of creating an empty job.
+MINIMUM_PYTHON_SHARDS = tuple(shard for shard in SHARDS if shard != "examples-parity")
 FAST_MARKERS = "not integration and not slow and not manual and not gpu"
 EXAMPLE_TESTS = (
     "tests/examples",
@@ -107,7 +129,14 @@ def selection(shard: str) -> list[str]:
             *(f"--ignore={path}" for path in EXAMPLE_TESTS),
             *(f"--ignore={path}" for path in RUNTIME_TESTS),
             *(f"--ignore={path}" for path in SUPPORT_TESTS),
+            *(
+                f"--ignore={path}"
+                for paths in CORE_PARTITIONS.values()
+                for path in paths
+            ),
         ]
+    if shard in CORE_PARTITIONS:
+        return [*CORE_PARTITIONS[shard], "-m", FAST_MARKERS]
     if shard in EXAMPLE_PARTITIONS:
         return list(EXAMPLE_PARTITIONS[shard])
     if shard == "examples":
@@ -133,7 +162,14 @@ def selection(shard: str) -> list[str]:
 def test_selection(shard: str) -> list[str]:
     """Keep unrestricted runtime and compatibility tests out of fast partitions."""
     if shard == "supplement":
-        arguments = selection("core")
+        # Supplemental release checks must still include non-fast cases from
+        # files whose fast tests moved to independent measured partitions.
+        moved = {
+            f"--ignore={path}" for paths in CORE_PARTITIONS.values() for path in paths
+        }
+        arguments = [
+            argument for argument in selection("core") if argument not in moved
+        ]
         arguments[arguments.index(FAST_MARKERS)] = (
             "integration or slow or manual or gpu"
         )
@@ -141,6 +177,8 @@ def test_selection(shard: str) -> list[str]:
     if shard == "runtime":
         return [*RUNTIME_TESTS, "tests/compatibility"]
     arguments = selection(shard)
+    if shard == "examples-comparisons":
+        arguments.extend(EXAMPLE_PARTITIONS["examples-parity"])
     if shard == "support":
         arguments = [
             path
@@ -159,7 +197,7 @@ def test(shard: str, workers: int) -> int:
     env["PYTHONPATH"] = os.pathsep.join(str(ROOT / path) for path in ("src", "."))
     command = [sys.executable, "-m", "pytest", "-q", *arguments]
     if workers:
-        command.extend(["-n", str(workers)])
+        command.extend(["-n", str(workers), "--dist=worksteal"])
     return subprocess.run(command, cwd=ROOT, env=env, check=False).returncode
 
 
@@ -278,7 +316,7 @@ def run(shard: str, artifact_dir: Path, workers: int) -> int:
         "xdist.plugin",
     ]
     if workers:
-        command.extend(["-n", str(workers)])
+        command.extend(["-n", str(workers), "--dist=worksteal"])
     command.extend(
         [
             "-q",
@@ -383,7 +421,7 @@ def main(argv: list[str] | None = None) -> int:
     runner.add_argument("--artifact-dir", type=Path, default=Path("artifacts/coverage"))
     runner.add_argument("--workers", type=int, default=2)
     behavior = commands.add_parser("test")
-    behavior.add_argument("shard", choices=SHARDS)
+    behavior.add_argument("shard", choices=MINIMUM_PYTHON_SHARDS)
     behavior.add_argument("--workers", type=int, default=2)
     supplement = commands.add_parser("supplement")
     supplement.add_argument("--workers", type=int, default=2)

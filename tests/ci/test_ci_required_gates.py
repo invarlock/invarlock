@@ -32,10 +32,12 @@ def test_ci_runs_the_repository_gates() -> None:
         "policy-engine-interop",
         "verify-fast",
         "verify-checks",
+        "verify-packages",
         "evaluator-parity",
         "minimum-python",
         "minimum-python-tests",
         "minimum-python-packages",
+        "minimum-python-parity",
         "coverage-tests",
         "coverage",
         "verify-full",
@@ -63,7 +65,13 @@ def test_ci_runs_the_repository_gates() -> None:
     assert _step(fast, "Check full-capacity signed verification")["run"] == (
         "python -m pytest -q 'tests/evaluation_comparison/test_capacity.py::test_full_capacity_signed_independent_recipient[50000]'"
     )
-    assert _step(fast, "Build, install, and validate distributions")["run"] == (
+    packages = jobs["verify-packages"]
+    _assert_core_wheel_install(packages)
+    assert _step(packages, "Set up uv")["with"]["version"] == "0.10.10"
+    assert _step(packages, "Set up Python")["with"]["python-version"] == "3.13"
+    assert packages["if"] == fast["if"]
+    assert "needs" not in packages
+    assert _step(packages, "Build, install, and validate distributions")["run"] == (
         "make install-smoke inspect-judge-sdk-test langfuse-sdk-test"
     )
     assert _step(
@@ -84,8 +92,13 @@ def test_ci_runs_the_repository_gates() -> None:
     assert _step(minimum, "Build, install, and validate distributions")["run"] == (
         "make install-smoke inspect-judge-sdk-test langfuse-sdk-test"
     )
+    parity = jobs["minimum-python-parity"]
+    _assert_core_wheel_install(parity)
+    assert _step(parity, "Set up Python")["with"]["python-version"] == "3.12"
+    assert parity["if"] == minimum["if"]
+    assert "needs" not in parity and "needs" not in minimum
     assert _step(
-        minimum,
+        parity,
         "Check all dedicated evaluator profiles with an installed recipient",
     )["run"] == (
         "INVARLOCK_REPLAY_RETAINED_CAMPAIGNS=0 "
@@ -94,13 +107,21 @@ def test_ci_runs_the_repository_gates() -> None:
     assert minimum["timeout-minutes"] >= 35
 
     gate = jobs["minimum-python"]
-    assert set(gate["needs"]) == {"minimum-python-tests", "minimum-python-packages"}
+    assert set(gate["needs"]) == {
+        "minimum-python-tests",
+        "minimum-python-packages",
+        "minimum-python-parity",
+    }
     assert "always()" in gate["if"]
     assert _step(gate, "Require every minimum-Python check")["run"] == (
-        'test "$TEST_RESULT" = success && test "$PACKAGE_RESULT" = success'
+        'test "$TEST_RESULT" = success && test "$PACKAGE_RESULT" = success && test "$PARITY_RESULT" = success'
     )
     tests = jobs["minimum-python-tests"]
-    assert tests["strategy"]["matrix"] == jobs["coverage-tests"]["strategy"]["matrix"]
+    assert tests["strategy"]["matrix"]["shard"] == [
+        shard
+        for shard in jobs["coverage-tests"]["strategy"]["matrix"]["shard"]
+        if shard != "examples-parity"
+    ]
     assert _step(tests, "Run disjoint minimum-Python tests")["run"] == (
         "python scripts/ci/coverage_runner.py test ${{ matrix.shard }} --workers 2"
     )
@@ -108,8 +129,11 @@ def test_ci_runs_the_repository_gates() -> None:
     _assert_core_wheel_install(coverage_tests)
     assert coverage_tests["strategy"]["matrix"]["shard"] == [
         "core",
+        "core-capacity",
         "examples",
         "examples-comparisons",
+        "examples-parity",
+        "examples-journeys",
         "examples-judge",
         "examples-judge-review",
         "examples-judge-priority",

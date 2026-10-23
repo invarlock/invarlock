@@ -264,19 +264,29 @@ uses a separate environment, so its execution does not contribute coverage.
 The complete coverage gate requires Linux descriptor execution. On another
 operating system, run the relevant portable target such as `make
 coverage-examples`, and report the full Linux result from CI separately.
-CI splits examples across five groups balanced using retained test timings,
-alongside the core, support-tooling and runtime jobs. Each test belongs to one group. The required `coverage` gate combines
-all eight successful measurements and enforces the existing domain, per-file and
+CI splits examples across seven groups balanced using retained test timings,
+alongside separate core and capacity groups, support-tooling and runtime jobs.
+Each test belongs to one group. Parallel test workers rebalance pending work
+using pytest-xdist's work-stealing scheduler; worker counts and selected cases
+remain unchanged. The required `coverage` gate combines
+all eleven successful measurements and enforces the existing domain, per-file and
 aggregate branch thresholds. Missing, failed or mismatched measurements cannot
 pass. Test timing reports are retained with each group's coverage data. Release
 promotion branches are checked through their pull requests; main/staging pushes,
 release tags and scheduled security scans retain their separate checks.
 
-The `verify-fast` CI result requires both parallel jobs to succeed:
-`verify-checks` runs repository checks, installed-package journeys and the
-50,000-record signed-recipient case without tracing; `evaluator-parity` runs
-all dedicated evaluator profiles with an isolated installed recipient. A failure,
-cancellation or skip in either job fails the aggregate. Its success is also
+Minimum-Python tests use ten groups with the same marker policy as before.
+Their comparison group retains the integration parity paths, which the existing
+integration exclusion deselects. Coverage runs those parity cases in its own
+unrestricted group. Each Python version also requires the dedicated evaluator
+parity gate.
+
+The `verify-fast` CI result requires all three parallel jobs to succeed:
+`verify-checks` runs repository checks, captured-evaluation journeys and the
+50,000-record signed-recipient case without tracing; `verify-packages` runs
+distribution and installed-SDK checks; `evaluator-parity` runs all dedicated
+evaluator profiles with an isolated installed recipient. A failure,
+cancellation or skip in any job fails the aggregate. Its success is also
 required by the coverage gate. Reporting uses a separate hash-pinned core and
 coverage-tool environment, retaining every domain, per-file and branch check.
 Main CI and pre-commit install their pinned environments directly. They avoid
@@ -286,13 +296,16 @@ Pre-commit retains its separate hook-environment cache and runs every hook.
 Python 3.13 behavioral tests run under coverage;
 the separate Python 3.12 suite checks the minimum supported interpreter. Local
 `make verify-fast` still includes its behavioral tests. Minimum-Python tests use
-the same partitions, with their existing marker policy, and run concurrently with installed
-package checks. The required `minimum-python` result rejects a failure or skip in
-either group.
+the ten groups described above, with their existing marker policy, and run concurrently with
+installed-package checks and a separate Python 3.12 evaluator-parity job.
+The required `minimum-python` result rejects a failure, cancellation or skip in
+any group.
 
 The release workflow runs the measured tests once. Separate supplemental tests
 cover the slow or integration-marked core cases outside routine coverage; docs,
 static checks and installed-artifact qualification remain separate gates.
+Moving fast capacity cases to their own group does not remove the slow capacity
+cases from supplemental release validation.
 
 The 12,000-record capacity case remains under subprocess branch coverage. Both
 capacity cases retain the same assertions and watchdog; the large case is
