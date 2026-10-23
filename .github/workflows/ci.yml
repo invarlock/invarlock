@@ -86,10 +86,11 @@ jobs:
         uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
         with:
           version: "0.10.10"
+          enable-cache: false
       - name: Install dependencies
         run: |
           python scripts/security/build_hardened_accelerate_wheel.py bootstrap
-          python -m pip install --require-hashes --find-links runtime/wheels -r requirements/workflows/ci-hf-py313.txt
+          uv pip install --python "$(command -v python)" --compile-bytecode --require-hashes --no-config --find-links runtime/wheels -r requirements/workflows/ci-hf-py313.txt
           python -m build --wheel --no-isolation
           python -m pip install --no-deps --force-reinstall dist/*.whl
       - name: Check installed hardened Accelerate APIs
@@ -145,10 +146,11 @@ jobs:
         uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
         with:
           version: "0.10.10"
+          enable-cache: false
       - name: Install dependencies
         run: |
           python scripts/security/build_hardened_accelerate_wheel.py bootstrap
-          python -m pip install --require-hashes --find-links runtime/wheels -r requirements/workflows/ci-hf-py313.txt
+          uv pip install --python "$(command -v python)" --compile-bytecode --require-hashes --no-config --find-links runtime/wheels -r requirements/workflows/ci-hf-py313.txt
           python -m build --wheel --no-isolation
           python -m pip install --no-deps --force-reinstall dist/*.whl
       - name: Build, install, and validate distributions
@@ -172,10 +174,15 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: '3.13'
+      - name: Set up uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
+        with:
+          version: "0.10.10"
+          enable-cache: false
       - name: Install dependencies
         run: |
           python scripts/security/build_hardened_accelerate_wheel.py bootstrap
-          python -m pip install --require-hashes --find-links runtime/wheels -r requirements/workflows/ci-hf-py313.txt
+          uv pip install --python "$(command -v python)" --compile-bytecode --require-hashes --no-config --find-links runtime/wheels -r requirements/workflows/ci-hf-py313.txt
           python -m build --wheel --no-isolation
           python -m pip install --no-deps --force-reinstall dist/*.whl
       - name: Check all dedicated evaluator profiles with an installed recipient
@@ -222,10 +229,11 @@ jobs:
         uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
         with:
           version: "0.10.10"
+          enable-cache: false
       - name: Install dependencies
         run: |
           python scripts/security/build_hardened_accelerate_wheel.py bootstrap
-          python -m pip install --require-hashes --find-links runtime/wheels -r requirements/workflows/ci-hf-py312.txt
+          uv pip install --python "$(command -v python)" --compile-bytecode --require-hashes --no-config --find-links runtime/wheels -r requirements/workflows/ci-hf-py312.txt
           python -m build --wheel --no-isolation
           python -m pip install --no-deps --force-reinstall dist/*.whl
       - name: Check command surface
@@ -251,10 +259,15 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: '3.12'
+      - name: Set up uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
+        with:
+          version: "0.10.10"
+          enable-cache: false
       - name: Install dependencies
         run: |
           python scripts/security/build_hardened_accelerate_wheel.py bootstrap
-          python -m pip install --require-hashes --find-links runtime/wheels -r requirements/workflows/ci-hf-py312.txt
+          uv pip install --python "$(command -v python)" --compile-bytecode --require-hashes --no-config --find-links runtime/wheels -r requirements/workflows/ci-hf-py312.txt
           python -m build --wheel --no-isolation
           python -m pip install --no-deps --force-reinstall dist/*.whl
       - name: Check all dedicated evaluator profiles with an installed recipient
@@ -285,10 +298,15 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: '3.12'
+      - name: Set up uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
+        with:
+          version: "0.10.10"
+          enable-cache: false
       - name: Install dependencies
         run: |
           python scripts/security/build_hardened_accelerate_wheel.py bootstrap
-          python -m pip install --require-hashes --find-links runtime/wheels -r requirements/workflows/ci-hf-py312.txt
+          uv pip install --python "$(command -v python)" --compile-bytecode --require-hashes --no-config --find-links runtime/wheels -r requirements/workflows/ci-hf-py312.txt
           python -m build --wheel --no-isolation
           python -m pip install --no-deps --force-reinstall dist/*.whl
       - name: Run disjoint minimum-Python tests
@@ -332,22 +350,27 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: '3.13'
+      - name: Set up uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
+        with:
+          version: "0.10.10"
+          enable-cache: false
       - name: Install dependencies
         run: |
           python scripts/security/build_hardened_accelerate_wheel.py bootstrap
-          python -m pip install --require-hashes --find-links runtime/wheels -r requirements/workflows/ci-hf-py313.txt
+          uv pip install --python "$(command -v python)" --compile-bytecode --require-hashes --no-config --find-links runtime/wheels -r requirements/workflows/ci-hf-py313.txt
           python -m build --wheel --no-isolation
           python -m pip install --no-deps --force-reinstall dist/*.whl
       - name: Install runtime coverage SDK dependencies
         if: ${{ matrix.shard == 'runtime' }}
         run: |
-          python -m pip install --require-hashes -r requirements/workflows/inspect-judge-tests-py313.txt
+          uv pip install --python "$(command -v python)" --compile-bytecode --require-hashes --no-config -r requirements/workflows/inspect-judge-tests-py313.txt
           python -m pip check
       - name: Install examples coverage SDK dependencies
         if: ${{ startsWith(matrix.shard, 'examples') }}
         run: |
-          python -m pip install --require-hashes -r requirements/workflows/inspect-judge-tests-py313.txt
-          python -m pip install --require-hashes -r requirements/workflows/langfuse-sdk-tests-py313.txt
+          uv pip install --python "$(command -v python)" --compile-bytecode --require-hashes --no-config -r requirements/workflows/inspect-judge-tests-py313.txt
+          uv pip install --python "$(command -v python)" --compile-bytecode --require-hashes --no-config -r requirements/workflows/langfuse-sdk-tests-py313.txt
           python -m pip check
       - name: Collect disjoint test coverage
         env:

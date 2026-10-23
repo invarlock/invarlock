@@ -289,6 +289,11 @@ evaluator profiles with an isolated installed recipient. A failure,
 cancellation or skip in any job fails the aggregate. Its success is also
 required by the coverage gate. Reporting uses a separate hash-pinned core and
 coverage-tool environment, retaining every domain, per-file and branch check.
+The heavy standard-CI jobs install the same hash-pinned dependencies with the
+pinned uv installer, targeting the selected Python interpreter and compiling
+bytecode. Hardened-wheel authentication, first-party wheel builds and pip
+installation, SDK dependency checks and all validation commands remain in place.
+The uv action's cross-run cache is disabled; downloads can be reused within a job.
 Main CI and pre-commit install their pinned environments directly. They avoid
 transferring the shared multi-gigabyte pip cache, whose restore exceeded account
 egress limits and delayed jobs before their checks could start.
