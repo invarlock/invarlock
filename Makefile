@@ -43,7 +43,7 @@ COVERAGE_EXAMPLES_FILE ?= $(CURDIR)/.coverage.examples
 COVERAGE_MAINTENANCE_FILE ?= $(CURDIR)/.coverage.maintenance
 COVERAGE_TARGET_JOBS ?= 3
 RUNTIME_TEST_ROOTS := tests/diagnostics tests/runtime tests/runtime_providers tests/judge_measurements
-COVERAGE_SHARDS := core examples examples-comparisons examples-judge support runtime
+COVERAGE_SHARDS := core examples examples-comparisons examples-judge examples-judge-review examples-judge-priority support runtime
 VERIFY_TARGET_JOBS ?= 3
 
 MYPY_TYPED_SURFACE := \

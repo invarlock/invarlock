@@ -46,7 +46,7 @@ def test_langfuse_sdk_gate_uses_two_installed_environments_and_hashed_closures()
 
 def test_langfuse_sdk_is_required_only_for_examples_coverage_and_installed_gates():
     jobs = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text())["jobs"]
-    for job in ("verify-fast", "minimum-python-packages", "verify-full"):
+    for job in ("verify-checks", "minimum-python-packages", "verify-full"):
         assert any(
             "make install-smoke inspect-judge-sdk-test langfuse-sdk-test"
             == step.get("run")

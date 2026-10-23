@@ -20,11 +20,9 @@ EXAMPLE_PARTITIONS = {
         "tests/examples/test_priority_workflow_reference.py",
         "tests/examples/test_captured_reference.py",
     ),
-    "examples-judge": (
-        "tests/examples/test_judge_measurements_reference.py",
-        "tests/examples/test_judge_measurements_review.py",
-        "tests/examples/test_priority_judge_reference.py",
-    ),
+    "examples-judge": ("tests/examples/test_judge_measurements_reference.py",),
+    "examples-judge-review": ("tests/examples/test_judge_measurements_review.py",),
+    "examples-judge-priority": ("tests/examples/test_priority_judge_reference.py",),
 }
 SHARDS = ("core", "examples", *EXAMPLE_PARTITIONS, "support", "runtime")
 FAST_MARKERS = "not integration and not slow and not manual and not gpu"

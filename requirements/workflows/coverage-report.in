@@ -1,0 +1,8 @@
+# Reporting needs the core runtime and build tools, not model execution SDKs.
+# Match versions from the measured environment; retain every reporting command.
+-c ci-hf-py313.txt
+-r release-install.in
+coverage
+build
+setuptools
+wheel

@@ -65,6 +65,13 @@ def test_pip_cache_tracks_each_jobs_installed_locks(path: Path) -> None:
                         "requirements/workflows/pip-bootstrap.txt",
                     )
                 )
+            if "scripts/evaluator_parity_gate.sh" in commands:
+                installed.update(
+                    (
+                        f"requirements/workflows/release-install-py{tag}.txt",
+                        "requirements/workflows/pip-bootstrap.txt",
+                    )
+                )
             cached = options.get("cache-dependency-path", "").splitlines()
             assert installed, (path.name, name)
             assert set(cached) == installed, (path.name, name)
@@ -125,6 +132,13 @@ def test_precommit_reports_for_every_pull_request() -> None:
     assert workflow["on"]["pull_request"] is None
     job = workflow["jobs"]["run"]
     assert job["name"] == "pre-commit"
+    setup = next(
+        step
+        for step in job["steps"]
+        if step.get("uses", "").startswith("actions/setup-python@")
+    )
+    # A small tooling job must not restore the shared multi-GB model-wheel cache.
+    assert "cache" not in setup["with"]
     assert any(
         step.get("run") == "pre-commit run --all-files --show-diff-on-failure"
         for step in job["steps"]

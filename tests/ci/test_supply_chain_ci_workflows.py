@@ -399,6 +399,8 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
         "examples",
         "examples-comparisons",
         "examples-judge",
+        "examples-judge-review",
+        "examples-judge-priority",
         "support",
         "runtime",
     }
