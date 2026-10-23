@@ -1,187 +1,187 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
-         <loc>https://invarlock.github.io/invarlock/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/assurance/acceptance-checklist/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/assurance/acceptance-checklist/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/assurance/assurance-case/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/assurance/assurance-case/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/assurance/decision-semantics/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/assurance/decision-semantics/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/assurance/glossary/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/assurance/glossary/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/assurance/pairing-and-replay/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/assurance/pairing-and-replay/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/assurance/reproducibility/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/assurance/reproducibility/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/reference/acceptance-attestations/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/reference/acceptance-attestations/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/reference/api-guide/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/reference/api-guide/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/reference/architecture/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/reference/architecture/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/reference/artifacts/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/reference/artifacts/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/reference/cli/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/reference/cli/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/reference/compatibility/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/reference/compatibility/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/reference/contracts/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/reference/contracts/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/reference/documentation/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/reference/documentation/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/reference/environment/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/reference/environment/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/reference/evaluation-capacity/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/reference/evaluation-capacity/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/reference/evaluation-records/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/reference/evaluation-records/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/reference/evaluator-qualification/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/reference/evaluator-qualification/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/reference/evidence-sets/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/reference/evidence-sets/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/reference/judge-measurements/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/reference/judge-measurements/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/reference/lifecycle/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/reference/lifecycle/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/reference/policy-engine-interop/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/reference/policy-engine-interop/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/reference/release-verification/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/reference/release-verification/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/reference/reports/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/reference/reports/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/reference/runtime-providers/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/reference/runtime-providers/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/reference/runtime-security/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/reference/runtime-security/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/security/best-practices/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/security/best-practices/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/security/dependency-audit/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/security/dependency-audit/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/security/threat-model/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/security/threat-model/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/security/trust-model/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/security/trust-model/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/user-guide/captured-results/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/user-guide/captured-results/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/user-guide/change-scenarios/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/user-guide/change-scenarios/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/user-guide/ci-integration/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/user-guide/ci-integration/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/user-guide/diagnostics/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/user-guide/diagnostics/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/user-guide/evaluation-request/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/user-guide/evaluation-request/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/user-guide/evidence-and-verification/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/user-guide/evidence-and-verification/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/user-guide/getting-started/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/user-guide/getting-started/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/user-guide/hosted-service-requalification/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/user-guide/hosted-service-requalification/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/user-guide/key-management/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/user-guide/key-management/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/user-guide/modelkit-handoff/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/user-guide/modelkit-handoff/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/user-guide/public-evidence/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/user-guide/public-evidence/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/user-guide/runtime-providers/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/user-guide/runtime-providers/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/user-guide/schedule-and-policy/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/user-guide/schedule-and-policy/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/user-guide/troubleshooting/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/user-guide/troubleshooting/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
-         <loc>https://invarlock.github.io/invarlock/user-guide/verification-failure-lab/</loc>
-         <lastmod>2026-10-10</lastmod>
+         <loc>https://invarlock.github.io/invarlock/latest/user-guide/verification-failure-lab/</loc>
+         <lastmod>2026-10-23</lastmod>
     </url>
 </urlset>

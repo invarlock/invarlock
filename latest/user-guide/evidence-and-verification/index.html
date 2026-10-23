@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://invarlock.github.io/invarlock/user-guide/evidence-and-verification/">
+        <link rel="canonical" href="https://invarlock.github.io/invarlock/latest/user-guide/evidence-and-verification/">
       
       
         <link rel="prev" href="../schedule-and-policy/">
@@ -2346,8 +2346,7 @@ verification.receipt.json               evidence.html
 </code></pre></div>
 
 <p>The evidence directory is the only signed evaluation artifact. The receipt is a
-separate verifier statement. HTML is a reproducible view. Keep all three roles
-distinct even when one automation job creates them in sequence.</p>
+separate verifier statement. HTML is a reproducible view.</p>
 <h2 id="canonical-evidence-layout">Canonical evidence layout<a class="headerlink" href="#canonical-evidence-layout" title="Permanent link">&para;</a></h2>
 <p>A completed bundle contains fixed roles similar to:</p>
 <div class="codehilite"><pre><span></span><code>evidence/
@@ -2509,8 +2508,7 @@ Applying different policy bytes requires a new evidence transaction.</p>
 <p>Text output separates evidence integrity from the policy decision. A replayed
 policy rejection includes observed and required values for failed checks and
 the signed receipt path. Evidence, receipt and HTML paths remain complete
-logical lines even on narrow terminals. A readable report or an existing
-receipt file alone does not establish acceptance.</p>
+logical lines even on narrow terminals.</p>
 <p>Use <code>--json</code> in automation. A successful result includes the core verifier
 fields plus the receipt path and verifier identity. Check the structured
 fields instead of matching fragments of terminal output:</p>
@@ -2663,20 +2661,11 @@ and must remain outside evidence. A successful render exits <code>0</code> for b
 passing and failing recorded policies. See the
 <a href="../../reference/reports/">report reference</a> for output contracts and partial-write
 recovery.</p>
-<p>The report verifies the embedded signature without pinning that signer to an
-independent allowlist, and it does not validate a verification receipt. Treat
-it as a summary of signed evidence, not as the independent acceptance result.</p>
-<p>Use the report to answer presentation questions:</p>
-<ul>
-<li>Which artifacts, built-in metric or scorer, schedule size, and evidence
-  signer does this bundle name?</li>
-<li>What baseline and subject means were recorded?</li>
-<li>What comparison value and threshold produced the bound verdict?</li>
-<li>Which policy digest is bound into the report?</li>
-</ul>
-<p>Use verification and its receipt to answer the acceptance question: did an
-independent verifier replay this exact manifest under separately recorded
-anchors?</p>
+<p>Use the report to inspect the comparison and verification to establish
+acceptance under independent anchors. Reporting checks the embedded signature
+without pinning the signer to an independent allowlist or validating a receipt.
+See <a href="../../reference/reports/#keep-rendering-separate-from-recipient-acceptance">rendering and recipient acceptance</a>
+for the distinction.</p>
 <h2 id="store-and-transfer">Store and transfer<a class="headerlink" href="#store-and-transfer" title="Permanent link">&para;</a></h2>
 <p>Keep the immutable records together:</p>
 <div class="codehilite"><pre><span></span><code>review/

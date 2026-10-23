@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://invarlock.github.io/invarlock/reference/evaluation-records/">
+        <link rel="canonical" href="https://invarlock.github.io/invarlock/latest/reference/evaluation-records/">
       
       
         <link rel="prev" href="../contracts/">
@@ -2274,6 +2274,28 @@ a null output when valid reference-continuation facts are present. Matching IDs
 must bind matching input, reference and metadata. Missing required scorer facts
 produce <code>insufficient_evidence</code>, rather than a pass computed over survivors. Duplicate
 IDs or changed paired facts are integration errors.</p>
+<p>For captured comparisons, <code>exact_match</code>, <code>normalized_match</code>, and <code>token_f1</code>
+require string outputs on both sides; null and other non-string outputs are
+unavailable. Empty strings are present answers and can score zero or one.
+<code>numeric_tolerance</code> treats null output as unavailable, but a present incorrect
+or malformed numeric answer still scores zero. JSON scorers accept JSON null
+as a value: use an explicit row <code>error</code> to distinguish a failed capture from a
+submitted JSON null. Recorded metrics require their score key, including valid
+zero scores; likelihood metrics require bound likelihood facts, not answer text.
+Any unavailable pair makes its metric and slice insufficient, retains its ID
+in <code>missing_ids</code>, and leaves that metric's means and interval unset. Other
+complete metrics and slices are still evaluated.</p>
+<p>This corrects captured comparison behavior after v0.17.0, which could score
+unavailable text and numeric answers as zero and pass a permissive policy.
+Exact-match capability reporting and comparison now share the output-availability
+rule. The standalone deterministic <code>score</code> function retains its existing
+zero-for-invalid-answer behavior; native and judge scoring are unchanged.
+Fresh captured evidence uses the corrected comparison during independent replay.
+An older pack whose stored comparison counted such answers as usable fails
+replay consistency (verification exit 6); preserve it and create a new assessment
+from the retained runs instead of editing signed bytes. Authenticating an older
+receipt's signature does not rerun that comparison or revise its historical
+verdict. No format identifiers or scorer descriptors change.</p>
 <p><code>artifact_digest</code> attributes the run to a supplied artifact identity; it does not
 prove inference. <code>source_digest</code> binds raw imported bytes when applicable and is
 part of the complete run. Canonical <code>run_digest</code> covers the whole normalized run,

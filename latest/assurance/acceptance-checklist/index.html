@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://invarlock.github.io/invarlock/assurance/acceptance-checklist/">
+        <link rel="canonical" href="https://invarlock.github.io/invarlock/latest/assurance/acceptance-checklist/">
       
       
         <link rel="prev" href="../reproducibility/">
@@ -2121,9 +2121,8 @@
 <h1 id="acceptance-checklist">Acceptance checklist<a class="headerlink" href="#acceptance-checklist" title="Permanent link">&para;</a></h1>
 <blockquote>
 <p><strong>Assurance note</strong></p>
-<p><strong>In plain language:</strong> A valid signature is only the start. A decision owner must
-also confirm the independent anchors, decision scope, key authorization,
-and known limitations before relying on the result.</p>
+<p><strong>In plain language:</strong> Confirm the independent anchors, decision scope, key
+authorization, and known limitations before relying on a signed result.</p>
 <p><strong>Question:</strong> Has a decision owner established every prerequisite needed to rely
 on one signed evidence decision?</p>
 <p><strong>Decision use:</strong> Use this for recipient-owned acceptance after strict
@@ -2134,8 +2133,7 @@ signed verifier receipt, and the decision-owner-maintained decision record.</p>
 <p>Use this checklist for one native exact-match, normalized-NLL or deterministic
 extension <code>invarlock/evidence-pack-v1</code> decision. For captured comparisons and
 bounded judge evidence, use the contract-specific checks below.</p>
-<p>This is a decision-owner checklist, not an additional runtime approval workflow.
-Apply conditional items only when relevant and record which operational checks
+<p>Apply conditional items only when relevant and record which operational checks
 your decision requires. Independent expectations can be maintained by the same
 team that evaluates models; their authority comes from approved inputs outside
 the submitted evidence. A checked item means those expectations were established,
@@ -2303,14 +2301,13 @@ native receipt v1/v2; captured and judge receipts use their own handoff paths.</
       wrapper-supplied evaluation time cannot refresh undated evidence; a missing
       receipt-authenticated time fails a configured evidence-age requirement.</li>
 <li>[ ] Treat source descriptions and metric context as envelope-signer assertions
-      unless checked against complete evidence. Envelope verification does not
-      repeat full replay or confer deployment approval.</li>
+      unless checked against complete evidence. Use <code>invarlock verify</code> for full
+      evidence replay.</li>
 </ul>
 <h2 id="present-and-retain">Present and retain<a class="headerlink" href="#present-and-retain" title="Permanent link">&para;</a></h2>
 <ul>
 <li>[ ] Use <code>invarlock report evidence/ --html evidence.html --explain</code> for a
-      report; do not treat the rendered file as the signed acceptance
-      record.</li>
+      readable view, retaining the signed receipt as the acceptance record.</li>
 <li>[ ] Record any external attestation, independent rerun, exception, or decision owner
       decision beside the bundle without modifying it.</li>
 <li>[ ] Re-evaluate when any artifact, schedule, policy, provider, runtime, or

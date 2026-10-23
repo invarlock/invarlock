@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://invarlock.github.io/invarlock/reference/contracts/">
+        <link rel="canonical" href="https://invarlock.github.io/invarlock/latest/reference/contracts/">
       
       
         <link rel="prev" href="../architecture/">
@@ -3266,14 +3266,14 @@ signed receipt statements use one trailing line feed, while canonical schedule,
 artifact-identity, scoring-observation, and embedded substructure hash inputs
 use the same representation without a final line feed. Writers and readers
 must use the contract serializer rather than normalize whitespace themselves.</p>
-<p>The base JSON syntax follows <a href="https://www.rfc-editor.org/rfc/rfc8259">RFC 8259</a>.
+<p>The base JSON syntax follows <a href="https://www.rfc-editor.org/info/rfc8259/">RFC 8259</a>.
 InvarLock deliberately narrows it with unique keys, finite numbers, closed
 schemas, exact encodings, and semantic cross-replay.</p>
 <p>Bundle-level digests use lowercase <code>sha256:&lt;64 hex&gt;</code>. Some provider ABI fields
 and the checksum-file digest use a bare lowercase 64-character SHA-256 value;
 their schemas identify that distinction. Signatures use Ed25519. A key
 fingerprint is <code>sha256:</code> followed by the SHA-256 of the raw Ed25519 public key.
-Ed25519 is specified by <a href="https://www.rfc-editor.org/rfc/rfc8032">RFC 8032</a>.</p>
+Ed25519 is specified by <a href="https://www.rfc-editor.org/info/rfc8032/">RFC 8032</a>.</p>
 <h2 id="digest-and-signature-dependency-chain">Digest and signature dependency chain<a class="headerlink" href="#digest-and-signature-dependency-chain" title="Permanent link">&para;</a></h2>
 <div class="codehilite"><pre><span></span><code>input/runtime bytes -&gt; typed identity or material digest
 provider observation + receipt + runtime manifest -&gt; side report

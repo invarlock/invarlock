@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://invarlock.github.io/invarlock/user-guide/runtime-providers/">
+        <link rel="canonical" href="https://invarlock.github.io/invarlock/latest/user-guide/runtime-providers/">
       
       
         <link rel="prev" href="../key-management/">
@@ -2419,61 +2419,46 @@ First-party provider authorization checks the extracted distribution and
 <code>invarlock.runtime_providers</code> entry-point metadata in addition to provider code.
 Using one isolated environment for <code>PYTHON</code> and <code>QUALIFICATION_DRIVER_PYTHON</code>
 avoids interpreter drift.</p>
-<p>Use the wrapper maintained beside the selected provider. Optional-provider
-wrappers add the installed entry-point check and required provider resources;
-do not substitute the root wrapper for them.</p>
+<p>All four providers use the repository-root qualification targets. Provider
+selection comes from the request; installed discovery checks the provider's
+entry point and required resources.</p>
 <p>Ordinary <code>invarlock evaluate</code> receives its immutable image reference and digest
-directly through CLI options or the embedding API. The first-party optional
-provider Makefile wrappers expose a mutable <code>IMAGE</code> build/smoke handle, but
-their signed <code>qualify-*</code> targets pass <code>QUALIFICATION_IMAGE</code>. That value defaults
-to <code>IMAGE_DIGEST</code>; override it with an exact <code>repository@sha256:...</code> reference
-when the qualification must remain fetchable across hosts. A mutable tag is
-never a strict qualification identity.</p>
+through CLI options or the embedding API. The qualification targets pass
+<code>IMAGE</code> and <code>IMAGE_DIGEST</code> to those options. Set <code>IMAGE</code> to an exact
+<code>repository@sha256:...</code> reference when the image must be fetchable across hosts;
+a mutable tag is not a strict qualification identity.</p>
 <table>
 <thead>
 <tr>
-<th>Provider</th>
-<th>Signed canary</th>
-<th>Readiness</th>
-<th>Evidence</th>
+<th>Stage</th>
+<th>Command</th>
+<th>Purpose</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>hf_transformers</code></td>
+<td>Signed canary</td>
 <td><code>make runtime-qualification-canary</code></td>
+<td>Run a small representative request through the exact image</td>
+</tr>
+<tr>
+<td>Readiness</td>
 <td><code>make runtime-qualification-readiness</code></td>
+<td>Check the frozen request, resources and retained canary</td>
+</tr>
+<tr>
+<td>Evidence</td>
 <td><code>make runtime-qualification-evidence</code></td>
-</tr>
-<tr>
-<td><code>hf_vision_text</code></td>
-<td><code>make qualify-canary</code></td>
-<td><code>make qualify-preflight</code></td>
-<td><code>make qualify-evidence</code></td>
-</tr>
-<tr>
-<td><code>llama_cpp</code></td>
-<td><code>make qualify-canary</code></td>
-<td><code>make qualify-preflight</code></td>
-<td><code>make qualify-evidence</code></td>
-</tr>
-<tr>
-<td><code>tensorrt_llm</code></td>
-<td><code>make qualify-canary</code></td>
-<td><code>make qualify-preflight</code></td>
-<td><code>make qualify-evidence</code></td>
+<td>Evaluate, verify and report the frozen comparison</td>
 </tr>
 </tbody>
 </table>
-<p>All four paths accept the same resource controls:
-<code>QUALIFICATION_DEVICE</code>, <code>QUALIFICATION_CPUS</code>,
-<code>QUALIFICATION_MEMORY_MIB</code>, and <code>QUALIFICATION_USER</code>. Set them once and keep
-them unchanged across canary, readiness, and evidence. The root wrapper
-requires an explicit device. The provider wrappers have provider-appropriate
-device defaults, but an explicit <code>cpu</code> or <code>cuda:&lt;index&gt;</code> keeps the execution
-contract reviewable. Vision-text additionally requires <code>RESOURCE_ROOT</code> and
-<code>CONTENT_STORE</code>; GGUF and TensorRT-LLM use the provider resource variables
-documented in their sections below.</p>
+<p>Each target requires an explicit <code>QUALIFICATION_DEVICE</code> and accepts
+<code>QUALIFICATION_CPUS</code>, <code>QUALIFICATION_MEMORY_MIB</code>, and <code>QUALIFICATION_USER</code>.
+Keep these values unchanged across canary, readiness and evidence. Set
+<code>cpu</code> or an explicit <code>cuda:&lt;index&gt;</code> according to the provider and image.
+Supply vision-text, GGUF and TensorRT-LLM resources through the
+<code>INVARLOCK_*</code> environment variables documented in their sections below.</p>
 <h2 id="hugging-face-transformers">Hugging Face Transformers<a class="headerlink" href="#hugging-face-transformers" title="Permanent link">&para;</a></h2>
 <p><code>hf_transformers</code> is the canonical built-in provider. The public core package
 supplies the host CLI; the maintained runtime image supplies model execution

@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://invarlock.github.io/invarlock/user-guide/public-evidence/">
+        <link rel="canonical" href="https://invarlock.github.io/invarlock/latest/user-guide/public-evidence/">
       
       
         <link rel="prev" href="../ci-integration/">
@@ -2296,11 +2296,10 @@ full signed payload.</p>
 </tr>
 </tbody>
 </table>
-<p>Installed wheels contain only <code>evidence_index.json</code>. They do not silently
-embed full packs. The index is a discovery and transport-integrity surface; it
-does not replace <code>invarlock verify</code> or the caller's independent artifact,
-schedule, policy, runtime, evidence-signer, and verifier anchors, including the
-normalized-request anchor required for GGUF evidence.</p>
+<p>Installed wheels contain only <code>evidence_index.json</code>, which locates packs and
+records their transport hashes. Verify retrieved evidence using
+<a href="../evidence-and-verification/#obtain-each-anchor-independently">independent anchors</a>
+and validate its signed receipt.</p>
 <h2 id="prepare-a-local-entry">Prepare a local entry<a class="headerlink" href="#prepare-a-local-entry" title="Permanent link">&para;</a></h2>
 <p>Choose a stable, portable slug and stage exactly three objects:</p>
 <div class="codehilite"><pre><span></span><code>public_evidence/evidence/example-comparison/
@@ -2325,8 +2324,7 @@ it, and neither may be a symbolic link. The metadata paths are relative to the
 entry and cannot escape it.</p>
 <p>Before indexing, independently repeat strict verification into a fresh receipt
 destination outside the pack and validate the received receipt with
-<code>verify_signed_verification_receipt</code>. An evidence signature, a report-local pass,
-or an existing receipt alone is not sufficient.</p>
+<code>verify_signed_verification_receipt</code>.</p>
 <h2 id="disclosure-review">Disclosure review<a class="headerlink" href="#disclosure-review" title="Permanent link">&para;</a></h2>
 <p>Review the entire pack and receipt before public staging. In particular, search
 record text, model outputs, locators, summaries, runtime descriptions, and error
@@ -2357,11 +2355,10 @@ make<span class="w"> </span>public-evidence-audit
 </ul>
 <p>This repository audit validates publication structure, local carrier bytes,
 the receipt's Ed25519 signature and embedded verifier-key fingerprint, and the
-receipt-to-manifest binding. Authorization remains with independently managed
-artifact, schedule, policy, runtime, evidence-signer, and verifier anchors,
-including the normalized-request anchor required for GGUF evidence.
-Perform strict verification and independently anchored receipt validation
-before indexing, and retain those review inputs outside the submitted pack.</p>
+receipt-to-manifest binding. It checks publication consistency; independent
+authorization comes from the verification and receipt-validation steps in
+<a href="#prepare-a-local-entry">Prepare a local entry</a>. Retain those review inputs
+outside the submitted pack.</p>
 <p>The synchronizer rebuilds the source index from local metadata, preserves
 validated external-only entries, and writes the same bytes to the package-owned
 index. Every local directory must appear in the index; external-only entries

@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://invarlock.github.io/invarlock/reference/documentation/">
+        <link rel="canonical" href="https://invarlock.github.io/invarlock/latest/reference/documentation/">
       
       
         <link rel="prev" href="../release-verification/">
@@ -2114,11 +2114,30 @@ evidence guidance, scripts, examples, tests, and GitHub contribution templates.<
 <td>CLI surface smoke plus the documentation gate</td>
 <td>None after dependencies are installed</td>
 </tr>
+<tr>
+<td><code>make docs-external-links</code></td>
+<td>Strict site build and rendered-page link crawl</td>
+<td>Network access to linked destinations</td>
+</tr>
 </tbody>
 </table>
 <p><code>docs-check</code> validates every maintained repository Markdown file selected by
 the Makefile, not only <code>docs/**/*.md</code>. Generated, cached, vendored, dependency,
 and temporary-run trees are deliberately excluded.</p>
+<p>The external-link check serves the rendered site on loopback and follows its
+page navigation, including outbound URLs. Checking raw Markdown does not follow
+Markdown links. Serving the site also resolves directory links to index pages,
+instead of crawling the output directory as a file listing.
+Canonical URLs use the published <code>latest/</code> directory. The weekly documentation
+job runs this check; to run it on a branch manually:</p>
+<div class="codehilite"><pre><span></span><code>gh<span class="w"> </span>workflow<span class="w"> </span>run<span class="w"> </span>docs-ci.yml<span class="w"> </span>--ref<span class="w"> </span>staging/next<span class="w"> </span>-f<span class="w"> </span><span class="nv">external_links</span><span class="o">=</span><span class="nb">true</span>
+</code></pre></div>
+
+<p>The check fails on unreachable destinations and link warnings, including
+redirects. Review the reported response before changing a link: a rate limit or
+temporary upstream failure is not proof that its URL is obsolete. Sitemap
+publication and browser-executed JavaScript requests are outside this navigation
+crawl.</p>
 <h2 id="offline-build-versus-browser-rendering">Offline build versus browser rendering<a class="headerlink" href="#offline-build-versus-browser-rendering" title="Permanent link">&para;</a></h2>
 <p>MkDocs builds the site without fetching remote content. The generated pages
 reference MathJax from jsDelivr for browser-side equation rendering. Therefore:</p>

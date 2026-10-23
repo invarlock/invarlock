@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://invarlock.github.io/invarlock/user-guide/captured-results/">
+        <link rel="canonical" href="https://invarlock.github.io/invarlock/latest/user-guide/captured-results/">
       
       
         <link rel="prev" href="../getting-started/">
@@ -2202,8 +2202,8 @@ use their declared provenance and a <code>recorded</code> policy; per-case strin
 supports slices under the same policy. These observations do not replace the
 likelihood or judge measurements required above. Supply an actual typed
 likelihood under <code>metadata.invarlock_likelihood</code>; do not fabricate generated text
-for a likelihood-only case. A successful import establishes usable captured
-facts, and does not itself qualify a model or approve a release.</p>
+for a likelihood-only case. Import validates the captured facts for the selected
+scoring contract; evaluation then applies the comparison policy.</p>
 <p>For a measured NLL comparison between distinct checkpoints, replay the
 <a href="https://github.com/invarlock/invarlock/blob/main/examples/captured-results/references/mistral-7b-likelihood/README.md">Mistral 7B reference</a>.
 It retains 400 paired narrative continuations, both model identities and the

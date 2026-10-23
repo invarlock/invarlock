@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://invarlock.github.io/invarlock/">
+        <link rel="canonical" href="https://invarlock.github.io/invarlock/latest/">
       
       
       
@@ -2263,17 +2263,15 @@ can issue a separate signed receipt. It makes no model or judge calls.</p>
 <h3 id="report"><code>report</code><a class="headerlink" href="#report" title="Permanent link">&para;</a></h3>
 <p>Explain the comparison identities, measured changes, uncertainty and every
 configured check. HTML, terminal and Markdown presentations share the result;
-JSON and JUnit support automation where available. Directory-pack reporting
-checks embedded signatures when signed. Judge reporting replays retained
-measurements but leaves signature authentication to <code>verify</code>. Rendering does
-not replace recipient verification. Explicit unsigned captured reports retain
-their local, unauthenticated status.</p>
+JSON and JUnit support automation where available. The
+<a href="reference/reports/">report reference</a>
+explains each evidence family's integrity checks and the separate recipient
+verification step.</p>
 </div>
 </div>
 <p>Commands default to readable text; use <code>--json</code> for machine-readable status.
-Publication, recorded policy outcome and independent verification are separate
-results. Use the <a href="reference/cli/">CLI's exit-code contract</a> for automation,
-rather than interpreting a rendered report's successful exit as policy approval.</p>
+Use the <a href="reference/cli/">CLI's exit-code contract</a> to distinguish publication,
+recorded policy outcome and independent verification in automation.</p>
 <h2 id="select-a-scorer-and-its-evidence">Select a scorer and its evidence<a class="headerlink" href="#select-a-scorer-and-its-evidence" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -2353,12 +2351,11 @@ not determine policy acceptance.</p>
 recipient supplies its expected identities, policy and signer trust; a signed verification
 receipt records that recipient's check. Imported observations and native
 runtime bindings retain distinct provenance claims.</p>
-<p>The result is bounded by the supplied cases, observations and assumptions.
-Verification does not independently rerun model execution, establish production
-representativeness or authorize deployment. A valid signature alone cannot
-supply an independent trust decision, and a comparative pass can coexist with
-poor absolute task performance. Read the <a href="assurance/assurance-case/">assurance case</a>
-and <a href="security/trust-model/">trust model</a> for the complete boundaries.</p>
+<p>Verification replays the retained observations without rerunning the model.
+Choose cases and requirements appropriate to the intended workload, including
+an absolute quality minimum when needed. The <a href="assurance/assurance-case/">assurance case</a>
+and <a href="security/trust-model/">trust model</a> explain the result's scope and the
+independent inputs needed to rely on it.</p>
 <h2 id="find-the-detailed-contract">Find the detailed contract<a class="headerlink" href="#find-the-detailed-contract" title="Permanent link">&para;</a></h2>
 <table>
 <thead>

@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://invarlock.github.io/invarlock/user-guide/getting-started/">
+        <link rel="canonical" href="https://invarlock.github.io/invarlock/latest/user-guide/getting-started/">
       
       
         <link rel="prev" href="../..">
@@ -2656,9 +2656,9 @@ invarlock<span class="w"> </span>report<span class="w"> </span>release-check/evi
 the baseline and subject. It shows both side means, the point comparison, the
 selected paired interval, and every configured metric, count, precision and
 side-accuracy check. HTML details expand to show exact values and bindings.
-<code>report</code> checks the embedded
-evidence signature and bundle integrity before rendering, but it does not use
-the independent verifier anchors or replace the signed receipt.
+<code>report</code> checks the embedded evidence signature and bundle integrity before
+rendering. Retain the signed receipt from step 5 as the independent verification
+record.
 Successful rendering exits <code>0</code> even when the recorded policy failed. Use
 <code>--json</code> for a machine-readable rendering status and HTML path; do not parse
 the terminal layout to decide acceptance.</p>
@@ -2690,9 +2690,9 @@ v1 evidence with its original exact-match method.</p>
 not a general model-quality measure. A displayed token-weighted perplexity
 ratio is derived interpretation only; it has no policy, interval, or verdict
 authority.</p>
-<p>This describes sensitivity to paired resampling of the fixed schedule. It is
-not a population confidence interval, statistical-power calculation, safety
-claim, or proof that the schedule represents production traffic.</p>
+<p>The NLL interval describes sensitivity to paired resampling of the fixed
+schedule. Broader claims require a sampling design and supporting evidence;
+see <a href="../../assurance/decision-semantics/#finite-schedule-interpretation">finite-schedule interpretation</a>.</p>
 <h2 id="secondary-offline-import-smoke">Secondary offline import smoke<a class="headerlink" href="#secondary-offline-import-smoke" title="Permanent link">&para;</a></h2>
 <p>The repository's
 <a href="https://github.com/invarlock/invarlock/tree/main/examples"><code>examples/</code></a>
