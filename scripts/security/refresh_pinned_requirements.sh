@@ -321,6 +321,8 @@ run_workflow_locks() {
 
   compile_release_install "${WORKFLOW_DIR}/release-install-py312.txt" 3.12
   compile_release_install "${WORKFLOW_DIR}/release-install-py313.txt" 3.13
+  compile_release_install "${WORKFLOW_DIR}/coverage-report-py313.txt" 3.13 \
+    requirements/workflows/coverage-report.in
   compile_release_install "${WORKFLOW_DIR}/release-options-py312.txt" 3.12 \
     requirements/workflows/release-options.in
   compile_release_install "${WORKFLOW_DIR}/release-options-py313.txt" 3.13 \

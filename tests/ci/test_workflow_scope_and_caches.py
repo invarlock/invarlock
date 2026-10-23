@@ -65,6 +65,13 @@ def test_pip_cache_tracks_each_jobs_installed_locks(path: Path) -> None:
                         "requirements/workflows/pip-bootstrap.txt",
                     )
                 )
+            if "scripts/evaluator_parity_gate.sh" in commands:
+                installed.update(
+                    (
+                        f"requirements/workflows/release-install-py{tag}.txt",
+                        "requirements/workflows/pip-bootstrap.txt",
+                    )
+                )
             cached = options.get("cache-dependency-path", "").splitlines()
             assert installed, (path.name, name)
             assert set(cached) == installed, (path.name, name)

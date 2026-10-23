@@ -31,6 +31,8 @@ def test_ci_runs_the_repository_gates() -> None:
     assert set(jobs) == {
         "policy-engine-interop",
         "verify-fast",
+        "verify-checks",
+        "evaluator-parity",
         "minimum-python",
         "minimum-python-tests",
         "minimum-python-packages",
@@ -54,7 +56,7 @@ def test_ci_runs_the_repository_gates() -> None:
         )["run"]
     )
 
-    fast = jobs["verify-fast"]
+    fast = jobs["verify-checks"]
     _assert_core_wheel_install(fast)
     assert _step(fast, "Set up uv")["with"]["version"] == "0.10.10"
     assert _step(fast, "Run repository checks")["run"] == "make verify-checks"
@@ -65,7 +67,7 @@ def test_ci_runs_the_repository_gates() -> None:
         "make install-smoke inspect-judge-sdk-test langfuse-sdk-test"
     )
     assert _step(
-        fast,
+        jobs["evaluator-parity"],
         "Check all dedicated evaluator profiles with an installed recipient",
     )["run"] == (
         "INVARLOCK_REPLAY_RETAINED_CAMPAIGNS=0 "
@@ -109,6 +111,8 @@ def test_ci_runs_the_repository_gates() -> None:
         "examples",
         "examples-comparisons",
         "examples-judge",
+        "examples-judge-review",
+        "examples-judge-priority",
         "support",
         "runtime",
     ]
