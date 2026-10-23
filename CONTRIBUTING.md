@@ -278,7 +278,11 @@ The `verify-fast` CI result requires both parallel jobs to succeed:
 all dedicated evaluator profiles with an isolated installed recipient. A failure,
 cancellation or skip in either job fails the aggregate. Its success is also
 required by the coverage gate. Reporting uses a separate hash-pinned core and
-coverage-tool environment, retaining every domain, per-file and branch check. Python 3.13 behavioral tests run under coverage;
+coverage-tool environment, retaining every domain, per-file and branch check.
+Reporting and pre-commit install their small pinned environments directly;
+they avoid restoring the shared pip cache containing large model-runtime wheels.
+Pre-commit retains its separate hook-environment cache and runs every hook.
+Python 3.13 behavioral tests run under coverage;
 the separate Python 3.12 suite checks the minimum supported interpreter. Local
 `make verify-fast` still includes its behavioral tests. Minimum-Python tests use
 the same partitions, with their existing marker policy, and run concurrently with installed

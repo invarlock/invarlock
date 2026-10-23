@@ -132,6 +132,13 @@ def test_precommit_reports_for_every_pull_request() -> None:
     assert workflow["on"]["pull_request"] is None
     job = workflow["jobs"]["run"]
     assert job["name"] == "pre-commit"
+    setup = next(
+        step
+        for step in job["steps"]
+        if step.get("uses", "").startswith("actions/setup-python@")
+    )
+    # A small tooling job must not restore the shared multi-GB model-wheel cache.
+    assert "cache" not in setup["with"]
     assert any(
         step.get("run") == "pre-commit run --all-files --show-diff-on-failure"
         for step in job["steps"]
