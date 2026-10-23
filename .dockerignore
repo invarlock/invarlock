@@ -2,8 +2,11 @@
 !.dockerignore
 !README.md
 !LICENSE
+!THIRD_PARTY_NOTICES.md
 !MANIFEST.in
 !pyproject.toml
+!packaging/
+!packaging/README.md
 !contracts/
 !contracts/**
 !requirements/

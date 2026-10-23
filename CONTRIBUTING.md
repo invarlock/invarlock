@@ -343,6 +343,13 @@ A skipped container test does not establish isolation or cleanup behavior.
 The container gate includes network positive controls, resource limits,
 interruption, exact-container cleanup, and failed-transaction publication checks.
 
+Optional local workflow checks with `act` use the `.actrc` mapping for the
+repository's `ubuntu-26.04` label. The pinned local image runs Ubuntu 24.04;
+it provides workflow feedback but does not qualify the hosted Ubuntu 26.04
+environment. Run `act --list --workflows .github/workflows/ci.yml` to inspect jobs,
+or add `--dryrun --job verify-checks` instead of `--list` to preview one job.
+Hosted CI remains required for runner, container and security validation.
+
 Investigate dependency-audit failures even when the affected lock predates the
 pull request. Follow the [dependency-audit policy](docs/security/dependency-audit.md)
 for remediation and any explicitly approved, time-bounded exception.
