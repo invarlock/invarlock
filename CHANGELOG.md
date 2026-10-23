@@ -26,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Install the pinned `uv` tool in release coverage jobs so dependency-installer
+  regression checks run during candidate and tagged-release validation.
 - Check external documentation links through the rendered site instead of raw
   Markdown, allow the scheduled link check to run manually on a branch, and
   point canonical documentation URLs to the published `latest/` directory.

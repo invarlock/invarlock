@@ -32,6 +32,23 @@ def _jobs():
     return yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text())["jobs"]
 
 
+def test_release_coverage_installs_the_same_pinned_uv_before_tests():
+    workflow = yaml.safe_load((ROOT / ".github/workflows/release.yml").read_text())
+    steps = workflow["jobs"]["coverage_shards"]["steps"]
+    setup = next(step for step in steps if step.get("name") == "Set up uv")
+    standard = next(
+        step
+        for step in _jobs()["coverage-tests"]["steps"]
+        if step.get("name") == "Set up uv"
+    )
+    assert setup == standard
+    assert "if" not in setup
+    collect = next(
+        step for step in steps if step.get("name") == "Collect release coverage"
+    )
+    assert steps.index(setup) < steps.index(collect)
+
+
 @pytest.mark.parametrize("name", JOBS)
 def test_standard_setup_preserves_pins_bytecode_and_selected_python(name):
     steps = _jobs()[name]["steps"]
