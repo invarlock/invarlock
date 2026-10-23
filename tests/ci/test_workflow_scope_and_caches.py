@@ -182,12 +182,12 @@ def test_runtime_coverage_requires_pinned_sdk_tests_in_its_measured_interpreter(
         if step["if"] == "${{ startsWith(matrix.shard, 'examples') }}"
     )
     assert (
-        "--require-hashes -r requirements/workflows/langfuse-sdk-tests-py313.txt"
+        "--require-hashes --no-config -r requirements/workflows/langfuse-sdk-tests-py313.txt"
         in examples["run"]
     )
     assert examples["run"].strip().endswith("python -m pip check")
     assert install["if"] == "${{ matrix.shard == 'runtime' }}"
-    assert "python -m pip install --require-hashes -r " in install["run"]
+    assert "--require-hashes --no-config -r " in install["run"]
     assert install["run"].strip().endswith("python -m pip check")
     collect = next(
         step for step in steps if "make coverage-collect-" in step.get("run", "")
