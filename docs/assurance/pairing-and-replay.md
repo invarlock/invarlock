@@ -274,10 +274,10 @@ and
 ## References
 
 - [RFC 8259: The JavaScript Object Notation Data Interchange
-  Format](https://www.rfc-editor.org/rfc/rfc8259), Internet Standard, 2017.
-- [RFC 8785: JSON Canonicalization Scheme](https://www.rfc-editor.org/rfc/rfc8785),
+  Format](https://www.rfc-editor.org/info/rfc8259/), Internet Standard, 2017.
+- [RFC 8785: JSON Canonicalization Scheme](https://www.rfc-editor.org/info/rfc8785/),
   2020. InvarLock uses its own versioned canonical profile and does not claim
   RFC 8785 conformance.
 - National Institute of Standards and Technology,
-  [Secure Hash Standard](https://doi.org/10.6028/NIST.FIPS.180-4),
+  [Secure Hash Standard](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.180-4.pdf),
   2015.

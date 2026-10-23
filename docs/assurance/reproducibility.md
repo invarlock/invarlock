@@ -311,5 +311,5 @@ describes adversarial selection and fabricated-execution scenarios.
 - Supply-chain Levels for Software Artifacts,
   [SLSA Provenance 1.2](https://slsa.dev/spec/v1.2/provenance), 2026.
 - National Institute of Standards and Technology,
-  [Secure Hash Standard](https://doi.org/10.6028/NIST.FIPS.180-4),
+  [Secure Hash Standard](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.180-4.pdf),
   2015.

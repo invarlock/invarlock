@@ -1,6 +1,6 @@
 site_name: InvarLock Documentation
 site_description: Paired model release-regression evaluation with independently verifiable evidence
-site_url: https://invarlock.github.io/invarlock/
+site_url: https://invarlock.github.io/invarlock/latest/
 repo_url: https://github.com/invarlock/invarlock
 repo_name: invarlock
 

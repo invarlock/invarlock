@@ -21,6 +21,12 @@ on:
   schedule:
     - cron: '0 2 * * 1'
   workflow_dispatch:
+    inputs:
+      external_links:
+        description: "Check rendered documentation and external links"
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: docs-${{ github.ref }}
@@ -75,9 +81,11 @@ jobs:
 
   external-links:
     name: "external-links"
-    if: ${{ github.event_name == 'schedule' }}
+    if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.external_links) }}
     runs-on: ubuntu-26.04
     timeout-minutes: 15
+    env:
+      PYTHON: python
     steps:
       - name: Use disk-backed temporary storage
         run: printf 'TMPDIR=%s\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
@@ -92,4 +100,4 @@ jobs:
       - name: Install dependencies
         run: python -m pip install --require-hashes -r requirements/workflows/docs-ci-py313.txt
       - name: Check external links
-        run: linkchecker --check-extern docs/
+        run: make docs-external-links

@@ -542,7 +542,7 @@ artifact-identity, scoring-observation, and embedded substructure hash inputs
 use the same representation without a final line feed. Writers and readers
 must use the contract serializer rather than normalize whitespace themselves.
 
-The base JSON syntax follows [RFC 8259](https://www.rfc-editor.org/rfc/rfc8259).
+The base JSON syntax follows [RFC 8259](https://www.rfc-editor.org/info/rfc8259/).
 InvarLock deliberately narrows it with unique keys, finite numbers, closed
 schemas, exact encodings, and semantic cross-replay.
 
@@ -550,7 +550,7 @@ Bundle-level digests use lowercase `sha256:<64 hex>`. Some provider ABI fields
 and the checksum-file digest use a bare lowercase 64-character SHA-256 value;
 their schemas identify that distinction. Signatures use Ed25519. A key
 fingerprint is `sha256:` followed by the SHA-256 of the raw Ed25519 public key.
-Ed25519 is specified by [RFC 8032](https://www.rfc-editor.org/rfc/rfc8032).
+Ed25519 is specified by [RFC 8032](https://www.rfc-editor.org/info/rfc8032/).
 
 ## Digest and signature dependency chain
 
