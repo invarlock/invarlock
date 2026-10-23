@@ -137,3 +137,48 @@ def test_coverage_checks_untracked_runtime_files_without_requiring_staging(tmp_p
         "src/invarlock/existing.py",
         "src/invarlock/new_untracked.py",
     ]
+
+
+def test_batch_semantics_selects_the_compatible_evidently_environment(
+    tmp_path, monkeypatch
+):
+    import os
+    import shlex
+
+    root = Path(__file__).resolve().parents[2]
+    launcher = tmp_path / "uv"
+    launcher.write_text(
+        f"#!{sys.executable}\nimport json, sys\nprint(json.dumps(sys.argv[1:]))\n"
+    )
+    launcher.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{tmp_path}{os.pathsep}{os.environ['PATH']}")
+    result = subprocess.run(
+        ["make", "--silent", "evaluator-batch-semantics", "PYTHON=true"],
+        cwd=root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    calls = [
+        json.loads(line) for line in result.stdout.splitlines() if line.startswith("[")
+    ]
+    by_provider = {args[args.index("--provider") + 1]: args for args in calls}
+    assert set(by_provider) == {
+        "evidently",
+        "langfuse",
+        "azure-ai-evaluation",
+        "pydantic-evals",
+    }
+    for provider, args in by_provider.items():
+        lock = root / args[args.index("--with-requirements") + 1]
+        if provider == "evidently":
+            constraints = [shlex.split(line) for line in lock.read_text().splitlines()]
+            assert ["pandas==3.0.6"] in constraints
+            include = next(fields[1] for fields in constraints if fields[:1] == ["-r"])
+            assert (
+                lock.parent / include
+            ).resolve() == root / "examples/evaluator-qualification/locks/evidently.txt"
+        else:
+            assert (
+                lock == root / f"examples/evaluator-qualification/locks/{provider}.txt"
+            )

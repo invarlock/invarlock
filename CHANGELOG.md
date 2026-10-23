@@ -24,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Include the generated package README and third-party notices in runtime-image
+  build inputs, preserving the wheel description and source-distribution notices.
+- Map the current CI runner label in local `act` configuration and document the
+  local container's different Ubuntu version.
 - Captured comparisons now classify non-string text answers and null numeric
   answers as unavailable, retaining their IDs and returning insufficient evidence
   for affected metrics and slices. Empty text, wrong answers, JSON null, recorded
@@ -35,7 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sequential report outputs, and CI artifacts after failed verification.
 - Restore Evidently capture compatibility by pinning pandas 3.0.6 in the live
   capture environment; the retained SDK imports a private helper removed in
-  pandas 3.1. Preserve the historical SDK qualification lock and evidence.
+  pandas 3.1. Use that compatible environment for the batch-semantic check too.
+  Preserve the historical SDK qualification lock and evidence.
 
 ### Security
 

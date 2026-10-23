@@ -9,7 +9,8 @@ COPY requirements/workflows/runtime-image-py312-cu129.txt /requirements/workflow
 COPY requirements/workflows/runtime-wheel-build-py312.txt /requirements/workflows/runtime-wheel-build-py312.txt
 COPY scripts/security/build_hardened_accelerate_wheel.py scripts/security/accelerate_checkpoint_files.py scripts/security/build_cache_free_lm_eval_wheel.py /runtime-build/scripts/security/
 COPY requirements/workflows/accelerate-upstream-wheel.txt /requirements/workflows/accelerate-upstream-wheel.txt
-COPY pyproject.toml README.md LICENSE MANIFEST.in /project/
+COPY pyproject.toml README.md LICENSE THIRD_PARTY_NOTICES.md MANIFEST.in /project/
+COPY packaging/README.md /project/packaging/README.md
 COPY contracts /project/contracts
 COPY src /project/src
 

@@ -400,8 +400,12 @@ evaluator-batch-semantics:  ## Check the five pinned batch scorers against liter
 		audit_dir="$$(mktemp -d)"; \
 		trap 'rm -rf "$$audit_dir"' EXIT; \
 		for provider in evidently langfuse azure-ai-evaluation pydantic-evals; do \
+			sdk_lock="examples/evaluator-qualification/locks/$$provider.txt"; \
+			if [ "$$provider" = evidently ]; then \
+				sdk_lock="examples/integrations/evaluator-live/locks/evidently.txt"; \
+			fi; \
 			uv run --no-project --python "$(PYTHON)" \
-				--with-requirements "examples/evaluator-qualification/locks/$$provider.txt" \
+				--with-requirements "$$sdk_lock" \
 				python examples/evaluator-qualification/maintained/batch_differential.py \
 				--provider "$$provider" --output "$$audit_dir/$$provider.json"; \
 		done; \
