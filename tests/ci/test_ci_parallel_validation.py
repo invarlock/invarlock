@@ -58,7 +58,11 @@ def test_required_verification_gate_rejects_every_unsuccessful_dependency(
     assert set(gate["needs"]) == {"verify-checks", "evaluator-parity"}
     assert "always()" in gate["if"]
     assert "inputs.full" in gate["if"]
-    step = gate["steps"][0]
+    step = next(
+        step
+        for step in gate["steps"]
+        if step["name"] == "Require every verification check"
+    )
     assert step["env"] == {
         "CHECK_RESULT": "${{ needs.verify-checks.result }}",
         "PARITY_RESULT": "${{ needs.evaluator-parity.result }}",
