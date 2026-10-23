@@ -80,13 +80,41 @@ def test_core_judge_consumer_preserves_inconclusive_result_and_rejects_bad_pins(
 @pytest.mark.parametrize("module_name", ["inspect_ai", "openai"])
 def test_rehearsal_refuses_optional_sdk_install_or_import(monkeypatch, module_name):
     module = load_module()
+    for name in ("inspect_ai", "openai"):
+        monkeypatch.delitem(sys.modules, name, raising=False)
     monkeypatch.setattr(
         module.importlib.util,
         "find_spec",
         lambda name: object() if name == module_name else None,
     )
-    with pytest.raises(RuntimeError, match="optional module"):
+    with pytest.raises(RuntimeError, match=f"optional module: {module_name}$"):
         module.require_core_only()
+
+
+@pytest.mark.parametrize("module_name", ["inspect_ai", "openai"])
+def test_rehearsal_refuses_previously_imported_optional_sdk(monkeypatch, module_name):
+    module = load_module()
+    monkeypatch.setattr(module.importlib.util, "find_spec", lambda _: None)
+    for name in ("inspect_ai", "openai"):
+        monkeypatch.delitem(sys.modules, name, raising=False)
+    monkeypatch.setitem(sys.modules, module_name, object())
+    with pytest.raises(RuntimeError, match=f"optional module: {module_name}$"):
+        module.require_core_only()
+
+
+@pytest.mark.parametrize("missing_spec", [False, True])
+def test_rehearsal_accepts_absent_optional_sdks(monkeypatch, missing_spec):
+    module = load_module()
+    for name in ("inspect_ai", "openai"):
+        monkeypatch.delitem(sys.modules, name, raising=False)
+
+    def find_spec(_name):
+        if missing_spec:
+            raise ModuleNotFoundError("optional SDK is absent")
+        return None
+
+    monkeypatch.setattr(module.importlib.util, "find_spec", find_spec)
+    module.require_core_only()
 
 
 def test_rehearsal_requires_an_installed_candidate_cli(monkeypatch):
