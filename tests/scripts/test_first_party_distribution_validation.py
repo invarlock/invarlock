@@ -33,19 +33,19 @@ VERSION = str(
 def built_core(tmp_path_factory: pytest.TempPathFactory) -> Path:
     root = tmp_path_factory.mktemp("first-party-core")
     source = root / "source"
+
+    def ignore_generated(directory: str, names: list[str]) -> set[str]:
+        ignored = shutil.ignore_patterns(
+            ".git", ".venv*", "__pycache__", "*.egg-info", "build", "dist", "reports"
+        )(directory, names)
+        if Path(directory) == ROOT:
+            ignored.add("artifacts")
+        return ignored
+
     shutil.copytree(
         ROOT,
         source,
-        ignore=shutil.ignore_patterns(
-            ".git",
-            ".venv*",
-            "__pycache__",
-            "*.egg-info",
-            "artifacts",
-            "build",
-            "dist",
-            "reports",
-        ),
+        ignore=ignore_generated,
     )
     dist = root / "dist"
     dist.mkdir()
