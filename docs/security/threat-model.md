@@ -370,13 +370,13 @@ decision. Portable recipient verification is specified in
 ## References
 
 - National Institute of Standards and Technology,
-  [SP 800-190: Application Container Security Guide](https://doi.org/10.6028/NIST.SP.800-190),
+  [SP 800-190: Application Container Security Guide](https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-190.pdf),
   2017.
 - National Institute of Standards and Technology,
-  [SP 800-218: Secure Software Development Framework 1.1](https://doi.org/10.6028/NIST.SP.800-218),
+  [SP 800-218: Secure Software Development Framework 1.1](https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-218.pdf),
   2022.
 - National Institute of Standards and Technology,
-  [SP 800-57 Part 1 Revision 5: Recommendation for Key Management](https://doi.org/10.6028/NIST.SP.800-57pt1r5),
+  [SP 800-57 Part 1 Revision 5: Recommendation for Key Management](https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-57pt1r5.pdf),
   2020.
 - in-toto project,
   [Attestation Framework Specification 1.2](https://github.com/in-toto/attestation/blob/v1.2.0/spec/README.md),

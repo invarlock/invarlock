@@ -417,13 +417,13 @@ high-impact decision.
 ## References
 
 - National Institute of Standards and Technology,
-  [SP 800-57 Part 1 Revision 5: Recommendation for Key Management](https://doi.org/10.6028/NIST.SP.800-57pt1r5),
+  [SP 800-57 Part 1 Revision 5: Recommendation for Key Management](https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-57pt1r5.pdf),
   2020.
 - National Institute of Standards and Technology,
-  [Digital Signature Standard](https://doi.org/10.6028/NIST.FIPS.186-5),
+  [Digital Signature Standard](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-5.pdf),
   2023.
-- [RFC 8032: Edwards-Curve Digital Signature Algorithm](https://www.rfc-editor.org/rfc/rfc8032),
+- [RFC 8032: Edwards-Curve Digital Signature Algorithm](https://www.rfc-editor.org/info/rfc8032/),
   2017.
 - National Institute of Standards and Technology,
-  [SP 800-190: Application Container Security Guide](https://doi.org/10.6028/NIST.SP.800-190),
+  [SP 800-190: Application Container Security Guide](https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-190.pdf),
   2017.

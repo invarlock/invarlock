@@ -86,7 +86,7 @@ RELEASE_EXAMPLE_COVERAGE_FILES := \
 .PHONY: example-torchao-int8 example-gguf-llama-cpp example-gguf-deployment example-spdx-ai-observation example-lm-evaluation-harness example-inspect-ai example-openai-evals example-tensorrt-llm example-tensorrt-llm-prepared
 .PHONY: lint typecheck mypy-typed-surface format verify verify-fast verify-ruff
 .PHONY: cli-smoke-core hf-provider-smoke hf-provider-smoke-locked
-.PHONY: workflow-lint docs docs-serve docs-check docs-live-fast
+.PHONY: workflow-lint docs docs-serve docs-check docs-live-fast docs-external-links
 .PHONY: docs-lint docs-lint-markdown docs-lint-spell docs-lint-public-text
 .PHONY: security supply-chain-security cve-audit dist-check install-smoke packaging-smoke-front-door
 .PHONY: runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-image-cuda129
@@ -303,6 +303,7 @@ coverage-examples-report:  ## Enforce retained examples coverage measurements
 coverage-maintenance:  ## Measure maintained repository checks and security tooling
 	COVERAGE_FILE=$(COVERAGE_MAINTENANCE_FILE) $(PYTHON) -m coverage erase
 	COVERAGE_FILE=$(COVERAGE_MAINTENANCE_FILE) PYTHONPATH=src:. $(PYTEST) $(PYTEST_WORKER_ARGS) -q \
+		tests/docs/test_external_links.py \
 		tests/ci/test_coverage_branch_rate.py \
 		tests/ci/test_coverage_shards.py \
 		tests/ci/test_public_evidence_audit.py \
@@ -664,6 +665,9 @@ examples-check:  ## Test the maintained one-command integration journeys
 ##@ Documentation
 docs:  ## Build documentation strictly
 	$(MKDOCS) build --strict
+
+docs-external-links: docs  ## Check rendered documentation links, including external URLs
+	$(PYTHON) scripts/checks/check_docs_links.py
 
 docs-serve:  ## Serve documentation locally
 	$(MKDOCS) serve -a 127.0.0.1:8000

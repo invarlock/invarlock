@@ -308,13 +308,13 @@ receipt.
 InvarLock uses:
 
 - SHA-256 as specified by the
-  [NIST Secure Hash Standard](https://doi.org/10.6028/NIST.FIPS.180-4) for material and
+  [NIST Secure Hash Standard](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.180-4.pdf) for material and
   inventory digests;
 - Ed25519 as specified by
-  [RFC 8032](https://www.rfc-editor.org/rfc/rfc8032) for evidence-signer and verifier
+  [RFC 8032](https://www.rfc-editor.org/info/rfc8032/) for evidence-signer and verifier
   signatures; and
 - JSON as specified by
-  [RFC 8259](https://www.rfc-editor.org/rfc/rfc8259), constrained by
+  [RFC 8259](https://www.rfc-editor.org/info/rfc8259/), constrained by
   InvarLock's versioned canonical file profiles.
 
 These references define primitives and encodings. They do not extend the

@@ -20,10 +20,28 @@ evidence guidance, scripts, examples, tests, and GitHub contribution templates.
 | `make docs` | Strict static-site build | None after dependencies are installed |
 | `make docs-serve` | Local server on `127.0.0.1:8000` | None for local navigation |
 | `make docs-live-fast` | CLI surface smoke plus the documentation gate | None after dependencies are installed |
+| `make docs-external-links` | Strict site build and rendered-page link crawl | Network access to linked destinations |
 
 `docs-check` validates every maintained repository Markdown file selected by
 the Makefile, not only `docs/**/*.md`. Generated, cached, vendored, dependency,
 and temporary-run trees are deliberately excluded.
+
+The external-link check serves the rendered site on loopback and follows its
+page navigation, including outbound URLs. Checking raw Markdown does not follow
+Markdown links. Serving the site also resolves directory links to index pages,
+instead of crawling the output directory as a file listing.
+Canonical URLs use the published `latest/` directory. The weekly documentation
+job runs this check; to run it on a branch manually:
+
+```bash
+gh workflow run docs-ci.yml --ref staging/next -f external_links=true
+```
+
+The check fails on unreachable destinations and link warnings, including
+redirects. Review the reported response before changing a link: a rate limit or
+temporary upstream failure is not proof that its URL is obsolete. Sitemap
+publication and browser-executed JavaScript requests are outside this navigation
+crawl.
 
 ## Offline build versus browser rendering
 

@@ -7,10 +7,11 @@ Workflow YAML is linted with `make workflow-lint`.
 
 - `ci.yml` runs repository checks, the Python 3.12 suite, Python 3.13 coverage,
   manual full verification, distribution checks, and the tag supply-chain
-  backstop. Its `verify-fast` job runs `make verify-checks`, downloads a
+  backstop. Its `verify-checks` job runs `make verify-checks`, downloads a
   checksum-pinned KitOps executable, exercises installed package journeys and
-  checks signed verification at full capacity. Four separate coverage jobs run
-  disjoint test groups. The required `coverage` job accepts only complete,
+  checks signed verification at full capacity. Separate coverage jobs run
+  disjoint test groups, while `verify-fast` aggregates the repository, package,
+  and evaluator gates. The required `coverage` job accepts only complete,
   successful measurements from the same source and enforces every coverage
   threshold. Per-test timings are retained to diagnose slow runs.
 - `container-front-door-smoke.yml` builds the final runtime image and exercises
@@ -37,6 +38,9 @@ that job's `cache-dependency-path`.
 
 - `docs-ci.yml` lints and builds the current documentation once and smoke-checks
   the documented CLI command surface through `make docs-live-fast`.
+  Its weekly external-link job builds and serves the rendered site through
+  `make docs-external-links`; manual runs can enable it with the
+  `external_links` input.
 - `docs-publish.yml` serializes MkDocs publication to `gh-pages`. `main` pushes
   update `latest`, while the production release workflow calls it from the
   exact release tag to update the immutable version path, `latest`, and

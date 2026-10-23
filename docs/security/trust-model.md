@@ -370,13 +370,13 @@ in [Acceptance attestations](../reference/acceptance-attestations.md).
 
 ## References
 
-- [RFC 8032: Edwards-Curve Digital Signature Algorithm](https://www.rfc-editor.org/rfc/rfc8032),
+- [RFC 8032: Edwards-Curve Digital Signature Algorithm](https://www.rfc-editor.org/info/rfc8032/),
   2017.
 - National Institute of Standards and Technology,
-  [Digital Signature Standard](https://doi.org/10.6028/NIST.FIPS.186-5),
+  [Digital Signature Standard](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-5.pdf),
   2023.
 - National Institute of Standards and Technology,
-  [SP 800-57 Part 1 Revision 5: Recommendation for Key Management](https://doi.org/10.6028/NIST.SP.800-57pt1r5),
+  [SP 800-57 Part 1 Revision 5: Recommendation for Key Management](https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-57pt1r5.pdf),
   2020.
 - in-toto project,
   [Attestation Framework Specification 1.2](https://github.com/in-toto/attestation/blob/v1.2.0/spec/README.md),

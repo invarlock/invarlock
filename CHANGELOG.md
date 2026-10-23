@@ -24,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Check external documentation links through the rendered site instead of raw
+  Markdown, allow the scheduled link check to run manually on a branch, and
+  point canonical documentation URLs to the published `latest/` directory.
+  Refresh redirected citations to their primary-source destinations.
 - Include the generated package README and third-party notices in runtime-image
   build inputs, preserving the wheel description and source-distribution notices.
 - Map the current CI runner label in local `act` configuration and document the

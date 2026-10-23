@@ -229,3 +229,16 @@ def test_docs_ci_reports_for_every_pull_request_and_scopes_pushes() -> None:
     }
     assert len(paths) == len(expected_paths)
     assert set(paths) == expected_paths
+
+
+def test_external_links_run_on_schedule_or_explicit_manual_request() -> None:
+    workflow = _load(".github/workflows/docs-ci.yml")
+    option = workflow["on"]["workflow_dispatch"]["inputs"]["external_links"]
+    assert option["type"] == "boolean"
+    assert option["default"] is False
+    job = workflow["jobs"]["external-links"]
+    assert "github.event_name == 'schedule'" in job["if"]
+    assert (
+        "github.event_name == 'workflow_dispatch' && inputs.external_links" in job["if"]
+    )
+    assert _step(job, "Check external links")["run"] == "make docs-external-links"
