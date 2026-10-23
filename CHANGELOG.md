@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Upgrade maintained Pillow, certifi, virtualenv, OpenTelemetry, and Markdown
+  parser dependencies to patched releases. The `vision-text` extra now requires
+  Pillow 13, and installed HF audits bind the refreshed dependency lock.
 - Upgrade maintained `aiohttp` locks to 3.14.4 and its required `yarl`
   dependency to 1.25.1, resolving three dependency audit findings.
 - Captured comparisons now classify non-string text answers and null numeric
