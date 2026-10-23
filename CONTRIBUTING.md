@@ -279,8 +279,9 @@ all dedicated evaluator profiles with an isolated installed recipient. A failure
 cancellation or skip in either job fails the aggregate. Its success is also
 required by the coverage gate. Reporting uses a separate hash-pinned core and
 coverage-tool environment, retaining every domain, per-file and branch check.
-Reporting and pre-commit install their small pinned environments directly;
-they avoid restoring the shared pip cache containing large model-runtime wheels.
+Main CI and pre-commit install their pinned environments directly. They avoid
+transferring the shared multi-gigabyte pip cache, whose restore exceeded account
+egress limits and delayed jobs before their checks could start.
 Pre-commit retains its separate hook-environment cache and runs every hook.
 Python 3.13 behavioral tests run under coverage;
 the separate Python 3.12 suite checks the minimum supported interpreter. Local

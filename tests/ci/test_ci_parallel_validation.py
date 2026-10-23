@@ -117,3 +117,14 @@ def test_reporting_lock_preserves_versions_without_restoring_the_runtime_cache()
     } <= reporting.keys()
     assert not {"torch", "transformers", "accelerate"} & reporting.keys()
     assert all(measured[name] == version for name, version in reporting.items())
+
+
+def test_main_ci_does_not_transfer_the_shared_model_wheel_cache():
+    jobs = yaml.safe_load(Path(".github/workflows/ci.yml").read_text())["jobs"]
+    for name, job in jobs.items():
+        for step in job.get("steps", []):
+            if step.get("uses", "").startswith("actions/setup-python@"):
+                # Restoring the multi-GB cache exceeded account egress limits
+                # and delayed setup by 12 minutes before any checks could run.
+                assert "cache" not in step.get("with", {}), name
+                assert "cache-dependency-path" not in step.get("with", {}), name
