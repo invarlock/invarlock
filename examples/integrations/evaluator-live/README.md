@@ -118,7 +118,10 @@ timer alone cannot interrupt a stalled native GPU call.
 
 Use separate, pinned SDK environments. The normal locks are in
 `examples/evaluator-qualification/locks/`. LightEval also needs this example's
-`locks/lighteval.txt` for a compatible `xxhash` version. Promptfoo uses the verified npm archive;
+`locks/lighteval.txt` for a compatible `xxhash` version. Evidently uses
+`locks/evidently.txt` to retain the Pandas API required by its pinned SDK.
+These live constraints leave the historical qualification inputs unchanged.
+Promptfoo uses the verified npm archive;
 LightEval requires checksum-verified NLTK resources staged before execution.
 Its pinned registry imports an unrelated judge definition that still uses the
 Hub `model_name` query argument. During registry construction, the isolated
