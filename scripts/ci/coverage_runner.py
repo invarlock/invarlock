@@ -44,6 +44,9 @@ SHARDS = (
     "support",
     "runtime",
 )
+# The minimum-Python marker policy excludes every integration parity case.
+# Keep those paths in its comparison group instead of creating an empty job.
+MINIMUM_PYTHON_SHARDS = tuple(shard for shard in SHARDS if shard != "examples-parity")
 FAST_MARKERS = "not integration and not slow and not manual and not gpu"
 EXAMPLE_TESTS = (
     "tests/examples",
@@ -174,6 +177,8 @@ def test_selection(shard: str) -> list[str]:
     if shard == "runtime":
         return [*RUNTIME_TESTS, "tests/compatibility"]
     arguments = selection(shard)
+    if shard == "examples-comparisons":
+        arguments.extend(EXAMPLE_PARTITIONS["examples-parity"])
     if shard == "support":
         arguments = [
             path
@@ -416,7 +421,7 @@ def main(argv: list[str] | None = None) -> int:
     runner.add_argument("--artifact-dir", type=Path, default=Path("artifacts/coverage"))
     runner.add_argument("--workers", type=int, default=2)
     behavior = commands.add_parser("test")
-    behavior.add_argument("shard", choices=SHARDS)
+    behavior.add_argument("shard", choices=MINIMUM_PYTHON_SHARDS)
     behavior.add_argument("--workers", type=int, default=2)
     supplement = commands.add_parser("supplement")
     supplement.add_argument("--workers", type=int, default=2)

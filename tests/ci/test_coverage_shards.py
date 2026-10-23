@@ -489,7 +489,7 @@ def test_run_collects_real_xdist_inventory_and_coverage(tmp_path, monkeypatch):
     assert (artifacts / "examples/junit.xml").is_file()
 
 
-@pytest.mark.parametrize("shard", runner.SHARDS)
+@pytest.mark.parametrize("shard", runner.MINIMUM_PYTHON_SHARDS)
 def test_minimum_python_preserves_marker_and_runtime_exceptions(shard):
     selected = runner.test_selection(shard)
     if shard == "runtime":
@@ -582,6 +582,76 @@ def test_real_capacity_collection_retains_slow_release_cases(tmp_path):
             "tests/evaluation_comparison/test_capacity.py::test_capacity[50000]",
         },
     }
+
+
+def test_real_minimum_comparison_groups_retain_integration_marker_policy(tmp_path):
+    import yaml
+
+    files = {
+        "tests/integration/test_evaluator_parity.py": "def test_parity(): pass\n",
+        "tests/examples/test_priority_workflow_reference.py": "def test_priority(): pass\n",
+        "tests/examples/test_captured_reference.py": "def test_captured(): pass\n",
+    }
+    for name, contents in files.items():
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(contents)
+    (tmp_path / "tests/integration/conftest.py").write_text(
+        (runner.ROOT / "tests/integration/conftest.py").read_text()
+    )
+    (tmp_path / "pytest.ini").write_text(
+        "[pytest]\nmarkers =\n integration\n slow\n manual\n gpu\n"
+    )
+    workflow = yaml.safe_load((runner.ROOT / ".github/workflows/ci.yml").read_text())
+    minimum = workflow["jobs"]["minimum-python-tests"]["strategy"]["matrix"]["shard"]
+    selected = []
+    groups = [
+        name for name in minimum if name in {"examples-comparisons", "examples-parity"}
+    ]
+    for name in [*groups, "coverage-parity"]:
+        path = tmp_path / f"{name}.json"
+        env = isolated_env()
+        env.update(
+            PYTHONPATH=str(runner.ROOT / "scripts/ci"),
+            PYTEST_DISABLE_PLUGIN_AUTOLOAD="1",
+            INVARLOCK_COVERAGE_INVENTORY=str(path),
+        )
+        arguments = (
+            runner.selection("examples-parity")
+            if name == "coverage-parity"
+            else runner.test_selection(name)
+        )
+        subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "pytest",
+                "--collect-only",
+                "-q",
+                "-p",
+                "coverage_runner",
+                *arguments,
+            ],
+            cwd=tmp_path,
+            env=env,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        inventory = json.loads(path.read_text())
+        if name == "coverage-parity":
+            assert inventory == [
+                "tests/integration/test_evaluator_parity.py::test_parity"
+            ]
+        else:
+            selected.extend(inventory)
+    assert sorted(selected) == [
+        "tests/examples/test_captured_reference.py::test_captured",
+        "tests/examples/test_priority_workflow_reference.py::test_priority",
+    ]
+    assert "tests/integration/test_evaluator_parity.py" in runner.test_selection(
+        "examples-comparisons"
+    )
 
 
 @pytest.mark.parametrize("workers", [0, 2])

@@ -103,7 +103,12 @@ def test_judge_replays_have_independent_disjoint_partitions():
 )
 def test_every_workflow_collects_all_required_shards(workflow, job):
     jobs = yaml.safe_load((Path(".github/workflows") / workflow).read_text())["jobs"]
-    assert jobs[job]["strategy"]["matrix"]["shard"] == list(coverage_runner.SHARDS)
+    expected = (
+        coverage_runner.MINIMUM_PYTHON_SHARDS
+        if job == "minimum-python-tests"
+        else coverage_runner.SHARDS
+    )
+    assert jobs[job]["strategy"]["matrix"]["shard"] == list(expected)
     makefile = Path("Makefile").read_text()
     shards = re.search(r"(?m)^COVERAGE_SHARDS := (.+)$", makefile)
     assert shards is not None

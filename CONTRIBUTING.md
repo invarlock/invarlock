@@ -275,6 +275,12 @@ pass. Test timing reports are retained with each group's coverage data. Release
 promotion branches are checked through their pull requests; main/staging pushes,
 release tags and scheduled security scans retain their separate checks.
 
+Minimum-Python tests use ten groups with the same marker policy as before.
+Their comparison group retains the integration parity paths, which the existing
+integration exclusion deselects. Coverage runs those parity cases in its own
+unrestricted group. Each Python version also requires the dedicated evaluator
+parity gate.
+
 The `verify-fast` CI result requires all three parallel jobs to succeed:
 `verify-checks` runs repository checks, captured-evaluation journeys and the
 50,000-record signed-recipient case without tracing; `verify-packages` runs
@@ -290,7 +296,7 @@ Pre-commit retains its separate hook-environment cache and runs every hook.
 Python 3.13 behavioral tests run under coverage;
 the separate Python 3.12 suite checks the minimum supported interpreter. Local
 `make verify-fast` still includes its behavioral tests. Minimum-Python tests use
-the same partitions, with their existing marker policy, and run concurrently with
+the ten groups described above, with their existing marker policy, and run concurrently with
 installed-package checks and a separate Python 3.12 evaluator-parity job.
 The required `minimum-python` result rejects a failure, cancellation or skip in
 any group.

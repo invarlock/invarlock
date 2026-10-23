@@ -275,7 +275,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [core, core-capacity, examples, examples-comparisons, examples-parity, examples-journeys, examples-judge, examples-judge-review, examples-judge-priority, support, runtime]
+        shard: [core, core-capacity, examples, examples-comparisons, examples-journeys, examples-judge, examples-judge-review, examples-judge-priority, support, runtime]
     steps:
       - name: Use disk-backed temporary storage
         run: printf 'TMPDIR=%s\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"

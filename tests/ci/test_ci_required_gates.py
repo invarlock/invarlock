@@ -117,7 +117,11 @@ def test_ci_runs_the_repository_gates() -> None:
         'test "$TEST_RESULT" = success && test "$PACKAGE_RESULT" = success && test "$PARITY_RESULT" = success'
     )
     tests = jobs["minimum-python-tests"]
-    assert tests["strategy"]["matrix"] == jobs["coverage-tests"]["strategy"]["matrix"]
+    assert tests["strategy"]["matrix"]["shard"] == [
+        shard
+        for shard in jobs["coverage-tests"]["strategy"]["matrix"]["shard"]
+        if shard != "examples-parity"
+    ]
     assert _step(tests, "Run disjoint minimum-Python tests")["run"] == (
         "python scripts/ci/coverage_runner.py test ${{ matrix.shard }} --workers 2"
     )
