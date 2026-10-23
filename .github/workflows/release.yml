@@ -140,7 +140,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [core, examples, examples-comparisons, examples-judge, examples-judge-review, examples-judge-priority, support, runtime]
+        shard: [core, core-capacity, examples, examples-comparisons, examples-parity, examples-journeys, examples-judge, examples-judge-review, examples-judge-priority, support, runtime]
     env:
       PYTHON: python
       PYTHONPATH: ${{ github.workspace }}/src

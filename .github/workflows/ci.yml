@@ -117,13 +117,42 @@ jobs:
         run: make verify-checks
       - name: Check full-capacity signed verification
         run: python -m pytest -q 'tests/evaluation_comparison/test_capacity.py::test_full_capacity_signed_independent_recipient[50000]'
-      - name: Build, install, and validate distributions
-        run: make install-smoke inspect-judge-sdk-test langfuse-sdk-test
       - name: Lint workflows
         run: |
           gopath="$(go env GOPATH)"
           export PATH="${gopath}/bin:$PATH"
           make workflow-lint
+
+  verify-packages:
+    name: "verify-packages"
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.full) }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 35
+    env:
+      PYTHON: python
+      PYTHONPATH: ${{ github.workspace }}/src
+      PYTHONWARNINGS: default
+    steps:
+      - name: Use disk-backed temporary storage
+        run: printf 'TMPDIR=%s\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.13'
+      - name: Set up uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
+        with:
+          version: "0.10.10"
+      - name: Install dependencies
+        run: |
+          python scripts/security/build_hardened_accelerate_wheel.py bootstrap
+          python -m pip install --require-hashes --find-links runtime/wheels -r requirements/workflows/ci-hf-py313.txt
+          python -m build --wheel --no-isolation
+          python -m pip install --no-deps --force-reinstall dist/*.whl
+      - name: Build, install, and validate distributions
+        run: make install-smoke inspect-judge-sdk-test langfuse-sdk-test
 
   evaluator-parity:
     name: "evaluator-parity"
@@ -158,7 +187,7 @@ jobs:
   verify-fast:
     name: "verify-fast"
     if: ${{ always() && !(github.event_name == 'workflow_dispatch' && inputs.full) }}
-    needs: [verify-checks, evaluator-parity]
+    needs: [verify-checks, verify-packages, evaluator-parity]
     runs-on: ubuntu-26.04
     timeout-minutes: 2
     steps:
@@ -167,8 +196,9 @@ jobs:
       - name: Require every verification check
         env:
           CHECK_RESULT: ${{ needs.verify-checks.result }}
+          PACKAGE_RESULT: ${{ needs.verify-packages.result }}
           PARITY_RESULT: ${{ needs.evaluator-parity.result }}
-        run: test "$CHECK_RESULT" = success && test "$PARITY_RESULT" = success
+        run: test "$CHECK_RESULT" = success && test "$PACKAGE_RESULT" = success && test "$PARITY_RESULT" = success
 
   minimum-python-packages:
     name: "minimum-python-packages"
@@ -202,6 +232,31 @@ jobs:
         run: make cli-smoke-core
       - name: Build, install, and validate distributions
         run: make install-smoke inspect-judge-sdk-test langfuse-sdk-test
+
+  minimum-python-parity:
+    name: "minimum-python-parity"
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.full) }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    env:
+      PYTHON: python
+      PYTHONPATH: ${{ github.workspace }}/src
+      PYTHONWARNINGS: default
+    steps:
+      - name: Use disk-backed temporary storage
+        run: printf 'TMPDIR=%s\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          python scripts/security/build_hardened_accelerate_wheel.py bootstrap
+          python -m pip install --require-hashes --find-links runtime/wheels -r requirements/workflows/ci-hf-py312.txt
+          python -m build --wheel --no-isolation
+          python -m pip install --no-deps --force-reinstall dist/*.whl
       - name: Check all dedicated evaluator profiles with an installed recipient
         run: >-
           INVARLOCK_REPLAY_RETAINED_CAMPAIGNS=0
@@ -220,7 +275,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [core, examples, examples-comparisons, examples-judge, examples-judge-review, examples-judge-priority, support, runtime]
+        shard: [core, core-capacity, examples, examples-comparisons, examples-parity, examples-journeys, examples-judge, examples-judge-review, examples-judge-priority, support, runtime]
     steps:
       - name: Use disk-backed temporary storage
         run: printf 'TMPDIR=%s\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
@@ -242,7 +297,7 @@ jobs:
   minimum-python:
     name: "minimum-python"
     if: ${{ always() && !(github.event_name == 'workflow_dispatch' && inputs.full) }}
-    needs: [minimum-python-tests, minimum-python-packages]
+    needs: [minimum-python-tests, minimum-python-packages, minimum-python-parity]
     runs-on: ubuntu-26.04
     timeout-minutes: 2
     steps:
@@ -252,7 +307,8 @@ jobs:
         env:
           TEST_RESULT: ${{ needs.minimum-python-tests.result }}
           PACKAGE_RESULT: ${{ needs.minimum-python-packages.result }}
-        run: test "$TEST_RESULT" = success && test "$PACKAGE_RESULT" = success
+          PARITY_RESULT: ${{ needs.minimum-python-parity.result }}
+        run: test "$TEST_RESULT" = success && test "$PACKAGE_RESULT" = success && test "$PARITY_RESULT" = success
 
   coverage-tests:
     name: "coverage-tests (${{ matrix.shard }})"
@@ -262,7 +318,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [core, examples, examples-comparisons, examples-judge, examples-judge-review, examples-judge-priority, support, runtime]
+        shard: [core, core-capacity, examples, examples-comparisons, examples-parity, examples-journeys, examples-judge, examples-judge-review, examples-judge-priority, support, runtime]
     env:
       PYTHON: python
       PYTHONPATH: ${{ github.workspace }}/src

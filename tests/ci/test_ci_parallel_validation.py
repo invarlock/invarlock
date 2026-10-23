@@ -13,6 +13,68 @@ import yaml
 from scripts.ci import coverage_runner
 
 
+def test_capacity_partition_preserves_fast_and_supplemental_cases():
+    paths = {
+        "tests/evaluation_comparison/test_capacity.py",
+        "tests/evaluation_comparison/test_default_resource_budget.py",
+    }
+    capacity = coverage_runner.selection("core-capacity")
+    assert set(capacity[:-2]) == paths
+    assert capacity[-2:] == ["-m", coverage_runner.FAST_MARKERS]
+    for path in paths:
+        assert f"--ignore={path}" in coverage_runner.selection("core")
+        assert f"--ignore={path}" not in coverage_runner.test_selection("supplement")
+
+
+def test_comparison_and_journey_partitions_preserve_all_moved_files():
+    partitions = coverage_runner.EXAMPLE_PARTITIONS
+    assert partitions["examples-parity"] == (
+        "tests/integration/test_evaluator_parity.py",
+    )
+    assert set(partitions["examples-comparisons"]) == {
+        "tests/examples/test_priority_workflow_reference.py",
+        "tests/examples/test_captured_reference.py",
+    }
+    assert set(partitions["examples-journeys"]) == {
+        "tests/examples/test_modelkit_real_journey.py",
+        "tests/examples/test_evaluator_real_judge_journey.py",
+        "tests/examples/test_judge_heldout_reference.py",
+        "tests/examples/test_live_evaluator_reference.py",
+    }
+    moved = [path for paths in partitions.values() for path in paths]
+    assert len(moved) == len(set(moved))
+    assert all(
+        f"--ignore={path}" in coverage_runner.selection("examples") for path in moved
+    )
+
+
+@pytest.mark.parametrize("result", ["success", "failure", "cancelled", "skipped", ""])
+@pytest.mark.parametrize(
+    "dependency", ["TEST_RESULT", "PACKAGE_RESULT", "PARITY_RESULT"]
+)
+def test_minimum_python_gate_requires_every_independent_check(result, dependency):
+    jobs = yaml.safe_load(Path(".github/workflows/ci.yml").read_text())["jobs"]
+    gate = jobs["minimum-python"]
+    assert set(gate["needs"]) == {
+        "minimum-python-tests",
+        "minimum-python-packages",
+        "minimum-python-parity",
+    }
+    assert "always()" in gate["if"]
+    step = next(
+        s for s in gate["steps"] if s["name"] == "Require every minimum-Python check"
+    )
+    assert step["env"] == {
+        "TEST_RESULT": "${{ needs.minimum-python-tests.result }}",
+        "PACKAGE_RESULT": "${{ needs.minimum-python-packages.result }}",
+        "PARITY_RESULT": "${{ needs.minimum-python-parity.result }}",
+    }
+    env = {**os.environ, **dict.fromkeys(step["env"], "success")}
+    env[dependency] = result
+    completed = subprocess.run(["bash", "-c", step["run"]], env=env, check=False)
+    assert (completed.returncode == 0) == (result == "success")
+
+
 def test_judge_replays_have_independent_disjoint_partitions():
     expected = {
         "tests/examples/test_judge_measurements_reference.py",
@@ -49,13 +111,19 @@ def test_every_workflow_collects_all_required_shards(workflow, job):
 
 
 @pytest.mark.parametrize("result", ["success", "failure", "cancelled", "skipped", ""])
-@pytest.mark.parametrize("dependency", ["CHECK_RESULT", "PARITY_RESULT"])
+@pytest.mark.parametrize(
+    "dependency", ["CHECK_RESULT", "PACKAGE_RESULT", "PARITY_RESULT"]
+)
 def test_required_verification_gate_rejects_every_unsuccessful_dependency(
     result, dependency
 ):
     jobs = yaml.safe_load(Path(".github/workflows/ci.yml").read_text())["jobs"]
     gate = jobs["verify-fast"]
-    assert set(gate["needs"]) == {"verify-checks", "evaluator-parity"}
+    assert set(gate["needs"]) == {
+        "verify-checks",
+        "verify-packages",
+        "evaluator-parity",
+    }
     assert "always()" in gate["if"]
     assert "inputs.full" in gate["if"]
     step = next(
@@ -65,9 +133,10 @@ def test_required_verification_gate_rejects_every_unsuccessful_dependency(
     )
     assert step["env"] == {
         "CHECK_RESULT": "${{ needs.verify-checks.result }}",
+        "PACKAGE_RESULT": "${{ needs.verify-packages.result }}",
         "PARITY_RESULT": "${{ needs.evaluator-parity.result }}",
     }
-    env = {**os.environ, "CHECK_RESULT": "success", "PARITY_RESULT": "success"}
+    env = {**os.environ, **dict.fromkeys(step["env"], "success")}
     env[dependency] = result
     completed = subprocess.run(["bash", "-c", step["run"]], env=env, check=False)
     assert (completed.returncode == 0) == (result == "success")
