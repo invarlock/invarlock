@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.1] - 2026-10-23
+
+### Changed
+
+- Shorten onboarding, report and example guidance, consolidate repeated
+  verification boundaries, and link to detailed acceptance and security contracts.
+- Update runtime qualification commands and packaging guidance, and make the
+  native-judge starter's documentation links work outside the source checkout.
+- Reduce CI and release verification time by rebalancing test groups, distributing
+  tests with work stealing, and running independent package and evaluator checks
+  in parallel. Preserve the test inventory, SDK checks, and coverage thresholds.
+- Reduce CI dependency setup and cache transfer time with hash-locked `uv`
+  installs, a smaller coverage reporting environment, and removal of oversized
+  shared package caches. Retain package integrity and installed dependency checks.
+- Refresh pinned workflow actions for environment setup, artifact transfer,
+  CodeQL analysis, and supply-chain scorecards.
+
+### Fixed
+
+- Install the pinned `uv` tool in release coverage jobs so dependency-installer
+  regression checks run during candidate and tagged-release validation.
+- Check external documentation links through the rendered site instead of raw
+  Markdown, allow the scheduled link check to run manually on a branch, and
+  point canonical documentation URLs to the published `latest/` directory.
+  Refresh redirected citations to their primary-source destinations.
+- Include the generated package README and third-party notices in runtime-image
+  build inputs, preserving the wheel description and source-distribution notices.
+- Map the current CI runner label in local `act` configuration and document the
+  local container's different Ubuntu version.
+- Captured comparisons now classify non-string text answers and null numeric
+  answers as unavailable, retaining their IDs and returning insufficient evidence
+  for affected metrics and slices. Empty text, wrong answers, JSON null, recorded
+  zero scores, and likelihood-only records keep their metric-specific meaning.
+  Independent replay applies the same rule; older packs whose comparisons relied
+  on zero-scoring unavailable answers fail replay consistency. Preserve those
+  signed packs and produce a new assessment from the retained runs.
+- Clarify native API omission errors, post-publication runtime import checks,
+  sequential report outputs, and CI artifacts after failed verification.
+- Restore Evidently capture compatibility by pinning pandas 3.0.6 in the live
+  capture environment; the retained SDK imports a private helper removed in
+  pandas 3.1. Use that compatible environment for the batch-semantic check too.
+  Preserve the historical SDK qualification lock and evidence.
+
+### Security
+
+- Upgrade maintained Pillow, `certifi`, virtualenv, OpenTelemetry, and Markdown
+  parser dependencies to patched releases. The `vision-text` extra now requires
+  Pillow 13, and installed HF audits bind the refreshed dependency lock.
+- Upgrade maintained `aiohttp` locks to 3.14.4 and its required `yarl`
+  dependency to 1.25.1, resolving three dependency audit findings.
+
 ## [0.17.0] - 2026-10-10
 
 ### Added

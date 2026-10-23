@@ -265,8 +265,8 @@ Inspect `campaign/handoff/result.json`, the immutable
 the recipient directory. The synthetic four-case example should report
 `insufficient_evidence` under its 20-case minimum. Successful helper completion
 means authenticated replay finished, even when the policy decision is adverse;
-inspect the recorded decision separately. Verification and report rendering make
-no new model calls and do not attest execution or authorize deployment.
+inspect the recorded decision separately. Verification and report rendering
+replay the retained campaign offline.
 
 For a bounded illustration of evaluating resulting files instead of an agent's
 completion message, see [agent_outcomes.py](agent_outcomes.py) and the

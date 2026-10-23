@@ -396,9 +396,14 @@ def test_release_builds_from_the_resolved_tag_and_uses_trusted_publishing() -> N
     assert shards["strategy"]["fail-fast"] is False
     assert set(shards["strategy"]["matrix"]["shard"]) == {
         "core",
+        "core-capacity",
         "examples",
         "examples-comparisons",
+        "examples-parity",
+        "examples-journeys",
         "examples-judge",
+        "examples-judge-review",
+        "examples-judge-priority",
         "support",
         "runtime",
     }

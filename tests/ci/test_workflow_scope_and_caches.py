@@ -65,6 +65,13 @@ def test_pip_cache_tracks_each_jobs_installed_locks(path: Path) -> None:
                         "requirements/workflows/pip-bootstrap.txt",
                     )
                 )
+            if "scripts/evaluator_parity_gate.sh" in commands:
+                installed.update(
+                    (
+                        f"requirements/workflows/release-install-py{tag}.txt",
+                        "requirements/workflows/pip-bootstrap.txt",
+                    )
+                )
             cached = options.get("cache-dependency-path", "").splitlines()
             assert installed, (path.name, name)
             assert set(cached) == installed, (path.name, name)
@@ -125,6 +132,13 @@ def test_precommit_reports_for_every_pull_request() -> None:
     assert workflow["on"]["pull_request"] is None
     job = workflow["jobs"]["run"]
     assert job["name"] == "pre-commit"
+    setup = next(
+        step
+        for step in job["steps"]
+        if step.get("uses", "").startswith("actions/setup-python@")
+    )
+    # A small tooling job must not restore the shared multi-GB model-wheel cache.
+    assert "cache" not in setup["with"]
     assert any(
         step.get("run") == "pre-commit run --all-files --show-diff-on-failure"
         for step in job["steps"]
@@ -168,12 +182,12 @@ def test_runtime_coverage_requires_pinned_sdk_tests_in_its_measured_interpreter(
         if step["if"] == "${{ startsWith(matrix.shard, 'examples') }}"
     )
     assert (
-        "--require-hashes -r requirements/workflows/langfuse-sdk-tests-py313.txt"
+        "--require-hashes --no-config -r requirements/workflows/langfuse-sdk-tests-py313.txt"
         in examples["run"]
     )
     assert examples["run"].strip().endswith("python -m pip check")
     assert install["if"] == "${{ matrix.shard == 'runtime' }}"
-    assert "python -m pip install --require-hashes -r " in install["run"]
+    assert "--require-hashes --no-config -r " in install["run"]
     assert install["run"].strip().endswith("python -m pip check")
     collect = next(
         step for step in steps if "make coverage-collect-" in step.get("run", "")

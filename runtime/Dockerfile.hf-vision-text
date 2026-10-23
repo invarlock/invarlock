@@ -6,7 +6,8 @@ ARG SOURCE_DATE_EPOCH=0
 FROM scratch AS runtime-inputs
 COPY requirements/workflows/multimodal-runtime-py312.txt /requirements/multimodal-runtime-py312.txt
 COPY requirements/workflows/runtime-wheel-build-py312.txt /requirements/runtime-wheel-build-py312.txt
-COPY pyproject.toml README.md LICENSE MANIFEST.in /project/
+COPY pyproject.toml README.md LICENSE THIRD_PARTY_NOTICES.md MANIFEST.in /project/
+COPY packaging/README.md /project/packaging/README.md
 COPY src /project/src
 
 FROM ${WHEEL_BUILD_BASE} AS public-wheel

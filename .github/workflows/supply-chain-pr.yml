@@ -42,7 +42,7 @@ jobs:
             --out-md artifacts/supply-chain/cve-audit.md
       - name: Upload dependency audit report
         if: ${{ always() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: supply-chain-pr-cve-audit
           path: |
@@ -302,7 +302,7 @@ jobs:
 
       - name: Upload gitleaks PR artifacts
         if: ${{ always() && steps.gitleaks_scan.outcome != 'skipped' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: supply-chain-pr-gitleaks
           path: |
@@ -356,7 +356,7 @@ jobs:
         run: bash scripts/security/generate_sbom.sh --scope install-surface --python "${{ steps.install_surface.outputs.python }}" artifacts/supply-chain/sbom.json
 
       - name: Upload supply-chain artifacts
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: supply-chain-pr-artifacts
           path: |
@@ -395,7 +395,7 @@ jobs:
           python scripts/security/run_pip_audit.py \
             --path "${{ steps.hf_surface.outputs.site_packages }}" \
             --installed-lock requirements/workflows/hf-py313.txt \
-            --installed-lock-sha256 667f77a6c80831761205f5cc987ce67a782f757fba9c68ca0993730e645678a6 \
+            --installed-lock-sha256 ad447f44c6c073e484f51a555d40d370db675c7537d4f1872dd4f17b7321bee8 \
             --installed-bootstrap-lock requirements/workflows/pip-bootstrap.txt \
             --installed-bootstrap-lock-sha256 8639968bea3cd8bc234d2a6d38f2c54e5d1b09c3474ac954278c99c2fa44e944 \
             --installed-project-wheel dist/*.whl \
@@ -404,7 +404,7 @@ jobs:
 
       - name: Upload HF installed audit
         if: ${{ always() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: hf-installed-audit
           path: artifacts/supply-chain/hf-pip-audit.json

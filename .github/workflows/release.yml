@@ -140,7 +140,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [core, examples, examples-comparisons, examples-judge, support, runtime]
+        shard: [core, core-capacity, examples, examples-comparisons, examples-parity, examples-journeys, examples-judge, examples-judge-review, examples-judge-priority, support, runtime]
     env:
       PYTHON: python
       PYTHONPATH: ${{ github.workspace }}/src
@@ -165,6 +165,11 @@ jobs:
             requirements/workflows/inspect-judge-tests-py313.txt
             requirements/workflows/langfuse-sdk-tests-py313.txt
             requirements/workflows/release-security-py313.txt
+      - name: Set up uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
+        with:
+          version: "0.10.10"
+          enable-cache: false
       - name: Install measured coverage dependencies
         run: |
           python scripts/security/build_hardened_accelerate_wheel.py bootstrap
@@ -180,7 +185,7 @@ jobs:
         run: make coverage-collect-${{ matrix.shard }} PYTEST_WORKERS=2
       - name: Retain release coverage measurements
         if: ${{ always() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: release-coverage-shard-${{ matrix.shard }}
           path: artifacts/coverage/
@@ -216,7 +221,7 @@ jobs:
           python -m build --wheel --no-isolation
           python -m pip install --no-deps --force-reinstall dist/*.whl
       - name: Download release coverage measurements
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           pattern: release-coverage-shard-*
           path: artifacts/coverage/
@@ -257,7 +262,7 @@ jobs:
             requirements/workflows/release-install-py313.txt
             requirements/workflows/release-options-py313.txt
             requirements/workflows/release-security-py313.txt
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: '22'
           cache: npm
@@ -286,7 +291,7 @@ jobs:
             --out-md artifacts/supply-chain/cve-audit.md
       - name: Upload dependency audit report
         if: ${{ always() && steps.dependency_audit.outcome != 'skipped' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: release-cve-audit
           path: |
@@ -375,7 +380,7 @@ jobs:
           echo "exit_code=${exit_code}" >> "$GITHUB_OUTPUT"
       - name: Upload gitleaks artifacts
         if: ${{ always() && steps.gitleaks_scan.outcome != 'skipped' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: release-gitleaks
           path: artifacts/supply-chain/gitleaks.json
@@ -546,7 +551,7 @@ jobs:
           printf '%s  %s\n' "${EXPECTED_DIST_LEDGER_SHA256}" SHA256SUMS | sha256sum --check -
           sha256sum --check SHA256SUMS
       - name: Upload dist artifacts
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: dist
           path: |
@@ -557,7 +562,7 @@ jobs:
           retention-days: 14
       - name: Upload SBOM artifact
         if: ${{ always() && steps.generate_sbom.outcome != 'skipped' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: release-sbom
           path: artifacts/supply-chain/sbom.json
@@ -578,7 +583,7 @@ jobs:
       - name: Use disk-backed temporary storage
         run: printf 'TMPDIR=%s\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - name: Download validated distributions
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: dist
           path: dist
@@ -596,7 +601,7 @@ jobs:
         with:
           subject-checksums: dist/SHA256SUMS
       - name: Upload tagged candidate provenance
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: release-candidate-provenance
           path: ${{ steps.attest_candidate.outputs.bundle-path }}
@@ -666,7 +671,7 @@ jobs:
             --api-url "${GITHUB_API_URL}" \
             --github-output "${GITHUB_OUTPUT}"
       - name: Download tagged candidate distributions
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: dist
           path: _release_dist
@@ -707,7 +712,7 @@ jobs:
         with:
           python-version: '3.13'
       - name: Download dist artifacts
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: dist
           path: _release_dist
@@ -818,7 +823,7 @@ jobs:
             exit 1
           fi
       - name: Upload verified publication files
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: publish-dist
           path: publish-dist/*
@@ -843,7 +848,7 @@ jobs:
       - name: Use disk-backed temporary storage
         run: printf 'TMPDIR=%s\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - name: Download verified publication files
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: publish-dist
           path: publish-dist
@@ -903,7 +908,7 @@ jobs:
         with:
           python-version: '3.13'
       - name: Download candidate distribution ledger
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: dist
           path: _release_dist
@@ -946,7 +951,7 @@ jobs:
         with:
           python-version: '3.13'
       - name: Download candidate distribution ledger
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: dist
           path: _release_dist

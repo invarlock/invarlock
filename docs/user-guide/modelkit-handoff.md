@@ -157,9 +157,8 @@ candidate directories again before returning.
 | `2` | Inputs were invalid, unsupported, altered, incomplete, unauthenticated, or inconsistently bound |
 
 An expired or revoked acceptance may fail while the historical technical result
-still passes. Preserve both results. A successful check does not assert production
-quality, general model safety, delivery receipt, or permission to replace the
-recipient's deployment controls.
+still passes. Preserve both results and apply the recipient's delivery and
+deployment controls after the package and evidence checks.
 
 Default limits are 2 MiB per JSON document, 160 GiB per stored blob, decompressed
 archive and model contents, and 200,000 archive members or candidate entries.

@@ -74,7 +74,7 @@ separately:
 - `pip-bootstrap.txt` contains the Python-version-independent pip bootstrap
   wheel and source hashes already reviewed in `release-security-py313.txt`;
 - `runtime-wheel-build-py312.txt` contains only the versions and hashes needed
-  to build the core and runtime-provider wheels without build isolation.
+  to build the `invarlock` wheel without build isolation.
 
 When their source pins change, update those files in the same review,
 confirm each hash against the downloaded index artifact, and keep their inline

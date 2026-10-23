@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "invarlock"
-version = "0.17.0"
+version = "0.17.1"
 description = "Paired model release-regression evaluation with independently verifiable evidence"
 authors = [{ name = "InvarLock Team", email = "oss@invarlock.dev" }]
 maintainers = [{ name = "InvarLock Maintainers", email = "support@invarlock.dev" }]
@@ -38,15 +38,15 @@ dependencies = [
 [project.urls]
 Homepage = "https://invarlock.ai"
 Repository = "https://github.com/invarlock/invarlock"
-Documentation = "https://invarlock.github.io/invarlock/0.17.0/"
+Documentation = "https://invarlock.github.io/invarlock/0.17.1/"
 Issues = "https://github.com/invarlock/invarlock/issues"
-Changelog = "https://github.com/invarlock/invarlock/blob/v0.17.0/CHANGELOG.md"
+Changelog = "https://github.com/invarlock/invarlock/blob/v0.17.1/CHANGELOG.md"
 
 [project.optional-dependencies]
 # Optional user-facing runtime and evidence features. Maintainer tooling lives
 # in dependency groups below and is never published as an extra.
 diagnostics = ["numpy>=1.24"]
-vision-text = ["pillow>=11.3,<13"]
+vision-text = ["pillow>=13.0.0,<14"]
 judge = [
   "inspect-ai==0.3.263",
   "openai==3.13.0",
@@ -112,7 +112,7 @@ ci = [
   { include-group = "docs" },
   { include-group = "build" },
   { include-group = "release" },
-  "pillow>=11.3,<13",
+  "pillow>=13.0.0,<14",
 ]
 
 # Runtime preparation is source-bound and uses the verified generated wheelhouse.
@@ -128,7 +128,7 @@ hf = [
 ]
 runtime-test = [
   { include-group = "hf" },
-  "pillow>=11.3,<13",
+  "pillow>=13.0.0,<14",
   "peft==0.20.0",
   "torchao==0.18.0",
 ]

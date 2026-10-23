@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
+from invarlock.core.scoring import captured_output_available
 from invarlock.evaluation_record_contracts.contracts import EvaluationRecordsError
 from invarlock.evidence_pack_contract import canonical_json_bytes
 
@@ -27,6 +28,13 @@ def missing_pair(
         or (
             metric["kind"] == "recorded"
             and any(metric["score_key"] not in row["scores"] for row in (left, right))
+        )
+        or (
+            metric["kind"] not in ("recorded", "normalized_nll_per_utf8_byte")
+            and any(
+                not captured_output_available(metric["kind"], row["output"])
+                for row in (left, right)
+            )
         )
     )
 

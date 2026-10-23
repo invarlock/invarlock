@@ -32,7 +32,6 @@ This starter is unsigned. For a result another team can verify, follow the
 [complete signed handoff](../../docs/user-guide/captured-results.md#signed-handoff):
 the operator signs the evidence, and the recipient supplies its own expected
 runs, request, policy and signing identity before issuing a separate receipt.
-A passing receipt does not authorize deployment.
 
 ## Choose the data for your scorer
 

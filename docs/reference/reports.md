@@ -44,17 +44,17 @@ Combined evidence reports name both required component outcomes. Advisory
 judge reports identify their advisory role in the title and at the start of
 the explanation. Browser-tab titles include the recorded outcome.
 
-These are explanations of the retained decision, not additional verdicts.
-The report states which checks it performed; some report workflows authenticate
-retained records without replaying the comparison. Independent recipient
-verification remains a separate step. A captured report that records a pass
+**What was checked** states the operations performed by reporting. Some workflows
+authenticate retained records without replaying the comparison; see
+[rendering and recipient acceptance](#keep-rendering-separate-from-recipient-acceptance).
+A captured report that records a pass
 while an available displayed requirement fails is rejected as inconsistent;
 this check does not replay scoring.
 
 Then check **What was compared**: confirm the baseline, subject, task and recorded
 configuration change. The report distinguishes model-artifact identity from a
 hosted service's reported identity, and native execution from imported records.
-Matching displayed previews do not establish equality of complete configurations.
+Use the retained fields for complete configuration comparisons.
 
 Then read **Results and requirements**. Exact-match values are accuracies; NLL
 values are nats per UTF-8 byte and a subject-to-baseline ratio; judge values are
@@ -71,18 +71,14 @@ checks determine the policy result, not the point estimate alone.
 
 A policy can correctly pass a comparison whose absolute quality is unsuitable
 for an application. Confirm that the declared requirements cover that workload,
-including an absolute quality minimum when needed. The report displays the
-recorded requirements; it does not infer a business justification for them.
+including an absolute quality minimum when needed. Record the rationale for
+those requirements with the release decision.
 
 Use **Evidence details** for retained identities and exact values. Judge reports
 can show selected retained cases with `report --case-id`; native and captured
 reports do not provide a universal per-case debugging interface. Their source
 records remain in the evidence bundle. A useful example pairs its report with
 instructions for finding those records and replaying the comparison.
-
-**What was checked** states the operations actually performed by reporting.
-Recipient verification and organizational release approval are separate steps.
-Verifying an old package does not measure the current model or service again.
 
 Metric and scope headings use readable labels for identifier-style names, such
 as `grounded_qa-judge-quality` becoming **Grounded QA judge quality**. The original
@@ -615,8 +611,7 @@ For captured comparisons, the technical details identify both recorded runs,
 their complete-run digests, attributed artifact digests and evaluator
 source name and version. These fields make the report traceable to the exact
 supplied runs. Optional model and prompt context describes the evaluator-recorded
-change; it does not establish checkpoint identity. Only `verify` can add
-independent authentication and replay assurance.
+change; it does not establish checkpoint identity.
 
 Hosted captured evidence attributes a service observation, with an explicit
 configuration, harness and observation window, instead of asserting an immutable
@@ -624,11 +619,8 @@ weight artifact. An observed model name or exposed revision remains a source
 assertion. Replaying or rendering the evidence does not make new service calls
 or establish current service behavior.
 
-Keep policy satisfaction, regression or other policy failure, insufficient
-evidence, and integrity or verification failure separate. An authentic policy
-rejection differs from a submission that cannot be verified. Neither report
-rendering nor technical policy satisfaction makes the organizational decision;
-record that decision separately with its remaining conditions and scope.
+Use the [failure-state table](#failure-state-interpretation) to distinguish
+an authentic policy rejection from a submission that cannot be verified.
 
 For exact match, means appear as percentages and changes as percentage points.
 The decision tests the paired interval's lower bound, not just the observed
@@ -712,7 +704,6 @@ The report remains one offline HTML file. A fixed, hash-authorized script handle
 navigation only; no evidence labels or values are inserted into executable code.
 Without JavaScript, all metric details remain visible and section links still
 work. Printing includes every metric, even when only one tab is selected.
-Navigation does not score results, change policy decisions or verify evidence.
 
 ### Keep rendering separate from recipient acceptance
 
@@ -721,6 +712,9 @@ independent recipient acceptance. A bundle's embedded signer is not a
 recipient-owned trust anchor. Use `invarlock verify` with independent policy,
 identity and signer inputs to produce the signed acceptance or rejection
 receipt. A report can show an authenticated policy failure.
+
+Record the organizational release decision separately, with its scope and
+remaining conditions.
 
 A successful `report` invocation indicates that rendering completed, including
 when the recorded policy verdict is `fail`. Automation should parse verified
@@ -740,9 +734,9 @@ The trust profile must independently supply the captured policy, complete-run
 and request pins, evidence signer, and verifier identity and key. The core
 commands retain JSON output for automation. `report` regenerates presentations
 from bounded evidence after checking the closed inventory, payload digests,
-canonical JSON, cross-file bindings and embedded signature for signed packs. It
-does not recompute scores or replay comparison arithmetic, and the embedded
-signer does not authorize itself as a recipient trust anchor.
+canonical JSON, cross-file bindings and embedded signature for signed packs.
+It does not recompute scores or replay comparison arithmetic; use `verify`
+for independent authentication and replay.
 
 Captured reports distinguish unsigned local evidence, an embedded signature
 validated without recipient authorization, and unavailable signing information
@@ -759,9 +753,8 @@ Result values. All checks remain visible without horizontal scrolling. HTML
 uses the light color scheme regardless of system appearance, including when
 printed.
 
-Use `invarlock verify` with recipient-owned policy and complete-run digests for
-independent authentication and replay. Successful captured report
-regeneration exits `0` regardless of the stored policy decision. Evaluation exits
+Successful captured report regeneration exits `0` regardless of the stored
+policy decision. Evaluation exits
 `0` on publication unless `--fail-on-policy` requests the local gate; independent
 verification rejects adverse decisions. See the
 [captured-results guide](../user-guide/captured-results.md) for the full

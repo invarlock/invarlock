@@ -219,8 +219,11 @@ directory. Their roles remain distinct:
 | `verification.receipt.json` | Verifier-signed decision and independent anchors |
 | `evidence.html` | Reproducible HTML report; not an acceptance record |
 
-Verification JSON is written even when the verifier returns nonzero. The action
-then attempts the authenticated renderer and uploads available review material.
+Verification JSON is written even when the verifier returns nonzero. On exit 0,
+the action renders the report and uploads the evidence, verification JSON,
+signed receipt, and HTML. On a nonzero exit, it skips rendering and uploads only
+the verification JSON under the artifact name ending in `-verification-failure`.
+A rejection receipt may exist locally but is not included in that failure upload.
 With the default `fail-on-verify: true`, any nonzero verification result fails
 the job after artifact collection. Automation must require job success and
 validate the signed receipt; it must not infer acceptance from HTML or artifact

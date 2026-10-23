@@ -5,9 +5,7 @@
 > **In plain language:** For native exact match and NLL, InvarLock recomputes
 > scores from authenticated paired records, derives the paired interval, and
 > applies the policy to the conservative bound. When the policy qualifies sample size,
-> precision, or exact-match side accuracy, those checks must pass too. A
-> favorable point value cannot override a threshold, count, width, or side-
-> accuracy failure.
+> precision, or exact-match side accuracy, those checks must pass too.
 >
 > **Question:** How does each scoring contract turn its measurements and
 > uncertainty into a replayable policy decision?
@@ -624,13 +622,13 @@ those assumptions.
 
 ## References
 
-- [RFC 3629: UTF-8, a transformation format of ISO 10646](https://www.rfc-editor.org/rfc/rfc3629), Internet Standard, 2003.
+- [RFC 3629: UTF-8, a transformation format of ISO 10646](https://www.rfc-editor.org/info/rfc3629/), Internet Standard, 2003.
 - McNemar, Q., [Note on the sampling error of the difference between correlated
-  proportions or percentages](https://doi.org/10.1007/BF02295996),
+  proportions or percentages](https://www.cambridge.org/core/journals/psychometrika/article/abs/note-on-the-sampling-error-of-the-difference-between-correlated-proportions-or-percentages/698C2461BE63F5848763502D54E534FD),
   *Psychometrika* 12, 153–157, 1947.
 - Newcombe, R. G., [Improved confidence intervals for the difference between
   binomial proportions based on paired data](https://pubmed.ncbi.nlm.nih.gov/9839354/),
   *Statistics in Medicine* 17(22), 2635–2650, 1998.
 - National Institute of Standards and Technology,
-  [Artificial Intelligence Risk Management Framework 1.0](https://doi.org/10.6028/NIST.AI.100-1),
+  [Artificial Intelligence Risk Management Framework 1.0](https://nvlpubs.nist.gov/nistpubs/ai/NIST.AI.100-1.pdf),
   2023.

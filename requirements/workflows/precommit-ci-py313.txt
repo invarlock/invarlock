@@ -154,9 +154,9 @@ cryptography==50.0.0 \
     --hash=sha256:f89831ef99dd7dd169ab06d63a831adb9e20a87aac6d380266bbda5823349169 \
     --hash=sha256:fd9192b7b70c573d7f214eb1ae35e00d359f6f5e4b27c7e21e30de1fc6204645
     # via invarlock (pyproject.toml)
-distlib==0.4.0 \
-    --hash=sha256:9659f7d87e46584a30b5780e43ac7a2143098441670ff0a49d5f9034c54a6c16 \
-    --hash=sha256:feec40075be03a04501a973d81f633735b4b69f98b05450592310c0f401a4e0d
+distlib==0.4.4 \
+    --hash=sha256:ca4175b4ac7f71223cc30ed7248c45d2b38c2439d8ee6e498ab67ed63cf3508d \
+    --hash=sha256:cf09d55b1e85a89576b036aeb71550bfd68320f3f21761ca329eadadad918638
     # via virtualenv
 filelock==3.25.2 \
     --hash=sha256:b64ece2b38f4ca29dd3e810287aa8c48182bbecd1ae6e9ae126c9b35f1382694 \
@@ -188,6 +188,10 @@ nodeenv==1.10.0 \
     --hash=sha256:5bb13e3eed2923615535339b3c620e76779af4cb4c6a90deccc9e36b274d3827 \
     --hash=sha256:996c191ad80897d076bdfba80a41994c2b47c68e224c542b48feba42ba00f8bb
     # via pre-commit
+packaging==26.3 \
+    --hash=sha256:94edc256424af38762eb31306eed28beb9f0efc50a8837492c9d6fd6004aed79 \
+    --hash=sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c
+    # via virtualenv
 platformdirs==4.9.4 \
     --hash=sha256:1ec356301b7dc906d83f371c8f487070e99d3ccf9e501686456394622a01a934 \
     --hash=sha256:68a9a4619a666ea6439f2ff250c12a853cd1cbd5158d258bd824a7df6be2f868
@@ -424,7 +428,7 @@ typer==0.24.1 \
     --hash=sha256:112c1f0ce578bfb4cab9ffdabc68f031416ebcc216536611ba21f04e9aa84c9e \
     --hash=sha256:e39b4732d65fbdcde189ae76cf7cd48aeae72919dea1fdfc16593be016256b45
     # via invarlock (pyproject.toml)
-virtualenv==21.7.13 \
-    --hash=sha256:0355558b6f33619aab31347e43643b0ebc97f61ea3acf617b2b69e1f8a843d11 \
-    --hash=sha256:1bea5af7463f59c4719db48fe739579a2a4f569c96f26c086edda85c96da9f59
+virtualenv==21.14.13 \
+    --hash=sha256:5fbb04138a4861580b78ba9110d529a26bc48fcc93c8ec36bc0202eeed96a788 \
+    --hash=sha256:de5307ba4b9a0001d9c8ea02832d38f63ca432880f416c1bface61c4323fd905
     # via pre-commit

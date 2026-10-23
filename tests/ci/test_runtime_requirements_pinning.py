@@ -281,7 +281,7 @@ def test_multimodal_runtime_lock_pins_cuda_matched_torchvision() -> None:
     )
 
     assert "torchvision==0.28.0+cu126" in text
-    assert "pillow==12.3.0" in text
+    assert "pillow==13.0.0" in text
     assert "torch==" not in text
     assert "--hash=sha256:" in text
 
