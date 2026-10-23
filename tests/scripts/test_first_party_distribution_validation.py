@@ -37,7 +37,14 @@ def built_core(tmp_path_factory: pytest.TempPathFactory) -> Path:
         ROOT,
         source,
         ignore=shutil.ignore_patterns(
-            ".git", ".venv*", "__pycache__", "*.egg-info", "build", "dist", "reports"
+            ".git",
+            ".venv*",
+            "__pycache__",
+            "*.egg-info",
+            "artifacts",
+            "build",
+            "dist",
+            "reports",
         ),
     )
     dist = root / "dist"
