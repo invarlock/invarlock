@@ -266,6 +266,19 @@ class MetricView:
 
 
 @dataclass(frozen=True)
+class AuthoredReview:
+    """Separately attributed commentary; never serialized into signed evidence."""
+
+    label: str
+    byline: str
+    context: tuple[tuple[str, str], ...]
+    recommendation: str
+    decision: str
+    basis: tuple[tuple[str, str], ...]
+    next_action: str
+
+
+@dataclass(frozen=True)
 class ReportView:
     title: str
     family: str
@@ -281,6 +294,7 @@ class ReportView:
     technical: dict[str, Any] = field(default_factory=dict)
     context: tuple[tuple[str, str], ...] = ()
     changes: tuple[str, ...] = ()
+    review: AuthoredReview | None = None
 
 
 def _metric_identifier_details(view: ReportView) -> tuple[tuple[str, Any], ...]:
@@ -886,6 +900,15 @@ _MISSING_CHECKS = (
 )
 
 
+def _interpretation_note(view: ReportView) -> str:
+    if view.review:
+        return (
+            "Decision context, recommendation and review rationale are separately "
+            "authored commentary. Technical results come from the retained evidence."
+        )
+    return _INTERPRETATION_NOTE
+
+
 def _review_action(view: ReportView) -> str:
     if view.decision == "pass":
         return "Confirm the intended use and complete recipient verification before recording a release decision."
@@ -939,6 +962,20 @@ def _findings(view: ReportView) -> tuple[list[tuple[int, MetricView]], str]:
 
 
 def _review_context_html(view: ReportView) -> str:
+    if view.review:
+        review = view.review
+        return (
+            '<section class="review-context" aria-labelledby="review-context"><h2 id="review-context">Decision context</h2>'
+            f'<p class="eyebrow">{escape(review.label)}</p>'
+            f"<p><strong>Owner decision.</strong> {escape(review.decision)}</p>"
+            f'<p class="scope">{escape(review.byline)}</p>'
+            + "".join(
+                f"<p><strong>{escape(label)}.</strong> {escape(value)}</p>"
+                for label, value in review.context
+            )
+            + "</section>"
+            + f'<p class="change-summary"><strong>Change context.</strong> {escape(_change_summary(view))}</p>'
+        )
     return (
         '<section class="review-context" aria-labelledby="review-context"><h2 id="review-context">Decision context</h2>'
         + (
@@ -992,8 +1029,8 @@ def render_html(view: ReportView) -> str:
         f"<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none';{script_policy}\">",
         f"<title>{e(decision_label(view.decision))} · {e(view.title)}</title><style>{_CSS}</style></head><body><main>",
         f'<header class="brand">{_BRAND_MARK} InvarLock<span class="family">{e(view.family)}</span></header>',
-        f'<div class="report-heading"><p class="eyebrow">Comparison / Review / Evidence</p><h1>Model change review</h1><p>{e(view.title)}</p></div>',
-        f'<p class="interpretation-note">{_INTERPRETATION_NOTE}</p>',
+        f'<div class="report-heading"><p class="eyebrow">Comparison / Review / Evidence</p><h1>{"Client review package" if view.review else "Model change review"}</h1><p>{e(view.title)}</p></div>',
+        f'<p class="interpretation-note">{_interpretation_note(view)}</p>',
         _review_context_html(view),
         f'<section class="hero {_tone(view.decision)}" aria-labelledby="decision"><div class="verdict"><p class="eyebrow">Recorded policy result</p><h2 id="decision">{e(decision_label(view.decision))}</h2><p class="decision-summary">{_summary_html(view)}</p>',
     ]
@@ -1002,7 +1039,7 @@ def render_html(view: ReportView) -> str:
             f'<div class="summary-row"><span class="pill">{len(view.metrics)} metric / scope results</span></div>'
         )
     parts.append(
-        f'<p class="review-action"><strong>Review action.</strong> {_review_action(view)}</p>'
+        f'<p class="review-action"><strong>{"Owner recommendation" if view.review else "Review action"}.</strong> {e(view.review.recommendation) if view.review else _review_action(view)}</p>'
     )
     parts.append(
         '</div><aside class="assurance" aria-labelledby="assurance-heading"><h2 id="assurance-heading">What was checked</h2><dl>'
@@ -1015,9 +1052,9 @@ def render_html(view: ReportView) -> str:
     parts.append("</aside></section>")
     parts.append(_findings_html(view))
     support = [
-        f'<section class="panel next-steps"><h2>Next decision</h2><p>{_NEXT_DECISION}</p>'
+        f'<section class="panel next-steps"><h2>{"Decision follow-up" if view.review else "Next decision"}</h2><p>{e(view.review.next_action) if view.review else _NEXT_DECISION}</p>'
     ]
-    if view.next_steps:
+    if view.next_steps and not view.review:
         support.append("<h3>Next steps</h3><ol>")
         support.extend(f"<li>{e(step)}</li>" for step in view.next_steps)
         support.append("</ol>")
@@ -1030,6 +1067,15 @@ def render_html(view: ReportView) -> str:
         + "</ul></section>"
     )
     parts.extend(support)
+    if view.review:
+        parts.append(
+            '<section class="panel review-basis"><h2>Review rationale</h2>'
+            + "".join(
+                f"<p><strong>{e(label)}.</strong> {e(value)}</p>"
+                for label, value in view.review.basis
+            )
+            + "</section>"
+        )
     if view.subjects or view.context or view.changes:
         parts.append(_comparison_context(view))
     parts.append(
@@ -1191,11 +1237,23 @@ def render_markdown(view: ReportView, *, include_details: bool = False) -> str:
         "",
         "## Decision context",
         "",
-        _INTERPRETATION_NOTE,
+        _interpretation_note(view),
         "",
         *(f"- **{clean(label)}:** {clean(value)}" for label, value in view.subjects),
         "",
-        *(f"- {item}" for item in _DECISION_CONTEXT),
+        *(
+            [
+                f"**{clean(view.review.label)}**",
+                "",
+                f"**Owner decision:** {clean(view.review.decision)}",
+                "",
+                clean(view.review.byline),
+                "",
+                *(f"- **{clean(k)}:** {clean(v)}" for k, v in view.review.context),
+            ]
+            if view.review
+            else [f"- {item}" for item in _DECISION_CONTEXT]
+        ),
         "",
         f"**Change context:** {clean(_change_summary(view))}",
         "",
@@ -1203,7 +1261,7 @@ def render_markdown(view: ReportView, *, include_details: bool = False) -> str:
         "",
         clean(view.summary),
         "",
-        f"**Review action:** {_review_action(view)}",
+        f"**{'Owner recommendation' if view.review else 'Review action'}:** {clean(view.review.recommendation) if view.review else _review_action(view)}",
         "",
     ]
     findings, note = _findings(view)
@@ -1225,10 +1283,19 @@ def render_markdown(view: ReportView, *, include_details: bool = False) -> str:
         lines += [_MISSING_ASSURANCE, ""]
     lines += ["", "## Scope and limitations", ""]
     lines.extend(f"- {clean(s)}" for s in (view.limitations or (_MISSING_LIMITATIONS,)))
-    lines += ["", "## Next decision", "", _NEXT_DECISION, ""]
-    if view.next_steps:
+    lines += [
+        "",
+        "## Decision follow-up" if view.review else "## Next decision",
+        "",
+        clean(view.review.next_action) if view.review else _NEXT_DECISION,
+        "",
+    ]
+    if view.next_steps and not view.review:
         lines += ["### Next steps", ""]
         lines.extend(f"{i}. {clean(s)}" for i, s in enumerate(view.next_steps, 1))
+    if view.review:
+        lines += ["", "## Review rationale", ""]
+        lines.extend(f"- **{clean(k)}:** {clean(v)}" for k, v in view.review.basis)
     if view.subjects or view.context or view.changes:
         lines += ["## What was compared", ""]
         context = _comparison_view(view)

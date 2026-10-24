@@ -46,11 +46,21 @@ supporting file locations and separate recipient verification.
 
 ## Reading a report for a release review
 
-The report starts with **Decision context**, including the compared identities.
-Intended use, business context, decision owner and recommendation are explicitly
-marked as not supplied; the report does not infer them from technical provenance
-or a passing result. Organizational approval is not recorded by this renderer.
-Supply that context separately as labeled, authored commentary in a client handover.
+The evidence-only report starts with **Decision context**, including the compared
+identities. When no authored review is provided, intended use, business context,
+decision owner and recommendation are explicitly marked as not supplied. The
+renderer does not infer them from technical provenance or a passing result.
+
+A client handover supplies that context as separately attributed commentary.
+The shared presentation view can include an `AuthoredReview`: a label, author,
+context, recommendation, decision, rationale and next action. It appears in both
+HTML and Markdown without changing the technical result, evidence or receipt.
+This presentation helper is not an approval system or a new CLI input contract.
+
+The [completed worked examples](https://github.com/invarlock/invarlock/blob/main/examples/client-review/README.md) choose all
+those fields using clearly labeled fictional organizations and owners around real
+retained comparisons. Their primary reviews contain completed decisions; missing
+context remains appropriate for evidence-only views and missing-data test cases.
 
 The result heading names the recorded policy result; its explanation states what
 led to it before the chart. A passing description identifies the satisfied interval
@@ -77,6 +87,9 @@ preview quotes a retained comparison note and identifies any additional notes
 below; missing context is not counted as an observed change. Outcome counts refer
 to metric/scope results, not independent cases. An unavailable outcome uses a
 neutral treatment, and absent limitations or check details are explicitly labeled.
+When an authored review is supplied, its **Owner recommendation**, **Owner decision**,
+**Review rationale** and **Decision follow-up** replace the generic business-context
+placeholders and next-decision guidance. Their attribution stays visible in print.
 
 Each metric's **Supporting record** gives a path relative to the evidence root
 and a JSON pointer after `#`; an empty pointer identifies the whole JSON object.
