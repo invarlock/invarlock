@@ -186,7 +186,13 @@ def test_report_escapes_external_labels_and_omits_large_run_payloads():
     parsed.feed(result)
     assert "img" not in parsed.tags and "script" not in parsed.tags
     assert not any(
-        name in {"src", "href", "onerror", "onload"} for name, _ in parsed.attributes
+        name in {"src", "onerror", "onload"} for name, _ in parsed.attributes
+    )
+    ids = {value for name, value in parsed.attributes if name == "id"}
+    assert all(
+        value.startswith("#") and value[1:] in ids
+        for name, value in parsed.attributes
+        if name == "href"
     )
     assert "&lt;img" in result
     assert "DO_NOT_RENDER_PAYLOAD" not in result
