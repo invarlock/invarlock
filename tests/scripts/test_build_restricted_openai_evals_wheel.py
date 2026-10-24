@@ -139,11 +139,41 @@ def test_bootstrap_authenticates_source_and_existing_derived_bytes(
     )
     output = tmp_path / "wheels"
     kwargs = {} if download else {"source": source}
-    wheel = module.bootstrap(output, **kwargs)
+    arguments = ["bootstrap", "--output-directory", str(output)]
+    if not download:
+        arguments.extend(["--input", str(source)])
+    assert module.main(arguments) == 0
+    wheel = output / module.DERIVED_WHEEL_NAME
+    assert wheel.is_file()
     assert module.bootstrap(output, **kwargs) == wheel
     wheel.write_bytes(wheel.read_bytes() + b"tampered")
     with pytest.raises(module.DerivationError, match="bytes changed"):
         module.bootstrap(output, **kwargs)
+    assert not list(output.glob(".evals-build-*"))
+
+
+@pytest.mark.parametrize("destination_kind", ("symlink", "directory"))
+def test_bootstrap_rejects_non_regular_destination_without_overwriting(
+    tmp_path, monkeypatch, destination_kind
+):
+    module = _load(monkeypatch)
+    source = tmp_path / "upstream.whl"
+    _source(module, source)
+    payload = source.read_bytes()
+    monkeypatch.setattr(
+        module, "UPSTREAM_WHEEL_SHA256", hashlib.sha256(payload).hexdigest()
+    )
+    output = tmp_path / "wheels"
+    output.mkdir()
+    destination = output / module.DERIVED_WHEEL_NAME
+    if destination_kind == "symlink":
+        destination.symlink_to(source)
+    else:
+        destination.mkdir()
+    with pytest.raises(module.DerivationError, match="regular file"):
+        module.bootstrap(output, source=source)
+    assert source.read_bytes() == payload
+    assert destination.is_symlink() or destination.is_dir()
     assert not list(output.glob(".evals-build-*"))
 
 
