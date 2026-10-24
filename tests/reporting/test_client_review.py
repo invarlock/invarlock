@@ -12,6 +12,40 @@ from invarlock.report_presentation import render_html, render_markdown
 from tests.reporting.test_report_experience import evidence, pack_json
 
 
+def test_authored_review_is_complete_separate_and_escaped_in_both_formats():
+    from invarlock.report_presentation import AuthoredReview
+
+    pack = evidence()
+    original = _view(pack_json(pack, "report"), pack)
+    review = AuthoredReview(
+        label="Fictional worked example · Authored scenario",
+        byline="Alex Example, release owner · 24 October 2026",
+        context=(("Intended use", "Internal editorial evaluation <only>"),),
+        recommendation="Retain the baseline. Supporting record: reports/evaluation.report.json#/metrics/0",
+        decision="Replacement declined for the editorial workflow.",
+        basis=(("Sample rationale", "Use the complete retained review set."),),
+        next_action="Alex will review a task-specific candidate on 30 October 2026.",
+    )
+    view = replace(original, review=review)
+    for render in (render_html, render_markdown):
+        output = render(view)
+        assert review.label in output
+        assert review.byline in output
+        assert review.decision in output
+        assert output.index(review.decision) < output.index("Recorded policy result")
+        assert "Intended use and business context: Not supplied" not in output
+        assert "Decision owner and recommendation: Not supplied" not in output
+        assert "Organizational approval: Not recorded by this report" not in output
+        assert "&lt;only&gt;" in output and "<only>" not in output
+        assert review.next_action in output
+        assert review.basis[0][1] in output
+        assert original.metrics[0].evidence_source in output
+        assert "Not performed by report" in output
+    assert view.metrics == original.metrics
+    assert view.technical == original.technical
+    assert "Intended use and business context: Not supplied" in render_html(original)
+
+
 def test_decision_context_and_limitations_precede_statistics_in_both_formats():
     pack = evidence()
     view = _view(pack_json(pack, "report"), pack)
