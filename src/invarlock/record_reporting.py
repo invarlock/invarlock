@@ -626,7 +626,7 @@ def _metric_views(
 ) -> tuple[MetricView, ...]:
     """Project recorded metrics consistently for CLI and SDK presentation."""
     metrics: list[MetricView] = []
-    for m in comparison["metrics"]:
+    for source_index, m in enumerate(comparison["metrics"]):
         policy = policy_metrics.get(m["name"])
         likelihood = m["kind"] == "normalized_nll_per_utf8_byte"
         change = m["ratio"] if likelihood else m["delta"]
@@ -842,6 +842,7 @@ def _metric_views(
         metrics.append(
             MetricView(
                 name=m["name"],
+                evidence_source=f"reports/evaluation.report.json#/metrics/{source_index}",
                 scope=m["slice"],
                 decision=m["decision"],
                 baseline="Unavailable"
