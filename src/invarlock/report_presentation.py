@@ -62,16 +62,14 @@ def xml_text(value: str) -> str:
     )
 
 
-# Static mark from docs/assets/invarlock-app-icon.svg; the adjacent name labels it.
+# Paper rendition of docs/assets/invarlock-mark.svg. The bracket/signal geometry
+# stays recognizable without an app tile, translucent overprint or tiny dot.
+# One ink and a live-text wordmark also survive background-free printing.
 _BRAND_MARK = """<svg class="mark" xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 512 512" aria-hidden="true" focusable="false">
-<rect x="32" y="32" width="448" height="448" rx="92" fill="#11130f"/>
-<rect x="32.5" y="32.5" width="447" height="447" rx="91.5" fill="none" stroke="#3f4235"/>
-<g transform="translate(256 256) scale(1.3) translate(-256 -256)">
-<path d="M174 150 H126 V362 H174" fill="none" stroke="#f4efe3" stroke-width="26.15" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
-<path d="M338 150 H386 V362 H338" fill="none" stroke="#f4efe3" stroke-width="26.15" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
-<path d="M156 292 C 198 212, 230 212, 256 252 S 314 332, 356 242" fill="none" stroke="#9fb7ff" stroke-width="24.62" stroke-linecap="round" opacity="0.72"/>
-<path d="M156 292 C 198 212, 230 212, 256 252 S 314 332, 356 242" fill="none" stroke="#f4efe3" stroke-width="10.77" stroke-linecap="round" opacity="0.52"/>
-<circle cx="256" cy="252" r="6.92" fill="#f4efe3" opacity="0.64"/>
+<g transform="translate(256 256) scale(1.55) translate(-256 -256)" fill="none" stroke="currentColor" stroke-width="22" stroke-linecap="round" stroke-linejoin="round">
+<path d="M174 150 H126 V362 H174"/>
+<path d="M338 150 H386 V362 H338"/>
+<path d="M156 292 C 198 212, 230 212, 256 252 S 314 332, 356 242"/>
 </g></svg>"""
 
 
@@ -151,7 +149,7 @@ _METRIC_TABS_SCRIPT = """(() => {
     target.focus();
     target.scrollIntoView({block: 'start'});
   };
-  main.querySelectorAll('.results-overview a[href^="#metric-result-"]').forEach(link => {
+  main.querySelectorAll('.results-overview a[href^="#metric-result-"], .findings a[href^="#metric-result-"]').forEach(link => {
     link.addEventListener('click', event => {
       if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
       const target = document.getElementById(link.hash.slice(1));
@@ -323,6 +321,8 @@ def _tone(value: str) -> str:
         else "insufficient"
         if value == "insufficient_evidence"
         else "fail"
+        if value in {"fail", "regression"}
+        else "unavailable"
     )
 
 
@@ -390,8 +390,8 @@ def _interval_reading(view: IntervalView) -> tuple[tuple[str, str], ...]:
     return tuple(reading)
 
 
-def _interval_reading_html(view: IntervalView) -> str:
-    result = '<div class="interval-reading"><h4>How to read this comparison</h4><dl>'
+def _interval_reading_html(view: IntervalView, *, heading_level: int = 4) -> str:
+    result = f'<div class="interval-reading"><h{heading_level}>How to read this comparison</h{heading_level}><dl>'
     result += "".join(
         f"<dt>{escape(label)}</dt><dd>{escape(text)}</dd>"
         for label, text in _interval_reading(view)
@@ -565,8 +565,8 @@ _CSS = """
 *{box-sizing:border-box}
 body{margin:0;background:var(--canvas);color:var(--ink);font:15px/1.55 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 a{color:#145d7b}main{max-width:1120px;margin:32px auto;background:var(--paper);padding:36px 48px 48px;border-top:5px solid var(--ink);box-shadow:0 8px 40px #20251f08}
-h1,h2,h3,h4,p{margin-top:0}h1{font-size:36px;line-height:1.15;letter-spacing:-.03em;margin-bottom:14px}h2{font-size:18px;line-height:1.3;letter-spacing:-.02em;margin-bottom:0}h3,h4{font-size:20px;line-height:1.3;margin-bottom:10px}
-.brand{display:flex;align-items:center;gap:10px;font-weight:750}.mark{width:34px;height:34px;flex-shrink:0}.family{margin-left:auto;color:var(--muted);font-size:13px;text-align:right}
+h1,h2,h3,h4,h5,p{margin-top:0}h1,h2,h3,h4,h5,p,li,dd{overflow-wrap:anywhere}h1{font-size:36px;line-height:1.15;letter-spacing:-.03em;margin-bottom:14px}h2{font-size:18px;line-height:1.3;letter-spacing:-.02em;margin-bottom:0}h3,h4{font-size:20px;line-height:1.3;margin-bottom:10px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:750}.mark{width:34px;height:34px;flex-shrink:0}.family{min-width:0;overflow-wrap:anywhere;margin-left:auto;color:var(--muted);font-size:13px;text-align:right}
 .hero{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(260px,1fr);gap:30px;margin:24px 0 12px;padding:26px;background:#f4f6f1;border:1px solid var(--line);border-left:4px solid var(--teal);border-radius:4px}
 .hero .verdict h2::before{content:"";display:inline-block;width:12px;height:12px;border-radius:50%;background:var(--teal);margin-right:12px;vertical-align:middle}.hero.fail .verdict h2::before{background:var(--red)}.hero.insufficient .verdict h2::before{background:var(--amber)}
 .verdict{min-width:0}.decision-summary{max-width:65ch;margin-bottom:0;overflow-wrap:anywhere;font-size:16px;color:var(--muted)}.decision-summary strong{color:var(--ink);font-weight:650}.hero .eyebrow{margin-bottom:10px}
@@ -588,17 +588,21 @@ h1,h2,h3,h4,p{margin-top:0}h1{font-size:36px;line-height:1.15;letter-spacing:-.0
 .value{padding:12px;border-right:1px solid var(--line);min-width:0}.value:last-child{border:0}.value dt{font-size:13px;color:var(--muted)}.value dd{margin:4px 0 0;font-size:26px;font-weight:650;line-height:1.2;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .value small{display:block;margin-top:5px;font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--muted);letter-spacing:0}.interval{margin:22px 0}.interval svg{display:block;width:100%;height:auto}.interval figcaption{overflow-wrap:anywhere;font-size:13px;color:var(--muted);margin-top:8px}.axis{stroke:var(--line);stroke-width:2}.range{stroke:var(--range);stroke-width:7;stroke-linecap:round}.estimate{fill:var(--paper);stroke:var(--range);stroke-width:3}.threshold{stroke:var(--red);stroke-width:2}.neutral{stroke:var(--neutral);stroke-width:1.5;stroke-dasharray:3 4}.allowed{fill:var(--allowed)}.tick{stroke:var(--neutral);stroke-width:1.5}.legend{display:block;margin-top:4px}.chart-annotations{height:24px;position:relative;font-size:12px;font-variant-numeric:tabular-nums}.chart-label{position:absolute;max-width:72%;overflow-wrap:anywhere}.chart-label.middle{transform:translateX(-50%)}.chart-label.end{transform:translateX(-100%)}.limit-label{top:0;color:var(--red)}.interval-plot{position:relative}.interval-bounds{position:absolute;inset:0;pointer-events:none;font-size:12px;font-variant-numeric:tabular-nums}.bound-label{bottom:calc(47.222222% + 10px);line-height:1.2;font-weight:650}.chart-key{display:inline-block;margin-right:18px}.chart-key i,.legend i{display:inline-block;margin-right:7px;vertical-align:middle}.estimate-key{width:10px;height:10px;border:2px solid var(--range);border-radius:50%}.interval-key{width:16px;border-top:3px solid var(--range)}.neutral-key{width:16px;border-top:2px dashed var(--neutral)}.threshold-key{height:12px;border-left:2px solid var(--red)}.axis-labels{position:relative;height:22px;font-size:13px;font-variant-numeric:tabular-nums;color:var(--muted)}.axis-labels span{position:absolute;transform:translateX(-50%);white-space:nowrap}
 .scroll{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:14px;margin-top:16px}caption{text-align:left;font-weight:650;padding:0 0 8px}th{text-align:left;color:var(--muted);font-size:13px;font-weight:650}th,td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}th:first-child,td:first-child{padding-left:0}td:last-child,th:last-child{padding-right:0}tbody tr:last-child td,tbody tr:last-child th{border-bottom:0}
-.interval-reading{margin:18px 0;font-size:14px}.interval-reading h4{font-size:14px;margin:0 0 10px}.interval-reading dl{display:grid;grid-template-columns:100px minmax(0,1fr);gap:10px 16px;margin:0}.interval-reading dt{font-weight:650}.interval-reading dd{margin:0;color:var(--muted)}.interval-basis{margin:16px 0}.interval-basis p{font-size:14px;line-height:1.6}@media(max-width:600px){.interval-reading dl{grid-template-columns:1fr;gap:5px}.interval-reading dd+dt{margin-top:8px}}
+.interval-reading{margin:18px 0;font-size:14px}.interval-reading h4,.interval-reading h5{font-size:14px;margin:0 0 10px}.interval-reading dl{display:grid;grid-template-columns:100px minmax(0,1fr);gap:10px 16px;margin:0}.interval-reading dt{font-weight:650}.interval-reading dd{margin:0;color:var(--muted)}.interval-basis{margin:16px 0}.interval-basis p{font-size:14px;line-height:1.6}@media(max-width:600px){.interval-reading dl{grid-template-columns:1fr;gap:5px}.interval-reading dd+dt{margin-top:8px}}
 .check-label{display:none}.context-heading{font-size:14px;margin:14px 0 8px}.checks-table td{white-space:normal;overflow-wrap:anywhere}.checks-table td:last-child{white-space:nowrap;overflow-wrap:normal}.checks-table th[scope="row"]{width:48%}.check-detail{display:block;font-size:13px;font-weight:400;margin-top:4px;color:var(--muted)}.check-fail{color:var(--red);font-weight:650}.check-pass{color:var(--teal)}.check-unknown{color:var(--amber)}.notes{font-size:13px;color:var(--muted);padding-left:20px;margin-bottom:0}.notes li+li{margin-top:6px}
 .columns{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:24px}.panel dl{margin:0}.panel dt{font-size:13px;font-weight:650;margin-top:10px}.panel dt:first-child{margin-top:0}.panel dd{margin:3px 0 0;color:var(--muted);font-size:14px;overflow-wrap:anywhere}.panel ol,.panel ul{padding-left:20px;font-size:14px;margin:0}.panel li+li{margin-top:8px}
 .limits{color:var(--muted);font-size:14px;margin:24px 0}.limits h2{font-size:18px;margin-bottom:8px}.limits li+li{margin-top:6px}
 details{border:1px solid var(--line);border-radius:8px;background:var(--paper);margin:10px 0}summary{overflow-wrap:anywhere;padding:14px 18px;font-size:14px;font-weight:650;cursor:pointer}details .detail-content{padding:0 18px 18px}pre{font:13px/1.6 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere;background:#f5f6f2;border-radius:6px;padding:14px;max-height:480px;overflow:auto}code{overflow-wrap:anywhere}.footer{color:var(--muted);font-size:13px;margin-top:26px;border-top:1px solid var(--line);padding-top:16px}
 a:focus-visible,summary:focus-visible,[tabindex]:focus-visible{outline:3px solid #277b91;outline-offset:4px}a,[tabindex]{scroll-margin-top:20px}.metric-group:target,.metric:target{border-color:#277b91}
 .metric-group>.section-heading h3{font-size:22px;margin:0}.metric-group>.section-heading>a{font-size:13px}.results-overview{margin:18px 0}.results-overview .section-heading p{max-width:48ch}.overview-scroll{border:1px solid var(--line);border-radius:8px;background:var(--paper);padding:4px 16px}.overview-table{margin:12px 0;min-width:840px}.overview-table a,.overview-table .scope{display:block}.overview-table .badge{white-space:normal}.overview-table tbody th{font-size:14px}.overview-table td{font-variant-numeric:tabular-nums}.overview-checks{margin:0;padding-left:16px}.overview-checks li+li{margin-top:4px}
-.metric-controls{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:18px 0}.metric-navigation{display:flex;flex-wrap:wrap;gap:8px}.metric-navigation a{display:block;padding:9px 14px;border:1px solid var(--line);border-radius:8px;background:var(--paper);font-weight:650;text-decoration:none}.metric-navigation a:hover{border-color:#277b91;background:#eaf3f7}.metric-navigation span{display:block;color:var(--muted);font-size:13px;font-weight:400}.metric-navigation [role="tab"][aria-selected="true"]{border-color:#145d7b;background:#e4f1f7;box-shadow:inset 0 -3px #145d7b}.metric-display-toggle{font:inherit;font-size:13px;border:1px solid var(--line);border-radius:7px;background:var(--paper);color:#145d7b;padding:9px 12px;cursor:pointer}.metric-display-toggle:focus-visible{outline:3px solid #277b91;outline-offset:4px}
+.metric-controls{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:18px 0}.metric-navigation{min-width:0;display:flex;flex-wrap:wrap;gap:8px}.metric-navigation a{max-width:100%;overflow-wrap:anywhere;display:block;padding:9px 14px;border:1px solid var(--line);border-radius:8px;background:var(--paper);font-weight:650;text-decoration:none}.metric-navigation a:hover{border-color:#277b91;background:#eaf3f7}.metric-navigation span{display:block;color:var(--muted);font-size:13px;font-weight:400}.metric-navigation [role="tab"][aria-selected="true"]{border-color:#145d7b;background:#e4f1f7;box-shadow:inset 0 -3px #145d7b}.metric-display-toggle{font:inherit;font-size:13px;border:1px solid var(--line);border-radius:7px;background:var(--paper);color:#145d7b;padding:9px 12px;cursor:pointer}.metric-display-toggle:focus-visible{outline:3px solid #277b91;outline-offset:4px}
 .report-heading{padding:30px 0 22px;border-bottom:1px solid var(--line);margin-bottom:22px}.report-heading h1{font-size:46px;letter-spacing:-.045em;margin-bottom:8px}.report-heading>p:last-child{margin:0;color:var(--muted);font-size:15px}.review-context h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:14px}.review-subjects{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:0 0 16px}.review-subjects>div{min-width:0;border-left:2px solid var(--line);padding-left:14px}.review-subjects dt{font-size:12px;font-weight:650;color:var(--muted);margin-bottom:4px}.review-subjects dd{font-size:16px;font-weight:600;margin:0;overflow-wrap:anywhere}.context-status{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;list-style:none;padding:0;margin:0 0 12px;font-size:12px;color:var(--muted)}.context-status li{padding:10px 12px;background:#f5f6f2;border-radius:3px}.hero .verdict h2{font-size:30px;letter-spacing:-.03em;line-height:1.2;margin:0 0 14px}.hero.fail{border-left-color:var(--red);background:#fff7f6}.hero.insufficient{border-left-color:var(--amber);background:#fffbf1}.interpretation-note{font-size:12px;color:var(--muted);max-width:90ch;margin:0 0 24px}.findings{border:0;border-block:1px solid var(--line);padding:20px 0}.findings h2,.next-steps h2{font-size:20px}.findings p:last-child{margin:12px 0 0;font-size:13px}.next-steps{background:#f4f6f1;border-left:3px solid #77876b}.next-steps h3{font-size:13px;text-transform:uppercase;letter-spacing:.06em;margin-top:18px}.limits{border:0;border-top:1px solid var(--line);padding:20px 0}.section-heading>h2{font-size:24px}.metric-heading h3,.metric-heading h4{font-size:23px}.metric{border-top:3px solid var(--ink)}
-@media(max-width:650px){main{padding:20px 18px 40px;margin:0;border-top-width:4px}.review-subjects{grid-template-columns:1fr!important}.report-heading h1{font-size:34px!important}.context-status{grid-template-columns:1fr!important}.hero .verdict h2{font-size:26px!important}.hero{grid-template-columns:1fr;gap:22px;padding:22px 0}.assurance dl>div{grid-template-columns:1fr 1.8fr}h1{font-size:29px}.metric,.panel{padding:18px}.values{grid-template-columns:repeat(2,minmax(0,1fr))}.value:nth-child(2){border-right:0}.value:nth-child(-n+2){border-bottom:1px solid var(--line)}.value dd{font-size:20px}.columns,.subjects{grid-template-columns:1fr}.family{max-width:160px}.section-heading{display:block}.section-heading p{margin-top:5px}.metric-heading{gap:8px;flex-direction:column}th,td{padding:10px 8px}.context-list{grid-template-columns:1fr}.context-list dd{margin-bottom:6px}.comparison-table{font-size:13px}.comparison-table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}.comparison-table,.comparison-table tbody,.comparison-table tr,.comparison-table th,.comparison-table td{display:block;width:100%}.comparison-table th:first-child{width:100%}.comparison-table tbody tr{padding:10px 12px;border-bottom:1px solid var(--line)}.comparison-table tbody th,.comparison-table tbody td{padding:5px 0;border:0}.comparison-table .different-label{display:inline;margin-left:8px}.side-label{display:block;font-size:11px;color:var(--muted);font-weight:500;margin-bottom:2px}.checks-table{min-width:0}.checks-table caption{display:block;width:100%}.checks-table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}.checks-table,.checks-table tbody,.checks-table tbody tr,.checks-table tbody th,.checks-table tbody td{display:block;width:100%}.checks-table th[scope="row"]{width:100%}.checks-table tbody tr{padding:12px 0;border-bottom:1px solid var(--line)}.checks-table tbody th,.checks-table tbody td{border:0;padding:5px 0}.checks-table tbody td{display:grid;grid-template-columns:90px minmax(0,1fr);white-space:normal;overflow-wrap:anywhere}.check-label{display:block;font-weight:400;color:var(--muted)}.interval{margin-inline:0}}
-@media print{body{background:white;font-size:10pt}main{max-width:none;padding:0;margin:0;box-shadow:none;border-top:0}.hero{margin-top:16px;padding:14px;grid-template-columns:1.2fr 1fr;gap:20px;break-inside:avoid}h1{font-size:25pt}.metric,.panel{padding:15px}.columns{display:block}.panel{margin:12px 0}details{break-inside:auto}details::details-content{display:block!important;content-visibility:visible!important;height:auto!important}details>.detail-content{display:block!important}details.evidence-detail:not([open])::details-content{display:none!important;content-visibility:hidden!important}details.evidence-detail:not([open])>.detail-content{display:none!important}summary{break-after:avoid}details>summary::marker{content:""}pre{max-height:none}.footer{font-size:9pt}.scroll{overflow:visible}a{color:inherit}.metric-group[hidden]{display:block!important}.metric-navigation,.metric-display-toggle,.metric-group>.section-heading>a{display:none}.overview-table,.checks-table{min-width:0;font-size:8pt;table-layout:fixed}.overview-table th{font-size:8pt}.overview-scroll{padding:0;border:0}.overview-table th,.overview-table td{padding:6px 4px}.overview-table .badge{font-size:8pt}.section-heading,.metric-heading,h2,h3,h4{break-after:avoid}tr,.review-context,.findings,.limits,.next-steps,.interval,.notes{break-inside:avoid}details.evidence-detail:not([open])>summary::after{content:" — available in HTML and original evidence";font-weight:400;font-size:9pt;color:var(--muted)}.checks-table td{white-space:normal}}
+@media screen and (max-width:650px){main{padding:20px 18px 40px;margin:0;border-top-width:4px}.review-subjects{grid-template-columns:1fr!important}.report-heading h1{font-size:34px!important}.context-status{grid-template-columns:1fr!important}.hero .verdict h2{font-size:26px!important}.hero{grid-template-columns:1fr;gap:22px;padding:22px 0}.assurance dl>div{grid-template-columns:1fr 1.8fr}h1{font-size:29px}.metric,.panel{padding:18px}.values{grid-template-columns:repeat(2,minmax(0,1fr))}.value:nth-child(2){border-right:0}.value:nth-child(-n+2){border-bottom:1px solid var(--line)}.value dd{font-size:20px}.columns,.subjects{grid-template-columns:1fr}.family{max-width:160px}.section-heading{display:block}.section-heading p{margin-top:5px}.metric-heading{gap:8px;flex-direction:column}th,td{padding:10px 8px}.context-list{grid-template-columns:1fr}.context-list dd{margin-bottom:6px}.comparison-table{font-size:13px}.comparison-table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}.comparison-table,.comparison-table tbody,.comparison-table tr,.comparison-table th,.comparison-table td{display:block;width:100%}.comparison-table th:first-child{width:100%}.comparison-table tbody tr{padding:10px 12px;border-bottom:1px solid var(--line)}.comparison-table tbody th,.comparison-table tbody td{padding:5px 0;border:0}.comparison-table .different-label{display:inline;margin-left:8px}.side-label{display:block;font-size:11px;color:var(--muted);font-weight:500;margin-bottom:2px}.checks-table{min-width:0}.checks-table caption{display:block;width:100%}.checks-table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}.checks-table,.checks-table tbody,.checks-table tbody tr,.checks-table tbody th,.checks-table tbody td{display:block;width:100%}.checks-table th[scope="row"]{width:100%}.checks-table tbody tr{padding:12px 0;border-bottom:1px solid var(--line)}.checks-table tbody th,.checks-table tbody td{border:0;padding:5px 0}.checks-table tbody td{display:grid;grid-template-columns:90px minmax(0,1fr);white-space:normal;overflow-wrap:anywhere}.check-label{display:block;font-weight:400;color:var(--muted)}.interval{margin-inline:0}}
+.hero.unavailable{border-left-color:var(--neutral);background:#f5f6f2}.hero.unavailable .verdict h2::before{background:var(--neutral)}.unavailable .badge,.badge.unavailable{color:var(--muted);background:#f5f6f2}
+.change-summary{font-size:14px;margin:14px 0 0}.review-action{font-size:14px;margin:16px 0 0;padding-left:16px;border-left:3px solid var(--ink)}.result-counts{font-size:13px;font-weight:650;font-variant-numeric:tabular-nums}.finding-status{font-size:12px;font-weight:700;display:block;margin-bottom:3px}.finding-status.fail{color:var(--red)}.finding-status.insufficient{color:var(--amber)}.finding-status.unavailable{color:var(--muted)}
+@page{margin:14mm;@bottom-left{content:"InvarLock · Model change review";font:8pt sans-serif;color:#62695e}@bottom-right{content:"Page " counter(page) " of " counter(pages);font:8pt sans-serif;color:#62695e}}
+.identity-list>div{margin-bottom:10px;break-inside:avoid}.identity-list dt{font-size:12px;font-weight:650}.identity-list dd{margin:3px 0 0;font-size:12px;overflow-wrap:anywhere}
+@media print{p{break-inside:avoid}*:focus{outline:none!important}.report-heading{padding:16px 0 12px;margin-bottom:12px}.report-heading h1{font-size:25pt}.report-heading .eyebrow{margin-bottom:6px}.interpretation-note{font-size:9pt;margin-bottom:14px}.review-context h2{margin-bottom:10px}.review-subjects{margin-bottom:10px}.review-subjects dd{font-size:10pt}.context-status{gap:8px;margin-bottom:8px}.context-status li{padding:6px 8px}.change-summary{font-size:10pt;margin-top:8px}.decision-summary{font-size:10pt}.hero .verdict h2{font-size:19pt;margin-bottom:10px}.review-action{font-size:10pt;margin-bottom:12px}.findings{padding:12px 0}.interval-reading h5{break-after:avoid}.interval-reading dt,.interval-reading dd{break-inside:avoid}.metric-lead{break-inside:avoid}.metric-explanation,caption,thead{break-after:avoid}.metric .checks-table{break-inside:avoid;font-size:9pt}body{background:white;font-size:10pt}main{max-width:none;padding:0;margin:0;box-shadow:none;border-top:0}.hero{display:block;margin-top:12px;padding:14px;break-inside:auto}.verdict{break-inside:avoid}.assurance{margin-top:16px}.assurance dl>div{grid-template-columns:140px 1fr;padding:6px 0;break-inside:avoid}h1{font-size:25pt}.metric,.panel{padding:15px}.columns{display:block}.panel{margin:12px 0}details{break-inside:auto}details::details-content{display:block!important;content-visibility:visible!important;height:auto!important}details>.detail-content{display:block!important}details.evidence-detail:not([open])::details-content{display:none!important;content-visibility:hidden!important}details.evidence-detail:not([open])>.detail-content{display:none!important}summary{break-after:avoid}details>summary::marker{content:""}pre{max-height:none}.footer{font-size:9pt}.scroll{overflow:visible}a{color:inherit}.metric-group[hidden]{display:block!important}.metric-navigation,.metric-display-toggle,.metric-group>.section-heading>a{display:none}.overview-table,.checks-table{min-width:0;font-size:8pt;table-layout:fixed}.overview-table th{font-size:8pt}.overview-scroll{padding:0;border:0}.overview-table th,.overview-table td{padding:6px 4px}.overview-table .badge{font-size:8pt}.section-heading,.metric-heading,h2,h3,h4{break-after:avoid}tr,.review-context,.findings,.limits,.next-steps,.interval,.notes{break-inside:avoid}details.evidence-detail:not([open])>summary::after{content:" — available in HTML and original evidence";font-weight:400;font-size:9pt;color:var(--muted)}.checks-table td{white-space:normal}}
 """
 
 
@@ -871,6 +875,54 @@ _NEXT_DECISION = (
     "the intended use, review unresolved findings, and record the release decision "
     "alongside recipient verification."
 )
+_MISSING_LIMITATIONS = (
+    "Limitations were not supplied with this view. Their absence does not establish "
+    "that the evaluated scope covers the intended use."
+)
+_MISSING_ASSURANCE = "Reporting checks were not supplied with this view."
+_MISSING_CHECKS = (
+    "Decision check details were not supplied with this view. Consult the original "
+    "evidence before interpreting the recorded result."
+)
+
+
+def _review_action(view: ReportView) -> str:
+    if view.decision == "pass":
+        return "Confirm the intended use and complete recipient verification before recording a release decision."
+    if view.decision in {"fail", "regression"}:
+        return (
+            "Review the unmet requirements and their causes before considering release."
+        )
+    if view.decision == "insufficient_evidence":
+        return "Resolve the missing or insufficient evidence before drawing a release conclusion."
+    return "Establish the recorded outcome and evidence coverage before drawing a release conclusion."
+
+
+def _result_counts(view: ReportView) -> str:
+    counts = dict.fromkeys(("pass", "fail", "insufficient", "unavailable"), 0)
+    for metric in view.metrics:
+        counts[_tone(metric.decision)] += 1
+    return " · ".join(
+        f"{counts[tone]} {label}"
+        for tone, label in (
+            ("pass", "satisfied"),
+            ("fail", "not met"),
+            ("insufficient", "need more evidence"),
+            ("unavailable", "unavailable"),
+        )
+        if counts[tone]
+    )
+
+
+def _change_summary(view: ReportView) -> str:
+    if not view.changes:
+        return "No change description was supplied with this view."
+    extra = len(view.changes) - 1
+    return view.changes[0] + (
+        f" {extra} additional comparison note{'s' if extra != 1 else ''} under What was compared."
+        if extra
+        else ""
+    )
 
 
 def _findings(view: ReportView) -> tuple[list[tuple[int, MetricView]], str]:
@@ -902,6 +954,7 @@ def _review_context_html(view: ReportView) -> str:
         + '<ul class="context-status">'
         + "".join(f"<li>{item}</li>" for item in _DECISION_CONTEXT)
         + '</ul><p class="scope">The recorded task, cases and requirements define the evaluated scope. A policy result does not supply a business recommendation.</p></section>'
+        + f'<p class="change-summary"><strong>Change context.</strong> {escape(_change_summary(view))}</p>'
     )
 
 
@@ -909,9 +962,15 @@ def _findings_html(view: ReportView) -> str:
     findings, note = _findings(view)
     return (
         '<section class="panel findings"><h2>Findings to review</h2>'
-        f"<p>{note}</p><ul>"
+        f"<p>{note}</p>"
+        + (
+            f'<p class="result-counts">{_result_counts(view)}</p>'
+            if view.metrics
+            else ""
+        )
+        + "<ul>"
         + "".join(
-            f'<li><a href="#metric-result-{index}">Result {index}: {escape(metric.display_name)} · {escape(metric.display_scope)}</a> — {escape(metric.explanation)}</li>'
+            f'<li><span class="finding-status {_tone(metric.decision)}">{escape(decision_label(metric.decision))}</span> <a href="#metric-result-{index}">Result {index}: {escape(metric.display_name)} · {escape(metric.display_scope)}</a> — {escape(metric.explanation)}</li>'
             for index, metric in findings
         )
         + '</ul><p><a href="#results-and-requirements">Supporting evidence: results and decision checks</a></p></section>'
@@ -934,6 +993,7 @@ def render_html(view: ReportView) -> str:
         f"<title>{e(decision_label(view.decision))} · {e(view.title)}</title><style>{_CSS}</style></head><body><main>",
         f'<header class="brand">{_BRAND_MARK} InvarLock<span class="family">{e(view.family)}</span></header>',
         f'<div class="report-heading"><p class="eyebrow">Comparison / Review / Evidence</p><h1>Model change review</h1><p>{e(view.title)}</p></div>',
+        f'<p class="interpretation-note">{_INTERPRETATION_NOTE}</p>',
         _review_context_html(view),
         f'<section class="hero {_tone(view.decision)}" aria-labelledby="decision"><div class="verdict"><p class="eyebrow">Recorded policy result</p><h2 id="decision">{e(decision_label(view.decision))}</h2><p class="decision-summary">{_summary_html(view)}</p>',
     ]
@@ -942,24 +1002,33 @@ def render_html(view: ReportView) -> str:
             f'<div class="summary-row"><span class="pill">{len(view.metrics)} metric / scope results</span></div>'
         )
     parts.append(
+        f'<p class="review-action"><strong>Review action.</strong> {_review_action(view)}</p>'
+    )
+    parts.append(
         '</div><aside class="assurance" aria-labelledby="assurance-heading"><h2 id="assurance-heading">What was checked</h2><dl>'
     )
     for name, value in view.assurance:
         parts.append(f"<div><dt>{e(name)}</dt><dd>{e(value)}</dd></div>")
-    parts.append("</dl></aside></section>")
-    parts.append(f'<p class="interpretation-note">{_INTERPRETATION_NOTE}</p>')
+    parts.append("</dl>")
+    if not view.assurance:
+        parts.append(f"<p>{_MISSING_ASSURANCE}</p>")
+    parts.append("</aside></section>")
     parts.append(_findings_html(view))
     support = [
-        f'<section class="panel next-steps"><h2>Next decision</h2><p>{_NEXT_DECISION}</p><h3>Next steps</h3><ol>'
+        f'<section class="panel next-steps"><h2>Next decision</h2><p>{_NEXT_DECISION}</p>'
     ]
-    support.extend(f"<li>{e(step)}</li>" for step in view.next_steps)
-    support.append("</ol></section>")
-    if view.limitations:
-        parts.append(
-            '<section class="panel limits"><h2>Scope and limitations</h2><ul>'
-            + "".join(f"<li>{e(n)}</li>" for n in view.limitations)
-            + "</ul></section>"
+    if view.next_steps:
+        support.append("<h3>Next steps</h3><ol>")
+        support.extend(f"<li>{e(step)}</li>" for step in view.next_steps)
+        support.append("</ol>")
+    support.append("</section>")
+    parts.append(
+        '<section class="panel limits"><h2>Scope and limitations</h2><ul>'
+        + "".join(
+            f"<li>{e(n)}</li>" for n in (view.limitations or (_MISSING_LIMITATIONS,))
         )
+        + "</ul></section>"
+    )
     parts.extend(support)
     if view.subjects or view.context or view.changes:
         parts.append(_comparison_context(view))
@@ -1004,7 +1073,7 @@ def render_html(view: ReportView) -> str:
                 else f"Scope: {e(metric.display_scope)}"
             )
             parts.append(
-                f'<section id="metric-result-{result_index}" tabindex="-1" class="metric {_tone(metric.decision)}"><div class="metric-heading"><div>{heading}<p class="scope">{context}</p></div><span class="badge">{e(decision_label(metric.decision))}</span></div><p class="metric-explanation">{e(metric.explanation)}</p><dl class="values">'
+                f'<section id="metric-result-{result_index}" tabindex="-1" class="metric {_tone(metric.decision)}"><div class="metric-lead"><div class="metric-heading"><div>{heading}<p class="scope">{context}</p></div><span class="badge">{e(decision_label(metric.decision))}</span></div><p class="metric-explanation">{e(metric.explanation)}</p><dl class="values">'
             )
             change_detail = (
                 _interval_summary(metric.interval, compact=True)
@@ -1021,13 +1090,18 @@ def render_html(view: ReportView) -> str:
                 parts.append(
                     f'<div class="value"><dt>{e(name)}</dt><dd>{e(value)}{sublabel}</dd></div>'
                 )
-            parts.append("</dl>")
+            parts.append("</dl></div>")
             if metric.interval:
                 parts.append(_interval(metric.interval))
-                parts.append(_interval_reading_html(metric.interval))
-            parts.append(
-                '<div class="scroll" tabindex="0" role="region" aria-label="Decision checks"><table class="checks-table"><caption>Decision checks</caption><thead><tr><th scope="col">Check</th><th scope="col">Observed</th><th scope="col">Required</th><th scope="col">Result</th></tr></thead><tbody>'
-            )
+                parts.append(
+                    _interval_reading_html(
+                        metric.interval, heading_level=5 if multiple_results else 4
+                    )
+                )
+            if metric.checks:
+                parts.append(
+                    '<div class="scroll" tabindex="0" role="region" aria-label="Decision checks"><table class="checks-table"><caption>Decision checks</caption><thead><tr><th scope="col">Check</th><th scope="col">Observed</th><th scope="col">Required</th><th scope="col">Result</th></tr></thead><tbody>'
+                )
             for check in metric.checks:
                 tone = (
                     "pass"
@@ -1044,7 +1118,10 @@ def render_html(view: ReportView) -> str:
                 parts.append(
                     f'<tr><th scope="row">{e(check.name)}{detail}</th><td data-label="Observed"><span class="check-label" aria-hidden="true">Observed</span>{e(check.observed)}</td><td data-label="Required"><span class="check-label" aria-hidden="true">Required</span>{e(check.required)}</td><td data-label="Result" class="check-{tone}"><span class="check-label" aria-hidden="true">Result</span>{_status(check)}</td></tr>'
                 )
-            parts.append("</tbody></table></div>")
+            if metric.checks:
+                parts.append("</tbody></table></div>")
+            else:
+                parts.append(f'<p class="missing-checks">{_MISSING_CHECKS}</p>')
             parts.append(
                 f'<p class="scope">Result {result_index} · Supporting record: {e(metric.evidence_source or "Not supplied with this view")}</p>'
             )
@@ -1062,10 +1139,11 @@ def render_html(view: ReportView) -> str:
     )
     if view.identity:
         parts.append(
-            '<details><summary>Comparison and policy identities</summary><div class="detail-content"><dl>'
+            '<details><summary>Comparison and policy identities</summary><div class="detail-content"><dl class="identity-list">'
         )
         parts.extend(
-            f"<dt>{e(k)}</dt><dd><code>{e(v)}</code></dd>" for k, v in view.identity
+            f"<div><dt>{e(k)}</dt><dd><code>{e(v)}</code></dd></div>"
+            for k, v in view.identity
         )
         parts.append("</dl></div></details>")
     for heading, data in (
@@ -1115,17 +1193,25 @@ def render_markdown(view: ReportView, *, include_details: bool = False) -> str:
         "",
         _INTERPRETATION_NOTE,
         "",
+        *(f"- **{clean(label)}:** {clean(value)}" for label, value in view.subjects),
+        "",
         *(f"- {item}" for item in _DECISION_CONTEXT),
+        "",
+        f"**Change context:** {clean(_change_summary(view))}",
         "",
         f"**Recorded policy result: {decision_label(view.decision)}**",
         "",
         clean(view.summary),
         "",
+        f"**Review action:** {_review_action(view)}",
+        "",
     ]
     findings, note = _findings(view)
     lines += ["## Findings to review", "", note, ""]
+    if view.metrics:
+        lines += [_result_counts(view), ""]
     lines.extend(
-        f"- Result {i}: {clean(m.display_name)} · {clean(m.display_scope)} — {clean(m.explanation)} Supporting record: {clean(m.evidence_source or 'Not supplied with this view')}"
+        f"- {decision_label(m.decision)} — Result {i}: {clean(m.display_name)} · {clean(m.display_scope)} — {clean(m.explanation)} Supporting record: {clean(m.evidence_source or 'Not supplied with this view')}"
         for i, m in findings
     )
     lines += [
@@ -1133,6 +1219,16 @@ def render_markdown(view: ReportView, *, include_details: bool = False) -> str:
         "Supporting evidence: the numbered results and decision checks below.",
         "",
     ]
+    lines += ["", "## What was checked", ""]
+    lines.extend(f"- **{clean(k)}:** {clean(v)}" for k, v in view.assurance)
+    if not view.assurance:
+        lines += [_MISSING_ASSURANCE, ""]
+    lines += ["", "## Scope and limitations", ""]
+    lines.extend(f"- {clean(s)}" for s in (view.limitations or (_MISSING_LIMITATIONS,)))
+    lines += ["", "## Next decision", "", _NEXT_DECISION, ""]
+    if view.next_steps:
+        lines += ["### Next steps", ""]
+        lines.extend(f"{i}. {clean(s)}" for i, s in enumerate(view.next_steps, 1))
     if view.subjects or view.context or view.changes:
         lines += ["## What was compared", ""]
         context = _comparison_view(view)
@@ -1159,12 +1255,6 @@ def render_markdown(view: ReportView, *, include_details: bool = False) -> str:
         if view.changes:
             lines += ["", "### Recorded changes", ""]
             lines.extend(f"- {clean(change)}" for change in view.changes)
-    lines += ["", "## What was checked", ""]
-    lines.extend(f"- **{clean(k)}:** {clean(v)}" for k, v in view.assurance)
-    lines += ["", "## Scope and limitations", ""]
-    lines.extend(f"- {clean(s)}" for s in view.limitations)
-    lines += ["", "## Next decision", "", _NEXT_DECISION, "", "### Next steps", ""]
-    lines.extend(f"{i}. {clean(s)}" for i, s in enumerate(view.next_steps, 1))
     for result_index, metric in enumerate(view.metrics, 1):
         lines += [
             "",
@@ -1205,12 +1295,12 @@ def render_markdown(view: ReportView, *, include_details: bool = False) -> str:
                 lines += ["### How this interval was calculated", ""]
                 for paragraph in i.basis:
                     lines += [clean(paragraph), ""]
-        lines += [
-            "### Decision checks",
-            "",
-            "| Check | Observed | Required | Result |",
-            "| --- | --- | --- | --- |",
-        ]
+        lines += ["### Decision checks", ""]
+        if metric.checks:
+            lines += [
+                "| Check | Observed | Required | Result |",
+                "| --- | --- | --- | --- |",
+            ]
         lines.extend(
             "| "
             + " | ".join(map(clean, [c.name, c.observed, c.required, _status(c)]))
@@ -1218,6 +1308,8 @@ def render_markdown(view: ReportView, *, include_details: bool = False) -> str:
             for c in metric.checks
         )
         lines.append("")
+        if not metric.checks:
+            lines += [_MISSING_CHECKS, ""]
         lines += [
             f"Result {result_index} · Supporting record: {clean(metric.evidence_source or 'Not supplied with this view')}",
             "",

@@ -18,7 +18,8 @@ pytestmark = pytest.mark.manual
 
 
 @pytest.mark.parametrize("family", ["native", "captured", "judge", "combined"])
-def test_actual_pdf_retains_review_and_closed_evidence_details(tmp_path, family):
+@pytest.mark.parametrize("paper", ["A4", "Letter"])
+def test_actual_pdf_retains_review_and_closed_evidence_details(tmp_path, family, paper):
     module = os.environ.get("INVARLOCK_REPORT_PLAYWRIGHT_MODULE")
     pdf_python = os.environ.get("INVARLOCK_REPORT_PDF_PYTHON")
     if not module or not pdf_python:
@@ -59,13 +60,13 @@ const fs = require('node:fs');
     const page = await browser.newPage({viewport: {width: 1280, height: 900}});
     await page.goto(process.argv[3]);
     if (!(await page.locator('details:not([open])').count())) throw Error('No closed details exercised');
-    const expected = await page.locator('.review-context li,.review-context dt,.review-context dd,.review-context p,.decision-summary,.assurance dt,.assurance dd,.findings li,.findings p,.limits li,.next-steps p,.next-steps li,.metric-explanation,.interval-reading dt,.interval-reading dd,.interval-basis p,.notes li,.shared-context dd').allTextContents();
+    const expected = await page.locator('.review-context li,.review-context dt,.review-context dd,.review-context p,.interpretation-note,.change-summary,.review-action,.decision-summary,.assurance dt,.assurance dd,.findings li,.findings p,.limits li,.next-steps p,.next-steps li,.metric-explanation,.interval-reading dt,.interval-reading dd,.interval-basis p,.notes li,.shared-context dd').allTextContents();
     fs.writeFileSync(process.argv[6], JSON.stringify(expected));
-    await page.pdf({path: process.argv[4], format: 'A4', printBackground: true,
+    await page.pdf({path: process.argv[4], format: process.argv[7], printBackground: process.argv[7] === 'A4',
       margin: {top: '14mm', bottom: '14mm', left: '14mm', right: '14mm'}});
     await page.locator('.evidence-detail').evaluateAll(details => details.forEach(item => item.open = true));
-    await page.pdf({path: process.argv[4] + '.expanded.pdf', format: 'A4', printBackground: true});
-    await page.setViewportSize({width: 390, height: 844});
+    await page.pdf({path: process.argv[4] + '.expanded.pdf', format: process.argv[7], printBackground: true});
+    await page.setViewportSize({width: 320, height: 844});
     if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)) throw Error('Mobile page overflows');
     await page.screenshot({path: process.argv[5], fullPage: true});
   } finally { await browser.close(); }
@@ -81,6 +82,7 @@ const fs = require('node:fs');
             str(pdf),
             str(tmp_path / "mobile.png"),
             str(tmp_path / "expected.json"),
+            paper,
         ],
         check=True,
         capture_output=True,
@@ -100,7 +102,15 @@ const fs = require('node:fs');
         timeout=30,
     )
     pages = json.loads(result.stdout)
-    text = re.sub(r"\s+", " ", " ".join(pages))
+    assert "Review action" in pages[0]
+    assert all(f"Page {i} of {len(pages)}" in page for i, page in enumerate(pages, 1))
+    # Running page furniture can interrupt a paragraph split across two pages.
+    # Check it above, then compare the complete body text independently.
+    body_pages = [
+        re.sub(r"Page \d+ of \d+|InvarLock · Model change review", "", page)
+        for page in pages
+    ]
+    text = re.sub(r"\s+", " ", " ".join(body_pages))
     for phrase in (
         "Model change review",
         "Decision context",
