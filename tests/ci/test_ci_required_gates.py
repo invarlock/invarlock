@@ -60,14 +60,14 @@ def test_ci_runs_the_repository_gates() -> None:
 
     fast = jobs["verify-checks"]
     _assert_core_wheel_install(fast)
-    assert _step(fast, "Set up uv")["with"]["version"] == "0.10.10"
+    assert _step(fast, "Set up uv")["with"]["version"] == "0.13.4"
     assert _step(fast, "Run repository checks")["run"] == "make verify-checks"
     assert _step(fast, "Check full-capacity signed verification")["run"] == (
         "python -m pytest -q 'tests/evaluation_comparison/test_capacity.py::test_full_capacity_signed_independent_recipient[50000]'"
     )
     packages = jobs["verify-packages"]
     _assert_core_wheel_install(packages)
-    assert _step(packages, "Set up uv")["with"]["version"] == "0.10.10"
+    assert _step(packages, "Set up uv")["with"]["version"] == "0.13.4"
     assert _step(packages, "Set up Python")["with"]["python-version"] == "3.13"
     assert packages["if"] == fast["if"]
     assert "needs" not in packages
@@ -85,7 +85,7 @@ def test_ci_runs_the_repository_gates() -> None:
 
     minimum = jobs["minimum-python-packages"]
     _assert_core_wheel_install(minimum)
-    assert _step(minimum, "Set up uv")["with"]["version"] == "0.10.10"
+    assert _step(minimum, "Set up uv")["with"]["version"] == "0.13.4"
     python = _step(minimum, "Set up Python")
     assert python["with"]["python-version"] == "3.12"
     assert _step(minimum, "Check command surface")["run"] == "make cli-smoke-core"
@@ -163,7 +163,7 @@ def test_manual_full_ci_uses_standard_repository_and_distribution_gates() -> Non
 
     _assert_core_wheel_install(full)
     assert "workflow_dispatch" in full["if"]
-    assert _step(full, "Set up uv")["with"]["version"] == "0.10.10"
+    assert _step(full, "Set up uv")["with"]["version"] == "0.13.4"
     assert _step(full, "Install documentation linters")["run"] == "npm ci"
     assert _step(full, "Run complete repository gates")["run"] == "make verify"
     assert _step(full, "Build, install, and validate distributions")["run"] == (

@@ -31,6 +31,66 @@ When `make security` reports an advisory:
 Do not add an exception merely because exploitation was not reproduced. Lack
 of a local proof is not evidence that a vulnerability is unreachable.
 
+## Installer certificate bundles
+
+Keep installer trust stores in the security review alongside application
+dependencies. Updating the application's `certifi` does not update the separate
+certificate bundles embedded in pip and uv.
+
+The [Python incident notice](https://discuss.python.org/t/information-for-python-users-regarding-emudhra-emsign-ca-certificate-security-incident/109576/1)
+requires pip 26.2.2 or newer and recommends `certifi` 2026.10.19 or newer.
+The [uv advisory](https://github.com/astral-sh/uv/security/advisories/GHSA-hq85-5cpj-mr62)
+identifies 0.13.4 as the first patched uv release. The maintained installer pins
+use those pip and uv versions, including CI, release tooling and the authenticated
+K2 bootstrap wheel. The project also rejects uv versions older than 0.13.4 before
+dependency operations. This remediation is separate from the earlier dependency
+audit findings; affected tooling alone is not evidence of repository compromise.
+
+For a new or existing development environment, upgrade pip through the maintained
+hash-checked bootstrap before using it to install uv:
+
+```bash
+python -m pip install --require-hashes -r requirements/workflows/pip-bootstrap.txt
+python -m pip install uv==0.13.4
+python -m pip --version
+uv --version
+make lock-sync
+make security
+```
+
+An OS trust-store update alone does not remove pip's vendored trust anchors.
+Retain artifact hashes while bootstrapping from an older installer. Validate the
+actual installed versions, pip's vendored bundle, hash rejection and the affected
+installation workflows; an application dependency audit alone does not exercise
+these boundaries.
+
+Existing environments and built images need their own update. Rebuild affected
+containers without layer caching and refresh their OS certificates as directed
+by the upstream notice. A pin change does not establish that an existing image
+or deployed environment has been rebuilt. Keep historical evidence and its
+recorded dependency identities unchanged.
+
+## Regenerating patched dependency locks
+
+`requirements/security-constraints.in` keeps `filelock` at 4.2.1 or newer and
+setuptools at 84.1.0 or newer when workflow and runtime locks are regenerated.
+The project groups and build requirements carry the same security floors.
+Refresh through `scripts/security/refresh_pinned_requirements.sh --write` and
+run `make lock-sync security verify` after reviewing the resolved changes.
+
+The floors address the upstream
+[`filelock` advisories](https://github.com/tox-dev/filelock/releases/tag/4.2.1) and
+[setuptools namespace-path advisory](https://github.com/pypa/setuptools/security/advisories/GHSA-xmj3-9gf7-h52w).
+Keep hash-checked installation checks alongside the audit: project-wide uv
+constraints also apply during installation and can reject hashed locks if
+their requirements are not exact pins.
+
+`filelock` 4 changes the on-disk `SoftReadWriteLock` protocol. Any external
+participants using that lock type on a shared path must be stopped, upgraded
+together and restarted, as described in the
+[upstream migration notes](https://py-filelock.readthedocs.io/en/latest/changelog.html).
+The maintained HF cache path uses `FileLock` and its `SoftFileLock` fallback.
+
 ## Documentation dependencies
 
 Documentation CI runs `npm audit --audit-level=low` after installing the root
@@ -43,6 +103,13 @@ constraints.
 
 ## Restricted evaluator images
 
+The separate Promptfoo capture gate audits and installs its reviewed npm lock.
+Its overrides retain patched `body-parser`, `fast-uri`, `ip-address`, `undici`
+and `zod` versions while preserving the pinned Promptfoo archive. Both `undici`
+major versions remain on their compatible patched release lines. Optional
+integrations remain excluded, and the actual SDK capture and recipient checks
+must pass after lock updates.
+
 The maintained LM Evaluation Harness and OpenAI Evals example images support
 specific evaluator paths. Their build helpers authenticate the complete
 upstream wheel by SHA-256, validate its `RECORD`, apply exact expected changes,
@@ -50,9 +117,17 @@ and regenerate `RECORD` under an explicit local package version. A changed
 upstream input fails the derivation.
 
 The LM image omits response caching, ROUGE, and NLTK; the OpenAI Evals image
-omits NLTK. Selected exact-match scorer code remains unchanged. These images
+omits NLTK and the unused Snowflake connector. Selected exact-match scorer code remains unchanged. These images
 do not provide the removed task and metric dependencies. Their respective
 example READMEs describe the supported execution paths.
+
+The Evals lock is resolved from the authenticated `invarlock.match.2` wheel,
+prepared by `build_restricted_openai_evals_wheel.py bootstrap`. This keeps its
+local Match dependencies compatible with patched `filelock`. The older Snowflake
+connector requires `filelock` below 4, while current connectors conflict with the
+protobuf range required by Evals' Gemini dependency. The maintained local Match
+profile does not support Snowflake recording. Bootstrap rebuilds the complete
+wheel before accepting an existing generated artifact.
 
 Keep the original package names and versions in the hash-pinned
 `requirements/workflows/*-upstream-wheel.txt` inputs. The maintained-lock audit

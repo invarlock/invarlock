@@ -35,8 +35,8 @@ COPY bootstrap /usr/share/invarlock-k2/bootstrap
 # Replace Ubuntu's venv seed using only the independently authenticated wheel.
 RUN --network=none sha256sum -c /usr/share/invarlock-k2/bootstrap/pip-wheel.sha256 \
     && python -m pip --isolated install --no-index --no-deps --no-cache-dir \
-       /usr/share/invarlock-k2/bootstrap/pip-26.2-py3-none-any.whl \
-    && python -c 'import pip; assert pip.__version__ == "26.2"'
+       /usr/share/invarlock-k2/bootstrap/pip-26.2.2-py3-none-any.whl \
+    && python -c 'import pip; assert pip.__version__ == "26.2.2"'
 COPY requirements.txt /usr/share/invarlock-k2/requirements.txt
 RUN python -m pip install --no-cache-dir --only-binary=:all: --require-hashes \
     -r /usr/share/invarlock-k2/requirements.txt

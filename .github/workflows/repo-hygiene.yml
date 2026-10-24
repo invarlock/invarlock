@@ -23,7 +23,7 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
         with:
-          version: "0.10.10"
+          version: "0.13.4"
       - name: Check uv.lock sync
         run: make lock-sync
 

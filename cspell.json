@@ -36,6 +36,7 @@
     "ModelKit",
     "venv",
     "pytest",
+    "filelock",
     "coveragerc",
     "mypy",
     "mkdocs",
