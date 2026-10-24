@@ -136,7 +136,7 @@ Supply vision-text, GGUF and TensorRT-LLM resources through the
 `hf_transformers` is the canonical built-in provider. The public core package
 supplies the host CLI; the maintained runtime image supplies model execution
 dependencies. For host-side model preparation or development, run from the
-matching source checkout with `uv` 0.10.10:
+matching source checkout with `uv` 0.13.4:
 
 ```bash
 python scripts/security/build_hardened_accelerate_wheel.py bootstrap

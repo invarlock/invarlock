@@ -47,7 +47,7 @@ def _inputs(tmp_path, monkeypatch):
     pip = tmp_path / build.PIP_WHEEL
     pip.write_bytes(b"pip fixture")
     pip_digest = hashlib.sha256(pip.read_bytes()).hexdigest()
-    lock.write_text(f"pip==26.2 --hash=sha256:{pip_digest}\n")
+    lock.write_text(f"pip==26.2.2 --hash=sha256:{pip_digest}\n")
     monkeypatch.setattr(build, "PIP_WHEEL_SHA256", pip_digest)
     monkeypatch.setattr(build, "ROOT", root)
     monkeypatch.setattr(build, "RUNTIME", runtime)
@@ -315,7 +315,7 @@ def test_bootstrap_requires_one_exact_hash_bound_lock_record(
     if kind == "absent":
         lock = b"other==1\n"
     elif kind == "version":
-        lock = lock.replace(b"26.2", b"24.0")
+        lock = lock.replace(b"26.2.2", b"24.0")
     elif kind == "hash":
         lock = lock.replace(build.PIP_WHEEL_SHA256.encode(), b"0" * 64)
     elif kind == "duplicate":
@@ -331,7 +331,7 @@ def test_bootstrap_accepts_continued_hashes_without_accepting_the_sdist(
 ):
     _inputs(tmp_path, monkeypatch)
     lock = (
-        "pip==26.2 \\\n"
+        "pip==26.2.2 \\\n"
         f"    --hash=sha256:{'a' * 64} \\\n"
         f"    --hash=sha256:{build.PIP_WHEEL_SHA256}\nother==1\n"
     ).encode()

@@ -92,7 +92,7 @@ release = [
   "cyclonedx-bom>=4.1",
 ]
 security = [
-  "pip>=26.2",
+  "pip>=26.2.2",
   "pip-audit>=2.8",
   "msgpack>=1.2.1",
   "cyclonedx-bom>=4.1",
@@ -142,6 +142,7 @@ example-torchao = [
 ]
 
 [tool.uv]
+required-version = ">=0.13.4"
 find-links = ["runtime/wheels"]
 
 [project.entry-points."invarlock.runtime_providers"]

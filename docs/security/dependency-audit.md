@@ -31,6 +31,45 @@ When `make security` reports an advisory:
 Do not add an exception merely because exploitation was not reproduced. Lack
 of a local proof is not evidence that a vulnerability is unreachable.
 
+## Installer certificate bundles
+
+Keep installer trust stores in the security review alongside application
+dependencies. Updating the application's `certifi` does not update the separate
+certificate bundles embedded in pip and uv.
+
+The [Python incident notice](https://discuss.python.org/t/information-for-python-users-regarding-emudhra-emsign-ca-certificate-security-incident/109576/1)
+requires pip 26.2.2 or newer and recommends `certifi` 2026.10.19 or newer.
+The [uv advisory](https://github.com/astral-sh/uv/security/advisories/GHSA-hq85-5cpj-mr62)
+identifies 0.13.4 as the first patched uv release. The maintained installer pins
+use those pip and uv versions, including CI, release tooling and the authenticated
+K2 bootstrap wheel. The project also rejects uv versions older than 0.13.4 before
+dependency operations. This remediation is separate from the earlier dependency
+audit findings; affected tooling alone is not evidence of repository compromise.
+
+For a new or existing development environment, upgrade pip through the maintained
+hash-checked bootstrap before using it to install uv:
+
+```bash
+python -m pip install --require-hashes -r requirements/workflows/pip-bootstrap.txt
+python -m pip install uv==0.13.4
+python -m pip --version
+uv --version
+make lock-sync
+make security
+```
+
+An OS trust-store update alone does not remove pip's vendored trust anchors.
+Retain artifact hashes while bootstrapping from an older installer. Validate the
+actual installed versions, pip's vendored bundle, hash rejection and the affected
+installation workflows; an application dependency audit alone does not exercise
+these boundaries.
+
+Existing environments and built images need their own update. Rebuild affected
+containers without layer caching and refresh their OS certificates as directed
+by the upstream notice. A pin change does not establish that an existing image
+or deployed environment has been rebuilt. Keep historical evidence and its
+recorded dependency identities unchanged.
+
 ## Documentation dependencies
 
 Documentation CI runs `npm audit --audit-level=low` after installing the root

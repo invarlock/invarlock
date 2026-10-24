@@ -39,7 +39,7 @@ def test_standard_setup_preserves_pins_bytecode_and_selected_python(name):
     assert (
         setup["uses"] == "astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884"
     )
-    assert setup["with"] == {"version": "0.10.10", "enable-cache": False}
+    assert setup["with"] == {"version": "0.13.4", "enable-cache": False}
     installs = [step for step in steps if "uv pip install" in step.get("run", "")]
     assert installs
     for install in installs:

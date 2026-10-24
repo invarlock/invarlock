@@ -24,6 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Upgrade pip to 26.2.2 and uv to 0.13.4 for their independent certificate-bundle
+  fixes, including hashed bootstrap and audit locks, CI selections, and the
+  authenticated K2 installer wheel. Application `certifi` updates remain separate.
 - Check external documentation links through the rendered site instead of raw
   Markdown, allow the scheduled link check to run manually on a branch, and
   point canonical documentation URLs to the published `latest/` directory.
