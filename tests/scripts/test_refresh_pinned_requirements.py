@@ -20,12 +20,18 @@ def test_refresh_filters_evaluator_locks_and_fails_closed(
     scripts = tmp_path / "scripts/security"
     scripts.mkdir(parents=True)
     shutil.copyfile(REFRESH_SCRIPT, scripts / REFRESH_SCRIPT.name)
-    for name in (
-        "build_cache_free_lm_eval_wheel.py",
-        "build_restricted_openai_evals_wheel.py",
-    ):
+    for name in ("build_cache_free_lm_eval_wheel.py",):
         # Subprocess coverage must retain the helpers' canonical source identity.
         (scripts / name).symlink_to(ROOT / "scripts/security" / name)
+    restricted = ROOT / "scripts/security/build_restricted_openai_evals_wheel.py"
+    (scripts / restricted.name).write_text(
+        "import runpy, sys\nfrom pathlib import Path\n"
+        "if sys.argv[1:] == ['bootstrap']:\n"
+        "    Path('evals-bootstrap-verified').touch()\n"
+        "else:\n"
+        f"    sys.path.insert(0, {str(restricted.parent)!r})\n"
+        f"    runpy.run_path({str(restricted)!r}, run_name='__main__')\n"
+    )
 
     # Wheel derivation has its own authenticated-artifact tests. This fixture
     # verifies that refresh calls bootstrap before asking the compiler to resolve.
@@ -38,6 +44,11 @@ def test_refresh_filters_evaluator_locks_and_fails_closed(
     )
 
     workflow = tmp_path / "requirements/workflows"
+    workflow.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(
+        ROOT / "requirements/security-constraints.in",
+        workflow.parent / "security-constraints.in",
+    )
     if retained_lock:
         workflow.mkdir(parents=True)
         for name in (
@@ -56,7 +67,10 @@ def test_refresh_filters_evaluator_locks_and_fails_closed(
         "import os, sys\n"
         "from pathlib import Path\n"
         "assert Path('bootstrap-verified').is_file()\n"
+        "assert Path('evals-bootstrap-verified').is_file()\n"
         "assert sys.argv[sys.argv.index('--find-links') + 1] == 'runtime/wheels'\n"
+        "assert sys.argv[sys.argv.index('--constraint') + 1] == 'requirements/security-constraints.in'\n"
+        "assert 'filelock>=4.2.1' in Path('requirements/security-constraints.in').read_text()\n"
         "output = Path(sys.argv[sys.argv.index('--output-file') + 1])\n"
         "if '-full-' in output.name and os.environ['RETAINED_LOCK'] == '1':\n"
         "    assert output.read_text() == 'retained==1.0\\n'\n"
@@ -65,9 +79,8 @@ def test_refresh_filters_evaluator_locks_and_fails_closed(
         "    packages += 'lm-eval==0.4.12\\nsqlitedict==2.1.0\\n'\n"
         "    packages += 'rouge-score==0.1.2\\nnltk==3.10.3\\n'\n"
         "elif 'openai-evals-runtime' in sys.argv[3]:\n"
-        "    packages += 'evals==3.0.1.post1\\n'\n"
         "    if os.environ['MISSING_EVALUATOR_DEPENDENCY'] != '1':\n"
-        "        packages += 'nltk==3.10.3\\n'\n"
+        "        packages += 'evals==3.0.1.post1+invarlock.match.2\\n'\n"
         "output.write_text(packages)\n",
         encoding="utf-8",
     )
@@ -89,7 +102,7 @@ def test_refresh_filters_evaluator_locks_and_fails_closed(
     workflow = tmp_path / "requirements/workflows"
     if missing_dependency:
         assert result.returncode != 0
-        assert "nltk" in result.stderr
+        assert "evals" in result.stderr
         output = workflow / "openai-evals-runtime-py312.txt"
         if retained_lock:
             assert output.read_text() == "retained==1.0\n"

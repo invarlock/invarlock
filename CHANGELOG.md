@@ -24,6 +24,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Upgrade maintained `filelock` and setuptools locks above their advisory floors,
+  and preserve those floors during regeneration. Remove the unused Snowflake
+  connector from the restricted local Evals Match profile so patched `filelock`
+  can be installed without unrelated dependency downgrades.
+- Patch the Promptfoo integration's HTTP, URI, address, and schema dependencies
+  while preserving the pinned evaluator archive and omitting unused integrations.
 - Upgrade pip to 26.2.2 and uv to 0.13.4 for their independent certificate-bundle
   fixes, including hashed bootstrap and audit locks, CI selections, and the
   authenticated K2 installer wheel. Application `certifi` updates remain separate.

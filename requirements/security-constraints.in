@@ -1,0 +1,5 @@
+# Security floors for every maintained workflow/runtime lock compilation.
+# filelock: GHSA-v4x8-3wr5-3wq8, GHSA-567q-5qvw-pf92, GHSA-9vhv-jxww-xfm5.
+# setuptools: GHSA-xmj3-9gf7-h52w.
+filelock>=4.2.1
+setuptools>=84.1.0

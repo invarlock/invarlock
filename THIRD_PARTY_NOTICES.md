@@ -30,6 +30,7 @@ direct dependencies are:
 | Component | Upstream | License | Use |
 | --- | --- | --- | --- |
 | `accelerate` | [huggingface/accelerate](https://github.com/huggingface/accelerate) | Apache-2.0 | Device placement and quantized checkpoint loading support |
+| `filelock` | [tox-dev/filelock](https://github.com/tox-dev/filelock) | MIT | Cross-process model-cache locking |
 | `torch` | [pytorch/pytorch](https://github.com/pytorch/pytorch) | BSD 3-Clause | Tensor runtime |
 | `transformers` | [huggingface/transformers](https://github.com/huggingface/transformers) | Apache-2.0 | Model and tokenizer loading |
 | `safetensors` | [huggingface/safetensors](https://github.com/huggingface/safetensors) | Apache-2.0 | Tensor-only artifact loading |

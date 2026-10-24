@@ -70,6 +70,27 @@ by the upstream notice. A pin change does not establish that an existing image
 or deployed environment has been rebuilt. Keep historical evidence and its
 recorded dependency identities unchanged.
 
+## Regenerating patched dependency locks
+
+`requirements/security-constraints.in` keeps `filelock` at 4.2.1 or newer and
+setuptools at 84.1.0 or newer when workflow and runtime locks are regenerated.
+The project groups and build requirements carry the same security floors.
+Refresh through `scripts/security/refresh_pinned_requirements.sh --write` and
+run `make lock-sync security verify` after reviewing the resolved changes.
+
+The floors address the upstream
+[`filelock` advisories](https://github.com/tox-dev/filelock/releases/tag/4.2.1) and
+[setuptools namespace-path advisory](https://github.com/pypa/setuptools/security/advisories/GHSA-xmj3-9gf7-h52w).
+Keep hash-checked installation checks alongside the audit: project-wide uv
+constraints also apply during installation and can reject hashed locks if
+their requirements are not exact pins.
+
+`filelock` 4 changes the on-disk `SoftReadWriteLock` protocol. Any external
+participants using that lock type on a shared path must be stopped, upgraded
+together and restarted, as described in the
+[upstream migration notes](https://py-filelock.readthedocs.io/en/latest/changelog.html).
+The maintained HF cache path uses `FileLock` and its `SoftFileLock` fallback.
+
 ## Documentation dependencies
 
 Documentation CI runs `npm audit --audit-level=low` after installing the root
@@ -82,6 +103,13 @@ constraints.
 
 ## Restricted evaluator images
 
+The separate Promptfoo capture gate audits and installs its reviewed npm lock.
+Its overrides retain patched `body-parser`, `fast-uri`, `ip-address`, `undici`
+and `zod` versions while preserving the pinned Promptfoo archive. Both `undici`
+major versions remain on their compatible patched release lines. Optional
+integrations remain excluded, and the actual SDK capture and recipient checks
+must pass after lock updates.
+
 The maintained LM Evaluation Harness and OpenAI Evals example images support
 specific evaluator paths. Their build helpers authenticate the complete
 upstream wheel by SHA-256, validate its `RECORD`, apply exact expected changes,
@@ -89,9 +117,17 @@ and regenerate `RECORD` under an explicit local package version. A changed
 upstream input fails the derivation.
 
 The LM image omits response caching, ROUGE, and NLTK; the OpenAI Evals image
-omits NLTK. Selected exact-match scorer code remains unchanged. These images
+omits NLTK and the unused Snowflake connector. Selected exact-match scorer code remains unchanged. These images
 do not provide the removed task and metric dependencies. Their respective
 example READMEs describe the supported execution paths.
+
+The Evals lock is resolved from the authenticated `invarlock.match.2` wheel,
+prepared by `build_restricted_openai_evals_wheel.py bootstrap`. This keeps its
+local Match dependencies compatible with patched `filelock`. The older Snowflake
+connector requires `filelock` below 4, while current connectors conflict with the
+protobuf range required by Evals' Gemini dependency. The maintained local Match
+profile does not support Snowflake recording. Bootstrap rebuilds the complete
+wheel before accepting an existing generated artifact.
 
 Keep the original package names and versions in the hash-pinned
 `requirements/workflows/*-upstream-wheel.txt` inputs. The maintained-lock audit
