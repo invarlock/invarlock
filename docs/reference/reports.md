@@ -31,6 +31,11 @@ followed by detailed results and supporting evidence. A restrained light palette
 readable tables and numbered results work on screen and paper. Status words
 accompany color so the result remains readable in monochrome.
 
+The paper lockup retains InvarLock's bracket-and-signal geometry with a single
+ink stroke and live-text name. It omits the app icon's tile, translucent overlays
+and small center dot. This is a report-specific rendition, not a replacement for
+the website or application identity. The report uses no remote fonts or images.
+
 This structure draws on the intended-use and evaluation context in
 [Model Cards for Model Reporting](https://research.google/pubs/model-cards-for-model-reporting/)
 and [SageMaker Model Cards](https://docs.aws.amazon.com/sagemaker/latest/dg/model-cards.html).
@@ -65,6 +70,13 @@ links to their numbered checks. If more than five need review, the report says
 how many remain and retains every result below. It does not rank unrelated
 metrics by numerical severity. **Scope and limitations** and **Next decision**
 remain visible before the detailed statistics.
+
+The opening also gives a **Review action** appropriate to the recorded result.
+This is generated guidance, not an owner's recommendation. The **Change context**
+preview quotes a retained comparison note and identifies any additional notes
+below; missing context is not counted as an observed change. Outcome counts refer
+to metric/scope results, not independent cases. An unavailable outcome uses a
+neutral treatment, and absent limitations or check details are explicitly labeled.
 
 Each metric's **Supporting record** gives a path relative to the evidence root
 and a JSON pointer after `#`; an empty pointer identifies the whole JSON object.
@@ -130,6 +142,21 @@ context; print styles expose collapsed explanations and all metric tabs. Open
 raw evidence details before printing to include them in the printout. Original
 evidence files, hashes and signatures are unaffected by rendering. Generating a
 new presentation does not replace a historical canonical download.
+
+Print layouts place the result and review action together, then let assurance
+checks flow below. Running page numbers help keep longer copies in order.
+Identity labels stay with their values, and keyboard focus outlines are omitted
+from paper. These print features are exercised in Chromium on A4 and US Letter;
+other print engines may handle pagination differently.
+
+The accessibility checks draw on W3C guidance for
+[reflow](https://www.w3.org/WAI/WCAG22/Understanding/reflow.html),
+[contrast](https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html),
+[text spacing](https://www.w3.org/WAI/WCAG22/Understanding/text-spacing.html) and
+[keyboard tabs](https://www.w3.org/WAI/ARIA/apg/patterns/tabs/).
+They exercise narrow layouts, explicit status words, local navigation and text
+equivalents for interval graphics. They do not establish full accessibility
+conformance or substitute for assistive-technology testing with users.
 
 ## Where the interval comes from
 
@@ -755,14 +782,20 @@ details print when opened, keeping the default review from expanding into a long
 dump of technical data. Complete exact values remain in the HTML and original
 evidence either way.
 
-The optional real-browser regression checks both default and expanded PDF text and mobile
-overflow for native, captured, judge and combined evidence. With an installed
+The optional real-browser regressions check default and expanded PDF text on A4
+and US Letter, including printing without backgrounds, first-page review actions,
+page numbering and 320-pixel overflow for native, captured, judge and combined
+evidence. A separate synthetic stress fixture checks keyboard navigation,
+hidden-result links, computed text/graphic contrast, enlarged text spacing,
+long identifiers, offline use and operation without JavaScript. With an installed
 Playwright Node module and a Python interpreter containing `pypdf`, run:
 
 ```bash
 INVARLOCK_REPORT_PLAYWRIGHT_MODULE=/absolute/path/to/playwright \
 INVARLOCK_REPORT_PDF_PYTHON=/absolute/path/to/python \
-PYTHONPATH=src python -m pytest tests/reporting/test_report_browser_print.py
+PYTHONPATH=src python -m pytest \
+  tests/reporting/test_report_browser_print.py \
+  tests/reporting/test_report_browser_access.py
 ```
 
 The check makes no model calls or dependency downloads. It is skipped when the

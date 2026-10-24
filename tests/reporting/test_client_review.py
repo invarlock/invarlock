@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+from dataclasses import replace
 
 import pytest
 
@@ -24,6 +25,8 @@ def test_decision_context_and_limitations_precede_statistics_in_both_formats():
         assert "Organizational approval: Not recorded by this report" in output
         assert "Generated interpretation" in output
         assert "reports/evaluation.report.json#/metrics/0" in output
+        for _, subject in view.subjects:
+            assert output.index(subject) < output.index("Recorded policy result")
 
 
 def test_sorted_findings_point_to_original_metric_positions():
@@ -49,8 +52,113 @@ def test_sorted_findings_point_to_original_metric_positions():
     assert html.index("Findings to review") < html.index("Decision checks")
     assert (
         "bad"
-        in html[html.index("Findings to review") : html.index("What was compared")]
+        in html[html.index("Findings to review") : html.index("Scope and limitations")]
     )
+
+
+@pytest.mark.parametrize(
+    "decision,action",
+    [
+        ("pass", "Confirm the intended use"),
+        ("regression", "Review the unmet requirements"),
+        ("insufficient_evidence", "Resolve the missing or insufficient evidence"),
+        ("unknown", "Establish the recorded outcome"),
+    ],
+)
+def test_opening_names_the_review_action_without_inventing_owner_approval(
+    decision, action
+):
+    pack = evidence()
+    view = replace(_view(pack_json(pack, "report"), pack), decision=decision)
+    for render in (render_html, render_markdown):
+        output = render(view)
+        assert output.index("Generated interpretation") < output.index(
+            "Recorded policy result"
+        )
+        assert output.index(action) < output.index("Findings to review")
+        assert "Decision owner and recommendation: Not supplied" in output
+
+
+def test_opening_keeps_recorded_change_and_points_to_remaining_context():
+    pack = evidence()
+    view = replace(
+        _view(pack_json(pack, "report"), pack),
+        changes=(
+            "A different model artifact was recorded.",
+            "Runtime settings differ.",
+        ),
+    )
+    for render in (render_html, render_markdown):
+        output = render(view)
+        assert output.index(view.changes[0]) < output.index("Recorded policy result")
+        assert "1 additional comparison note" in output
+        assert view.changes[1] in output
+
+
+def test_unknown_and_empty_views_do_not_visually_assert_failure_or_silently_omit_gaps():
+    pack = evidence()
+    view = replace(
+        _view(pack_json(pack, "report"), pack),
+        decision="unknown",
+        metrics=(),
+        limitations=(),
+        assurance=(),
+        next_steps=(),
+    )
+    html = render_html(view)
+    assert 'class="hero unavailable"' in html
+    for output in (html, render_markdown(view)):
+        assert "Metric results are unavailable in this view" in output
+        assert "Limitations were not supplied" in output
+        assert "Reporting checks were not supplied" in output
+    assert "<ol></ol>" not in html
+    assert "### Next steps" not in render_markdown(view)
+
+
+def test_findings_preview_retains_every_result_and_its_original_source():
+    pack = evidence()
+    view = _view(pack_json(pack, "report"), pack)
+    view = replace(
+        view,
+        metrics=tuple(
+            replace(
+                view.metrics[0],
+                name=f"metric_{i}",
+                decision="regression",
+                evidence_source=f"reports/evaluation.report.json#/metrics/{i}",
+            )
+            for i in range(7)
+        ),
+    )
+    for output in (render_html(view), render_markdown(view)):
+        assert "7 of 7 metric / scope results need review" in output
+        assert "First 5 shown here" in output
+        for metric in view.metrics:
+            assert metric.evidence_source in output
+
+
+def test_findings_label_outcomes_and_missing_check_details_explicitly():
+    pack = evidence()
+    view = _view(pack_json(pack, "report"), pack)
+    view = replace(
+        view,
+        metrics=tuple(
+            replace(view.metrics[0], name=f"metric_{i}", decision=decision, checks=())
+            for i, decision in enumerate(
+                ("pass", "regression", "insufficient_evidence", "unknown")
+            )
+        ),
+    )
+    html = render_html(view)
+    brief = html[html.index("Findings to review") : html.index("Scope and limitations")]
+    assert "Policy not met" in brief
+    assert "More evidence needed" in brief
+    assert "Decision unavailable" in brief
+    for output in (html, render_markdown(view)):
+        assert (
+            "1 satisfied · 1 not met · 1 need more evidence · 1 unavailable" in output
+        )
+        assert "Decision check details were not supplied" in output
 
 
 @pytest.mark.parametrize("family", ["native", "captured", "judge", "combined"])
