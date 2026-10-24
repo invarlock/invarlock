@@ -125,6 +125,7 @@ def build_evidence_set_view(
         replace(
             metric,
             name=f"Deterministic · {metric.name}",
+            evidence_source=f"{index['members']['deterministic']['path']}/{metric.evidence_source}",
             notes=(
                 *metric.notes,
                 "Original cases; each interval applies to this component only.",
@@ -133,7 +134,12 @@ def build_evidence_set_view(
         for metric in first.metrics
     )
     metrics += tuple(
-        replace(metric, name=f"Judge · {metric.name}") for metric in second.metrics
+        replace(
+            metric,
+            name=f"Judge · {metric.name}",
+            evidence_source=f"{index['members']['judge']['path']}/{metric.evidence_source}",
+        )
+        for metric in second.metrics
     )
     assurance = (
         (

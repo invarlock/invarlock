@@ -1263,6 +1263,7 @@ def _report_view(
             "This describes resampling of the fixed recorded schedule; it is not a population confidence interval or a claim that the sample represents production traffic.",
         )
     metric = MetricView(
+        evidence_source="reports/evaluation.report.json#",
         name=names.get(report["metric"], report["metric"]),
         scope="All paired records",
         decision=report["verdict"],
