@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import signal
 import subprocess
 import sys
 import time
@@ -251,6 +252,53 @@ def test_bounded_command_timeout_terminates_descendants(tmp_path: Path) -> None:
         time.sleep(0.05)
     else:
         pytest.fail("bounded command left a descendant process running")
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX process-group cleanup")
+@pytest.mark.parametrize("group_state", ("gone", "present", "denied"))
+def test_cleanup_permission_error_requires_confirmed_group_exit(
+    monkeypatch, group_state
+):
+    class ExitedLeader:
+        pid = 123
+
+        def poll(self):
+            return 0
+
+        def wait(self, *, timeout):
+            return 0
+
+    signals = []
+
+    def killpg(pid, sig):
+        assert pid == 123
+        signals.append(sig)
+        if sig == signal.SIGKILL or (sig == 0 and group_state == "denied"):
+            raise PermissionError("signal denied")
+        if sig == 0 and group_state == "gone":
+            raise ProcessLookupError("group already exited")
+
+    monkeypatch.setattr(bounded_command.os, "killpg", killpg)
+    if group_state == "gone":
+        bounded_command._terminate(ExitedLeader())
+    else:
+        with pytest.raises(PermissionError):
+            bounded_command._terminate(ExitedLeader())
+    assert signals == [signal.SIGTERM, signal.SIGKILL, 0]
+
+
+def test_post_start_os_error_is_not_reported_as_a_start_failure(monkeypatch):
+    monkeypatch.setattr(bounded_command.subprocess, "Popen", lambda *a, **k: object())
+
+    def fail_communication(*args, **kwargs):
+        raise PermissionError("cleanup denied")
+
+    monkeypatch.setattr(bounded_command, "communicate_bounded", fail_communication)
+    with pytest.raises(
+        RuntimeError, match="command execution or cleanup failed"
+    ) as exc:
+        run_bounded_command(["fixture"])
+    assert isinstance(exc.value.__cause__, PermissionError)
 
 
 @pytest.mark.parametrize("failed_stream", ["source", "destination"])

@@ -106,7 +106,8 @@ def test_browser_title_and_visible_heading_use_same_safe_decision_label(decision
     html = render_html(view)
     label = decision_label(decision)
     assert f"<title>{label} · {escape(view.title)}</title>" in html
-    assert f'<h1 id="decision">{label}</h1>' in html
+    assert "<h1>Model change review</h1>" in html
+    assert f'<h2 id="decision">{label}</h2>' in html
     assert '<script>alert("x")</script>' not in html
 
 

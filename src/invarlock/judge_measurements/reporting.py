@@ -418,6 +418,7 @@ def _view(
         _baseline_mean(plan, artifacts["measurements"]) if subject is not None else None
     )
     metric = MetricView(
+        evidence_source="analysis_result.json#",
         name=policy["metric_name"],
         scope="Fixed benchmark; equal independent-unit weights"
         if required
