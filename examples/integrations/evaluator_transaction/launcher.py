@@ -62,7 +62,7 @@ CUDA_LOCKS = {
 }
 EVALUATOR_VERSIONS = {
     "inspect-ai": "0.3.263",
-    "openai-evals": "3.0.1.post1+invarlock.match.1",
+    "openai-evals": "3.0.1.post1+invarlock.match.2",
 }
 try:
     from examples.integrations.launch import (

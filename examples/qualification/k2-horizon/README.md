@@ -220,7 +220,7 @@ python -m examples.qualification.k2_runtime_build \
   --archive sglang-source.tar.gz --core-wheel "$CORE_WHEEL" \
   --expected-core-wheel-sha256 "$EXPECTED_CORE_WHEEL" \
   --apt-bundle runtime-apt \
-  --pip-wheel pip-26.2-py3-none-any.whl \
+  --pip-wheel pip-26.2.2-py3-none-any.whl \
   --expat-bundle expat-release \
   --expected-apt-manifest-sha256 "$EXPECTED_OS_MANIFEST" \
   --output runtime-context
@@ -236,7 +236,7 @@ docker run --rm --platform linux/amd64 --network none --read-only \
   python /opt/campaign/native_probe.py > native-imports.json
 ```
 
-Supply the separately downloaded `pip-26.2-py3-none-any.whl`; preparation
+Supply the separately downloaded `pip-26.2.2-py3-none-any.whl`; preparation
 checks its exact maintained hash and lock membership. The image installs its
 Ubuntu bundle and upgrades the initial pip from that wheel with network access
 disabled. The first networked Python installation therefore uses the reviewed

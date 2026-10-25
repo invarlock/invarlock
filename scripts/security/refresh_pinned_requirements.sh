@@ -62,6 +62,7 @@ if ! command -v uv >/dev/null 2>&1; then
 fi
 
 python3 "${ROOT_DIR}/scripts/security/build_hardened_accelerate_wheel.py" bootstrap
+python3 "${ROOT_DIR}/scripts/security/build_restricted_openai_evals_wheel.py" bootstrap
 
 REQ_DIR="${SOURCE_REQ_DIR}"
 TMP_REQ_DIR=""
@@ -86,6 +87,7 @@ compile_pyproject() {
   (
     cd "${ROOT_DIR}"
     uv pip compile pyproject.toml \
+      --constraint requirements/security-constraints.in \
       --python-platform x86_64-unknown-linux-gnu \
       --find-links runtime/wheels \
       --generate-hashes \
@@ -107,6 +109,7 @@ compile_req_platform() {
   (
     cd "${ROOT_DIR}"
     uv pip compile "${input_arg}" \
+      --constraint requirements/security-constraints.in \
       --find-links runtime/wheels \
       --generate-hashes \
       --output-file "${output_arg}" \
@@ -126,6 +129,7 @@ compile_release_install() {
     cd "${ROOT_DIR}"
     uv pip compile \
       "${input}" \
+      --constraint requirements/security-constraints.in \
       --python-platform x86_64-unknown-linux-gnu \
       --python-version "${python_version}" \
       --find-links runtime/wheels \

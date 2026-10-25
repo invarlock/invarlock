@@ -165,6 +165,11 @@ jobs:
             requirements/workflows/inspect-judge-tests-py313.txt
             requirements/workflows/langfuse-sdk-tests-py313.txt
             requirements/workflows/release-security-py313.txt
+      - name: Set up uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
+        with:
+          version: "0.13.4"
+          enable-cache: false
       - name: Install measured coverage dependencies
         run: |
           python scripts/security/build_hardened_accelerate_wheel.py bootstrap

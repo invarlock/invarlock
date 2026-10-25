@@ -61,14 +61,15 @@ environment, and install the development dependencies:
 ```bash
 python3.13 -m venv .venv
 source .venv/bin/activate
-python -m pip install uv==0.10.10
+python -m pip install --require-hashes -r requirements/workflows/pip-bootstrap.txt
+python -m pip install uv==0.13.4
 python scripts/security/build_hardened_accelerate_wheel.py bootstrap
 uv sync --locked --group dev --group runtime-test
 npm ci
 ```
 
 Install `uv` for lock, distribution, and dependency-audit targets; CI currently
-uses version `0.10.10`. Workflow changes also require the CI-pinned `actionlint`
+uses version `0.13.4`. Workflow changes also require the CI-pinned `actionlint`
 version and ShellCheck on `PATH`. A newer local linter can miss issues reported
 by the pinned version.
 The exact label entry in `.github/actionlint.yaml` lets the pinned linter recognize
@@ -77,7 +78,8 @@ hosted image from `runs-on`.
 With Go installed:
 
 ```bash
-python -m pip install uv==0.10.10
+python -m pip install --require-hashes -r requirements/workflows/pip-bootstrap.txt
+python -m pip install uv==0.13.4
 go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
 ```
 
