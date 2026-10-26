@@ -990,5 +990,10 @@
       "stage": "2\u20135",
       "reference_sha256": "ca5c3da7788ac9c208110cf62994ba01404e4d713d30045f5bd549c7bc9d75e5"
     }
+  ],
+  "coverage_notes": [
+    "Ownership entries describe the target design; differential fixtures and retained corpus qualify only exercised behavior, not every possible input.",
+    "Native report reconstruction has a local work budget of 10000000 paired outcomes. Larger authored reports return incomplete, not invalid evidence; Python renderer parity above this budget is not claimed.",
+    "The native JSON parser caps nesting at 900 levels and rejects lone UTF-16 surrogates during parsing. Python may reject those surrogates later during canonical UTF-8 serialization; rejection-stage and diagnostic parity are not claimed."
   ]
 }

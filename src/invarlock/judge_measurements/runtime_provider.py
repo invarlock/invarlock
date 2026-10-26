@@ -5,7 +5,10 @@ from __future__ import annotations
 import hashlib
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
+
+if TYPE_CHECKING:
+    from .native_collection import _NativeCollection
 
 from invarlock.core.runtime_provider import (
     EvaluationBatch,
@@ -658,6 +661,24 @@ def _attempt(
     }
 
 
+def _check_next_retained_capacity(
+    native: Any,
+    sources: list[dict[str, Any]],
+    plan: JudgeMeasurementPlan,
+    plan_digest: str,
+) -> None:
+    if native is not None:
+        return
+    retained = _retained_measurement_size(sources, plan=plan, plan_digest=plan_digest)
+    if (
+        retained + _RETAINED_BYTES_PER_TRIAL + _MEASUREMENTS_ENVELOPE_BYTES
+        > MEASUREMENTS_MAX_BYTES
+    ):
+        raise RuntimeProviderJudgeError(
+            "runtime judge retained capacity was exhausted before the next inference admission; completed checkpoint shards remain durable"
+        )
+
+
 def collect_runtime_provider(
     plan: JudgeMeasurementPlan,
     *,
@@ -667,6 +688,59 @@ def collect_runtime_provider(
     baseline_run: dict[str, Any],
     subject_run: dict[str, Any],
     options: RuntimeProviderJudgeOptions = RuntimeProviderJudgeOptions(),
+    execution_backend: str = "python",
+) -> JudgeMeasurements:
+    """Collect the frozen schedule under one explicit process-control backend."""
+    from invarlock.runtime_providers.native_execution import using_execution_backend
+
+    if execution_backend not in {"python", "rust"}:
+        raise RuntimeProviderJudgeError("execution backend must be python or rust")
+    with using_execution_backend(execution_backend):
+        return _collect_runtime_provider(
+            plan,
+            provider=provider,
+            spec=spec,
+            resources=resources,
+            baseline_run=baseline_run,
+            subject_run=subject_run,
+            options=options,
+            execution_backend=execution_backend,
+        )
+
+
+def _resume_collection_sources(
+    native: _NativeCollection | None,
+    options: RuntimeProviderJudgeOptions,
+    identity: bytes,
+    pending: list[Any],
+    plan: JudgeMeasurementPlan,
+    spec: ModelRuntimeSpec,
+    resources: RuntimeArtifactResources,
+) -> list[dict[str, Any]]:
+    if native is not None:
+        return native.sources()
+    sources = _prepare_checkpoint(options, identity, batch_count=len(pending))
+    _validate_cached_sources(
+        sources,
+        pending=pending,
+        plan=plan,
+        spec=spec,
+        resources=resources,
+        options=options,
+    )
+    return sources
+
+
+def _collect_runtime_provider(
+    plan: JudgeMeasurementPlan,
+    *,
+    provider: RuntimeProvider,
+    spec: ModelRuntimeSpec,
+    resources: RuntimeArtifactResources,
+    baseline_run: dict[str, Any],
+    subject_run: dict[str, Any],
+    options: RuntimeProviderJudgeOptions = RuntimeProviderJudgeOptions(),
+    execution_backend: str = "python",
 ) -> JudgeMeasurements:
     """Collect one complete frozen-answer schedule without network access.
 
@@ -773,227 +847,228 @@ def collect_runtime_provider(
             "runtime judge schedules above the in-memory worst-case retained capacity "
             "require a checkpoint directory"
         )
-    source_values = _prepare_checkpoint(
-        options, checkpoint_identity, batch_count=len(pending)
-    )
-    _validate_cached_sources(
-        source_values,
-        pending=pending,
-        plan=plan,
-        spec=spec,
-        resources=resources,
-        options=options,
-    )
-    start = len(source_values)
-    session = None
-    context = None
-    if start < len(pending):
-        context = provider.prepare_execution(spec, resources)
-        if (
-            not context.strict
-            or context.allow_network
-            or context.container_image_digest != resources.container_image_digest
-            or context.device_kind != resources.device_kind
-            or context.artifact_identity_sha256 != artifact_digest
-        ):
-            if context.close_callback is not None:
-                context.close_callback()
-            raise RuntimeProviderJudgeError(
-                "runtime judge requires a strict offline execution context"
-            )
-        try:
-            session = provider.open(spec, context)
-        except BaseException:
-            if context.close_callback is not None:
-                context.close_callback()
-            raise
-    try:
-        for index in range(start, len(pending)):
-            trial, request, expected_record = pending[index]
-            source_id = _source_id(options, index, len(pending))
-            retained_bytes = _retained_measurement_size(
-                source_values,
-                plan=plan,
-                plan_digest=plan_digest,
-            )
-            if (
-                retained_bytes
-                + _RETAINED_BYTES_PER_TRIAL
-                + _MEASUREMENTS_ENVELOPE_BYTES
-                > MEASUREMENTS_MAX_BYTES
-            ):
-                raise RuntimeProviderJudgeError(
-                    "runtime judge retained capacity was exhausted before the next "
-                    "inference admission; completed checkpoint shards remain durable"
-                )
-            _admit_checkpoint_batch(options, index)
-            assert session is not None
-            observation = session.score(
-                EvaluationBatch(
-                    schedule_sha256=plan_digest,
-                    records=(expected_record,),
-                    metric="exact_match",
-                    task="text_causal",
-                )
-            )
-            receipt = session.runtime_receipt()
-            observation_bytes = encode_scoring_observation(observation)
-            receipt_bytes = encode_runtime_provider_receipt(receipt)
-            if (
-                len(artifact_bytes) > 64 * 1024
-                or len(observation_bytes) > 2 * 1024 * 1024
-                or len(receipt_bytes) > 256 * 1024
-            ):
-                raise RuntimeProviderJudgeError(
-                    "runtime judge provider evidence exceeds its retained reservation"
-                )
-            evidence_errors = runtime_provider_evidence_errors(
-                artifact_identity=artifact,
-                scoring_observation=observation,
-                receipt=receipt,
-                scoring_observation_bytes=observation_bytes,
-                expected_outer_image_digest=resources.container_image_digest,
-            )
-            evidence_errors += runtime_request_binding_errors(
-                provider_name=spec.provider_name,
-                settings=spec.settings,
-                artifact_identity=artifact,
-                receipt=receipt,
-            )
-            if evidence_errors:
-                raise RuntimeProviderJudgeError(evidence_errors[0])
-            if receipt.plugin.distribution != "invarlock":
-                raise RuntimeProviderJudgeError(
-                    "runtime judge requires a first-party InvarLock provider receipt"
-                )
-            execution = receipt.execution_settings
-            if (
-                execution.allow_network
-                or execution.seed != plan["judge"]["config"]["seed"]
-                or execution.max_output_tokens
-                != plan["judge"]["config"]["max_output_tokens"]
-            ):
-                raise RuntimeProviderJudgeError(
-                    "runtime judge receipt differs from the approved generation settings"
-                )
-            if (
-                observation.schedule_sha256 != plan_digest
-                or len(observation.records) != 1
-            ):
-                raise RuntimeProviderJudgeError(
-                    "runtime judge observation differs from the plan"
-                )
-            aggregate = runtime_scoring_records_sha256(
-                [
-                    cast(dict[str, object], asdict(record))
-                    for record in observation.records
-                ]
-            )
-            if observation.aggregate_source_sha256 != aggregate:
-                raise RuntimeProviderJudgeError(
-                    "runtime judge observation aggregate digest is invalid"
-                )
-            record = observation.records[0]
-            if (
-                record.record_id != expected_record.record_id
-                or record.input_sha256 != expected_record.input_sha256
-            ):
-                raise RuntimeProviderJudgeError(
-                    "runtime judge observation does not match its planned prompt"
-                )
-            attempt = _attempt(
-                record=record,
-                request=request,
-                spec=spec,
-                options=options,
-                source_id=source_id,
-                record_index=0,
-            )
-            parsed = (
-                _parse_result(record.output_text, plan)
-                if record.status == "ok" and record.output_text is not None
-                else {"status": "unavailable", "rating": None, "value": None}
-            )
-            trial.update(
-                status="complete" if parsed["status"] == "ok" else "incomplete",
-                attempts=[attempt],
-                selected_attempt=1 if record.status == "ok" else None,
-                parse=parsed,
-            )
-            source_value = {
-                "format": RUNTIME_PROVIDER_SOURCE_FORMAT,
-                "runtime_spec": {
-                    "provider_name": spec.provider_name,
-                    "model_id": spec.model_id,
-                    "settings": dict(spec.settings),
-                },
-                "artifact_identity": _decoded_object(
-                    artifact_bytes, label="runtime judge artifact identity"
-                ),
-                "scoring_observation": _decoded_object(
-                    observation_bytes, label="runtime judge scoring observation"
-                ),
-                "provider_receipt": _decoded_object(
-                    receipt_bytes, label="runtime judge provider receipt"
-                ),
-                "trials": [trial],
-            }
-            source_bytes = canonical_payload(source_value)
-            if len(source_bytes) > _SOURCE_MAX_BYTES:
-                raise RuntimeProviderJudgeError(
-                    f"runtime judge retained source exceeds {_SOURCE_MAX_BYTES} bytes"
-                )
-            _retain_checkpoint_batch(options, index, source_value)
-            source_values.append(source_value)
-    finally:
-        if session is not None:
-            session.close()
+    from .native_collection import sequential_collection
 
-    trials = [source["trials"][0] for source in source_values]
-    retained_sources = []
-    for source in source_values:
-        source_bytes = canonical_payload(source)
-        source_id = source["trials"][0]["attempts"][0]["source"]["source_id"]
-        retained_sources.append(
-            {
-                "source_id": source_id,
-                "profile": RUNTIME_PROVIDER_SOURCE_FORMAT,
-                "encoding": "utf-8",
-                "byte_size": len(source_bytes),
-                "media_type": "application/json",
-                "content": source_bytes.decode("utf-8"),
-                "sha256": _sha256(source_bytes),
-            }
-        )
-    completed = sum(trial["status"] == "complete" for trial in trials)
-    result = cast(
-        JudgeMeasurements,
-        {
-            "format": MEASUREMENTS_FORMAT,
-            "profile_id": plan["profile_id"],
-            "plan_sha256": plan_digest,
-            "source_profile": RUNTIME_PROVIDER_SOURCE_FORMAT,
-            "sources": retained_sources,
-            "trials": trials,
-            "completeness": {
-                "status": "complete" if completed == len(trials) else "incomplete",
-                "expected_trials": plan["schedule"]["expected_trials"],
-                "recorded_trials": len(trials),
-                "completed_trials": completed,
-            },
-        },
-    )
-    if len(canonical_payload(result)) > MEASUREMENTS_MAX_BYTES:
-        raise RuntimeProviderJudgeError(
-            "runtime judge retained measurements exceed the global byte limit"
-        )
-    validate_measurements(
-        result,
-        plan,
+    with sequential_collection(
+        execution_backend,
+        directory=options.checkpoint_directory,
+        identity=checkpoint_identity,
+        plan=plan,
         baseline_run=baseline_run,
         subject_run=subject_run,
-    )
-    return result
+        error_type=RuntimeProviderJudgeError,
+    ) as native:
+        source_values = _resume_collection_sources(
+            native, options, checkpoint_identity, pending, plan, spec, resources
+        )
+        start = len(source_values)
+        session = None
+        context = None
+        if start < len(pending):
+            context = provider.prepare_execution(spec, resources)
+            if (
+                not context.strict
+                or context.allow_network
+                or context.container_image_digest != resources.container_image_digest
+                or context.device_kind != resources.device_kind
+                or context.artifact_identity_sha256 != artifact_digest
+            ):
+                if context.close_callback is not None:
+                    context.close_callback()
+                raise RuntimeProviderJudgeError(
+                    "runtime judge requires a strict offline execution context"
+                )
+            try:
+                session = provider.open(spec, context)
+            except BaseException:
+                if context.close_callback is not None:
+                    context.close_callback()
+                raise
+        try:
+            for index in range(start, len(pending)):
+                trial, request, expected_record = pending[index]
+                source_id = _source_id(options, index, len(pending))
+                _check_next_retained_capacity(native, source_values, plan, plan_digest)
+                if native:
+                    admitted = native.admit(index, request)
+                    request = admitted["normalized_request"].encode("utf-8")
+                    expected_record = _input_record(
+                        admitted["trial_id"], admitted["runtime_prompt"].encode("utf-8")
+                    )
+                else:
+                    _admit_checkpoint_batch(options, index)
+                assert session is not None
+                observation = session.score(
+                    EvaluationBatch(
+                        schedule_sha256=plan_digest,
+                        records=(expected_record,),
+                        metric="exact_match",
+                        task="text_causal",
+                    )
+                )
+                receipt = session.runtime_receipt()
+                observation_bytes = encode_scoring_observation(observation)
+                receipt_bytes = encode_runtime_provider_receipt(receipt)
+                if (
+                    len(artifact_bytes) > 64 * 1024
+                    or len(observation_bytes) > 2 * 1024 * 1024
+                    or len(receipt_bytes) > 256 * 1024
+                ):
+                    raise RuntimeProviderJudgeError(
+                        "runtime judge provider evidence exceeds its retained reservation"
+                    )
+                evidence_errors = runtime_provider_evidence_errors(
+                    artifact_identity=artifact,
+                    scoring_observation=observation,
+                    receipt=receipt,
+                    scoring_observation_bytes=observation_bytes,
+                    expected_outer_image_digest=resources.container_image_digest,
+                )
+                evidence_errors += runtime_request_binding_errors(
+                    provider_name=spec.provider_name,
+                    settings=spec.settings,
+                    artifact_identity=artifact,
+                    receipt=receipt,
+                )
+                if evidence_errors:
+                    raise RuntimeProviderJudgeError(evidence_errors[0])
+                if receipt.plugin.distribution != "invarlock":
+                    raise RuntimeProviderJudgeError(
+                        "runtime judge requires a first-party InvarLock provider receipt"
+                    )
+                execution = receipt.execution_settings
+                if (
+                    execution.allow_network
+                    or execution.seed != plan["judge"]["config"]["seed"]
+                    or execution.max_output_tokens
+                    != plan["judge"]["config"]["max_output_tokens"]
+                ):
+                    raise RuntimeProviderJudgeError(
+                        "runtime judge receipt differs from the approved generation settings"
+                    )
+                if (
+                    observation.schedule_sha256 != plan_digest
+                    or len(observation.records) != 1
+                ):
+                    raise RuntimeProviderJudgeError(
+                        "runtime judge observation differs from the plan"
+                    )
+                aggregate = runtime_scoring_records_sha256(
+                    [
+                        cast(dict[str, object], asdict(record))
+                        for record in observation.records
+                    ]
+                )
+                if observation.aggregate_source_sha256 != aggregate:
+                    raise RuntimeProviderJudgeError(
+                        "runtime judge observation aggregate digest is invalid"
+                    )
+                record = observation.records[0]
+                if (
+                    record.record_id != expected_record.record_id
+                    or record.input_sha256 != expected_record.input_sha256
+                ):
+                    raise RuntimeProviderJudgeError(
+                        "runtime judge observation does not match its planned prompt"
+                    )
+                attempt = _attempt(
+                    record=record,
+                    request=request,
+                    spec=spec,
+                    options=options,
+                    source_id=source_id,
+                    record_index=0,
+                )
+                parsed = (
+                    _parse_result(record.output_text, plan)
+                    if record.status == "ok" and record.output_text is not None
+                    else {"status": "unavailable", "rating": None, "value": None}
+                )
+                trial.update(
+                    status="complete" if parsed["status"] == "ok" else "incomplete",
+                    attempts=[attempt],
+                    selected_attempt=1 if record.status == "ok" else None,
+                    parse=parsed,
+                )
+                source_value = {
+                    "format": RUNTIME_PROVIDER_SOURCE_FORMAT,
+                    "runtime_spec": {
+                        "provider_name": spec.provider_name,
+                        "model_id": spec.model_id,
+                        "settings": dict(spec.settings),
+                    },
+                    "artifact_identity": _decoded_object(
+                        artifact_bytes, label="runtime judge artifact identity"
+                    ),
+                    "scoring_observation": _decoded_object(
+                        observation_bytes, label="runtime judge scoring observation"
+                    ),
+                    "provider_receipt": _decoded_object(
+                        receipt_bytes, label="runtime judge provider receipt"
+                    ),
+                    "trials": [trial],
+                }
+                source_bytes = canonical_payload(source_value)
+                if len(source_bytes) > _SOURCE_MAX_BYTES:
+                    raise RuntimeProviderJudgeError(
+                        f"runtime judge retained source exceeds {_SOURCE_MAX_BYTES} bytes"
+                    )
+                if native:
+                    native.complete(index, source_value)
+                else:
+                    _retain_checkpoint_batch(options, index, source_value)
+                source_values.append(source_value)
+        finally:
+            if session is not None:
+                session.close()
+
+        if native:
+            return native.finish()
+        trials = [source["trials"][0] for source in source_values]
+        retained_sources = []
+        for source in source_values:
+            source_bytes = canonical_payload(source)
+            source_id = source["trials"][0]["attempts"][0]["source"]["source_id"]
+            retained_sources.append(
+                {
+                    "source_id": source_id,
+                    "profile": RUNTIME_PROVIDER_SOURCE_FORMAT,
+                    "encoding": "utf-8",
+                    "byte_size": len(source_bytes),
+                    "media_type": "application/json",
+                    "content": source_bytes.decode("utf-8"),
+                    "sha256": _sha256(source_bytes),
+                }
+            )
+        completed = sum(trial["status"] == "complete" for trial in trials)
+        result = cast(
+            JudgeMeasurements,
+            {
+                "format": MEASUREMENTS_FORMAT,
+                "profile_id": plan["profile_id"],
+                "plan_sha256": plan_digest,
+                "source_profile": RUNTIME_PROVIDER_SOURCE_FORMAT,
+                "sources": retained_sources,
+                "trials": trials,
+                "completeness": {
+                    "status": "complete" if completed == len(trials) else "incomplete",
+                    "expected_trials": plan["schedule"]["expected_trials"],
+                    "recorded_trials": len(trials),
+                    "completed_trials": completed,
+                },
+            },
+        )
+        if len(canonical_payload(result)) > MEASUREMENTS_MAX_BYTES:
+            raise RuntimeProviderJudgeError(
+                "runtime judge retained measurements exceed the global byte limit"
+            )
+        validate_measurements(
+            result,
+            plan,
+            baseline_run=baseline_run,
+            subject_run=subject_run,
+        )
+        return result
 
 
 __all__ = [

@@ -530,6 +530,36 @@ def read_gguf_artifact_identity(
 ) -> GGUFArtifactIdentity:
     """Read a stable local GGUF file and return privacy-safe content identity."""
 
+    from invarlock.runtime_providers.native_execution import execution_backend
+
+    if execution_backend() == "rust":
+        import base64
+
+        from invarlock.native_backend import (
+            NativeBackendUnavailable,
+            require_native,
+            transact,
+        )
+
+        try:
+            path_string = os.fspath(path)
+            if not isinstance(path_string, str):
+                raise TypeError("GGUF path must be text")
+            encoded_path = base64.b64encode(os.fsencode(path_string)).decode("ascii")
+        except (TypeError, ValueError, OSError) as exc:
+            raise GGUFIdentityError("GGUF artifact path is invalid") from exc
+        try:
+            native = require_native()
+        except NativeBackendUnavailable as exc:
+            raise GGUFIdentityError(str(exc)) from exc
+        try:
+            payload = transact("gguf-identity", {"path_base64": encoded_path})[
+                "payload"
+            ]
+        except native.NativeVerificationError as exc:
+            raise GGUFIdentityError(str(exc)) from exc
+        return GGUFArtifactIdentity(**payload)
+
     artifact = _open_regular_without_symlinks(path)
     try:
         file_size = artifact.initial_stat.st_size

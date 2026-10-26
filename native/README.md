@@ -1,92 +1,140 @@
-# Isolated paired interval experiment
+# Experimental native core
 
-This workspace contains an ordinary Rust library (`core`) and an explicitly
-invoked Python companion (`bindings`). The root Python distribution and release
-configuration are independent. There is no automatic backend selection and no
-standalone evidence verifier.
+This workspace implements the portable InvarLock core and a separate execution
+layer in Rust. The Python package remains the default backend. Select Rust
+explicitly after installing the companion wheel; a missing native package or
+failed operation never selects Python automatically.
 
-The only product operation in scope is the fixed 2048-replicate paired SHA-256
-percentile interval in `src/invarlock/evidence_pack_contract.py`. The core uses
-owned scalar data, SHA-256 over the decoded 32-byte schedule digest plus big-endian
-u64 replicate/draw counters, the first digest u64 modulo pair count, CPython-style
-`math.fsum` arithmetic, and the original percentile operation order. Ordinary Rust
-binary64 operations are used without fast math or fused replacement expressions.
-The single-pair path does not resample.
+The experiment compares complete transactions with the fixed Python reference.
+It does not replace model frameworks, evaluator SDKs or Python scorer plugins.
+Those integrations supply owned data to the native boundary. An explicitly
+authorized scorer callback can run in Python; Rust checks its returned facts.
 
-The Python module exposes:
+## Workspace
 
-```python
-from invarlock_native import paired_resampling_interval
-lower, upper = paired_resampling_interval(
-    metric="normalized_nll_per_utf8_byte",
-    baseline_scores=[1.0, 2.0, 3.0],
-    subject_scores=[1.1, 1.9, 2.8],
-    schedule_sha256="a" * 64,
-)
-```
+| Crate | Responsibility |
+| --- | --- |
+| `contracts` | Bounded JSON, canonical bytes, embedded schemas, typed runtime/schedule/request contracts |
+| `core` | Deterministic scoring, exact binary64 statistics, comparison reports, judge replay and precision |
+| `filesystem` | Pinned descriptors, bounded snapshots, identity checks, atomic no-clobber publication |
+| `evidence` | Captured/native/judge packs, recipient trust, signatures, receipts, evidence sets, qualification, attestations, GGUF inspection and reports |
+| `execution` | Bounded child processes, OCI workers, admission, budgets, checkpoint/resume and workspace ownership |
+| `bindings` | Coarse PyO3 transactions and explicit Python callback adapters |
+| `cli` | `invarlock-native-verify`, an offline executable without the execution crate |
+| `control-cli` | `invarlock-native`, a separate process/checkpoint command executable |
 
-The named NLL metric computes the ratio of separate rounded means. All other
-metric names use the reference's paired difference mean multiplied by 100.
-Scores are copied into `Vec<f64>` before the complete computation runs with the
-GIL released using PyO3 `Python::detach`. The binding accepts no borrowed Python
-objects in the detached computation. Diagnostic functions `sample_indexes`,
-`resampling_distribution`, and `_diagnostic_fsum` support protocol verification;
-the normal interval call never returns a full replicate array across the FFI.
+Differential tests cover the existing digest domains, canonical newlines, numerical
+methods, historical report versions and independent recipient trust on the
+qualified fixtures and retained corpus. This is not an all-input equivalence claim. It uses
+owned inputs, checked records and descriptor-backed snapshots. Long operations
+release the Python GIL; an authorized callback reacquires it only for that call.
+Publication cannot replace an existing destination. Interrupted admitted work
+cannot be silently dispatched again.
 
-Supplied vectors must be nonempty, equal-length, and finite. This is stricter
-than calling the raw private Python helper with unvalidated arguments and agrees
-with its intended validated domain. Seed validation occurs first, including for
-one pair. Native invalid-input errors are `ValueError`; intermediate `fsum`
-overflow is `OverflowError`; opposite infinite summands are `ValueError`.
-Seed and nonpositive-baseline messages match the Python reference. Computed
-infinity and NaN are preserved for the existing outer report validator. The
-Python integration adapter remains responsible for public exception classes.
+## Build
 
-## Build and verify
+The qualified build profile is Rust 1.94.0 and CPython 3.12 on macOS arm64.
+The companion package declares Python `>=3.12,<3.13`; other profiles require their
+own qualification. The toolchain and Cargo dependency versions are pinned.
 
-From this directory, with an isolated Python environment and Rust 1.94.0:
+From this directory:
 
 ```sh
 python -m pip install maturin==1.12.0
-export CARGO_TARGET_DIR=/Volumes/InvarLock-Rust-Dev/build/native
-cargo test --locked --offline -p invarlock-native-core
-cargo test --locked --offline --release -p invarlock-native-core
-cargo clippy --locked --offline --workspace --all-targets -- -D warnings
-cargo fmt --all --check
+cargo build --release --locked --offline --workspace --bins
 maturin build --release --locked --offline -i /path/to/python --out /path/to/wheels
 python -m pip install /path/to/wheels/invarlock_native_experiment-*.whl
-python -m unittest discover -s tests -v
-maturin sdist --out /path/to/sdists
 ```
 
-The differential tests require this checkout's unchanged Python source at
-`../src/invarlock/evidence_pack_contract.py`. They compile the exact helper AST
-nodes to avoid importing optional evaluation dependencies. They compare every
-replicate and interval endpoint bit-for-bit (NaN by classification), complete draw
-sets and u64 counter boundaries, singleton behavior, CPython summation final
-rounding/cancellation/subnormals, deterministic randomized finite inputs, and
-relevant failure classes/messages. Rust golden tests also exercise complete
-nonconstant intervals independently of Python. Tests establish these exercised
-behaviors; they do not establish parity over all binary64 inputs or platforms.
+Use `CARGO_TARGET_DIR` to keep compiled artifacts outside the checkout. A first
+build needs the locked Cargo sources available locally before `--offline` works.
+The source archive includes all workspace crates, embedded schemas, dependency
+inventory, licenses and the Cargo lock. Differential tests additionally require
+the Python reference checkout and its test dependencies.
 
-The source distribution includes both workspace crates, Cargo.lock,
-`rust-toolchain.toml`, tests and licenses. Its Rust workspace builds independently of the checkout; differential
-reference tests still require the checkout source. Version pins are sha2 0.10.9,
-PyO3 0.29.0 and maturin 1.12.0. Apache 2.0 covers original code; adapted CPython
-summation retains PSF terms as described in `THIRD_PARTY_NOTICES.md`.
+## Select the backend
 
-## Qualification scope
+The Python command keeps its existing request and result formats:
 
-`rust-toolchain.toml` pins Rust 1.94.0 with the minimal profile. The manifest
-`rust-version = "1.83"` is a declared minimum, not tested compatibility; only
-Rust 1.94.0 is qualified here. Rustup honors the toolchain file automatically.
-This host uses Homebrew Rust without rustup, so the build records the actual
-`rustc --version` and `cargo --version`; both report 1.94.0. Other installations
-should verify those versions before running the experiment.
+```sh
+invarlock evaluate request.yaml --signing-key signer.pem --backend rust
+invarlock verify evidence --trust-profile trust.json --receipt receipt.json --backend rust
+invarlock report evidence --html report.html --backend rust
+```
 
-The primary experiment targets CPython 3.12 on macOS arm64 with Rust 1.94.0;
-CPython 3.14 builds and differential runs are exploratory smoke coverage. Wheels
-for the two interpreter ABIs are retained separately. The test suite exercises
-both implementations on this host; it makes no cross-platform or performance
-claim. Benchmarking and any public integration decisions belong to the separate
-experiment harness. The original Python package remains the default.
+`evaluate --execution-backend rust` remains an alias for the same selection.
+Provider discovery, strict YAML decoding, external evaluator format adapters,
+SDK calls and model execution remain Python integrations. Rust owns the portable
+analysis/evidence path and the selected process, admission and checkpoint work.
+OCI worker images must contain the native extension when Rust is selected.
+The selection also scopes host provider hooks, GGUF inspection and worker-side
+publication. Native publication checks the original SDK observation and receipt
+before writing their exact bytes; it cannot replace inconsistent provider facts.
+
+The offline binary uses bounded JSON requests:
+
+```sh
+invarlock-native-verify --capabilities
+invarlock-native-verify verify-trust --request recipient-request.json
+```
+
+For captured/native evidence, `recipient-request.json` contains the caller's
+`trust_path`, `evidence_path` and `receipt_path`. Judge and evidence-set recipient
+policies use the corresponding `verify-judge` and `verify-evidence-set` commands.
+`--help` lists every transaction. Request fields are experimental; the stable
+external evidence formats remain authoritative.
+
+The control executable has process and checkpoint authority and is deliberately
+separate from the offline verifier. It does not embed Python provider SDKs.
+
+## Verification
+
+```sh
+cargo fmt --all --check
+cargo clippy --locked --offline --workspace --all-targets -- -D warnings
+cargo test --locked --offline --workspace --exclude invarlock-native-bindings
+cargo test --release --locked --offline --workspace --exclude invarlock-native-bindings
+cargo build --locked --offline --workspace --bins --examples
+```
+
+The extension boundary is exercised through its installed Python wheel.
+Run `native/tests/` with pytest from the repository root, setting `PYTHONPATH=src:.`,
+`CARGO_TARGET_DIR`, `INVARLOCK_NATIVE_VERIFY`, `INVARLOCK_NATIVE_COMMAND`,
+`INVARLOCK_ANALYSIS_BIN`, `INVARLOCK_ATTESTATION_BIN` and
+`INVARLOCK_NATIVE_REPORT_BINDINGS=1` and `INVARLOCK_NATIVE_GGUF_BINDINGS=1`
+to the freshly built tools. The installed
+companion wheel must match that source. Run the root `make verify` gates too.
+
+The differential suite checks exact canonical output, binary64 results, signed
+bytes, public error/status behavior, retained historical artifacts, bounded
+resources, interrupted recovery and complete public API paths. Controlled SDK,
+provider and container fixtures are distinct from live execution qualification.
+Linux descriptor execution and real container/provider operation are not
+qualified by macOS fixtures.
+
+The original interval measurements are retained under `experiments/rust/`.
+They describe that earlier slice only. Expanded measurements use separate frozen
+artifacts, retained workloads, qualification attempts and timing records.
+
+`dependency-inventory.json` and `sbom.cdx.json` describe the resolved dependency
+graph. `THIRD_PARTY_NOTICES.md` and `licenses/` retain dependency and adapted
+CPython notices. A vulnerability scan is evidence about its dated database and
+exact lock, not a general security guarantee.
+
+## Local resource limits and qualification boundaries
+
+Native report replay reconstructs at most 10,000,000 paired binary outcomes.
+Exceeding that budget is an incomplete local operation, not a finding that
+authenticated evidence is invalid. The Python renderer can attempt larger
+authored counts; parity above this native work budget is not claimed. Runtime
+schedules retain their separate schema limits. The JSON parser caps nesting at
+900 levels and rejects lone UTF-16 surrogates. Python parsing may accept those
+surrogates before canonical UTF-8 serialization rejects them, so rejection stage
+and diagnostic parity for those inputs are not claimed. The schema byte and
+record limits remain independent of these implementation resource limits.
+
+Some host preflight checks are repeated around provider hooks, including runtime
+identity and configuration checks. Low-level Python helpers remain available;
+selecting a coarse native transaction is the migration boundary. This candidate
+does not claim that every target-map Python function has been removed or that
+all internal copies and validation passes have been eliminated.

@@ -5,13 +5,14 @@ build-backend = "maturin"
 [project]
 name = "invarlock-native-experiment"
 version = "0.1.0"
-requires-python = ">=3.12"
-description = "Isolated opt-in paired interval experiment"
+requires-python = ">=3.12,<3.13"
+description = "Experimental native evidence, analysis and execution core"
 readme = "README.md"
 license = "Apache-2.0 AND PSF-2.0"
 license-files = ["LICENSE", "licenses/**/*"]
 
 [tool.maturin]
+sdist-generator = "git"
 manifest-path = "bindings/Cargo.toml"
 module-name = "invarlock_native"
 exclude = ["**/__pycache__/**", "**/*.pyc"]
@@ -19,8 +20,18 @@ include = [
   { path = "Cargo.toml", format = "sdist" },
   { path = "Cargo.lock", format = "sdist" },
   { path = "rust-toolchain.toml", format = "sdist" },
+  { path = "bindings/**/*", format = "sdist" },
   { path = "core/**/*", format = "sdist" },
+  { path = "contracts/**/*", format = "sdist" },
+  { path = "filesystem/**/*", format = "sdist" },
+  { path = "evidence/**/*", format = "sdist" },
+  { path = "execution/**/*", format = "sdist" },
+  { path = "cli/**/*", format = "sdist" },
+  { path = "control-cli/**/*", format = "sdist" },
+  { path = "tools/**/*", format = "sdist" },
   { path = "tests/*.py", format = "sdist" },
+  { path = "dependency-inventory.json", format = ["sdist", "wheel"] },
+  { path = "sbom.cdx.json", format = ["sdist", "wheel"] },
   { path = "THIRD_PARTY_NOTICES.md", format = ["sdist", "wheel"] },
   { path = "licenses/**/*", format = ["sdist", "wheel"] },
 ]

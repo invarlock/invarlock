@@ -313,6 +313,29 @@ def run_evidence_side(
         )
 
     output, parent = _resolved_output(output_directory)
+    from invarlock.runtime_providers.native_execution import execution_backend
+
+    if execution_backend() == "rust":
+        from invarlock.runtime_behavior.native_publication import publish_runtime_side
+
+        evidence = publish_runtime_side(
+            role=role,
+            output=output,
+            schedule=schedule,
+            policy_digest=policy_digest,
+            artifact_identity=artifact_identity,
+            observation=observation,
+            receipt=receipt,
+            execution=execution,
+        )
+        return RuntimeEvidenceSideBundle(
+            role=role,
+            directory=output,
+            report_path=output / _REPORT_FILENAME,
+            config_path=output / _CONFIG_FILENAME,
+            manifest_path=output / "runtime.manifest.json",
+            evidence=evidence,
+        )
     staging = Path(tempfile.mkdtemp(dir=parent, prefix=f".{output.name}.staging."))
     try:
         evidence = write_runtime_provider_evidence(

@@ -61,6 +61,7 @@ class VerificationOptions:
     verifier_signing_key: Path | None
     verifier_identity: str | None
     allow_installed_scorers: bool
+    backend: str = "python"
 
 
 def execute_verification(
@@ -71,6 +72,17 @@ def execute_verification(
 ) -> EvidenceVerification:
     """Resolve one closed trust source and execute mode-appropriate verification."""
 
+    from invarlock.evidence_verification import EvidenceVerificationError
+
+    if options.backend not in {"python", "rust"}:
+        raise EvidenceVerificationError("verification backend must be python or rust")
+    if options.backend == "rust":
+        from invarlock.native_backend import NativeBackendUnavailable, require_native
+
+        try:
+            require_native()
+        except NativeBackendUnavailable as exc:
+            raise EvidenceVerificationError(str(exc)) from exc
     from invarlock.evidence_sets.contracts import is_evidence_set
 
     if is_evidence_set(options.evidence):
@@ -98,6 +110,9 @@ def execute_verification(
         TrustInputsError,
         load_trust_inputs,
     )
+
+    if options.backend == "rust":
+        from invarlock.native_backend import load_trust_inputs
 
     policy = options.policy
     expected_baseline_artifact = options.expected_baseline_artifact
@@ -193,6 +208,7 @@ def execute_verification(
             verifier_signing_key_bytes=verifier_signing_key_bytes,
             max_bootstrap_draws=options.max_bootstrap_draws,
             _expected_captured=True,
+            **({"backend": options.backend} if options.backend != "python" else {}),
         )
     if command_line.intersection(NATIVE_IRRELEVANT_OPTIONS):
         raise EvidenceVerificationError(
@@ -218,4 +234,5 @@ def execute_verification(
         policy_bytes=policy_bytes,
         verifier_signing_key_bytes=verifier_signing_key_bytes,
         _expected_captured=False,
+        **({"backend": options.backend} if options.backend != "python" else {}),
     )

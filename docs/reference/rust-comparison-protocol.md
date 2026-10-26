@@ -1,5 +1,8 @@
 # Rust comparison protocol
 
+The [expanded results](rust-expanded-results.md) record the completed four-candidate
+comparison, its budget-only continuation, and the measured tradeoffs.
+
 > **Reference**
 >
 > **Surface:** Experimental conformance, measurement and adoption criteria
@@ -85,6 +88,50 @@ whole-process-tree resources where execution creates children. Deterministic
 worker fixtures isolate local control overhead; they do not establish actual
 provider performance. Qualify each materially changed real execution boundary
 before claiming support, within existing authorization and resource constraints.
+
+## Expanded transaction matrix
+
+`experiments/rust/matrix-expanded.json` freezes four candidates and four balanced
+rounds per workload: unchanged Python, the recorded interval optimization, the
+complete Rust transaction through Python, and a standalone Rust transaction
+driver. The last driver calls the same evidence crate as the offline executable;
+it does not start Python. All candidates use the same retained input evidence.
+The Python optimization is a practical narrow control, not a second complete
+architectural rewrite or a claim about optimal Python.
+
+Eight workloads cover nonconstant captured NLL at 1,000, 5,000, 12,000 and 50,000
+pairs, a captured regression, a native runtime pack, bounded judge evidence, and
+an evidence set. Every journey includes independent replay, receipt production
+and authentication, and HTML, Markdown and JUnit report publication. Judge and
+native fixtures are small; they do not establish large-collection throughput.
+
+Before measurement, run one complete qualification per candidate and workload.
+The planned denominators are 32 qualification attempts and 128 timing attempts.
+The matrix permits 300 seconds per process and at most 3,600 seconds overall;
+the driver reserves enough time for a full four-candidate round before starting
+it. These are local execution limits, not billing limits. No models or external
+providers are invoked.
+
+Retain every stdout, stderr, request, receipt, report and resource record. Compare
+canonical transaction results and file hashes exactly. Only the declared
+`requested_outputs` and `written_outputs` report destination fields normalize
+to the common output marker; text, identities, decisions and file bytes do not.
+Rotate candidate order so each occupies every position once. Report medians and
+ranges separately for fresh-process wall time, operation wall time, CPU and peak
+resident memory. Four rounds support a local comparison, not broad performance
+confidence intervals.
+
+There are no automatic retries or exclusions. A failing qualification stops
+measurement. A bad measurement round stops further dispatch, retains all its
+attempts and requires a documented correction before a new matrix. Do not pool
+failed or superseded configurations into a clean final denominator. Recheck
+wheel, command, input and harness identities before and after each phase.
+
+Python workers reject checkout/editable imports and check installed bytes against
+retained wheels. Their Python audit hook rejects socket operations. The standalone
+verifier has no networking or execution crate dependency; that property is
+separate from operating-system network sandbox qualification. Provider, container
+and GPU performance remain separate questions.
 
 ## Conformance comes first
 

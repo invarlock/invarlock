@@ -654,6 +654,26 @@ def _run_bounded_process(
     recheck_bindings()
     vendor_python_path = str(vendor_python.path)
     runner_path = str(runner.path)
+    from .native_execution import execution_backend, run_native_process
+
+    if execution_backend() == "rust":
+        try:
+            return run_native_process(
+                program=vendor_python_path,
+                arguments=(runner_path, *arguments),
+                input_bytes=input_bytes,
+                pass_fds=(),
+                cwd=run_directory.path,
+                environment=run_directory.environment(),
+                timeout_seconds=timeout_seconds,
+                stdout_limit=stdout_limit,
+                stderr_limit=stderr_limit,
+                error_type=TensorRTLLMExecutionError,
+                timeout_label="TensorRT-LLM record",
+                output_label="TensorRT-LLM runner",
+            )
+        finally:
+            recheck_bindings()
     try:
         try:
             process = subprocess.Popen(

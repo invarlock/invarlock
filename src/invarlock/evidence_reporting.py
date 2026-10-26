@@ -1442,8 +1442,22 @@ def render_evidence(
     markdown_path: Path | None = None,
     junit_path: Path | None = None,
     case_ids: tuple[str, ...] = (),
+    backend: str = "python",
 ) -> EvidenceReportV2:
     """Render either evidence family without replay or implicit receipt discovery."""
+    if backend not in {"python", "rust"}:
+        raise EvidenceReportError("backend must be python or rust")
+    if backend == "rust":
+        from invarlock.native_reporting import render_evidence as render_native
+
+        return render_native(
+            evidence_path,
+            html_path=html_path,
+            markdown_path=markdown_path,
+            junit_path=junit_path,
+            explain=explain,
+            case_ids=case_ids,
+        )
     from invarlock.captured_contracts import sha
     from invarlock.captured_reporting import (
         CapturedReportError,

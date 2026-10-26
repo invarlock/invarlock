@@ -1,0 +1,684 @@
+{
+  "format": "invarlock/native-implementation-coverage-v1",
+  "target_architecture_manifest": "experiments/rust/module-map.json",
+  "scope": "Implemented experimental contracts, analysis, evidence, reporting, filesystem, and execution surfaces, with explicit Python integrations. This supplements the target-ownership map; it does not claim exhaustive parity, migration of every mapped module, or completion of an architectural stage.",
+  "backend_selection": "Python remains the default. Rust is selected explicitly through backend arguments, the native transaction adapter, or native command-line operations. Provider SDK execution and external-format import adapters remain explicit host integrations.",
+  "groups": [
+    {
+      "surface": "Strict JSON, canonical bytes, and packaged schemas",
+      "native_files": [
+        "native/contracts/src/parser.rs",
+        "native/contracts/src/canonical.rs",
+        "native/contracts/src/schemas.rs",
+        "native/contracts/src/diagnostic.rs",
+        "native/contracts/src/numeric.rs",
+        "native/contracts/build.rs",
+        "native/contracts/schemas"
+      ],
+      "facade_reachability": [
+        "Every native transaction parses owned JSON and uses these canonical and schema APIs.",
+        "Standalone canonicalize and validate operations expose the same boundary."
+      ],
+      "test_sources": [
+        "native/tests/test_contracts_differential.py",
+        "native/contracts/tests"
+      ],
+      "exercised_behavior": [
+        "Duplicate-key and nonfinite rejection; Unicode and arbitrary-integer preservation; seeded binary64 canonical-byte differential; newline and no-newline identities.",
+        "Packaged schema/source byte equality and source-compatible diagnostics for exercised record schemas and numerical keywords, including integers beyond binary64 range."
+      ],
+      "remaining_boundaries": [
+        "Isolated UTF-16 surrogates are rejected at parse time; Python may parse them before its canonical UTF-8 encoding rejects them.",
+        "Native parser depth is bounded at 900 and integer text at the standard CPython 4300-digit limit.",
+        "Exact diagnostic equivalence is fixture-qualified; unexercised combinations and schema keywords are not claimed exhaustively equivalent."
+      ],
+      "status": "qualified_on_listed_fixtures",
+      "evidence_reference": "qualification.final_aggregate"
+    },
+    {
+      "surface": "Typed schedules and pinned local JSONL preparation",
+      "native_files": [
+        "native/contracts/src/schedule.rs",
+        "native/evidence/src/native_pack/replay.rs",
+        "native/evidence/src/preparation.rs"
+      ],
+      "facade_reachability": [
+        "prepare-schedule transaction supports build, parse, material, and local preparation.",
+        "core.schedule_preparation file/bytes APIs accept backend=\"rust\"; pure native-result hydration returns existing frozen Python values.",
+        "Native pack verification and runtime input preparation use the shared typed schedule implementation."
+      ],
+      "test_sources": [
+        "native/tests/test_schedule_differential.py",
+        "tests/core/test_schedule_preparation.py",
+        "tests/core/test_evaluation_request_contract.py"
+      ],
+      "exercised_behavior": [
+        "Closed typed fields, ordered parts and records, source digests, preparation descriptors, Unicode whitespace, and arbitrary positive content byte lengths.",
+        "Malformed and noncanonical inputs, 16 MiB raw bounds, record bounds, and accepted material containing 128 nested unused JSON arrays."
+      ],
+      "remaining_boundaries": [
+        "YAML authored-request token decoding remains an explicit Python loading adapter.",
+        "Provider loading and content materialization are outside the portable schedule contract."
+      ],
+      "status": "qualified_on_listed_fixtures",
+      "evidence_reference": "qualification.final_aggregate"
+    },
+    {
+      "surface": "Authored requests and captured/runtime preflight",
+      "native_files": [
+        "native/contracts/src/request.rs",
+        "native/core/src/preflight.rs",
+        "native/evidence/src/preparation.rs",
+        "native/evidence/src/transaction.rs"
+      ],
+      "facade_reachability": [
+        "core.evaluation_request loader and discriminator accept backend=\"rust\".",
+        "prepare-captured, prepare-runtime-inputs, and normalize-runtime-request operations are used by the selected Rust evaluation facade."
+      ],
+      "test_sources": [
+        "native/tests/test_preparation_differential.py",
+        "native/tests/test_public_evaluation_differential.py",
+        "native/tests/test_adapter_audit.py"
+      ],
+      "exercised_behavior": [
+        "Authored schema/context diagnostics, forbidden include directives, mode selection, root-relative reference syntax, immutable read snapshots, planned case and run pins.",
+        "Captured pairing, provenance, work and missing-ID capacity checks without scoring; runtime schedule/policy/observation preparation and normalized request identities.",
+        "Actual source facade projections for run and import requests; explicit JSONL import followed by native publication."
+      ],
+      "remaining_boundaries": [
+        "Provider registry admission, configuration hooks, artifact resources, and YAML decoding remain explicit host adapters.",
+        "External evaluator formats remain Python import adapters; native preparation checks imported canonical values and their physical source digest against owned input bytes.",
+        "Malformed filesystem OS error text has not been exhaustively matched."
+      ],
+      "status": "qualified_on_listed_fixtures",
+      "evidence_reference": "qualification.final_aggregate"
+    },
+    {
+      "surface": "Native signed runtime pack replay and receipts",
+      "native_files": [
+        "native/evidence/src/native_pack.rs",
+        "native/evidence/src/native_pack/replay.rs",
+        "native/evidence/src/native_pack/receipt.rs"
+      ],
+      "facade_reachability": [
+        "verify-native and verify-native-receipt transactions.",
+        "native_backend.verify_native_evidence supplies owned independent trust bytes and an explicitly authorized scorer callback when required."
+      ],
+      "test_sources": [
+        "native/tests/test_native_pack_differential.py",
+        "native/tests/test_native_bridge_differential.py"
+      ],
+      "exercised_behavior": [
+        "Exact-match, normalized NLL, historical report profiles, observations, independent artifact/runtime/request/schedule anchors, signed positive and rejection receipts.",
+        "Fresh score/report reconstruction; authenticated mutations of six retained evidence roles; explicit extension scorer bridge."
+      ],
+      "remaining_boundaries": [
+        "Some simultaneous malformed failures still stop at the first native failure rather than accumulate every Python diagnostic.",
+        "Rare malformed Ed25519 signature acceptance differences between the cryptographic implementations remain outside the valid-signature fixtures.",
+        "Installed scorer replay requires an explicitly supplied authorized registry; standalone operation supports built-in metrics."
+      ],
+      "status": "qualified_on_listed_fixtures",
+      "evidence_reference": "qualification.final_aggregate"
+    },
+    {
+      "surface": "Runtime evidence authoring and publication",
+      "native_files": [
+        "native/evidence/src/native_publication.rs"
+      ],
+      "facade_reachability": [
+        "publish-native, write-runtime-side, load-runtime-side, write-runtime-paired, and derive-runtime-transaction operations.",
+        "Selected Rust runtime evaluation passes owned six-file side material and retained signing-key bytes through native_backend."
+      ],
+      "test_sources": [
+        "native/tests/test_native_publication_differential.py",
+        "native/tests/test_public_evaluation_differential.py"
+      ],
+      "exercised_behavior": [
+        "Source-identical pack bytes for passing, failed-policy, and observation cases; fresh verifier replay; read-only pack inventory and no replacement.",
+        "Six-file runtime import authoring from records and JSONL, independent reload, canonical retained run.yaml content."
+      ],
+      "remaining_boundaries": [
+        "Runtime import authoring requires an explicit timestamp in its native command request; automatic current-time generation is not implemented there.",
+        "Exotic ISO timestamp forms and all invalid authoring error-order combinations remain unqualified.",
+        "Source runtime_import_authoring APIs remain Python unless the caller selects the corresponding native transaction.",
+        "The native runtime-side authoring command writes all six files with owner-only permissions; the source authoring API may create its plain JSON files with broader permissions. Retained bytes match the exercised fixtures."
+      ],
+      "status": "qualified_on_listed_fixtures",
+      "evidence_reference": "qualification.final_aggregate"
+    },
+    {
+      "surface": "Retained runtime-provider judge evidence",
+      "native_files": [
+        "native/contracts/src/runtime.rs",
+        "native/core/src/judge_runtime.rs"
+      ],
+      "facade_reachability": [
+        "Shared core judge measurement validation dispatches retained runtime-provider sources through native replay.",
+        "Native runtime pack and judge capture operations share portable runtime contracts."
+      ],
+      "test_sources": [
+        "native/tests/test_judge_runtime_differential.py"
+      ],
+      "exercised_behavior": [
+        "Runtime specification, artifact, observation and receipt bindings; frozen-answer request reconstruction; canonical and ChatML prompts; completed/cancelled trial facts; cross-shard consistency."
+      ],
+      "remaining_boundaries": [
+        "Provider execution and model authentication are explicit host adapters.",
+        "Unexercised malformed runtime contract diagnostic combinations remain bounded by the general diagnostic qualification."
+      ],
+      "status": "qualified_on_listed_fixtures",
+      "evidence_reference": "qualification.final_aggregate"
+    },
+    {
+      "surface": "Evidence-set composition and stored-result verification",
+      "native_files": [
+        "native/evidence/src/evidence_sets.rs"
+      ],
+      "facade_reachability": [
+        "verify-evidence-set, verify-stored-evidence-set, and write-evidence-set-index operations.",
+        "native_backend.verify_evidence_set uses the native composition transaction."
+      ],
+      "test_sources": [
+        "native/tests/test_evidence_sets_differential.py"
+      ],
+      "exercised_behavior": [
+        "Independent child trust snapshots and fresh captured/judge verification; exact shared run, case and subject bindings; required-policy conjunction; embedded signed receipts.",
+        "Stored-result recomputation, hosted service identities, changed pins, malformed profiles, nested evidence, advisory policy rejection, work budgets and no-clobber indexing."
+      ],
+      "remaining_boundaries": [
+        "Composition does not create a joint confidence guarantee.",
+        "Exact source equivalence is limited to the exercised profile and mutation fixtures."
+      ],
+      "status": "qualified_on_listed_fixtures",
+      "evidence_reference": "qualification.final_aggregate"
+    },
+    {
+      "surface": "Combined reports and safe output publication",
+      "native_files": [
+        "native/evidence/src/reporting/sets.rs",
+        "native/evidence/src/reporting/publication.rs"
+      ],
+      "facade_reachability": [
+        "reporting::sets load/render and the shared report transaction.",
+        "Source native report adapter can return public report payloads and rendered text without recipient authorization."
+      ],
+      "test_sources": [
+        "native/tests/test_set_reporting_differential.py",
+        "native/evidence/src/reporting/publication.rs"
+      ],
+      "exercised_behavior": [
+        "Authenticated component snapshots, fresh judge replay, exact combined view/facts and Markdown/HTML/JUnit bytes.",
+        "All-output destination preflight; no-clobber writes outside evidence; collision, overlap and symlink-parent rejection; preservation of partial publication metadata after a later write failure."
+      ],
+      "remaining_boundaries": [
+        "Rendering does not authorize recipients or replay deterministic scoring.",
+        "Concurrent filesystem failure diagnostics beyond the injected partial-write case are not exhaustively qualified."
+      ],
+      "status": "qualified_on_listed_fixtures",
+      "evidence_reference": "qualification.final_aggregate"
+    },
+    {
+      "surface": "Captured comparison publication, verification, and receipts",
+      "native_files": [
+        "native/evidence/src/captured.rs",
+        "native/evidence/src/preparation.rs",
+        "native/evidence/src/transaction.rs"
+      ],
+      "python_adapters": [
+        "src/invarlock/captured_evaluation.py",
+        "src/invarlock/native_backend.py"
+      ],
+      "facade_reachability": [
+        "prepare-captured, compare, publish-captured, verify-captured, and verify-captured-receipt transactions.",
+        "Explicit Rust evaluate/verify adapters use the native preparation, comparison, publication, independent trust, and receipt paths."
+      ],
+      "test_sources": [
+        "native/tests/test_evidence_differential.py",
+        "native/tests/test_public_evaluation_differential.py",
+        "native/tests/test_adapter_audit.py"
+      ],
+      "exercised_behavior": [
+        "Complete captured reports and signed/unsigned pack bytes; independent request/run/policy/signer pins; rejection and receipt semantics; no-clobber publication.",
+        "Installed public API fixtures forbid Python portable comparison/publication; external JSONL import remains explicit."
+      ],
+      "qualification_targets": [],
+      "remaining_boundaries": [
+        "Schema validation is repeated before typed comparison validation; a schema-only read is not a substitute for semantic validation."
+      ],
+      "status": "qualified_on_listed_fixtures",
+      "evidence_reference": "qualification.final_aggregate"
+    },
+    {
+      "surface": "Deterministic scoring, comparison statistics, and historical native reports",
+      "native_files": [
+        "native/core/src/analysis.rs",
+        "native/core/src/scoring.rs",
+        "native/core/src/exact_match.rs",
+        "native/core/src/report.rs",
+        "native/core/src/unicode_tables.rs"
+      ],
+      "python_adapters": [],
+      "facade_reachability": [
+        "compare and score transactions; coarse comparison binding; captured/native evidence replay and publication call the shared core."
+      ],
+      "test_sources": [
+        "native/tests/test_analysis_differential.py",
+        "native/tests/test_differential.py",
+        "native/tests/test_retained_replay_corpus.py"
+      ],
+      "exercised_behavior": [
+        "Deterministic scorers, Unicode normalization, paired resampling, exact binary64 arithmetic, missingness, likelihood bindings, scope qualification, and native report versions v1/v2/v3.",
+        "Large integer policy thresholds and source comparison/projected case identities."
+      ],
+      "qualification_targets": [],
+      "remaining_boundaries": [
+        "Fixture arithmetic equivalence does not prove every floating-point input or policy combination.",
+        "Public low-level Python comparison APIs do not automatically select the native core."
+      ],
+      "status": "qualified_on_listed_fixtures",
+      "evidence_reference": "qualification.final_aggregate"
+    },
+    {
+      "surface": "Judge analysis and four retained-source replay profiles",
+      "native_files": [
+        "native/core/src/judge.rs",
+        "native/core/src/judge_analysis.rs",
+        "native/core/src/judge_contracts.rs",
+        "native/core/src/judge_import.rs",
+        "native/core/src/judge_inspect.rs",
+        "native/core/src/judge_compatible.rs",
+        "native/core/src/judge_runtime.rs"
+      ],
+      "python_adapters": [],
+      "facade_reachability": [
+        "Native judge evidence replay, collection validation, source import, and precision use the shared core.",
+        "Supported retained profiles are retained-judge-json-v1, retained-inspect-model-events-v1, retained-openai-compatible-judge-v1, and retained-runtime-provider-judge-v1."
+      ],
+      "test_sources": [
+        "native/tests/test_analysis_differential.py",
+        "native/tests/test_judge_runtime_differential.py",
+        "native/tests/test_judge_evidence_differential.py"
+      ],
+      "exercised_behavior": [
+        "Exact unit collapse, decimal/Hoeffding intervals, precision qualification, source/trial bindings, source sharding, endpoint normalization, prompt/event reconstruction, and malformed retained-source checks."
+      ],
+      "qualification_targets": [],
+      "remaining_boundaries": [
+        "Replaying retained facts does not establish live model or provider correctness.",
+        "Unexercised multi-error diagnostic combinations are not claimed exhaustively equivalent."
+      ],
+      "status": "qualified_on_listed_fixtures",
+      "evidence_reference": "qualification.final_aggregate"
+    },
+    {
+      "surface": "Generic and native judge authoring, recipient replay, and signed receipts",
+      "native_files": [
+        "native/evidence/src/judge.rs",
+        "native/evidence/src/judge_native.rs",
+        "native/evidence/src/transaction.rs"
+      ],
+      "python_adapters": [
+        "src/invarlock/judge_measurements/native_publication.py",
+        "src/invarlock/judge_measurements/native_workflow.py",
+        "src/invarlock/judge_measurements/captured_workflow.py"
+      ],
+      "facade_reachability": [
+        "prepare-native-judge, validate-native-capture, finalize-native-judge, publish-judge, replay-judge, verify-judge, and judge receipt transactions.",
+        "Selected captured and runtime judge workflows use native recipe/capture/finalization/publication and independent recipient replay."
+      ],
+      "test_sources": [
+        "native/tests/test_judge_evidence_differential.py",
+        "native/tests/test_native_judge_capture_differential.py",
+        "native/tests/test_execution_differential.py"
+      ],
+      "exercised_behavior": [
+        "Frozen-answer provenance, finalized recipe identities, complete/incomplete and advisory policy outcomes, independent signer/recipient pins, native capture mutations, and signed receipt replay."
+      ],
+      "qualification_targets": [],
+      "remaining_boundaries": [
+        "SDK collection remains an explicit adapter; native admission and checkpoints do not validate external service behavior."
+      ],
+      "status": "qualified_on_listed_fixtures",
+      "evidence_reference": "qualification.final_aggregate"
+    },
+    {
+      "surface": "Independent trust snapshots, evaluator qualification, and acceptance attestations",
+      "native_files": [
+        "native/evidence/src/trust_inputs.rs",
+        "native/evidence/src/qualification.rs",
+        "native/evidence/src/attestation.rs",
+        "native/evidence/src/attestation_artifact.rs",
+        "native/evidence/src/attestation_time.rs",
+        "native/evidence/src/crypto.rs"
+      ],
+      "python_adapters": [
+        "src/invarlock/native_backend.py",
+        "src/invarlock/evaluator_qualification.py",
+        "src/invarlock/evidence_verification.py"
+      ],
+      "facade_reachability": [
+        "load-trust, verify-trust, qualify-export, write-attestation, and verify-attestation transactions.",
+        "Public selected Rust qualification and verification preserve independent owned policy/key snapshots; attestations are exposed through native transactions."
+      ],
+      "test_sources": [
+        "native/tests/test_trust_differential.py",
+        "native/tests/test_qualification_differential.py",
+        "native/tests/test_attestation_differential.py"
+      ],
+      "exercised_behavior": [
+        "Trust profile resolution, external policy/key constraints and owned bytes; export/runner/dependency-lock bindings and canonical results.",
+        "Acceptance statement/receipt/raw-byte bindings, recipient policies, artifact file/checkpoint-tree/engine-bundle hashing and temporal constraints on exercised fixtures."
+      ],
+      "qualification_targets": [],
+      "remaining_boundaries": [
+        "Low-level source attestation APIs remain Python unless native transactions are selected.",
+        "Rare malformed Ed25519 acceptance differences and exhaustive timestamp/error-order parity remain unqualified."
+      ],
+      "status": "qualified_on_listed_fixtures",
+      "evidence_reference": "qualification.final_aggregate"
+    },
+    {
+      "surface": "Complete report views, renderers, and explicit backend facade",
+      "native_files": [
+        "native/evidence/src/reporting/mod.rs",
+        "native/evidence/src/reporting/transaction.rs",
+        "native/evidence/src/reporting/captured_view.rs",
+        "native/evidence/src/reporting/native_load.rs",
+        "native/evidence/src/reporting/native_checks.rs",
+        "native/evidence/src/reporting/native_view.rs",
+        "native/evidence/src/reporting/judge_view.rs",
+        "native/evidence/src/reporting/presentation.rs",
+        "native/evidence/src/reporting/html.rs",
+        "native/evidence/src/reporting/markdown.rs",
+        "native/evidence/src/reporting/junit.rs",
+        "native/bindings/src/portable.rs",
+        "native/cli/src/main.rs"
+      ],
+      "python_adapters": [
+        "src/invarlock/native_backend.py",
+        "src/invarlock/native_reporting.py",
+        "src/invarlock/evidence_reporting.py"
+      ],
+      "facade_reachability": [
+        "report transaction renders captured/native/judge/evidence-set views; public report backend returns the existing typed result and optional output files.",
+        "Coarse bindings release the GIL for native work and use only an explicitly authorized scorer callback; native selection fails if the companion extension is unavailable."
+      ],
+      "test_sources": [
+        "native/tests/test_reporting_differential.py",
+        "native/tests/test_reporting_backend.py",
+        "native/tests/test_retained_reporting_corpus.py",
+        "native/tests/test_set_reporting_differential.py",
+        "native/tests/test_native_bridge_differential.py",
+        "native/tests/test_native_unavailable.py"
+      ],
+      "exercised_behavior": [
+        "Exact view/facts and HTML/Markdown/JUnit fixtures; retained historical reporting and publication failures; missing-extension rejection and explicit scorer boundary."
+      ],
+      "qualification_targets": [],
+      "remaining_boundaries": [
+        "Reports do not grant recipient authority.",
+        "Native report reconstruction has a 10,000,000 paired-outcome local budget; source renderer parity above it is not claimed."
+      ],
+      "status": "qualified_on_listed_fixtures",
+      "evidence_reference": "qualification.final_aggregate"
+    },
+    {
+      "surface": "Descriptor-backed filesystem snapshots and publication ownership",
+      "native_files": [
+        "native/filesystem/src/lib.rs"
+      ],
+      "python_adapters": [],
+      "facade_reachability": [
+        "Evidence, trust, reporting, artifact inspection, and execution use pinned roots/files, bounded snapshots, identity rechecks, and owned staging."
+      ],
+      "test_sources": [
+        "native/filesystem/src/lib.rs",
+        "native/tests/test_evidence_differential.py",
+        "native/tests/test_execution_differential.py",
+        "native/tests/test_set_reporting_differential.py"
+      ],
+      "exercised_behavior": [
+        "Symlink and inventory rejection, changed-file detection, streaming hashing, no-replace publication, read-only pack sealing, ownership-aware cleanup, and partial publication behavior."
+      ],
+      "qualification_targets": [],
+      "remaining_boundaries": [
+        "Filesystem races and platform system-call differences cannot be exhaustively established by fixtures.",
+        "The implemented Unix mechanisms do not establish Windows support or Linux execution qualification."
+      ],
+      "status": "qualified_on_listed_fixtures",
+      "evidence_reference": "qualification.final_aggregate"
+    },
+    {
+      "surface": "Separate execution/control, OCI workers, admission, and checkpoints",
+      "native_files": [
+        "native/execution/src/lib.rs",
+        "native/execution/src/oci.rs",
+        "native/execution/src/admission.rs",
+        "native/execution/src/checkpoint.rs",
+        "native/execution/src/inspect_checkpoint.rs",
+        "native/execution/src/collection.rs",
+        "native/execution/src/sequential.rs",
+        "native/execution/src/workspace.rs",
+        "native/bindings/src/execution.rs",
+        "native/control-cli/src/main.rs"
+      ],
+      "python_adapters": [
+        "src/invarlock/runtime_providers/native_execution.py",
+        "src/invarlock/judge_measurements/rust_runner.py",
+        "src/invarlock/evaluation_oci.py",
+        "src/invarlock/runtime_providers/llama_cpp_session.py",
+        "src/invarlock/runtime_providers/_tensorrt_llm_execution.py"
+      ],
+      "facade_reachability": [
+        "Separate native control executable and execution bindings own bounded child I/O, cancellation/deadlines, paired OCI launch, budgets, durable admission, checkpoint/resume, and workspace ownership.",
+        "Selected judge/provider/OCI adapters keep SDK calls explicit while invoking native coordination; public evaluation backend scope propagation has fixture coverage in the final rebuilt artifact suite."
+      ],
+      "test_sources": [
+        "native/tests/test_execution_differential.py",
+        "native/execution/src/lib.rs",
+        "native/execution/src/checkpoint.rs",
+        "native/execution/src/inspect_checkpoint.rs"
+      ],
+      "exercised_behavior": [
+        "Controlled process output/overflow/cancellation, descriptor reuse, integer resource capacity, checkpoint replay/contention, interrupted admissions, provider callback validation, OCI fixture orchestration, and workflow routing."
+      ],
+      "qualification_targets": [],
+      "remaining_boundaries": [
+        "Generic native journals are not interchangeable with existing Python checkpoints; the Inspect compatibility path is separately tested.",
+        "Controlled workers are not live OCI/GPU/provider qualification; Linux descriptor execution and Windows remain unqualified."
+      ],
+      "status": "qualified_on_listed_fixtures",
+      "evidence_reference": "qualification.final_aggregate"
+    },
+    {
+      "surface": "Judge-import derivation through the selected public backend",
+      "native_files": [
+        "native/evidence/src/native_publication.rs",
+        "native/evidence/src/native_pack/replay.rs"
+      ],
+      "python_adapters": [
+        "src/invarlock/evaluation_transaction.py"
+      ],
+      "facade_reachability": [
+        "derive-runtime-transaction validates the original judge request and uses an internal exact-match projection only to reconstruct frozen pairs.",
+        "Selected Rust judge-import preflight and capture call native derivation; original request bytes remain bound into the comparison identity."
+      ],
+      "test_sources": [
+        "native/tests/test_native_judge_capture_differential.py",
+        "native/tests/test_public_evaluation_differential.py"
+      ],
+      "exercised_behavior": [
+        "Focused rebuilt native CLI fixture matches source paired records, runtime/artifact digests, and comparison identity while retaining the original judge request."
+      ],
+      "qualification_targets": [
+        "Public judge-import evaluation forbids Python derive_paired_records and compares the complete published evidence bytes."
+      ],
+      "remaining_boundaries": [
+        "Repeated host-side _validate_import_side checks remain unchanged."
+      ],
+      "status": "qualified_on_listed_fixtures",
+      "evidence_reference": "qualification.final_aggregate"
+    },
+    {
+      "surface": "Live worker publication preserving original provider facts",
+      "native_files": [
+        "native/evidence/src/native_publication.rs",
+        "native/contracts/src/runtime.rs"
+      ],
+      "python_adapters": [
+        "src/invarlock/runtime_behavior/native_publication.py",
+        "src/invarlock/runtime_behavior/transaction.py"
+      ],
+      "facade_reachability": [
+        "write-runtime-side optionally receives the paired original observation and receipt, validates their original bindings, and rejects any mismatch with reconstructed evidence before staging.",
+        "Selected runtime worker publication uses the native authoring transaction and hydrates existing Python result values from owned returned evidence bytes."
+      ],
+      "test_sources": [
+        "native/tests/test_native_publication_differential.py",
+        "native/tests/test_runtime_side_publication.py"
+      ],
+      "exercised_behavior": [
+        "Focused rebuilt native CLI fixtures cover unchanged importer behavior, valid original-fact byte identity, partial-pair rejection, changed receipt image/hash/backend, and changed observation aggregate; rejected input creates no destination.",
+        "The public worker path passes with Python evidence writers/reload forbidden; source and native bytes match except independent observed manifest timestamps, and mismatched original receipts publish no destination."
+      ],
+      "qualification_targets": [
+        "Whole selected runtime-side publication with Python evidence writer disabled, and tampered provider fact rejection."
+      ],
+      "remaining_boundaries": [
+        "Provider SDK execution and live execution-state inspection remain host responsibilities.",
+        "The source worker adapter and real provider/OCI behavior require their own final artifact/live qualification; only the controlled fixture suite is planned here."
+      ],
+      "status": "qualified_on_listed_fixtures",
+      "evidence_reference": "qualification.final_aggregate"
+    },
+    {
+      "surface": "GGUF artifact identity inspection",
+      "native_files": [
+        "native/evidence/src/gguf.rs",
+        "native/evidence/src/transaction.rs"
+      ],
+      "python_adapters": [
+        "src/invarlock/runtime_providers/gguf_identity.py",
+        "src/invarlock/runtime_providers/native_execution.py"
+      ],
+      "facade_reachability": [
+        "gguf identity inspection is exposed as a native transaction and selected through the provider backend adapter; source identity construction remains the default path."
+      ],
+      "test_sources": [
+        "native/tests/test_gguf_differential.py",
+        "tests/runtime_providers/test_gguf_identity.py",
+        "tests/runtime_providers/test_gguf_identity_edges.py"
+      ],
+      "exercised_behavior": [
+        "GGUF v2/v3, all 35 supported tensor layouts and one-byte truncation, scalar and array metadata, nesting and size limits, streamed hashing, symlink/replacement guards, and both context/worker-environment native routing."
+      ],
+      "qualification_targets": [
+        "GGUF v2/v3, supported tensor layouts, scalar/array metadata, nesting and size limits, truncation, streamed hashing, symlink/replacement guards, non-UTF8 paths, and selected native parser routing."
+      ],
+      "remaining_boundaries": [
+        "No live llama.cpp/GPU execution claim follows from file-identity fixtures.",
+        "The non-UTF-8 filename fixture is skipped because this host filesystem rejects that filename before either reader runs."
+      ],
+      "status": "qualified_on_listed_fixtures",
+      "evidence_reference": "qualification.final_aggregate"
+    }
+  ],
+  "audit": {
+    "test_source": "native/tests/test_adapter_audit.py",
+    "findings_fixed": [
+      "Judge configuration validation precedes captured backend dispatch.",
+      "Captured scoring errors retain the public comparison-failure context.",
+      "Nonnegative integer work budgets above u64 remain valid for bounded native workloads.",
+      "Captured public SDK results preserve metric_summaries tuple type while native wire JSON remains an array.",
+      "An omitted optional CLI backend retains Python routing and original validation precedence.",
+      "Judge import preflight and capture route paired derivation through Rust.",
+      "Rust-selected workers publish validated original observations and receipts through the native transaction.",
+      "Public evaluation scopes the selected provider backend and restores prior context on exceptions; GGUF inspection uses native bounded file capabilities."
+    ],
+    "pending_recheck": [],
+    "observed_optimization_boundary": "Captured load_inputs performs schema validation before compare_runs constructs ValidatedRun/ValidatedPolicy and repeats schema checks. Reuse should be factored through a fully validated immutable transaction; schema-only loading must not be treated as semantic validation.",
+    "verification": {
+      "outcome": "passed",
+      "case_count": 5,
+      "command": "PYTHONPATH=src python -m pytest -q native/tests/test_adapter_audit.py",
+      "environment": "Previously installed CPython 3.12 macOS arm64 companion wheel identified below",
+      "wheel": "invarlock_native_experiment-0.1.0-cp312-cp312-macosx_11_0_arm64.whl",
+      "wheel_sha256": "60d02a1d53edbd1ad5a0731abb5b1736d31e10a10cb1a6ec362ceb9b7327dc49",
+      "evidence_log": "adapter-audit-final.log",
+      "evidence_log_sha256": "4d2df7a96ce4a667da3ccf295f2d16c728a65ed0e861a3baa919f7bb469b02b5",
+      "exercised_behavior": [
+        "Captured preflight and evaluation reject invalid judge configuration before native dispatch.",
+        "Native scoring failures preserve the source comparison-error prefix and publish no evidence.",
+        "The explicit JSONL import adapter produces byte-identical captured evidence.",
+        "A bootstrap budget of 10**80 is accepted and preserves the source transaction result."
+      ],
+      "artifact_relation": "Passed before the latest route changes; its wheel and log identities remain historical evidence."
+    },
+    "current_artifact_recheck": "Passed in qualification.final_aggregate, including all five adapter audit cases."
+  },
+  "known_boundaries": [
+    "Selected Rust runtime evaluation still runs _validate_import_side in Python, including repeated portable receipt/configuration/request-binding checks alongside required provider capability and artifact-identity hooks. Removing those repetitions requires a validated side-facts interface and diagnostic-order qualification.",
+    "Strict YAML decoding, provider discovery, resource negotiation, model and evaluator SDK execution, and external evaluator format import remain explicit Python adapters.",
+    "Low-level Python APIs remain Python unless their caller selects an exposed native transaction, native executable, or supported backend argument. Availability of a native counterpart does not imply every Python entry point routes through it.",
+    "Real OCI engines, live provider calls, GPU workloads and Linux descriptor execution are not qualified by the retained macOS fixtures. Current Unix-specific native code requires a Windows port."
+  ],
+  "qualification": {
+    "current_artifact_status": "passed_listed_fixtures",
+    "retained_aggregate": {
+      "evidence_log": "expanded-native-all-final.xml",
+      "sha256": "ee7912023d010b6de63b43f8bec5cfcfc917940e6c12890ac4bf6a65a09fc853",
+      "named_testcase_count": 318,
+      "junit_reported_test_count": 16766,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "elapsed_seconds": 138.371,
+      "scope": "Native differential and retained-corpus fixtures plus experiment harness tests. The JUnit aggregate count is not the number of separately named testcase elements.",
+      "artifact_relation": "Precedes the latest judge derivation, original-fact live publication, GGUF, and provider-backend scope changes; retained as earlier evidence, not final qualification of those routes."
+    },
+    "pending_routes": [],
+    "focused_route_evidence": [
+      {
+        "evidence_log": "judge-route-native-tests.log",
+        "sha256": "64576d99c4cef913eb9b9bd4e5a096807fe2289f77eb08a67c7de2e43fc6349d",
+        "scope": "26 focused native CLI cases passed; covers judge derivation and runtime-side authoring checks, not the final installed wheel."
+      },
+      {
+        "evidence_log": "judge-route-source-tests.log",
+        "sha256": "8876c9830608f9c64826246c16b2934e04138061819f176caaad11a1cf8ba140",
+        "scope": "41 Python-default judge/transaction regressions passed after the route changes."
+      }
+    ],
+    "final_aggregate": {
+      "evidence_log": "complete-native-all.log",
+      "log_sha256": "e39069bbe5eabde207b1ffd40e7d43eb6b0ebce36b5f7a23997eb65d6cf972f2",
+      "junit": "complete-native-all.xml",
+      "junit_sha256": "78bc43db290f12a7df5ce97794487dd81319f157a2e769a66a63088c8e4147b7",
+      "passed": 387,
+      "skipped": 1,
+      "subtests_passed": 16448,
+      "named_testcase_count": 388,
+      "skip_reason": "Host filesystem rejects non-UTF-8 filenames.",
+      "wheel_sha256": "aa6710c7f34880858d44304392a030b3c1364474e2b4f380e96e44cc19007acd",
+      "native_sdist_sha256": "8f53e0dde71d90499f59e060cea101ee681d05abf8e3bf4fda558d93cd21b947",
+      "scope": "Full native differential and experiment suites with installed release extension, release binaries, reporting/GGUF binding opt-ins and complete source archive; no live provider/container/GPU or other-platform qualification."
+    },
+    "expanded_comparison": {
+      "results": "experiments/rust/results/expanded-macos-arm64-py312.json",
+      "qualification_attempted": 32,
+      "qualification_matched": 32,
+      "timing_attempted": 128,
+      "timing_matched": 128,
+      "retries": 0,
+      "exclusions": 0,
+      "outcome": "Captured NLL faster; smaller measured journeys slower; higher peak RSS in every workload. Python remains default."
+    },
+    "final_delivery_sdist": {
+      "sha256": "4c4f92d03b3eefaec53848f265491918fc4726db4e2ae38ffe939f332d325bc1",
+      "qualification": "packaging-complete-v4/qualification.json",
+      "required_files_verified": 424,
+      "measured_runtime_artifacts_unchanged": true,
+      "nonfunctional_delta": "One AST-identical Python test formatting change and parsed-TOML-identical CLI manifest whitespace; binary hashes unchanged."
+    }
+  }
+}

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, NoReturn
 
@@ -13,6 +14,7 @@ from invarlock.evidence_verification import (
 
 if TYPE_CHECKING:
     from invarlock.cli.verification_workflow import VerificationOptions
+    from invarlock.judge_measurements.acceptance import JudgeVerificationResult
 
 
 def execute_judge_verification(
@@ -70,14 +72,24 @@ def execute_judge_verification(
             "Judge --receipt requires both --verifier-signing-key and --verifier-identity"
         )
     assert options.trust_profile is not None
+    verifier: Callable[[Path, Path], JudgeVerificationResult] = (
+        verify_judge_evidence_with_policy
+    )
+    if options.backend == "rust":
+        from invarlock.native_backend import (
+            verify_judge_evidence_with_policy as native_verify,
+        )
+        from invarlock.native_backend import (
+            write_signed_judge_verification_receipt,
+        )
+
+        verifier = native_verify
     try:
         if options.receipt is not None:
             _require_outside_evidence(
                 options.evidence, options.receipt, label="judge receipt"
             )
-        result = verify_judge_evidence_with_policy(
-            options.evidence, options.trust_profile
-        )
+        result = verifier(options.evidence, options.trust_profile)
         result_value = result.to_dict()
         result_format = result_value.pop("format")
         payload = {

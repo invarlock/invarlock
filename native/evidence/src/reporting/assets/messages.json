@@ -1,0 +1,13 @@
+{
+  "_DECISION_CONTEXT": [
+    "Intended use and business context: Not supplied",
+    "Decision owner and recommendation: Not supplied",
+    "Organizational approval: Not recorded by this report"
+  ],
+  "_INTERPRETATION_NOTE": "Generated interpretation of recorded evidence. This presentation is not signed evidence or an approval; keep any authored business commentary separately labeled.",
+  "_MATCHING_CONTEXT_NOTE": "Matching previews do not establish equality of the complete retained fields.",
+  "_MISSING_ASSURANCE": "Reporting checks were not supplied with this view.",
+  "_MISSING_CHECKS": "Decision check details were not supplied with this view. Consult the original evidence before interpreting the recorded result.",
+  "_MISSING_LIMITATIONS": "Limitations were not supplied with this view. Their absence does not establish that the evaluated scope covers the intended use.",
+  "_NEXT_DECISION": "The decision owner should confirm that the evaluated cases and requirements cover the intended use, review unresolved findings, and record the release decision alongside recipient verification."
+}

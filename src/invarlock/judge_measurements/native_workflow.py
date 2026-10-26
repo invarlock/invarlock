@@ -34,6 +34,8 @@ from invarlock.judge_measurements.workflow import (
 )
 from invarlock.security import network_policy_allows
 
+from .native_publication import Publisher
+
 if TYPE_CHECKING:
     from invarlock.core.evaluation_request import (
         ComparisonSideRequest,
@@ -177,8 +179,18 @@ def collection_preflight(
 
 
 @contextmanager
-def locked_workspace(path: Path) -> Iterator[Callable[[], None]]:
+def locked_workspace(
+    path: Path, *, execution_backend: str = "python"
+) -> Iterator[Callable[[], None]]:
     """Serialize capture and collection under a private, pinned workspace."""
+    if execution_backend == "rust":
+        from .native_publication import locked_workspace as native_locked_workspace
+
+        with native_locked_workspace(path) as unchanged:
+            yield unchanged
+        return
+    if execution_backend != "python":
+        raise JudgeWorkflowError("execution backend must be python or rust")
     path = Path(path).absolute()
     with pinned_directory(path, create=True) as directory:
         current = os.fstat(directory)
@@ -239,6 +251,11 @@ def locked_workspace(path: Path) -> Iterator[Callable[[], None]]:
 
 
 def _retain_identity(path: Path, value: dict[str, Any]) -> None:
+    from .native_publication import active_workspace, retain_identity
+
+    if active_workspace() is not None:
+        retain_identity(path, value)
+        return
     raw = canonical_payload(
         {
             "format": "invarlock/judge-workspace-identity-v1",
@@ -268,8 +285,11 @@ def collect_frozen(
     integration: str | None = None,
     model: ComparisonSideRequest | None = None,
     request_root: Path | None = None,
+    execution_backend: str = "python",
 ) -> Any:
     """Resume only unadmitted calls against the same immutable frozen answers."""
+    if execution_backend not in {"python", "rust"}:
+        raise JudgeWorkflowError("execution backend must be python or rust")
     api = collection_api()
     if integration is not None and integration != (
         "runtime-provider-judge"
@@ -290,6 +310,11 @@ def collect_frozen(
             status.clear()
         result = api.collect_openai_compatible(
             plan,
+            **(
+                {"execution_backend": execution_backend}
+                if execution_backend != "python"
+                else {}
+            ),
             configuration=collection,
             baseline_run=baseline_run,
             subject_run=subject_run,
@@ -324,6 +349,11 @@ def collect_frozen(
             status.clear()
         result = api.collect_runtime_provider(
             plan,
+            **(
+                {"execution_backend": execution_backend}
+                if execution_backend != "python"
+                else {}
+            ),
             provider=provider,
             spec=spec,
             resources=resources,
@@ -365,6 +395,11 @@ def collect_frozen(
             baseline_run,
             subject_run,
             on_stop=stopped,
+            **(
+                {"execution_backend": execution_backend}
+                if execution_backend != "python"
+                else {}
+            ),
             **({"status": status} if status is not None else {}),
         )
     )
@@ -414,8 +449,13 @@ def preflight_native_judge(
     request: EvaluationRequest,
     schedule: dict[str, Any],
     policy_bytes: bytes,
+    *,
+    execution_backend: str = "python",
 ) -> dict[str, Any]:
-    prepared = prepare_native_judge(policy_bytes, schedule)
+    prepare = prepare_native_judge
+    if execution_backend == "rust":
+        from .native_publication import prepare
+    prepared = prepare(policy_bytes, schedule)
     if request.comparison.judge is None:
         raise JudgeWorkflowError("native judge configuration is required")
     metadata = {
@@ -448,6 +488,7 @@ def evaluate_native_judge(
     *,
     expected_artifact_digests: dict[str, str],
     expected_runtime_digests: dict[str, str] | None,
+    execution_backend: str = "python",
 ) -> JudgeWorkflowResult:
     """Use the native provider lifecycle once, then retain and judge its outputs."""
     from invarlock.judge_measurements.evidence import publish_judge_evidence
@@ -457,7 +498,19 @@ def evaluate_native_judge(
         validate_native_capture,
     )
 
-    prepared = prepare_native_judge(policy_bytes, schedule)
+    prepare = prepare_native_judge
+    finalize = finalize_native_plan
+    publisher: Publisher = publish_judge_evidence
+    read_capture = read_file
+    write_capture: Callable[[Path, bytes], None] = write_file_no_replace
+    if execution_backend == "rust":
+        from .native_publication import create_capture as create_native_capture
+        from .native_publication import finalize, prepare
+        from .native_publication import publish as publisher
+        from .native_publication import read_file as read_capture
+        from .native_publication import validate_capture as validate_native_capture
+        from .native_publication import write_file_no_replace as write_capture
+    prepared = prepare(policy_bytes, schedule)
     configuration = request.comparison.judge
     if configuration is None:
         raise JudgeWorkflowError("native judge configuration is required")
@@ -473,7 +526,14 @@ def evaluate_native_judge(
     )
     _require_service_network_authorization(recipe["collection"], collection_environment)
     workspace = configuration.workspace
-    with locked_workspace(workspace) as unchanged:
+    with locked_workspace(
+        workspace,
+        **(
+            {"execution_backend": execution_backend}
+            if execution_backend != "python"
+            else {}
+        ),
+    ) as unchanged:
         _retain_identity(
             workspace / "identity.json",
             {
@@ -487,14 +547,12 @@ def evaluate_native_judge(
         )
         frozen_path = workspace / "native_capture.json"
         try:
-            raw = read_file(frozen_path, NATIVE_CAPTURE_MAX_BYTES)
+            raw = read_capture(frozen_path, NATIVE_CAPTURE_MAX_BYTES)
         except FileNotFoundError:
             unchanged()
             admission = workspace / "capture-admission.json"
             try:
-                write_file_no_replace(
-                    admission, canonical_payload({"capture_admitted": True})
-                )
+                write_capture(admission, canonical_payload({"capture_admitted": True}))
             except FileExistsError:
                 raise JudgeWorkflowError(
                     "Previous native answer capture did not finish. Inspect the workspace before explicitly starting a new capture in a new workspace."
@@ -510,7 +568,7 @@ def evaluate_native_judge(
                 subject,
                 observations=observations,
             )
-            write_file_no_replace(frozen_path, canonical_payload(frozen))
+            write_capture(frozen_path, canonical_payload(frozen))
         else:
             frozen = parse_json_bytes(raw, label="retained native judge capture")
             if not isinstance(frozen, dict):
@@ -541,7 +599,7 @@ def evaluate_native_judge(
                 raise JudgeWorkflowError(
                     "retained native runtime differs from current preflight"
                 )
-        plan, policy = finalize_native_plan(recipe, baseline_run, subject_run)
+        plan, policy = finalize(recipe, baseline_run, subject_run)
         unchanged()
         collection_stop: dict[str, Any] = {}
         collection_arguments = {
@@ -558,6 +616,8 @@ def evaluate_native_judge(
                 model=configuration.model,
                 request_root=request.root,
             )
+        if execution_backend != "python":
+            collection_arguments["execution_backend"] = execution_backend
         measurements = collect_frozen(**collection_arguments)
         unchanged()
         collection_status = require_completed_collection(
@@ -566,7 +626,7 @@ def evaluate_native_judge(
             stop_reason=collection_stop.get("stop_reason"),
             capacity=collection_stop.get("capacity"),
         )
-        publication = publish_judge_evidence(
+        publication = publisher(
             request.output.evidence,
             plan=plan,
             measurements=measurements,

@@ -6,7 +6,16 @@ import os
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, cast
+from typing import TYPE_CHECKING, Literal, TypedDict, cast
+
+
+class _BackendOptions(TypedDict, total=False):
+    backend: str
+
+
+def _backend_options(backend: str) -> _BackendOptions:
+    return {"backend": backend} if backend != "python" else {}
+
 
 if TYPE_CHECKING:  # pragma: no cover - imports exist only for static analysis
     from invarlock.captured_evaluation import (
@@ -94,6 +103,7 @@ class EvaluationOptions:
     runtime_cpus: str | None
     runtime_memory_mib: str | None
     runtime_user: str | None
+    execution_backend: str | None = "python"
 
     def runtime_strings(self) -> dict[str, str]:
         """Return explicit-string candidates using their CLI parameter names."""
@@ -255,6 +265,19 @@ def execute_evaluation(
         preflight_evaluation_request,
     )
 
+    # Legacy programmatic option builders use None for an omitted CLI option.
+    execution_backend = (
+        "python" if options.execution_backend is None else options.execution_backend
+    )
+    if execution_backend not in {"python", "rust"}:
+        raise EvaluationRequestError("execution backend must be python or rust")
+    if execution_backend == "rust":
+        from invarlock.native_backend import NativeBackendUnavailable, require_native
+
+        try:
+            require_native()
+        except NativeBackendUnavailable as exc:
+            raise EvaluationRequestError(str(exc)) from exc
     request_path = options.request
     if not request_path.is_file():
         raise EvaluationRequestError(
@@ -277,7 +300,10 @@ def execute_evaluation(
     detected_mode = initial_mode
     if detected_mode is None:
         try:
-            detected_mode = evaluation_request_mode(request_path)
+            detected_mode = evaluation_request_mode(
+                request_path,
+                **_backend_options(execution_backend),
+            )
         except EvaluationRequestError:
             pass
     if detected_mode in {"judge_import", "judge_collect"}:
@@ -302,7 +328,14 @@ def execute_evaluation(
             preflight_judge_request(judge_request)
             if options.preflight
             else evaluate_judge_request(
-                judge_request, signing_key=effective_key, unsigned=options.unsigned
+                judge_request,
+                signing_key=effective_key,
+                unsigned=options.unsigned,
+                **(
+                    {"execution_backend": execution_backend}
+                    if execution_backend != "python"
+                    else {}
+                ),
             )
         )
         return EvaluationOutcome(result=judge_result, request_mode=judge_request.mode)
@@ -312,6 +345,7 @@ def execute_evaluation(
         loaded_request = load_evaluation_request(
             request_path,
             request_root=options.request_root,
+            **_backend_options(execution_backend),
             provider_resolver=lambda name: CoreRegistry().get_runtime_provider(name),
             **overrides,
         )
@@ -328,6 +362,7 @@ def execute_evaluation(
             loaded_request = load_evaluation_request(
                 request_path,
                 request_root=options.request_root,
+                **_backend_options(execution_backend),
                 provider_resolver=lambda name: CoreRegistry().get_runtime_provider(
                     name
                 ),
@@ -357,6 +392,7 @@ def execute_evaluation(
                 signing_key_path=effective_signing_key,
                 unsigned=options.unsigned,
                 max_bootstrap_draws=options.max_bootstrap_draws,
+                **_backend_options(execution_backend),
             )
         else:
             captured_result = evaluate_request_file(
@@ -364,6 +400,7 @@ def execute_evaluation(
                 signing_key_path=effective_signing_key,
                 unsigned=options.unsigned,
                 max_bootstrap_draws=options.max_bootstrap_draws,
+                **_backend_options(execution_backend),
             )
         return EvaluationOutcome(result=captured_result, request_mode="captured")
 
@@ -383,6 +420,7 @@ def execute_evaluation(
             request_path,
             provider_resolver=registry.get_runtime_provider,
             request_root=options.request_root,
+            **_backend_options(execution_backend),
             **overrides,
         )
     else:
@@ -442,7 +480,13 @@ def execute_evaluation(
         else:
             launch = launch_from_resolved_config(profile_context)
             runtime_executor = OciRuntimeExecutor(
-                launch, environment=environment_snapshot
+                launch,
+                environment=environment_snapshot,
+                **(
+                    {"execution_backend": execution_backend}
+                    if execution_backend != "python"
+                    else {}
+                ),
             )
             runtime_digests = preflight_oci_launch(launch)
     runtime_result: (
@@ -452,6 +496,7 @@ def execute_evaluation(
         runtime_result = preflight_evaluation_request(
             loaded_runtime_request,
             signing_key_path=options.signing_key,
+            **_backend_options(execution_backend),
             scorer_registry=scorer_registry,
             runtime_image_digests=runtime_digests,
             resource_resolver=resource_resolver or runtime_executor,
@@ -461,6 +506,7 @@ def execute_evaluation(
         runtime_result = evaluate_request_file(
             loaded_runtime_request,
             signing_key_path=options.signing_key,
+            **_backend_options(execution_backend),
             runtime_executor=runtime_executor,
             resource_resolver=resource_resolver,
             runtime_image_digests=runtime_digests,

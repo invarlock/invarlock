@@ -16,7 +16,7 @@ from contextlib import contextmanager
 from dataclasses import asdict, dataclass, replace
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Protocol, cast
 
 from invarlock.captured_contracts import _read_at
 from invarlock.evidence_pack_json import parse_json_bytes
@@ -265,6 +265,10 @@ class _EventSink:
                 "one judge call completed more than one model event"
             )
         self.complete = event
+
+
+class PacingWaiter(Protocol):
+    async def wait(self) -> None: ...
 
 
 class _Pacer:
@@ -1258,7 +1262,7 @@ async def _call_one(
     request: dict[str, Any],
     config: Any,
     options: CollectionOptions,
-    pacer: _Pacer,
+    pacer: PacingWaiter,
     check_directory: Callable[[], None],
 ) -> dict[str, Any]:
     await pacer.wait()

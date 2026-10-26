@@ -10,7 +10,7 @@ import stat
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, overload
+from typing import TYPE_CHECKING, Any, TypedDict, overload
 
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
@@ -92,6 +92,7 @@ from invarlock.runtime_provider_evidence import (
     encode_artifact_identity,
     runtime_request_binding_errors,
 )
+from invarlock.runtime_providers.native_execution import scope_execution_backend
 from invarlock.runtime_security_helpers import (
     network_allowed,
     remote_code_allowed,
@@ -100,6 +101,27 @@ from invarlock.runtime_security_helpers import (
 
 if TYPE_CHECKING:
     from invarlock.judge_measurements.workflow import JudgeWorkflowResult
+
+
+class _BackendOptions(TypedDict, total=False):
+    backend: str
+
+
+def _backend_options(backend: str) -> _BackendOptions:
+    return {"backend": backend} if backend == "rust" else {}
+
+
+def _require_backend(backend: str, error_type: type[ValueError]) -> None:
+    if backend not in {"python", "rust"}:
+        raise ValueError("backend must be python or rust")
+    if backend == "rust":
+        from invarlock.native_backend import NativeBackendUnavailable, require_native
+
+        try:
+            require_native()
+        except NativeBackendUnavailable as exc:
+            raise error_type(str(exc)) from exc
+
 
 _MAX_POLICY_BYTES = 4 * 1024 * 1024
 _MAX_REQUEST_INPUT_BYTES = 64 * 1024 * 1024
@@ -651,7 +673,14 @@ def _normalized_request(
     request: EvaluationRequest,
     schedule: RuntimeBehavioralSchedule,
     observations: tuple[EvidenceObservation, ...],
+    *,
+    backend: str = "python",
 ) -> dict[str, object]:
+    if backend == "rust":
+        from invarlock.native_backend import normalize_runtime_request
+
+        return normalize_runtime_request(request, schedule, observations)
+
     def imported(side: str) -> dict[str, str]:
         return {
             "identity": EVIDENCE_PATHS[f"{side}_provider_identity"],
@@ -857,6 +886,7 @@ def _prepare_evaluation_inputs(
     scorer_registry: ScorerExtensionRegistry | None,
     authenticate_artifacts: bool = False,
     registry: CoreRegistry | None = None,
+    backend: str = "python",
 ) -> _PreparedEvaluation:
     if signing_key_path is None:
         raise EvaluationTransactionError("an Ed25519 evidence-signing key is required")
@@ -869,6 +899,7 @@ def _prepare_evaluation_inputs(
         else load_evaluation_request(
             request_path,
             provider_resolver=selected_registry.get_runtime_provider,
+            **_backend_options(backend),
         )
     )
     if isinstance(request, CapturedEvaluationRequest):
@@ -885,79 +916,103 @@ def _prepare_evaluation_inputs(
     _validate_judge_workspace_inputs(request)
     artifact_digests: dict[str, str] | None = None
 
-    if request.execution.mode == "import":
-        schedule_path = request.execution.schedule
-        assert schedule_path is not None
-        schedule_raw = _read_request_file(
-            request.root, schedule_path, label="canonical schedule"
-        )
-        schedule_payload = _parse_object(schedule_raw, label="canonical schedule")
-        schedule = build_runtime_behavioral_schedule(schedule_payload)
-        if schedule.task != request.comparison.task:
-            raise EvaluationTransactionError(
-                "imported schedule task does not match comparison.task"
-            )
+    sample_requirements: dict[str, int | float]
+    native_prepared = None
+    if backend == "rust":
+        from invarlock.native_backend import prepare_runtime_inputs
+
+        native_prepared = prepare_runtime_inputs(request)
+        schedule = native_prepared["schedule_object"]
         canonical_schedule = schedule_bytes(schedule)
-        if schedule_raw != canonical_schedule:
-            raise EvaluationTransactionError(
-                "canonical schedule bytes are not canonical"
+        policy_bytes = native_prepared["policy_bytes"]
+        policy_digest = native_prepared["policy_digest"]
+        selected_metric = native_prepared["selected_metric"]
+        sample_requirements = native_prepared["sample_requirements"]
+        judge = None
+        if selected_metric == "judge":
+            from invarlock.judge_measurements.native_workflow import (
+                preflight_native_judge,
             )
-        dataset_path = request.comparison.dataset
-        assert isinstance(dataset_path, Path)
-        dataset_raw = _read_request_file(
-            request.root, dataset_path, label="dataset input"
-        )
-        if dataset_raw != canonical_schedule:
-            raise EvaluationTransactionError(
-                "dataset input must be the exact canonical imported schedule"
+
+            judge = preflight_native_judge(
+                request, schedule.to_payload(), policy_bytes, execution_backend="rust"
             )
     else:
-        dataset_source = request.comparison.dataset
-        assert isinstance(dataset_source, LocalDatasetRequest)
-        dataset_raw = _read_request_file(
+        if request.execution.mode == "import":
+            schedule_path = request.execution.schedule
+            assert schedule_path is not None
+            schedule_raw = _read_request_file(
+                request.root, schedule_path, label="canonical schedule"
+            )
+            schedule_payload = _parse_object(schedule_raw, label="canonical schedule")
+            schedule = build_runtime_behavioral_schedule(schedule_payload)
+            if schedule.task != request.comparison.task:
+                raise EvaluationTransactionError(
+                    "imported schedule task does not match comparison.task"
+                )
+            canonical_schedule = schedule_bytes(schedule)
+            if schedule_raw != canonical_schedule:
+                raise EvaluationTransactionError(
+                    "canonical schedule bytes are not canonical"
+                )
+            dataset_path = request.comparison.dataset
+            assert isinstance(dataset_path, Path)
+            dataset_raw = _read_request_file(
+                request.root, dataset_path, label="dataset input"
+            )
+            if dataset_raw != canonical_schedule:
+                raise EvaluationTransactionError(
+                    "dataset input must be the exact canonical imported schedule"
+                )
+        else:
+            dataset_source = request.comparison.dataset
+            assert isinstance(dataset_source, LocalDatasetRequest)
+            dataset_raw = _read_request_file(
+                request.root,
+                dataset_source.path,
+                label="local evaluation dataset",
+            )
+            schedule = prepare_local_evaluation_schedule_bytes(
+                dataset_source,
+                dataset_raw,
+                task=request.comparison.task,
+            )
+            canonical_schedule = schedule_bytes(schedule)
+
+        policy_bytes = _read_request_file(
             request.root,
-            dataset_source.path,
-            label="local evaluation dataset",
+            request.comparison.policy,
+            label="policy input",
+            max_bytes=_MAX_POLICY_BYTES,
         )
-        schedule = prepare_local_evaluation_schedule_bytes(
-            dataset_source,
-            dataset_raw,
-            task=request.comparison.task,
+        policy_payload = _parse_object(policy_bytes, label="policy input")
+        policy_digest = sha256_digest(policy_bytes)
+        selected_metric = (
+            request.comparison.scorer_extension.scorer_id
+            if request.comparison.scorer_extension is not None
+            else request.comparison.metric
         )
-        canonical_schedule = schedule_bytes(schedule)
+        assert selected_metric is not None
+        judge = None
+        sample_requirements = {}
+        if selected_metric == "judge":
+            from invarlock.judge_measurements.native_workflow import (
+                preflight_native_judge,
+            )
 
-    policy_bytes = _read_request_file(
-        request.root,
-        request.comparison.policy,
-        label="policy input",
-        max_bytes=_MAX_POLICY_BYTES,
-    )
-    policy_payload = _parse_object(policy_bytes, label="policy input")
-    policy_digest = sha256_digest(policy_bytes)
-    selected_metric = (
-        request.comparison.scorer_extension.scorer_id
-        if request.comparison.scorer_extension is not None
-        else request.comparison.metric
-    )
-    assert selected_metric is not None
-    judge = None
-    sample_requirements: dict[str, int | float] = {}
-    if selected_metric == "judge":
-        from invarlock.judge_measurements.native_workflow import preflight_native_judge
-
-        judge = preflight_native_judge(request, schedule.to_payload(), policy_bytes)
-    else:
-        _preflight_policy(
-            policy_payload,
-            metric=selected_metric,
-            policy_digest=policy_digest,
-            scorer_binding=request.comparison.scorer_extension,
-        )
-        sample_requirements = policy_sample_requirements(
-            policy_payload,
-            metric=selected_metric,
-            scorer_binding=request.comparison.scorer_extension,
-        )
+            judge = preflight_native_judge(request, schedule.to_payload(), policy_bytes)
+        else:
+            _preflight_policy(
+                policy_payload,
+                metric=selected_metric,
+                policy_digest=policy_digest,
+                scorer_binding=request.comparison.scorer_extension,
+            )
+            sample_requirements = policy_sample_requirements(
+                policy_payload,
+                metric=selected_metric,
+                scorer_binding=request.comparison.scorer_extension,
+            )
     minimum_record_count = sample_requirements.get("minimum_record_count")
     if (
         isinstance(minimum_record_count, int)
@@ -1006,7 +1061,11 @@ def _prepare_evaluation_inputs(
                     f"{side_name} artifact could not be authenticated: {exc}"
                 ) from exc
 
-    observations = _load_request_observations(request)
+    observations = (
+        native_prepared["observations_objects"]
+        if native_prepared is not None
+        else _load_request_observations(request)
+    )
     _validate_output_destination(request)
     return _PreparedEvaluation(
         signing_key=signing_key,
@@ -1027,6 +1086,8 @@ def _prepare_evaluation_inputs(
 
 def _captured_request(
     request: Path | EvaluationRequest | CapturedEvaluationRequest,
+    *,
+    backend: str = "python",
 ) -> CapturedEvaluationRequest | None:
     if isinstance(request, CapturedEvaluationRequest):
         if (request.metric == "judge") != (request.judge is not None):
@@ -1057,6 +1118,7 @@ def _captured_request(
         loaded = load_evaluation_request(
             request,
             provider_resolver=lambda name: CoreRegistry().get_runtime_provider(name),
+            **_backend_options(backend),
         )
     except EvaluationRequestError as exc:
         raise CapturedEvaluationError(str(exc)) from exc
@@ -1076,6 +1138,7 @@ def preflight_evaluation_request(
     registry: CoreRegistry | None = None,
     unsigned: bool = False,
     max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
+    backend: str = "python",
 ) -> EvaluationPreflightResult: ...
 
 
@@ -1086,6 +1149,7 @@ def preflight_evaluation_request(
     signing_key_path: Path | None,
     unsigned: bool = False,
     max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
+    backend: str = "python",
 ) -> CapturedEvaluationPreflightResult | JudgeWorkflowResult: ...
 
 
@@ -1100,11 +1164,13 @@ def preflight_evaluation_request(
     registry: CoreRegistry | None = None,
     unsigned: bool = False,
     max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
+    backend: str = "python",
 ) -> (
     EvaluationPreflightResult | CapturedEvaluationPreflightResult | JudgeWorkflowResult
 ): ...
 
 
+@scope_execution_backend
 def preflight_evaluation_request(
     request_path: Path | EvaluationRequest | CapturedEvaluationRequest,
     *,
@@ -1115,13 +1181,15 @@ def preflight_evaluation_request(
     registry: CoreRegistry | None | _Omitted = _OMITTED,
     unsigned: bool = False,
     max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
+    backend: str = "python",
 ) -> (
     EvaluationPreflightResult | CapturedEvaluationPreflightResult | JudgeWorkflowResult
 ):
     """Validate an evaluation transaction without execution or filesystem mutation."""
 
+    _require_backend(backend, EvaluationPreflightError)
     try:
-        captured = _captured_request(request_path)
+        captured = _captured_request(request_path, **_backend_options(backend))
         if captured is not None:
             from invarlock.captured_evaluation import preflight_captured_request
 
@@ -1142,6 +1210,7 @@ def preflight_evaluation_request(
                 signing_key_path=signing_key_path,
                 unsigned=unsigned,
                 max_bootstrap_draws=max_bootstrap_draws,
+                **_backend_options(backend),
             )
         if (
             unsigned
@@ -1170,6 +1239,7 @@ def preflight_evaluation_request(
             scorer_registry=scorer_registry,
             authenticate_artifacts=True,
             registry=registry,
+            **_backend_options(backend),
         )
         request = prepared.request
         checks = [
@@ -1334,16 +1404,32 @@ def preflight_evaluation_request(
                 )
             if prepared.selected_metric == "judge":
                 normalized_runtime_digests = imported_runtimes
-                derived = derive_paired_records(
-                    schedule=prepared.schedule,
-                    metric="exact_match",
-                    baseline=imported_sides["baseline"],
-                    subject=imported_sides["subject"],
-                    baseline_identity_digest=artifact_digests["baseline"],
-                    subject_identity_digest=artifact_digests["subject"],
-                    baseline_runtime_digest=imported_runtimes["baseline"],
-                    subject_runtime_digest=imported_runtimes["subject"],
-                )
+                if backend == "rust":
+                    from invarlock.native_backend import derive_runtime_transaction
+
+                    derived = derive_runtime_transaction(
+                        normalized_request=_normalized_request(
+                            request,
+                            prepared.schedule,
+                            prepared.observations,
+                            backend="rust",
+                        ),
+                        schedule=prepared.schedule,
+                        policy_bytes=prepared.policy_bytes,
+                        baseline_evidence=imported_sides["baseline"],
+                        subject_evidence=imported_sides["subject"],
+                    )["paired_records"]
+                else:
+                    derived = derive_paired_records(
+                        schedule=prepared.schedule,
+                        metric="exact_match",
+                        baseline=imported_sides["baseline"],
+                        subject=imported_sides["subject"],
+                        baseline_identity_digest=artifact_digests["baseline"],
+                        subject_identity_digest=artifact_digests["subject"],
+                        baseline_runtime_digest=imported_runtimes["baseline"],
+                        subject_runtime_digest=imported_runtimes["subject"],
+                    )
                 if records_payload != derived:
                     raise EvaluationTransactionError(
                         "imported paired records do not equal verifier-derived pairs"
@@ -1354,6 +1440,7 @@ def preflight_evaluation_request(
             request,
             prepared.schedule,
             prepared.observations,
+            **_backend_options(backend),
         )
         sample_qualification: dict[str, object] | None = None
         if prepared.sample_requirements:
@@ -1432,6 +1519,7 @@ def evaluate_request_file(
     registry: CoreRegistry | None = None,
     unsigned: bool = False,
     max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
+    backend: str = "python",
 ) -> EvaluationTransactionResult | JudgeWorkflowResult: ...
 
 
@@ -1442,6 +1530,7 @@ def evaluate_request_file(
     signing_key_path: Path | None,
     unsigned: bool = False,
     max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
+    backend: str = "python",
 ) -> CapturedEvaluationTransactionResult | JudgeWorkflowResult: ...
 
 
@@ -1457,6 +1546,7 @@ def evaluate_request_file(
     registry: CoreRegistry | None = None,
     unsigned: bool = False,
     max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
+    backend: str = "python",
 ) -> (
     EvaluationTransactionResult
     | CapturedEvaluationTransactionResult
@@ -1464,6 +1554,7 @@ def evaluate_request_file(
 ): ...
 
 
+@scope_execution_backend
 def evaluate_request_file(
     request_path: Path | EvaluationRequest | CapturedEvaluationRequest,
     *,
@@ -1475,6 +1566,7 @@ def evaluate_request_file(
     registry: CoreRegistry | None | _Omitted = _OMITTED,
     unsigned: bool = False,
     max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
+    backend: str = "python",
 ) -> (
     EvaluationTransactionResult
     | CapturedEvaluationTransactionResult
@@ -1482,8 +1574,9 @@ def evaluate_request_file(
 ):
     """Execute or import, authenticate, and publish one closed request."""
 
+    _require_backend(backend, EvaluationTransactionError)
     try:
-        captured = _captured_request(request_path)
+        captured = _captured_request(request_path, **_backend_options(backend))
         if captured is not None:
             from invarlock.captured_evaluation import evaluate_captured_request
 
@@ -1505,6 +1598,7 @@ def evaluate_request_file(
                 signing_key_path=signing_key_path,
                 unsigned=unsigned,
                 max_bootstrap_draws=max_bootstrap_draws,
+                **_backend_options(backend),
             )
         if (
             unsigned
@@ -1535,6 +1629,7 @@ def evaluate_request_file(
             signing_key_path=signing_key_path,
             scorer_registry=scorer_registry,
             registry=registry,
+            **_backend_options(backend),
         )
         signing_key = prepared.signing_key
         registry = prepared.registry
@@ -1570,6 +1665,7 @@ def evaluate_request_file(
             runtime_image_digests=runtime_image_digests,
             resource_resolver=preflight_resolver,
             registry=registry,
+            **_backend_options(backend),
         )
         output_probe = _prepare_output_parent(request.root, request.output.evidence)
         try:
@@ -1580,11 +1676,19 @@ def evaluate_request_file(
             )
         finally:
             os.close(output_probe.descriptor)
-        normalized = _normalized_request(request, schedule, observations)
+        normalized = _normalized_request(
+            request,
+            schedule,
+            observations,
+            **_backend_options(backend),
+        )
+
+        native_derivation = None
 
         def capture() -> tuple[
             RuntimeSideEvidence, RuntimeSideEvidence, str, str, dict[str, Any]
         ]:
+            nonlocal native_derivation
             if request.execution.mode == "import":
                 assert request.execution.records is not None
                 assert request.execution.baseline is not None
@@ -1662,18 +1766,33 @@ def evaluate_request_file(
                     )
             baseline_digest = sha256_digest(baseline_evidence.artifact_identity)
             subject_digest = sha256_digest(subject_evidence.artifact_identity)
-            derived = derive_paired_records(
-                schedule=schedule,
-                metric="exact_match" if selected_metric == "judge" else selected_metric,
-                baseline=baseline_evidence,
-                subject=subject_evidence,
-                baseline_identity_digest=baseline_digest,
-                subject_identity_digest=subject_digest,
-                baseline_runtime_digest=baseline_runtime,
-                subject_runtime_digest=subject_runtime,
-                scorer_binding=request.comparison.scorer_extension,
-                scorer_registry=scorer_registry,
-            )
+            if backend == "rust":
+                from invarlock.native_backend import derive_runtime_transaction
+
+                native_derivation = derive_runtime_transaction(
+                    normalized_request=normalized,
+                    schedule=schedule,
+                    policy_bytes=policy_bytes,
+                    baseline_evidence=baseline_evidence,
+                    subject_evidence=subject_evidence,
+                    scorer_registry=scorer_registry,
+                )
+                derived = native_derivation["paired_records"]
+            else:
+                derived = derive_paired_records(
+                    schedule=schedule,
+                    metric="exact_match"
+                    if selected_metric == "judge"
+                    else selected_metric,
+                    baseline=baseline_evidence,
+                    subject=subject_evidence,
+                    baseline_identity_digest=baseline_digest,
+                    subject_identity_digest=subject_digest,
+                    baseline_runtime_digest=baseline_runtime,
+                    subject_runtime_digest=subject_runtime,
+                    scorer_binding=request.comparison.scorer_extension,
+                    scorer_registry=scorer_registry,
+                )
             if request.execution.mode == "import":
                 assert request.execution.records is not None
                 imported_records_raw = _read_request_file(
@@ -1726,6 +1845,7 @@ def evaluate_request_file(
                     observations=observations,
                     expected_artifact_digests=preflight_result.artifact_digests,
                     expected_runtime_digests=preflight_result.runtime_image_digests,
+                    **({"execution_backend": backend} if backend == "rust" else {}),
                 )
                 _revalidate_output_parent(
                     output_anchor, request.output.evidence, published=True
@@ -1744,22 +1864,32 @@ def evaluate_request_file(
         baseline_digest = sha256_digest(baseline_evidence.artifact_identity)
         subject_digest = sha256_digest(subject_evidence.artifact_identity)
 
-        comparison_id = _comparison_id(
-            normalized,
-            baseline_identity=baseline_evidence.artifact_identity,
-            subject_identity=subject_evidence.artifact_identity,
-            schedule_payload=canonical_schedule,
-            policy_payload=policy_bytes,
-            baseline_runtime_digest=baseline_runtime,
-            subject_runtime_digest=subject_runtime,
-            paired_records=derived,
-        )
+        if native_derivation is not None:
+            comparison_id = native_derivation["comparison_id"]
+        else:
+            comparison_id = _comparison_id(
+                normalized,
+                baseline_identity=baseline_evidence.artifact_identity,
+                subject_identity=subject_evidence.artifact_identity,
+                schedule_payload=canonical_schedule,
+                policy_payload=policy_bytes,
+                baseline_runtime_digest=baseline_runtime,
+                subject_runtime_digest=subject_runtime,
+                paired_records=derived,
+            )
         output_anchor = _prepare_output_parent(request.root, request.output.evidence)
         try:
             _revalidate_output_parent(
                 output_anchor, request.output.evidence, published=False
             )
-            publication = publish_comparison_evidence(
+            publisher = publish_comparison_evidence
+            if backend == "rust":
+                from invarlock.native_backend import (
+                    publish_comparison_evidence as native_publish,
+                )
+
+                publisher = native_publish
+            publication = publisher(
                 request.output.evidence,
                 comparison_id=comparison_id,
                 baseline=InputIdentity(

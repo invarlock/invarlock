@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Literal, cast
+from typing import Any, Literal, TypedDict, cast
 
 from jsonschema import Draft202012Validator
 
@@ -42,6 +42,8 @@ from invarlock.judge_measurements.contracts import (
 )
 from invarlock.public_contracts import load_judge_evaluation_request_schema
 
+from .native_publication import Publisher
+
 MAX_WORKFLOW_BYTES = 384 * 1024 * 1024
 _INPUT_LIMITS = {
     "plan": 64 * 1024 * 1024,
@@ -70,6 +72,14 @@ _COLLECTION_FIELDS = {
     "input_tokens_per_call",
     "cost_microusd_per_call",
 }
+
+
+class _ExecutionOptions(TypedDict, total=False):
+    execution_backend: str
+
+
+def _execution_options(backend: str) -> _ExecutionOptions:
+    return {"execution_backend": backend} if backend != "python" else {}
 
 
 class JudgeWorkflowError(ValueError):
@@ -652,8 +662,11 @@ def evaluate_judge_request(
     *,
     signing_key: Path | None,
     unsigned: bool,
+    execution_backend: str = "python",
 ) -> JudgeWorkflowResult:
     """Publish imported evidence through its separately scoped evidence writer."""
+    if execution_backend not in {"python", "rust"}:
+        raise JudgeWorkflowError("execution backend must be python or rust")
     try:
         values, preflight = _prepare(request)
         if not preflight["ready"]:
@@ -695,7 +708,10 @@ def evaluate_judge_request(
                 }
             elif request.integration == "openai-compatible-judge":
                 local_binding = {"integration": request.integration}
-            with locked_workspace(request.workspace) as unchanged:
+            with locked_workspace(
+                request.workspace,
+                **_execution_options(execution_backend),
+            ) as unchanged:
                 _retain_identity(
                     request.workspace / "identity.json",
                     {
@@ -717,6 +733,7 @@ def evaluate_judge_request(
                     baseline_run=values["baseline_run"],
                     subject_run=values["subject_run"],
                     status=collection_stop,
+                    **_execution_options(execution_backend),
                     **cast(
                         dict[str, Any],
                         {
@@ -736,7 +753,10 @@ def evaluate_judge_request(
                     capacity=collection_stop.get("capacity"),
                 )
 
-        publication = publish_judge_evidence(
+        publisher: Publisher = publish_judge_evidence
+        if execution_backend == "rust":
+            from .native_publication import publish as publisher
+        publication = publisher(
             request.evidence,
             plan=cast(JudgeMeasurementPlan, values["plan"]),
             measurements=cast(JudgeMeasurements, values["measurements"]),

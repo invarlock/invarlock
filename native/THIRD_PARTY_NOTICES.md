@@ -12,7 +12,22 @@ Rust iterators and Vec; returned typed errors instead of Python exceptions.
 The summation algorithm retains its PSF license. Original experiment code is
 Apache License 2.0; see `LICENSE`.
 
-Pinned Rust dependencies: sha2 0.10.9 (MIT OR Apache-2.0), PyO3 0.29.0
-(MIT OR Apache-2.0). Cargo.lock records all transitive versions. Dependency
-license files are bundled under `licenses/dependencies/`; their filenames
-identify the crate and version. Their original copyright notices are retained.
+The compensated sum in `evidence/src/qualification.rs` follows the floating
+addition operation order in CPython 3.12.13,
+[Python/bltinmodule.c](https://github.com/python/cpython/blob/v3.12.13/Python/bltinmodule.c).
+The generated Unicode and IDNA tables are derived from the qualified Python
+3.12 Unicode and Unicode 3.2 string preparation data. These adaptations retain
+the PSF terms in `licenses/CPython-LICENSE.txt`.
+
+`dependency-inventory.json` records every resolved crate version, registry
+archive checksum, declared license expression and retained notice hash.
+`sbom.cdx.json` records the complete Cargo dependency graph, including dependencies
+for platforms that are not linked on the qualified host. These files describe
+the lockfile; they do not claim every platform or dependency has been tested.
+
+Dependency notices are bundled under `licenses/dependencies/`. Most are copied
+from the exact registry archive. The `uuid-simd` and `vsimd` notices are retained
+from their recorded upstream revision
+`d74c030d9dc4f3cae02146d1f497ff62726ef09a`, because those archives omit the root
+license file. The r-efi notice is its archive's `AUTHORS` file, which contains
+the license grant and copyright holders.

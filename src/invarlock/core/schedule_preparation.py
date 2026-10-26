@@ -7,6 +7,7 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, TypeVar, cast
 
 from invarlock.evidence_pack_json import parse_json_bytes, read_regular_file_bytes
 
@@ -315,6 +316,7 @@ def prepare_local_evaluation_schedule_bytes(
     payload: bytes,
     *,
     task: RuntimeTask = "text_causal",
+    backend: str = "python",
 ) -> RuntimeBehavioralSchedule:
     """Authenticate local JSONL bytes and derive one canonical ordered schedule.
 
@@ -322,6 +324,29 @@ def prepare_local_evaluation_schedule_bytes(
     the zero-based source position, so the same pinned bytes and preparation
     request always produce the same IDs and schedule digest.
     """
+
+    if backend not in {"python", "rust"}:
+        raise ValueError("backend must be python or rust")
+    if backend == "rust":
+        import base64
+        from dataclasses import asdict
+
+        from invarlock.native_backend import transact
+
+        if not isinstance(payload, bytes):
+            raise TypeError("local evaluation dataset payload must be bytes")
+        source_value = asdict(source)
+        source_value.pop("path")
+        outcome = transact(
+            "prepare-schedule",
+            {
+                "action": "prepare",
+                "source": source_value,
+                "payload_base64": base64.b64encode(payload).decode("ascii"),
+                "task": task,
+            },
+        )
+        return _schedule_from_native(outcome["payload"])
 
     if not isinstance(payload, bytes):
         raise TypeError("local evaluation dataset payload must be bytes")
@@ -453,6 +478,7 @@ def prepare_local_evaluation_schedule(
     source: LocalDatasetRequest,
     *,
     task: RuntimeTask = "text_causal",
+    backend: str = "python",
 ) -> RuntimeBehavioralSchedule:
     """Read and prepare a pinned local dataset outside a request transaction."""
 
@@ -461,7 +487,9 @@ def prepare_local_evaluation_schedule(
         label="local evaluation dataset",
         max_bytes=MAX_RUNTIME_BEHAVIORAL_SCHEDULE_BYTES,
     )
-    return prepare_local_evaluation_schedule_bytes(source, payload, task=task)
+    return prepare_local_evaluation_schedule_bytes(
+        source, payload, task=task, backend=backend
+    )
 
 
 __all__ = [
@@ -475,3 +503,52 @@ __all__ = [
     "prepare_local_evaluation_schedule_bytes",
     "validate_local_dataset_preparation",
 ]
+
+
+_Hydrated = TypeVar("_Hydrated")
+
+
+def _schedule_from_native(result: dict[str, Any]) -> RuntimeBehavioralSchedule:
+    """Hydrate only a native-validated transaction result without replaying validation."""
+    from dataclasses import fields
+
+    from .runtime_provider.types import EvaluationInputPart, EvaluationRecord
+
+    def hydrate(cls: type[_Hydrated], values: dict[str, Any]) -> _Hydrated:
+        instance = object.__new__(cls)
+        # This private hydrator is called only with the dataclass types below.
+        for field in fields(cast(Any, cls)):
+            object.__setattr__(
+                instance, field.name, values.get(field.name, field.default)
+            )
+        return instance
+
+    payload = result["value"]
+    identity = hydrate(RuntimeBehavioralDatasetIdentity, payload["dataset_identity"])
+    records = []
+    for row in payload["records"]:
+        parts = tuple(hydrate(EvaluationInputPart, part) for part in row["input_parts"])
+        records.append(
+            hydrate(
+                EvaluationRecord,
+                {
+                    "record_id": row["record_id"],
+                    "input_parts": parts,
+                    "input_text": next(
+                        part.text for part in parts if part.kind == "text"
+                    ),
+                    "input_sha256": row["input_sha256"],
+                    "expected_output": row["expected_output"],
+                },
+            )
+        )
+    return hydrate(
+        RuntimeBehavioralSchedule,
+        {
+            "dataset_identity": identity,
+            "records": tuple(records),
+            "schedule_sha256": result["digest"],
+            "task": payload["task"],
+            "format_version": payload["format_version"],
+        },
+    )

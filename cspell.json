@@ -30,6 +30,10 @@
     "*.egg-info/**"
   ],
   "words": [
+    "subtests",
+    "Clippy",
+    "IDNA",
+    "bltinmodule",
     "APFS",
     "editably",
     "mathmodule",
@@ -75,7 +79,7 @@
     "exponentiating",
     "exponentiate",
     "exponentiates",
-    "Δlog",
+    "\u0394log",
     "logloss",
     "lognll",
     "Bonferroni",
@@ -141,7 +145,7 @@
     "Jurafsky",
     "Cohen",
     "Manning",
-    "Schütze",
+    "Sch\u00fctze",
     "Casella",
     "Berger",
     "Erlbaum",

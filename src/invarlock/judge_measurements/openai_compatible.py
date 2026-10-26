@@ -712,6 +712,7 @@ def collect_openai_compatible(
     baseline_run: dict[str, Any],
     subject_run: dict[str, Any],
     options: OpenAICompatibleJudgeOptions = OpenAICompatibleJudgeOptions(),
+    execution_backend: str = "python",
 ) -> JudgeMeasurements:
     """Collect exact chat-completion outcomes from one explicit compatible endpoint."""
 
@@ -724,6 +725,8 @@ def collect_openai_compatible(
             "synchronous OpenAI-compatible collection cannot run inside an active "
             "event loop; use a worker thread or the CLI"
         )
+    if execution_backend not in {"python", "rust"}:
+        raise OpenAICompatibleJudgeError("execution backend must be python or rust")
     options.validate()
     checked = _closed_configuration(configuration)
     preflight_openai_compatible(checked, plan)
@@ -802,181 +805,214 @@ def collect_openai_compatible(
             "large compatible schedules require a durable checkpoint directory"
         )
     identity = _checkpoint_identity(plan_digest, checked, options)
-    sources = _checkpoint_sources(options, identity, len(pending))
-    _validate_cached(
-        sources,
-        pending=pending,
+    from .native_collection import sequential_collection
+
+    with sequential_collection(
+        execution_backend,
+        directory=options.checkpoint_directory,
+        identity=identity,
         plan=plan,
-        configuration=checked,
-        options=options,
-    )
-    headers = {
-        "accept-encoding": "identity",
-        "content-type": "application/json",
-    }
-    credential = None
-    if checked["authentication"] == "bearer_env":
-        credential = os.environ.get(OPENAI_COMPATIBLE_API_KEY_ENV, "").strip()
-        if not credential:
-            raise OpenAICompatibleJudgeError(
-                f"{OPENAI_COMPATIBLE_API_KEY_ENV} must be set for bearer authentication"
-            )
-        headers["authorization"] = f"Bearer {credential}"
-    scope = temporarily_allow_network() if allow_network else nullcontext()
-    with scope:
-        for index in range(len(sources), len(pending)):
-            current = _assemble(plan, plan_digest, sources) if sources else None
-            retained_size = (
-                len(canonical_payload(current)) if current is not None else 0
-            )
-            if (
-                retained_size
-                + _NEXT_SOURCE_RESERVATION_BYTES
-                + _MEASUREMENTS_ENVELOPE_BYTES
-                > MEASUREMENTS_MAX_BYTES
-            ):
-                raise OpenAICompatibleJudgeError(
-                    "compatible retained capacity was exhausted before the next admission"
-                )
-            trial, normalized_request, body = pending[index]
-            source_id = _source_id(index, len(pending))
-            try:
-                client = _client(checked, headers)
-            except Exception:
-                raise OpenAICompatibleJudgeError(
-                    "OpenAI-compatible HTTP client could not be initialized"
-                ) from None
-            _admit(options, index)
-            try:
-                exchange = asyncio.run(
-                    _exchange_once(
-                        client,
-                        body=canonical_payload(body),
-                        credential=credential,
-                        timeout_seconds=checked["request_timeout_seconds"],
-                    )
-                )
-            except Exception:
-                exchange = {
-                    "outcome": "transport_error",
-                    "response_status": None,
-                    "response_headers": {},
-                    "response_body": None,
-                    "raw": None,
-                }
-            service_identity: dict[str, Any] = {
-                "service": checked["service"],
-                "endpoint_sha256": _sha256(checked["base_url"].encode("utf-8")),
-                "requested_model": checked["model"],
-                "response_model": None,
-                "request_id": None,
-                "system_fingerprint": None,
-            }
-            outcome = exchange["outcome"]
-            facts = None
-            if outcome == "success":
-                raw = cast(bytes, exchange["raw"])
-                try:
-                    decoded_text = raw.decode("utf-8", errors="strict")
-                    decoded = parse_json_bytes(
-                        decoded_text.encode("utf-8"),
-                        label="compatible chat completion",
-                    )
-                    facts = _response_facts(decoded, plan=plan)
-                    if len(facts["content"].encode("utf-8")) > JUDGE_REQUEST_MAX_BYTES:
-                        raise OpenAICompatibleJudgeError(
-                            "compatible completion exceeds the retained byte limit"
-                        )
-                except (UnicodeError, ValueError):
-                    outcome = "malformed_response"
-            if outcome == "success" and facts is not None:
-                output = facts["content"]
-                parsed = _parse_rating(output, plan)
-                attempt_response = _blob(output.encode("utf-8"))
-                attempt_status = "completed"
-                attempt_error = None
-                selected = 1
-                service_identity.update(
-                    response_model=facts["model"],
-                    request_id=facts["request_id"],
-                    system_fingerprint=facts["system_fingerprint"],
-                )
-                usage = facts["usage"]
-                finish_reason = facts["finish_reason"]
-                resolved_model = facts["model"]
-            else:
-                parsed = {"status": "unavailable", "rating": None, "value": None}
-                attempt_response = None
-                attempt_status = "cancelled"
-                error_code, error_message = _failure_details(
-                    outcome, exchange["response_status"]
-                )
-                attempt_error = {
-                    "code": error_code,
-                    "message": error_message,
-                }
-                selected = None
-                usage = None
-                finish_reason = None
-                resolved_model = None
-            attempt = {
-                "attempt": 1,
-                "role": "judge",
-                "resolved_model": resolved_model,
-                "status": attempt_status,
-                "request": _blob(normalized_request),
-                "response": attempt_response,
-                "request_id": service_identity["request_id"],
-                "finish_reason": finish_reason,
-                "error": attempt_error,
-                "usage": usage,
-                "cache": "none",
-                "source": {
-                    "source_id": source_id,
-                    "scorer_id": options.scorer_id,
-                    "model_event_id": trial["trial_id"],
-                    "record_index": 0,
-                    "attempt_index": 0,
-                },
-            }
-            trial.update(
-                status="complete" if parsed["status"] == "ok" else "incomplete",
-                attempts=[attempt],
-                selected_attempt=selected,
-                parse=parsed,
-            )
-            source = {
-                "format": OPENAI_COMPATIBLE_SOURCE_FORMAT,
-                "collection": checked,
-                "http": {
-                    "outcome": outcome,
-                    "request": body,
-                    "response_status": exchange["response_status"],
-                    "response_headers": exchange["response_headers"],
-                    "response_body": exchange["response_body"],
-                },
-                "service_identity": service_identity,
-                "trials": [trial],
-            }
-            encoded = canonical_payload(source)
-            if len(encoded) > _MAX_SOURCE_BYTES:
-                raise OpenAICompatibleJudgeError(
-                    "compatible retained source exceeds the per-source byte limit"
-                )
-            _retain(options, index, source)
-            sources.append(source)
-    result = _assemble(plan, plan_digest, sources)
-    if len(canonical_payload(result)) > MEASUREMENTS_MAX_BYTES:
-        raise OpenAICompatibleJudgeError(
-            "compatible retained measurements exceed the aggregate byte limit"
-        )
-    validate_measurements(
-        result,
-        plan,
         baseline_run=baseline_run,
         subject_run=subject_run,
-    )
-    return result
+        error_type=OpenAICompatibleJudgeError,
+    ) as native:
+        sources = (
+            native.sources()
+            if native
+            else _checkpoint_sources(options, identity, len(pending))
+        )
+        if native is None:
+            _validate_cached(
+                sources,
+                pending=pending,
+                plan=plan,
+                configuration=checked,
+                options=options,
+            )
+        headers = {
+            "accept-encoding": "identity",
+            "content-type": "application/json",
+        }
+        credential = None
+        if checked["authentication"] == "bearer_env":
+            credential = os.environ.get(OPENAI_COMPATIBLE_API_KEY_ENV, "").strip()
+            if not credential:
+                raise OpenAICompatibleJudgeError(
+                    f"{OPENAI_COMPATIBLE_API_KEY_ENV} must be set for bearer authentication"
+                )
+            headers["authorization"] = f"Bearer {credential}"
+        scope = temporarily_allow_network() if allow_network else nullcontext()
+        with scope:
+            for index in range(len(sources), len(pending)):
+                current = (
+                    _assemble(plan, plan_digest, sources)
+                    if sources and native is None
+                    else None
+                )
+                retained_size = (
+                    len(canonical_payload(current)) if current is not None else 0
+                )
+                if native is None and (
+                    retained_size
+                    + _NEXT_SOURCE_RESERVATION_BYTES
+                    + _MEASUREMENTS_ENVELOPE_BYTES
+                    > MEASUREMENTS_MAX_BYTES
+                ):
+                    raise OpenAICompatibleJudgeError(
+                        "compatible retained capacity was exhausted before the next admission"
+                    )
+                trial, normalized_request, body = pending[index]
+                source_id = _source_id(index, len(pending))
+                try:
+                    client = _client(checked, headers)
+                except Exception:
+                    raise OpenAICompatibleJudgeError(
+                        "OpenAI-compatible HTTP client could not be initialized"
+                    ) from None
+                if native:
+                    admitted = native.admit(index, normalized_request)
+                    normalized_request = admitted["normalized_request"].encode("utf-8")
+                    body = admitted["request_body"]
+                else:
+                    _admit(options, index)
+                try:
+                    exchange = asyncio.run(
+                        _exchange_once(
+                            client,
+                            body=canonical_payload(body),
+                            credential=credential,
+                            timeout_seconds=checked["request_timeout_seconds"],
+                        )
+                    )
+                except Exception:
+                    exchange = {
+                        "outcome": "transport_error",
+                        "response_status": None,
+                        "response_headers": {},
+                        "response_body": None,
+                        "raw": None,
+                    }
+                service_identity: dict[str, Any] = {
+                    "service": checked["service"],
+                    "endpoint_sha256": _sha256(checked["base_url"].encode("utf-8")),
+                    "requested_model": checked["model"],
+                    "response_model": None,
+                    "request_id": None,
+                    "system_fingerprint": None,
+                }
+                outcome = exchange["outcome"]
+                facts = None
+                if outcome == "success":
+                    raw = cast(bytes, exchange["raw"])
+                    try:
+                        decoded_text = raw.decode("utf-8", errors="strict")
+                        decoded = parse_json_bytes(
+                            decoded_text.encode("utf-8"),
+                            label="compatible chat completion",
+                        )
+                        facts = _response_facts(decoded, plan=plan)
+                        if (
+                            len(facts["content"].encode("utf-8"))
+                            > JUDGE_REQUEST_MAX_BYTES
+                        ):
+                            raise OpenAICompatibleJudgeError(
+                                "compatible completion exceeds the retained byte limit"
+                            )
+                    except (UnicodeError, ValueError):
+                        outcome = "malformed_response"
+                if outcome == "success" and facts is not None:
+                    output = facts["content"]
+                    parsed = _parse_rating(output, plan)
+                    attempt_response = _blob(output.encode("utf-8"))
+                    attempt_status = "completed"
+                    attempt_error = None
+                    selected = 1
+                    service_identity.update(
+                        response_model=facts["model"],
+                        request_id=facts["request_id"],
+                        system_fingerprint=facts["system_fingerprint"],
+                    )
+                    usage = facts["usage"]
+                    finish_reason = facts["finish_reason"]
+                    resolved_model = facts["model"]
+                else:
+                    parsed = {"status": "unavailable", "rating": None, "value": None}
+                    attempt_response = None
+                    attempt_status = "cancelled"
+                    error_code, error_message = _failure_details(
+                        outcome, exchange["response_status"]
+                    )
+                    attempt_error = {
+                        "code": error_code,
+                        "message": error_message,
+                    }
+                    selected = None
+                    usage = None
+                    finish_reason = None
+                    resolved_model = None
+                attempt = {
+                    "attempt": 1,
+                    "role": "judge",
+                    "resolved_model": resolved_model,
+                    "status": attempt_status,
+                    "request": _blob(normalized_request),
+                    "response": attempt_response,
+                    "request_id": service_identity["request_id"],
+                    "finish_reason": finish_reason,
+                    "error": attempt_error,
+                    "usage": usage,
+                    "cache": "none",
+                    "source": {
+                        "source_id": source_id,
+                        "scorer_id": options.scorer_id,
+                        "model_event_id": trial["trial_id"],
+                        "record_index": 0,
+                        "attempt_index": 0,
+                    },
+                }
+                trial.update(
+                    status="complete" if parsed["status"] == "ok" else "incomplete",
+                    attempts=[attempt],
+                    selected_attempt=selected,
+                    parse=parsed,
+                )
+                source = {
+                    "format": OPENAI_COMPATIBLE_SOURCE_FORMAT,
+                    "collection": checked,
+                    "http": {
+                        "outcome": outcome,
+                        "request": body,
+                        "response_status": exchange["response_status"],
+                        "response_headers": exchange["response_headers"],
+                        "response_body": exchange["response_body"],
+                    },
+                    "service_identity": service_identity,
+                    "trials": [trial],
+                }
+                encoded = canonical_payload(source)
+                if len(encoded) > _MAX_SOURCE_BYTES:
+                    raise OpenAICompatibleJudgeError(
+                        "compatible retained source exceeds the per-source byte limit"
+                    )
+                if native:
+                    native.complete(index, source)
+                else:
+                    _retain(options, index, source)
+                sources.append(source)
+        if native:
+            return native.finish()
+        result = _assemble(plan, plan_digest, sources)
+        if len(canonical_payload(result)) > MEASUREMENTS_MAX_BYTES:
+            raise OpenAICompatibleJudgeError(
+                "compatible retained measurements exceed the aggregate byte limit"
+            )
+        validate_measurements(
+            result,
+            plan,
+            baseline_run=baseline_run,
+            subject_run=subject_run,
+        )
+        return result
 
 
 __all__ = [

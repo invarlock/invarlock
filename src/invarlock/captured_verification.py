@@ -65,6 +65,8 @@ class CapturedVerificationIncomplete(ValueError):
 class CapturedVerificationError(ValueError):
     """Submitted evidence failed a check, optionally after a signed rejection."""
 
+    receipt_written: bool
+
     def __init__(self, message: str, *, exit_code: int = 6) -> None:
         super().__init__(message)
         self.exit_code = exit_code

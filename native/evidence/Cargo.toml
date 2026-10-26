@@ -1,0 +1,17 @@
+[package]
+name = "invarlock-native-evidence"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+invarlock-native-contracts = { path = "../contracts" }
+invarlock-native-core = { path = "../core" }
+invarlock-native-filesystem = { path = "../filesystem" }
+serde_json = { version = "=1.0.149", features = ["arbitrary_precision", "preserve_order"] }
+ed25519-dalek = { version = "=2.2.0", features = ["pkcs8", "pem"] }
+base64 = "=0.22.1"
+
+sha2 = "=0.10.9"

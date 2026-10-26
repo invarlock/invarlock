@@ -1,0 +1,18 @@
+[package]
+name = "invarlock-native-verifier"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[[bin]]
+name = "invarlock-native-verify"
+path = "src/main.rs"
+
+[dependencies]
+invarlock-native-contracts = { path = "../contracts" }
+invarlock-native-core = { path = "../core" }
+invarlock-native-evidence = { path = "../evidence" }
+invarlock-native-filesystem = { path = "../filesystem" }
+serde_json = { version = "=1.0.149", features = ["arbitrary_precision", "preserve_order"] }

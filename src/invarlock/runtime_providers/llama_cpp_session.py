@@ -345,6 +345,27 @@ def _run_bounded_process(
     executable.recheck()
     executable_path = executable.fd_path
     inherited_fds = tuple(sorted({executable.descriptor, *pass_fds}))
+    from .native_execution import execution_backend, run_native_process
+
+    if execution_backend() == "rust":
+        try:
+            return run_native_process(
+                program=executable_path,
+                arguments=arguments,
+                input_bytes=input_bytes,
+                pass_fds=inherited_fds,
+                cwd=run_directory.path,
+                environment=run_directory.environment(),
+                timeout_seconds=timeout_seconds,
+                stdout_limit=stdout_limit,
+                stderr_limit=stderr_limit,
+                error_type=LlamaCppExecutionError,
+                timeout_label="llama.cpp record",
+                output_label="llama.cpp",
+            )
+        finally:
+            run_directory.recheck()
+            executable.recheck()
     try:
         process = subprocess.Popen(
             [executable_path, *arguments],

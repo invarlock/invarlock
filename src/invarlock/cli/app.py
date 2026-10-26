@@ -312,6 +312,13 @@ def evaluate(  # noqa: C901
         resolve_path=False,
         help="Closed evaluation request YAML.",
     ),
+    execution_backend: str = typer.Option(
+        "python",
+        "--execution-backend",
+        "--backend",
+        help="Process and collection coordinator: python or rust.",
+        rich_help_panel="Signing and execution authorization",
+    ),
     signing_key: Path | None = typer.Option(
         None,
         "--signing-key",
@@ -555,6 +562,7 @@ def evaluate(  # noqa: C901
         else None
     )
     setup_option_names = {
+        "execution_backend",
         "baseline_run",
         "subject_run",
         "output",
@@ -694,13 +702,31 @@ def evaluate(  # noqa: C901
         | None
     ) = None
     try:
+        if execution_backend == "rust":
+            from invarlock.native_backend import (
+                NativeBackendUnavailable,
+                require_native,
+            )
+
+            try:
+                require_native()
+            except NativeBackendUnavailable as exc:
+                raise EvaluationRequestError(str(exc)) from exc
         try:
-            request_mode = evaluation_request_mode(request)
+            request_mode = evaluation_request_mode(
+                request,
+                **(
+                    {"backend": execution_backend}
+                    if execution_backend != "python"
+                    else {}
+                ),
+            )
             initial_mode = request_mode
         except EvaluationRequestError:
             pass
         outcome = execute_evaluation(
             EvaluationOptions(
+                execution_backend=execution_backend,
                 request=request,
                 signing_key=signing_key,
                 allow_installed_scorers=allow_installed_scorers,
@@ -941,6 +967,12 @@ def verify(
         resolve_path=False,
         help="Canonical evidence-pack directory.",
     ),
+    backend: str = typer.Option(
+        "python",
+        "--backend",
+        help="Verification backend: python or rust.",
+        rich_help_panel="Recipient verification",
+    ),
     trust_profile: Path | None = typer.Option(
         None,
         "--trust-profile",
@@ -1097,6 +1129,7 @@ def verify(
         )
         result = execute_verification(
             VerificationOptions(
+                backend=backend,
                 evidence=evidence,
                 trust_profile=trust_profile,
                 policy=policy,
@@ -1250,6 +1283,9 @@ def report(
         ),
         rich_help_panel="Output and workflow",
     ),
+    backend: str = typer.Option(
+        "python", "--backend", help="Reporting backend: python or rust."
+    ),
     json_out: bool = typer.Option(
         False,
         "--json",
@@ -1275,6 +1311,7 @@ def report(
             html_path=html,
             explain=explain,
             case_ids=tuple(case_id or ()),
+            backend=backend,
             **destinations,
         )
     except EvidenceReportError as exc:

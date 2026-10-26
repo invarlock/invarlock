@@ -11,7 +11,7 @@ from contextlib import nullcontext
 from contextvars import ContextVar
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any
+from typing import Any, TypedDict
 
 from invarlock.judge_measurement_types import JudgeMeasurementPlan, JudgeMeasurements
 from invarlock.security import network_policy_allows, temporarily_allow_network
@@ -23,6 +23,12 @@ from .collector import (
     _check_options,
 )
 from .runner import RunnerOptions, _require_qualified_live_provider_model, collect
+
+
+class _ConfiguredOptions(TypedDict, total=False):
+    execution_backend: str
+    status: dict[str, Any]
+
 
 _BASE_SDK_VERSIONS = {
     "inspect-ai": INSPECT_VERSION,
@@ -312,12 +318,15 @@ async def collect_configured(
     *,
     on_stop: Callable[[str], None] | None = None,
     status: dict[str, Any] | None = None,
+    execution_backend: str = "python",
 ) -> JudgeMeasurements:
     """Collect frozen judgments with pinned SDKs and an environment-only key.
 
     ``runner.stop_after_batches`` requests a graceful invocation stop after
     durable results, without changing the plan or checkpoint budget identity.
     """
+    if execution_backend not in {"python", "rust"}:
+        raise InspectJudgeError("execution_backend must be python or rust")
     if status is not None:
         status.clear()
     allow_judge_network = os.environ.get(
@@ -329,6 +338,11 @@ async def collect_configured(
             "invoke only the collection command with INVARLOCK_ALLOW_JUDGE_NETWORK=1. "
             "Preflight and retained-measurement import remain available offline"
         )
+    optional: _ConfiguredOptions = {}
+    if execution_backend != "python":
+        optional["execution_backend"] = execution_backend
+    if status is not None:
+        optional["status"] = status
     with temporarily_allow_network() if allow_judge_network else nullcontext():
         return await _collect_configured(
             plan,
@@ -338,7 +352,7 @@ async def collect_configured(
             subject_run,
             environment,
             on_stop=on_stop,
-            **({"status": status} if status is not None else {}),
+            **optional,
         )
 
 
@@ -352,6 +366,7 @@ async def _collect_configured(
     *,
     on_stop: Callable[[str], None] | None,
     status: dict[str, Any] | None = None,
+    execution_backend: str = "python",
 ) -> JudgeMeasurements:
     """Keep model initialization, collection and cleanup inside the judge scope."""
     _check_options(plan, options)
@@ -407,7 +422,10 @@ async def _collect_configured(
             raise InspectJudgeError(
                 "Inspect provider must use the standard service tier"
             )
-        result = await collect(
+        collector = collect
+        if execution_backend == "rust":
+            from .rust_runner import collect as collector
+        result = await collector(
             plan=plan,
             options=options,
             runner=runner,

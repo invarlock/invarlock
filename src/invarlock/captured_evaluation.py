@@ -355,9 +355,29 @@ def preflight_captured_request(
     signing_key_path: Path | None = None,
     unsigned: bool = False,
     max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
+    backend: str = "python",
 ) -> CapturedEvaluationPreflightResult | JudgeWorkflowResult:
+    if backend not in {"python", "rust"}:
+        raise CapturedEvaluationError("backend must be python or rust")
     if request.metric != "judge" and request.judge is not None:
         raise CapturedEvaluationError("judge configuration requires metric: judge")
+    if backend == "rust":
+        from invarlock.native_backend import NativeBackendUnavailable, require_native
+
+        try:
+            require_native()
+        except NativeBackendUnavailable as exc:
+            raise CapturedEvaluationError(str(exc)) from exc
+    if backend == "rust" and request.metric != "judge":
+        from invarlock.native_backend import captured_request
+
+        return captured_request(
+            request,
+            preflight=True,
+            signing_key_path=signing_key_path,
+            unsigned=unsigned,
+            max_bootstrap_draws=max_bootstrap_draws,
+        )
     if request.metric == "judge":
         from invarlock.judge_measurements.captured_workflow import (
             preflight_captured_judge,
@@ -368,7 +388,10 @@ def preflight_captured_request(
                 "bootstrap overrides do not apply to judge scoring"
             )
         return preflight_captured_judge(
-            request, signing_key_path=signing_key_path, unsigned=unsigned
+            request,
+            signing_key_path=signing_key_path,
+            unsigned=unsigned,
+            **({"execution_backend": backend} if backend == "rust" else {}),
         )
     return _prepare_captured_request(
         request,
@@ -384,10 +407,30 @@ def evaluate_captured_request(
     signing_key_path: Path | None = None,
     unsigned: bool = False,
     max_bootstrap_draws: int | None = DEFAULT_MAX_BOOTSTRAP_DRAWS,
+    backend: str = "python",
 ) -> CapturedEvaluationTransactionResult | JudgeWorkflowResult:
     """Load, compare, bind, and publish one captured request."""
+    if backend not in {"python", "rust"}:
+        raise CapturedEvaluationError("backend must be python or rust")
     if request.metric != "judge" and request.judge is not None:
         raise CapturedEvaluationError("judge configuration requires metric: judge")
+    if backend == "rust":
+        from invarlock.native_backend import NativeBackendUnavailable, require_native
+
+        try:
+            require_native()
+        except NativeBackendUnavailable as exc:
+            raise CapturedEvaluationError(str(exc)) from exc
+    if backend == "rust" and request.metric != "judge":
+        from invarlock.native_backend import captured_request
+
+        return captured_request(
+            request,
+            preflight=False,
+            signing_key_path=signing_key_path,
+            unsigned=unsigned,
+            max_bootstrap_draws=max_bootstrap_draws,
+        )
     if request.metric == "judge":
         from invarlock.judge_measurements.captured_workflow import (
             evaluate_captured_judge,
@@ -398,7 +441,10 @@ def evaluate_captured_request(
                 "bootstrap overrides do not apply to judge scoring"
             )
         return evaluate_captured_judge(
-            request, signing_key_path=signing_key_path, unsigned=unsigned
+            request,
+            signing_key_path=signing_key_path,
+            unsigned=unsigned,
+            **({"execution_backend": backend} if backend == "rust" else {}),
         )
     baseline, subject, policy, normalized_request, prepared = _prepare_captured_request(
         request,

@@ -1,4 +1,6 @@
 //! Explicit opt-in Python companion; no automatic backend selection.
+mod execution;
+mod portable;
 use invarlock_native_core as core;
 use pyo3::exceptions::{PyOverflowError, PyValueError};
 use pyo3::prelude::*;
@@ -67,6 +69,8 @@ fn invarlock_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(resampling_distribution, m)?)?;
     m.add_function(wrap_pyfunction!(sample_indexes, m)?)?;
     m.add_function(wrap_pyfunction!(_diagnostic_fsum, m)?)?;
+    execution::register(m)?;
+    portable::register(m)?;
     m.add("__version__", "0.1.0")?;
     Ok(())
 }

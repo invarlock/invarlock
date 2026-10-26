@@ -1,6 +1,49 @@
-# Bounded evidence-kernel comparison
+# Rust architecture comparison
 
-[First measured results](RESULTS.md) cover the initial local interval experiment.
+[Expanded results](../../docs/reference/rust-expanded-results.md) cover the broad
+Rust implementation. [First measured results](RESULTS.md) remain the historical
+interval experiment. Machine-readable expanded timings and evidence identities
+are in `results/expanded-macos-arm64-py312.json`.
+
+The expanded candidate implements complete evidence transactions and separate
+execution/control infrastructure. See `native/README.md` for building and selecting
+it, and `implementation-coverage.json` for the exercised boundaries.
+
+`full_fixtures.py` authors retained workloads through the installed fixed Python
+reference. `full_runner.py` uses `matrix-expanded.json` to compare original Python,
+the recorded narrow optimization, whole Rust transactions through Python, and a
+standalone Rust driver. It qualifies each path before timing and retains every
+attempt. The journey includes signed receipts and report publication. Fixture
+inputs, command binaries, wheels and harness sources are pinned in metadata.
+The metadata additionally records `standalone`, `offline_cli` and `harness_sources`.
+
+## Expanded comparison
+
+Use the retained metadata, fixture manifest and exact matrix hash with the
+installed comparison environment. Set each path to the actual retained files;
+the output directory must not exist. The fixture manifest includes the report
+steps and their output files as well as receipt operations.
+
+```sh
+"$PYTHON" -I -c \
+  'import sys;sys.path.insert(0,sys.argv.pop(1));from invarlock_rust_experiment.full_runner import main;raise SystemExit(main())' \
+  "$EXPERIMENT" --python "$PYTHON" \
+  --metadata /absolute/metadata.json --fixtures /absolute/fixtures-with-reports.json \
+  --matrix /absolute/matrix-expanded.json --matrix-sha256 "$MATRIX_SHA" \
+  --output /absolute/new-expanded-output
+```
+
+The retained run has 32 matching qualification attempts and 128 matching timings.
+Its original budget reserve stopped after 64 timings. The declared budget-only
+continuation used `recovery/continue_budget.py` for the 64 unmeasured attempts;
+it preserved every original attempt and did not repeat qualification. That
+script accepts only a matching stopped run, the original interpreter and frozen
+inputs. It is not a retry mechanism for failed or incomplete attempts.
+
+## Historical interval experiment
+
+The following sections describe the original interval-only experiment and remain
+available for reproducing those historical results.
 
 This directory contains an explicit offline experiment. The original Python
 package remains the installed baseline. The experiment substitutes both the
@@ -39,7 +82,7 @@ value with the actual identity):
 ```json
 {
   "source_commit": "actual commit",
-  "source_tree_sha256": "actual source snapshot SHA-256",
+  "source_tree_sha256": "actual Git tree identity (legacy field name)",
   "dependency_lock": {"path": "/absolute/retained/lock", "sha256": "actual hash"},
   "root_wheel": {"path": "/absolute/retained/root.whl", "sha256": "actual hash"},
   "native_wheel": {"path": "/absolute/retained/native.whl", "sha256": "actual hash"},

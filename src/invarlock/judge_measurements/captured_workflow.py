@@ -43,6 +43,8 @@ from invarlock.judge_measurements.workflow import (
     _collection_budgets,
 )
 
+from .native_publication import Publisher
+
 
 def prepare_evaluator_judge(
     recipe: dict[str, Any], baseline: dict[str, Any], subject: dict[str, Any]
@@ -129,7 +131,10 @@ def _locations(request: CapturedEvaluationRequest, signing_key: Path | None) -> 
 
 
 def _prepare(
-    request: CapturedEvaluationRequest, signing_key: Path | None, unsigned: bool
+    request: CapturedEvaluationRequest,
+    signing_key: Path | None,
+    unsigned: bool,
+    execution_backend: str = "python",
 ) -> tuple[dict[str, Any], dict[str, Any], Any]:
     if type(unsigned) is not bool or unsigned == (signing_key is not None):
         raise JudgeWorkflowError(
@@ -162,7 +167,18 @@ def _prepare(
     recipe = _recipe(
         _json(read_input(request.policy, NATIVE_POLICY_MAX_BYTES), label="judge policy")
     )
-    plan, policy = prepare_evaluator_judge(recipe, baseline, subject)
+    if execution_backend == "rust":
+        from .native_publication import finalize
+
+        if any(
+            run["source"]["name"] == NATIVE_RUN_SOURCE for run in (baseline, subject)
+        ):
+            raise JudgeWorkflowError(
+                "Native judge answers require their runtime capture and native request"
+            )
+        plan, policy = finalize(recipe, baseline, subject)
+    else:
+        plan, policy = prepare_evaluator_judge(recipe, baseline, subject)
     values: dict[str, Any] = {
         "baseline": baseline,
         "subject": subject,
@@ -273,11 +289,24 @@ def _prepare(
 
 
 def preflight_captured_judge(
-    request: CapturedEvaluationRequest, *, signing_key_path: Path | None, unsigned: bool
+    request: CapturedEvaluationRequest,
+    *,
+    signing_key_path: Path | None,
+    unsigned: bool,
+    execution_backend: str = "python",
 ) -> JudgeWorkflowResult:
     """Validate capture mappings and full collection reserves without writes."""
     try:
-        _, result, _ = _prepare(request, signing_key_path, unsigned)
+        _, result, _ = _prepare(
+            request,
+            signing_key_path,
+            unsigned,
+            **(
+                {"execution_backend": execution_backend}
+                if execution_backend != "python"
+                else {}
+            ),
+        )
         return JudgeWorkflowResult(result)
     except (OSError, ValueError) as exc:
         if isinstance(exc, JudgeWorkflowError):
@@ -286,11 +315,24 @@ def preflight_captured_judge(
 
 
 def evaluate_captured_judge(
-    request: CapturedEvaluationRequest, *, signing_key_path: Path | None, unsigned: bool
+    request: CapturedEvaluationRequest,
+    *,
+    signing_key_path: Path | None,
+    unsigned: bool,
+    execution_backend: str = "python",
 ) -> JudgeWorkflowResult:
     """Collect or import judgments on existing answers, then publish once."""
     try:
-        values, preparation, key = _prepare(request, signing_key_path, unsigned)
+        values, preparation, key = _prepare(
+            request,
+            signing_key_path,
+            unsigned,
+            **(
+                {"execution_backend": execution_backend}
+                if execution_backend != "python"
+                else {}
+            ),
+        )
         judge = request.judge
         assert judge is not None
         status = None
@@ -299,7 +341,14 @@ def evaluate_captured_judge(
                 values["recipe"]["collection"],
                 preparation["collection_environment"],
             )
-            with native_workflow.locked_workspace(judge.workspace) as unchanged:
+            with native_workflow.locked_workspace(
+                judge.workspace,
+                **(
+                    {"execution_backend": execution_backend}
+                    if execution_backend != "python"
+                    else {}
+                ),
+            ) as unchanged:
                 native_workflow._retain_identity(
                     judge.workspace / "identity.json", values
                 )
@@ -311,6 +360,8 @@ def evaluate_captured_judge(
                         "model": judge.model,
                         "request_root": request.root,
                     }
+                if execution_backend != "python":
+                    collect_arguments["execution_backend"] = execution_backend
                 values["measurements"] = native_workflow.collect_frozen(
                     plan=values["plan"],
                     collection=values["recipe"]["collection"],
@@ -327,7 +378,10 @@ def evaluate_captured_judge(
                     judge.workspace,
                     stop_reason=stop.get("stop_reason"),
                 )
-        publication = publish_judge_evidence(
+        publisher: Publisher = publish_judge_evidence
+        if execution_backend == "rust":
+            from .native_publication import publish as publisher
+        publication = publisher(
             request.evidence,
             plan=values["plan"],
             measurements=values["measurements"],

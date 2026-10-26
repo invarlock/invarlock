@@ -18,6 +18,42 @@ The initial reference is `staging/next` commit
 commit with this same tree. Earlier timings remain exploratory measurements;
 new comparisons use retained installed artifacts and explicitly identified inputs.
 
+## Implemented experimental candidate
+
+The isolated candidate now contains eight Rust crates covering contracts,
+analysis, filesystem snapshots, evidence transactions, execution, Python bindings,
+an offline verifier and a separate control executable. Public evaluation,
+verification and reporting commands accept an explicit Rust backend. Python
+continues to supply model frameworks, provider SDKs, external format adapters,
+YAML decoding and resource negotiation.
+
+The candidate includes captured/native/judge publication and replay, independent
+recipient trust and receipts, evidence sets, qualification and attestations,
+report rendering, deterministic and judge analysis, and separate process,
+OCI, admission and checkpoint controls. Retained judge replay covers generic
+JSON, Inspect events, OpenAI-compatible records and runtime-provider records.
+
+The latest routes add native pair derivation to judge-import preflight and
+capture, native live-worker evidence publication that preserves original provider
+observations and receipts, and GGUF identity inspection through the explicitly
+selected provider backend. The final rebuilt extension and tools passed the
+listed differential fixtures, including these routes; this does not qualify live
+provider execution.
+Provider hooks still run in Python, and `_validate_import_side` currently repeats
+some portable checks there. Low-level Python APIs remain Python unless callers
+select a supported native backend or transaction.
+
+The implementation coverage ledger at `experiments/rust/implementation-coverage.json`
+records actual files, reachable interfaces, exercised tests, retained artifact
+identities and pending checks. It supplements the target module map without
+claiming every target module or migration stage is complete. Controlled macOS
+fixtures do not qualify live OCI/provider/GPU operation, Linux descriptor
+execution or Windows behavior. The first interval results remain historical.
+Complete transaction measurements use separately retained artifacts and the
+expanded comparison protocol. The [expanded results](rust-expanded-results.md)
+show faster captured NLL transactions, slower small transactions and higher peak
+RSS in every measured workload. Python remains the default backend.
+
 ## Objective and constraints
 
 Give maintainers a defensible adoption decision and give recipients a practical
@@ -80,8 +116,9 @@ capabilities during the experiment.
 | Execution/control | Portable transaction coordination, bounded process I/O, deadlines, cancellation, budgets, checkpoints and resume | Core, platform APIs and explicit execution adapters; never a dependency of offline verification |
 | Native CLI | Portable command routing, preflight and reports; explicit Python-assisted commands where required | Core for offline commands; execution/control for live commands; no implicit provider or extension discovery |
 
-The first experiment implements native paired resampling inside `analysis`.
-This is a feasibility slice within the larger design, not the finished core.
+The first experiment implemented native paired resampling inside `analysis`.
+That historical feasibility slice preceded the broader candidate described above;
+its results do not establish the performance or compatibility of the later core.
 
 ## Internal design and optimization
 

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import importlib
+import json
 import logging
 import os
 import re
@@ -153,6 +155,8 @@ finally:
 
 class OciEvaluationError(ValueError):
     """Raised before or after an unsafe, ambiguous, or failed side launch."""
+
+    retain_worker_root: bool = False
 
 
 @dataclass(frozen=True)
@@ -1265,6 +1269,8 @@ def _cleanup_worker_directory(
     root: Path,
     launch: OciEvaluationLaunch,
     providers: Mapping[RuntimeSideRole, str],
+    *,
+    execution_backend: str = "python",
 ) -> None:
     """Clean only this run's outputs after both worker launchers have settled."""
 
@@ -1301,7 +1307,12 @@ def _cleanup_worker_directory(
                     command = _output_cleanup_command(
                         root, directory, launch, getattr(launch, role), providers[role]
                     )
-                    result = run_side_worker(
+                    supervisor = (
+                        _run_native_cleanup
+                        if execution_backend == "rust"
+                        else run_side_worker
+                    )
+                    result = supervisor(
                         command, timeout_seconds=_OUTPUT_CLEANUP_TIMEOUT_SECONDS
                     )
                     if result.returncode:
@@ -1326,9 +1337,14 @@ def _cleanup_worker_directory(
 
 @contextmanager
 def _worker_directory(
-    launch: OciEvaluationLaunch, providers: Mapping[RuntimeSideRole, str]
+    launch: OciEvaluationLaunch,
+    providers: Mapping[RuntimeSideRole, str],
+    *,
+    execution_backend: str = "python",
 ) -> Iterator[Path]:
     root = Path(tempfile.mkdtemp(prefix="invarlock-side-workers-"))
+    if execution_backend == "rust":
+        root = root.resolve(strict=True)
     original_error: BaseException | None = None
     try:
         yield root
@@ -1337,7 +1353,22 @@ def _worker_directory(
         raise
     finally:
         try:
-            _cleanup_worker_directory(root, launch, providers)
+            if original_error is not None and getattr(
+                original_error, "retain_worker_root", False
+            ):
+                raise OciEvaluationError(
+                    "container cleanup is uncertain; retained native CID evidence"
+                )
+            _cleanup_worker_directory(
+                root,
+                launch,
+                providers,
+                **(
+                    {"execution_backend": execution_backend}
+                    if execution_backend != "python"
+                    else {}
+                ),
+            )
         except (OSError, OciEvaluationError) as exc:
             diagnostic = f"worker temporary cleanup failed; retained {root}: {exc}"
             if original_error is None:
@@ -1346,12 +1377,89 @@ def _worker_directory(
             logging.getLogger(__name__).error(diagnostic)
 
 
+def _run_native_cleanup(
+    command: Sequence[str], *, timeout_seconds: int
+) -> subprocess.CompletedProcess[str]:
+    invarlock_native = importlib.import_module("invarlock_native")
+
+    try:
+        result = json.loads(
+            invarlock_native.run_oci_command(list(command), timeout_seconds)
+        )
+    except ValueError as exc:
+        raise OciEvaluationError(str(exc)) from exc
+    if result["cleanup_errors"]:
+        raise OciEvaluationError(
+            "container cleanup is uncertain: " + "; ".join(result["cleanup_errors"])
+        )
+    return subprocess.CompletedProcess(
+        list(command), result["status"], result["stdout"], result["stderr"]
+    )
+
+
+def _run_native_workers(
+    plans: Mapping[str, object], *, parallel: bool
+) -> dict[RuntimeSideRole, subprocess.CompletedProcess[str]]:
+    """Project results from the native pair supervisor; no Python process launch."""
+    try:
+        invarlock_native = importlib.import_module("invarlock_native")
+    except ImportError as exc:
+        raise OciEvaluationError(
+            "the explicit Rust execution backend requires invarlock_native"
+        ) from exc
+    cancellation = invarlock_native.CancellationToken()
+    payload = canonical_json_bytes({"workers": dict(plans), "parallel": parallel})
+    # Keep the interpreter's signal handling responsive while native code owns
+    # both workers and joins/reaps them after cancellation.
+    with ThreadPoolExecutor(
+        max_workers=1, thread_name_prefix="invarlock-control"
+    ) as pool:
+        future = pool.submit(
+            invarlock_native.run_oci_workers, payload, cancellation=cancellation
+        )
+        try:
+            while True:
+                try:
+                    raw = future.result(timeout=0.1)
+                    break
+                except TimeoutError:
+                    continue
+        except ValueError as exc:
+            cancellation.cancel()
+            error = OciEvaluationError(str(exc))
+            error.retain_worker_root = True
+            raise error from exc
+        except BaseException as exc:
+            cancellation.cancel()
+            exc.__dict__["retain_worker_root"] = True
+            raise
+    try:
+        results = json.loads(raw)
+    except (ValueError, TypeError) as exc:
+        raise OciEvaluationError("native worker response is invalid") from exc
+    completed = {}
+    for role, result in results.items():
+        diagnostic = result["stderr"]
+        if result["cleanup_errors"]:
+            error = OciEvaluationError(
+                "native OCI cleanup is uncertain: "
+                + "; ".join(result["cleanup_errors"])
+            )
+            error.retain_worker_root = True
+            raise error
+        completed[cast(RuntimeSideRole, role)] = subprocess.CompletedProcess(
+            [], result["status"], result["stdout"], diagnostic
+        )
+    return completed
+
+
 @dataclass(frozen=True)
 class OciRuntimeExecutor:
     """Host-side coordinator for two isolated model workers."""
 
     launch: OciEvaluationLaunch
     environment: Mapping[str, str] | None = None
+    execution_backend: str = "python"
     _provider_bindings_snapshot: Mapping[str, ProviderResourceBinding] = field(
         init=False,
         repr=False,
@@ -1359,6 +1467,8 @@ class OciRuntimeExecutor:
     )
 
     def __post_init__(self) -> None:
+        if self.execution_backend not in {"python", "rust"}:
+            raise OciEvaluationError("execution backend must be python or rust")
         observed = os.environ if self.environment is None else self.environment
         object.__setattr__(
             self,
@@ -1418,8 +1528,17 @@ class OciRuntimeExecutor:
             cast(RuntimeSideRole, role): side.runtime.provider
             for role, (side, _side_launch) in sides.items()
         }
-        with _worker_directory(self.launch, providers) as root:
+        with _worker_directory(
+            self.launch,
+            providers,
+            **(
+                {"execution_backend": self.execution_backend}
+                if self.execution_backend != "python"
+                else {}
+            ),
+        ) as root:
             commands: dict[RuntimeSideRole, list[str]] = {}
+            native_plans: dict[str, object] = {}
             outputs: dict[RuntimeSideRole, Path] = {}
             timeouts: dict[RuntimeSideRole, int] = {}
             for role, (side, side_launch) in sides.items():
@@ -1464,15 +1583,60 @@ class OciRuntimeExecutor:
                     "output": "/invarlock/output-root/side",
                 }
                 job_root.joinpath("job.json").write_bytes(canonical_json_bytes(job))
-                commands[cast(RuntimeSideRole, role)] = compose_side_worker_command(
-                    launch=self.launch,
-                    side_launch=side_launch,
-                    provider_name=provider.name,
-                    artifact_source=resources.primary_path(),
-                    support_sources=support_sources,
-                    job_root=job_root,
-                    output_root=output_parent,
-                )
+                if self.execution_backend == "rust":
+                    profile = side_launch.entrypoint
+                    if profile == "auto":
+                        optional = OPTIONAL_RUNTIME_PROVIDER_PROFILES.get(provider.name)
+                        profile = (
+                            optional.automatic_entrypoint if optional else "python"
+                        )
+                    native_plans[role] = {
+                        "engine": self.launch.engine_path or self.launch.engine,
+                        "engine_kind": self.launch.engine,
+                        "image": side_launch.image_ref,
+                        "device": side_launch.device,
+                        "cpus": self.launch.worker_limits.cpus,
+                        "memory_mib": self.launch.worker_limits.memory_mib,
+                        "user": self.launch.worker_limits.user,
+                        "artifact": str(resources.primary_path()),
+                        "support": {
+                            name: str(path) for name, path in support_sources.items()
+                        },
+                        "job": str(job_root),
+                        "output": str(output_parent),
+                        "cidfile": str(job_root / "container.cid"),
+                        "tmpfs_gib": _worker_tmpfs_size_gib(
+                            provider_name=provider.name,
+                            artifact_source=resources.primary_path(),
+                        ),
+                        "entrypoint": "/opt/nvidia/nvidia_entrypoint.sh"
+                        if profile == "nvidia"
+                        else "python",
+                        "arguments": (
+                            ["/opt/invarlock/cli-venv/bin/python"]
+                            if profile == "nvidia"
+                            else []
+                        )
+                        + [
+                            "-m",
+                            "invarlock.evaluation_side_worker",
+                            "/invarlock/job/job.json",
+                        ],
+                        "timeout_seconds": _worker_outer_timeout_seconds(
+                            cast(Mapping[str, object], side.runtime.settings),
+                            record_count=record_count,
+                        ),
+                    }
+                else:
+                    commands[cast(RuntimeSideRole, role)] = compose_side_worker_command(
+                        launch=self.launch,
+                        side_launch=side_launch,
+                        provider_name=provider.name,
+                        artifact_source=resources.primary_path(),
+                        support_sources=support_sources,
+                        job_root=job_root,
+                        output_root=output_parent,
+                    )
                 outputs[cast(RuntimeSideRole, role)] = output
                 timeouts[cast(RuntimeSideRole, role)] = _worker_outer_timeout_seconds(
                     cast(Mapping[str, object], side.runtime.settings),
@@ -1480,7 +1644,11 @@ class OciRuntimeExecutor:
                 )
 
             completed: dict[RuntimeSideRole, subprocess.CompletedProcess[str]] = {}
-            if _workers_may_run_parallel(self.launch):
+            if self.execution_backend == "rust":
+                completed = _run_native_workers(
+                    native_plans, parallel=_workers_may_run_parallel(self.launch)
+                )
+            elif _workers_may_run_parallel(self.launch):
                 cancellation_event = threading.Event()
                 primary_error: Exception | None = None
                 with ThreadPoolExecutor(

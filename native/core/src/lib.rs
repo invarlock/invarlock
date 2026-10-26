@@ -239,3 +239,58 @@ pub fn paired_resampling_interval(
         percentile(&distribution, 1.0 - alpha),
     ))
 }
+
+mod analysis;
+mod exact_match;
+mod idna;
+mod idna_tables;
+mod scoring;
+mod unicode_tables;
+pub use analysis::{
+    check_policy, check_run, compare_runs, compare_validated_runs, validate_policy, validate_run,
+    verify_input_projection, AnalysisError, ValidatedPolicy, ValidatedRun,
+    DEFAULT_MAX_BOOTSTRAP_DRAWS,
+};
+pub use exact_match::paired_exact_match_statistics;
+pub use scoring::{score, validate_configuration};
+mod report;
+pub use report::{build_comparison_report, validated_derived_measurements};
+mod judge;
+pub use judge::{judge_plan_precision, judge_statistics};
+mod judge_contracts;
+pub use judge_contracts::{
+    expected_judge_trial_id, measurement_plan_digest, render_judge_request,
+    render_judge_runtime_prompt, validate_judge_analysis_policy, validate_measurement_plan,
+    validate_measurements,
+};
+mod judge_analysis;
+pub use judge_analysis::{analyze_measurements, combine_judge_analysis_results};
+
+mod judge_inspect;
+
+mod judge_compatible;
+
+mod judge_import;
+mod judge_runtime;
+pub use judge_import::{
+    import_inspect_export, import_inspect_sample, validate_inspect_collection_budgets,
+    validate_inspect_collection_options, InspectImportContext,
+};
+pub use judge_inspect::{replay_retained_inspect_source, validate_retained_inspect_event};
+
+pub use judge_compatible::{
+    normalize_openai_compatible_collection, normalized_compatible_base_url,
+    openai_compatible_service_identity, validate_openai_compatible_collection,
+};
+
+pub use scoring::casefold_text as unicode_casefold;
+
+pub use judge_compatible::render_compatible_judge_request;
+pub use judge_contracts::validate_retained_collection_prefix;
+
+pub use judge::judge_report_numbers;
+
+mod preflight;
+pub use preflight::captured_preflight_capacity;
+
+pub use report::validate_scorer_binding;

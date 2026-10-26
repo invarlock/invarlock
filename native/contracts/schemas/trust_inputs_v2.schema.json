@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://invarlock.dev/contracts/trust_inputs_v2.schema.json",
+  "title": "InvarLock Captured Trust Inputs v2",
+  "type": "object",
+  "required": ["format", "kind", "policy", "anchors", "verifier"],
+  "additionalProperties": false,
+  "properties": {
+    "format": {"const": "invarlock/trust-inputs-v2"},
+    "kind": {"const": "captured"},
+    "policy": {
+      "type": "object", "required": ["path"], "additionalProperties": false,
+      "properties": {"path": {"$ref": "#/$defs/safeRelativePath"}}
+    },
+    "anchors": {
+      "type": "object", "additionalProperties": false,
+      "required": ["baseline_run_digest", "subject_run_digest", "request_digest", "evidence_signer_fingerprint"],
+      "properties": {
+        "baseline_run_digest": {"$ref": "#/$defs/digest"},
+        "subject_run_digest": {"$ref": "#/$defs/digest"},
+        "request_digest": {"$ref": "#/$defs/digest"},
+        "evidence_signer_fingerprint": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "verifier": {
+      "type": "object", "required": ["identity", "signing_key_path"], "additionalProperties": false,
+      "properties": {
+        "identity": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}(?![\\s\\S])"},
+        "signing_key_path": {"$ref": "#/$defs/safeRelativePath"}
+      }
+    }
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}(?![\\s\\S])"},
+    "safeRelativePath": {
+      "type": "string", "minLength": 1, "maxLength": 512,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(?:/|$))(?!.*//)(?!.*/$)[A-Za-z0-9._/-]+(?![\\s\\S])"
+    }
+  }
+}

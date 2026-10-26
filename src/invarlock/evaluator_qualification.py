@@ -479,9 +479,24 @@ def qualify_evaluator_export(
     schedule_path: str | Path,
     export_path: str | Path,
     raw_output_path: str | Path,
+    backend: str = "python",
 ) -> EvaluatorQualificationResult:
     """Qualify one normalized evaluator export without evaluator-specific code."""
 
+    if backend == "rust":
+        from invarlock.native_backend import qualify_evaluator_export as native_qualify
+
+        try:
+            return native_qualify(
+                profile_path=profile_path,
+                schedule_path=schedule_path,
+                export_path=export_path,
+                raw_output_path=raw_output_path,
+            )
+        except ValueError as exc:
+            raise EvaluatorQualificationError(str(exc)) from exc
+    if backend != "python":
+        raise ValueError("qualification backend must be python or rust")
     profile, profile_raw = _load_closed_json(
         Path(profile_path),
         label="evaluator qualification profile",

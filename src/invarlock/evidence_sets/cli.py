@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, NoReturn
+from pathlib import Path
+from typing import TYPE_CHECKING, NoReturn, Protocol
 
-from invarlock.evidence_sets.verification import verify_evidence_set
 from invarlock.evidence_verification import (
     EvidenceVerification,
     EvidenceVerificationError,
@@ -12,6 +12,19 @@ from invarlock.evidence_verification import (
 
 if TYPE_CHECKING:  # pragma: no cover - static imports only
     from invarlock.cli.verification_workflow import VerificationOptions
+    from invarlock.evidence_sets.verification import EvidenceSetVerification
+
+
+class _EvidenceSetVerifier(Protocol):
+    def __call__(
+        self,
+        evidence: Path,
+        /,
+        *,
+        recipient_policy: Path,
+        receipt: Path | None = None,
+        max_bootstrap_draws: int | None = 102_400_000,
+    ) -> EvidenceSetVerification: ...
 
 
 def execute_evidence_set_verification(
@@ -48,8 +61,17 @@ def execute_evidence_set_verification(
             + ", ".join("--" + name.replace("_", "-") for name in conflicts)
         )
     assert options.trust_profile is not None
+    verifier: _EvidenceSetVerifier
+    if options.backend == "rust":
+        from invarlock.native_backend import verify_evidence_set as native_verify
+
+        verifier = native_verify
+    else:
+        from invarlock.evidence_sets.verification import verify_evidence_set
+
+        verifier = verify_evidence_set
     try:
-        result = verify_evidence_set(
+        result = verifier(
             options.evidence,
             recipient_policy=options.trust_profile,
             receipt=options.receipt,

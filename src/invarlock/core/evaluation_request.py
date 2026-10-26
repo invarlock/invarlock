@@ -1168,6 +1168,7 @@ def load_evaluation_request(
     baseline_run: str | Path | None = None,
     subject_run: str | Path | None = None,
     output: str | Path | None = None,
+    backend: str = "python",
 ) -> EvaluationRequest | CapturedEvaluationRequest:
     """Load one strict request anchored to its file's real parent directory.
 
@@ -1176,6 +1177,33 @@ def load_evaluation_request(
     resolver. Callers must repeat no-follow resolution when opening returned
     paths so a later filesystem mutation cannot cross the request root.
     """
+
+    if backend not in {"python", "rust"}:
+        raise EvaluationRequestError("backend must be python or rust")
+
+    def validate(value: Any, *, captured: bool) -> dict[str, Any]:
+        if backend == "python":
+            return (
+                _validate_captured_schema(value)
+                if captured
+                else _validate_schema(value)
+            )
+        from invarlock.native_backend import transact
+
+        try:
+            return cast(
+                dict[str, Any],
+                transact(
+                    "validate-request",
+                    {
+                        "value": value,
+                        "schema_only": True,
+                        "captured": captured,
+                    },
+                )["payload"],
+            )
+        except ValueError as exc:
+            raise EvaluationRequestError(str(exc)) from exc
 
     request_path = Path(path)
     try:
@@ -1188,14 +1216,22 @@ def load_evaluation_request(
     except (OSError, StrictJsonError) as exc:
         raise EvaluationRequestError(str(exc)) from exc
     value = _load_yaml(payload)
-    _reject_include_directives(value)
+    if backend == "rust":
+        from invarlock.native_backend import transact
+
+        try:
+            transact("validate-request", {"value": value})
+        except ValueError as exc:
+            raise EvaluationRequestError(str(exc)) from exc
+    else:
+        _reject_include_directives(value)
     if not isinstance(value, dict):
         raise EvaluationRequestError("request must be a YAML object")
     format_version = value.get("format_version")
     if format_version == CAPTURED_EVALUATION_REQUEST_FORMAT_VERSION:
-        validated = _validate_captured_schema(value)
+        validated = validate(value, captured=True)
     elif format_version == EVALUATION_REQUEST_FORMAT:
-        validated = _validate_schema(value)
+        validated = validate(value, captured=False)
         if baseline_run is not None or subject_run is not None:
             raise EvaluationRequestError("run overrides require a captured request")
     else:
@@ -1229,7 +1265,7 @@ def load_evaluation_request(
         target[key] = reference
     if format_version == CAPTURED_EVALUATION_REQUEST_FORMAT_VERSION:
         captured = _build_captured_request(
-            _validate_captured_schema(validated),
+            validate(validated, captured=True),
             root=root,
             provider_resolver=provider_resolver or _default_provider_resolver,
         )
@@ -1248,7 +1284,7 @@ def load_evaluation_request(
             )
         return captured
     request = _build_request(
-        _validate_schema(validated),
+        validate(validated, captured=False),
         root=root,
         provider_resolver=provider_resolver or _default_provider_resolver,
     )
@@ -1258,6 +1294,8 @@ def load_evaluation_request(
 
 def evaluation_request_mode(
     path: str | Path,
+    *,
+    backend: str = "python",
 ) -> Literal["captured", "run", "import", "judge_import", "judge_collect"]:
     """Read only the closed request discriminator before provider discovery."""
     try:
@@ -1271,6 +1309,18 @@ def evaluation_request_mode(
             f"evaluation request is unavailable: {exc}"
         ) from exc
     value = _load_yaml(payload)
+    if backend not in {"python", "rust"}:
+        raise EvaluationRequestError("backend must be python or rust")
+    if backend == "rust":
+        from invarlock.native_backend import transact
+
+        try:
+            return cast(
+                Literal["captured", "run", "import", "judge_import", "judge_collect"],
+                transact("request-mode", {"value": value})["payload"],
+            )
+        except ValueError as exc:
+            raise EvaluationRequestError(str(exc)) from exc
     if not isinstance(value, dict):
         raise EvaluationRequestError("request must be a YAML object")
     format_version = value.get("format_version")
