@@ -38,6 +38,54 @@ and run affected conformance against that rolling control. Keep the original
 fixed baseline and old results. Never mix baseline versions in one performance
 cell or call a stale tracking reference the latest remote state.
 
+## Complete architecture comparison
+
+The three candidates above describe the completed interval experiment only.
+For subsequent stages, the primary Rust candidate is a coherent transaction
+implementation using the target architecture: contracts, stable snapshots,
+validated records, analysis, trust and publication owned by the same core.
+The experiment is allowed to restructure these internals and remove repeated
+work. Preserve externally observable contracts, limits and historical semantics;
+do not require a line-by-line translation of the Python implementation.
+
+Report distinct questions and comparisons:
+
+| Question | Comparison and interpretation |
+| --- | --- |
+| Is the new system better for users? | Complete Rust paths against fixed original Python and separately pinned current staging; include total architectural improvement |
+| How much comes from avoiding repeated work? | A practical Python control with recorded validation/snapshot reuse and other justified optimizations; state its limits |
+| What does the native implementation contribute? | Matched semantics, workload and resource allowance; retain component profiles and avoid claiming a pure language effect when internal algorithms differ |
+| What does standalone delivery contribute? | Rust executable against the supported Python recipient entry point; measure startup, installation, dependencies and complete outputs |
+| What does concurrency contribute? | Separate bounded parallel configurations with recorded worker and CPU budgets; retain a single-worker comparison |
+
+Python controls can be developed alongside the Rust design. They need not become
+an entire second redesign before Rust work proceeds. Freeze the controls and
+their source identities before each timing matrix, record profiling separately,
+and describe practical optimization coverage without claiming globally optimal
+Python. Add targeted measurements only where a material cause remains unresolved.
+
+The first complete comparison is captured verification. The final core comparison
+covers supported native, captured, judge and combined evidence paths and the
+standalone capability list. Optional Python scorer execution must remain visible
+as Python-assisted verification; do not silently narrow the baseline's workload
+or describe that mode as Python-free. Report installation, wall time, CPU, peak
+memory, capacity and failure behavior as separate dimensions.
+
+A component may have little isolated speed benefit while enabling shared data,
+fewer allocations or fewer language crossings in a complete path. Such a result
+does not by itself stop implementation of the declared coherent architecture.
+Correctness and feasibility checkpoints still apply. Preserve completed interval
+measurements unchanged: they establish that slice's result, not the full design's
+performance ceiling.
+
+The later execution/control comparison includes native command workflows,
+bounded process I/O, admission, checkpoint/resume and cleanup. Compare the same
+worker protocols, inputs, output limits and concurrency allowances. Retain
+whole-process-tree resources where execution creates children. Deterministic
+worker fixtures isolate local control overhead; they do not establish actual
+provider performance. Qualify each materially changed real execution boundary
+before claiming support, within existing authorization and resource constraints.
+
 ## Conformance comes first
 
 Require exact canonical bytes and binary64 results on valid input, not just
@@ -201,11 +249,15 @@ Assess absolute saved time and memory alongside native build/release burden,
 platform coverage, debugging and ongoing ownership. Compare Rust with both Python
 controls. Measure standalone installation separately when that executable exists.
 
-Adopt a component only with scoped evidence supporting its intended benefit and
-no unresolved material compatibility failure. A small local kernel speedup does
-not justify a whole-repository migration. A complete verifier may be valuable
-for distribution even without a large kernel speedup; that value needs its own
-evidence. Record the decision per component and retain rejected alternatives.
+Make adoption decisions for coherent components or groups of components using
+complete-path evidence supporting their intended benefit and no unresolved
+material compatibility failure. A small local kernel speedup does not justify
+a whole-repository migration or set the ceiling for its potential benefit. A
+complete verifier may be valuable for distribution even without a large kernel
+speedup; that value needs its own evidence. Record the adopted boundary and its
+dependencies so a successful shared-core result is not attributed to one isolated
+helper. Retain rejected alternatives and distinguish production adoption from
+intermediate implementation checkpoints.
 
 The initial implementation has a 45-minute checkpoint; the small/medium timing
 matrix has a 30-minute watchdog budget after qualification. A checkpoint is a

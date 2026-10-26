@@ -1,7 +1,7 @@
 {
   "baseline_commit": "ce04f20ed7ccefc1bc826098f1b0aa4102b63ef3",
   "baseline_tree": "95553894421fc6d3de83f50360457fff763ccda2",
-  "scope": "All Python source modules; ownership is target design, not implementation status. Package initializers remain adapters even when their area moves. Non-Python packaged schemas/data retain a single authoritative source.",
+  "scope": "All Python source modules; ownership is target design, not implementation status. Package initializers remain adapters even when their area moves. Non-Python packaged schemas/data retain a single authoritative source. Complete core and separate execution/control are target designs. Native command workflows retain Python entry-point adapters; model/provider SDK execution stays behind explicit adapters.",
   "modules": [
     {
       "path": "src/invarlock/__init__.py",
@@ -19,9 +19,9 @@
     },
     {
       "path": "src/invarlock/_bounded_subprocess.py",
-      "owner": "Python",
-      "target": "integration / facade / presentation",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "execution.process; Python compatibility adapter",
+      "stage": "6",
       "reference_sha256": "fde86c3c1ba5b7e056b3651738d18172bc3a6deb83ccc1a609ef0711b1f6c23d"
     },
     {
@@ -68,9 +68,9 @@
     },
     {
       "path": "src/invarlock/captured_reporting.py",
-      "owner": "Python",
-      "target": "integration / facade / presentation",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "commands.reports; Python value/presentation adapters",
+      "stage": "6",
       "reference_sha256": "1e2f4ba810c424770efa459431c823bfe47c16cc3ae874894aa7e41fea61beb2"
     },
     {
@@ -89,37 +89,37 @@
     },
     {
       "path": "src/invarlock/cli/app.py",
-      "owner": "Python",
-      "target": "integration / facade / presentation",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "commands; Python entry-point adapters",
+      "stage": "6",
       "reference_sha256": "dd9042d3326eb877078fe505ea7dc1e28c9d04b0097e903249561f1dcc437a49"
     },
     {
       "path": "src/invarlock/cli/evaluation_setup.py",
-      "owner": "Python",
-      "target": "integration / facade / presentation",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "commands; Python entry-point adapters",
+      "stage": "6",
       "reference_sha256": "edf7d3b9c92af62b4843dfeba6ff4171a195dbd5bfb9cde1aaa75bd2bbdbe44c"
     },
     {
       "path": "src/invarlock/cli/evaluation_workflow.py",
-      "owner": "Python",
-      "target": "integration / facade / presentation",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "commands; Python entry-point adapters",
+      "stage": "6",
       "reference_sha256": "92346a0eced7fd1af65ab4ef48b139fba66142fd6472f34fec5b9ca2ca011edb"
     },
     {
       "path": "src/invarlock/cli/runtime_profile.py",
-      "owner": "Python",
-      "target": "integration / facade / presentation",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "commands; Python entry-point adapters",
+      "stage": "6",
       "reference_sha256": "d707ec63291f322487e95ce3a57cac1d8b2eafafcb954658f34d4b71baf36e7f"
     },
     {
       "path": "src/invarlock/cli/verification_workflow.py",
-      "owner": "Python",
-      "target": "integration / facade / presentation",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "commands; Python entry-point adapters",
+      "stage": "6",
       "reference_sha256": "2a1e7fd86f353c4485e11dffaa38a206e7bdefedb8918143c058f414158f8ae6"
     },
     {
@@ -278,9 +278,9 @@
     },
     {
       "path": "src/invarlock/evaluation_oci.py",
-      "owner": "Python",
-      "target": "integration / facade / presentation",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "execution.container; Python API adapters",
+      "stage": "6",
       "reference_sha256": "6a52aecbfc9174b6085bd503e8b8d236a7e744b528df313b1bdaf8fd4489ddf7"
     },
     {
@@ -383,30 +383,30 @@
     },
     {
       "path": "src/invarlock/evaluation_run.py",
-      "owner": "Python",
-      "target": "integration / facade / presentation",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "execution.transaction; Python SDK/model adapters",
+      "stage": "6",
       "reference_sha256": "ce52ea1059d71696284ca1affa70750a07074ccc31855a7cc2dbf5ddb0632fd6"
     },
     {
       "path": "src/invarlock/evaluation_runtime.py",
-      "owner": "Python",
-      "target": "integration / facade / presentation",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "execution.resources; Python SDK/model adapters",
+      "stage": "6",
       "reference_sha256": "7a891e6fc067e538c03ef9a224c9887d49fc013cac3cd0c1bd1dd9f3345d22bf"
     },
     {
       "path": "src/invarlock/evaluation_side_worker.py",
-      "owner": "Python",
-      "target": "integration / facade / presentation",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "contracts.worker + execution.worker; Python model worker",
+      "stage": "6",
       "reference_sha256": "a4e38b0f243da00fdf77d0bbacef72d4c44c58d9b6b360d579e55200be0d8fe4"
     },
     {
       "path": "src/invarlock/evaluation_transaction.py",
-      "owner": "Python",
-      "target": "integration / facade / presentation",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "execution.transaction + evidence; Python API adapters",
+      "stage": "6",
       "reference_sha256": "dd91bd49b9051e42cfca687b7db505f1dd2f9baf73f484f1b745a06dfafbad5b"
     },
     {
@@ -425,16 +425,16 @@
     },
     {
       "path": "src/invarlock/evaluator_qualification_cli.py",
-      "owner": "Python",
-      "target": "integration / facade / presentation",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "commands.qualification; Python entry-point adapters",
+      "stage": "6",
       "reference_sha256": "b8ce7a078a50803eac27305c5b149fe99caa1dca2c403d9fe5d1fb2cdf05180b"
     },
     {
       "path": "src/invarlock/evidence_explanation.py",
-      "owner": "Python",
-      "target": "integration / facade / presentation",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "commands.reports; Python value/presentation adapters",
+      "stage": "6",
       "reference_sha256": "bc9d5e2ab16723e0b58654b53bdb7612335cca4de873fbd8564911de4a6c767f"
     },
     {
@@ -502,9 +502,9 @@
     },
     {
       "path": "src/invarlock/evidence_reporting.py",
-      "owner": "Python",
-      "target": "integration / facade / presentation",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "commands.reports; Python value/presentation adapters",
+      "stage": "6",
       "reference_sha256": "62267dd5c567911ec0aea4bbfc382dccdebd7df9ffde8878c48998689d7a6e82"
     },
     {
@@ -516,9 +516,9 @@
     },
     {
       "path": "src/invarlock/evidence_sets/cli.py",
-      "owner": "Python",
-      "target": "integration / facade / presentation",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "commands.evidence_sets; Python entry-point adapters",
+      "stage": "6",
       "reference_sha256": "e9f2d691f5a4700eefb9e264697ac901a26055a080ee84d830bf931ca240a5f3"
     },
     {
@@ -530,9 +530,9 @@
     },
     {
       "path": "src/invarlock/evidence_sets/reporting.py",
-      "owner": "Python",
-      "target": "integration / facade / presentation",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "commands.reports; Python value/presentation adapters",
+      "stage": "6",
       "reference_sha256": "9f624e8651c78e79a4d7c4a1a669b0c18ae0f63f7456d85d6d12db2f06fa4548"
     },
     {
@@ -628,30 +628,30 @@
     },
     {
       "path": "src/invarlock/judge_measurements/captured_workflow.py",
-      "owner": "Python",
-      "target": "integration / facade / presentation",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "commands.judge + evidence.judge; Python API adapters",
+      "stage": "6",
       "reference_sha256": "1c0a070d2cd765e3a8fe6b5f9517100de4951f12a3301c1d526145a676c3090c"
     },
     {
       "path": "src/invarlock/judge_measurements/cli_verification.py",
-      "owner": "Python",
-      "target": "integration / facade / presentation",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "commands.judge; Python entry-point adapters",
+      "stage": "6",
       "reference_sha256": "2d9597dda34f44bfb00f692817fd8944ac94068e106e7737758e094c0ed605a9"
     },
     {
       "path": "src/invarlock/judge_measurements/collector.py",
-      "owner": "Python",
-      "target": "integration / facade / presentation",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "execution.collection + checkpoints; Python provider SDK adapters",
+      "stage": "6",
       "reference_sha256": "082018f1ec10e4688d95c3702eac7468da2ced553c5f0d3cd6c7940914a8be39"
     },
     {
       "path": "src/invarlock/judge_measurements/configured.py",
-      "owner": "Python",
-      "target": "integration / facade / presentation",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "execution.configuration + contracts.judge; Python SDK adapters",
+      "stage": "6",
       "reference_sha256": "1a50326e2351bf9bfdbb3621b3963ed5e5f294559590e35f117f33dfec18f0a9"
     },
     {
@@ -684,9 +684,9 @@
     },
     {
       "path": "src/invarlock/judge_measurements/native_workflow.py",
-      "owner": "Python",
-      "target": "integration / facade / presentation",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "execution.workflow + evidence.judge; Python API adapters",
+      "stage": "6",
       "reference_sha256": "70a60b2e4dc3eb4eb51b3d86a8338ee67d35c4a60c5e37b99c011c32ea9d4182"
     },
     {
@@ -712,16 +712,16 @@
     },
     {
       "path": "src/invarlock/judge_measurements/reporting.py",
-      "owner": "Python",
-      "target": "integration / facade / presentation",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "commands.reports; Python value/presentation adapters",
+      "stage": "6",
       "reference_sha256": "6804bf15cd82398fce4ca641b5dc483aec635df11cd6d014e49b54aa12b07d2b"
     },
     {
       "path": "src/invarlock/judge_measurements/runner.py",
-      "owner": "Python",
-      "target": "integration / facade / presentation",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "execution.admission + budgets + retries; Python provider SDK adapters",
+      "stage": "6",
       "reference_sha256": "0f379997f0703e9deca9b8e3a837169cf109b59189ed0b3fd2559e1bb82b7eea"
     },
     {
@@ -747,9 +747,9 @@
     },
     {
       "path": "src/invarlock/judge_measurements/workflow.py",
-      "owner": "Python",
-      "target": "integration / facade / presentation",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "execution.workflow + evidence.judge; Python API adapters",
+      "stage": "6",
       "reference_sha256": "aab5a24641e897beb3a58b71718c45171c89a620e71fd6b2e67b67a730855a76"
     },
     {
@@ -775,23 +775,23 @@
     },
     {
       "path": "src/invarlock/record_reporting.py",
-      "owner": "Python",
-      "target": "integration / facade / presentation",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "commands.reports; Python value/presentation adapters",
+      "stage": "6",
       "reference_sha256": "010d1ac57f4b393a3fc2cb46970fede0427b0486b48664ffa2ac1ec4a013cbbf"
     },
     {
       "path": "src/invarlock/report_presentation.py",
-      "owner": "Python",
-      "target": "integration / facade / presentation",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "commands.reports; Python presentation adapters",
+      "stage": "6",
       "reference_sha256": "47164c7d1eabba4779049c79d5e930bf8bc4ff5e309e5e57e5f348b0893ca3c7"
     },
     {
       "path": "src/invarlock/report_publication.py",
-      "owner": "Python",
-      "target": "integration / facade / presentation",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "commands.reports + filesystem.publication; Python API adapters",
+      "stage": "6",
       "reference_sha256": "7d2d7a75d0ec6cfad2965259bd649ae7baa89942ef9682ff8ddcccfd882ee736"
     },
     {
@@ -803,9 +803,9 @@
     },
     {
       "path": "src/invarlock/runtime_behavior/transaction.py",
-      "owner": "Python",
-      "target": "integration / facade / presentation",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "execution.transaction; Python model adapters",
+      "stage": "6",
       "reference_sha256": "56091db4f3e1ea597f8afa7190a3b3b0e771d8e20a1359d218a79ebf2b173171"
     },
     {
@@ -838,37 +838,37 @@
     },
     {
       "path": "src/invarlock/runtime_providers/_hf_safetensors_identity.py",
-      "owner": "Python",
-      "target": "Python provider execution; selected portable identities reviewed separately",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "contracts.identity + safe inspection; Python format/SDK adapters where required",
+      "stage": "6",
       "reference_sha256": "6d6b6c5d3148dd67214e9986e83fe353add1899c9cf06dd0aaed8390a94aceb0"
     },
     {
       "path": "src/invarlock/runtime_providers/_hf_transformers_identity.py",
-      "owner": "Python",
-      "target": "Python provider execution; selected portable identities reviewed separately",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "contracts.identity + safe inspection; Python format/SDK adapters where required",
+      "stage": "6",
       "reference_sha256": "ea1ea1bab2442996c6c926be0328d17b9514f050e7458dd5fb05e3a271e4ff04"
     },
     {
       "path": "src/invarlock/runtime_providers/_tensorrt_llm_execution.py",
-      "owner": "Python",
-      "target": "Python provider execution; selected portable identities reviewed separately",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "execution.provider process/session control; Python worker/SDK adapters",
+      "stage": "6",
       "reference_sha256": "9195e7a2d0f2e3ef0a6da02d5885024aabd3019035bb68feb4f854f33fac3a63"
     },
     {
       "path": "src/invarlock/runtime_providers/_tensorrt_llm_inspection.py",
-      "owner": "Python",
-      "target": "Python provider execution; selected portable identities reviewed separately",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "contracts.identity + safe inspection; Python format/SDK adapters where required",
+      "stage": "6",
       "reference_sha256": "0557f12cf119325ca4940e4554d22fc33ceafa32723034934e2fee08a8be6d48"
     },
     {
       "path": "src/invarlock/runtime_providers/gguf_identity.py",
-      "owner": "Python",
-      "target": "Python provider execution; selected portable identities reviewed separately",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "contracts.identity + safe inspection; Python format/SDK adapters where required",
+      "stage": "6",
       "reference_sha256": "9263e5c16803d29882fba20785db8e22b3a6cd2fc26150272c6893c35af6aaa9"
     },
     {
@@ -894,9 +894,9 @@
     },
     {
       "path": "src/invarlock/runtime_providers/llama_cpp.py",
-      "owner": "Python",
-      "target": "Python provider execution; selected portable identities reviewed separately",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "execution.provider process/session control; Python worker/SDK adapters",
+      "stage": "6",
       "reference_sha256": "9b5c55e4402d1b08e2206e6d607c0d0c07d87c56ec2c628ed0490794cc4d8ffe"
     },
     {
@@ -908,16 +908,16 @@
     },
     {
       "path": "src/invarlock/runtime_providers/llama_cpp_session.py",
-      "owner": "Python",
-      "target": "Python provider execution; selected portable identities reviewed separately",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "execution.provider process/session control; Python worker/SDK adapters",
+      "stage": "6",
       "reference_sha256": "8263aac3cce37c77730693502a3dfd0c54e18e4fd4281e9a23af51ecc9729a3a"
     },
     {
       "path": "src/invarlock/runtime_providers/tensorrt_llm.py",
-      "owner": "Python",
-      "target": "Python provider execution; selected portable identities reviewed separately",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "execution.provider process/session control; Python worker/SDK adapters",
+      "stage": "6",
       "reference_sha256": "13da0033ecfb30def2a6a60a448029558d9b9a4cf6e5ff1b70135b26dac7a227"
     },
     {
@@ -936,37 +936,37 @@
     },
     {
       "path": "src/invarlock/runtime_providers/tensorrt_llm_identity.py",
-      "owner": "Python",
-      "target": "Python provider execution; selected portable identities reviewed separately",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "contracts.identity + safe inspection; Python format/SDK adapters where required",
+      "stage": "6",
       "reference_sha256": "ac752f70ce8021013691c45cb1eaba077ed796849b60ef0ef34aac9895b1626e"
     },
     {
       "path": "src/invarlock/runtime_providers/tensorrt_llm_runner.py",
-      "owner": "Python",
-      "target": "Python provider execution; selected portable identities reviewed separately",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "execution.provider process/session control; Python worker/SDK adapters",
+      "stage": "6",
       "reference_sha256": "397dd1cef0581854d3cad623bfdf973473e6bdd4a590933333215332ff2f1ae7"
     },
     {
       "path": "src/invarlock/runtime_providers/tensorrt_llm_session.py",
-      "owner": "Python",
-      "target": "Python provider execution; selected portable identities reviewed separately",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "execution.provider process/session control; Python worker/SDK adapters",
+      "stage": "6",
       "reference_sha256": "a8e67d8206e141fe5ff19d66aa93d6a11a55f6fe92583942348ed55741280275"
     },
     {
       "path": "src/invarlock/runtime_security.py",
-      "owner": "Python",
-      "target": "integration / facade / presentation",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "execution.enforcement; retained Python execution guards",
+      "stage": "6",
       "reference_sha256": "691b2255ee1e42b94202d307b66f8b57d14b528d3203016e7f052f12e77204da"
     },
     {
       "path": "src/invarlock/runtime_security_helpers.py",
-      "owner": "Python",
-      "target": "integration / facade / presentation",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "execution.policy; retained Python execution guards",
+      "stage": "6",
       "reference_sha256": "823f09b05764d52003ebeb23a2058acf8d5caeb89ade1f305312191afd128221"
     },
     {
@@ -978,9 +978,9 @@
     },
     {
       "path": "src/invarlock/security.py",
-      "owner": "Python",
-      "target": "integration / facade / presentation",
-      "stage": "retained",
+      "owner": "Split",
+      "target": "execution.enforcement; retained Python socket guards",
+      "stage": "6",
       "reference_sha256": "31521eb162e9bf9615c701ca4e17755f11bb12945c87ce8e0cee91c0d991381a"
     },
     {

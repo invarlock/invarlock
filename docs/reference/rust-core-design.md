@@ -34,17 +34,28 @@ not estimates for InvarLock.
 
 ## Target ownership
 
-The Rust core owns portable evidence semantics. Python owns the ML integration
-experience and existing public facade. No percentage-of-code target applies.
+The experiment targets the broadest coherent Rust implementation justified by
+InvarLock's responsibilities: the complete portable evidence core, a separate
+execution/control layer and native command-line workflows. Python owns the ML
+integration experience and existing public facade. No percentage-of-code target
+applies.
+The unit of architectural comparison is a complete transaction, including the
+benefits of shared ownership and distribution across components.
+
+Incremental ports are implementation and conformance checkpoints. A small port's
+timing result cannot establish the value or ceiling of the complete Rust design.
+Do not require each helper to win an isolated benchmark before implementing the
+coherent path that depends on it. Preserve the external contracts while allowing
+internal data structures, module boundaries and execution to change substantially.
 
 ```text
-Python SDK / existing CLI / capture and provider integrations
-                        |
-                explicit Python binding
-                        |
-                 Rust evidence core <---- standalone verifier
-                 /        |        \
-           contracts   analysis   filesystem
+Python SDK / model and provider SDK adapters
+                 |                 |
+        coarse Python binding      | explicit execution adapter
+                 |                 v
+           Rust evidence core <--- Rust execution/control <--- native CLI
+                 ^
+          standalone verifier
 ```
 
 Use one `native/` Cargo workspace. Start with `invarlock-core` and a private
@@ -52,7 +63,11 @@ Python-binding crate. Organize the core into the modules below; separate modules
 into crates only when dependency enforcement, reuse or build costs justify it.
 Add a standalone verifier when a complete supported verification path exists.
 An executable that only checks a signature must not be presented as a semantic
-verifier.
+verifier. Keep the execution/control layer in a separate crate so offline
+verification has no dependency on process execution or network clients. Native
+execution commands call that layer; the standalone verifier depends only on the
+evidence core. Python entry points remain compatible adapters for their declared
+capabilities during the experiment.
 
 | Core module | Ownership | Allowed dependencies |
 | --- | --- | --- |
@@ -62,9 +77,60 @@ verifier.
 | `evidence` | Native, captured and judge authentication/replay, independent trust inputs, receipts, acceptance and evidence sets | Contracts, analysis, filesystem and established cryptographic libraries |
 | Python binding | Owned input conversion, typed result/error conversion and explicit authorized scorer bridge | Core and Python binding runtime |
 | Standalone verifier | Argument handling and explicitly supported offline verification transactions | Same core; no automatic Python discovery, provider SDKs or downloads |
+| Execution/control | Portable transaction coordination, bounded process I/O, deadlines, cancellation, budgets, checkpoints and resume | Core, platform APIs and explicit execution adapters; never a dependency of offline verification |
+| Native CLI | Portable command routing, preflight and reports; explicit Python-assisted commands where required | Core for offline commands; execution/control for live commands; no implicit provider or extension discovery |
 
 The first experiment implements native paired resampling inside `analysis`.
 This is a feasibility slice within the larger design, not the finished core.
+
+## Internal design and optimization
+
+Use Rust to own a whole verification transaction. The following are design
+opportunities to implement and measure, not benefits already demonstrated:
+
+- Read bounded, stable input snapshots and construct typed records once. Keep
+  validated state bound to the exact snapshot, contract version and independent
+  trust/policy inputs. Reuse within that transaction must not authorize a later
+  changed file or a different recipient's policy.
+- Retain compact records, shared immutable bytes and reusable buffers inside the
+  core. Avoid rebuilding Python dictionaries, serializing intermediate JSON or
+  crossing the language boundary for each record or validation step. Borrow from
+  owned stable buffers where safe; measure necessary input/output copies.
+- Model parsing, authenticated facts, qualified analysis and publication as
+  explicit states. Types can prevent invalid internal transitions, while public
+  input validation, filesystem checks and rejection behavior remain required.
+- Combine compatible traversal, hashing and validation work when the exact
+  canonicalization and failure semantics permit it. Streaming must respect byte,
+  nesting and work limits, and preserve stable snapshots and diagnostic order.
+- Reuse numerical workspace and consider bounded parallel work across independent
+  records or replicates. Preserve draw mapping, arithmetic order within each
+  replicate, final ordering, error selection and exact historical outputs.
+  A faster changed statistical method is a separate versioned experiment.
+- Provide coarse Python calls and a standalone executable over the same core.
+  Measure Python integration and Python-free verification separately, including
+  startup, installation and dependency footprint.
+
+Start comparisons with one computational worker. Measure concurrency separately
+with an explicit CPU and memory budget; more available cores must not be reported
+as a language-only speedup. Ownership does not itself establish zero allocation,
+race freedom at filesystem boundaries or a security improvement.
+
+Keep SDK execution, user Python extensions and notebook integration in Python.
+Move portable execution coordination into the separate Rust control layer,
+including subprocess lifetime, bounded I/O, deadlines, cancellation, output limits,
+resource reservations, checkpoints and cleanup. Review executable-backed providers
+individually; they do not need the same ownership boundary as Python model SDKs.
+The source mechanisms include `_bounded_subprocess.py`, `evaluation_oci.py`,
+`runtime_providers/llama_cpp_session.py` and judge `collector.py`/`runner.py`.
+Moving these mechanisms requires their own execution qualification and must not
+introduce network or process execution into offline verification.
+
+Preserve who can access signing keys, execute extensions, authorize network access
+and spend resources. The new native layer cannot inherit isolation from Python
+socket monkey patches. Define the actual enforcement boundary before changing
+execution. Use deterministic workers to measure local overhead, then qualify each
+changed real provider path separately; simulated timings cannot establish live
+provider throughput. No paid provider batch is implied by this design.
 
 ## Source migration map
 
@@ -88,16 +154,19 @@ moving a pure helper does not imply rewriting its provider or public wrapper.
 | `judge_measurement_types.py`, `judge_evidence_types.py` | Rust typed contracts and Python value adapters |
 | Judge contracts, statistics, analysis, precision, evidence and acceptance | Rust offline semantics, completeness, exact arithmetic, envelopes and receipts |
 | Judge native capture/recipe, source import, retained HTTP contracts | Rust portable plan/fact binding; Python source acquisition and workflow wrappers |
-| Judge collector, configured runner, HTTP and runtime provider modules | Python provider calls, pacing, budgets, checkpoints and retries |
-| Judge workflow and CLI modules | Python routing/orchestration calling Rust offline semantics |
+| Judge collector and configured runner | Rust admission, budgets, pacing, checkpoints, retry accounting and portable coordination; Python provider SDK calls |
+| Judge HTTP/provider integrations | Python SDK/session adapters; Rust portable plan, response and accounting contracts |
+| Judge workflow and CLI modules | Rust portable routing, preflight and reports; compatible Python entry points and SDK adapters |
 | `evidence_sets/contracts.py`, `verification.py` | Rust shared-input binding and fresh component verification |
 | `evidence_receipt.py`, `acceptance_attestation.py`, `trust_inputs.py` | Rust independent pins, signatures, receipts, transport and recipient acceptance |
 | `filesystem/` | Rust descriptor and publication primitives; temporary Python adapters |
-| `evaluation_transaction.py`, `evaluation_run.py`, `evaluation_runtime.py`, `evaluation_oci.py`, `evaluation_side_worker.py`, `runtime_behavior/` | Python runtime/container/session orchestration; Rust completed-evidence checks |
-| `runtime_providers/`, registry and optional-profile modules | Python backend execution and discovery; selected portable identity helpers can move later |
-| `runtime_security.py`, `runtime_security_helpers.py`, `security.py`, `_bounded_subprocess.py` | Python execution/network controls and bounded subprocess handling; shared local reads/hashes can call Rust |
+| `evaluation_transaction.py`, `evaluation_run.py`, `evaluation_runtime.py`, `evaluation_oci.py`, `evaluation_side_worker.py`, `runtime_behavior/` | Rust portable transaction, container and process control; Python model execution and API adapters |
+| `runtime_providers/`, registry and optional-profile modules | Python SDK-backed model execution/discovery; Rust portable identity and executable/session control with explicit Python worker adapters |
+| `_bounded_subprocess.py` | Rust bounded I/O, deadlines, cancellation and cleanup; Python compatibility adapter |
+| `runtime_security.py`, `runtime_security_helpers.py`, `security.py` | Rust native enforcement for migrated execution; Python guards for retained Python execution; qualify both actual boundaries |
 | `engine.py`, `evidence_verification.py`, `captured_evaluation.py`, `evaluator_qualification.py` | Stable Python facade dispatching semantic work to Rust |
-| CLI, report/explanation/presentation modules, diagnostics and sensitivity tooling | Python; consume authenticated facts without acquiring new acceptance authority |
+| CLI and portable report modules | Rust command workflows and deterministic reports; compatible Python adapters; consume authenticated facts without new acceptance authority |
+| Diagnostics, sensitivity tooling and Python-specific presentation | Python integration; shared facts and numerical semantics from Rust |
 
 ## Data and trust model
 
@@ -250,7 +319,18 @@ inventory statically linked Rust crates. Preserve all applicable notices.
 | 3 | Complete captured deterministic comparison/verification | Signed pass/regression/insufficient/rejection paths, native-to-Python and Python-to-native replay, capacity and receipts; closed standalone capability list |
 | 4 | Native pack identities, filesystem transactions, replay and receipt v1/v2 | Historical corpus, scorer bridge, adversarial filesystem behavior and retained native packs |
 | 5 | Judge retained evidence/statistics, evidence sets and acceptance | Exact calibration, missing/interrupted trials, component binding and recipient-policy/transport semantics |
-| 6 | Production integration and distribution | Every promised target installed and exercised, complete release/provenance/security path, default-dispatch/rollback decision |
+| 6 | Rust execution/control and native command workflows | Process and resource accounting parity; bursts, slow consumption, cancellation, interrupted checkpoints, resume and cleanup; same-workload CLI/report comparisons and actual changed-provider qualification |
+| 7 | Production integration and distribution | Every promised target installed and exercised, complete release/provenance/security path, default-dispatch/rollback decision |
+
+Stages 2 through 5 build toward the complete core described above. At stage 3,
+compare a complete captured verification transaction; at stage 5, compare the
+supported native, captured, judge and combined evidence paths through the shared
+core, including standalone execution for its declared capabilities. Retain
+component timings to explain the result. Stage 6 extends the product comparison
+to local execution overhead and native command workflows with explicitly qualified
+provider paths. Production adoption is a later decision based on complete paths
+and deployment costs, rather than a prerequisite for each implementation stage. Correctness failures, feasibility limits or an
+explicit scope change can still require repair or reassessment.
 
 Filesystem/trust primitives must be qualified before any stage that publishes or
 accepts through them. The stage table permits prerequisite work to move earlier;
