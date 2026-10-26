@@ -30,6 +30,17 @@
     "*.egg-info/**"
   ],
   "words": [
+    "APFS",
+    "editably",
+    "mathmodule",
+    "maturin",
+    "nonconstant",
+    "nonpositive",
+    "rustup",
+    "subnormals",
+    "summands",
+    "unevaluable",
+    "unvalidated",
     "NFKC",
     "multiset",
     "invarlock",

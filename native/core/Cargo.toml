@@ -1,0 +1,10 @@
+[package]
+name = "invarlock-native-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license = "Apache-2.0 AND PSF-2.0"
+description = "Bounded paired interval experiment independent of Python"
+
+[dependencies]
+sha2 = "=0.10.9"

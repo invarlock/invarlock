@@ -1,0 +1,26 @@
+[build-system]
+requires = ["maturin==1.12.0"]
+build-backend = "maturin"
+
+[project]
+name = "invarlock-native-experiment"
+version = "0.1.0"
+requires-python = ">=3.12"
+description = "Isolated opt-in paired interval experiment"
+readme = "README.md"
+license = "Apache-2.0 AND PSF-2.0"
+license-files = ["LICENSE", "licenses/**/*"]
+
+[tool.maturin]
+manifest-path = "bindings/Cargo.toml"
+module-name = "invarlock_native"
+exclude = ["**/__pycache__/**", "**/*.pyc"]
+include = [
+  { path = "Cargo.toml", format = "sdist" },
+  { path = "Cargo.lock", format = "sdist" },
+  { path = "rust-toolchain.toml", format = "sdist" },
+  { path = "core/**/*", format = "sdist" },
+  { path = "tests/*.py", format = "sdist" },
+  { path = "THIRD_PARTY_NOTICES.md", format = ["sdist", "wheel"] },
+  { path = "licenses/**/*", format = ["sdist", "wheel"] },
+]

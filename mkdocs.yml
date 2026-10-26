@@ -32,6 +32,9 @@ nav:
   - Reference:
       - CLI: reference/cli.md
       - Architecture: reference/architecture.md
+      - Rust core design: reference/rust-core-design.md
+      - Rust module inventory: reference/rust-module-map.md
+      - Rust comparison protocol: reference/rust-comparison-protocol.md
       - Contracts: reference/contracts.md
       - Evaluation records: reference/evaluation-records.md
       - Evaluation capacity: reference/evaluation-capacity.md

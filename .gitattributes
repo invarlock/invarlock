@@ -1,0 +1,2 @@
+# Retain third-party license files exactly as distributed upstream.
+native/licenses/** -whitespace
