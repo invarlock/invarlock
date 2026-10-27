@@ -361,6 +361,20 @@ exact `accepted_provenance` (`kind`, `source`, `version`, `unit`, `rubric_digest
 The verifier authenticates attributed values and paired arithmetic; it does not
 reproduce or authenticate the original scoring process.
 
+Recorded scores are converted to binary64 floats before comparison. Large JSON
+integers can lose distinctions during conversion, and subtracting rounded means
+can differ from the exact mean of paired differences. Finite inputs can also
+overflow intermediate sums or differences; these comparisons raise
+`EvaluationRecordsError` with a finite-numeric-range message. The captured CLI
+returns a structured failure without publishing evidence. This refusal does not
+imply that the exact mathematical mean is infinite.
+
+Normalized NLL uses binary64 arithmetic too: subnormal means can underflow and
+alter a ratio. Every sampled baseline mean must be positive, so even identical
+`[0, 1]` inputs can be refused when a bootstrap draw contains only zeros. Failed
+draws are not discarded or retried. These comparisons do not promise exact
+integer or real arithmetic.
+
 An independent planned case set can be pinned in policy as
 `expected_case_set_digest`. Use `freeze_case_set`, `case_set_digest`, and
 `validate_run_case_set` to require the reviewed schedule, not merely agreement

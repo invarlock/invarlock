@@ -8,12 +8,21 @@ const { pathToFileURL } = require('node:url');
   const browser = await chromium.launch({ headless: true });
   try {
     const page = await browser.newPage({ viewport: { width: 1280, height: 960 } });
-    await page.goto(pathToFileURL(path.join(root, 'review.html')).href);
-    await page.pdf({ path: path.join(root, 'review.pdf'), format: paper, printBackground: paper === 'A4' });
-    await page.screenshot({ path: path.join(root, 'review-cover.png') });
-    await page.setViewportSize({ width: 320, height: 844 });
-    if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)) {
-      throw new Error('Client review overflows at 320 pixels');
+    const fs = require('node:fs');
+    for (const document of ['review', 'brief']) {
+      await page.setViewportSize({ width: 1280, height: 960 });
+      await page.goto(pathToFileURL(path.join(root, document + '.html')).href);
+      await page.pdf({ path: path.join(root, document + '.pdf'), format: paper, printBackground: paper === 'A4' });
+      await page.screenshot({ path: path.join(root, document + '-cover.png') });
+      await page.setViewportSize({ width: 320, height: 844 });
+      if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)) {
+        throw new Error(document + ' overflows at 320 pixels');
+      }
+      if (document === 'brief') {
+        for (const href of await page.locator('a').evaluateAll(links => links.map(link => link.getAttribute('href')))) {
+          if (!fs.existsSync(path.join(root, href))) throw new Error('Missing package link: ' + href);
+        }
+      }
     }
   } finally {
     await browser.close();

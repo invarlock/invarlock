@@ -22,6 +22,9 @@ from invarlock.runtime_providers.hf_transformers import hf_tokenizer_contract_sh
 
 def test_engine_exports_only_supported_transactions_and_provider_contracts() -> None:
     assert set(engine.__all__) == {
+        "CLIENT_REVIEW_CONTEXT_FORMAT",
+        "ClientReviewError",
+        "build_client_review",
         "ACCEPTANCE_PREDICATE_FORMAT",
         "ACCEPTANCE_PREDICATE_TYPE",
         "DEFAULT_MAX_BOOTSTRAP_DRAWS",

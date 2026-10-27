@@ -215,6 +215,8 @@ def _interval(
             "replicates": 0,
         }
     differences = [c - b for b, c in zip(baseline, candidate, strict=True)]
+    if not all(math.isfinite(value) for value in differences):
+        raise EvaluationRecordsError("metric arithmetic exceeded finite numeric range")
     count = len(differences)
     if min(differences) == max(differences):
         lower = upper = differences[0]
@@ -236,7 +238,12 @@ def _interval(
                     if v < ceiling
                 )
                 block += 1
-            draws.append(math.fsum(values[:count]) / count)
+            try:
+                draws.append(math.fsum(values[:count]) / count)
+            except OverflowError as exc:
+                raise EvaluationRecordsError(
+                    "metric arithmetic exceeded finite numeric range"
+                ) from exc
         draws.sort()
 
         def percentile(q: float) -> float:
