@@ -50,8 +50,8 @@ def main():
     # A fresh worker owns this explicit checker selection. The historical module
     # remains unchanged for reproduction of earlier measurements.
     full_worker.check_wheel_binding = check_wheel_binding
-    full_worker.main()
+    return full_worker.main()
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

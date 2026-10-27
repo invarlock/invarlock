@@ -97,3 +97,11 @@ def test_changed_or_corrupt_bytes_are_still_rejected(tmp_path, monkeypatch, targ
         path.write_text(json.dumps(metadata))
     with pytest.raises((RuntimeError, zipfile.BadZipFile)):
         bounded_worker.check_wheel_binding(path)
+
+
+def test_main_preserves_worker_failure_exit_status(monkeypatch):
+    from invarlock_rust_experiment import bounded_worker, full_worker
+
+    monkeypatch.setattr(full_worker, "main", lambda: 1)
+    monkeypatch.setattr(full_worker, "check_wheel_binding", lambda _: {})
+    assert bounded_worker.main() == 1

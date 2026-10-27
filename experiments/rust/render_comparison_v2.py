@@ -842,6 +842,7 @@ def validate(
     return {
         "format": "invarlock/linux-five-candidate-results-v2",
         "scope": "Linux ARM64 Docker VM; observed fixture journeys only. No production x86 or bare-metal performance claim.",
+        "identity_check_scope": "Python and FFI process metrics include runtime identity and streamed verification of both installed wheels; Python also checks the unused native wheel. Standalone executable hashing happens before measurement. Cross-language process ratios therefore include asymmetric harness work. Before/after comparisons within each path share the boundary. Identity-check wall time and operation wall time are diagnostics, never subtracted from process CPU or peak RSS.",
         "comparison_complete": True,
         "qualification_attempted": 40,
         "qualification_valid": 40,
