@@ -4,7 +4,8 @@ use crate::{
 };
 use ed25519_dalek::SigningKey;
 use invarlock_native_contracts::{
-    canonical_json_matches, parse_json, sha256_digest, validate_schema, SchemaCheckedValue,
+    canonical_json_matches, parse_json, parse_run, sha256_digest, validate_schema, ParsedRun,
+    RunView, SchemaCheckedRun, SchemaCheckedValue,
 };
 use invarlock_native_core as analysis;
 use invarlock_native_filesystem as fs;
@@ -195,6 +196,19 @@ pub fn validate_normalized_request(
     subject: &Value,
     policy: &Value,
 ) -> Result<()> {
+    validate_normalized_request_views(
+        request,
+        RunView::Json(baseline),
+        RunView::Json(subject),
+        policy,
+    )
+}
+fn validate_normalized_request_views(
+    request: &Value,
+    baseline: RunView<'_>,
+    subject: RunView<'_>,
+    policy: &Value,
+) -> Result<()> {
     if canonical(request)?.len() > REQUEST {
         return Err(EvidenceError::contract(
             "captured request exceeds the 1 MiB byte limit",
@@ -220,7 +234,7 @@ pub fn validate_normalized_request(
     }
     for (side, run) in [("baseline", baseline), ("subject", subject)] {
         let source = &comparison[side];
-        let actual = digest(run)?;
+        let actual = run.canonical_digest()?;
         if source["run_digest"] != actual {
             return Err(EvidenceError::integrity(
                 "captured request contradicts its bound inputs",
@@ -271,10 +285,12 @@ pub fn validate_normalized_request(
                 }
             }
             if let Some(projection) = source.get("input_projection") {
-                for row in run["records"]
-                    .as_array()
-                    .ok_or_else(|| EvidenceError::contract("records are invalid"))?
-                {
+                if let RunView::Json(value) = run {
+                    value["records"]
+                        .as_array()
+                        .ok_or_else(|| EvidenceError::contract("records are invalid"))?;
+                }
+                for row in run.records() {
                     if row["context"]["input_projection"]["configuration"] != *projection {
                         return Err(EvidenceError::integrity(format!(
                             "{side} input projection differs from declared intent"
@@ -335,6 +351,68 @@ pub struct CapturedInputs {
     pub payloads: CapturedPayloads,
     pub signer: String,
 }
+#[cfg(test)]
+thread_local! {
+    static COMPACT_MATERIALIZATIONS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+#[cfg(test)]
+pub(crate) fn compact_materializations() -> usize {
+    COMPACT_MATERIALIZATIONS.with(|value| value.get())
+}
+#[cfg(test)]
+pub(crate) fn reset_compact_materializations() {
+    COMPACT_MATERIALIZATIONS.with(|value| value.set(0));
+}
+pub(crate) enum CapturedRun {
+    Json(SchemaCheckedValue),
+    Compact(SchemaCheckedRun),
+}
+impl CapturedRun {
+    pub(crate) fn view(&self) -> RunView<'_> {
+        match self {
+            Self::Json(value) => RunView::Json(value.value()),
+            Self::Compact(value) => value.view(),
+        }
+    }
+    fn into_checked(self) -> Result<SchemaCheckedValue> {
+        match self {
+            Self::Json(value) => Ok(value),
+            Self::Compact(value) => {
+                #[cfg(test)]
+                COMPACT_MATERIALIZATIONS.with(|count| count.set(count.get() + 1));
+                Ok(SchemaCheckedValue::new(value.into_value(), "run")?)
+            }
+        }
+    }
+}
+pub(crate) struct OwnedCapturedInputs {
+    pub(crate) manifest: Value,
+    pub(crate) baseline: CapturedRun,
+    pub(crate) subject: CapturedRun,
+    pub(crate) request: SchemaCheckedValue,
+    pub(crate) policy: SchemaCheckedValue,
+    pub(crate) report: SchemaCheckedValue,
+    pub(crate) signer: String,
+}
+impl OwnedCapturedInputs {
+    // Existing public Value-returning APIs retain their complete payload shape.
+    // Internal verification and rendering use views and never call this adapter.
+    pub(crate) fn into_inputs(self) -> Result<CapturedInputs> {
+        Ok(CapturedInputs {
+            manifest: self.manifest,
+            signer: self.signer,
+            payloads: CapturedPayloads {
+                values: BTreeMap::from([
+                    ("baseline".into(), self.baseline.into_checked()?),
+                    ("subject".into(), self.subject.into_checked()?),
+                    ("request".into(), self.request),
+                    ("policy".into(), self.policy),
+                    ("report".into(), self.report),
+                ]),
+            },
+        })
+    }
+}
 enum CapturedEntry<'a> {
     Borrowed(&'a fs::SnapshotEntry),
     Owned(fs::SnapshotEntry),
@@ -362,19 +440,25 @@ pub fn load_inputs(entries: &BTreeMap<String, fs::SnapshotEntry>) -> Result<Capt
             .iter()
             .map(|(name, entry)| (name.clone(), CapturedEntry::Borrowed(entry)))
             .collect(),
-    )
+        false,
+    )?
+    .into_inputs()
 }
 pub(crate) fn load_owned_inputs(
     entries: BTreeMap<String, fs::SnapshotEntry>,
-) -> Result<CapturedInputs> {
+) -> Result<OwnedCapturedInputs> {
     load_input_entries(
         entries
             .into_iter()
             .map(|(name, entry)| (name, CapturedEntry::Owned(entry)))
             .collect(),
+        true,
     )
 }
-fn load_input_entries(mut entries: BTreeMap<String, CapturedEntry<'_>>) -> Result<CapturedInputs> {
+fn load_input_entries(
+    mut entries: BTreeMap<String, CapturedEntry<'_>>,
+    compact_runs: bool,
+) -> Result<OwnedCapturedInputs> {
     let manifest_raw = required_entry(&entries, "manifest.json")?.bytes();
     let manifest = object(manifest_raw, "captured manifest", true)?;
     validate_manifest(&manifest)?;
@@ -388,6 +472,7 @@ fn load_input_entries(mut entries: BTreeMap<String, CapturedEntry<'_>>) -> Resul
         "Unsigned local evidence".to_string()
     };
     let mut payloads = Map::new();
+    let mut runs = BTreeMap::new();
     let mut payload_hashes = BTreeMap::new();
     let mut canonical_checks = BTreeMap::new();
     for (role, name) in PAYLOADS {
@@ -401,28 +486,58 @@ fn load_input_entries(mut entries: BTreeMap<String, CapturedEntry<'_>>) -> Resul
                 "captured {role} binding is invalid"
             )));
         }
-        let value = object(raw, role, false)?;
-        // Retain the result, not the bytes. Syntax and record-limit errors from
-        // any payload still precede canonical/schema errors at the phase below.
-        canonical_checks.insert(
-            role,
-            canonical_json_matches(&value, raw).map_err(EvidenceError::from),
-        );
+        if compact_runs && matches!(role, "baseline" | "subject") {
+            // Certification failure reparses the retained raw bytes through the
+            // generic strict parser before this snapshot entry is released.
+            let run = parse_run(raw, role)
+                .map_err(|_| EvidenceError::contract(format!("{role} is not strict JSON")))?;
+            match &run {
+                ParsedRun::Compact(_) => {
+                    canonical_checks.insert(role, Ok(true));
+                }
+                ParsedRun::Json(value) => {
+                    if !value.is_object() {
+                        return Err(EvidenceError::contract(format!(
+                            "{role} must be a JSON object"
+                        )));
+                    }
+                    canonical_checks.insert(
+                        role,
+                        canonical_json_matches(value, raw).map_err(EvidenceError::from),
+                    );
+                }
+            }
+            runs.insert(role.to_owned(), run);
+        } else {
+            let value = object(raw, role, false)?;
+            // Retain results rather than bytes. Later syntax and record-limit
+            // failures still precede these deferred canonical/schema results.
+            canonical_checks.insert(
+                role,
+                canonical_json_matches(&value, raw).map_err(EvidenceError::from),
+            );
+            if matches!(role, "baseline" | "subject") {
+                runs.insert(role.to_owned(), ParsedRun::Json(value));
+            } else {
+                payloads.insert(role.into(), value);
+            }
+        }
         payload_hashes.insert(name, hash.to_owned());
-        payloads.insert(role.into(), value);
         drop(entry);
     }
     for role in ["baseline", "subject"] {
-        if payloads[role]["records"]
-            .as_array()
-            .is_some_and(|rows| rows.len() > 50_000)
-        {
+        let count = match &runs[role] {
+            ParsedRun::Compact(run) => run.view().record_count(),
+            ParsedRun::Json(run) => run["records"].as_array().map_or(0, Vec::len),
+        };
+        if count > 50_000 {
             return Err(EvidenceError::contract(
                 "run exceeds the 50,000-record limit",
             ));
         }
     }
     let mut checked = BTreeMap::new();
+    let mut checked_runs = BTreeMap::new();
     for (role, _) in PAYLOADS {
         if !canonical_checks
             .remove(role)
@@ -432,14 +547,22 @@ fn load_input_entries(mut entries: BTreeMap<String, CapturedEntry<'_>>) -> Resul
                 "{role} must be canonical JSON"
             )));
         }
-        if role != "request" {
-            let value = payloads.remove(role).expect("parsed payload");
+        if matches!(role, "baseline" | "subject") {
+            let run = match runs.remove(role).expect("parsed run") {
+                ParsedRun::Compact(run) => CapturedRun::Compact(run),
+                ParsedRun::Json(run) => CapturedRun::Json(
+                    SchemaCheckedValue::new(run, "run")
+                        .map_err(|e| EvidenceError::contract(bounded(&e.to_string())))?,
+                ),
+            };
+            checked_runs.insert(role.to_owned(), run);
+        } else if role != "request" {
             let value = SchemaCheckedValue::new(
-                value,
-                match role {
-                    "baseline" | "subject" => "run",
-                    "report" => "comparison",
-                    _ => "policy",
+                payloads.remove(role).expect("parsed payload"),
+                if role == "report" {
+                    "comparison"
+                } else {
+                    "policy"
                 },
             )
             .map_err(|e| EvidenceError::contract(bounded(&e.to_string())))?;
@@ -480,10 +603,10 @@ fn load_input_entries(mut entries: BTreeMap<String, CapturedEntry<'_>>) -> Resul
             "captured request or comparison identity is invalid",
         ));
     }
-    validate_normalized_request(
+    validate_normalized_request_views(
         &payloads["request"],
-        checked["baseline"].value(),
-        checked["subject"].value(),
+        checked_runs["baseline"].view(),
+        checked_runs["subject"].view(),
         checked["policy"].value(),
     )?;
     let request = SchemaCheckedValue::new(
@@ -491,17 +614,20 @@ fn load_input_entries(mut entries: BTreeMap<String, CapturedEntry<'_>>) -> Resul
         "normalized_captured_request",
     )?;
     checked.insert("request".into(), request);
-    let payloads = CapturedPayloads { values: checked };
     let bindings = json!({"baseline":format!("sha256:{}",payload_hashes["records/baseline.json"]),
         "subject":format!("sha256:{}",payload_hashes["records/subject.json"]),"policy":format!("sha256:{}",payload_hashes["inputs/policy.json"])});
-    if payloads["report"]["bindings"] != bindings {
+    if checked["report"].value()["bindings"] != bindings {
         return Err(EvidenceError::integrity(
             "captured comparison contradicts its bound inputs",
         ));
     }
-    Ok(CapturedInputs {
+    Ok(OwnedCapturedInputs {
         manifest,
-        payloads,
+        baseline: checked_runs.remove("baseline").expect("checked baseline"),
+        subject: checked_runs.remove("subject").expect("checked subject"),
+        policy: checked.remove("policy").expect("checked policy"),
+        report: checked.remove("report").expect("checked report"),
+        request: checked.remove("request").expect("checked request"),
         signer,
     })
 }
@@ -826,14 +952,10 @@ pub fn verify_with_inputs(
         let stored_report = stored_report.expect("loaded report entry");
         replay = "failed";
         let comparison = (|| {
-            let baseline = analysis::ValidatedRun::from_schema_checked(
-                loaded.payloads.schema_checked("baseline").unwrap(),
-            )?;
-            let subject = analysis::ValidatedRun::from_schema_checked(
-                loaded.payloads.schema_checked("subject").unwrap(),
-            )?;
+            let baseline = analysis::ValidatedRunView::from_run_view(loaded.baseline.view())?;
+            let subject = analysis::ValidatedRunView::from_run_view(loaded.subject.view())?;
             let policy = analysis::ValidatedPolicy::from_schema_checked(&input.policy)?;
-            analysis::compare_validated_runs(&baseline, &subject, &policy, input.budget)
+            analysis::compare_validated_run_views(&baseline, &subject, &policy, input.budget)
         })()
         .map_err(|e| {
             if e.reason == "local_work_budget_exceeded"
@@ -1174,7 +1296,7 @@ pub fn publish(config: &Value) -> Result<Value> {
 }
 
 #[cfg(test)]
-mod immutable_input_tests {
+pub(crate) mod immutable_input_tests {
     use super::*;
     use std::sync::atomic::{AtomicU64, Ordering};
     static NEXT: AtomicU64 = AtomicU64::new(0);
@@ -1189,6 +1311,19 @@ mod immutable_input_tests {
         owned: bool,
         mutate_source: bool,
     ) -> Result<CapturedInputs> {
+        fixture_entries(mutate, mutate_source, |entries| {
+            if owned {
+                load_owned_inputs(entries)?.into_inputs()
+            } else {
+                load_inputs(&entries)
+            }
+        })
+    }
+    pub(crate) fn fixture_entries<T>(
+        mutate: impl FnOnce(&mut BTreeMap<String, Vec<u8>>),
+        mutate_source: bool,
+        load: impl FnOnce(BTreeMap<String, fs::SnapshotEntry>) -> Result<T>,
+    ) -> Result<T> {
         let run = |side: &str| {
             json!({
                 "format":"invarlock/evaluation-run-v1", "run_id":side,
@@ -1274,11 +1409,7 @@ mod immutable_input_tests {
             .capture_selected(fs::SnapshotLimits::default(), &names, &dirs)
             .unwrap();
         let (entries, guard) = snapshot.into_parts();
-        let loaded = if owned {
-            load_owned_inputs(entries)?
-        } else {
-            load_inputs(&entries)?
-        };
+        let loaded = load(entries)?;
         if mutate_source {
             std::fs::write(temporary.0.join("records/baseline.json"), b"{}\n").unwrap();
         }

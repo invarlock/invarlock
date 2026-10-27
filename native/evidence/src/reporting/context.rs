@@ -1,6 +1,7 @@
 //! Bounded projections of evaluator-recorded model and prompt context.
 use super::presentation::*;
 use crate::{EvidenceError, Result};
+use invarlock_native_contracts::{RecordRef, RunView};
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
 fn error(s: &str) -> EvidenceError {
@@ -73,30 +74,30 @@ pub(super) fn policy_preview(p: &Value) -> Value {
     }
     p
 }
-fn common(records: &[Value], key: &str, container: &str) -> (Option<String>, String) {
-    let values = records
-        .iter()
-        .filter_map(|r| r[container][key].as_str())
+fn common(run: RunView<'_>, key: &str, container: &str) -> (Option<String>, String) {
+    let values = run
+        .records()
+        .filter_map(|r| r.get(container).and_then(|v| v[key].as_str()))
         .filter(|v| !v.trim().is_empty())
         .collect::<Vec<_>>();
     if values.is_empty() {
         (None, "Unavailable in recorded context".into())
-    } else if values.len() != records.len() || values.iter().any(|v| *v != values[0]) {
+    } else if values.len() != run.record_count() || values.iter().any(|v| *v != values[0]) {
         (None, "Mixed or incomplete across records".into())
     } else {
         (Some(values[0].into()), short(values[0], 256))
     }
 }
-fn summary(records: &[Value], key: &str) -> String {
-    let values = records
-        .iter()
-        .filter_map(|r| r["metadata"][key].as_str())
+fn summary(run: RunView<'_>, key: &str) -> String {
+    let values = run
+        .records()
+        .filter_map(|r| r.get("metadata").and_then(|v| v[key].as_str()))
         .filter(|v| !v.trim().is_empty())
         .collect::<Vec<_>>();
     if values.is_empty() {
         return "Unavailable in recorded context".into();
     }
-    if values.len() != records.len() {
+    if values.len() != run.record_count() {
         return "Mixed or incomplete across records".into();
     }
     let values = values.into_iter().collect::<BTreeSet<_>>();
@@ -114,9 +115,9 @@ fn summary(records: &[Value], key: &str) -> String {
     }
     format!("Multiple recorded values: {out}")
 }
-fn model(run: &Value, records: &[Value]) -> Result<Option<Value>> {
+fn model(run: RunView<'_>) -> Result<Option<Value>> {
     let mut identities = Vec::new();
-    for r in records {
+    for r in run.records() {
         let candidates = [
             &r["context"]["upstream_record"]["metadata"]["invarlock_model_execution"],
             &r["context"]["langfuse"]["item_result"]["item"]["metadata"]
@@ -169,7 +170,7 @@ fn model(run: &Value, records: &[Value]) -> Result<Option<Value>> {
         ));
     }
     for (key, legacy) in [("id", "model_id"), ("revision", "model_revision")] {
-        for r in records {
+        for r in run.records() {
             if let Some(v) = r["context"].get(legacy) {
                 if v.as_str().is_none_or(|s| s.trim().is_empty()) {
                     return Err(error("recorded model identity has invalid shallow context"));
@@ -180,20 +181,23 @@ fn model(run: &Value, records: &[Value]) -> Result<Option<Value>> {
             }
         }
     }
-    Ok(if present.len() == records.len() {
+    Ok(if present.len() == run.record_count() {
         Some(m.clone())
     } else {
         None
     })
 }
 type Messages<'a> = BTreeMap<&'a str, Vec<(&'a str, &'a str)>>;
-fn messages(records: &[Value], http: bool) -> Option<Messages<'_>> {
+fn messages<'a>(
+    records: impl IntoIterator<Item = RecordRef<'a>>,
+    http: bool,
+) -> Option<Messages<'a>> {
     let mut out = Messages::new();
     for r in records {
         let list = if http {
-            &r["context"]["http_observation"]["request"]["messages"]
+            &r.get("context")?["http_observation"]["request"]["messages"]
         } else {
-            &r["context"]["effective_messages"]
+            &r.get("context")?["effective_messages"]
         };
         let list = list.as_array()?;
         if list.is_empty() {
@@ -209,7 +213,7 @@ fn messages(records: &[Value], http: bool) -> Option<Messages<'_>> {
             }
             parsed.push((t(m, "role"), t(m, "content")))
         }
-        let id = t(r, "id");
+        let id = r.get("id")?.as_str().unwrap_or("");
         if id.is_empty() || out.insert(id, parsed).is_some() {
             return None;
         }
@@ -289,13 +293,18 @@ fn prompt(a: &Option<Messages<'_>>, b: &Option<Messages<'_>>, http: bool) -> (St
     (format!("Recorded {desc} differ in {} of {count} paired cases; the change is not one uniform added system instruction.",comma(changed as u64)),vec![])
 }
 pub(super) fn identities(inputs: &Value) -> Result<Vec<Value>> {
+    identities_views(
+        RunView::Json(&inputs["baseline"]),
+        RunView::Json(&inputs["subject"]),
+    )
+}
+pub(super) fn identities_views(baseline: RunView<'_>, subject: RunView<'_>) -> Result<Vec<Value>> {
     let mut out = Vec::new();
-    for (side, label) in [("baseline", "Baseline"), ("subject", "Subject")] {
-        let r = &inputs[side];
+    for (r, label) in [(baseline, "Baseline"), (subject, "Subject")] {
         let service = r.get("service_identity");
         out.extend([
             json!([format!("{label} run"), r["run_id"]]),
-            json!([format!("{label} run digest"), crate::digest(r)?]),
+            json!([format!("{label} run digest"), r.canonical_digest()?]),
             json!([
                 format!(
                     "{label} {}",
@@ -333,42 +342,45 @@ pub(super) fn identities(inputs: &Value) -> Result<Vec<Value>> {
 }
 type ContextProjection = (Vec<Value>, Vec<Value>, Vec<Value>, Vec<Value>);
 pub(super) fn captured(inputs: &Value) -> Result<ContextProjection> {
+    captured_views(
+        RunView::Json(&inputs["baseline"]),
+        RunView::Json(&inputs["subject"]),
+    )
+}
+pub(super) fn captured_views(
+    baseline: RunView<'_>,
+    subject: RunView<'_>,
+) -> Result<ContextProjection> {
     let mut subjects = Vec::new();
     let mut context = vec![json!(["Evaluation mode", "Captured evaluator outputs"])];
     let mut details = Vec::new();
     let mut keys = Vec::new();
     let mut models = Vec::new();
     let mut messages = [
-        messages(a(&inputs["baseline"], "records"), false),
-        messages(a(&inputs["subject"], "records"), false),
+        messages(baseline.records(), false),
+        messages(subject.records(), false),
     ];
     let mut http = false;
     if !paired(&messages[0], &messages[1]) {
         let requests = [
-            self::messages(a(&inputs["baseline"], "records"), true),
-            self::messages(a(&inputs["subject"], "records"), true),
+            self::messages(baseline.records(), true),
+            self::messages(subject.records(), true),
         ];
         if paired(&requests[0], &requests[1]) {
             messages = requests;
             http = true
         }
     }
-    for (index, (side, label)) in [("baseline", "Baseline"), ("subject", "Subject")]
+    for (index, (r, label)) in [(baseline, "Baseline"), (subject, "Subject")]
         .into_iter()
         .enumerate()
     {
-        let r = &inputs[side];
-        let records = a(r, "records");
         let fields = ["model_key", "model_id", "model_revision", "role"]
             .into_iter()
-            .map(|k| (k, common(records, k, "context")))
+            .map(|k| (k, common(r, k, "context")))
             .collect::<BTreeMap<_, _>>();
         let service = r.get("service_identity").filter(|v| !v.is_null());
-        let model = if service.is_none() {
-            model(r, records)?
-        } else {
-            None
-        };
+        let model = if service.is_none() { model(r)? } else { None };
         keys.push(fields["model_key"].0.clone());
         let mut identity = if fields["model_id"].0.is_some() {
             format!("Recorded model ID: {}", fields["model_id"].1)
@@ -377,7 +389,10 @@ pub(super) fn captured(inputs: &Value) -> Result<ContextProjection> {
         } else if fields["model_key"].0.is_some() {
             format!("Recorded model key: {}", fields["model_key"].1)
         } else {
-            format!("Recorded run: {}", short(t(r, "run_id"), 128))
+            format!(
+                "Recorded run: {}",
+                short(r["run_id"].as_str().unwrap_or(""), 128)
+            )
         };
         if let Some(sv) = service {
             let observed = t(sv, "observed_model");
@@ -470,9 +485,9 @@ pub(super) fn captured(inputs: &Value) -> Result<ContextProjection> {
                     .unwrap_or(fields["model_revision"].1.clone()),
             ),
             ("capture role".into(), fields["role"].1.clone()),
-            ("workflow".into(), common(records, "workflow", "metadata").1),
-            ("dataset".into(), summary(records, "dataset")),
-            ("records".into(), comma(records.len() as u64)),
+            ("workflow".into(), common(r, "workflow", "metadata").1),
+            ("dataset".into(), summary(r, "dataset")),
+            ("records".into(), comma(r.record_count() as u64)),
             (
                 if http {
                     "HTTP request message roles"
@@ -498,12 +513,8 @@ pub(super) fn captured(inputs: &Value) -> Result<ContextProjection> {
         models.push(model)
     }
     let services = [
-        inputs["baseline"]
-            .get("service_identity")
-            .filter(|v| !v.is_null()),
-        inputs["subject"]
-            .get("service_identity")
-            .filter(|v| !v.is_null()),
+        baseline.get("service_identity").filter(|v| !v.is_null()),
+        subject.get("service_identity").filter(|v| !v.is_null()),
     ];
     let change = if services.iter().any(Option::is_some) {
         context.push(json!([
@@ -562,10 +573,10 @@ mod tests {
 
     #[test]
     fn message_views_borrow_record_strings_and_keep_duplicate_rejection() {
-        let records = vec![json!({"id":"one","context":{"effective_messages":[
+        let records = [json!({"id":"one","context":{"effective_messages":[
             {"role":"user","content":"é😀 prompt"}
         ]}})];
-        let view = messages(&records, false).unwrap();
+        let view = messages(records.iter().map(RecordRef::Json), false).unwrap();
         let (&id, pairs) = view.first_key_value().unwrap();
         assert!(std::ptr::eq(
             id.as_ptr(),
@@ -578,18 +589,76 @@ mod tests {
                 .unwrap()
                 .as_ptr()
         ));
-        assert!(messages(&[records[0].clone(), records[0].clone()], false).is_none());
-        assert!(messages(&[json!({"id":"one","context":{"effective_messages":[{"role":"user","content":"x","extra":true}]}})], false).is_none());
         assert!(messages(
-            &[json!({"id":"one","context":{"effective_messages":[{"role":" ","content":"x"}]}})],
+            [RecordRef::Json(&records[0]), RecordRef::Json(&records[0])],
+            false
+        )
+        .is_none());
+        assert!(messages([RecordRef::Json(&json!({"id":"one","context":{"effective_messages":[{"role":"user","content":"x","extra":true}]}}))], false).is_none());
+        assert!(messages(
+            [RecordRef::Json(
+                &json!({"id":"one","context":{"effective_messages":[{"role":" ","content":"x"}]}})
+            )],
             false
         )
         .is_none());
         assert!(messages(
-            &[json!({"id":"one","context":{"effective_messages":[]}})],
+            [RecordRef::Json(
+                &json!({"id":"one","context":{"effective_messages":[]}})
+            )],
             false
         )
         .is_none());
+    }
+
+    #[test]
+    fn compact_context_preserves_id_pairing_roles_and_borrowed_messages() {
+        use invarlock_native_contracts::{parse_run, ParsedRun};
+        let run = |side: &str, system: bool| {
+            json!({
+                "format":"invarlock/evaluation-run-v1", "run_id":side,
+                "artifact_digest":crate::digest(&json!(side)).unwrap(), "source_digest":null,
+                "source":{"name":"fixture","version":"1"}, "score_provenance":{},
+                "records":(["second", "first"].into_iter().map(|id| json!({
+                    "id":id, "input":"question", "expected":"yes", "output":"yes", "scores":{},
+                    "metadata":{"dataset":"é😀"}, "error":null, "context":{
+                        "model_key":"model", "role":side,
+                        "effective_messages":if system {
+                            json!([{"role":"system","content":"uniform instruction"},{"role":"user","content":id}])
+                        } else { json!([{"role":"user","content":id}]) }
+                    }
+                })).collect::<Vec<_>>())
+            })
+        };
+        let baseline = run("baseline", false);
+        let mut subject = run("subject", true);
+        subject["records"].as_array_mut().unwrap().reverse();
+        let generic = captured(&json!({"baseline":baseline,"subject":subject})).unwrap();
+        let ParsedRun::Compact(baseline) =
+            parse_run(&crate::canonical(&baseline).unwrap(), "baseline").unwrap()
+        else {
+            panic!("baseline fixture must stay compact")
+        };
+        let ParsedRun::Compact(subject) =
+            parse_run(&crate::canonical(&subject).unwrap(), "subject").unwrap()
+        else {
+            panic!("subject fixture must stay compact")
+        };
+        assert_eq!(
+            captured_views(baseline.view(), subject.view()).unwrap(),
+            generic
+        );
+        let rows = messages(subject.view().records(), false).unwrap();
+        let record = subject.view().record(0);
+        assert!(std::ptr::eq(
+            rows[record.id()][0].1.as_ptr(),
+            record["context"]["effective_messages"][0]["content"]
+                .as_str()
+                .unwrap()
+                .as_ptr()
+        ));
+        assert_eq!(roles(&Some(rows)), "system → user");
+        assert!(generic.2[1].as_str().unwrap().contains("2 paired cases"));
     }
 
     #[test]

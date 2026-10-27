@@ -168,6 +168,22 @@ proofs and digests belong to the values they describe. Planned case-set digests
 stream sorted borrowed records; tests assert that the validated run schema
 implies every projected case-set constraint, with the encoded-size limit retained.
 
+The compact path decodes canonical, schema-valid captured runs one row at a time
+into owned fields instead of row and likelihood object maps. Open fields, scores,
+metadata and numeric values keep their existing `Value` representation.
+Immutable `RunView`, `RecordRef` and `LikelihoodRef` borrows serve verification
+and report assembly. Comparison sorts borrowed records by ID; each scope retains
+a packed selection mask and count so predicates run once and pair arrays are
+shared. Production captured reporting returns the view and required shared-input
+projections without reconstructing complete JSON runs.
+
+Existing public `Value` helpers remain available and materialize ordinary JSON
+on demand. A failed, unsupported or noncanonical compact parse discards its
+partial compact state and reparses the original bytes through the strict generic
+parser. Deferred checks retain the established canonical, schema and semantic
+error stages. Fallback stays within Rust and can add CPU work for rejected or
+noncanonical inputs; its resource behavior requires separate qualification.
+
 The ordered JSON map uses a locally patched `serde_json` representation: its
 map header is boxed only when needed, reducing the size of each JSON value while
 retaining insertion order. Empty objects allocate no map header. This patch adds

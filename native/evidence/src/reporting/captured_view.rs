@@ -1,6 +1,7 @@
 //! Projection of recorded captured comparisons; no scoring is performed here.
 use super::presentation::*;
 use crate::{EvidenceError, Result};
+use invarlock_native_contracts::RunView;
 use serde_json::{json, Value};
 fn n(v: &Value) -> f64 {
     v.as_f64().unwrap()
@@ -478,20 +479,39 @@ pub(crate) fn assemble(
     manifest: Option<&Value>,
     signer: Option<&str>,
 ) -> Result<Value> {
+    assemble_views(
+        comparison,
+        inputs.map(|v| {
+            (
+                RunView::Json(&v["baseline"]),
+                RunView::Json(&v["subject"]),
+                &v["policy"],
+            )
+        }),
+        manifest,
+        signer,
+    )
+}
+fn assemble_views(
+    comparison: &Value,
+    inputs: Option<(RunView<'_>, RunView<'_>, &Value)>,
+    manifest: Option<&Value>,
+    signer: Option<&str>,
+) -> Result<Value> {
     let metrics = metric_views(
         comparison,
         inputs
-            .map(|v| &v["policy"]["metrics"])
+            .map(|(_, _, policy)| &policy["metrics"])
             .unwrap_or(&Value::Null),
     )?;
     let mut identity = Vec::new();
-    if let (Some(inputs), Some(m)) = (inputs, manifest) {
+    if let (Some((baseline, subject, _)), Some(m)) = (inputs, manifest) {
         identity.extend([
             json!(["Manifest", crate::digest(m)?]),
             json!(["Comparison", m["comparison_id"]]),
             json!(["Evidence signer", signer.unwrap_or("None")]),
         ]);
-        identity.extend(super::context::identities(inputs)?);
+        identity.extend(super::context::identities_views(baseline, subject)?);
     }
     if let Some(bindings) = comparison["bindings"].as_object() {
         identity.extend(
@@ -500,14 +520,7 @@ pub(crate) fn assemble(
                 .map(|(k, v)| json!([format!("{} binding", capitalize(k)), v])),
         )
     }
-    let mut technical = comparison.clone();
-    for m in technical["metrics"].as_array_mut().unwrap() {
-        let missing = a(m, "missing_ids").to_vec();
-        m.as_object_mut().unwrap().remove("missing_ids");
-        m["missing_count"] = json!(missing.len());
-        m["missing_ids_preview"] = json!(missing.iter().take(20).collect::<Vec<_>>());
-        m["missing_ids_preview_is_complete"] = json!(missing.len() <= 20)
-    }
+    let technical = technical_projection(comparison);
     let signing=match manifest.map(|m|t(m,"authentication")){Some("unsigned_local")=>"Unsigned local evidence; no signer authentication.",Some(_)=>"Signed manifest verified. This rendering has not authenticated it against a recipient-owned key.",None=>"Signing state unavailable: this view was created from comparison data only."};
     let mut assurance = Vec::new();
     if manifest.is_some() {
@@ -542,11 +555,12 @@ pub(crate) fn assemble(
     view["identity"] = json!(identity);
     view["next_steps"]=json!(["Review the recorded checks against the approved requirements.","For a signed handoff, run invarlock verify with independent signer, policy, request and complete-run anchors and an external signed receipt.","Use the comparison JSON and JUnit outputs in CI; preserve missing results and the original policy."]);
     view["limitations"] = comparison["limitations"].clone();
-    if let Some(inputs) = inputs {
-        let (subjects, context, changes, mut details) = super::context::captured(inputs)?;
+    if let Some((baseline, subject, policy)) = inputs {
+        let (subjects, context, changes, mut details) =
+            super::context::captured_views(baseline, subject)?;
         details.push(json!([
             "Bound policy (configuration preview)",
-            super::context::policy_preview(&inputs["policy"])
+            super::context::policy_preview(policy)
         ]));
         view["subjects"] = json!(subjects);
         view["context"] = json!(context);
@@ -558,12 +572,85 @@ pub(crate) fn assemble(
     Ok(view)
 }
 
+fn technical_projection(comparison: &Value) -> Value {
+    // Exclude full missing-ID inventories before cloning. Only the first twenty
+    // strings are owned by the rendering projection, including missing-heavy runs.
+    comparison
+        .as_object()
+        .unwrap()
+        .iter()
+        .map(|(key, value)| {
+            let projected = if key == "metrics" {
+                Value::Array(
+                    value
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|metric| {
+                            let mut fields: serde_json::Map<String, Value> = metric
+                                .as_object()
+                                .unwrap()
+                                .iter()
+                                .map(|(key, value)| {
+                                    (
+                                        key.clone(),
+                                        if key == "missing_ids" {
+                                            Value::Null
+                                        } else {
+                                            value.clone()
+                                        },
+                                    )
+                                })
+                                .collect();
+                            // A null placeholder preserves Map::remove's existing swap order.
+                            fields.remove("missing_ids");
+                            let missing = a(metric, "missing_ids");
+                            fields.insert("missing_count".into(), json!(missing.len()));
+                            fields.insert(
+                                "missing_ids_preview".into(),
+                                json!(missing.iter().take(20).collect::<Vec<_>>()),
+                            );
+                            fields.insert(
+                                "missing_ids_preview_is_complete".into(),
+                                json!(missing.len() <= 20),
+                            );
+                            Value::Object(fields)
+                        })
+                        .collect(),
+                )
+            } else {
+                value.clone()
+            };
+            (key.clone(), projected)
+        })
+        .collect::<serde_json::Map<String, Value>>()
+        .into()
+}
+
 /// Authenticate one immutable captured snapshot, then project its stored results.
 pub fn load(path: &std::path::Path) -> Result<Value> {
-    let loaded = crate::evidence_sets::load_captured(path)?;
+    let loaded = crate::evidence_sets::load_captured(path)?.into_inputs()?;
     let payloads = Value::Object(loaded.payloads.into_values());
     let comparison = &payloads["report"];
     let policy = &payloads["policy"];
+    validate_report_policy(comparison, policy)?;
+    let view = assemble(
+        comparison,
+        Some(&payloads),
+        Some(&loaded.manifest),
+        Some(&loaded.signer),
+    )?;
+    // Move the authenticated payloads: json! serializes borrowed expressions,
+    // which would duplicate both complete runs before dropping the originals.
+    let mut snapshot = serde_json::Map::new();
+    snapshot.insert("view".into(), view);
+    snapshot.insert("manifest".into(), loaded.manifest);
+    snapshot.insert("payloads".into(), payloads);
+    snapshot.insert("signer".into(), Value::String(loaded.signer));
+    Ok(Value::Object(snapshot))
+}
+
+fn validate_report_policy(comparison: &Value, policy: &Value) -> Result<()> {
     let policies = a(policy, "metrics")
         .iter()
         .map(|m| (t(m, "name"), m))
@@ -631,18 +718,226 @@ pub fn load(path: &std::path::Path) -> Result<Value> {
             "captured report omits configured metric scopes",
         ));
     }
-    let view = assemble(
-        comparison,
-        Some(&payloads),
+    Ok(())
+}
+
+pub(crate) fn load_projection(path: &std::path::Path) -> Result<Value> {
+    project_loaded(crate::evidence_sets::load_captured(path)?, false)
+}
+pub(crate) fn load_set_projection(path: &std::path::Path, manifest_pin: &Value) -> Result<Value> {
+    project_loaded_with_manifest_pin(
+        crate::evidence_sets::load_captured(path)?,
+        true,
+        Some(manifest_pin),
+    )
+}
+pub(crate) fn project_loaded(
+    loaded: crate::captured::OwnedCapturedInputs,
+    include_shared: bool,
+) -> Result<Value> {
+    project_loaded_with_manifest_pin(loaded, include_shared, None)
+}
+fn project_loaded_with_manifest_pin(
+    loaded: crate::captured::OwnedCapturedInputs,
+    include_shared: bool,
+    manifest_pin: Option<&Value>,
+) -> Result<Value> {
+    validate_report_policy(loaded.report.value(), loaded.policy.value())?;
+    let view = assemble_views(
+        loaded.report.value(),
+        Some((
+            loaded.baseline.view(),
+            loaded.subject.view(),
+            loaded.policy.value(),
+        )),
         Some(&loaded.manifest),
         Some(&loaded.signer),
     )?;
-    // Move the authenticated payloads: json! serializes borrowed expressions,
-    // which would duplicate both complete runs before dropping the originals.
+    // Set rendering historically checks this binding after assembling the view
+    // but before deterministic-policy and shared-case validation. Keep that error
+    // precedence even if the statement changed after the initial file check.
+    if let Some(expected) = manifest_pin {
+        if crate::digest(&loaded.manifest)? != *expected {
+            return Err(EvidenceError::contract(
+                "captured statement changed during report preparation",
+            ));
+        }
+    }
+    let shared = if include_shared {
+        crate::evidence_sets::require_deterministic_policy(loaded.policy.value())?;
+        Some(crate::evidence_sets::shared_owned_captured_inputs(&loaded)?)
+    } else {
+        None
+    };
     let mut snapshot = serde_json::Map::new();
     snapshot.insert("view".into(), view);
     snapshot.insert("manifest".into(), loaded.manifest);
-    snapshot.insert("payloads".into(), payloads);
+    snapshot.insert("policy".into(), loaded.policy.into_value());
     snapshot.insert("signer".into(), Value::String(loaded.signer));
+    if let Some(shared) = shared {
+        snapshot.insert("shared_inputs".into(), shared);
+    }
     Ok(Value::Object(snapshot))
+}
+
+#[cfg(test)]
+mod projection_tests {
+    use super::*;
+    #[test]
+    fn production_projection_keeps_compact_rows_and_matches_generic_snapshot() {
+        use crate::captured::{self, immutable_input_tests::fixture_entries};
+        captured::reset_compact_materializations();
+        fixture_entries(
+            |_| {},
+            false,
+            |entries| {
+                let generic = captured::load_inputs(&entries)?;
+                let expected_shared =
+                    crate::evidence_sets::shared_checked_captured_inputs(&generic.payloads)?;
+                let payloads = Value::Object(generic.payloads.into_values());
+                let expected = assemble(
+                    &payloads["report"],
+                    Some(&payloads),
+                    Some(&generic.manifest),
+                    Some(&generic.signer),
+                )?;
+                let owned = captured::load_owned_inputs(entries)?;
+                assert!(matches!(owned.baseline, captured::CapturedRun::Compact(_)));
+                assert!(matches!(owned.subject, captured::CapturedRun::Compact(_)));
+                let projected = project_loaded(owned, true)?;
+                assert_eq!(captured::compact_materializations(), 0);
+                assert_eq!(
+                    crate::canonical(&projected["view"])?,
+                    crate::canonical(&expected)?
+                );
+                assert_eq!(
+                    serde_json::to_vec(&projected["view"]).unwrap(),
+                    serde_json::to_vec(&expected).unwrap()
+                );
+                assert_eq!(projected["shared_inputs"], expected_shared);
+                assert_eq!(projected["policy"], payloads["policy"]);
+                assert_eq!(projected["manifest"], generic.manifest);
+                assert!(projected.get("payloads").is_none());
+                Ok(())
+            },
+        )
+        .unwrap();
+        // Positive control: the compatibility adapter actually rebuilds both
+        // compact runs, so the zero count above detects that regression.
+        fixture_entries(
+            |_| {},
+            false,
+            |entries| captured::load_owned_inputs(entries)?.into_inputs(),
+        )
+        .unwrap();
+        assert_eq!(captured::compact_materializations(), 2);
+    }
+
+    #[test]
+    fn set_manifest_mismatch_precedes_competing_shared_policy_failure() {
+        use crate::captured::{self, immutable_input_tests::fixture_entries};
+        use invarlock_native_contracts::SchemaCheckedValue;
+        for mismatch in [true, false] {
+            fixture_entries(|_| {}, false, |entries| {
+                let generic = captured::load_inputs(&entries)?;
+                let mut policy = generic.payloads["policy"].clone();
+                policy["metrics"][0]["kind"] = json!("normalized_nll_per_utf8_byte");
+                policy["metrics"][0]["direction"] = json!("lower");
+                policy["metrics"][0]["unit"] = json!("nats_per_utf8_byte");
+                policy["metrics"][0].as_object_mut().unwrap().remove("maximum_regression");
+                policy["metrics"][0]["ratio_max"] = json!(1.1);
+                let configuration_digest = crate::digest(&json!({}))?;
+                policy["metrics"][0]["configuration"] = json!({
+                    "configuration_digest":configuration_digest,
+                    "baseline_tokenizer_digest":configuration_digest,
+                    "subject_tokenizer_digest":configuration_digest,
+                });
+                let report = invarlock_native_core::compare_runs(&generic.payloads["baseline"], &generic.payloads["subject"], &policy, None).unwrap();
+                // Exercise the projection boundary with two competing errors;
+                // no filesystem race or mutation of an authenticated run is needed.
+                let mut owned = captured::load_owned_inputs(entries)?;
+                owned.policy = SchemaCheckedValue::new(policy, "policy")?;
+                owned.report = SchemaCheckedValue::new(report, "comparison")?;
+                let pin = if mismatch { json!("sha256:wrong") } else { json!(crate::digest(&owned.manifest)?) };
+                let error = project_loaded_with_manifest_pin(owned, true, Some(&pin)).unwrap_err();
+                assert_eq!(error.message, if mismatch {
+                    "captured statement changed during report preparation"
+                } else {
+                    "evidence set requires recomputed deterministic captured metrics; recorded scores are unsupported"
+                });
+                assert_eq!(error.exit_code, 4);
+                Ok(())
+            }).unwrap();
+        }
+    }
+
+    #[test]
+    fn valid_missing_result_report_retains_counts_and_bounded_preview() {
+        let run = |side: &str, missing: bool| {
+            json!({
+                "format":"invarlock/evaluation-run-v1", "run_id":side,
+                "artifact_digest":crate::digest(&json!(side)).unwrap(), "source_digest":null,
+                "source":{"name":"fixture","version":"1"}, "score_provenance":{},
+                "records":(0..137).map(|index| json!({"id":format!("case-{index:03}"),
+                    "input":"question", "expected":"yes", "output":if missing { Value::Null } else { json!("yes") },
+                    "scores":{}, "metadata":{}, "error":null, "context":{}})).collect::<Vec<_>>()
+            })
+        };
+        let policy = json!({"format":"invarlock/comparison-policy-v1", "slices":[],
+            "metrics":[{"name":"exact","kind":"exact_match","configuration":{},
+                "direction":"higher","unit":"score","aggregation":"mean",
+                "minimum_count":1,"maximum_regression":0,"maximum_interval_width":100}]});
+        let comparison = invarlock_native_core::compare_runs(
+            &run("baseline", false),
+            &run("subject", true),
+            &policy,
+            None,
+        )
+        .unwrap();
+        let view = build_comparison_view(&comparison).unwrap();
+        assert_eq!(view["decision"], "insufficient_evidence");
+        let technical = &view["technical"]["metrics"][0];
+        assert_eq!(technical["missing_count"], 137);
+        assert_eq!(technical["missing_ids_preview_is_complete"], false);
+        assert_eq!(
+            technical["missing_ids_preview"],
+            json!((0..20)
+                .map(|index| format!("case-{index:03}"))
+                .collect::<Vec<_>>())
+        );
+        assert!(technical.get("missing_ids").is_none());
+        assert_eq!(a(&comparison["metrics"][0], "missing_ids").len(), 137);
+    }
+
+    #[test]
+    fn missing_heavy_technical_projection_matches_previous_output() {
+        for count in [0, 1, 20, 21, 50_000] {
+            let comparison = json!({"decision":"insufficient_evidence", "metrics":[{
+                "name":"missing", "count":count,
+                "missing_ids":(0..count).map(|i| format!("missing-{i:05}-é😀")).collect::<Vec<_>>(),
+                "explanation":"retained missing results", "interval":null
+            }], "limitations":[]});
+            let mut expected = comparison.clone();
+            for metric in expected["metrics"].as_array_mut().unwrap() {
+                let missing = a(metric, "missing_ids").to_vec();
+                metric.as_object_mut().unwrap().remove("missing_ids");
+                metric["missing_count"] = json!(missing.len());
+                metric["missing_ids_preview"] = json!(missing.iter().take(20).collect::<Vec<_>>());
+                metric["missing_ids_preview_is_complete"] = json!(missing.len() <= 20);
+            }
+            let actual = technical_projection(&comparison);
+            assert_eq!(actual, expected);
+            assert_eq!(
+                serde_json::to_vec(&actual).unwrap(),
+                serde_json::to_vec(&expected).unwrap()
+            );
+            assert_eq!(
+                crate::canonical(&actual).unwrap(),
+                crate::canonical(&expected).unwrap()
+            );
+            assert!(actual["metrics"][0].get("missing_ids").is_none());
+            assert!(a(&actual["metrics"][0], "missing_ids_preview").len() <= 20);
+            assert_eq!(a(&comparison["metrics"][0], "missing_ids").len(), count);
+        }
+    }
 }

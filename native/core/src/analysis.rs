@@ -3,7 +3,7 @@ use crate::{
 };
 use invarlock_native_contracts::{
     canonical_json, canonical_json_digest, canonical_json_matches, canonical_json_no_newline,
-    canonical_json_to_writer, validate_schema, SchemaCheckedValue,
+    canonical_json_to_writer, validate_schema, RecordRef, RunView, SchemaCheckedValue,
 };
 use num_bigint::BigInt;
 use num_rational::BigRational;
@@ -45,11 +45,26 @@ fn canonical(v: &Value) -> Result<Vec<u8>, AnalysisError> {
 fn digest(v: &Value) -> Result<String, AnalysisError> {
     canonical_json_digest(v).map_err(|e| err(e.to_string()))
 }
+// Accept legacy JSON rows and compact borrowed rows without materializing an
+// intermediate JSON document or changing the canonical field encoder.
+trait RecordInput<'a>: Copy {
+    fn record(self) -> RecordRef<'a>;
+}
+impl<'a> RecordInput<'a> for &'a Value {
+    fn record(self) -> RecordRef<'a> {
+        RecordRef::Json(self)
+    }
+}
+impl<'a> RecordInput<'a> for RecordRef<'a> {
+    fn record(self) -> RecordRef<'a> {
+        self
+    }
+}
 // Preserve the canonical case-identity projection without owning another copy
 // of every record. These fixed keys are in canonical Unicode lexical order;
 // nested field values still use the shared canonical encoder.
-fn case_projection_to_writer<'a>(
-    rows: impl IntoIterator<Item = &'a Value>,
+fn case_projection_to_writer<'a, R: RecordInput<'a>>(
+    rows: impl IntoIterator<Item = R>,
     writer: &mut impl std::io::Write,
     newline: bool,
 ) -> Result<(), AnalysisError> {
@@ -60,6 +75,7 @@ fn case_projection_to_writer<'a>(
     }
     put(writer, b"[")?;
     for (index, left) in rows.into_iter().enumerate() {
+        let left = left.record();
         if index != 0 {
             put(writer, b",")?;
         }
@@ -83,13 +99,20 @@ fn case_projection_to_writer<'a>(
     }
     put(writer, if newline { b"]\n" } else { b"]" })
 }
-fn case_seed_to_writer(
-    pairs: &[(&Value, &Value)],
+#[cfg(test)]
+fn case_seed_to_writer<'a, R: RecordInput<'a>>(
+    pairs: &[(R, R)],
     writer: &mut impl std::io::Write,
 ) -> Result<(), AnalysisError> {
     case_projection_to_writer(pairs.iter().map(|(left, _)| *left), writer, true)
 }
-fn case_seed(pairs: &[(&Value, &Value)]) -> Result<String, AnalysisError> {
+#[cfg(test)]
+fn case_seed<'a, R: RecordInput<'a>>(pairs: &[(R, R)]) -> Result<String, AnalysisError> {
+    case_seed_rows(pairs.iter().map(|(left, _)| left.record()))
+}
+fn case_seed_rows<'a>(
+    rows: impl IntoIterator<Item = RecordRef<'a>>,
+) -> Result<String, AnalysisError> {
     struct HashWriter(sha2::Sha256);
     impl std::io::Write for HashWriter {
         fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
@@ -101,11 +124,11 @@ fn case_seed(pairs: &[(&Value, &Value)]) -> Result<String, AnalysisError> {
         }
     }
     let mut writer = HashWriter(sha2::Sha256::default());
-    case_seed_to_writer(pairs, &mut writer)?;
+    case_projection_to_writer(rows, &mut writer, true)?;
     Ok(format!("sha256:{:x}", sha2::Digest::finalize(writer.0)))
 }
-fn case_set_to_writer(
-    rows: &[&Value],
+fn case_set_to_writer<'a, R: RecordInput<'a>>(
+    rows: &[R],
     writer: &mut impl std::io::Write,
 ) -> Result<(), AnalysisError> {
     writer
@@ -116,10 +139,13 @@ fn case_set_to_writer(
         .write_all(b",\"format\":\"invarlock/evaluation-case-set-v1\"}\n")
         .map_err(|e| err(format!("value is not canonical JSON: {e}")))
 }
-fn case_set_digest(rows: &[&Value]) -> Result<String, AnalysisError> {
+fn case_set_digest<'a, R: RecordInput<'a>>(rows: &[R]) -> Result<String, AnalysisError> {
     case_set_digest_with_limit(rows, invarlock_native_contracts::MAX_INPUT_BYTES)
 }
-fn case_set_digest_with_limit(rows: &[&Value], maximum: usize) -> Result<String, AnalysisError> {
+fn case_set_digest_with_limit<'a, R: RecordInput<'a>>(
+    rows: &[R],
+    maximum: usize,
+) -> Result<String, AnalysisError> {
     use std::io::{self, Write};
     struct HashWriter(sha2::Sha256);
     impl Write for HashWriter {
@@ -261,6 +287,9 @@ fn projection_tokens(v: &Value) -> Result<String, AnalysisError> {
     Ok(p.into())
 }
 pub fn verify_input_projection(row: &Value) -> Result<(), AnalysisError> {
+    verify_input_projection_record(RecordRef::Json(row))
+}
+fn verify_input_projection_record(row: RecordRef<'_>) -> Result<(), AnalysisError> {
     let Some(context) = row["context"].as_object() else {
         return Ok(());
     };
@@ -351,7 +380,7 @@ fn timestamp(v: &Value) -> Result<[u32; 7], AnalysisError> {
     }
     Ok(parts)
 }
-fn service_digest(run: &Value) -> Result<Option<String>, AnalysisError> {
+fn service_digest(run: RunView<'_>) -> Result<Option<String>, AnalysisError> {
     let Some(identity) = run.get("service_identity") else {
         return Ok(None);
     };
@@ -372,34 +401,39 @@ fn service_digest(run: &Value) -> Result<Option<String>, AnalysisError> {
     }
     Ok(Some(digest(identity)?))
 }
-fn likelihood_record(row: &Value, run: &Value, service: Option<&str>) -> Result<(), AnalysisError> {
-    let Some(facts) = row.get("likelihood") else {
+fn likelihood_record(
+    row: RecordRef<'_>,
+    run: RunView<'_>,
+    service: Option<&str>,
+) -> Result<(), AnalysisError> {
+    let Some(facts) = row.likelihood() else {
         return Ok(());
     };
-    let label = format!(
-        "record {}: reference-continuation likelihood",
-        text(row, "id")
-    );
+    let label = || format!("record {}: reference-continuation likelihood", row.id());
     let reference = row["expected"]
         .as_str()
         .filter(|s| !s.is_empty())
-        .ok_or_else(|| err(format!("{label} requires nonempty reference text")))?;
+        .ok_or_else(|| err(format!("{} requires nonempty reference text", label())))?;
     for key in ["token_count", "utf8_byte_count"] {
-        let s = facts[key].to_string();
-        if !facts[key].is_number()
-            || s.contains(['.', 'e', 'E'])
-            || s.parse::<BigInt>()
-                .map(|x| x <= BigInt::from(0))
-                .unwrap_or(true)
-        {
+        let positive = facts[key].as_u64().is_some_and(|value| value > 0) || {
+            let value = facts[key].to_string();
+            facts[key].is_number()
+                && !value.contains(['.', 'e', 'E'])
+                && value
+                    .parse::<BigInt>()
+                    .is_ok_and(|value| value > BigInt::from(0))
+        };
+        if !positive {
             return Err(err(format!(
-                "{label} {key} must be a positive exact integer"
+                "{} {key} must be a positive exact integer",
+                label()
             )));
         }
     }
     if facts["utf8_byte_count"].as_u64() != Some(reference.len() as u64) {
         return Err(err(format!(
-            "{label} utf8_byte_count differs from reference"
+            "{} utf8_byte_count differs from reference",
+            label()
         )));
     }
     let captured = row["context"]
@@ -409,27 +443,34 @@ fn likelihood_record(row: &Value, run: &Value, service: Option<&str>) -> Result<
     if run.get("service_identity").is_some() {
         if service.is_none() || facts["service_identity_digest"].as_str() != service {
             return Err(err(format!(
-                "{label} service_identity_digest binding differs"
+                "{} service_identity_digest binding differs",
+                label()
             )));
         }
         if facts["configuration_digest"] != run["service_identity"]["configuration_digest"] {
             return Err(err(format!(
-                "{label} service configuration binding differs"
+                "{} service configuration binding differs",
+                label()
             )));
         }
     } else if facts.get("service_identity_digest").is_some() {
         return Err(err(format!(
-            "{label} service identity cannot replace an artifact"
+            "{} service identity cannot replace an artifact",
+            label()
         )));
     }
+    // Compute both identities before checking bindings, preserving the original
+    // canonical-error precedence while borrowing the immutable run fields.
+    let input_digest = Value::String(digest(captured)?);
+    let reference_digest = Value::String(digest(&row["expected"])?);
     for (key, expected) in [
-        ("input_digest", json!(digest(captured)?)),
-        ("reference_digest", json!(digest(&row["expected"])?)),
-        ("artifact_digest", run["artifact_digest"].clone()),
-        ("source", run["source"].clone()),
+        ("input_digest", &input_digest),
+        ("reference_digest", &reference_digest),
+        ("artifact_digest", &run["artifact_digest"]),
+        ("source", &run["source"]),
     ] {
-        if !py_equal(&facts[key], &expected) {
-            return Err(err(format!("{label} {key} binding differs")));
+        if !py_equal(&facts[key], expected) {
+            return Err(err(format!("{} {key} binding differs", label())));
         }
     }
     Ok(())
@@ -439,14 +480,16 @@ pub fn check_run(run: &Value) -> Result<(), AnalysisError> {
     check_run_semantics(run)
 }
 fn check_run_semantics(run: &Value) -> Result<(), AnalysisError> {
+    check_run_view_semantics(RunView::Json(run))
+}
+fn check_run_view_semantics(run: RunView<'_>) -> Result<(), AnalysisError> {
     let service = service_digest(run)?;
-    let rows = run["records"].as_array().unwrap();
-    for row in rows {
-        verify_input_projection(row)?;
+    for row in run.records() {
+        verify_input_projection_record(row)?;
         likelihood_record(row, run, service.as_deref())?
     }
     let mut ids = BTreeSet::new();
-    if rows.iter().any(|r| !ids.insert(text(r, "id"))) {
+    if run.records().any(|row| !ids.insert(row.id())) {
         return Err(err(
             "duplicate record IDs; repeated trials need distinct paired IDs",
         ));
@@ -565,6 +608,36 @@ impl<'a> ValidatedRun<'a> {
         self.value
     }
 }
+/// Semantic evidence for an immutable borrowed run representation. Compact
+/// runs carry their packaged-schema proof; JSON runs are checked at this boundary.
+pub struct ValidatedRunView<'a> {
+    view: RunView<'a>,
+    checked: Option<&'a SchemaCheckedValue>,
+}
+impl<'a> ValidatedRunView<'a> {
+    pub fn from_run_view(view: RunView<'a>) -> Result<Self, AnalysisError> {
+        if let RunView::Json(value) = view {
+            schema(value, "run")?;
+        }
+        check_run_view_semantics(view)?;
+        Ok(Self {
+            view,
+            checked: None,
+        })
+    }
+    pub fn view(&self) -> RunView<'a> {
+        self.view
+    }
+    fn canonical_digest(&self) -> Result<String, AnalysisError> {
+        match self.checked {
+            Some(checked) => checked
+                .canonical_digest()
+                .map(str::to_owned)
+                .map_err(|e| err(e.to_string())),
+            None => self.view.canonical_digest().map_err(|e| err(e.to_string())),
+        }
+    }
+}
 pub struct ValidatedPolicy<'a> {
     value: &'a Value,
     checked: Option<&'a SchemaCheckedValue>,
@@ -592,13 +665,16 @@ impl<'a> ValidatedPolicy<'a> {
     }
 }
 pub(crate) fn missing(left: &Value, right: &Value, metric: &Value) -> bool {
+    missing_record(RecordRef::Json(left), RecordRef::Json(right), metric)
+}
+fn missing_record(left: RecordRef<'_>, right: RecordRef<'_>, metric: &Value) -> bool {
     let kind = text(metric, "kind");
     [left, right].iter().any(|row| {
         !row["error"].is_null()
             || if kind == "recorded" {
                 row["scores"].get(text(metric, "score_key")).is_none()
             } else if kind == NLL {
-                row.get("likelihood").is_none()
+                row.likelihood().is_none()
             } else if matches!(kind, "exact_match" | "normalized_match" | "token_f1") {
                 !row["output"].is_string()
             } else {
@@ -657,26 +733,106 @@ fn interval(b: &[f64], s: &[f64], seed: &str, is_binary: bool) -> Result<Value, 
         json!({"lower":lower,"upper":upper,"method":"paired_mean_shake256_percentile_v1","mass":0.95,"replicates":2048}),
     )
 }
-fn metric_result(
-    baseline: &Value,
-    subject: &Value,
+// A scope owns only one bit per paired row. Predicate evaluation happens once;
+// subsequent budget, missing-result and metric passes reuse the immutable mask.
+struct SelectedRows {
+    words: Box<[u64]>,
+    count: usize,
+}
+impl SelectedRows {
+    fn all(count: usize) -> Self {
+        let mut words = vec![u64::MAX; count.div_ceil(64)];
+        if !count.is_multiple_of(64) {
+            *words.last_mut().unwrap() = (1u64 << (count % 64)) - 1;
+        }
+        Self {
+            words: words.into_boxed_slice(),
+            count,
+        }
+    }
+    fn matching(count: usize, mut predicate: impl FnMut(usize) -> bool) -> Self {
+        let mut words = vec![0u64; count.div_ceil(64)];
+        let mut selected = 0;
+        for index in 0..count {
+            if predicate(index) {
+                words[index / 64] |= 1u64 << (index % 64);
+                selected += 1;
+            }
+        }
+        Self {
+            words: words.into_boxed_slice(),
+            count: selected,
+        }
+    }
+    fn iter(&self) -> SelectedIndices<'_> {
+        SelectedIndices {
+            words: &self.words,
+            next_word: 0,
+            pending: 0,
+            remaining: self.count,
+        }
+    }
+}
+#[derive(Clone)]
+struct SelectedIndices<'a> {
+    words: &'a [u64],
+    next_word: usize,
+    pending: u64,
+    remaining: usize,
+}
+impl Iterator for SelectedIndices<'_> {
+    type Item = usize;
+    fn next(&mut self) -> Option<usize> {
+        if self.remaining == 0 {
+            return None;
+        }
+        while self.pending == 0 {
+            self.pending = *self.words.get(self.next_word)?;
+            self.next_word += 1;
+        }
+        let bit = self.pending.trailing_zeros() as usize;
+        self.pending &= self.pending - 1;
+        self.remaining -= 1;
+        Some((self.next_word - 1) * 64 + bit)
+    }
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.remaining, Some(self.remaining))
+    }
+}
+impl ExactSizeIterator for SelectedIndices<'_> {}
+
+struct RecordPairs<'s, 'r> {
+    rows: &'s [(RecordRef<'r>, RecordRef<'r>)],
+    selected: SelectedRows,
+}
+impl<'r> RecordPairs<'_, 'r> {
+    fn len(&self) -> usize {
+        self.selected.count
+    }
+    fn iter(&self) -> impl ExactSizeIterator<Item = (RecordRef<'r>, RecordRef<'r>)> + Clone + '_ {
+        self.selected.iter().map(move |index| self.rows[index])
+    }
+}
+fn metric_result<'a>(
+    baseline: RunView<'a>,
+    subject: RunView<'a>,
     metric: &Value,
     slice: &str,
-    pairs: &[(&Value, &Value)],
+    pairs: impl ExactSizeIterator<Item = (RecordRef<'a>, RecordRef<'a>)> + Clone,
 ) -> Result<Value, AnalysisError> {
     let kind = text(metric, "kind");
     let recorded = kind == "recorded";
     let likelihood = kind == NLL;
     if likelihood {
-        for &(left, right) in pairs {
+        for (left, right) in pairs.clone() {
             for (side, row) in [("baseline", left), ("subject", right)] {
-                if let Some(facts) = row.get("likelihood") {
+                if let Some(facts) = row.likelihood() {
                     if facts["configuration_digest"]
                         != metric["configuration"]["configuration_digest"]
                     {
                         return Err(err(format!(
                             "record {}: likelihood configuration differs from policy",
-                            text(row, "id")
+                            row.id()
                         )));
                     }
                     if facts["tokenizer_digest"]
@@ -684,7 +840,7 @@ fn metric_result(
                     {
                         return Err(err(format!(
                             "record {}: likelihood tokenizer differs from policy",
-                            text(row, "id")
+                            row.id()
                         )));
                     }
                 }
@@ -706,8 +862,8 @@ fn metric_result(
     }
     let mut values = [Vec::new(), Vec::new()];
     let mut missing_ids = Vec::new();
-    for &(left, right) in pairs {
-        if missing(left, right, metric) {
+    for (left, right) in pairs.clone() {
+        if missing_record(left, right, metric) {
             missing_ids.push(left["id"].clone());
             continue;
         }
@@ -715,9 +871,9 @@ fn metric_result(
             let result = if recorded {
                 numeric(&row["scores"][text(metric, "score_key")])
             } else if likelihood {
-                numeric(&row["likelihood"]["logprob_sum"]).and_then(|sum| {
-                    numeric(&row["likelihood"]["utf8_byte_count"]).map(|count| -sum / count)
-                })
+                let facts = row.likelihood().expect("present likelihood checked above");
+                numeric(&facts["logprob_sum"])
+                    .and_then(|sum| numeric(&facts["utf8_byte_count"]).map(|count| -sum / count))
             } else {
                 score(
                     kind,
@@ -730,7 +886,7 @@ fn metric_result(
                 err(format!(
                     "metric {}, record {}: {e}",
                     text(metric, "name"),
-                    text(row, "id")
+                    row.id()
                 ))
             })?;
             if !value.is_finite() {
@@ -761,7 +917,7 @@ fn metric_result(
     let c = fsum(values[1].iter().copied())
         .map_err(|_| err("metric arithmetic exceeded finite numeric range"))?
         / count;
-    let seed = case_seed(pairs)?;
+    let seed = case_seed_rows(pairs.clone().map(|(left, _)| left))?;
     let ci = if likelihood {
         if b <= 0.0 {
             return Err(err(
@@ -852,24 +1008,41 @@ pub fn compare_validated_runs(
     policy: &ValidatedPolicy<'_>,
     max_bootstrap_draws: Option<u64>,
 ) -> Result<Value, AnalysisError> {
-    let checked = [baseline.checked, subject.checked, policy.checked];
-    let baseline = baseline.value;
-    let subject = subject.value;
+    let baseline = ValidatedRunView {
+        view: RunView::Json(baseline.value),
+        checked: baseline.checked,
+    };
+    let subject = ValidatedRunView {
+        view: RunView::Json(subject.value),
+        checked: subject.checked,
+    };
+    compare_validated_run_views(&baseline, &subject, policy, max_bootstrap_draws)
+}
+/// Compare already validated immutable runs without reconstructing JSON rows.
+pub fn compare_validated_run_views(
+    baseline: &ValidatedRunView<'_>,
+    subject: &ValidatedRunView<'_>,
+    policy: &ValidatedPolicy<'_>,
+    max_bootstrap_draws: Option<u64>,
+) -> Result<Value, AnalysisError> {
+    let baseline_digest = baseline;
+    let subject_digest = subject;
+    let baseline = baseline.view;
+    let subject = subject.view;
+    let checked_policy = policy.checked;
     let policy = policy.value;
+    fn sorted_rows(run: RunView<'_>) -> Vec<RecordRef<'_>> {
+        let mut rows: Vec<_> = run.records().collect();
+        rows.sort_unstable_by(|a, b| a.id().cmp(b.id()));
+        rows
+    }
+    let left = sorted_rows(baseline);
+    let right = sorted_rows(subject);
     if let Some(expected) = policy.get("expected_case_set_digest") {
-        for run in [baseline, subject] {
-            let mut rows = run["records"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .collect::<Vec<_>>();
-            rows.sort_by_key(|r| text(r, "id"));
-            // ValidatedRun proves the projected fields and record bounds satisfy
-            // case_set: id/input/expected/metadata schemas are identical, and this
-            // encoder supplies its closed object shape and constant format.
-            // Tests assert the complete packaged-schema implication to catch drift.
-            // Keep the case-set encoded-size preflight while hashing in one pass.
-            if case_set_digest(&rows)? != expected.as_str().unwrap() {
+        for (run, rows) in [(baseline, &left), (subject, &right)] {
+            // Validated runs prove the complete projected case-set schema.
+            // This encoder retains its canonical-size preflight and byte order.
+            if case_set_digest(rows)? != expected.as_str().unwrap() {
                 return Err(err(format!(
                     "run {} does not match the planned case set",
                     invarlock_native_contracts::python_repr(&run["run_id"])
@@ -877,24 +1050,14 @@ pub fn compare_validated_runs(
             }
         }
     }
-    fn rows(run: &Value) -> BTreeMap<&str, &Value> {
-        run["records"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|row| (text(row, "id"), row))
-            .collect()
-    }
-    let left = rows(baseline);
-    let right = rows(subject);
-    if left.keys().ne(right.keys()) {
+    if left.len() != right.len() || left.iter().zip(&right).any(|(a, b)| a.id() != b.id()) {
         return Err(err(
             "baseline/subject record IDs differ; export the complete paired schedule",
         ));
     }
-    let mut pairs = Vec::new();
-    for (id, left) in left {
-        let right = right[id];
+    let pairs: Vec<_> = left.into_iter().zip(right).collect();
+    for &(left, right) in &pairs {
+        let id = left.id();
         let lb = left["context"].get("input_projection");
         let rb = right["context"].get("input_projection");
         if lb.is_some() || rb.is_some() {
@@ -915,25 +1078,38 @@ pub fn compare_validated_runs(
                 return Err(err(format!("record {id}: {key} changed between runs")));
             }
         }
-        pairs.push((left, right))
     }
-    let mut scopes = vec![("overall", pairs.clone())];
+    let mut scopes = vec![(
+        "overall",
+        RecordPairs {
+            rows: &pairs,
+            selected: SelectedRows::all(pairs.len()),
+        },
+    )];
     for subset in policy["slices"].as_array().unwrap() {
-        let selected = pairs
-            .iter()
-            .copied()
-            .filter(|(b, _)| {
-                subset["where"]
-                    .as_object()
-                    .unwrap()
-                    .iter()
-                    .all(|(k, v)| py_equal(b["metadata"].get(k).unwrap_or(&Value::Null), v))
-            })
-            .collect::<Vec<_>>();
-        scopes.push((text(subset, "name"), selected))
+        let selected = SelectedRows::matching(pairs.len(), |index| {
+            let left = pairs[index].0;
+            subset["where"]
+                .as_object()
+                .unwrap()
+                .iter()
+                .all(|(key, value)| {
+                    py_equal(left["metadata"].get(key).unwrap_or(&Value::Null), value)
+                })
+        });
+        scopes.push((
+            text(subset, "name"),
+            RecordPairs {
+                rows: &pairs,
+                selected,
+            },
+        ));
     }
     let metrics = policy["metrics"].as_array().unwrap();
-    let scope_count = scopes.iter().map(|(_, s)| s.len() as u64).sum::<u64>();
+    let scope_count = scopes
+        .iter()
+        .map(|(_, selected)| selected.len() as u64)
+        .sum::<u64>();
     let required =
         scope_count * metrics.iter().filter(|m| !binary(text(m, "kind"))).count() as u64 * 2048;
     if max_bootstrap_draws.is_some_and(|max| required > max) {
@@ -945,9 +1121,9 @@ pub fn compare_validated_runs(
         for metric in metrics {
             missing_bytes += 2;
             let mut first = true;
-            for &(left, right) in selected {
-                if missing(left, right, metric) {
-                    let id = text(left, "id");
+            for (left, right) in selected.iter() {
+                if missing_record(left, right, metric) {
+                    let id = left.id();
                     let len = if let Some(n) = lengths.get(id) {
                         *n
                     } else {
@@ -969,7 +1145,13 @@ pub fn compare_validated_runs(
     let mut results = Vec::new();
     for (slice, selected) in &scopes {
         for metric in metrics {
-            results.push(metric_result(baseline, subject, metric, slice, selected)?);
+            results.push(metric_result(
+                baseline,
+                subject,
+                metric,
+                slice,
+                selected.iter(),
+            )?);
         }
     }
     let decision = if results.iter().any(|r| r["decision"] == "regression") {
@@ -992,14 +1174,16 @@ pub fn compare_validated_runs(
     if metrics.iter().any(|m| m["kind"] == NLL) {
         limitations.push("Normalized NLL replays captured reference-continuation likelihood facts; their model execution, tokenizer and configuration claims are source assertions, not independently established runtime facts.")
     }
-    let binding_digest = |value: &Value, checked: Option<&SchemaCheckedValue>| match checked {
+    let baseline_digest = baseline_digest.canonical_digest()?;
+    let subject_digest = subject_digest.canonical_digest()?;
+    let policy_digest = match checked_policy {
         Some(checked) => checked
             .canonical_digest()
             .map(str::to_owned)
-            .map_err(|e| err(e.to_string())),
-        None => digest(value),
+            .map_err(|e| err(e.to_string()))?,
+        None => digest(policy)?,
     };
-    let result = json!({"format":"invarlock/multi-metric-comparison-v1","decision":decision,"bindings":{"baseline":binding_digest(baseline, checked[0])?,"subject":binding_digest(subject, checked[1])?,"policy":binding_digest(policy, checked[2])?},"metrics":results,"limitations":limitations});
+    let result = json!({"format":"invarlock/multi-metric-comparison-v1","decision":decision,"bindings":{"baseline":baseline_digest,"subject":subject_digest,"policy":policy_digest},"metrics":results,"limitations":limitations});
     schema(&result, "comparison")?;
     Ok(result)
 }
@@ -1008,6 +1192,36 @@ pub fn compare_validated_runs(
 mod seed_tests {
     use super::*;
     use invarlock_native_contracts::sha256_digest;
+
+    #[test]
+    fn packed_scope_masks_preserve_order_counts_and_word_boundaries() {
+        for count in [0, 1, 63, 64, 65, 50_000] {
+            let all = SelectedRows::all(count);
+            assert_eq!(all.words.len(), count.div_ceil(64));
+            assert_eq!(
+                all.iter().collect::<Vec<_>>(),
+                (0..count).collect::<Vec<_>>()
+            );
+            for divisor in [1, 2, 63, 64, 65] {
+                let selected = SelectedRows::matching(count, |index| index % divisor == 0);
+                let expected: Vec<_> = (0..count).filter(|index| index % divisor == 0).collect();
+                assert_eq!(selected.count, expected.len());
+                assert_eq!(selected.iter().collect::<Vec<_>>(), expected);
+                let mut iter = selected.iter();
+                for (index, expected) in expected.iter().enumerate() {
+                    assert_eq!(iter.len(), selected.count - index);
+                    assert_eq!(iter.clone().next(), Some(*expected));
+                    assert_eq!(iter.next(), Some(*expected));
+                }
+                assert_eq!(iter.len(), 0);
+                assert_eq!(iter.next(), None);
+                assert_eq!(iter.next(), None);
+            }
+            let empty = SelectedRows::matching(count, |_| false);
+            assert_eq!(empty.iter().len(), 0);
+            assert_eq!(empty.iter().next(), None);
+        }
+    }
 
     fn owned_projection(pairs: &[(&Value, &Value)]) -> Value {
         Value::Array(

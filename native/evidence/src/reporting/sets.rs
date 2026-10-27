@@ -207,20 +207,13 @@ pub fn load(path: &Path, case_ids: Option<&[String]>) -> Result<Value> {
     evidence_sets::validate(&index, "evidence_set", "evidence set index")?;
     let paths = evidence_sets::index_paths(&root, &index)?;
     evidence_sets::check_statements(&root, &index)?;
-    let captured = super::captured_view::load(&paths["deterministic"])?;
+    let captured = super::captured_view::load_set_projection(
+        &paths["deterministic"],
+        &index["members"]["deterministic"]["statement_sha256"],
+    )?;
     let manifest = &captured["manifest"];
-    if sha256_digest(&crate::canonical(manifest)?)
-        != index["members"]["deterministic"]["statement_sha256"]
-    {
-        return Err(EvidenceError::contract(
-            "captured statement changed during report preparation",
-        ));
-    }
-    let payloads = captured["payloads"]
-        .as_object()
-        .ok_or_else(|| EvidenceError::contract("captured report snapshot is invalid"))?;
-    evidence_sets::require_deterministic_policy(&payloads["policy"])?;
-    let shared = evidence_sets::shared_captured_inputs(payloads)?;
+    evidence_sets::require_deterministic_policy(&captured["policy"])?;
+    let shared = captured["shared_inputs"].clone();
     let (expected_envelope, envelope_raw) =
         evidence_sets::read_object(&paths["judge"].join("envelope.json"), 256 * 1024)?;
     if sha256_digest(&envelope_raw) != index["members"]["judge"]["statement_sha256"] {

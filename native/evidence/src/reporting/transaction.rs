@@ -73,7 +73,7 @@ pub fn render(config: &Value) -> ReportOutput {
         let loaded = if judge {
             super::judge_view::load(evidence, Some(&ids))
         } else if captured {
-            super::captured_view::load(evidence)
+            super::captured_view::load_projection(evidence)
         } else {
             super::native_load::load(evidence)
         }

@@ -1,5 +1,10 @@
-use invarlock_native_contracts::{canonical_json, SchemaCheckedValue, Value};
-use invarlock_native_core::{compare_runs, compare_validated_runs, ValidatedPolicy, ValidatedRun};
+use invarlock_native_contracts::{
+    canonical_json, parse_run, ParsedRun, RunView, SchemaCheckedValue, Value,
+};
+use invarlock_native_core::{
+    compare_runs, compare_validated_run_views, compare_validated_runs, AnalysisError,
+    ValidatedPolicy, ValidatedRun, ValidatedRunView,
+};
 use serde_json::json;
 
 fn artifact(name: &str) -> Value {
@@ -184,4 +189,224 @@ fn planned_case_digest_preserves_matching_outputs_and_side_error_order() {
             .message,
         "run 'baseline' does not match the planned case set"
     );
+}
+
+fn parsed_view(parsed: &ParsedRun) -> RunView<'_> {
+    match parsed {
+        ParsedRun::Compact(run) => run.view(),
+        ParsedRun::Json(value) => RunView::Json(value),
+    }
+}
+fn compact_compare(
+    baseline: &Value,
+    subject: &Value,
+    policy: &Value,
+    budget: Option<u64>,
+) -> Result<Value, AnalysisError> {
+    let baseline = parse_run(&canonical_json(baseline).unwrap(), "baseline").unwrap();
+    let subject = parse_run(&canonical_json(subject).unwrap(), "subject").unwrap();
+    assert!(matches!(baseline, ParsedRun::Compact(_)));
+    assert!(matches!(subject, ParsedRun::Compact(_)));
+    let baseline = ValidatedRunView::from_run_view(parsed_view(&baseline))?;
+    let subject = ValidatedRunView::from_run_view(parsed_view(&subject))?;
+    let policy = ValidatedPolicy::new(policy)?;
+    compare_validated_run_views(&baseline, &subject, &policy, budget)
+}
+
+#[test]
+fn compact_comparison_keeps_lexical_pairing_slice_order_budget_and_binding_bytes() {
+    let mut baseline = artifact("baseline.json");
+    let mut subject = artifact("subject-pass.json");
+    for run in [&mut baseline, &mut subject] {
+        run["records"][0]["id"] = json!("é");
+        run["records"][1]["id"] = json!("A");
+        for row in run["records"].as_array_mut().unwrap() {
+            row["metadata"] = json!({"group":"all"});
+        }
+    }
+    // Input row order differs while paired evaluation stays lexical by ID.
+    subject["records"].as_array_mut().unwrap().reverse();
+    let mut policy = artifact("policy.json");
+    policy["slices"] = json!([
+        {"name":"second","where":{"group":"all"}},
+        {"name":"first","where":{"group":"all"}}
+    ]);
+    let expected = compare_runs(&baseline, &subject, &policy, None).unwrap();
+    let actual = compact_compare(&baseline, &subject, &policy, None).unwrap();
+    assert_eq!(
+        canonical_json(&actual).unwrap(),
+        canonical_json(&expected).unwrap()
+    );
+    assert_eq!(
+        actual["metrics"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|m| m["slice"].as_str().unwrap())
+            .collect::<Vec<_>>(),
+        vec!["overall", "second", "first"]
+    );
+    assert_eq!(
+        compact_compare(&baseline, &subject, &policy, Some(0)).unwrap_err(),
+        compare_runs(&baseline, &subject, &policy, Some(0)).unwrap_err()
+    );
+    let mut rows: Vec<_> = baseline["records"].as_array().unwrap().iter().collect();
+    rows.sort_by_key(|row| row["id"].as_str().unwrap());
+    let cases = json!({"format":"invarlock/evaluation-case-set-v1","cases":rows.iter().map(|row|
+        json!({"id":row["id"],"input":row["input"],"expected":row["expected"],"metadata":row["metadata"]})
+    ).collect::<Vec<_>>()});
+    policy["expected_case_set_digest"] =
+        json!(invarlock_native_contracts::canonical_json_digest(&cases).unwrap());
+    assert_eq!(
+        canonical_json(&compact_compare(&baseline, &subject, &policy, None).unwrap()).unwrap(),
+        canonical_json(&compare_runs(&baseline, &subject, &policy, None).unwrap()).unwrap()
+    );
+    subject["records"][0]["input"] = json!("changed");
+    assert_eq!(
+        compact_compare(&baseline, &subject, &policy, None).unwrap_err(),
+        compare_runs(&baseline, &subject, &policy, None).unwrap_err()
+    );
+}
+
+#[test]
+fn compact_semantic_checks_keep_original_row_order_before_duplicate_detection() {
+    for key in ["input_projection", "likelihood"] {
+        let mut run = artifact("baseline.json");
+        if key == "input_projection" {
+            run["records"][0]["context"]["input_projection"] = json!({});
+        } else {
+            let row = &run["records"][0];
+            run["records"][0]["likelihood"] = json!({
+                "basis":"reference_continuation","logprob_sum":-1.0,"token_count":1,"utf8_byte_count":4,
+                "input_digest":invarlock_native_contracts::canonical_json_digest(&row["input"]).unwrap(),
+                "reference_digest":invarlock_native_contracts::canonical_json_digest(&row["expected"]).unwrap(),
+                "artifact_digest":run["artifact_digest"],"source":run["source"],
+                "configuration_digest":format!("sha256:{}","3".repeat(64)),
+                "tokenizer_digest":format!("sha256:{}","4".repeat(64))
+            });
+        }
+        let duplicate = run["records"][0].clone();
+        run["records"].as_array_mut().unwrap().push(duplicate);
+        let parsed = parse_run(&canonical_json(&run).unwrap(), "run").unwrap();
+        assert!(matches!(parsed, ParsedRun::Compact(_)));
+        let actual = ValidatedRunView::from_run_view(parsed_view(&parsed))
+            .err()
+            .unwrap();
+        let expected = ValidatedRun::new(&run).err().unwrap();
+        assert_eq!(actual, expected);
+        assert!(!actual.message.contains("duplicate record IDs"));
+    }
+    let mut run = artifact("baseline.json");
+    let duplicate = run["records"][0].clone();
+    run["records"].as_array_mut().unwrap().push(duplicate);
+    let parsed = parse_run(&canonical_json(&run).unwrap(), "run").unwrap();
+    assert_eq!(
+        ValidatedRunView::from_run_view(parsed_view(&parsed))
+            .err()
+            .unwrap(),
+        ValidatedRun::new(&run).err().unwrap()
+    );
+}
+
+#[test]
+fn compact_missing_results_preserve_sorted_ids_and_complete_scope_preflight() {
+    let mut baseline = artifact("baseline.json");
+    let mut subject = artifact("subject-pass.json");
+    for run in [&mut baseline, &mut subject] {
+        run["records"][0]["id"] = json!("z");
+        run["records"][1]["id"] = json!("a");
+        for row in run["records"].as_array_mut().unwrap() {
+            row["metadata"] = json!({"group":"all"});
+        }
+    }
+    baseline["records"][0]["error"] = json!("missing");
+    subject["records"][1]["scores"] = json!({});
+    let mut policy = artifact("policy.json");
+    policy["slices"] = json!([{"name":"overlap","where":{"group":"all"}}]);
+    let expected = compare_runs(&baseline, &subject, &policy, None).unwrap();
+    let actual = compact_compare(&baseline, &subject, &policy, None).unwrap();
+    assert_eq!(
+        canonical_json(&actual).unwrap(),
+        canonical_json(&expected).unwrap()
+    );
+    assert_eq!(actual["metrics"][0]["missing_ids"], json!(["a", "z"]));
+    assert_eq!(actual["metrics"][1]["missing_ids"], json!(["a", "z"]));
+}
+
+#[test]
+fn overlapping_scope_preflight_precedes_first_metric_error() {
+    let mut baseline = artifact("baseline.json");
+    let mut subject = artifact("subject-pass.json");
+    for run in [&mut baseline, &mut subject] {
+        for row in run["records"].as_array_mut().unwrap() {
+            row["metadata"] = json!({"group":"all"});
+        }
+    }
+    baseline["records"][0]["error"] = json!("missing");
+    let mut policy = artifact("policy.json");
+    policy["slices"] = json!((0..16)
+        .map(|index| json!({"name":format!("slice-{index}"),"where":{"group":"all"}}))
+        .collect::<Vec<_>>());
+    let mut first = policy["metrics"][0].clone();
+    first["name"] = json!("first");
+    first["accepted_provenance"]["version"] = json!("2");
+    let mut second = first.clone();
+    second["name"] = json!("second");
+    policy["metrics"] = json!([first, second]);
+    const REQUIRED: u64 = 2 * 17 * 2 * 2048;
+    let budget_error =
+        compact_compare(&baseline, &subject, &policy, Some(REQUIRED - 1)).unwrap_err();
+    assert_eq!(budget_error.reason, "local_work_budget_exceeded");
+    assert!(budget_error
+        .message
+        .contains(&format!("plans {REQUIRED} bootstrap draws")));
+    let first_error = compact_compare(&baseline, &subject, &policy, Some(REQUIRED)).unwrap_err();
+    assert_eq!(
+        first_error.message,
+        "metric first: scorer provenance differs from approved policy"
+    );
+    assert_eq!(
+        first_error,
+        compare_runs(&baseline, &subject, &policy, Some(REQUIRED)).unwrap_err()
+    );
+}
+
+#[test]
+fn compact_likelihood_preserves_nll_bytes_and_large_exact_count_semantics() {
+    let configuration = format!("sha256:{}", "3".repeat(64));
+    let tokenizer = format!("sha256:{}", "4".repeat(64));
+    let mut baseline = artifact("baseline.json");
+    let mut subject = artifact("subject-pass.json");
+    let huge: Value = serde_json::from_str("340282366920938463463374607431768211457").unwrap();
+    for (side, run) in [(0, &mut baseline), (1, &mut subject)] {
+        for index in 0..2 {
+            let row = &run["records"][index];
+            let facts = json!({"basis":"reference_continuation", "logprob_sum":-((index+1)as f64)*(if side==0{3.0}else{2.97}),
+                "token_count":huge,"utf8_byte_count":3,
+                "input_digest":invarlock_native_contracts::canonical_json_digest(&row["input"]).unwrap(),
+                "reference_digest":invarlock_native_contracts::canonical_json_digest(&row["expected"]).unwrap(),
+                "artifact_digest":run["artifact_digest"],"source":run["source"],
+                "configuration_digest":configuration,"tokenizer_digest":tokenizer});
+            run["records"][index]["likelihood"] = facts;
+        }
+    }
+    let policy = json!({"format":"invarlock/comparison-policy-v1","slices":[],
+        "metrics":[{"name":"nll","kind":"normalized_nll_per_utf8_byte",
+            "configuration":{"configuration_digest":configuration,"baseline_tokenizer_digest":tokenizer,"subject_tokenizer_digest":tokenizer},
+            "direction":"lower","unit":"nats_per_utf8_byte","aggregation":"mean","minimum_count":2,"ratio_max":1.1,"maximum_interval_width":0.5}]});
+    let expected = compare_runs(&baseline, &subject, &policy, None).unwrap();
+    let actual = compact_compare(&baseline, &subject, &policy, None).unwrap();
+    assert_eq!(
+        canonical_json(&actual).unwrap(),
+        canonical_json(&expected).unwrap()
+    );
+    baseline["records"][0]["likelihood"]["utf8_byte_count"] = huge;
+    let parsed = parse_run(&canonical_json(&baseline).unwrap(), "run").unwrap();
+    let error = ValidatedRunView::from_run_view(parsed_view(&parsed))
+        .err()
+        .unwrap();
+    assert!(error
+        .message
+        .ends_with("utf8_byte_count differs from reference"));
+    assert_eq!(error, ValidatedRun::new(&baseline).err().unwrap());
 }

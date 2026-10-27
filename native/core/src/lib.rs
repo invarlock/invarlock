@@ -378,9 +378,9 @@ mod idna_tables;
 mod scoring;
 mod unicode_tables;
 pub use analysis::{
-    check_policy, check_run, compare_runs, compare_validated_runs, validate_policy, validate_run,
-    verify_input_projection, AnalysisError, ValidatedPolicy, ValidatedRun,
-    DEFAULT_MAX_BOOTSTRAP_DRAWS,
+    check_policy, check_run, compare_runs, compare_validated_run_views, compare_validated_runs,
+    validate_policy, validate_run, verify_input_projection, AnalysisError, ValidatedPolicy,
+    ValidatedRun, ValidatedRunView, DEFAULT_MAX_BOOTSTRAP_DRAWS,
 };
 pub use exact_match::paired_exact_match_statistics;
 pub use scoring::{score, validate_configuration};

@@ -3,7 +3,8 @@ use crate::{
     canonical, captured, digest, judge, required_string, trust_inputs, EvidenceError, Result,
 };
 use invarlock_native_contracts::{
-    first_schema_error, parse_json, python_repr, sha256_digest, SchemaErrorOrder,
+    canonical_json_to_writer, first_schema_error, parse_json, python_repr, sha256_digest, RunView,
+    SchemaErrorOrder, MAX_INPUT_BYTES,
 };
 use invarlock_native_filesystem as fs;
 use serde_json::{json, Map, Value};
@@ -163,6 +164,7 @@ pub fn shared_captured_inputs(payloads: &Map<String, Value>) -> Result<Value> {
         },
     )
 }
+#[cfg(test)]
 pub(crate) fn shared_checked_captured_inputs(
     payloads: &captured::CapturedPayloads,
 ) -> Result<Value> {
@@ -176,6 +178,93 @@ pub(crate) fn shared_checked_captured_inputs(
                 .to_owned())
         },
     )
+}
+pub(crate) fn shared_owned_captured_inputs(
+    inputs: &captured::OwnedCapturedInputs,
+) -> Result<Value> {
+    let baseline = inputs.baseline.view();
+    let subject = inputs.subject.view();
+    let baseline_cases = checked_case_set_digest(baseline)?;
+    let subject_cases = checked_case_set_digest(subject)?;
+    if baseline_cases != subject_cases {
+        return Err(error("component baseline and subject case sets differ"));
+    }
+    let mut shared = json!({
+        "baseline_run_sha256":baseline.canonical_digest()?,
+        "subject_run_sha256":subject.canonical_digest()?,
+        "case_set_sha256":baseline_cases,
+        "subject_artifact_sha256":subject["artifact_digest"],
+    });
+    if let Some(service) = subject.get("service_identity") {
+        shared["subject_service_identity_sha256"] = json!(digest(service)?);
+    }
+    Ok(shared)
+}
+fn checked_case_set_digest(run: RunView<'_>) -> Result<String> {
+    use sha2::{Digest, Sha256};
+    use std::io::{self, Write};
+    // The caller owns a schema-checked run. The case projection has exactly the
+    // same ID/input/expected/metadata constraints as the case-set schema; only
+    // duplicate IDs require the additional semantic check below.
+    let mut rows: Vec<_> = run.records().collect();
+    rows.sort_by(|left, right| left["id"].as_str().cmp(&right["id"].as_str()));
+    if rows.windows(2).any(|pair| pair[0]["id"] == pair[1]["id"]) {
+        return Err(error("planned case set has duplicate case IDs"));
+    }
+    struct LimitedHash {
+        digest: Sha256,
+        size: usize,
+    }
+    impl Write for LimitedHash {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            self.size = self.size.saturating_add(bytes.len());
+            if self.size > MAX_INPUT_BYTES {
+                return Err(io::Error::other("canonical size limit exceeded"));
+            }
+            self.digest.update(bytes);
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+    fn put(writer: &mut impl Write, bytes: &[u8]) -> Result<()> {
+        writer
+            .write_all(bytes)
+            .map_err(|e| error(format!("value is not canonical JSON: {e}")))
+    }
+    let mut writer = LimitedHash {
+        digest: Sha256::new(),
+        size: 0,
+    };
+    put(&mut writer, b"{\"cases\":[")?;
+    for (index, row) in rows.into_iter().enumerate() {
+        if index != 0 {
+            put(&mut writer, b",")?;
+        }
+        put(&mut writer, b"{")?;
+        for (index, (key, encoded)) in [
+            ("expected", b"\"expected\":".as_slice()),
+            ("id", b"\"id\":".as_slice()),
+            ("input", b"\"input\":".as_slice()),
+            ("metadata", b"\"metadata\":".as_slice()),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            if index != 0 {
+                put(&mut writer, b",")?;
+            }
+            put(&mut writer, encoded)?;
+            canonical_json_to_writer(&row[key], &mut writer, false)?;
+        }
+        put(&mut writer, b"}")?;
+    }
+    put(
+        &mut writer,
+        b"],\"format\":\"invarlock/evaluation-case-set-v1\"}\n",
+    )?;
+    Ok(format!("sha256:{:x}", writer.digest.finalize()))
 }
 fn shared_captured_inputs_from<'a>(
     get: impl Fn(&str) -> Option<&'a Value>,
@@ -248,7 +337,7 @@ pub fn require_deterministic_policy(policy: &Value) -> Result<()> {
     }
     Ok(())
 }
-pub(crate) fn load_captured(path: &Path) -> Result<captured::CapturedInputs> {
+pub(crate) fn load_captured(path: &Path) -> Result<captured::OwnedCapturedInputs> {
     let root = fs::PinnedDirectory::open(path, false).map_err(io_error)?;
     let (raw, _) = root
         .read_regular(Path::new("manifest.json"), CONTROL)
@@ -391,10 +480,13 @@ fn verify_inner(
         return Err(error("captured statement changed while loading"));
     }
     require_shared(
-        &shared_checked_captured_inputs(&loaded.payloads)?,
+        &shared_owned_captured_inputs(&loaded)?,
         shared,
         "captured runs, cases, or subject artifact differ from shared recipient pins",
     )?;
+    // The independently authorized replay captures a fresh snapshot below.
+    // Retain its checked shared identities, rather than a second complete run pair.
+    drop(loaded);
     let (expected_envelope, expected_envelope_raw) =
         read_object(&paths["judge"].join("envelope.json"), CONTROL)?;
     if sha256_digest(&expected_envelope_raw) != index["members"]["judge"]["statement_sha256"] {
@@ -661,4 +753,48 @@ pub fn write_index(config: &Value) -> Result<Value> {
     fs::write_file_no_replace(&root.join(INDEX), &canonical(&index)?, 0o600, true)
         .map_err(io_error)?;
     Ok(json!({"index_path":root.join(INDEX)}))
+}
+
+#[cfg(test)]
+mod compact_case_tests {
+    use super::*;
+    use invarlock_native_contracts::{parse_run, ParsedRun, SchemaCheckedValue};
+
+    #[test]
+    fn streamed_checked_case_identity_matches_existing_schema_checked_projection() {
+        let rows: Vec<_> = ["😀", "é", "a"].into_iter().enumerate().map(|(index, id)| json!({
+            "id":id, "input":{"nested":[index, {"é":"literal UTF-8 😀"}]},
+            "expected":parse_json(b"18446744073709551617", "integer").unwrap(),
+            "output":null, "scores":{}, "metadata":{"dataset":"é😀"}, "error":null, "context":{}
+        })).collect();
+        let run = json!({"format":"invarlock/evaluation-run-v1", "run_id":"fixture",
+            "artifact_digest":digest(&json!("artifact")).unwrap(), "source_digest":null,
+            "source":{"name":"fixture","version":"1"}, "score_provenance":{}, "records":rows});
+        let checked = SchemaCheckedValue::new(run, "run").unwrap();
+        let cases: Vec<_> = checked.value()["records"].as_array().unwrap().iter().map(|row| json!({
+            "id":row["id"], "input":row["input"], "expected":row["expected"], "metadata":row["metadata"]
+        })).collect();
+        let expected = judge::case_set_digest(
+            &json!({"format":"invarlock/evaluation-case-set-v1", "cases":cases}),
+        )
+        .unwrap();
+        assert_eq!(
+            checked_case_set_digest(RunView::Json(checked.value())).unwrap(),
+            expected
+        );
+        let raw = canonical(checked.value()).unwrap();
+        let ParsedRun::Compact(compact) = parse_run(&raw, "fixture").unwrap() else {
+            panic!("canonical fixture must stay compact")
+        };
+        assert_eq!(checked_case_set_digest(compact.view()).unwrap(), expected);
+        let mut duplicate = checked.into_value();
+        duplicate["records"][1]["id"] = duplicate["records"][0]["id"].clone();
+        let checked = SchemaCheckedValue::new(duplicate, "run").unwrap();
+        assert_eq!(
+            checked_case_set_digest(RunView::Json(checked.value()))
+                .unwrap_err()
+                .message,
+            "planned case set has duplicate case IDs"
+        );
+    }
 }

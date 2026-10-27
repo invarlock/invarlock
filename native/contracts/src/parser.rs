@@ -21,6 +21,86 @@ pub fn parse_json(raw: &[u8], label: &str) -> Result<Value> {
     }
     Ok(value)
 }
+type RootRecordParts<T> = (Map<String, Value>, Vec<T>);
+
+/// Decode only the direct root records array one row at a time. Unsupported
+/// shapes return None; callers reparse the original bytes for public diagnostics.
+pub(crate) fn parse_root_records<T>(
+    raw: &[u8],
+    label: &str,
+    mut row: impl FnMut(Value) -> Option<T>,
+) -> Result<Option<RootRecordParts<T>>> {
+    let text = std::str::from_utf8(raw)
+        .map_err(|_| ContractError::new("invalid_utf8", format!("{label} is not UTF-8 JSON")))?;
+    let mut parser = Parser {
+        text,
+        offset: 0,
+        label,
+    };
+    parser.space();
+    if !parser.consume(b'{') {
+        return Ok(None);
+    }
+    let mut header = Map::new();
+    let mut records = None;
+    parser.space();
+    if parser.consume(b'}') {
+        return Ok(None);
+    }
+    loop {
+        parser.space();
+        let key = parser.string()?;
+        if header.contains_key(&key) || (key == "records" && records.is_some()) {
+            return Ok(None);
+        }
+        parser.space();
+        if !parser.consume(b':') {
+            return Err(parser.invalid());
+        }
+        parser.space();
+        if key == "records" {
+            if !parser.consume(b'[') {
+                return Ok(None);
+            }
+            let mut rows = Vec::new();
+            parser.space();
+            if !parser.consume(b']') {
+                loop {
+                    let value = parser.value(2)?;
+                    let Some(value) = row(value) else {
+                        return Ok(None);
+                    };
+                    rows.push(value);
+                    if rows.len() > crate::MAX_RECORDS {
+                        return Ok(None);
+                    }
+                    parser.space();
+                    if parser.consume(b']') {
+                        break;
+                    }
+                    if !parser.consume(b',') {
+                        return Err(parser.invalid());
+                    }
+                }
+            }
+            records = Some(rows);
+        } else {
+            header.insert(key, parser.value(1)?);
+        }
+        parser.space();
+        if parser.consume(b'}') {
+            break;
+        }
+        if !parser.consume(b',') {
+            return Err(parser.invalid());
+        }
+    }
+    parser.space();
+    if parser.offset != text.len() {
+        return Err(parser.invalid());
+    }
+    Ok(records.map(|records| (header, records)))
+}
 // Most contract objects have only a handful of fields. Growing IndexMap's entry
 // vector geometrically retains unused Value-sized slots in every such object.
 // Buffer a bounded number of fields so these maps can reserve their exact size;
@@ -111,7 +191,7 @@ impl Parser<'_> {
             false
         }
     }
-    fn value(&mut self, _depth: usize) -> Result<Value> {
+    fn value(&mut self, depth: usize) -> Result<Value> {
         enum Frame {
             Array(Vec<Value>),
             Object {
@@ -123,7 +203,7 @@ impl Parser<'_> {
         let mut frames = Vec::new();
         'next_value: loop {
             self.space();
-            if frames.len() > MAX_JSON_DEPTH {
+            if frames.len().saturating_add(depth) > MAX_JSON_DEPTH {
                 return Err(ContractError::new(
                     "json_depth",
                     format!(
@@ -428,4 +508,33 @@ fn unpaired_surrogate(raw: &str) -> bool {
         }
     }
     false
+}
+
+#[cfg(test)]
+mod root_record_tests {
+    use super::*;
+    #[test]
+    fn direct_array_callback_bounds_records_without_collecting_generic_values() {
+        for count in [crate::MAX_RECORDS, crate::MAX_RECORDS + 1] {
+            let raw = format!(
+                "{{\"records\":[{}]}}",
+                std::iter::repeat_n("0", count)
+                    .collect::<Vec<_>>()
+                    .join(",")
+            );
+            let mut calls = 0;
+            let result = parse_root_records(raw.as_bytes(), "run", |value| {
+                assert_eq!(value, Value::Number(0.into()));
+                calls += 1;
+                Some(())
+            })
+            .unwrap();
+            assert_eq!(calls, count);
+            if count == crate::MAX_RECORDS {
+                assert_eq!(result.unwrap().1.len(), count);
+            } else {
+                assert!(result.is_none());
+            }
+        }
+    }
 }

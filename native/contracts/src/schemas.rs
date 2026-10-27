@@ -506,3 +506,216 @@ pub fn first_schema_error_details(value: &Value, name: &str) -> Result<Option<St
     }
     Ok(Some(details.join("; ")))
 }
+
+pub(crate) struct RunValidators {
+    pub(crate) row: jsonschema::Validator,
+    pub(crate) header: jsonschema::Validator,
+}
+fn root_independent_of_records(schema: &Value, outer: bool) -> bool {
+    let Some(object) = schema.as_object() else {
+        return schema.is_boolean();
+    };
+    object.iter().all(|(key, value)| match key.as_str() {
+        "$schema" | "$id" | "title" | "description" | "type" | "minProperties"
+        | "maxProperties" => true,
+        "required" => value
+            .as_array()
+            .is_some_and(|items| items.iter().all(|item| item != "records")),
+        "properties" => value
+            .as_object()
+            .is_some_and(|properties| !properties.contains_key("records")),
+        "additionalProperties" => outer || value.is_boolean(),
+        "allOf" | "anyOf" | "oneOf" => value.as_array().is_some_and(|items| {
+            items
+                .iter()
+                .all(|item| root_independent_of_records(item, false))
+        }),
+        "if" | "then" | "else" | "not" => root_independent_of_records(value, false),
+        _ => false,
+    })
+}
+fn has_schema_reference(value: &Value) -> bool {
+    match value {
+        Value::Object(object) => object.iter().any(|(key, value)| {
+            key == "$ref" || key == "$dynamicRef" || has_schema_reference(value)
+        }),
+        Value::Array(items) => items.iter().any(has_schema_reference),
+        _ => false,
+    }
+}
+pub(crate) fn run_schema_parts() -> Result<(Value, Value)> {
+    decompose_run_schema(packaged_schema("run")?)
+}
+fn decompose_run_schema(mut header: Value) -> Result<(Value, Value)> {
+    if has_schema_reference(&header) {
+        return Err(ContractError::new(
+            "unsupported_run_schema",
+            "run schema references require generic validation",
+        ));
+    }
+    let records = header["properties"]["records"].clone();
+    let expected_keys = ["type", "items", "minItems", "maxItems"];
+    let supported = records.as_object().is_some_and(|object| {
+        object.len() == expected_keys.len()
+            && expected_keys.iter().all(|key| object.contains_key(*key))
+    }) && records["type"] == "array"
+        && records["minItems"] == 1
+        && records["maxItems"] == MAX_RECORDS;
+    if !supported {
+        return Err(ContractError::new(
+            "unsupported_run_schema",
+            "run array schema cannot be decomposed",
+        ));
+    }
+    header["properties"]
+        .as_object_mut()
+        .unwrap()
+        .remove("records");
+    header["required"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|name| name != "records");
+    if !root_independent_of_records(&header, true) {
+        return Err(ContractError::new(
+            "unsupported_run_schema",
+            "run header schema depends on record values",
+        ));
+    }
+    header["properties"]["records"] = serde_json::json!({"const":null});
+    header["required"]
+        .as_array_mut()
+        .unwrap()
+        .push(serde_json::json!("records"));
+    Ok((header, records["items"].clone()))
+}
+pub(crate) fn run_validators() -> Result<&'static RunValidators> {
+    static RUN: OnceLock<Result<RunValidators>> = OnceLock::new();
+    RUN.get_or_init(|| {
+        let (header, row) = run_schema_parts()?;
+        let build = |schema: &Value| {
+            crate::numeric::options()
+                .build(schema)
+                .map_err(|error| ContractError::new("schema_internal", error.to_string()))
+        };
+        Ok(RunValidators {
+            row: build(&row)?,
+            header: build(&header)?,
+        })
+    })
+    .as_ref()
+    .map_err(Clone::clone)
+}
+
+#[cfg(test)]
+mod compact_run_schema_tests {
+    use super::*;
+    use serde_json::json;
+    fn run() -> Value {
+        json!({"format":"invarlock/evaluation-run-v1","run_id":"one",
+            "artifact_digest":crate::sha256_digest(b"artifact"),"source_digest":null,
+            "source":{"name":"fixture","version":"1"},"score_provenance":{},
+            "records":[{"id":"row","input":null,"expected":null,"output":null,
+                "scores":{},"metadata":{},"error":null,"context":{}}]})
+    }
+    fn decomposed_valid(value: &Value) -> bool {
+        let validators = run_validators().unwrap();
+        let Some(rows) = value.get("records").and_then(Value::as_array) else {
+            return false;
+        };
+        if rows.is_empty()
+            || rows.len() > MAX_RECORDS
+            || rows.iter().any(|row| !validators.row.is_valid(row))
+        {
+            return false;
+        }
+        let mut header = value.clone();
+        header["records"] = Value::Null;
+        validators.header.is_valid(&header)
+    }
+    #[test]
+    fn full_run_schema_reconstructs_exactly_from_certified_header_and_complete_row() {
+        let original = packaged_schema("run").unwrap();
+        let (mut header, row) = run_schema_parts().unwrap();
+        assert_eq!(row, original["properties"]["records"]["items"]);
+        assert_eq!(header["properties"]["records"], json!({"const":null}));
+        header["properties"]["records"] =
+            json!({"type":"array","items":row,"minItems":1,"maxItems":MAX_RECORDS});
+        assert_eq!(header, original);
+    }
+    #[test]
+    fn schema_decomposition_matches_full_validation_across_header_and_row_constraints() {
+        let full = validator("run").unwrap();
+        let mut variants = vec![run()];
+        for key in [
+            "format",
+            "run_id",
+            "artifact_digest",
+            "source_digest",
+            "source",
+            "score_provenance",
+            "records",
+        ] {
+            let mut invalid = run();
+            invalid.as_object_mut().unwrap().remove(key);
+            variants.push(invalid);
+        }
+        for key in [
+            "id", "input", "expected", "output", "scores", "metadata", "error", "context",
+        ] {
+            let mut invalid = run();
+            invalid["records"][0].as_object_mut().unwrap().remove(key);
+            variants.push(invalid);
+        }
+        for (key, value) in [
+            ("id", json!("")),
+            ("metadata", json!({"bad":true})),
+            ("scores", json!({"bad":"text"})),
+            ("error", json!(false)),
+            ("likelihood", Value::Null),
+            ("unexpected", json!(1)),
+        ] {
+            let mut invalid = run();
+            invalid["records"][0][key] = value;
+            variants.push(invalid);
+        }
+        for value in [Value::Null, json!([]), json!([1])] {
+            let mut invalid = run();
+            invalid["records"] = value;
+            variants.push(invalid);
+        }
+        let mut header = run();
+        header["source"]["version"] = json!(false);
+        variants.push(header);
+        let mut extra = run();
+        extra["unknown"] = json!(false);
+        variants.push(extra);
+        let mut service = run();
+        service["service_identity"] = json!({});
+        variants.push(service);
+        for value in variants {
+            assert_eq!(
+                decomposed_valid(&value),
+                full.validator.is_valid(&value),
+                "{value}"
+            );
+        }
+    }
+    #[test]
+    fn new_record_dependencies_and_array_keywords_disable_the_fast_path() {
+        for keyword in ["uniqueItems", "contains", "prefixItems", "unevaluatedItems"] {
+            let mut schema = packaged_schema("run").unwrap();
+            schema["properties"]["records"][keyword] = json!(true);
+            assert!(decompose_run_schema(schema).is_err());
+        }
+        for dependency in [
+            json!({"properties":{"records":{"minItems":2}}}),
+            json!({"patternProperties":{"^rec":{"type":"null"}}}),
+            json!({"additionalProperties":{"type":"null"}}),
+            json!({"$ref":"#/properties/records"}),
+        ] {
+            let mut schema = packaged_schema("run").unwrap();
+            schema["allOf"].as_array_mut().unwrap().push(dependency);
+            assert!(decompose_run_schema(schema).is_err());
+        }
+    }
+}

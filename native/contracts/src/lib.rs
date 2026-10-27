@@ -11,6 +11,7 @@ mod diagnostic;
 mod numeric;
 mod parser;
 mod printable;
+mod records;
 pub mod request;
 pub mod runtime;
 pub mod schedule;
@@ -21,6 +22,10 @@ pub use canonical::{
     canonical_json_to_writer,
 };
 pub use parser::parse_json;
+pub use records::{
+    parse_run, CompactLikelihood, CompactRecord, LikelihoodRef, ParsedRun, RecordRef, RunView,
+    SchemaCheckedRun,
+};
 pub use schemas::{
     first_schema_error, first_schema_error_details, first_schema_error_fragment,
     first_schema_error_value, packaged_schema, schema_names, validate_schema, SchemaErrorOrder,
