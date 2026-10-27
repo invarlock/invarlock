@@ -1,0 +1,449 @@
+{
+  "format": "invarlock/ffi-buffer-results-v1",
+  "python_reference": "1dc9cb644684dc915810da77326f6da8764c58c1",
+  "native_before": {
+    "commit": "b45f3fe172f8dd7fd5271c0b7e16f488442afed9",
+    "native_tree": "b67efb5540d27cf1de0a37c62742a657d8aae97f"
+  },
+  "native_after": {
+    "commit": "8828655dddf17e8f118b876c657941d6dd22d6e3",
+    "native_tree": "773130c19542f0925986522f85f46caf2e95de63"
+  },
+  "attempts": 48,
+  "exact_outputs": 48,
+  "retries": 0,
+  "exclusions": 0,
+  "plan_sha256": "1f767e2122d947d50a774351ee364c1e190d7b1873d831a7786a7a904849c83b",
+  "raw_results_sha256": "5e30f29a56f59c2035e8f366cac94a00c16d5c0c28374a92ee24c233b7b30e9f",
+  "script_sha256": "b076949ca2ff0e8cbec632075ef8c43eb157993fe3492919c724745852460674",
+  "metadata_sha256": "20ac2d0bb3b83bded7387a297fee3b32652ceeb1662a4a0bdaa2f9ff143378d8",
+  "scope": "Fresh-process input read, native canonicalization, output hash, and native module hash; no wheel checks inside the measured process. Distinct from the full-workflow measurement boundary.",
+  "limitations": [
+    "Three fresh processes per configuration; descriptive ranges, not population intervals.",
+    "The 64-byte case makes 1000 calls per process; these are three independent observations, not 3000.",
+    "RSS includes interpreter startup, input reads and output/module hashing; operation time covers native calls only.",
+    "Direct canonicalization diagnostics are separate from full-workflow measurements."
+  ],
+  "summary": [
+    {
+      "size": 64,
+      "kind": "immutable",
+      "candidate": "before",
+      "process_observations": 3,
+      "peak_rss_mib": {
+        "median": 21.30859375,
+        "minimum": 21.3046875,
+        "maximum": 23.5
+      },
+      "wall_seconds": {
+        "median": 0.028284125,
+        "minimum": 0.027881959,
+        "maximum": 0.029710208
+      },
+      "cpu_seconds": {
+        "median": 0.028212,
+        "minimum": 0.027802,
+        "maximum": 0.029637
+      },
+      "operation_seconds_per_call": {
+        "median": 4.0908300002229225e-07,
+        "minimum": 4.0549999994254906e-07,
+        "maximum": 4.37207999993916e-07
+      }
+    },
+    {
+      "size": 64,
+      "kind": "immutable",
+      "candidate": "after",
+      "process_observations": 3,
+      "peak_rss_mib": {
+        "median": 21.4375,
+        "minimum": 21.4375,
+        "maximum": 22.75
+      },
+      "wall_seconds": {
+        "median": 0.028678208,
+        "minimum": 0.027852625,
+        "maximum": 0.028866708
+      },
+      "cpu_seconds": {
+        "median": 0.028606,
+        "minimum": 0.027795,
+        "maximum": 0.028801999999999998
+      },
+      "operation_seconds_per_call": {
+        "median": 3.9874999993116946e-07,
+        "minimum": 3.7991599992892586e-07,
+        "maximum": 4.2400000006637126e-07
+      }
+    },
+    {
+      "size": 64,
+      "kind": "mutable",
+      "candidate": "before",
+      "process_observations": 3,
+      "peak_rss_mib": {
+        "median": 21.3125,
+        "minimum": 21.3125,
+        "maximum": 21.3515625
+      },
+      "wall_seconds": {
+        "median": 0.027909084,
+        "minimum": 0.027866583,
+        "maximum": 0.029233167
+      },
+      "cpu_seconds": {
+        "median": 0.027837999999999998,
+        "minimum": 0.027807,
+        "maximum": 0.029145
+      },
+      "operation_seconds_per_call": {
+        "median": 4.1312500002277377e-07,
+        "minimum": 3.9333299991994863e-07,
+        "maximum": 4.378749999887077e-07
+      }
+    },
+    {
+      "size": 64,
+      "kind": "mutable",
+      "candidate": "after",
+      "process_observations": 3,
+      "peak_rss_mib": {
+        "median": 22.75,
+        "minimum": 21.4375,
+        "maximum": 22.75
+      },
+      "wall_seconds": {
+        "median": 0.028953042,
+        "minimum": 0.028509625,
+        "maximum": 0.028991083
+      },
+      "cpu_seconds": {
+        "median": 0.028886000000000002,
+        "minimum": 0.028412,
+        "maximum": 0.028913
+      },
+      "operation_seconds_per_call": {
+        "median": 4.0820899994287176e-07,
+        "minimum": 4.009169999790174e-07,
+        "maximum": 4.2758299991874085e-07
+      }
+    },
+    {
+      "size": 1048576,
+      "kind": "immutable",
+      "candidate": "before",
+      "process_observations": 3,
+      "peak_rss_mib": {
+        "median": 26.3671875,
+        "minimum": 26.36328125,
+        "maximum": 26.375
+      },
+      "wall_seconds": {
+        "median": 0.031234208,
+        "minimum": 0.030894958,
+        "maximum": 0.032045208
+      },
+      "cpu_seconds": {
+        "median": 0.031117,
+        "minimum": 0.030828,
+        "maximum": 0.03195
+      },
+      "operation_seconds_per_call": {
+        "median": 0.002342291000104524,
+        "minimum": 0.0022369590001289907,
+        "maximum": 0.002418957999907434
+      }
+    },
+    {
+      "size": 1048576,
+      "kind": "immutable",
+      "candidate": "after",
+      "process_observations": 3,
+      "peak_rss_mib": {
+        "median": 25.37109375,
+        "minimum": 24.0625,
+        "maximum": 26.125
+      },
+      "wall_seconds": {
+        "median": 0.030377875,
+        "minimum": 0.029934834,
+        "maximum": 0.03185925
+      },
+      "cpu_seconds": {
+        "median": 0.030316,
+        "minimum": 0.029866,
+        "maximum": 0.031782
+      },
+      "operation_seconds_per_call": {
+        "median": 0.0018582499999411084,
+        "minimum": 0.0018080830000144488,
+        "maximum": 0.0018738329999905545
+      }
+    },
+    {
+      "size": 1048576,
+      "kind": "mutable",
+      "candidate": "before",
+      "process_observations": 3,
+      "peak_rss_mib": {
+        "median": 27.30859375,
+        "minimum": 25.859375,
+        "maximum": 27.30859375
+      },
+      "wall_seconds": {
+        "median": 0.03122,
+        "minimum": 0.031072959,
+        "maximum": 0.031753166
+      },
+      "cpu_seconds": {
+        "median": 0.031151,
+        "minimum": 0.031003999999999997,
+        "maximum": 0.031661
+      },
+      "operation_seconds_per_call": {
+        "median": 0.002178209000021525,
+        "minimum": 0.00216574999990371,
+        "maximum": 0.0021826669999427395
+      }
+    },
+    {
+      "size": 1048576,
+      "kind": "mutable",
+      "candidate": "after",
+      "process_observations": 3,
+      "peak_rss_mib": {
+        "median": 25.9921875,
+        "minimum": 25.98046875,
+        "maximum": 27.30859375
+      },
+      "wall_seconds": {
+        "median": 0.031678291,
+        "minimum": 0.0309955,
+        "maximum": 0.032246708
+      },
+      "cpu_seconds": {
+        "median": 0.031585,
+        "minimum": 0.030927999999999997,
+        "maximum": 0.032171000000000005
+      },
+      "operation_seconds_per_call": {
+        "median": 0.002169833999914772,
+        "minimum": 0.0021625419999509177,
+        "maximum": 0.002205666999998357
+      }
+    },
+    {
+      "size": 16777216,
+      "kind": "immutable",
+      "candidate": "before",
+      "process_observations": 3,
+      "peak_rss_mib": {
+        "median": 84.95703125,
+        "minimum": 84.89453125,
+        "maximum": 86.3984375
+      },
+      "wall_seconds": {
+        "median": 0.060219125,
+        "minimum": 0.059566667,
+        "maximum": 0.061054417
+      },
+      "cpu_seconds": {
+        "median": 0.060107,
+        "minimum": 0.059474000000000006,
+        "maximum": 0.060974
+      },
+      "operation_seconds_per_call": {
+        "median": 0.02111595899987151,
+        "minimum": 0.02093925000008312,
+        "maximum": 0.02147816700016847
+      }
+    },
+    {
+      "size": 16777216,
+      "kind": "immutable",
+      "candidate": "after",
+      "process_observations": 3,
+      "peak_rss_mib": {
+        "median": 69.11328125,
+        "minimum": 69.0625,
+        "maximum": 70.43359375
+      },
+      "wall_seconds": {
+        "median": 0.057914834,
+        "minimum": 0.057600625,
+        "maximum": 0.058244792
+      },
+      "cpu_seconds": {
+        "median": 0.057822,
+        "minimum": 0.057524000000000006,
+        "maximum": 0.058164
+      },
+      "operation_seconds_per_call": {
+        "median": 0.01968895799996062,
+        "minimum": 0.019511958000066443,
+        "maximum": 0.019865459000129704
+      }
+    },
+    {
+      "size": 16777216,
+      "kind": "mutable",
+      "candidate": "before",
+      "process_observations": 3,
+      "peak_rss_mib": {
+        "median": 103.07421875,
+        "minimum": 102.81640625,
+        "maximum": 103.3671875
+      },
+      "wall_seconds": {
+        "median": 0.06188275,
+        "minimum": 0.061630916,
+        "maximum": 0.063013709
+      },
+      "cpu_seconds": {
+        "median": 0.06177,
+        "minimum": 0.061542,
+        "maximum": 0.062927
+      },
+      "operation_seconds_per_call": {
+        "median": 0.0214792919998672,
+        "minimum": 0.020420374999957858,
+        "maximum": 0.021502125000097294
+      }
+    },
+    {
+      "size": 16777216,
+      "kind": "mutable",
+      "candidate": "after",
+      "process_observations": 3,
+      "peak_rss_mib": {
+        "median": 102.87890625,
+        "minimum": 102.69140625,
+        "maximum": 103.31640625
+      },
+      "wall_seconds": {
+        "median": 0.060862083,
+        "minimum": 0.059938792,
+        "maximum": 0.062586791
+      },
+      "cpu_seconds": {
+        "median": 0.060757000000000005,
+        "minimum": 0.05984199999999999,
+        "maximum": 0.062494
+      },
+      "operation_seconds_per_call": {
+        "median": 0.021343709000120725,
+        "minimum": 0.020928333000028942,
+        "maximum": 0.022023916000080135
+      }
+    },
+    {
+      "size": 67108864,
+      "kind": "immutable",
+      "candidate": "before",
+      "process_observations": 3,
+      "peak_rss_mib": {
+        "median": 278.33203125,
+        "minimum": 276.89453125,
+        "maximum": 278.39453125
+      },
+      "wall_seconds": {
+        "median": 0.1433855,
+        "minimum": 0.136710375,
+        "maximum": 0.145001292
+      },
+      "cpu_seconds": {
+        "median": 0.143294,
+        "minimum": 0.136597,
+        "maximum": 0.1449
+      },
+      "operation_seconds_per_call": {
+        "median": 0.07835916699991685,
+        "minimum": 0.07572966699990502,
+        "maximum": 0.07906708399991658
+      }
+    },
+    {
+      "size": 67108864,
+      "kind": "immutable",
+      "candidate": "after",
+      "process_observations": 3,
+      "peak_rss_mib": {
+        "median": 214.32421875,
+        "minimum": 213.01171875,
+        "maximum": 215.06640625
+      },
+      "wall_seconds": {
+        "median": 0.142310501,
+        "minimum": 0.140845958,
+        "maximum": 0.22295275
+      },
+      "cpu_seconds": {
+        "median": 0.14221,
+        "minimum": 0.140683,
+        "maximum": 0.222806
+      },
+      "operation_seconds_per_call": {
+        "median": 0.07665100099984556,
+        "minimum": 0.07624137499988137,
+        "maximum": 0.1431142919998365
+      }
+    },
+    {
+      "size": 67108864,
+      "kind": "mutable",
+      "candidate": "before",
+      "process_observations": 3,
+      "peak_rss_mib": {
+        "median": 276.95703125,
+        "minimum": 276.87890625,
+        "maximum": 278.375
+      },
+      "wall_seconds": {
+        "median": 0.144862208,
+        "minimum": 0.141265333,
+        "maximum": 0.147953291
+      },
+      "cpu_seconds": {
+        "median": 0.144752,
+        "minimum": 0.14117100000000002,
+        "maximum": 0.147853
+      },
+      "operation_seconds_per_call": {
+        "median": 0.07690629199987598,
+        "minimum": 0.07569162499999038,
+        "maximum": 0.0794647499999428
+      }
+    },
+    {
+      "size": 67108864,
+      "kind": "mutable",
+      "candidate": "after",
+      "process_observations": 3,
+      "peak_rss_mib": {
+        "median": 277.0703125,
+        "minimum": 277.01953125,
+        "maximum": 277.078125
+      },
+      "wall_seconds": {
+        "median": 0.143303876,
+        "minimum": 0.14229125,
+        "maximum": 0.143812458
+      },
+      "cpu_seconds": {
+        "median": 0.14320899999999998,
+        "minimum": 0.142183,
+        "maximum": 0.1437
+      },
+      "operation_seconds_per_call": {
+        "median": 0.07572449999997843,
+        "minimum": 0.0756853749999209,
+        "maximum": 0.07701858300015374
+      }
+    }
+  ],
+  "charts": {
+    "buffer-memory.svg": "60e40ad911536f07bef3c6174eea5c4195fac6f8806466c6b7a6f85b4e130365",
+    "buffer-memory.png": "0f5a78902bf0ddc07aa7948f273b3e3145dae7385e1f69f990f6226408d43bd0"
+  }
+}

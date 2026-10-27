@@ -72,3 +72,30 @@ def test_finite_control_report_bytes(baseline, subject):
     assert native.compare_runs_json(raw) == b"".join(
         _canonical_chunks(compare_runs(b, s, policy))
     )
+
+
+@pytest.mark.parametrize("baseline,subject", OVERFLOW_CASES[:4])
+def test_corrected_cli_refuses_without_publishing(tmp_path, baseline, subject):
+    from typer.testing import CliRunner
+
+    from invarlock.cli.app import app
+    from tests._evaluation_support import materialize_captured_request
+
+    outcomes = []
+    for backend in ("python", "rust"):
+        directory = (tmp_path / backend).resolve()
+        directory.mkdir()
+        request = materialize_captured_request(
+            directory, *scalar_request(baseline, subject)
+        )
+        result = CliRunner().invoke(
+            app,
+            ["evaluate", str(request), "--unsigned", "--json", "--backend", backend],
+        )
+        assert result.exit_code == 2, result.output
+        assert not (directory / "evidence").exists()
+        payload = json.loads(result.stdout)
+        assert payload["ok"] is False
+        assert "finite numeric range" in " ".join(payload["errors"])
+        outcomes.append(payload)
+    assert outcomes[0] == outcomes[1]

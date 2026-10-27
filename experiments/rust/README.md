@@ -1,5 +1,9 @@
 # Rust architecture comparison
 
+[FFI and corrected-reference results](../../docs/reference/rust-ffi-results.md)
+compare the latest measured native revision with corrected Python 0.17.3 and
+separately measure large-buffer memory.
+
 [Expanded results](../../docs/reference/rust-expanded-results.md) cover the broad
 Rust implementation. [First measured results](RESULTS.md) remain the historical
 interval experiment. Machine-readable expanded timings and evidence identities

@@ -58,6 +58,7 @@ EXPECTED_DOC_PAGES = {
     "reference/rust-optimization-results.md",
     "reference/rust-compact-results.md",
     "reference/rust-small-workload-results.md",
+    "reference/rust-ffi-results.md",
     "reference/rust-reference-audit.md",
     "reference/artifacts.md",
     "reference/cli.md",

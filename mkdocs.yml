@@ -41,6 +41,7 @@ nav:
       - Rust compact results: reference/rust-compact-results.md
       - Python reference audit: reference/rust-reference-audit.md
       - Rust small-workload results: reference/rust-small-workload-results.md
+      - Rust FFI results: reference/rust-ffi-results.md
       - Contracts: reference/contracts.md
       - Evaluation records: reference/evaluation-records.md
       - Evaluation capacity: reference/evaluation-capacity.md

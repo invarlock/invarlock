@@ -6,9 +6,12 @@
 >
 > **Stability:** Experimental; Python remains the default backend
 >
-> **Use this page when:** Comparing the latest schema optimization with the previous Rust implementation
+> **Use this page when:** Comparing the schema optimization with its preceding Rust implementation
 
-The new Rust change reduced small standalone elapsed medians by **3.4–6.0%**,
+For the subsequent byte-buffer optimization and corrected Python reference, see
+[Rust FFI results](rust-ffi-results.md).
+
+The schema change reduced small standalone elapsed medians by **3.4–6.0%**,
 total CPU by **4.0–6.1%**, and peak RSS by **1.8–3.0%**. These are modest gains:
 roughly 1.0–1.6 ms per small journey. Larger NLL results are mixed, and FFI elapsed
 changes range from a 2.06% reduction to a 0.47% increase. The change did not make
