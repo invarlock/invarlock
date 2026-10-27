@@ -1,0 +1,23 @@
+{
+  "candidates": [
+    "reference",
+    "rust-standalone-before",
+    "rust-ffi-before",
+    "rust-ffi",
+    "rust-standalone"
+  ],
+  "rounds": 5,
+  "seed": 4127,
+  "timeout_seconds": 300,
+  "total_budget_seconds": 7200,
+  "workloads": [
+    "captured-nll-1000",
+    "captured-nll-5000",
+    "captured-nll-12000",
+    "captured-nll-50000",
+    "captured-regression",
+    "native-pack",
+    "judge-pack",
+    "evidence-set"
+  ]
+}
