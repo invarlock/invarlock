@@ -54,6 +54,24 @@
     },
     {
       "type": "library",
+      "bom-ref": "pkg:cargo/allocator-api2@0.2.21",
+      "name": "allocator-api2",
+      "version": "0.2.21",
+      "purl": "pkg:cargo/allocator-api2@0.2.21",
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "bom-ref": "pkg:cargo/autocfg@1.5.1",
       "name": "autocfg",
       "version": "1.5.1",
@@ -342,6 +360,24 @@
     },
     {
       "type": "library",
+      "bom-ref": "pkg:cargo/data-encoding@2.11.1",
+      "name": "data-encoding",
+      "version": "2.11.1",
+      "purl": "pkg:cargo/data-encoding@2.11.1",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "4583a4551df46e2792f82ceeac45e850d2e2d5debba0b91f102385cda5b11f06"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "bom-ref": "pkg:cargo/der@0.7.10",
       "name": "der",
       "version": "0.7.10",
@@ -468,10 +504,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/fancy-regex@0.16.2",
+      "bom-ref": "pkg:cargo/fancy-regex@0.17.0",
       "name": "fancy-regex",
-      "version": "0.16.2",
-      "purl": "pkg:cargo/fancy-regex@0.16.2",
+      "version": "0.17.0",
+      "purl": "pkg:cargo/fancy-regex@0.17.0",
       "licenses": [
         {
           "expression": "MIT"
@@ -480,7 +516,7 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "998b056554fbe42e03ae0e152895cd1a7e1002aec800fdc6635d20270260c46f"
+          "content": "72cf461f865c862bb7dc573f643dd6a2b6842f7c30b07882b56bd148cc2761b8"
         }
       ]
     },
@@ -504,10 +540,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/fluent-uri@0.3.2",
+      "bom-ref": "pkg:cargo/fluent-uri@0.4.1",
       "name": "fluent-uri",
-      "version": "0.3.2",
-      "purl": "pkg:cargo/fluent-uri@0.3.2",
+      "version": "0.4.1",
+      "purl": "pkg:cargo/fluent-uri@0.4.1",
       "licenses": [
         {
           "expression": "MIT"
@@ -516,7 +552,25 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "1918b65d96df47d3591bed19c5cca17e3fa5d0707318e4b5ef2eae01764df7e5"
+          "content": "bc74ac4d8359ae70623506d512209619e5cf8f347124910440dbc221714b328e"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/foldhash@0.2.0",
+      "name": "foldhash",
+      "version": "0.2.0",
+      "purl": "pkg:cargo/foldhash@0.2.0",
+      "licenses": [
+        {
+          "expression": "Zlib"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
         }
       ]
     },
@@ -535,60 +589,6 @@
         {
           "alg": "SHA-256",
           "content": "e076045bb43dac435333ed5f04caf35c7463631d0dae2deb2638d94dd0a5b872"
-        }
-      ]
-    },
-    {
-      "type": "library",
-      "bom-ref": "pkg:cargo/futures-core@0.3.34",
-      "name": "futures-core",
-      "version": "0.3.34",
-      "purl": "pkg:cargo/futures-core@0.3.34",
-      "licenses": [
-        {
-          "expression": "MIT OR Apache-2.0"
-        }
-      ],
-      "hashes": [
-        {
-          "alg": "SHA-256",
-          "content": "92d699e522242e69e3003b94ecc1f960f3a5e015aa7c5d7486e65ad01dd94f5e"
-        }
-      ]
-    },
-    {
-      "type": "library",
-      "bom-ref": "pkg:cargo/futures-task@0.3.34",
-      "name": "futures-task",
-      "version": "0.3.34",
-      "purl": "pkg:cargo/futures-task@0.3.34",
-      "licenses": [
-        {
-          "expression": "MIT OR Apache-2.0"
-        }
-      ],
-      "hashes": [
-        {
-          "alg": "SHA-256",
-          "content": "cd417de3d1d015fc3bfd2b1ea46dfc7bab72ef86f1cc7cc9c78e728b34a6d1fd"
-        }
-      ]
-    },
-    {
-      "type": "library",
-      "bom-ref": "pkg:cargo/futures-util@0.3.34",
-      "name": "futures-util",
-      "version": "0.3.34",
-      "purl": "pkg:cargo/futures-util@0.3.34",
-      "licenses": [
-        {
-          "expression": "MIT OR Apache-2.0"
-        }
-      ],
-      "hashes": [
-        {
-          "alg": "SHA-256",
-          "content": "0d50a92467f8ba5dd6e3ee5d4bd04d73ab2e4e1c44474a0674821dfce14b79bc"
         }
       ]
     },
@@ -643,6 +643,24 @@
         {
           "alg": "SHA-256",
           "content": "899def5c37c4fd7b2664648c28120ecec138e4d395b459e5ca34f9cce2dd77fd"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/hashbrown@0.16.1",
+      "name": "hashbrown",
+      "version": "0.16.1",
+      "purl": "pkg:cargo/hashbrown@0.16.1",
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "841d1cc9bed7f9236f321df977030373f4a4163ae1a7dbfe1a51a2c1a51d9100"
         }
       ]
     },
@@ -996,19 +1014,63 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/jsonschema@0.33.0",
+      "bom-ref": "pkg:cargo/jsonschema@0.39.0",
       "name": "jsonschema",
-      "version": "0.33.0",
-      "purl": "pkg:cargo/jsonschema@0.33.0",
+      "version": "0.39.0",
+      "purl": "pkg:cargo/jsonschema@0.39.0",
       "licenses": [
         {
           "expression": "MIT"
         }
       ],
-      "hashes": [
+      "pedigree": {
+        "notes": "Locally modified upstream dependency"
+      },
+      "externalReferences": [
         {
-          "alg": "SHA-256",
-          "content": "d46662859bc5f60a145b75f4632fbadc84e829e45df6c5de74cfc8e05acb96b5"
+          "type": "distribution",
+          "url": "https://static.crates.io/crates/jsonschema/jsonschema-0.39.0.crate",
+          "comment": "Original upstream registry archive; excludes local patch",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "757e9e064986e27b3b33ef3f0926a08637745002a8aa1d5c178291061a4530e6"
+            }
+          ]
+        }
+      ],
+      "properties": [
+        {
+          "name": "source-classification",
+          "value": "vendored-third-party-modified"
+        },
+        {
+          "name": "provenance_path",
+          "value": "vendor/jsonschema/source-provenance.json"
+        },
+        {
+          "name": "provenance_sha256",
+          "value": "d8e3536fa37f0a2b4bdf140d4ff00aeaa9f65c3c18241e5e67c338af135c2745"
+        },
+        {
+          "name": "patch_sha256",
+          "value": "8b0e6ab149f19ebd9f7848e806b44ce29f61513368dd24e01f71d9c5badaf3a3"
+        },
+        {
+          "name": "upstream_file_hashes_sha256",
+          "value": "5f62ef77142dff44b05f9700505182cd394dfc5849b3af009faae50a79a445ee"
+        },
+        {
+          "name": "patched_file_hashes_sha256",
+          "value": "3edb5258d4bebea3bf66cfc7eae3e2c66e319e9f9d8d37b039bd55992d044c9e"
+        },
+        {
+          "name": "patched_source_tree_sha256",
+          "value": "526d43b0311008a43d43c149f2d66a4bc573c56838923b47fc255c22a1e68cea"
+        },
+        {
+          "name": "patched_source_tree_algorithm",
+          "value": "SHA-256 of UTF-8 JSON mapping retained upstream relative paths to current SHA-256 hashes, sorted keys, compact separators, no trailing newline; excludes local provenance and documentation files."
         }
       ]
     },
@@ -1374,24 +1436,6 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/pin-project-lite@0.2.17",
-      "name": "pin-project-lite",
-      "version": "0.2.17",
-      "purl": "pkg:cargo/pin-project-lite@0.2.17",
-      "licenses": [
-        {
-          "expression": "Apache-2.0 OR MIT"
-        }
-      ],
-      "hashes": [
-        {
-          "alg": "SHA-256",
-          "content": "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
-        }
-      ]
-    },
-    {
-      "type": "library",
       "bom-ref": "pkg:cargo/pkcs8@0.10.2",
       "name": "pkcs8",
       "version": "0.10.2",
@@ -1662,10 +1706,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/referencing@0.33.0",
+      "bom-ref": "pkg:cargo/referencing@0.39.0",
       "name": "referencing",
-      "version": "0.33.0",
-      "purl": "pkg:cargo/referencing@0.33.0",
+      "version": "0.39.0",
+      "purl": "pkg:cargo/referencing@0.39.0",
       "licenses": [
         {
           "expression": "MIT"
@@ -1674,7 +1718,7 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "9e9c261f7ce75418b3beadfb3f0eb1299fe8eb9640deba45ffa2cb783098697d"
+          "content": "d279220464be12a6e0c5612ea460bf1fd8407f701447dcb3875463fdda4c3dbf"
         }
       ]
     },
@@ -1950,24 +1994,6 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:cargo/slab@0.4.12",
-      "name": "slab",
-      "version": "0.4.12",
-      "purl": "pkg:cargo/slab@0.4.12",
-      "licenses": [
-        {
-          "expression": "MIT"
-        }
-      ],
-      "hashes": [
-        {
-          "alg": "SHA-256",
-          "content": "0c790de23124f9ab44544d7ac05d60440adc586479ce501c1d6d7da3cd8c9cf5"
-        }
-      ]
-    },
-    {
-      "type": "library",
       "bom-ref": "pkg:cargo/smallvec@1.16.4",
       "name": "smallvec",
       "version": "1.16.4",
@@ -2148,6 +2174,24 @@
     },
     {
       "type": "library",
+      "bom-ref": "pkg:cargo/unicode-general-category@1.1.0",
+      "name": "unicode-general-category",
+      "version": "1.1.0",
+      "purl": "pkg:cargo/unicode-general-category@1.1.0",
+      "licenses": [
+        {
+          "expression": "Apache-2.0"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "0b993bddc193ae5bd0d623b49ec06ac3e9312875fdae725a975c51db1cc1677f"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "bom-ref": "pkg:cargo/unicode-ident@1.0.24",
       "name": "unicode-ident",
       "version": "1.0.24",
@@ -2197,24 +2241,6 @@
         {
           "alg": "SHA-256",
           "content": "23b082222b4f6619906941c17eb2297fff4c2fb96cb60164170522942a200bd8"
-        }
-      ]
-    },
-    {
-      "type": "library",
-      "bom-ref": "pkg:cargo/uuid@1.29.0",
-      "name": "uuid",
-      "version": "1.29.0",
-      "purl": "pkg:cargo/uuid@1.29.0",
-      "licenses": [
-        {
-          "expression": "Apache-2.0 OR MIT"
-        }
-      ],
-      "hashes": [
-        {
-          "alg": "SHA-256",
-          "content": "4a0e2d11620c50695fe12bbbfde96b3477fe606e7284c22d505c12ce51214514"
         }
       ]
     },
@@ -2634,6 +2660,10 @@
       ]
     },
     {
+      "ref": "pkg:cargo/allocator-api2@0.2.21",
+      "dependsOn": []
+    },
+    {
       "ref": "pkg:cargo/autocfg@1.5.1",
       "dependsOn": []
     },
@@ -2699,6 +2729,14 @@
       ]
     },
     {
+      "ref": "pkg:cargo/curve25519-dalek-derive@0.1.1",
+      "dependsOn": [
+        "pkg:cargo/proc-macro2@1.0.107",
+        "pkg:cargo/quote@1.0.47",
+        "pkg:cargo/syn@2.0.119"
+      ]
+    },
+    {
       "ref": "pkg:cargo/curve25519-dalek@4.1.3",
       "dependsOn": [
         "pkg:cargo/cfg-if@1.0.4",
@@ -2712,12 +2750,8 @@
       ]
     },
     {
-      "ref": "pkg:cargo/curve25519-dalek-derive@0.1.1",
-      "dependsOn": [
-        "pkg:cargo/proc-macro2@1.0.107",
-        "pkg:cargo/quote@1.0.47",
-        "pkg:cargo/syn@2.0.119"
-      ]
+      "ref": "pkg:cargo/data-encoding@2.11.1",
+      "dependsOn": []
     },
     {
       "ref": "pkg:cargo/der@0.7.10",
@@ -2743,13 +2777,6 @@
       ]
     },
     {
-      "ref": "pkg:cargo/ed25519@2.2.3",
-      "dependsOn": [
-        "pkg:cargo/pkcs8@0.10.2",
-        "pkg:cargo/signature@2.2.0"
-      ]
-    },
-    {
       "ref": "pkg:cargo/ed25519-dalek@2.2.0",
       "dependsOn": [
         "pkg:cargo/curve25519-dalek@4.1.3",
@@ -2758,6 +2785,13 @@
         "pkg:cargo/sha2@0.10.9",
         "pkg:cargo/subtle@2.6.1",
         "pkg:cargo/zeroize@1.9.1"
+      ]
+    },
+    {
+      "ref": "pkg:cargo/ed25519@2.2.3",
+      "dependsOn": [
+        "pkg:cargo/pkcs8@0.10.2",
+        "pkg:cargo/signature@2.2.0"
       ]
     },
     {
@@ -2771,7 +2805,7 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:cargo/fancy-regex@0.16.2",
+      "ref": "pkg:cargo/fancy-regex@0.17.0",
       "dependsOn": [
         "pkg:cargo/bit-set@0.8.0",
         "pkg:cargo/regex-automata@0.4.18",
@@ -2783,7 +2817,7 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:cargo/fluent-uri@0.3.2",
+      "ref": "pkg:cargo/fluent-uri@0.4.1",
       "dependsOn": [
         "pkg:cargo/borrow-or-share@0.2.4",
         "pkg:cargo/ref-cast@1.0.27",
@@ -2791,27 +2825,14 @@
       ]
     },
     {
+      "ref": "pkg:cargo/foldhash@0.2.0",
+      "dependsOn": []
+    },
+    {
       "ref": "pkg:cargo/fraction@0.15.4",
       "dependsOn": [
         "pkg:cargo/lazy_static@1.5.1",
         "pkg:cargo/num@0.4.3"
-      ]
-    },
-    {
-      "ref": "pkg:cargo/futures-core@0.3.34",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:cargo/futures-task@0.3.34",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:cargo/futures-util@0.3.34",
-      "dependsOn": [
-        "pkg:cargo/futures-core@0.3.34",
-        "pkg:cargo/futures-task@0.3.34",
-        "pkg:cargo/pin-project-lite@0.2.17",
-        "pkg:cargo/slab@0.4.12"
       ]
     },
     {
@@ -2833,9 +2854,19 @@
       "ref": "pkg:cargo/getrandom@0.3.4",
       "dependsOn": [
         "pkg:cargo/cfg-if@1.0.4",
+        "pkg:cargo/js-sys@0.3.106",
         "pkg:cargo/libc@0.2.186",
         "pkg:cargo/r-efi@5.3.0",
-        "pkg:cargo/wasip2@1.0.4+wasi-0.2.12"
+        "pkg:cargo/wasip2@1.0.4+wasi-0.2.12",
+        "pkg:cargo/wasm-bindgen@0.2.129"
+      ]
+    },
+    {
+      "ref": "pkg:cargo/hashbrown@0.16.1",
+      "dependsOn": [
+        "pkg:cargo/allocator-api2@0.2.21",
+        "pkg:cargo/equivalent@1.0.3",
+        "pkg:cargo/foldhash@0.2.0"
       ]
     },
     {
@@ -2956,7 +2987,7 @@
     {
       "ref": "pkg:cargo/invarlock-native-contracts@0.1.0",
       "dependsOn": [
-        "pkg:cargo/jsonschema@0.33.0",
+        "pkg:cargo/jsonschema@0.39.0",
         "pkg:cargo/ryu@1.0.23",
         "pkg:cargo/serde_json@1.0.149",
         "pkg:cargo/sha2@0.10.9"
@@ -3023,30 +3054,30 @@
       "ref": "pkg:cargo/js-sys@0.3.106",
       "dependsOn": [
         "pkg:cargo/cfg-if@1.0.4",
-        "pkg:cargo/futures-util@0.3.34",
         "pkg:cargo/wasm-bindgen@0.2.129"
       ]
     },
     {
-      "ref": "pkg:cargo/jsonschema@0.33.0",
+      "ref": "pkg:cargo/jsonschema@0.39.0",
       "dependsOn": [
         "pkg:cargo/ahash@0.8.12",
-        "pkg:cargo/base64@0.22.1",
         "pkg:cargo/bytecount@0.6.9",
+        "pkg:cargo/data-encoding@2.11.1",
         "pkg:cargo/email_address@0.2.9",
-        "pkg:cargo/fancy-regex@0.16.2",
+        "pkg:cargo/fancy-regex@0.17.0",
         "pkg:cargo/fraction@0.15.4",
+        "pkg:cargo/getrandom@0.3.4",
         "pkg:cargo/idna@1.1.0",
         "pkg:cargo/itoa@1.0.18",
         "pkg:cargo/num-cmp@0.1.0",
         "pkg:cargo/num-traits@0.2.19",
-        "pkg:cargo/once_cell@1.21.4",
         "pkg:cargo/percent-encoding@2.3.2",
-        "pkg:cargo/referencing@0.33.0",
+        "pkg:cargo/referencing@0.39.0",
         "pkg:cargo/regex-syntax@0.8.11",
         "pkg:cargo/regex@1.13.1",
         "pkg:cargo/serde@1.0.229",
         "pkg:cargo/serde_json@1.0.149",
+        "pkg:cargo/unicode-general-category@1.1.0",
         "pkg:cargo/uuid-simd@0.8.0"
       ]
     },
@@ -3077,17 +3108,6 @@
     {
       "ref": "pkg:cargo/memchr@2.8.3",
       "dependsOn": []
-    },
-    {
-      "ref": "pkg:cargo/num@0.4.3",
-      "dependsOn": [
-        "pkg:cargo/num-bigint@0.4.6",
-        "pkg:cargo/num-complex@0.4.6",
-        "pkg:cargo/num-integer@0.1.47",
-        "pkg:cargo/num-iter@0.1.46",
-        "pkg:cargo/num-rational@0.4.2",
-        "pkg:cargo/num-traits@0.2.19"
-      ]
     },
     {
       "ref": "pkg:cargo/num-bigint@0.4.6",
@@ -3134,6 +3154,17 @@
       ]
     },
     {
+      "ref": "pkg:cargo/num@0.4.3",
+      "dependsOn": [
+        "pkg:cargo/num-bigint@0.4.6",
+        "pkg:cargo/num-complex@0.4.6",
+        "pkg:cargo/num-integer@0.1.47",
+        "pkg:cargo/num-iter@0.1.46",
+        "pkg:cargo/num-rational@0.4.2",
+        "pkg:cargo/num-traits@0.2.19"
+      ]
+    },
+    {
       "ref": "pkg:cargo/once_cell@1.21.4",
       "dependsOn": []
     },
@@ -3169,10 +3200,6 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:cargo/pin-project-lite@0.2.17",
-      "dependsOn": []
-    },
-    {
       "ref": "pkg:cargo/pkcs8@0.10.2",
       "dependsOn": [
         "pkg:cargo/der@0.7.10",
@@ -3196,17 +3223,6 @@
       ]
     },
     {
-      "ref": "pkg:cargo/pyo3@0.29.0",
-      "dependsOn": [
-        "pkg:cargo/libc@0.2.186",
-        "pkg:cargo/once_cell@1.21.4",
-        "pkg:cargo/portable-atomic@1.14.0",
-        "pkg:cargo/pyo3-build-config@0.29.0",
-        "pkg:cargo/pyo3-ffi@0.29.0",
-        "pkg:cargo/pyo3-macros@0.29.0"
-      ]
-    },
-    {
       "ref": "pkg:cargo/pyo3-build-config@0.29.0",
       "dependsOn": [
         "pkg:cargo/target-lexicon@0.13.5"
@@ -3220,6 +3236,15 @@
       ]
     },
     {
+      "ref": "pkg:cargo/pyo3-macros-backend@0.29.0",
+      "dependsOn": [
+        "pkg:cargo/heck@0.5.0",
+        "pkg:cargo/proc-macro2@1.0.107",
+        "pkg:cargo/quote@1.0.47",
+        "pkg:cargo/syn@2.0.119"
+      ]
+    },
+    {
       "ref": "pkg:cargo/pyo3-macros@0.29.0",
       "dependsOn": [
         "pkg:cargo/proc-macro2@1.0.107",
@@ -3229,12 +3254,14 @@
       ]
     },
     {
-      "ref": "pkg:cargo/pyo3-macros-backend@0.29.0",
+      "ref": "pkg:cargo/pyo3@0.29.0",
       "dependsOn": [
-        "pkg:cargo/heck@0.5.0",
-        "pkg:cargo/proc-macro2@1.0.107",
-        "pkg:cargo/quote@1.0.47",
-        "pkg:cargo/syn@2.0.119"
+        "pkg:cargo/libc@0.2.186",
+        "pkg:cargo/once_cell@1.21.4",
+        "pkg:cargo/portable-atomic@1.14.0",
+        "pkg:cargo/pyo3-build-config@0.29.0",
+        "pkg:cargo/pyo3-ffi@0.29.0",
+        "pkg:cargo/pyo3-macros@0.29.0"
       ]
     },
     {
@@ -3260,12 +3287,6 @@
       ]
     },
     {
-      "ref": "pkg:cargo/ref-cast@1.0.27",
-      "dependsOn": [
-        "pkg:cargo/ref-cast-impl@1.0.27"
-      ]
-    },
-    {
       "ref": "pkg:cargo/ref-cast-impl@1.0.27",
       "dependsOn": [
         "pkg:cargo/proc-macro2@1.0.107",
@@ -3274,23 +3295,21 @@
       ]
     },
     {
-      "ref": "pkg:cargo/referencing@0.33.0",
+      "ref": "pkg:cargo/ref-cast@1.0.27",
       "dependsOn": [
-        "pkg:cargo/ahash@0.8.12",
-        "pkg:cargo/fluent-uri@0.3.2",
-        "pkg:cargo/once_cell@1.21.4",
-        "pkg:cargo/parking_lot@0.12.5",
-        "pkg:cargo/percent-encoding@2.3.2",
-        "pkg:cargo/serde_json@1.0.149"
+        "pkg:cargo/ref-cast-impl@1.0.27"
       ]
     },
     {
-      "ref": "pkg:cargo/regex@1.13.1",
+      "ref": "pkg:cargo/referencing@0.39.0",
       "dependsOn": [
-        "pkg:cargo/aho-corasick@1.1.5",
-        "pkg:cargo/memchr@2.8.3",
-        "pkg:cargo/regex-automata@0.4.18",
-        "pkg:cargo/regex-syntax@0.8.11"
+        "pkg:cargo/ahash@0.8.12",
+        "pkg:cargo/fluent-uri@0.4.1",
+        "pkg:cargo/getrandom@0.3.4",
+        "pkg:cargo/hashbrown@0.16.1",
+        "pkg:cargo/parking_lot@0.12.5",
+        "pkg:cargo/percent-encoding@2.3.2",
+        "pkg:cargo/serde_json@1.0.149"
       ]
     },
     {
@@ -3304,6 +3323,15 @@
     {
       "ref": "pkg:cargo/regex-syntax@0.8.11",
       "dependsOn": []
+    },
+    {
+      "ref": "pkg:cargo/regex@1.13.1",
+      "dependsOn": [
+        "pkg:cargo/aho-corasick@1.1.5",
+        "pkg:cargo/memchr@2.8.3",
+        "pkg:cargo/regex-automata@0.4.18",
+        "pkg:cargo/regex-syntax@0.8.11"
+      ]
     },
     {
       "ref": "pkg:cargo/rustc_version@0.4.1",
@@ -3381,10 +3409,6 @@
       ]
     },
     {
-      "ref": "pkg:cargo/slab@0.4.12",
-      "dependsOn": []
-    },
-    {
       "ref": "pkg:cargo/smallvec@1.16.4",
       "dependsOn": []
     },
@@ -3443,6 +3467,10 @@
       "dependsOn": []
     },
     {
+      "ref": "pkg:cargo/unicode-general-category@1.1.0",
+      "dependsOn": []
+    },
+    {
       "ref": "pkg:cargo/unicode-ident@1.0.24",
       "dependsOn": []
     },
@@ -3451,17 +3479,9 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:cargo/uuid@1.29.0",
-      "dependsOn": [
-        "pkg:cargo/js-sys@0.3.106",
-        "pkg:cargo/wasm-bindgen@0.2.129"
-      ]
-    },
-    {
       "ref": "pkg:cargo/uuid-simd@0.8.0",
       "dependsOn": [
         "pkg:cargo/outref@0.5.2",
-        "pkg:cargo/uuid@1.29.0",
         "pkg:cargo/vsimd@0.8.0"
       ]
     },
@@ -3484,12 +3504,12 @@
       ]
     },
     {
-      "ref": "pkg:cargo/wasm-bindgen@0.2.129",
+      "ref": "pkg:cargo/wasm-bindgen-macro-support@0.2.129",
       "dependsOn": [
-        "pkg:cargo/cfg-if@1.0.4",
-        "pkg:cargo/once_cell@1.21.4",
-        "pkg:cargo/rustversion@1.0.23",
-        "pkg:cargo/wasm-bindgen-macro@0.2.129",
+        "pkg:cargo/bumpalo@3.20.3",
+        "pkg:cargo/proc-macro2@1.0.107",
+        "pkg:cargo/quote@1.0.47",
+        "pkg:cargo/syn@3.0.9",
         "pkg:cargo/wasm-bindgen-shared@0.2.129"
       ]
     },
@@ -3501,19 +3521,19 @@
       ]
     },
     {
-      "ref": "pkg:cargo/wasm-bindgen-macro-support@0.2.129",
-      "dependsOn": [
-        "pkg:cargo/bumpalo@3.20.3",
-        "pkg:cargo/proc-macro2@1.0.107",
-        "pkg:cargo/quote@1.0.47",
-        "pkg:cargo/syn@3.0.9",
-        "pkg:cargo/wasm-bindgen-shared@0.2.129"
-      ]
-    },
-    {
       "ref": "pkg:cargo/wasm-bindgen-shared@0.2.129",
       "dependsOn": [
         "pkg:cargo/unicode-ident@1.0.24"
+      ]
+    },
+    {
+      "ref": "pkg:cargo/wasm-bindgen@0.2.129",
+      "dependsOn": [
+        "pkg:cargo/cfg-if@1.0.4",
+        "pkg:cargo/once_cell@1.21.4",
+        "pkg:cargo/rustversion@1.0.23",
+        "pkg:cargo/wasm-bindgen-macro@0.2.129",
+        "pkg:cargo/wasm-bindgen-shared@0.2.129"
       ]
     },
     {
@@ -3529,14 +3549,6 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:cargo/yoke@0.8.4",
-      "dependsOn": [
-        "pkg:cargo/stable_deref_trait@1.2.1",
-        "pkg:cargo/yoke-derive@0.8.4",
-        "pkg:cargo/zerofrom@0.1.8"
-      ]
-    },
-    {
       "ref": "pkg:cargo/yoke-derive@0.8.4",
       "dependsOn": [
         "pkg:cargo/proc-macro2@1.0.107",
@@ -3546,9 +3558,11 @@
       ]
     },
     {
-      "ref": "pkg:cargo/zerocopy@0.8.63",
+      "ref": "pkg:cargo/yoke@0.8.4",
       "dependsOn": [
-        "pkg:cargo/zerocopy-derive@0.8.63"
+        "pkg:cargo/stable_deref_trait@1.2.1",
+        "pkg:cargo/yoke-derive@0.8.4",
+        "pkg:cargo/zerofrom@0.1.8"
       ]
     },
     {
@@ -3560,9 +3574,9 @@
       ]
     },
     {
-      "ref": "pkg:cargo/zerofrom@0.1.8",
+      "ref": "pkg:cargo/zerocopy@0.8.63",
       "dependsOn": [
-        "pkg:cargo/zerofrom-derive@0.1.8"
+        "pkg:cargo/zerocopy-derive@0.8.63"
       ]
     },
     {
@@ -3572,6 +3586,12 @@
         "pkg:cargo/quote@1.0.47",
         "pkg:cargo/syn@3.0.9",
         "pkg:cargo/synstructure@0.14.0"
+      ]
+    },
+    {
+      "ref": "pkg:cargo/zerofrom@0.1.8",
+      "dependsOn": [
+        "pkg:cargo/zerofrom-derive@0.1.8"
       ]
     },
     {
@@ -3587,19 +3607,19 @@
       ]
     },
     {
-      "ref": "pkg:cargo/zerovec@0.11.9",
-      "dependsOn": [
-        "pkg:cargo/yoke@0.8.4",
-        "pkg:cargo/zerofrom@0.1.8",
-        "pkg:cargo/zerovec-derive@0.11.7"
-      ]
-    },
-    {
       "ref": "pkg:cargo/zerovec-derive@0.11.7",
       "dependsOn": [
         "pkg:cargo/proc-macro2@1.0.107",
         "pkg:cargo/quote@1.0.47",
         "pkg:cargo/syn@3.0.9"
+      ]
+    },
+    {
+      "ref": "pkg:cargo/zerovec@0.11.9",
+      "dependsOn": [
+        "pkg:cargo/yoke@0.8.4",
+        "pkg:cargo/zerofrom@0.1.8",
+        "pkg:cargo/zerovec-derive@0.11.7"
       ]
     },
     {

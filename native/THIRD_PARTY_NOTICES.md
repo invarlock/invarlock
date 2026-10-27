@@ -31,3 +31,12 @@ from their recorded upstream revision
 `d74c030d9dc4f3cae02146d1f497ff62726ef09a`, because those archives omit the root
 license file. The r-efi notice is its archive's `AUTHORS` file, which contains
 the license grant and copyright holders.
+
+## Modified schema dependency
+
+`vendor/jsonschema` retains jsonschema 0.39.0 under its MIT license with a
+limited repair to preserve reference traversal for custom-keyword diagnostics.
+The accompanying provenance record separates the upstream archive hash from
+the exact patch and patched source-tree hashes. The dependency inventory and
+SBOM identify this as modified third-party code rather than a workspace crate.
+The upstream archive hash does not identify the patched compiled source.

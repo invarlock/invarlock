@@ -731,4 +731,70 @@ mod tests {
         assert_eq!(resource.bytes(), b"before");
         std::fs::remove_file(path).unwrap();
     }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_pinned_elf_runs_retained_descriptor_and_rejects_replacement() {
+        use std::os::unix::fs::{DirBuilderExt, MetadataExt};
+
+        struct OwnedDirectory(PathBuf);
+        impl Drop for OwnedDirectory {
+            fn drop(&mut self) {
+                let _ = std::fs::remove_dir_all(&self.0);
+            }
+        }
+
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().canonicalize().unwrap().join(format!(
+            "invarlock-pinned-elf-{}-{nonce}",
+            std::process::id()
+        ));
+        std::fs::DirBuilder::new()
+            .mode(0o700)
+            .create(&root)
+            .unwrap();
+        let directory = OwnedDirectory(root);
+        let path = directory.0.join("echo");
+        std::fs::copy("/bin/echo", &path).unwrap();
+        let executable = PinnedExecutable::capture(&path, 4 * 1024 * 1024).unwrap();
+        let spec = ProcessSpec {
+            // The retained descriptor selects the binary; this path supplies
+            // argv[0]. An accidental ordinary pathname launch would run false.
+            program: "/bin/false".into(),
+            args: vec!["descriptor-bound".into(), "argument with spaces".into()],
+            input: vec![],
+            timeout: Duration::from_secs(3),
+            stdout_limit: 128,
+            stderr_limit: 128,
+            env: Some(BTreeMap::new()),
+            cwd: Some(directory.0.clone()),
+        };
+        let cancel = AtomicBool::new(false);
+        let ordinary = run_process(&spec, &cancel).unwrap();
+        assert_eq!(ordinary.status, 1);
+        assert!(ordinary.stdout.is_empty());
+        let output = run_pinned_process(&spec, &cancel, &executable).unwrap();
+        assert_eq!(output.status, 0);
+        assert_eq!(output.stdout, b"descriptor-bound argument with spaces\n");
+        assert!(output.stderr.is_empty());
+
+        // Preserve the retained inode, but replace its source binding with a
+        // byte-identical copy. The dispatch guard must reject the new inode.
+        std::fs::rename(&path, directory.0.join("retained-echo")).unwrap();
+        std::fs::copy("/bin/echo", &path).unwrap();
+        assert_ne!(
+            std::fs::metadata(&path).unwrap().ino(),
+            executable.identity().inode
+        );
+        assert_eq!(std::fs::read(&path).unwrap(), executable.resource.bytes());
+        assert!(matches!(
+            run_pinned_process(&spec, &cancel, &executable),
+            Err(Error::Filesystem(
+                invarlock_native_filesystem::Error::Changed(_)
+            ))
+        ));
+    }
 }

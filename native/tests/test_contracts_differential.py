@@ -270,3 +270,65 @@ def test_schema_arbitrary_integers_and_exact_float_comparisons():
                 result,
                 error.message,
             )
+
+
+@pytest.mark.parametrize(
+    "shared,middle,bad_middle,bad_omega",
+    [
+        ({"type": "integer"}, {"type": "integer"}, "bad-middle", "bad-omega"),
+        ({"minimum": 0}, {"minimum": 0}, -1, -2),
+        ({"maximum": 0}, {"maximum": 0}, 1, 2),
+        ({"exclusiveMinimum": 0}, {"exclusiveMinimum": 0}, -1, -2),
+        ({"exclusiveMaximum": 0}, {"exclusiveMaximum": 0}, 1, 2),
+        ({"const": 0}, {"const": 1}, "bad-middle", "bad-omega"),
+        ({"enum": [0]}, {"enum": [1]}, "bad-middle", "bad-omega"),
+        ({"uniqueItems": True}, {"uniqueItems": True}, [1, 1], [2, 2]),
+        ({"pattern": "^valid$"}, {"pattern": "^valid$"}, "bad-middle", "bad-omega"),
+    ],
+    ids=[
+        "type",
+        "minimum",
+        "maximum",
+        "exclusive-minimum",
+        "exclusive-maximum",
+        "const",
+        "enum",
+        "unique-items",
+        "pattern",
+    ],
+)
+@pytest.mark.parametrize("reverse_instance", [False, True])
+@pytest.mark.parametrize("container", ["object", "nested", "array"])
+def test_shared_reference_diagnostics_follow_schema_use_site(
+    shared, middle, bad_middle, bad_omega, reverse_instance, container
+):
+    """An absent earlier reference must not own a later use site's error order."""
+    from jsonschema import Draft202012Validator
+
+    node = {
+        "type": "object",
+        "properties": {
+            "alpha": {"$ref": "#/$defs/shared~1value~0"},
+            "middle": middle,
+            "omega": {"$ref": "#/$defs/shared~1value~0"},
+        },
+    }
+    entries = [("middle", bad_middle), ("omega", bad_omega)]
+    if reverse_instance:
+        entries.reverse()
+    value = dict(entries)
+    if container == "nested":
+        node = {"type": "object", "properties": {"container": node}}
+        value = {"container": value}
+    elif container == "array":
+        node = {"type": "array", "items": node}
+        value = [value]
+    schema = {"$defs": {"shared/value~": shared}, **node}
+    expected = next(Draft202012Validator(schema).iter_errors(value))
+    assert list(expected.path)[-1] == "middle"
+    result = probe([{"raw": json.dumps(value), "schema_value": schema}])[0]
+    assert result == {
+        "ok": False,
+        "code": "schema_validation",
+        "message": expected.message,
+    }

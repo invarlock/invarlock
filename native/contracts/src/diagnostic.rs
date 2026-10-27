@@ -29,8 +29,8 @@ pub(crate) fn repr(value: &Value) -> String {
     }
 }
 pub(crate) fn message(error: &ValidationError<'_>, schema: &Value) -> String {
-    let instance = || repr(&error.instance);
-    match &error.kind {
+    let instance = || repr(error.instance());
+    match error.kind() {
         K::Required { property } => format!("{} is a required property", repr(property)),
         K::AdditionalProperties { unexpected } => {
             let mut keys = unexpected.clone();
@@ -48,7 +48,7 @@ pub(crate) fn message(error: &ValidationError<'_>, schema: &Value) -> String {
         K::Enum { options } => format!("{} is not one of {}", instance(), repr(options)),
         K::Type { kind } => {
             let types = if let Some(types) = schema
-                .pointer(error.schema_path.as_str())
+                .pointer(error.schema_path().as_str())
                 .and_then(Value::as_array)
             {
                 types
@@ -131,8 +131,8 @@ pub(crate) fn message(error: &ValidationError<'_>, schema: &Value) -> String {
 /// object property validators in instance order. Array indices precede their
 /// child schema positions, so an earlier record still owns the first error.
 pub(crate) fn priority(error: &ValidationError<'_>, root: &Value) -> Vec<usize> {
-    let schema_path = error.schema_path.to_string();
-    let instance_path = error.instance_path.to_string();
+    let schema_path = error.evaluation_path().to_string();
+    let instance_path = error.instance_path().to_string();
     let parts: Vec<_> = schema_path.trim_start_matches('/').split('/').collect();
     let instance: Vec<_> = instance_path.trim_start_matches('/').split('/').collect();
     let mut node = root;
@@ -140,6 +140,17 @@ pub(crate) fn priority(error: &ValidationError<'_>, root: &Value) -> Vec<usize> 
     let mut consumed = 0;
     let mut previous = "";
     for part in parts {
+        if part == "$ref" {
+            if let Some(target) = node
+                .get("$ref")
+                .and_then(Value::as_str)
+                .and_then(|s| s.strip_prefix('#'))
+                .and_then(|pointer| root.pointer(pointer))
+            {
+                node = target;
+            }
+            continue;
+        }
         let decoded = part.replace("~1", "/").replace("~0", "~");
         if let Some(reference) = node
             .get("$ref")

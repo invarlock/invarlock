@@ -309,7 +309,7 @@ pub fn validate_schema(value: &Value, name: &str) -> Result<()> {
         .iter_errors(value)
         .min_by_key(|error| crate::diagnostic::priority(error, &validator.schema))
     {
-        let path = instance_path(&error.instance_path.to_string()).join(".");
+        let path = instance_path(&error.instance_path().to_string()).join(".");
         let prefix = abbreviate(
             &format!("invalid {name} {}: ", abbreviate(&path, 800)),
             1200,
@@ -349,11 +349,11 @@ pub fn first_schema_error(
             errors.min_by_key(|e| crate::diagnostic::priority(e, &compiled.schema))
         }
         SchemaErrorOrder::Instance => {
-            errors.min_by_key(|e| instance_path(&e.instance_path.to_string()))
+            errors.min_by_key(|e| instance_path(&e.instance_path().to_string()))
         }
     };
     Ok(selected.map(|e| SchemaViolation {
-        path: instance_path(&e.instance_path.to_string()),
+        path: instance_path(&e.instance_path().to_string()),
         message: crate::diagnostic::message(&e, &compiled.schema),
     }))
 }
@@ -408,11 +408,11 @@ pub fn first_schema_error_fragment(
             errors.min_by_key(|e| crate::diagnostic::priority(e, &compiled.schema))
         }
         SchemaErrorOrder::Instance => {
-            errors.min_by_key(|e| instance_path(&e.instance_path.to_string()))
+            errors.min_by_key(|e| instance_path(&e.instance_path().to_string()))
         }
     };
     Ok(selected.map(|e| SchemaViolation {
-        path: instance_path(&e.instance_path.to_string()),
+        path: instance_path(&e.instance_path().to_string()),
         message: crate::diagnostic::message(&e, &compiled.schema),
     }))
 }
@@ -458,11 +458,11 @@ pub fn first_schema_error_value(
     let selected = match order {
         SchemaErrorOrder::Schema => errors.min_by_key(|e| crate::diagnostic::priority(e, schema)),
         SchemaErrorOrder::Instance => {
-            errors.min_by_key(|e| instance_path(&e.instance_path.to_string()))
+            errors.min_by_key(|e| instance_path(&e.instance_path().to_string()))
         }
     };
     Ok(selected.map(|e| SchemaViolation {
-        path: instance_path(&e.instance_path.to_string()),
+        path: instance_path(&e.instance_path().to_string()),
         message: crate::diagnostic::message(&e, schema),
     }))
 }
@@ -472,7 +472,7 @@ pub fn first_schema_error_details(value: &Value, name: &str) -> Result<Option<St
     let compiled = validator(name)?;
     let selected = compiled.validator.iter_errors(value).min_by_key(|e| {
         (
-            instance_path(&e.instance_path.to_string()),
+            instance_path(&e.instance_path().to_string()),
             crate::diagnostic::priority(e, &compiled.schema),
         )
     });
@@ -482,7 +482,7 @@ pub fn first_schema_error_details(value: &Value, name: &str) -> Result<Option<St
     let mut pending = std::collections::VecDeque::from([&error]);
     let mut details = Vec::new();
     while let Some(error) = pending.pop_front() {
-        let path = instance_path(&error.instance_path.to_string()).join(".");
+        let path = instance_path(&error.instance_path().to_string()).join(".");
         let message = crate::diagnostic::message(error, &compiled.schema);
         let message = if path.is_empty() {
             message
@@ -492,7 +492,7 @@ pub fn first_schema_error_details(value: &Value, name: &str) -> Result<Option<St
         if !details.contains(&message) {
             details.push(message);
         }
-        match &error.kind {
+        match error.kind() {
             jsonschema::error::ValidationErrorKind::AnyOf { context }
             | jsonschema::error::ValidationErrorKind::OneOfNotValid { context } => {
                 for branch in context {

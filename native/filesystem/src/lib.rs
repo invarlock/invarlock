@@ -116,6 +116,26 @@ fn open_at(fd: RawFd, n: &CStr, flags: i32, mode: u32) -> Result<File> {
     }
     Ok(unsafe { File::from_raw_fd(raw) })
 }
+// Match the Python filesystem contract: synchronize file data and metadata with
+// fsync at every existing publication boundary. On Apple, File::sync_all uses
+// the stronger F_FULLFSYNC operation instead; sync_data does the same.
+fn fsync_once(file: &File) -> io::Result<()> {
+    #[cfg(test)]
+    tests::before_sync()?;
+    if unsafe { libc::fsync(file.as_raw_fd()) } == 0 {
+        Ok(())
+    } else {
+        Err(io::Error::last_os_error())
+    }
+}
+fn fsync_file(file: &File) -> io::Result<()> {
+    loop {
+        match fsync_once(file) {
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+            result => return result,
+        }
+    }
+}
 fn id(f: &File) -> Result<FileIdentity> {
     Ok(FileIdentity::metadata(&f.metadata()?))
 }
@@ -585,7 +605,7 @@ impl PinnedDirectory {
         })
     }
     pub fn sync(&self) -> Result<()> {
-        self.directories.last().unwrap().sync_all()?;
+        fsync_file(self.directories.last().unwrap())?;
         Ok(())
     }
 }
@@ -1103,12 +1123,12 @@ pub fn write_file_no_replace(
     if unsafe { libc::fchmod(file.as_raw_fd(), mode as libc::mode_t) } != 0 {
         return Err(io::Error::last_os_error().into());
     }
-    file.sync_all()?;
+    fsync_file(file)?;
     let expected = id(file)?;
     if !expected.contents_eq(&stat_at(stage.file.as_raw_fd(), &payload_name)?) {
         return Err(Error::Changed("staged file changed".into()));
     }
-    stage.file.sync_all()?;
+    fsync_file(&stage.file)?;
     parent.sync()?;
     parent.verify()?;
     rename_exclusive(
@@ -1307,7 +1327,7 @@ impl StagedDirectory {
         if unsafe { libc::fchmod(file.as_raw_fd(), mode as libc::mode_t) } != 0 {
             return Err(io::Error::last_os_error().into());
         }
-        file.sync_all()?;
+        fsync_file(&file)?;
         let expected = id(&file)?;
         self.files.insert(relative_text.into(), (file, expected));
         self.total_bytes += payload.len() as u64;
@@ -1373,7 +1393,7 @@ impl StagedDirectory {
                 return Err(Error::Changed("staged file changed during sealing".into()));
             }
             *expected = sealed;
-            file.sync_all()?;
+            fsync_file(file)?;
         }
         for directory in self
             .directories
@@ -1389,9 +1409,9 @@ impl StagedDirectory {
     pub fn commit(mut self) -> Result<()> {
         self.verify()?;
         for directory in self.directories.values() {
-            directory.sync_all()?;
+            fsync_file(directory)?;
         }
-        self.stage.sync_all()?;
+        fsync_file(&self.stage)?;
         self.parent.sync()?;
         let expected = id(&self.stage)?;
         rename_exclusive(
@@ -1477,6 +1497,49 @@ impl Drop for StagedDirectory {
 mod tests {
     use super::*;
     use std::{os::unix::fs::symlink, path::PathBuf};
+    struct SyncFault {
+        fail_on: usize,
+        errno: i32,
+        calls: usize,
+    }
+    thread_local! {
+        static SYNC_FAULT: std::cell::RefCell<Option<SyncFault>> = const {
+            std::cell::RefCell::new(None)
+        };
+    }
+    pub(super) fn before_sync() -> io::Result<()> {
+        SYNC_FAULT.with(|state| {
+            let mut state = state.borrow_mut();
+            if let Some(fault) = state.as_mut() {
+                fault.calls += 1;
+                if fault.calls == fault.fail_on {
+                    return Err(io::Error::from_raw_os_error(fault.errno));
+                }
+            }
+            Ok(())
+        })
+    }
+    fn with_sync_fault<T>(fail_on: usize, errno: i32, action: impl FnOnce() -> T) -> (T, usize) {
+        struct Reset;
+        impl Drop for Reset {
+            fn drop(&mut self) {
+                SYNC_FAULT.with(|state| *state.borrow_mut() = None);
+            }
+        }
+        SYNC_FAULT.with(|state| {
+            let mut state = state.borrow_mut();
+            assert!(state.is_none());
+            *state = Some(SyncFault {
+                fail_on,
+                errno,
+                calls: 0,
+            });
+        });
+        let _reset = Reset;
+        let result = action();
+        let calls = SYNC_FAULT.with(|state| state.borrow().as_ref().unwrap().calls);
+        (result, calls)
+    }
     fn temp() -> PathBuf {
         let p = std::env::temp_dir().join(format!(
             "invarlock-fs-test-{}-{}",
@@ -1555,6 +1618,64 @@ mod tests {
         assert_eq!(unsafe { libc::mkfifo(n.as_ptr(), 0o600) }, 0);
         assert!(read_file(&p.join("fifo"), 1).is_err());
         std::fs::remove_dir_all(p).unwrap();
+    }
+    #[test]
+    fn fsync_retries_interruption_and_preserves_permanent_errno() {
+        let root = temp();
+        let path = root.join("file");
+        let file = File::create(&path).unwrap();
+        let (result, calls) = with_sync_fault(1, libc::EINTR, || fsync_file(&file));
+        result.unwrap();
+        assert_eq!(calls, 2);
+        let (result, calls) = with_sync_fault(1, libc::EIO, || fsync_file(&file));
+        assert_eq!(result.unwrap_err().raw_os_error(), Some(libc::EIO));
+        assert_eq!(calls, 1);
+        drop(file);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn publication_sync_failures_preserve_atomicity_and_owned_cleanup() {
+        // File, private stage, parent before rename, parent after rename.
+        for phase in 1..=4 {
+            let root = temp();
+            let destination = root.join("result");
+            let payload = b"complete signed output";
+            let (result, calls) = with_sync_fault(phase, libc::EIO, || {
+                write_file_no_replace(&destination, payload, 0o444, false)
+            });
+            assert!(matches!(result, Err(Error::Io(ref error))
+                if error.raw_os_error() == Some(libc::EIO)));
+            assert_eq!(calls, phase);
+            if phase == 4 {
+                assert_eq!(std::fs::read(&destination).unwrap(), payload);
+                assert_eq!(
+                    std::fs::metadata(&destination).unwrap().mode() & 0o777,
+                    0o444
+                );
+                assert_eq!(std::fs::read_dir(&root).unwrap().count(), 1);
+            } else {
+                assert!(!destination.exists());
+                assert_eq!(std::fs::read_dir(&root).unwrap().count(), 0);
+            }
+            std::fs::remove_dir_all(root).unwrap();
+        }
+    }
+    #[test]
+    fn prepublication_sync_failure_preserves_existing_destination() {
+        for phase in 1..=3 {
+            let root = temp();
+            let destination = root.join("result");
+            std::fs::write(&destination, b"other writer").unwrap();
+            let (result, calls) = with_sync_fault(phase, libc::EIO, || {
+                write_file_no_replace(&destination, b"replacement", 0o600, false)
+            });
+            assert!(matches!(result, Err(Error::Io(ref error))
+                if error.raw_os_error() == Some(libc::EIO)));
+            assert_eq!(calls, phase);
+            assert_eq!(std::fs::read(&destination).unwrap(), b"other writer");
+            assert_eq!(std::fs::read_dir(&root).unwrap().count(), 1);
+            std::fs::remove_dir_all(root).unwrap();
+        }
     }
     #[test]
     fn no_clobber_and_stage_cleanup() {

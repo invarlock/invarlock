@@ -2,7 +2,8 @@ use crate::{
     fsum, paired_exact_match_statistics, paired_resampling_interval, score, validate_configuration,
 };
 use invarlock_native_contracts::{
-    canonical_json, canonical_json_no_newline, sha256_digest, validate_schema,
+    canonical_json, canonical_json_no_newline, canonical_json_to_writer, sha256_digest,
+    validate_schema,
 };
 use num_bigint::BigInt;
 use num_rational::BigRational;
@@ -43,6 +44,59 @@ fn canonical(v: &Value) -> Result<Vec<u8>, AnalysisError> {
 }
 fn digest(v: &Value) -> Result<String, AnalysisError> {
     Ok(sha256_digest(&canonical(v)?))
+}
+// Preserve the canonical case-identity projection without owning another copy
+// of every record. These fixed keys are in canonical Unicode lexical order;
+// nested field values still use the shared canonical encoder.
+fn case_seed_to_writer(
+    pairs: &[(&Value, &Value)],
+    writer: &mut impl std::io::Write,
+) -> Result<(), AnalysisError> {
+    fn put(writer: &mut impl std::io::Write, bytes: &[u8]) -> Result<(), AnalysisError> {
+        writer
+            .write_all(bytes)
+            .map_err(|e| err(format!("value is not canonical JSON: {e}")))
+    }
+    put(writer, b"[")?;
+    for (index, (left, _)) in pairs.iter().enumerate() {
+        if index != 0 {
+            put(writer, b",")?;
+        }
+        put(writer, b"{")?;
+        for (index, (key, encoded)) in [
+            ("expected", b"\"expected\":".as_slice()),
+            ("id", b"\"id\":".as_slice()),
+            ("input", b"\"input\":".as_slice()),
+            ("metadata", b"\"metadata\":".as_slice()),
+        ]
+        .iter()
+        .enumerate()
+        {
+            if index != 0 {
+                put(writer, b",")?;
+            }
+            put(writer, encoded)?;
+            canonical_json_to_writer(&left[*key], writer, false).map_err(|e| err(e.to_string()))?;
+        }
+        put(writer, b"}")?;
+    }
+    // digest() previously used canonical_json(), which includes this newline.
+    put(writer, b"]\n")
+}
+fn case_seed(pairs: &[(&Value, &Value)]) -> Result<String, AnalysisError> {
+    struct HashWriter(sha2::Sha256);
+    impl std::io::Write for HashWriter {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            sha2::Digest::update(&mut self.0, bytes);
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    let mut writer = HashWriter(sha2::Sha256::default());
+    case_seed_to_writer(pairs, &mut writer)?;
+    Ok(format!("sha256:{:x}", sha2::Digest::finalize(writer.0)))
 }
 fn schema(v: &Value, name: &str) -> Result<(), AnalysisError> {
     validate_schema(v, name).map_err(|e| err(e.to_string()))
@@ -601,7 +655,7 @@ fn metric_result(
     let c = fsum(values[1].iter().copied())
         .map_err(|_| err("metric arithmetic exceeded finite numeric range"))?
         / count;
-    let seed=digest(&Value::Array(pairs.iter().map(|(left,_)|json!({"id":left["id"],"input":left["input"],"expected":left["expected"],"metadata":left["metadata"]})).collect()))?;
+    let seed = case_seed(pairs)?;
     let ci = if likelihood {
         if b <= 0.0 {
             return Err(err(
@@ -829,4 +883,83 @@ pub fn compare_validated_runs(
     let result = json!({"format":"invarlock/multi-metric-comparison-v1","decision":decision,"bindings":{"baseline":digest(baseline)?,"subject":digest(subject)?,"policy":digest(policy)?},"metrics":results,"limitations":limitations});
     schema(&result, "comparison")?;
     Ok(result)
+}
+
+#[cfg(test)]
+mod seed_tests {
+    use super::*;
+
+    fn owned_projection(pairs: &[(&Value, &Value)]) -> Value {
+        Value::Array(
+            pairs
+                .iter()
+                .map(|(left, _)| {
+                    json!({
+                        "id": left["id"],
+                        "input": left["input"],
+                        "expected": left["expected"],
+                        "metadata": left["metadata"]
+                    })
+                })
+                .collect(),
+        )
+    }
+
+    fn assert_projection_parity(records: &[Value]) {
+        let pairs: Vec<_> = records.iter().map(|row| (row, &Value::Null)).collect();
+        let expected = canonical(&owned_projection(&pairs)).unwrap();
+        let mut actual = Vec::new();
+        case_seed_to_writer(&pairs, &mut actual).unwrap();
+        assert_eq!(actual, expected);
+        assert_eq!(case_seed(&pairs).unwrap(), sha256_digest(&expected));
+    }
+
+    #[test]
+    fn streamed_case_seed_preserves_projection_bytes_and_numeric_spellings() {
+        let records: Vec<Value> = serde_json::from_str(
+            r#"[
+                {
+                    "metadata": {"z": -0.0, "a": [1e-7, 1e16, 1.0, 18446744073709551616]},
+                    "output": "not part of the case identity",
+                    "input": {"z": "é😀\n\t\"\\", "a": {"β": false, "A": null}},
+                    "id": "later",
+                    "expected": [null, true, {"b": 2, "a": 1}]
+                },
+                {"id": "earlier", "input": "", "expected": -0, "metadata": {}},
+                {}
+            ]"#,
+        )
+        .unwrap();
+        assert_projection_parity(&records);
+        assert_projection_parity(&[]);
+        let reversed: Vec<_> = records.into_iter().rev().collect();
+        assert_projection_parity(&reversed);
+    }
+
+    #[test]
+    fn streamed_case_seed_matches_owned_many_record_identity() {
+        let text = "bounded fixture 😀\n".repeat(128);
+        let records: Vec<_> = (0..1024)
+            .map(|index| {
+                json!({
+                    "id": format!("record-{index}"),
+                    "input": {"text": text, "index": index},
+                    "expected": "reference",
+                    "metadata": {"group": index % 7}
+                })
+            })
+            .collect();
+        assert_projection_parity(&records);
+    }
+
+    #[test]
+    fn streamed_case_seed_preserves_canonicalization_errors() {
+        let huge: Value = serde_json::from_str("1e999").unwrap();
+        let row = json!({"id": "invalid", "input": huge, "expected": null, "metadata": {}});
+        let pairs = [(&row, &Value::Null)];
+        assert_eq!(
+            case_seed(&pairs).unwrap_err(),
+            digest(&owned_projection(&pairs)).unwrap_err()
+        );
+    }
 }

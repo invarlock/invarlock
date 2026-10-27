@@ -54,6 +54,8 @@ EXPECTED_DOC_PAGES = {
     "reference/rust-core-design.md",
     "reference/rust-comparison-protocol.md",
     "reference/rust-module-map.md",
+    "reference/rust-expanded-results.md",
+    "reference/rust-optimization-results.md",
     "reference/artifacts.md",
     "reference/cli.md",
     "reference/compatibility.md",

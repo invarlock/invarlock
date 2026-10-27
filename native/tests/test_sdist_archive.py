@@ -47,6 +47,13 @@ def test_source_archive_retains_complete_workspace():
                 if path.is_file()
                 and path.suffix in {".toml", ".rs", ".json", ".svg", ".css", ".js"}
             )
+        for dependency in expected.get("patch", {}).get("crates-io", {}).values():
+            if "path" in dependency:
+                required.extend(
+                    path.relative_to(source)
+                    for path in (source / dependency["path"]).rglob("*")
+                    if path.is_file()
+                )
         required.extend(
             path.relative_to(source)
             for path in (source / "licenses").rglob("*")

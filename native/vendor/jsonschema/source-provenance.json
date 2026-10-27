@@ -1,0 +1,21 @@
+{
+  "name": "jsonschema",
+  "version": "0.39.0",
+  "origin": "external upstream dependency; not InvarLock implementation",
+  "source_url": "https://static.crates.io/crates/jsonschema/jsonschema-0.39.0.crate",
+  "archive_sha256": "757e9e064986e27b3b33ef3f0926a08637745002a8aa1d5c178291061a4530e6",
+  "license": "MIT",
+  "omitted_archive_files": [
+    "Cargo.lock"
+  ],
+  "modified_upstream_files": [
+    "src/error.rs",
+    "src/keywords/custom.rs"
+  ],
+  "patch": "reference-tracker.patch",
+  "upstream_file_hashes": "upstream-files.sha256.json",
+  "patch_sha256": "8b0e6ab149f19ebd9f7848e806b44ce29f61513368dd24e01f71d9c5badaf3a3",
+  "patched_file_hashes": "patched-files.sha256.json",
+  "patched_source_tree_sha256": "526d43b0311008a43d43c149f2d66a4bc573c56838923b47fc255c22a1e68cea",
+  "patched_source_tree_algorithm": "SHA-256 of UTF-8 JSON mapping retained upstream relative paths to current SHA-256 hashes, sorted keys, compact separators, no trailing newline; excludes local provenance and documentation files."
+}

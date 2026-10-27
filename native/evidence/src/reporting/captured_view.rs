@@ -640,5 +640,12 @@ pub fn load(path: &std::path::Path) -> Result<Value> {
         Some(&loaded.manifest),
         Some(&loaded.signer),
     )?;
-    Ok(json!({"view":view,"manifest":loaded.manifest,"payloads":payloads,"signer":loaded.signer}))
+    // Move the authenticated payloads: json! serializes borrowed expressions,
+    // which would duplicate both complete runs before dropping the originals.
+    let mut snapshot = serde_json::Map::new();
+    snapshot.insert("view".into(), view);
+    snapshot.insert("manifest".into(), loaded.manifest);
+    snapshot.insert("payloads".into(), payloads);
+    snapshot.insert("signer".into(), Value::String(loaded.signer));
+    Ok(Value::Object(snapshot))
 }

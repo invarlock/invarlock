@@ -1,10 +1,7 @@
 //! JSON Schema numeric keywords with Python's arbitrary-integer semantics.
 //! The upstream validator assumes every non-machine integer fits binary64.
 use crate::{diagnostic::repr, Value};
-use jsonschema::{
-    paths::{LazyLocation, Location},
-    Keyword, ValidationError,
-};
+use jsonschema::{Keyword, ValidationError};
 use std::{cmp::Ordering, collections::HashSet};
 fn integer(n: &serde_json::Number) -> bool {
     !n.to_string().contains(['.', 'e', 'E'])
@@ -134,7 +131,6 @@ fn matches_type(value: &Value, kind: &str) -> bool {
 struct NumericKeyword {
     name: &'static str,
     schema: Value,
-    path: Location,
 }
 impl NumericKeyword {
     fn message(&self, value: &Value) -> String {
@@ -175,20 +171,11 @@ impl NumericKeyword {
     }
 }
 impl Keyword for NumericKeyword {
-    fn validate<'i>(
-        &self,
-        instance: &'i Value,
-        location: &LazyLocation,
-    ) -> Result<(), ValidationError<'i>> {
+    fn validate<'i>(&self, instance: &'i Value) -> Result<(), ValidationError<'i>> {
         if self.is_valid(instance) {
             Ok(())
         } else {
-            Err(ValidationError::custom(
-                self.path.clone(),
-                location.into(),
-                instance,
-                self.message(instance),
-            ))
+            Err(ValidationError::custom(self.message(instance)))
         }
     }
     fn is_valid(&self, instance: &Value) -> bool {
@@ -257,11 +244,10 @@ pub(crate) fn options() -> jsonschema::ValidationOptions {
         "enum",
         "uniqueItems",
     ] {
-        options = options.with_keyword(name, move |_, schema, path| {
+        options = options.with_keyword(name, move |_, schema, _| {
             Ok(Box::new(NumericKeyword {
                 name,
                 schema: schema.clone(),
-                path,
             }))
         });
     }

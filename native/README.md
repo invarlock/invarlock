@@ -33,7 +33,11 @@ cannot be silently dispatched again.
 
 ## Build
 
-The qualified build profile is Rust 1.94.0 and CPython 3.12 on macOS arm64.
+Linux is the primary deployment and performance target. The core remains
+portable across the supported Unix paths; macOS is useful for development and
+regression checks. Platform-specific measurements are reported separately.
+
+The earlier qualified build profile is Rust 1.94.0 and CPython 3.12 on macOS arm64.
 The companion package declares Python `>=3.12,<3.13`; other profiles require their
 own qualification. The toolchain and Cargo dependency versions are pinned.
 
@@ -90,7 +94,10 @@ separate from the offline verifier. It does not embed Python provider SDKs.
 ## Verification
 
 ```sh
-cargo fmt --all --check
+cargo fmt -p invarlock-native-core -p invarlock-native-contracts \
+  -p invarlock-native-filesystem -p invarlock-native-evidence \
+  -p invarlock-native-execution -p invarlock-native-bindings \
+  -p invarlock-native-verifier -p invarlock-native-command --check
 cargo clippy --locked --offline --workspace --all-targets -- -D warnings
 cargo test --locked --offline --workspace --exclude invarlock-native-bindings
 cargo test --release --locked --offline --workspace --exclude invarlock-native-bindings
@@ -138,3 +145,25 @@ identity and configuration checks. Low-level Python helpers remain available;
 selecting a coarse native transaction is the migration boundary. This candidate
 does not claim that every target-map Python function has been removed or that
 all internal copies and validation passes have been eliminated.
+
+## Memory and publication changes
+
+The optimization candidate deduplicates compiled schema references, streams the
+case-set seed into its hash, and moves report snapshots into the returned result.
+It retains schema checks, numerical methods and pinned input verification.
+
+The schema dependency is a documented, locally patched third-party copy. Its
+custom validators must retain reference traversal when reporting errors; dropping
+that context changes which public diagnostic appears first. The retained upstream
+archive identity, source inventory, exact patch and removal criteria live under
+`vendor/`. Vendored dependency code is not InvarLock's own Rust implementation.
+
+Publication uses `fsync` at the same boundaries as Python. On macOS this replaces
+Rust's stronger `F_FULLFSYNC`; it is a deliberate alignment with the reference
+contract, not preservation of the former native power-loss guarantee. Linux
+already used `fsync`, so this change is not a Linux speedup claim.
+
+The portable Linux comparison launcher is documented in
+[`experiments/rust/linux/README.md`](../experiments/rust/linux/README.md).
+Its environment and retained results determine the scope of each performance
+claim; a Docker Desktop ARM64 VM does not establish production x86 performance.
