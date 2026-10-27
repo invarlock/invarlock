@@ -868,7 +868,15 @@ def validate(
             "platform": environment["platform"],
             "machine": environment["machine"],
             "work_filesystem": environment["work_filesystem"],
-            "runtime_identities": identities,
+            "runtime_identities": {
+                candidate: {
+                    key: value
+                    for key, value in identity.items()
+                    if key not in {"executable", "package"}
+                }
+                for candidate, identity in identities.items()
+            },
+            "runtime_path_scope": "Absolute executable and package paths were validated against retained metadata and are omitted from this portable result.",
             "supervisor_compiler": metadata["supervisor_compiler"],
             "environment_sha256": sha(environment_path),
             "boundary": "Linux guest ext filesystem; inputs and outputs staged before timing; VM and host storage remain part of the environment.",

@@ -294,6 +294,10 @@ def validate(root, run):
 def test_complete_path_has_five_candidates_and_separate_before_after(retained):
     root, run = retained
     result = validate(root, run)
+    for identity in result["environment"]["runtime_identities"].values():
+        assert "executable" not in identity
+        assert "package" not in identity
+        assert identity["wheel_bindings"]
     assert result["qualification_valid"] == 40
     assert result["timing_valid"] == 200
     assert len(result["samples"]) == 240

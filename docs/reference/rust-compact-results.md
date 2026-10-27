@@ -7,7 +7,8 @@
 > and tiny elapsed differences on this page cannot establish implementation
 > gains or regressions. The retained observations remain unchanged. Revised
 > measurements use a separate process boundary and are not pooled with these
-> results. Whole-wheel identity reads also inflated small FFI peaks.
+> results. Whole-wheel identity reads also inflated small FFI peaks. See the
+> [revised comparison](rust-small-workload-results.md) for the corrected method.
 
 > **Reference**
 >
