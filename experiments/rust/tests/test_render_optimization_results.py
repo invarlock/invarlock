@@ -69,3 +69,16 @@ def test_nonfinite_evidence_is_rejected(tmp_path, number):
     path.write_text('{"value": ' + number + "}")
     with pytest.raises(ValueError):
         report.read(path)
+
+
+def test_source_revisions_require_explicit_full_commit_identity():
+    metadata = {
+        "source_commit": "a" * 40,
+        "before_source": {"commit": "b" * 40},
+        "after_source": {"commit": "c" * 40},
+    }
+    report.validate_sources(metadata, "a" * 40, "b" * 40, "c" * 40)
+    with pytest.raises(ValueError, match="unexpected before"):
+        report.validate_sources(metadata, "a" * 40, "d" * 40, "c" * 40)
+    with pytest.raises(ValueError, match="full lowercase"):
+        report.validate_sources(metadata, "a" * 40, "b" * 8, "c" * 40)

@@ -152,11 +152,38 @@ fn empty_result() -> Value {
     json!({"format_version":"invarlock/evidence-set-verification-v1","kind":"evidence_set","scope":SCOPE,"statistical_scope":STATISTICAL_SCOPE,"ok":false,"verified":false,"authenticated":false,"replayed":false,"accepted":false,"decision":null,"index_sha256":null,"recipient_policy_sha256":null,"shared_inputs":null,"shared_inputs_verified":false,"members":{"deterministic":empty_member("captured"),"judge":empty_member("judge")},"errors":[]})
 }
 pub fn shared_captured_inputs(payloads: &Map<String, Value>) -> Result<Value> {
+    shared_captured_inputs_from(
+        |role| payloads.get(role),
+        |role| {
+            digest(
+                payloads
+                    .get(role)
+                    .ok_or_else(|| error("component run is missing"))?,
+            )
+        },
+    )
+}
+pub(crate) fn shared_checked_captured_inputs(
+    payloads: &captured::CapturedPayloads,
+) -> Result<Value> {
+    shared_captured_inputs_from(
+        |role| payloads.get(role),
+        |role| {
+            Ok(payloads
+                .schema_checked(role)
+                .ok_or_else(|| error("component run is missing"))?
+                .canonical_digest()?
+                .to_owned())
+        },
+    )
+}
+fn shared_captured_inputs_from<'a>(
+    get: impl Fn(&str) -> Option<&'a Value>,
+    payload_digest: impl Fn(&str) -> Result<String>,
+) -> Result<Value> {
     let mut sets = Vec::new();
     for role in ["baseline", "subject"] {
-        let run = payloads
-            .get(role)
-            .ok_or_else(|| error("component run is missing"))?;
+        let run = get(role).ok_or_else(|| error("component run is missing"))?;
         let rows = run["records"]
             .as_array()
             .ok_or_else(|| error("component records must be an array"))?;
@@ -168,8 +195,8 @@ pub fn shared_captured_inputs(payloads: &Map<String, Value>) -> Result<Value> {
     if sets[0] != sets[1] {
         return Err(error("component baseline and subject case sets differ"));
     }
-    let subject = &payloads["subject"];
-    let mut value = json!({"baseline_run_sha256":digest(&payloads["baseline"])? ,"subject_run_sha256":digest(subject)? ,"case_set_sha256":sets[0],"subject_artifact_sha256":subject["artifact_digest"]});
+    let subject = get("subject").ok_or_else(|| error("component run is missing"))?;
+    let mut value = json!({"baseline_run_sha256":payload_digest("baseline")? ,"subject_run_sha256":payload_digest("subject")? ,"case_set_sha256":sets[0],"subject_artifact_sha256":subject["artifact_digest"]});
     if let Some(service) = subject.get("service_identity") {
         value["subject_service_identity_sha256"] = json!(digest(service)?);
     }
@@ -363,7 +390,7 @@ fn verify_inner(
         return Err(error("captured statement changed while loading"));
     }
     require_shared(
-        &shared_captured_inputs(&loaded.payloads)?,
+        &shared_checked_captured_inputs(&loaded.payloads)?,
         shared,
         "captured runs, cases, or subject artifact differ from shared recipient pins",
     )?;
@@ -601,7 +628,7 @@ pub fn verify_stored(config: &Value) -> Result<Value> {
             "evidence_set_verification",
             "stored composition result",
         )?;
-        if canonical(&claimed)? != canonical(&actual)? {
+        if !invarlock_native_contracts::canonical_json_matches(&actual, &canonical(&claimed)?)? {
             return Err(error(
                 "stored composition result differs from fresh verification",
             ));

@@ -62,7 +62,7 @@ pub(crate) fn canonical(value: &Value) -> Result<Vec<u8>> {
     contracts::canonical_json(value).map_err(Into::into)
 }
 pub(crate) fn digest(value: &Value) -> Result<String> {
-    Ok(contracts::sha256_digest(&canonical(value)?))
+    contracts::canonical_json_digest(value).map_err(Into::into)
 }
 pub(crate) fn is_digest(value: &str) -> bool {
     value.len() == 71

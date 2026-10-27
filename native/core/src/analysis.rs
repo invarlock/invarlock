@@ -2,8 +2,8 @@ use crate::{
     fsum, paired_exact_match_statistics, paired_resampling_interval, score, validate_configuration,
 };
 use invarlock_native_contracts::{
-    canonical_json, canonical_json_no_newline, canonical_json_to_writer, sha256_digest,
-    validate_schema,
+    canonical_json, canonical_json_digest, canonical_json_matches, canonical_json_no_newline,
+    canonical_json_to_writer, validate_schema, SchemaCheckedValue,
 };
 use num_bigint::BigInt;
 use num_rational::BigRational;
@@ -43,7 +43,7 @@ fn canonical(v: &Value) -> Result<Vec<u8>, AnalysisError> {
     canonical_json(v).map_err(|e| err(e.to_string()))
 }
 fn digest(v: &Value) -> Result<String, AnalysisError> {
-    Ok(sha256_digest(&canonical(v)?))
+    canonical_json_digest(v).map_err(|e| err(e.to_string()))
 }
 // Preserve the canonical case-identity projection without owning another copy
 // of every record. These fixed keys are in canonical Unicode lexical order;
@@ -364,6 +364,9 @@ fn likelihood_record(row: &Value, run: &Value, service: Option<&str>) -> Result<
 }
 pub fn check_run(run: &Value) -> Result<(), AnalysisError> {
     schema(run, "run")?;
+    check_run_semantics(run)
+}
+fn check_run_semantics(run: &Value) -> Result<(), AnalysisError> {
     let service = service_digest(run)?;
     let rows = run["records"].as_array().unwrap();
     for row in rows {
@@ -380,6 +383,9 @@ pub fn check_run(run: &Value) -> Result<(), AnalysisError> {
 }
 pub fn check_policy(policy: &Value) -> Result<(), AnalysisError> {
     schema(policy, "policy")?;
+    check_policy_semantics(policy)
+}
+fn check_policy_semantics(policy: &Value) -> Result<(), AnalysisError> {
     let mut names = BTreeSet::new();
     let mut slices = BTreeSet::new();
     if policy["metrics"]
@@ -463,11 +469,25 @@ pub use check_policy as validate_policy;
 pub use check_run as validate_run;
 pub struct ValidatedRun<'a> {
     value: &'a Value,
+    checked: Option<&'a SchemaCheckedValue>,
 }
 impl<'a> ValidatedRun<'a> {
     pub fn new(value: &'a Value) -> Result<Self, AnalysisError> {
         check_run(value)?;
-        Ok(Self { value })
+        Ok(Self {
+            value,
+            checked: None,
+        })
+    }
+    pub fn from_schema_checked(checked: &'a SchemaCheckedValue) -> Result<Self, AnalysisError> {
+        if checked.schema() != "run" {
+            return Self::new(checked.value());
+        }
+        check_run_semantics(checked.value())?;
+        Ok(Self {
+            value: checked.value(),
+            checked: Some(checked),
+        })
     }
     pub fn value(&self) -> &'a Value {
         self.value
@@ -475,11 +495,25 @@ impl<'a> ValidatedRun<'a> {
 }
 pub struct ValidatedPolicy<'a> {
     value: &'a Value,
+    checked: Option<&'a SchemaCheckedValue>,
 }
 impl<'a> ValidatedPolicy<'a> {
     pub fn new(value: &'a Value) -> Result<Self, AnalysisError> {
         check_policy(value)?;
-        Ok(Self { value })
+        Ok(Self {
+            value,
+            checked: None,
+        })
+    }
+    pub fn from_schema_checked(checked: &'a SchemaCheckedValue) -> Result<Self, AnalysisError> {
+        if checked.schema() != "policy" {
+            return Self::new(checked.value());
+        }
+        check_policy_semantics(checked.value())?;
+        Ok(Self {
+            value: checked.value(),
+            checked: Some(checked),
+        })
     }
     pub fn value(&self) -> &'a Value {
         self.value
@@ -746,6 +780,7 @@ pub fn compare_validated_runs(
     policy: &ValidatedPolicy<'_>,
     max_bootstrap_draws: Option<u64>,
 ) -> Result<Value, AnalysisError> {
+    let checked = [baseline.checked, subject.checked, policy.checked];
     let baseline = baseline.value;
     let subject = subject.value;
     let policy = policy.value;
@@ -799,7 +834,9 @@ pub fn compare_validated_runs(
             }
         }
         for key in ["input", "expected", "metadata"] {
-            if canonical(&left[key])? != canonical(&right[key])? {
+            if !canonical_json_matches(&right[key], &canonical(&left[key])?)
+                .map_err(|e| err(e.to_string()))?
+            {
                 return Err(err(format!("record {id}: {key} changed between runs")));
             }
         }
@@ -880,7 +917,14 @@ pub fn compare_validated_runs(
     if metrics.iter().any(|m| m["kind"] == NLL) {
         limitations.push("Normalized NLL replays captured reference-continuation likelihood facts; their model execution, tokenizer and configuration claims are source assertions, not independently established runtime facts.")
     }
-    let result = json!({"format":"invarlock/multi-metric-comparison-v1","decision":decision,"bindings":{"baseline":digest(baseline)?,"subject":digest(subject)?,"policy":digest(policy)?},"metrics":results,"limitations":limitations});
+    let binding_digest = |value: &Value, checked: Option<&SchemaCheckedValue>| match checked {
+        Some(checked) => checked
+            .canonical_digest()
+            .map(str::to_owned)
+            .map_err(|e| err(e.to_string())),
+        None => digest(value),
+    };
+    let result = json!({"format":"invarlock/multi-metric-comparison-v1","decision":decision,"bindings":{"baseline":binding_digest(baseline, checked[0])?,"subject":binding_digest(subject, checked[1])?,"policy":binding_digest(policy, checked[2])?},"metrics":results,"limitations":limitations});
     schema(&result, "comparison")?;
     Ok(result)
 }
@@ -888,6 +932,7 @@ pub fn compare_validated_runs(
 #[cfg(test)]
 mod seed_tests {
     use super::*;
+    use invarlock_native_contracts::sha256_digest;
 
     fn owned_projection(pairs: &[(&Value, &Value)]) -> Value {
         Value::Array(

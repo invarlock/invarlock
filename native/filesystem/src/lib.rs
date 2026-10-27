@@ -704,19 +704,74 @@ pub struct SelectedSnapshot<'a> {
     files: BTreeMap<String, usize>,
     dirs: BTreeSet<String>,
 }
-impl SelectedSnapshot<'_> {
+impl<'a> SelectedSnapshot<'a> {
     pub fn entries(&self) -> &BTreeMap<String, SnapshotEntry> {
         &self.entries
     }
     pub fn verify_source(&self) -> Result<()> {
-        self.root.verify()?;
-        if selected_inventory(self.root, self.limits, &self.files, &self.dirs)? != self.inventory {
-            return Err(Error::Changed(
-                "snapshot sources changed after capture".into(),
-            ));
-        }
-        self.root.verify()
+        verify_selected_source(
+            self.root,
+            &self.inventory,
+            self.limits,
+            &self.files,
+            &self.dirs,
+        )
     }
+    /// Release captured payloads while retaining every source identity and
+    /// inventory check needed for a final verification after replay.
+    pub fn into_source_guard(self) -> SelectedSnapshotSourceGuard<'a> {
+        let Self {
+            root,
+            inventory,
+            entries,
+            limits,
+            files,
+            dirs,
+        } = self;
+        drop(entries);
+        SelectedSnapshotSourceGuard {
+            root,
+            inventory,
+            limits,
+            files,
+            dirs,
+        }
+    }
+}
+/// Source identities retained after a selected snapshot's captured bytes are
+/// released. Verification inspects the pinned inventory without rereading data.
+pub struct SelectedSnapshotSourceGuard<'a> {
+    root: &'a PinnedDirectory,
+    inventory: BTreeMap<String, FileIdentity>,
+    limits: SnapshotLimits,
+    files: BTreeMap<String, usize>,
+    dirs: BTreeSet<String>,
+}
+impl SelectedSnapshotSourceGuard<'_> {
+    pub fn verify_source(&self) -> Result<()> {
+        verify_selected_source(
+            self.root,
+            &self.inventory,
+            self.limits,
+            &self.files,
+            &self.dirs,
+        )
+    }
+}
+fn verify_selected_source(
+    root: &PinnedDirectory,
+    inventory: &BTreeMap<String, FileIdentity>,
+    limits: SnapshotLimits,
+    files: &BTreeMap<String, usize>,
+    dirs: &BTreeSet<String>,
+) -> Result<()> {
+    root.verify()?;
+    if selected_inventory(root, limits, files, dirs)? != *inventory {
+        return Err(Error::Changed(
+            "snapshot sources changed after capture".into(),
+        ));
+    }
+    root.verify()
 }
 pub struct PackSnapshot {
     root: PinnedDirectory,
@@ -1753,6 +1808,108 @@ mod tests {
         assert!(snapshot.verify_source().is_err());
         assert_eq!(snapshot.entries()["inputs/a"].bytes(), b"abc");
         std::fs::remove_dir_all(p).unwrap();
+    }
+    #[test]
+    fn selected_source_guard_moves_metadata_and_verifies_without_payloads() {
+        let p = temp();
+        std::fs::create_dir(p.join("inputs")).unwrap();
+        std::fs::write(p.join("manifest.json"), b"{}").unwrap();
+        std::fs::write(p.join("inputs/a"), b"abc").unwrap();
+        let root = PinnedDirectory::open(&p, false).unwrap();
+        let files = BTreeMap::from([("manifest.json".into(), 64), ("inputs/a".into(), 8)]);
+        let dirs = BTreeSet::from(["inputs".into()]);
+        let snapshot = root
+            .capture_selected(SnapshotLimits::default(), &files, &dirs)
+            .unwrap();
+        assert_eq!(snapshot.entries()["inputs/a"].bytes(), b"abc");
+        snapshot.verify_source().unwrap();
+        let inventory_key = snapshot.inventory.first_key_value().unwrap().0.as_ptr();
+        let files_key = snapshot.files.first_key_value().unwrap().0.as_ptr();
+        let directory_key = snapshot.dirs.first().unwrap().as_ptr();
+        let guard = snapshot.into_source_guard();
+        assert!(std::ptr::eq(guard.root, &root));
+        assert_eq!(
+            guard.inventory.first_key_value().unwrap().0.as_ptr(),
+            inventory_key
+        );
+        assert_eq!(guard.files.first_key_value().unwrap().0.as_ptr(), files_key);
+        assert_eq!(guard.dirs.first().unwrap().as_ptr(), directory_key);
+        assert_eq!(
+            guard.limits.max_file_bytes,
+            SnapshotLimits::default().max_file_bytes
+        );
+        guard.verify_source().unwrap();
+        std::fs::remove_dir_all(p).unwrap();
+    }
+    #[test]
+    fn selected_source_guard_rejects_changed_files_and_inventories() {
+        use std::os::unix::fs::PermissionsExt;
+        for mutation in [
+            "replacement",
+            "content",
+            "metadata",
+            "addition",
+            "missing",
+            "symlink",
+        ] {
+            let p = temp();
+            std::fs::create_dir(p.join("inputs")).unwrap();
+            std::fs::write(p.join("inputs/a"), b"abc").unwrap();
+            let root = PinnedDirectory::open(&p, false).unwrap();
+            let snapshot = root
+                .capture_selected(
+                    SnapshotLimits::default(),
+                    &BTreeMap::from([("inputs/a".into(), 8)]),
+                    &BTreeSet::from(["inputs".into()]),
+                )
+                .unwrap();
+            let guard = snapshot.into_source_guard();
+            match mutation {
+                "replacement" => {
+                    std::fs::write(p.join("replacement"), b"abc").unwrap();
+                    std::fs::rename(p.join("replacement"), p.join("inputs/a")).unwrap();
+                }
+                "content" => std::fs::write(p.join("inputs/a"), b"changed").unwrap(),
+                "metadata" => {
+                    let current = std::fs::metadata(p.join("inputs/a")).unwrap().mode();
+                    std::fs::set_permissions(
+                        p.join("inputs/a"),
+                        std::fs::Permissions::from_mode(current ^ 0o100),
+                    )
+                    .unwrap();
+                }
+                "addition" => std::fs::write(p.join("inputs/new"), b"x").unwrap(),
+                "missing" => std::fs::remove_file(p.join("inputs/a")).unwrap(),
+                "symlink" => {
+                    std::fs::remove_file(p.join("inputs/a")).unwrap();
+                    symlink("/", p.join("inputs/a")).unwrap();
+                }
+                _ => unreachable!(),
+            }
+            assert!(guard.verify_source().is_err(), "accepted {mutation}");
+            std::fs::remove_dir_all(p).unwrap();
+        }
+    }
+    #[test]
+    fn selected_source_guard_rejects_replaced_root_directory() {
+        let p = temp();
+        std::fs::write(p.join("a"), b"abc").unwrap();
+        let root = PinnedDirectory::open(&p, false).unwrap();
+        let guard = root
+            .capture_selected(
+                SnapshotLimits::default(),
+                &BTreeMap::from([("a".into(), 8)]),
+                &BTreeSet::new(),
+            )
+            .unwrap()
+            .into_source_guard();
+        let moved = p.with_extension("moved");
+        std::fs::rename(&p, &moved).unwrap();
+        std::fs::create_dir(&p).unwrap();
+        let error = guard.verify_source().unwrap_err();
+        assert_eq!(error.to_string(), "directory source was replaced");
+        std::fs::remove_dir_all(p).unwrap();
+        std::fs::remove_dir_all(moved).unwrap();
     }
     #[test]
     fn selected_snapshot_enforces_per_file_and_missing_entry_bounds() {

@@ -252,6 +252,24 @@
     },
     {
       "type": "library",
+      "bom-ref": "pkg:cargo/cc@1.10.0",
+      "name": "cc",
+      "version": "1.10.0",
+      "purl": "pkg:cargo/cc@1.10.0",
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "86e055fa6e3e40ad6187ba25b6855eeb635d5271f8e0f0e1e9a5826b8d75bea0"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "bom-ref": "pkg:cargo/cfg-if@1.0.4",
       "name": "cfg-if",
       "version": "1.0.4",
@@ -535,6 +553,24 @@
         {
           "alg": "SHA-256",
           "content": "28dea519a9695b9977216879a3ebfddf92f1c08c05d984f8996aecd6ecdc811d"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/find-msvc-tools@0.1.15",
+      "name": "find-msvc-tools",
+      "version": "0.1.15",
+      "purl": "pkg:cargo/find-msvc-tools@0.1.15",
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "1c66915cc5391097de7a2b0b972e8505aa33c0df401fd3a6811dbdb32881ba48"
         }
       ]
     },
@@ -1940,6 +1976,24 @@
     },
     {
       "type": "library",
+      "bom-ref": "pkg:cargo/sha2-asm@0.6.4",
+      "name": "sha2-asm",
+      "version": "0.6.4",
+      "purl": "pkg:cargo/sha2-asm@0.6.4",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "b845214d6175804686b2bd482bcffe96651bb2d1200742b712003504a2dac1ab"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "bom-ref": "pkg:cargo/sha2@0.10.9",
       "name": "sha2",
       "version": "0.10.9",
@@ -1971,6 +2025,24 @@
         {
           "alg": "SHA-256",
           "content": "75872d278a8f37ef87fa0ddbda7802605cb18344497949862c0d4dcb291eba60"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/shlex@2.0.1",
+      "name": "shlex",
+      "version": "2.0.1",
+      "purl": "pkg:cargo/shlex@2.0.1",
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
         }
       ]
     },
@@ -2708,6 +2780,13 @@
       "dependsOn": []
     },
     {
+      "ref": "pkg:cargo/cc@1.10.0",
+      "dependsOn": [
+        "pkg:cargo/find-msvc-tools@0.1.15",
+        "pkg:cargo/shlex@2.0.1"
+      ]
+    },
+    {
       "ref": "pkg:cargo/cfg-if@1.0.4",
       "dependsOn": []
     },
@@ -2814,6 +2893,10 @@
     },
     {
       "ref": "pkg:cargo/fiat-crypto@0.2.9",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:cargo/find-msvc-tools@0.1.15",
       "dependsOn": []
     },
     {
@@ -3388,11 +3471,18 @@
       ]
     },
     {
+      "ref": "pkg:cargo/sha2-asm@0.6.4",
+      "dependsOn": [
+        "pkg:cargo/cc@1.10.0"
+      ]
+    },
+    {
       "ref": "pkg:cargo/sha2@0.10.9",
       "dependsOn": [
         "pkg:cargo/cfg-if@1.0.4",
         "pkg:cargo/cpufeatures@0.2.17",
-        "pkg:cargo/digest@0.10.7"
+        "pkg:cargo/digest@0.10.7",
+        "pkg:cargo/sha2-asm@0.6.4"
       ]
     },
     {
@@ -3401,6 +3491,10 @@
         "pkg:cargo/digest@0.10.7",
         "pkg:cargo/keccak@0.1.6"
       ]
+    },
+    {
+      "ref": "pkg:cargo/shlex@2.0.1",
+      "dependsOn": []
     },
     {
       "ref": "pkg:cargo/signature@2.2.0",

@@ -16,7 +16,10 @@ pub mod runtime;
 pub mod schedule;
 mod schemas;
 
-pub use canonical::{canonical_json, canonical_json_no_newline, canonical_json_to_writer};
+pub use canonical::{
+    canonical_json, canonical_json_digest, canonical_json_matches, canonical_json_no_newline,
+    canonical_json_to_writer,
+};
 pub use parser::parse_json;
 pub use schemas::{
     first_schema_error, first_schema_error_details, first_schema_error_fragment,
@@ -82,7 +85,7 @@ impl ParsedDocument {
         &self.0.digest
     }
     pub fn require_canonical(&self) -> Result<()> {
-        if canonical_json(self.value())? != self.raw() {
+        if !canonical_json_matches(self.value(), self.raw())? {
             return Err(ContractError::new(
                 "noncanonical_json",
                 "payload must use canonical JSON",
@@ -96,6 +99,51 @@ impl ParsedDocument {
             parsed: self.clone(),
             schema: name.into(),
         })
+    }
+}
+
+/// Owned schema evidence tied to an immutable value. Consuming the wrapper
+/// releases the value but also consumes its validation and cached identity.
+///
+/// ```compile_fail
+/// use invarlock_native_contracts::{SchemaCheckedValue, Value};
+/// fn mutate(checked: &SchemaCheckedValue) {
+///     checked.value()["records"] = Value::Null;
+/// }
+/// ```
+#[derive(Debug)]
+pub struct SchemaCheckedValue {
+    value: Value,
+    schema: String,
+    canonical_digest: std::sync::OnceLock<String>,
+}
+impl SchemaCheckedValue {
+    pub fn new(value: Value, schema: &str) -> Result<Self> {
+        validate_schema(&value, schema)?;
+        Ok(Self {
+            value,
+            schema: schema.into(),
+            canonical_digest: std::sync::OnceLock::new(),
+        })
+    }
+    pub fn value(&self) -> &Value {
+        &self.value
+    }
+    pub fn schema(&self) -> &str {
+        &self.schema
+    }
+    pub fn into_value(self) -> Value {
+        self.value
+    }
+    pub fn canonical_digest(&self) -> Result<&str> {
+        if self.canonical_digest.get().is_none() {
+            let digest = canonical_json_digest(&self.value)?;
+            let _ = self.canonical_digest.set(digest);
+        }
+        Ok(self
+            .canonical_digest
+            .get()
+            .expect("initialized canonical digest"))
     }
 }
 

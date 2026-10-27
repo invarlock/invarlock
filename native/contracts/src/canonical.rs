@@ -1,5 +1,6 @@
 use crate::{ContractError, Result, Value};
-use std::io::Write;
+use sha2::{Digest, Sha256};
+use std::io::{self, BufWriter, Write};
 
 /// Python-compatible finite float representation, including exponent sign and
 /// zero padding, fixed/scientific cutovers, integral floats, and negative zero.
@@ -67,8 +68,64 @@ pub fn canonical_json_no_newline(value: &Value) -> Result<Vec<u8>> {
     Ok(out)
 }
 
+/// Compare the complete canonical encoding, including its final newline, with
+/// existing bytes without allocating a second document-sized buffer. A mismatch
+/// never stops traversal: invalid numbers retain precedence over inequality.
+pub fn canonical_json_matches(value: &Value, raw: &[u8]) -> Result<bool> {
+    struct MatchWriter<'a> {
+        remaining: &'a [u8],
+        matched: bool,
+    }
+    impl Write for MatchWriter<'_> {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            if self.matched {
+                if let Some(remaining) = self.remaining.strip_prefix(bytes) {
+                    self.remaining = remaining;
+                } else {
+                    self.matched = false;
+                }
+            }
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+    let mut writer = MatchWriter {
+        remaining: raw,
+        matched: true,
+    };
+    canonical_json_to_writer(value, &mut writer, true)?;
+    Ok(writer.matched && writer.remaining.is_empty())
+}
+
+/// SHA-256 identity of the complete canonical encoding, including its final
+/// newline. Buffer small encoding writes before updating the digest.
+pub fn canonical_json_digest(value: &Value) -> Result<String> {
+    struct DigestWriter<'a>(&'a mut Sha256);
+    impl Write for DigestWriter<'_> {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            self.0.update(bytes);
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+    let mut digest = Sha256::new();
+    {
+        let mut writer = BufWriter::with_capacity(64 * 1024, DigestWriter(&mut digest));
+        canonical_json_to_writer(value, &mut writer, true)?;
+        writer.flush().map_err(|e| {
+            ContractError::new("canonical_io", format!("value is not canonical JSON: {e}"))
+        })?;
+    }
+    Ok(format!("sha256:{:x}", digest.finalize()))
+}
+
 /// Encode directly to a bounded sink or hash writer without a document-sized
-/// temporary allocation. Object sorting allocates references only.
+/// temporary allocation. Pending traversal frames are bounded by nesting depth;
+/// each active object additionally retains its sorted entry references.
 pub fn canonical_json_to_writer(
     value: &Value,
     writer: &mut impl Write,
@@ -81,15 +138,49 @@ pub fn canonical_json_to_writer(
     }
     enum Action<'a> {
         Value(&'a Value),
-        Bytes(&'static [u8]),
-        Key(&'a str),
+        Array {
+            values: &'a [Value],
+            index: usize,
+        },
+        Object {
+            entries: std::vec::IntoIter<(&'a str, &'a Value)>,
+            first: bool,
+        },
     }
     let mut stack = vec![Action::Value(value)];
     while let Some(action) = stack.pop() {
         match action {
-            Action::Bytes(bytes) => put(writer, bytes)?,
-            Action::Key(key) => serde_json::to_writer(&mut *writer, key)
-                .map_err(|e| ContractError::new("canonical_io", e.to_string()))?,
+            Action::Array { values, index } => {
+                if let Some(value) = values.get(index) {
+                    if index != 0 {
+                        put(writer, b",")?;
+                    }
+                    stack.push(Action::Array {
+                        values,
+                        index: index + 1,
+                    });
+                    stack.push(Action::Value(value));
+                } else {
+                    put(writer, b"]")?;
+                }
+            }
+            Action::Object { mut entries, first } => {
+                if let Some((key, value)) = entries.next() {
+                    if !first {
+                        put(writer, b",")?;
+                    }
+                    serde_json::to_writer(&mut *writer, key)
+                        .map_err(|e| ContractError::new("canonical_io", e.to_string()))?;
+                    put(writer, b":")?;
+                    stack.push(Action::Object {
+                        entries,
+                        first: false,
+                    });
+                    stack.push(Action::Value(value));
+                } else {
+                    put(writer, b"}")?;
+                }
+            }
             Action::Value(value) => match value {
                 Value::Null => put(writer, b"null")?,
                 Value::Bool(v) => put(writer, if *v { b"true" } else { b"false" })?,
@@ -111,27 +202,20 @@ pub fn canonical_json_to_writer(
                 }
                 Value::Array(values) => {
                     put(writer, b"[")?;
-                    stack.push(Action::Bytes(b"]"));
-                    for (i, v) in values.iter().enumerate().rev() {
-                        stack.push(Action::Value(v));
-                        if i != 0 {
-                            stack.push(Action::Bytes(b","));
-                        }
-                    }
+                    stack.push(Action::Array { values, index: 0 });
                 }
                 Value::Object(values) => {
                     put(writer, b"{")?;
-                    stack.push(Action::Bytes(b"}"));
-                    let mut keys: Vec<_> = values.keys().collect();
-                    keys.sort_unstable(); // UTF-8 lexical order is Unicode scalar order.
-                    for (i, key) in keys.iter().enumerate().rev() {
-                        stack.push(Action::Value(&values[*key]));
-                        stack.push(Action::Bytes(b":"));
-                        stack.push(Action::Key(key));
-                        if i != 0 {
-                            stack.push(Action::Bytes(b","));
-                        }
-                    }
+                    let mut entries: Vec<_> = values
+                        .iter()
+                        .map(|(key, value)| (key.as_str(), value))
+                        .collect();
+                    // UTF-8 lexical order is Unicode scalar order.
+                    entries.sort_unstable_by(|(a, _), (b, _)| a.cmp(b));
+                    stack.push(Action::Object {
+                        entries: entries.into_iter(),
+                        first: true,
+                    });
                 }
             },
         }

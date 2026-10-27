@@ -1,5 +1,5 @@
 use crate::{canonical::python_float, ContractError, Result, Value};
-use serde_json::{Map, Number};
+use serde_json::{map::Entry, Map, Number};
 use std::str::FromStr;
 
 // Bounded independently of process stack settings. Python's recursion ceiling is
@@ -21,6 +21,69 @@ pub fn parse_json(raw: &[u8], label: &str) -> Result<Value> {
     }
     Ok(value)
 }
+// Most contract objects have only a handful of fields. Growing IndexMap's entry
+// vector geometrically retains unused Value-sized slots in every such object.
+// Buffer a bounded number of fields so these maps can reserve their exact size;
+// a wide object switches to the ordinary map before buffering can grow large.
+const BUFFERED_OBJECT_FIELDS: usize = 32;
+enum ObjectFields {
+    Buffered(Vec<(String, Value)>),
+    Wide(Map<String, Value>),
+}
+impl ObjectFields {
+    fn new() -> Self {
+        // Start below Vec's four-slot first growth for one- and two-field objects.
+        Self::Buffered(Vec::with_capacity(3))
+    }
+    fn insert(&mut self, key: String, value: Value, duplicate: &mut Option<String>) {
+        if let Self::Buffered(fields) = self {
+            if fields.len() < BUFFERED_OBJECT_FIELDS {
+                fields.push((key, value));
+                return;
+            }
+            let mut map = Map::with_capacity(fields.len() + 1);
+            for (key, value) in std::mem::take(fields) {
+                insert_field(&mut map, key, value, duplicate);
+            }
+            *self = Self::Wide(map);
+        }
+        let Self::Wide(map) = self else {
+            unreachable!()
+        };
+        insert_field(map, key, value, duplicate);
+    }
+    fn finish(self, duplicate: &mut Option<String>) -> Map<String, Value> {
+        match self {
+            Self::Wide(map) => map,
+            Self::Buffered(fields) => {
+                let mut map = Map::with_capacity(fields.len());
+                for (key, value) in fields {
+                    insert_field(&mut map, key, value, duplicate);
+                }
+                map
+            }
+        }
+    }
+}
+fn insert_field(
+    map: &mut Map<String, Value>,
+    key: String,
+    value: Value,
+    duplicate: &mut Option<String>,
+) {
+    match map.entry(key) {
+        Entry::Vacant(entry) => {
+            entry.insert(value);
+        }
+        Entry::Occupied(mut entry) => {
+            if duplicate.is_none() {
+                *duplicate = Some(entry.key().clone());
+            }
+            entry.insert(value);
+        }
+    }
+}
+
 struct Parser<'a> {
     text: &'a str,
     offset: usize,
@@ -52,7 +115,7 @@ impl Parser<'_> {
         enum Frame {
             Array(Vec<Value>),
             Object {
-                values: Map<String, Value>,
+                values: ObjectFields,
                 key: String,
                 duplicate: Option<String>,
             },
@@ -92,7 +155,7 @@ impl Parser<'_> {
                             return Err(self.invalid());
                         }
                         frames.push(Frame::Object {
-                            values: Map::new(),
+                            values: ObjectFields::new(),
                             key,
                             duplicate: None,
                         });
@@ -136,7 +199,7 @@ impl Parser<'_> {
                             let Some(Frame::Array(values)) = frames.pop() else {
                                 unreachable!()
                             };
-                            value = Value::Array(values);
+                            value = Value::Array(values.into_boxed_slice().into_vec());
                         } else if self.consume(b',') {
                             continue 'next_value;
                         } else {
@@ -148,17 +211,17 @@ impl Parser<'_> {
                         key,
                         duplicate,
                     } => {
-                        if values.contains_key(key) && duplicate.is_none() {
-                            *duplicate = Some(key.clone());
-                        }
-                        values.insert(std::mem::take(key), value);
+                        values.insert(std::mem::take(key), value, duplicate);
                         if self.consume(b'}') {
                             let Some(Frame::Object {
-                                values, duplicate, ..
+                                values,
+                                mut duplicate,
+                                ..
                             }) = frames.pop()
                             else {
                                 unreachable!()
                             };
+                            let values = values.finish(&mut duplicate);
                             if let Some(key) = duplicate {
                                 return Err(ContractError::new(
                                     "duplicate_key",
@@ -188,11 +251,15 @@ impl Parser<'_> {
             return Err(self.invalid());
         }
         let bytes = self.text.as_bytes();
+        let mut escaped = false;
         while self.offset < bytes.len() {
             let b = bytes[self.offset];
             self.offset += 1;
             match b {
                 b'"' => {
+                    if !escaped {
+                        return Ok(self.text[start + 1..self.offset - 1].into());
+                    }
                     let raw = &self.text[start..self.offset];
                     if unpaired_surrogate(raw) {
                         return Err(ContractError::new("unpaired_surrogate", format!("{} has an unpaired surrogate with no canonical UTF-8 representation", self.label)));
@@ -204,6 +271,7 @@ impl Parser<'_> {
                     });
                 }
                 b'\\' => {
+                    escaped = true;
                     if self.offset >= bytes.len() {
                         return Err(self.invalid());
                     }

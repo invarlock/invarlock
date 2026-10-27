@@ -34,6 +34,7 @@ WORKLOAD_LABELS = (
     "Judge\npack",
     "Evidence\nset",
 )
+BEFORE_COMMIT = "09e23090cba31666ca083d38acd15343da6096be"
 AFTER_COMMIT = "5e4c0c53ac2fe593880fda713b3c57f9d3d12478"
 BASELINE_COMMIT = "ce04f20ed7ccefc1bc826098f1b0aa4102b63ef3"
 METRICS = (
@@ -114,7 +115,28 @@ def order(round_index, workload_index):
     return base[shift:] + base[:shift]
 
 
-def validate(run, metadata_path, environment_path):
+def validate_sources(metadata, expected_python, expected_before, expected_after):
+    for label, expected, actual in (
+        ("Python baseline", expected_python, metadata["source_commit"]),
+        ("before", expected_before, metadata["before_source"]["commit"]),
+        ("final candidate", expected_after, metadata["after_source"]["commit"]),
+    ):
+        require(
+            len(expected) == 40 and all(c in "0123456789abcdef" for c in expected),
+            "expected source revisions must be full lowercase Git commit IDs",
+        )
+        require(actual == expected, f"unexpected {label} source commit")
+
+
+def validate(
+    run,
+    metadata_path,
+    environment_path,
+    *,
+    expected_python=BASELINE_COMMIT,
+    expected_before=BEFORE_COMMIT,
+    expected_after=AFTER_COMMIT,
+):
     metadata = read(metadata_path)
     environment = read(environment_path)
     manifest = read(run / "manifest.json")
@@ -141,18 +163,7 @@ def validate(run, metadata_path, environment_path):
         and sha(metadata_path) == manifest["metadata_sha256"],
         "run metadata identity differs",
     )
-    require(
-        metadata["source_commit"] == BASELINE_COMMIT,
-        "unexpected Python baseline commit",
-    )
-    require(
-        metadata["before_source"]["commit"].startswith("09e23090"),
-        "unexpected before source commit",
-    )
-    require(
-        metadata["after_source"]["commit"] == AFTER_COMMIT,
-        "unexpected final candidate source commit",
-    )
+    validate_sources(metadata, expected_python, expected_before, expected_after)
     require(
         environment["machine"] == "aarch64"
         and environment["platform"].startswith("Linux"),
@@ -444,7 +455,7 @@ def validate(run, metadata_path, environment_path):
         "exclusions": 0,
         "candidate_labels": dict(zip(CANDIDATES, LABELS, strict=True)),
         "sources": {
-            "python_baseline": BASELINE_COMMIT,
+            "python_baseline": expected_python,
             "rust_before": metadata["before_source"],
             "rust_after": metadata["after_source"],
             "source_archives": {
@@ -573,9 +584,17 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("run", "metadata", "environment", "output"):
         parser.add_argument("--" + name, type=Path, required=True)
+    parser.add_argument("--expected-python", default=BASELINE_COMMIT)
+    parser.add_argument("--expected-before", default=BEFORE_COMMIT)
+    parser.add_argument("--expected-after", default=AFTER_COMMIT)
     args = parser.parse_args()
     report = validate(
-        args.run.resolve(), args.metadata.resolve(), args.environment.resolve()
+        args.run.resolve(),
+        args.metadata.resolve(),
+        args.environment.resolve(),
+        expected_python=args.expected_python,
+        expected_before=args.expected_before,
+        expected_after=args.expected_after,
     )
     args.output.mkdir(parents=True, exist_ok=False)
     charts(report, args.output)

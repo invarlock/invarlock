@@ -69,7 +69,7 @@ def export(args):
     fixture_root = Path(os.path.commonpath(paths))
     output.mkdir(parents=True, exist_ok=False)
     sources = {}
-    for name, ref in (("before", "09e23090"), ("after", args.after)):
+    for name, ref in (("before", args.before), ("after", args.after)):
         commit = capture(
             ["git", "-C", str(repo), "rev-parse", "--verify", ref + "^{commit}"]
         )
@@ -444,6 +444,11 @@ def main():
     )
     for name in ("repository", "metadata", "fixtures", "output"):
         command.add_argument("--" + name, type=Path, required=True)
+    command.add_argument(
+        "--before",
+        default="09e23090cba31666ca083d38acd15343da6096be",
+        help="committed previous candidate revision; defaults to the original Rust build",
+    )
     command.add_argument(
         "--after",
         required=True,

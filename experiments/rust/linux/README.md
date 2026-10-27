@@ -23,11 +23,17 @@ its original nine files must match the retained metadata.
 ```sh
 python3 experiments/rust/linux/launch.py export \
   --repository /path/to/invarlock \
+  --before COMMITTED_PREVIOUS_REVISION \
   --after COMMITTED_CANDIDATE_REVISION \
   --metadata /path/to/retained-artifacts/metadata.json \
   --fixtures /path/to/retained-artifacts/fixtures-with-reports.json \
   --output /path/to/invarlock-linux-inputs
 ```
+
+`--before` selects the exact prior Rust source to rebuild. Its default preserves
+the original comparison against `09e23090`; subsequent optimization passes should
+supply their preceding measured revision explicitly. Retain both full revisions
+and validate the result renderer against those expected identities.
 
 The new output directory contains native source archives, the fixed pure-Python
 wheel and dependency lock, the allowlisted harness, matrix, launcher, and only

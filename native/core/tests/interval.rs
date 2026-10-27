@@ -1,4 +1,7 @@
-use invarlock_native_core::{fsum, paired_resampling_interval, sample_indexes, IntervalError};
+use invarlock_native_core::{
+    fsum, paired_resampling_interval, resampling_distribution, sample_indexes, IntervalError,
+    REPLICATES,
+};
 
 #[test]
 fn summation_retains_cancellation_and_final_partial_rounding() {
@@ -106,4 +109,25 @@ fn computed_infinity_and_nan_are_left_for_outer_report_validation() {
         fsum([f64::INFINITY, f64::NEG_INFINITY]),
         Err(IntervalError::OppositeInfinities)
     );
+}
+
+#[test]
+fn public_distribution_preserves_singleton_and_seed_first_behavior() {
+    let seed = "a".repeat(64);
+    assert_eq!(
+        resampling_distribution("custom", &[0.25], &[0.5], &seed).unwrap(),
+        vec![25.0]
+    );
+    assert_eq!(
+        resampling_distribution("custom", &[f64::NAN], &[1.0], "invalid"),
+        Err(IntervalError::InvalidSeed)
+    );
+    assert_eq!(
+        sample_indexes("invalid", 0, 0),
+        Err(IntervalError::InvalidSeed)
+    );
+    let distribution =
+        resampling_distribution("custom", &[0.0, -0.0], &[-0.0, 0.0], &seed).unwrap();
+    assert_eq!(distribution.len(), REPLICATES);
+    assert!(distribution.iter().all(|value| value.to_bits() == 0));
 }

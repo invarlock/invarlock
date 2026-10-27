@@ -41,6 +41,18 @@ The earlier qualified build profile is Rust 1.94.0 and CPython 3.12 on macOS arm
 The companion package declares Python `>=3.12,<3.13`; other profiles require their
 own qualification. The toolchain and Cargo dependency versions are pinned.
 
+ARM builds enable runtime SHA-256 acceleration through the locked `sha2`
+assembly feature and require a working C/assembly compiler. Linux dispatch checks
+CPU support and retains the software implementation when SHA instructions are
+unavailable. The x86 dependency feature selection is unchanged.
+
+Paired bootstrap replay uses at most eight workers, capped by the operating
+system's reported available parallelism. Small workloads stay serial; failed
+thread creation falls back to inline computation. Each replicate retains the
+reference draw schedule and floating-point summation order, and result/error
+selection follows replicate order. This is an execution change, not a change to
+the statistical method.
+
 From this directory:
 
 ```sh

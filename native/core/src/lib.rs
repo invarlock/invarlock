@@ -39,7 +39,14 @@ impl std::error::Error for IntervalError {}
 /// Includes CPython's final multiple-partial half-even correction, intermediate
 /// overflow rejection, special values, and positive zero for an empty/zero sum.
 pub fn fsum(values: impl IntoIterator<Item = f64>) -> Result<f64, IntervalError> {
-    let mut partials: Vec<f64> = Vec::with_capacity(32);
+    fsum_with_scratch(values, &mut Vec::with_capacity(32))
+}
+
+fn fsum_with_scratch(
+    values: impl IntoIterator<Item = f64>,
+    partials: &mut Vec<f64>,
+) -> Result<f64, IntervalError> {
+    partials.clear();
     let mut special_sum = 0.0;
     let mut inf_sum = 0.0;
     for mut x in values {
@@ -126,17 +133,22 @@ fn seed_bytes(schedule_sha256: &str) -> Result<[u8; 32], IntervalError> {
 }
 
 fn indexes(seed: &[u8; 32], count: usize, replicate: u64) -> Vec<usize> {
+    let mut draws = Vec::with_capacity(count);
+    indexes_into(seed, count, replicate, &mut draws);
+    draws
+}
+
+fn indexes_into(seed: &[u8; 32], count: usize, replicate: u64, draws: &mut Vec<usize>) {
     let mut input = [0u8; 48];
     input[..32].copy_from_slice(seed);
     input[32..40].copy_from_slice(&replicate.to_be_bytes());
-    (0..count)
-        .map(|draw| {
-            input[40..].copy_from_slice(&(draw as u64).to_be_bytes());
-            let digest = Sha256::digest(input);
-            (u64::from_be_bytes(digest[..8].try_into().expect("eight digest bytes")) % count as u64)
-                as usize
-        })
-        .collect()
+    draws.clear();
+    draws.extend((0..count).map(|draw| {
+        input[40..].copy_from_slice(&(draw as u64).to_be_bytes());
+        let digest = Sha256::digest(input);
+        (u64::from_be_bytes(digest[..8].try_into().expect("eight digest bytes")) % count as u64)
+            as usize
+    }));
 }
 
 /// Diagnostic entry point for checking the complete SHA-256 draw protocol.
@@ -173,16 +185,20 @@ fn comparison(
     baseline: &[f64],
     subject: &[f64],
     draws: &[usize],
+    partials: &mut Vec<f64>,
 ) -> Result<f64, IntervalError> {
     let count = baseline.len() as f64;
     if metric != "normalized_nll_per_utf8_byte" {
-        return Ok(fsum(draws.iter().map(|&i| subject[i] - baseline[i]))? / count * 100.0);
+        return Ok(
+            fsum_with_scratch(draws.iter().map(|&i| subject[i] - baseline[i]), partials)? / count
+                * 100.0,
+        );
     }
-    let baseline_mean = fsum(draws.iter().map(|&i| baseline[i]))? / count;
+    let baseline_mean = fsum_with_scratch(draws.iter().map(|&i| baseline[i]), partials)? / count;
     if baseline_mean <= 0.0 {
         return Err(IntervalError::NonPositiveBaseline);
     }
-    Ok((fsum(draws.iter().map(|&i| subject[i]))? / count) / baseline_mean)
+    Ok((fsum_with_scratch(draws.iter().map(|&i| subject[i]), partials)? / count) / baseline_mean)
 }
 
 /// Unsorted replicates in reference evaluation order. The singleton shortcut
@@ -193,16 +209,131 @@ pub fn resampling_distribution(
     subject: &[f64],
     schedule_sha256: &str,
 ) -> Result<Vec<f64>, IntervalError> {
+    let available = if baseline.len().saturating_mul(REPLICATES) < 2 * MIN_DRAWS_PER_WORKER {
+        1
+    } else {
+        std::thread::available_parallelism().map_or(1, usize::from)
+    };
+    distribution_with_workers(
+        metric,
+        baseline,
+        subject,
+        schedule_sha256,
+        REPLICATES,
+        bootstrap_workers(baseline.len(), REPLICATES, available),
+    )
+}
+
+// Bound both thread count and per-worker scratch memory. available_parallelism
+// accounts for the operating system's affinity and supported cgroup quotas.
+const MAX_BOOTSTRAP_WORKERS: usize = 8;
+// Release microcases on the development host amortize scoped-thread startup
+// by about 4,096 draws per worker; workloads below 8,192 total draws stay serial. This deliberately
+// keeps sub-millisecond cases serial even where extra threads can help.
+const MIN_DRAWS_PER_WORKER: usize = 4_096;
+
+fn bootstrap_workers(count: usize, replicates: usize, available: usize) -> usize {
+    available
+        .min(MAX_BOOTSTRAP_WORKERS)
+        .min(replicates)
+        .min(count.saturating_mul(replicates) / MIN_DRAWS_PER_WORKER)
+        .max(1)
+}
+
+fn distribution_with_workers(
+    metric: &str,
+    baseline: &[f64],
+    subject: &[f64],
+    schedule_sha256: &str,
+    replicates: usize,
+    workers: usize,
+) -> Result<Vec<f64>, IntervalError> {
+    distribution_with_spawn_policy(
+        metric,
+        baseline,
+        subject,
+        schedule_sha256,
+        replicates,
+        workers,
+        |_| Ok(()),
+    )
+}
+
+fn distribution_with_spawn_policy(
+    metric: &str,
+    baseline: &[f64],
+    subject: &[f64],
+    schedule_sha256: &str,
+    replicates: usize,
+    workers: usize,
+    mut permit_spawn: impl FnMut(usize) -> std::io::Result<()>,
+) -> Result<Vec<f64>, IntervalError> {
     let seed = validate(baseline, subject, schedule_sha256)?;
     if baseline.len() == 1 {
-        return Ok(vec![comparison(metric, baseline, subject, &[0])?]);
+        return Ok(vec![comparison(
+            metric,
+            baseline,
+            subject,
+            &[0],
+            &mut Vec::with_capacity(32),
+        )?]);
     }
-    let mut distribution = Vec::with_capacity(REPLICATES);
-    for replicate in 0..REPLICATES {
-        let draws = indexes(&seed, baseline.len(), replicate as u64);
-        distribution.push(comparison(metric, baseline, subject, &draws)?);
+    let workers = workers
+        .clamp(1, MAX_BOOTSTRAP_WORKERS)
+        .min(replicates.max(1));
+    let compute = |first: usize, length: usize| {
+        let mut output = Vec::with_capacity(length);
+        let mut draws = Vec::with_capacity(baseline.len());
+        let mut partials = Vec::with_capacity(32);
+        for replicate in first..first + length {
+            indexes_into(&seed, baseline.len(), replicate as u64, &mut draws);
+            output.push(comparison(
+                metric,
+                baseline,
+                subject,
+                &draws,
+                &mut partials,
+            )?);
+        }
+        Ok::<_, IntervalError>(output)
+    };
+    if workers == 1 {
+        return compute(0, replicates);
     }
-    Ok(distribution)
+    enum Chunk<'scope> {
+        Spawned(std::thread::ScopedJoinHandle<'scope, Result<Vec<f64>, IntervalError>>),
+        Inline(Result<Vec<f64>, IntervalError>),
+    }
+    let chunk_size = replicates.div_ceil(workers);
+    std::thread::scope(|scope| {
+        let chunks: Vec<_> = (0..replicates)
+            .step_by(chunk_size)
+            .enumerate()
+            .map(|(chunk, first)| {
+                let length = chunk_size.min(replicates - first);
+                match permit_spawn(chunk).and_then(|()| {
+                    std::thread::Builder::new().spawn_scoped(scope, move || compute(first, length))
+                }) {
+                    Ok(handle) => Chunk::Spawned(handle),
+                    // Thread creation is an optional optimization. If the OS
+                    // cannot create a worker, compute that range on this thread.
+                    Err(_) => Chunk::Inline(compute(first, length)),
+                }
+            })
+            .collect();
+        let mut distribution = Vec::with_capacity(replicates);
+        // Keep inline results in range order too: a later range's error must
+        // never displace an earlier worker's analytical error. Every replicate
+        // retains the same serial draws and arithmetic regardless of placement.
+        for chunk in chunks {
+            let output = match chunk {
+                Chunk::Spawned(handle) => handle.join().expect("bootstrap worker panicked"),
+                Chunk::Inline(result) => result,
+            }?;
+            distribution.extend(output);
+        }
+        Ok(distribution)
+    })
 }
 
 fn percentile(ordered: &[f64], quantile: f64) -> f64 {
@@ -294,3 +425,276 @@ mod preflight;
 pub use preflight::captured_preflight_capacity;
 
 pub use report::validate_scorer_binding;
+
+#[cfg(test)]
+mod bootstrap_tests {
+    use super::*;
+
+    const SEED: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+    // Keep the allocation-per-replicate reference to check scratch reuse as well
+    // as scheduling. This deliberately follows the previous serial implementation.
+    fn serial_reference(
+        metric: &str,
+        baseline: &[f64],
+        subject: &[f64],
+        replicates: usize,
+    ) -> Result<Vec<f64>, IntervalError> {
+        let seed = validate(baseline, subject, SEED)?;
+        (0..replicates)
+            .map(|replicate| {
+                let draws = indexes(&seed, baseline.len(), replicate as u64);
+                let count = baseline.len() as f64;
+                if metric != "normalized_nll_per_utf8_byte" {
+                    return Ok(
+                        fsum(draws.iter().map(|&i| subject[i] - baseline[i]))? / count * 100.0,
+                    );
+                }
+                let baseline_mean = fsum(draws.iter().map(|&i| baseline[i]))? / count;
+                if baseline_mean <= 0.0 {
+                    return Err(IntervalError::NonPositiveBaseline);
+                }
+                Ok((fsum(draws.iter().map(|&i| subject[i]))? / count) / baseline_mean)
+            })
+            .collect()
+    }
+
+    fn bits(result: Result<Vec<f64>, IntervalError>) -> Result<Vec<u64>, IntervalError> {
+        result.map(|values| values.into_iter().map(f64::to_bits).collect())
+    }
+
+    #[test]
+    fn worker_counts_preserve_every_replicate_bit() {
+        let fixtures = [
+            ("custom", vec![0.0; 5], vec![1e-16, 1.0, 1e16, -1e16, -1.0]),
+            ("custom", vec![0.0, -0.0, 0.0], vec![-0.0, 0.0, -0.0]),
+            (
+                "custom",
+                vec![0.0; 3],
+                vec![f64::from_bits(1), -f64::from_bits(1), 0.0],
+            ),
+            (
+                "normalized_nll_per_utf8_byte",
+                vec![0.125, 1.0, 3.0, 9.0],
+                vec![0.2, 0.75, 4.0, 5.0],
+            ),
+            (
+                "normalized_nll_per_utf8_byte",
+                vec![f64::from_bits(1); 2],
+                vec![1.0; 2],
+            ),
+            ("custom", vec![-f64::MAX; 2], vec![f64::MAX; 2]),
+        ];
+        for (metric, baseline, subject) in fixtures {
+            for replicates in [1, 3, 17, 65, REPLICATES] {
+                let expected = bits(serial_reference(metric, &baseline, &subject, replicates));
+                for workers in [1, 2, 4, 8] {
+                    assert_eq!(
+                        bits(distribution_with_workers(
+                            metric, &baseline, &subject, SEED, replicates, workers
+                        )),
+                        expected,
+                        "{metric}, {replicates} replicates, {workers} workers"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn worker_counts_preserve_serial_errors_and_validation_order() {
+        let fixtures = [
+            (
+                "normalized_nll_per_utf8_byte",
+                vec![1e308, 1e308, -1e308],
+                vec![1.0; 3],
+            ),
+            ("custom", vec![0.0; 3], vec![1e308, 1e308, -1e308]),
+            (
+                "custom",
+                vec![-f64::MAX, f64::MAX],
+                vec![f64::MAX, -f64::MAX],
+            ),
+            (
+                "normalized_nll_per_utf8_byte",
+                vec![-1.0, 0.0, 1.0],
+                vec![1.0; 3],
+            ),
+        ];
+        // This fixture has different errors across replicate ranges, so a worker
+        // that finishes first cannot be allowed to choose the returned error.
+        let seed = seed_bytes(SEED).unwrap();
+        let errors: Vec<_> = (0..65)
+            .filter_map(|replicate| {
+                comparison(
+                    fixtures[0].0,
+                    &fixtures[0].1,
+                    &fixtures[0].2,
+                    &indexes(&seed, 3, replicate),
+                    &mut Vec::new(),
+                )
+                .err()
+            })
+            .collect();
+        assert!(errors.contains(&IntervalError::IntermediateOverflow));
+        assert!(errors.contains(&IntervalError::NonPositiveBaseline));
+        for (metric, baseline, subject) in fixtures {
+            let expected = bits(serial_reference(metric, &baseline, &subject, 65));
+            assert!(expected.is_err());
+            for workers in [1, 2, 4, 8] {
+                assert_eq!(
+                    bits(distribution_with_workers(
+                        metric, &baseline, &subject, SEED, 65, workers
+                    )),
+                    expected
+                );
+            }
+        }
+        for workers in [1, 2, 4, 8] {
+            assert_eq!(
+                distribution_with_workers("custom", &[], &[], "invalid", 65, workers),
+                Err(IntervalError::InvalidSeed)
+            );
+            assert_eq!(
+                distribution_with_workers("custom", &[f64::NAN], &[1.0], "invalid", 65, workers),
+                Err(IntervalError::InvalidSeed)
+            );
+            assert_eq!(
+                distribution_with_workers("custom", &[1.0], &[], SEED, 65, workers),
+                Err(IntervalError::InvalidLength)
+            );
+            assert_eq!(
+                distribution_with_workers("custom", &[f64::NAN], &[1.0], SEED, 65, workers),
+                Err(IntervalError::NonFiniteInput)
+            );
+            assert_eq!(
+                distribution_with_workers("custom", &[0.25], &[0.5], SEED, 65, workers).unwrap(),
+                vec![25.0]
+            );
+        }
+    }
+
+    #[test]
+    fn failed_worker_creation_preserves_bits_and_first_analytical_error() {
+        let fixtures = [
+            ("custom", vec![0.0; 5], vec![1e-16, 1.0, 1e16, -1e16, -1.0]),
+            (
+                "custom",
+                vec![0.0; 3],
+                vec![f64::from_bits(1), -f64::from_bits(1), 0.0],
+            ),
+            (
+                "normalized_nll_per_utf8_byte",
+                vec![0.125, 1.0, 3.0, 9.0],
+                vec![0.2, 0.75, 4.0, 5.0],
+            ),
+            (
+                "normalized_nll_per_utf8_byte",
+                vec![1e308, 1e308, -1e308],
+                vec![1.0; 3],
+            ),
+            ("custom", vec![0.0; 3], vec![1e308, 1e308, -1e308]),
+            (
+                "custom",
+                vec![-f64::MAX, f64::MAX],
+                vec![f64::MAX, -f64::MAX],
+            ),
+        ];
+        for (metric, baseline, subject) in fixtures {
+            for replicates in [3, 17, 65, REPLICATES] {
+                let expected = bits(serial_reference(metric, &baseline, &subject, replicates));
+                for workers in [2, 4, 8] {
+                    let workers = workers.min(replicates);
+                    let chunk_size = replicates.div_ceil(workers);
+                    let chunk_count = replicates.div_ceil(chunk_size);
+                    // Fail the first attempt, a middle attempt, or every attempt.
+                    // The policy feeds the same Result branch as spawn_scoped's
+                    // OS failure, without disrupting the process's actual limits.
+                    for failure in [Some(0), Some(chunk_count / 2), None] {
+                        let mut attempts = 0;
+                        let actual = distribution_with_spawn_policy(
+                            metric,
+                            &baseline,
+                            &subject,
+                            SEED,
+                            replicates,
+                            workers,
+                            |chunk| {
+                                attempts += 1;
+                                if failure.is_none() || failure == Some(chunk) {
+                                    Err(std::io::Error::new(
+                                        std::io::ErrorKind::WouldBlock,
+                                        "injected worker creation failure",
+                                    ))
+                                } else {
+                                    Ok(())
+                                }
+                            },
+                        );
+                        assert_eq!(attempts, chunk_count);
+                        assert_eq!(bits(actual), expected, "{metric}, {replicates} replicates, {workers} workers, failure {failure:?}");
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn scratch_resets_after_overflow_and_partial_rounding() {
+        let mut partials = Vec::new();
+        assert_eq!(
+            fsum_with_scratch([1e308, 1e308], &mut partials),
+            Err(IntervalError::IntermediateOverflow)
+        );
+        for values in [[1e16, 1.0, -1e16], [1e-16, 1.0, 1e16], [-0.0, 0.0, -0.0]] {
+            assert_eq!(
+                fsum_with_scratch(values, &mut partials).unwrap().to_bits(),
+                fsum(values).unwrap().to_bits()
+            );
+        }
+    }
+
+    #[test]
+    fn worker_selection_bounds_threads_and_small_work() {
+        assert_eq!(bootstrap_workers(2, REPLICATES, 64), 1);
+        assert_eq!(
+            bootstrap_workers(50_000, REPLICATES, 64),
+            MAX_BOOTSTRAP_WORKERS
+        );
+        assert_eq!(bootstrap_workers(50_000, REPLICATES, 2), 2);
+        assert_eq!(bootstrap_workers(50_000, 3, 64), 3);
+        assert_eq!(
+            bootstrap_workers(usize::MAX, REPLICATES, 64),
+            MAX_BOOTSTRAP_WORKERS
+        );
+    }
+
+    #[test]
+    #[ignore = "bounded timing diagnostic; run explicitly in release mode"]
+    fn bootstrap_worker_microcases() {
+        for count in [2, 8, 16, 32, 64, 256, 1024] {
+            let baseline = vec![1.0; count];
+            let subject = vec![1.25; count];
+            for workers in [1, 2, 4, 8] {
+                let mut times = Vec::new();
+                for _ in 0..3 {
+                    let started = std::time::Instant::now();
+                    std::hint::black_box(
+                        distribution_with_workers(
+                            "custom", &baseline, &subject, SEED, REPLICATES, workers,
+                        )
+                        .unwrap(),
+                    );
+                    times.push(started.elapsed().as_secs_f64() * 1000.0);
+                }
+                times.sort_by(f64::total_cmp);
+                eprintln!(
+                    "draws={} workers={} median_ms={:.3}",
+                    count * REPLICATES,
+                    workers,
+                    times[1]
+                );
+            }
+        }
+    }
+}

@@ -186,8 +186,8 @@ fn model(run: &Value, records: &[Value]) -> Result<Option<Value>> {
         None
     })
 }
-type Messages = BTreeMap<String, Vec<(String, String)>>;
-fn messages(records: &[Value], http: bool) -> Option<Messages> {
+type Messages<'a> = BTreeMap<&'a str, Vec<(&'a str, &'a str)>>;
+fn messages(records: &[Value], http: bool) -> Option<Messages<'_>> {
     let mut out = Messages::new();
     for r in records {
         let list = if http {
@@ -207,22 +207,22 @@ fn messages(records: &[Value], http: bool) -> Option<Messages> {
             {
                 return None;
             }
-            parsed.push((t(m, "role").into(), t(m, "content").into()))
+            parsed.push((t(m, "role"), t(m, "content")))
         }
         let id = t(r, "id");
-        if id.is_empty() || out.insert(id.into(), parsed).is_some() {
+        if id.is_empty() || out.insert(id, parsed).is_some() {
             return None;
         }
     }
     Some(out)
 }
-fn paired(a: &Option<Messages>, b: &Option<Messages>) -> bool {
+fn paired(a: &Option<Messages<'_>>, b: &Option<Messages<'_>>) -> bool {
     match (a, b) {
         (Some(a), Some(b)) => !a.is_empty() && !b.is_empty() && a.keys().eq(b.keys()),
         _ => false,
     }
 }
-fn roles(m: &Option<Messages>) -> String {
+fn roles(m: &Option<Messages<'_>>) -> String {
     let Some(m) = m.as_ref().filter(|m| !m.is_empty()) else {
         return "Unavailable in recorded context".into();
     };
@@ -249,7 +249,7 @@ fn roles(m: &Option<Messages>) -> String {
     }
     out
 }
-fn prompt(a: &Option<Messages>, b: &Option<Messages>, http: bool) -> (String, Vec<Value>) {
+fn prompt(a: &Option<Messages<'_>>, b: &Option<Messages<'_>>, http: bool) -> (String, Vec<Value>) {
     if !paired(a, b) {
         return("Prompt comparison unavailable in this report projection: no complete, uniquely paired supported message view is available.".into(),vec![]);
     }
@@ -554,4 +554,60 @@ pub(super) fn captured(inputs: &Value) -> Result<ContextProjection> {
         vec![json!(change), json!(prompt)],
         prompt_details,
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn message_views_borrow_record_strings_and_keep_duplicate_rejection() {
+        let records = vec![json!({"id":"one","context":{"effective_messages":[
+            {"role":"user","content":"é😀 prompt"}
+        ]}})];
+        let view = messages(&records, false).unwrap();
+        let (&id, pairs) = view.first_key_value().unwrap();
+        assert!(std::ptr::eq(
+            id.as_ptr(),
+            records[0]["id"].as_str().unwrap().as_ptr()
+        ));
+        assert!(std::ptr::eq(
+            pairs[0].1.as_ptr(),
+            records[0]["context"]["effective_messages"][0]["content"]
+                .as_str()
+                .unwrap()
+                .as_ptr()
+        ));
+        assert!(messages(&[records[0].clone(), records[0].clone()], false).is_none());
+        assert!(messages(&[json!({"id":"one","context":{"effective_messages":[{"role":"user","content":"x","extra":true}]}})], false).is_none());
+        assert!(messages(
+            &[json!({"id":"one","context":{"effective_messages":[{"role":" ","content":"x"}]}})],
+            false
+        )
+        .is_none());
+        assert!(messages(
+            &[json!({"id":"one","context":{"effective_messages":[]}})],
+            false
+        )
+        .is_none());
+    }
+
+    #[test]
+    fn message_projection_keeps_http_fallback_and_uniform_instruction_detection() {
+        let baseline = json!({"run_id":"base","records":[{"id":"one","context":{
+            "effective_messages":[{"role":"user","content":false}],
+            "http_observation":{"request":{"messages":[{"role":"user","content":"q"}]}}
+        }}]});
+        let subject = json!({"run_id":"subject","records":[{"id":"one","context":{
+            "http_observation":{"request":{"messages":[{"role":"system","content":"instruction"},{"role":"user","content":"q"}]}}
+        }}]});
+        let inputs = json!({"baseline":baseline,"subject":subject});
+        let (_, context, conclusions, details) = captured(&inputs).unwrap();
+        assert!(context
+            .iter()
+            .any(|row| row[0] == "Prompt observation scope"));
+        assert_eq!(conclusions[1], "The subject adds the same system instruction across all 1 paired cases; all other HTTP request messages are unchanged.");
+        assert_eq!(details[0][1]["system_instruction"], "instruction");
+        assert_eq!(details[0][1]["paired_cases_checked"], 1);
+    }
 }

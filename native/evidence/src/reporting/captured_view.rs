@@ -487,10 +487,7 @@ pub(crate) fn assemble(
     let mut identity = Vec::new();
     if let (Some(inputs), Some(m)) = (inputs, manifest) {
         identity.extend([
-            json!([
-                "Manifest",
-                invarlock_native_contracts::sha256_digest(&crate::canonical(m)?)
-            ]),
+            json!(["Manifest", crate::digest(m)?]),
             json!(["Comparison", m["comparison_id"]]),
             json!(["Evidence signer", signer.unwrap_or("None")]),
         ]);
@@ -564,7 +561,7 @@ pub(crate) fn assemble(
 /// Authenticate one immutable captured snapshot, then project its stored results.
 pub fn load(path: &std::path::Path) -> Result<Value> {
     let loaded = crate::evidence_sets::load_captured(path)?;
-    let payloads = Value::Object(loaded.payloads);
+    let payloads = Value::Object(loaded.payloads.into_values());
     let comparison = &payloads["report"];
     let policy = &payloads["policy"];
     let policies = a(policy, "metrics")
