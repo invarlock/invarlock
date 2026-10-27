@@ -115,3 +115,27 @@ def test_worked_review_context_survives_actual_print(tmp_path, name, paper):
     for value in values:
         assert compact(value) in body, value
     assert "Decisionownerandrecommendation:Notsupplied".casefold() not in body
+
+    brief_result = subprocess.run(
+        [
+            pdf_python,
+            "-c",
+            "from pypdf import PdfReader; import json,sys; print(json.dumps([p.extract_text() for p in PdfReader(sys.argv[1]).pages]))",
+            str(root / "brief.pdf"),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    brief_pages = json.loads(brief_result.stdout)
+    assert len(brief_pages) == 1
+    brief_text = compact(brief_pages[0])
+    for value in (
+        scenario["decision"],
+        scenario["next_action"],
+        "Recorded policy result",
+        "Not performed for this recipient",
+        "Evidence statement identity",
+    ):
+        assert compact(value) in brief_text

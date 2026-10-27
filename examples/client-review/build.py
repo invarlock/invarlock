@@ -1,124 +1,85 @@
-"""Build complete fictional reviews around unchanged retained evidence, offline."""
+"""Build the worked scenarios through the installed client-handoff API, offline."""
 
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import shutil
-from dataclasses import replace
+import tempfile
 from html import escape
 from pathlib import Path
-from zipfile import ZIP_DEFLATED, ZipFile
 
-from invarlock.captured_contracts import captured_snapshot, load_payloads
-from invarlock.record_reporting import _view
-from invarlock.report_presentation import AuthoredReview, render_html, render_markdown
+from invarlock.engine import CLIENT_REVIEW_CONTEXT_FORMAT, build_client_review
 
 ROOT = Path(__file__).resolve().parents[2]
 SCENARIOS = Path(__file__).with_name("scenarios.json")
 
 
 def build(output: Path) -> dict[str, dict[str, str]]:
-    """Use a fresh destination; retain original files and a byte inventory."""
+    """Keep reference originals; clients use the same builder with their own context."""
     output.mkdir(parents=True, exist_ok=False)
     scenarios = json.loads(SCENARIOS.read_text())
     inventory = {}
     for name, scenario in scenarios.items():
         reference = ROOT / scenario["reference"]
         destination = output / name
-        shutil.copytree(reference / "evidence", destination / "evidence")
-        with captured_snapshot(reference / "evidence") as snapshot:
-            _, inputs, _ = load_payloads(snapshot)
-            technical = _view(inputs["report"], snapshot)
-        originals = {
-            str(path.relative_to(destination)): hashlib.sha256(
-                path.read_bytes()
-            ).hexdigest()
-            for path in destination.rglob("*")
-            if path.is_file()
+        attachments = {
+            "source-reference.json": reference / "reference.json",
+            "source-reference.md": reference / "README.md",
         }
-        for source_name, target_name in (
-            ("verification.receipt.json", "verification.receipt.json"),
-            ("reference.json", "source-reference.json"),
-            ("README.md", "source-reference.md"),
-        ):
-            shutil.copyfile(reference / source_name, destination / target_name)
-            originals[target_name] = hashlib.sha256(
-                (reference / source_name).read_bytes()
-            ).hexdigest()
-        for path in sorted(reference.glob("*.pem")):
-            shutil.copyfile(path, destination / path.name)
-            originals[path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
+        attachments.update(
+            {path.name: path for path in sorted(reference.glob("*.pem"))}
+        )
         for suffix in ("html", "md", "xml"):
             path = reference / f"report.{suffix}"
             if path.exists():
-                target = f"retained-report.{suffix}"
-                shutil.copyfile(path, destination / target)
-                originals[target] = hashlib.sha256(path.read_bytes()).hexdigest()
-        for suffix, render in (("html", render_html), ("md", render_markdown)):
-            (destination / f"technical-report.{suffix}").write_text(render(technical))
-        authored = AuthoredReview(
-            **{
-                key: scenario[key]
-                for key in (
-                    "label",
-                    "byline",
-                    "recommendation",
-                    "decision",
-                    "next_action",
-                )
-            },
-            context=tuple(tuple(row) for row in scenario["context"]),
-            basis=tuple(tuple(row) for row in scenario["basis"]),
+                attachments[f"retained-report.{suffix}"] = path
+        with tempfile.TemporaryDirectory(prefix="client-review-context-") as directory:
+            temporary = Path(directory).resolve()
+            scenario_path = temporary / "authored-scenario.json"
+            scenario_path.write_text(
+                json.dumps(scenario, indent=2, ensure_ascii=False) + "\n"
+            )
+            attachments["authored-scenario.json"] = scenario_path
+            context = {
+                key: value for key, value in scenario.items() if key != "reference"
+            }
+            context.update(
+                format=CLIENT_REVIEW_CONTEXT_FORMAT,
+                review_date="2026-10-24",
+                title=(
+                    "Editorial checkpoint replacement"
+                    if name == "likelihood-adverse"
+                    else "HTTP capture and handover rehearsal"
+                ),
+            )
+            context_path = temporary / "context.json"
+            context_path.write_text(json.dumps(context, ensure_ascii=False))
+            build_client_review(
+                reference / "evidence",
+                context_path=context_path,
+                output=destination,
+                retained_receipt=reference / "verification.receipt.json",
+                supporting_files=attachments,
+            )
+        inventory[name] = json.loads(
+            (destination / "original-file-hashes.json").read_text()
         )
-        review = replace(
-            technical,
-            review=authored,
-            metrics=tuple(
-                replace(metric, evidence_source="evidence/" + metric.evidence_source)
-                for metric in technical.metrics
-            ),
-        )
-        (destination / "review.html").write_text(render_html(review))
-        (destination / "review.md").write_text(render_markdown(review))
-        (destination / "authored-scenario.json").write_text(
-            json.dumps(scenario, indent=2, ensure_ascii=False) + "\n"
-        )
-        (destination / "original-file-hashes.json").write_text(
-            json.dumps(originals, indent=2, sort_keys=True) + "\n"
-        )
-        (destination / "README.txt").write_text(
-            "Start with review.html or review.md for the completed fictional client review.\n"
-            "authored-scenario.json contains the fictional business context and decisions.\n"
-            "technical-report.html and .md are current technical renderings without authored context.\n"
-            "retained-report files, where present, are the original reference renderings.\n"
-            "The evidence/ directory retains the original pack's paths and exact bytes.\n"
-            "original-file-hashes.json inventories those files and the copied source reference and receipt.\n"
-            "Source reference: "
-            + scenario["reference"]
-            + " in the InvarLock repository.\n"
-            "source-reference.md is copied unchanged; its original relative links refer to that repository location.\n"
-            "Verify the canonical pack inside evidence/ using independently approved trust inputs.\n"
-        )
-        with ZipFile(output / f"{name}.zip", "w", compression=ZIP_DEFLATED) as archive:
-            for path in sorted(destination.rglob("*")):
-                if path.is_file():
-                    archive.write(path, str(path.relative_to(destination)))
-        inventory[name] = originals
+        shutil.copyfile(destination / "handoff.zip", output / f"{name}.zip")
     links = "".join(
-        f'<li><a href="{name}/review.html">{escape(scenario["decision"])}</a> '
-        f'· <a href="{name}.zip">Complete review package</a> '
-        f'· <a href="{name}/technical-report.html">Technical report (evidence only)</a></li>'
+        f'<li><a href="{name}/brief.html">{escape(scenario["decision"])}</a> '
+        f'· <a href="{name}.zip">Review package ZIP</a> '
+        f'· <a href="{name}/verification.html">Recipient guide</a> '
+        f'· <a href="{name}/review.html">Full authored review</a></li>'
         for name, scenario in scenarios.items()
     )
     (output / "index.html").write_text(
         '<!doctype html><html lang="en"><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
-        "<title>Completed InvarLock review examples</title>"
+        "<title>InvarLock client review examples</title>"
         "<style>body{font:18px/1.6 system-ui;max-width:850px;margin:40px auto;padding:24px;color:#20251f}li{margin:24px 0}a{color:#145d7b}</style>"
-        "<h1>Completed client review examples</h1>"
-        "<p>Real retained comparisons, complete fictional business reviews. Each example chooses a purpose, rationale, owner, recommendation, decision and next action.</p>"
+        "<h1>Client review examples</h1>"
+        "<p>Real retained comparisons and attributed fictional business reviews. Start with the decision brief, then follow the guide using independently approved recipient inputs.</p>"
         "<ul>" + links + "</ul></html>\n"
     )
     return inventory
