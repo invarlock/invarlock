@@ -9,11 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add complete client-review examples with separately attributed fictional
+- Add client-review examples with separately attributed fictional
   context, recommendations, decisions and follow-up actions around retained real
   comparisons. Each package includes HTML and Markdown reviews alongside original
   signed evidence, a receipt, public keys, source references and a file-hash
-  inventory, with a ZIP copy of the complete handoff.
+  inventory, with a ZIP copy of those files.
   Authored commentary does not change evidence or grant recipient approval.
 
 ### Changed
