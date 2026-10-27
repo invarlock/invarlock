@@ -624,3 +624,13 @@ images or source-checkout dependency groups. See [Release verification](release-
   verification objects.
 - [Release verification](release-verification.md) separates package versioning
   from evidence-format and provider-ABI compatibility.
+
+## Authored client review context
+
+`invarlock/client-review-context-v1` is a closed commentary input validated by the
+client handoff builder. Its fields, size bounds and pending-decision behavior are
+specified in the [client handoff guide](../user-guide/client-handoff.md). It is
+separate from signed evidence and recipient trust inputs. The package inventory
+and CLI response use `invarlock/client-review-package-v1` and explicitly record
+that packaging has not performed recipient verification. These presentation
+records do not extend or replace an evidence or acceptance contract.

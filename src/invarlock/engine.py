@@ -30,6 +30,8 @@ from invarlock.captured_normalization import (
     comparison_policy_digest,
     normalize_captured_request,
 )
+from invarlock.client_review import CONTEXT_FORMAT as CLIENT_REVIEW_CONTEXT_FORMAT
+from invarlock.client_review import ClientReviewError, build_client_review
 from invarlock.core.checkpoint_identity import checkpoint_tree_sha256
 from invarlock.core.evaluation_request import (
     CapturedEvaluationRequest,
@@ -254,6 +256,9 @@ def compare_runs(
 
 
 __all__ = [
+    "CLIENT_REVIEW_CONTEXT_FORMAT",
+    "ClientReviewError",
+    "build_client_review",
     "CapturedEvaluationPreflightResult",
     "CapturedEvaluationTransactionResult",
     "CapturedTrustInputs",
