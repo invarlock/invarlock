@@ -6,10 +6,12 @@ the candidate Rust binding, and candidate Rust standalone. Both native versions
 are compiled on the selected Linux architecture. The old macOS executable is
 never copied or used.
 
-This launcher has not yet completed a Linux build or qualification. The cached
-`python:3.12-slim` image alone is insufficient: it lacks Rust and the required
-offline build/dependency caches. No image pull, container, build, or measurement
-is started by creating these files or running `--help`.
+The retained Linux ARM64 VM run completed all 32 qualifications and 128 timings
+with matching outputs and no retries or exclusions. See the
+[optimization results](../../../docs/reference/rust-optimization-results.md) for
+source identities, environment and limits. A cached `python:3.12-slim` image alone
+is insufficient: it lacks Rust and the required offline build/dependency caches.
+The instructions below describe how to prepare a separate run.
 
 ## Prepare the inputs on the current host
 
@@ -96,8 +98,8 @@ failed/stopped run and do not pool its timings into a replacement run.
 Use a locally prepared **Linux ARM64** image with the prerequisites above. A
 Python slim image can be its starting point, but preparing that image and any
 network downloads are separate work. Set `IMAGE` to its immutable local image ID
-and record its provenance. These commands are an operator recipe, not operations
-that have been performed:
+and record its provenance. These commands are a reusable operator recipe; the
+retained run used separately recorded names and the environment above:
 
 ```sh
 IMAGE=sha256:REPLACE_WITH_PREPARED_LOCAL_IMAGE_ID
@@ -122,7 +124,9 @@ docker exec invarlock-linux python3.12 /work/input/launch.py prepare \
   --host-description 'Apple M2 Max; fill in current macOS and physical RAM' \
   --vm-description 'Docker Desktop Linux ARM64 VM; fill in VM CPU/RAM; container 4 CPUs and 12 GiB' \
   --storage-description 'named volume on guest ext filesystem; record Docker virtual disk physical location and host filesystem'
-docker exec invarlock-linux python3.12 /work/comparison/inputs/launch.py run \
+docker exec invarlock-linux chown -R 1000:1000 /work/comparison
+docker exec --user 1000:1000 invarlock-linux \
+  python3.12 /work/comparison/inputs/launch.py run \
   --work /work/comparison --name primary
 ```
 
