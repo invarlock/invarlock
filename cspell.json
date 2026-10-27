@@ -32,6 +32,8 @@
     "native/vendor/serde_json/README.md"
   ],
   "words": [
+    "metaschema",
+    "prevalidated",
     "serde",
     "subtests",
     "Clippy",

@@ -1,5 +1,14 @@
 # Rust optimization results
 
+
+> **Measurement correction:** Later controls showed that the historical process
+> launcher inherited its Python parent’s peak-memory floor and rounded short
+> elapsed observations through a 10 ms polling loop. Small-workload RSS plateaus
+> and tiny elapsed differences on this page cannot establish implementation
+> gains or regressions. The retained observations remain unchanged. Revised
+> measurements use a separate process boundary and are not pooled with these
+> results. Whole-wheel identity reads also inflated small FFI peaks.
+
 > **Reference**
 >
 > **Surface:** Experimental native memory changes and Linux comparison
