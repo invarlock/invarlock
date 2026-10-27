@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import shutil
@@ -16,6 +17,42 @@ import launch as legacy
 
 NEW_HARNESS = ("comparison_v2.py", "bounded_worker.py")
 SUPPORT = ("measure_v2.c", "qualify_measurement_v2.py", "launch.py", "launch_v2.py")
+
+
+PRIOR_MEASURED_COMMIT = "e3caec51941990a2d620c00984c8b08e662e8b76"
+
+
+def harness_revision(repo, name, old):
+    relative = "experiments/rust/python/invarlock_rust_experiment/" + name
+    source = repo / relative
+    observed = legacy.digest(source)
+    reference = None
+    if name == "optimization_runner.py" and old is None:
+        # This module postdates the original expanded metadata. Bind its exact
+        # prior measured revision instead of inventing an original identity.
+        raw = subprocess.check_output(
+            ["git", "-C", str(repo), "show", PRIOR_MEASURED_COMMIT + ":" + relative]
+        )
+        if hashlib.sha256(raw).hexdigest() != observed:
+            raise ValueError(
+                "later-added optimization runner differs from frozen prior revision"
+            )
+        reference = {"commit": PRIOR_MEASURED_COMMIT, "path": relative}
+        change = "added after original baseline; bound to prior measured revision"
+    elif name in NEW_HARNESS:
+        change = "new measurement revision"
+    elif old != observed:
+        raise ValueError(
+            f"historical harness source changed: {name}; keep legacy bytes intact"
+        )
+    else:
+        change = "unchanged"
+    return {
+        "prior_sha256": old,
+        "current_sha256": observed,
+        "change": change,
+        "source_reference": reference,
+    }
 
 
 def export(args):
@@ -62,20 +99,9 @@ def export(args):
     revisions = {}
     for name in (*legacy.HARNESS, *NEW_HARNESS):
         source = repo / "experiments/rust/python/invarlock_rust_experiment" / name
-        observed = legacy.digest(source)
-        old = historical.get(name)
-        if name not in NEW_HARNESS and old != observed:
-            raise ValueError(
-                f"historical harness source changed: {name}; keep legacy bytes intact"
-            )
-        legacy.copy_verified(source, observed, harness / name)
-        revisions[name] = {
-            "prior_sha256": old,
-            "current_sha256": observed,
-            "change": "new measurement revision"
-            if name in NEW_HARNESS
-            else "unchanged",
-        }
+        revision = harness_revision(repo, name, historical.get(name))
+        legacy.copy_verified(source, revision["current_sha256"], harness / name)
+        revisions[name] = revision
     for name in SUPPORT:
         shutil.copyfile(repo / "experiments/rust/linux" / name, output / name)
     shutil.copyfile(args.fixtures, output / "fixtures-original.json")
