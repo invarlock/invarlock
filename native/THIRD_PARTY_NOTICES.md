@@ -35,7 +35,8 @@ the license grant and copyright holders.
 ## Modified schema dependency
 
 `vendor/jsonschema` retains jsonschema 0.39.0 under its MIT license with a
-limited repair to preserve reference traversal for custom-keyword diagnostics.
+limited repair to preserve reference traversal for custom-keyword diagnostics
+and an explicit compilation API for prevalidated embedded schema definitions.
 The accompanying provenance record separates the upstream archive hash from
 the exact patch and patched source-tree hashes. The dependency inventory and
 SBOM identify this as modified third-party code rather than a workspace crate.

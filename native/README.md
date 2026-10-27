@@ -198,6 +198,11 @@ custom validators must retain reference traversal when reporting errors; droppin
 that context changes which public diagnostic appears first. The retained upstream
 archive identity, source inventory, exact patch and removal criteria live under
 `vendor/`. Vendored dependency code is not InvarLock's own Rust implementation.
+Its explicit compilation path for prevalidated definitions is used only for the
+closed embedded schema list and guarded run projections. Contract tests validate
+those definitions with the ordinary metaschema checks. Instance validation and
+error traversal are unchanged; caller schemas and dynamic fragments retain
+schema-definition validation at runtime.
 
 Publication uses `fsync` at the same boundaries as Python. On macOS this replaces
 Rust's stronger `F_FULLFSYNC`; it is a deliberate alignment with the reference

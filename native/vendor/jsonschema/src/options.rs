@@ -531,6 +531,24 @@ impl ValidationOptions<Arc<dyn referencing::Retrieve>> {
     pub fn build(&self, schema: &Value) -> Result<Validator, ValidationError<'static>> {
         compiler::build_validator(self, schema)
     }
+
+    /// Compile a schema whose definition has already passed the selected draft's
+    /// metaschema validation. Instance validation is unchanged.
+    ///
+    /// The caller must ensure the exact schema definition and its resources are
+    /// trusted and validated. Use `build` for caller-supplied or mutable schemas.
+    ///
+    /// # Errors
+    ///
+    /// Returns compilation or reference-resolution errors. This method omits
+    /// only the schema-definition metaschema check.
+    pub fn build_prevalidated(
+        mut self,
+        schema: &Value,
+    ) -> Result<Validator, ValidationError<'static>> {
+        self.validate_schema = false;
+        compiler::build_validator(&self, schema)
+    }
     pub(crate) fn draft_for(&self, contents: &Value) -> Result<Draft, ValidationError<'static>> {
         // Preference:
         //  - Explicitly set

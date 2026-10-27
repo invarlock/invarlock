@@ -847,18 +847,19 @@
       ],
       "modified_upstream_files": [
         "src/error.rs",
-        "src/keywords/custom.rs"
+        "src/keywords/custom.rs",
+        "src/options.rs"
       ],
-      "patch": "reference-tracker.patch",
+      "patch": "local-changes.patch",
       "upstream_file_hashes": "upstream-files.sha256.json",
-      "patch_sha256": "8b0e6ab149f19ebd9f7848e806b44ce29f61513368dd24e01f71d9c5badaf3a3",
+      "patch_sha256": "cd3f7278b4daf91eb7da053a7bfcb675b7fbd19d99825d8781ad699f561c14b6",
       "patched_file_hashes": "patched-files.sha256.json",
-      "patched_source_tree_sha256": "526d43b0311008a43d43c149f2d66a4bc573c56838923b47fc255c22a1e68cea",
+      "patched_source_tree_sha256": "49a89dc448cbde854dac84d09b262e2a9a6d06d8a595dacb127438ee70be28c9",
       "patched_source_tree_algorithm": "SHA-256 of UTF-8 JSON mapping retained upstream relative paths to current SHA-256 hashes, sorted keys, compact separators, no trailing newline; excludes local provenance and documentation files.",
       "provenance_path": "vendor/jsonschema/source-provenance.json",
-      "provenance_sha256": "d8e3536fa37f0a2b4bdf140d4ff00aeaa9f65c3c18241e5e67c338af135c2745",
+      "provenance_sha256": "1791c8a320275dd610ae8c6d373c707400676749a30fef0df004f29f631c6c45",
       "upstream_file_hashes_sha256": "5f62ef77142dff44b05f9700505182cd394dfc5849b3af009faae50a79a445ee",
-      "patched_file_hashes_sha256": "3edb5258d4bebea3bf66cfc7eae3e2c66e319e9f9d8d37b039bd55992d044c9e"
+      "patched_file_hashes_sha256": "b638610f0d2b0dcfeb0c61c31fcf7e64d062fa089bb4294c2f3364494be6c921"
     },
     "notices": [
       {

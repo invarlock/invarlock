@@ -1,0 +1,72 @@
+--- a/src/error.rs
++++ b/src/error.rs
+@@ -1191,21 +1191,21 @@
+ 
+     /// Fill in context for a placeholder validation error.
+     ///
+-    /// Used by custom keywords, which never involve `$ref` traversal,
+-    /// so evaluation path equals schema path.
++    /// Custom keywords can be reached through shared `$ref` targets, so retain
++    /// the current traversal just as built-in keyword errors do.
+     pub(crate) fn with_context<'i>(
+         self,
+         instance: &'i Value,
+         instance_path: &LazyLocation,
+         schema_path: &Location,
++        tracker: Option<&crate::paths::RefTracker<'_>>,
+     ) -> ValidationError<'i> {
+         ValidationError::new(
+             Cow::Borrowed(instance),
+             self.repr.kind,
+             instance_path.into(),
+             schema_path.clone(),
+-            // Custom keywords are never reached via $ref, so evaluation path = schema path
+-            LazyEvaluationPath::SameAsSchemaPath,
++            crate::paths::capture_evaluation_path(tracker, schema_path),
+         )
+     }
+ 
+--- a/src/keywords/custom.rs
++++ b/src/keywords/custom.rs
+@@ -21,12 +21,12 @@
+         &self,
+         instance: &'i Value,
+         instance_path: &LazyLocation,
+-        _tracker: Option<&RefTracker>,
++        tracker: Option<&RefTracker>,
+         _ctx: &mut ValidationContext,
+     ) -> Result<(), ValidationError<'i>> {
+         self.inner
+             .validate(instance)
+-            .map_err(|err| err.with_context(instance, instance_path, &self.location))
++            .map_err(|err| err.with_context(instance, instance_path, &self.location, tracker))
+     }
+ 
+     fn is_valid(&self, instance: &Value, _ctx: &mut ValidationContext) -> bool {
+--- a/src/options.rs
++++ b/src/options.rs
+@@ -530,6 +530,24 @@
+     /// in a separate blocking thread via `tokio::task::spawn_blocking`.
+     pub fn build(&self, schema: &Value) -> Result<Validator, ValidationError<'static>> {
+         compiler::build_validator(self, schema)
++    }
++
++    /// Compile a schema whose definition has already passed the selected draft's
++    /// metaschema validation. Instance validation is unchanged.
++    ///
++    /// The caller must ensure the exact schema definition and its resources are
++    /// trusted and validated. Use `build` for caller-supplied or mutable schemas.
++    ///
++    /// # Errors
++    ///
++    /// Returns compilation or reference-resolution errors. This method omits
++    /// only the schema-definition metaschema check.
++    pub fn build_prevalidated(
++        mut self,
++        schema: &Value,
++    ) -> Result<Validator, ValidationError<'static>> {
++        self.validate_schema = false;
++        compiler::build_validator(&self, schema)
+     }
+     pub(crate) fn draft_for(&self, contents: &Value) -> Result<Draft, ValidationError<'static>> {
+         // Preference:

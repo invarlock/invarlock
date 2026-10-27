@@ -62,7 +62,7 @@
   "src/keywords/unique_items.rs": "c726834b23d2323d6adfb2c90bd558882a827b4ba42e37557c042bb5ac14f3d4",
   "src/lib.rs": "bcb1c4b4cbab817efd83cbe26092c3b7c7e041a1b3a7c6bec2519c4e3fd25b8d",
   "src/node.rs": "79699c910ec6619b6e22c290901a558d786924bc5a608a81790c83ddba9dde79",
-  "src/options.rs": "b5e254a4cfd73ace331e37d79f109ea50b7b66cdad6218d3793d519a5f3f04c9",
+  "src/options.rs": "a7d2faac9b45bce79712003f12ac3d0bb1f318338816b05b79d8ee3ee0dbbdf5",
   "src/output.rs": "7057d89819e137b68f10342aa3b8f48d1f0ddd668b0ebe8b7bb419839f474c88",
   "src/paths.rs": "20f5f86725ee2f05bd8b309d816874e448a02877ec40880ca7e977db38572997",
   "src/properties.rs": "5fa3442657dfe9fa8f8f806df1d1723e7a2ae78f441e39f3aa2d8786e039bdd5",

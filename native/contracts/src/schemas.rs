@@ -216,12 +216,17 @@ fn validator(name: &str) -> Result<Arc<Compiled>> {
         .map_err(|e| ContractError::new("schema_internal", e.to_string()))?;
     // Python Draft202012Validator does not assert formats without an explicit
     // format checker. External resolution is disabled at dependency level.
-    let compiled = crate::numeric::options().build(&schema).map_err(|e| {
-        ContractError::new(
-            "schema_internal",
-            format!("invalid packaged schema {name}: {e}"),
-        )
-    })?;
+    // This closed lookup contains immutable embedded definitions. Their default
+    // metaschema validation is exercised explicitly in the contract tests;
+    // instance validation and diagnostic traversal remain unchanged.
+    let compiled = crate::numeric::options()
+        .build_prevalidated(&schema)
+        .map_err(|e| {
+            ContractError::new(
+                "schema_internal",
+                format!("invalid packaged schema {name}: {e}"),
+            )
+        })?;
     let compiled = Arc::new(Compiled {
         validator: compiled,
         schema,
@@ -591,10 +596,12 @@ fn decompose_run_schema(mut header: Value) -> Result<(Value, Value)> {
 pub(crate) fn run_validators() -> Result<&'static RunValidators> {
     static RUN: OnceLock<Result<RunValidators>> = OnceLock::new();
     RUN.get_or_init(|| {
+        // The decomposition guard certifies these projections of the immutable
+        // embedded run schema; tests also validate both definitions normally.
         let (header, row) = run_schema_parts()?;
         let build = |schema: &Value| {
             crate::numeric::options()
-                .build(schema)
+                .build_prevalidated(schema)
                 .map_err(|error| ContractError::new("schema_internal", error.to_string()))
         };
         Ok(RunValidators {
@@ -717,5 +724,94 @@ mod compact_run_schema_tests {
             schema["allOf"].as_array_mut().unwrap().push(dependency);
             assert!(decompose_run_schema(schema).is_err());
         }
+    }
+}
+
+#[cfg(test)]
+mod embedded_schema_definition_tests {
+    use super::*;
+
+    #[test]
+    fn every_embedded_schema_passes_default_metaschema_validation() {
+        for (name, raw) in SCHEMAS {
+            let schema: Value = serde_json::from_str(raw).unwrap();
+            crate::numeric::options()
+                .build(&schema)
+                .unwrap_or_else(|error| panic!("{name}: {error}"));
+        }
+    }
+
+    #[test]
+    fn certified_run_projections_pass_default_metaschema_validation() {
+        let (header, row) = run_schema_parts().unwrap();
+        for schema in [header, row] {
+            crate::numeric::options().build(&schema).unwrap();
+        }
+    }
+
+    #[test]
+    fn prevalidated_compilation_preserves_instance_errors_and_reference_paths() {
+        let schema = serde_json::json!({
+            "$defs":{"bound":{"type":"integer","minimum":2}},
+            "type":"object", "properties":{
+                "z":{"$ref":"#/$defs/bound"}, "a":{"$ref":"#/$defs/bound"}},
+            "required":["z","a"], "additionalProperties":false
+        });
+        let normal = crate::numeric::options().build(&schema).unwrap();
+        let prevalidated = crate::numeric::options()
+            .build_prevalidated(&schema)
+            .unwrap();
+        let values = [
+            serde_json::json!({"z":2,"a":3}),
+            crate::parse_json(
+                b"{\"z\":123456789012345678901234567890,\"a\":2}",
+                "large integer",
+            )
+            .unwrap(),
+            serde_json::json!({"z":true,"a":1}),
+            serde_json::json!({"a":false}),
+            serde_json::json!({"z":0,"a":false,"extra":null}),
+        ];
+        for value in values {
+            assert_eq!(normal.is_valid(&value), prevalidated.is_valid(&value));
+            let errors = |validator: &jsonschema::Validator| {
+                validator
+                    .iter_errors(&value)
+                    .map(|error| {
+                        (
+                            error.instance_path().to_string(),
+                            error.schema_path().to_string(),
+                            error.evaluation_path().to_string(),
+                            crate::diagnostic::message(&error, &schema),
+                        )
+                    })
+                    .collect::<Vec<_>>()
+            };
+            assert_eq!(errors(&normal), errors(&prevalidated));
+        }
+    }
+
+    #[test]
+    fn caller_schema_definitions_still_require_metaschema_validation() {
+        // A dynamically selected object is not necessarily a schema: the
+        // properties map's "format" value is itself an object, not a format name.
+        assert_eq!(
+            first_schema_error_fragment(
+                &serde_json::json!({}),
+                "run",
+                "/properties",
+                SchemaErrorOrder::Schema
+            )
+            .unwrap_err()
+            .code,
+            "schema_internal"
+        );
+        let invalid = serde_json::json!({"required":false});
+        assert_eq!(
+            first_schema_error_value(&serde_json::json!({}), &invalid, SchemaErrorOrder::Schema)
+                .unwrap_err()
+                .code,
+            "schema_internal"
+        );
     }
 }
