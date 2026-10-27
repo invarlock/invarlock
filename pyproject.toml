@@ -95,7 +95,7 @@ security = [
   "filelock>=4.2.1",
   "pip>=26.2.2",
   "pip-audit>=2.8",
-  "msgpack>=1.2.1",
+  "msgpack>=1.2.3",
   "cyclonedx-bom>=4.1",
 ]
 
