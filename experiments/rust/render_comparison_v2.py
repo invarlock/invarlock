@@ -993,6 +993,13 @@ def charts(report, output, *, include_total_cpu=True):
         )
         figure.text(
             0.5,
+            0.065,
+            "Python/FFI include wheel identity checks; standalone executable hashing occurs before measurement.",
+            ha="center",
+            fontsize=9,
+        )
+        figure.text(
+            0.5,
             0.025,
             "Median with observed min–max whiskers; n=5 per cell. Descriptive ranges, not confidence intervals.",
             ha="center",
