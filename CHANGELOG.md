@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Refresh pinned GitHub Actions for Python and uv setup, CodeQL analysis, and
+  package publication. Keep the pinned uv version and hash-locked dependency
+  installation checks.
 - Redesign native, captured, judge and combined HTML and Markdown reports around
   decision context, the scoped policy result, numbered findings, limitations and
   the next review action. Link findings to supporting records and preserve the
