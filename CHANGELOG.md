@@ -41,6 +41,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Return a structured numeric-range error when paired score differences or
+  bootstrap sums overflow, without publishing evidence. Preserve finite-result
+  behavior and document binary64 rounding, underflow and zero-denominator limits.
 - Accept a late subprocess signal-permission error only after confirming that
   the process group has exited. Preserve execution and cleanup errors for live
   or unverified groups in integration examples.
