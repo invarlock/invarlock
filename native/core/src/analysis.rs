@@ -48,9 +48,10 @@ fn digest(v: &Value) -> Result<String, AnalysisError> {
 // Preserve the canonical case-identity projection without owning another copy
 // of every record. These fixed keys are in canonical Unicode lexical order;
 // nested field values still use the shared canonical encoder.
-fn case_seed_to_writer(
-    pairs: &[(&Value, &Value)],
+fn case_projection_to_writer<'a>(
+    rows: impl IntoIterator<Item = &'a Value>,
     writer: &mut impl std::io::Write,
+    newline: bool,
 ) -> Result<(), AnalysisError> {
     fn put(writer: &mut impl std::io::Write, bytes: &[u8]) -> Result<(), AnalysisError> {
         writer
@@ -58,7 +59,7 @@ fn case_seed_to_writer(
             .map_err(|e| err(format!("value is not canonical JSON: {e}")))
     }
     put(writer, b"[")?;
-    for (index, (left, _)) in pairs.iter().enumerate() {
+    for (index, left) in rows.into_iter().enumerate() {
         if index != 0 {
             put(writer, b",")?;
         }
@@ -80,8 +81,13 @@ fn case_seed_to_writer(
         }
         put(writer, b"}")?;
     }
-    // digest() previously used canonical_json(), which includes this newline.
-    put(writer, b"]\n")
+    put(writer, if newline { b"]\n" } else { b"]" })
+}
+fn case_seed_to_writer(
+    pairs: &[(&Value, &Value)],
+    writer: &mut impl std::io::Write,
+) -> Result<(), AnalysisError> {
+    case_projection_to_writer(pairs.iter().map(|(left, _)| *left), writer, true)
 }
 fn case_seed(pairs: &[(&Value, &Value)]) -> Result<String, AnalysisError> {
     struct HashWriter(sha2::Sha256);
@@ -97,6 +103,72 @@ fn case_seed(pairs: &[(&Value, &Value)]) -> Result<String, AnalysisError> {
     let mut writer = HashWriter(sha2::Sha256::default());
     case_seed_to_writer(pairs, &mut writer)?;
     Ok(format!("sha256:{:x}", sha2::Digest::finalize(writer.0)))
+}
+fn case_set_to_writer(
+    rows: &[&Value],
+    writer: &mut impl std::io::Write,
+) -> Result<(), AnalysisError> {
+    writer
+        .write_all(b"{\"cases\":")
+        .map_err(|e| err(format!("value is not canonical JSON: {e}")))?;
+    case_projection_to_writer(rows.iter().copied(), writer, false)?;
+    writer
+        .write_all(b",\"format\":\"invarlock/evaluation-case-set-v1\"}\n")
+        .map_err(|e| err(format!("value is not canonical JSON: {e}")))
+}
+fn case_set_digest(rows: &[&Value]) -> Result<String, AnalysisError> {
+    case_set_digest_with_limit(rows, invarlock_native_contracts::MAX_INPUT_BYTES)
+}
+fn case_set_digest_with_limit(rows: &[&Value], maximum: usize) -> Result<String, AnalysisError> {
+    use std::io::{self, Write};
+    struct HashWriter(sha2::Sha256);
+    impl Write for HashWriter {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            sha2::Digest::update(&mut self.0, bytes);
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+    struct Limited<W> {
+        inner: W,
+        size: usize,
+        maximum: usize,
+    }
+    impl<W: Write> Write for Limited<W> {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            self.size = self.size.saturating_add(bytes.len());
+            if self.size > self.maximum {
+                return Err(io::Error::other("canonical size limit exceeded"));
+            }
+            self.inner.write_all(bytes)?;
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> io::Result<()> {
+            self.inner.flush()
+        }
+    }
+    let hash = HashWriter(sha2::Sha256::default());
+    let mut writer = Limited {
+        inner: io::BufWriter::with_capacity(64 * 1024, hash),
+        size: 0,
+        maximum,
+    };
+    let result = case_set_to_writer(rows, &mut writer);
+    if writer.size > maximum {
+        return Err(err(format!(
+            "invalid case_set: case_set exceeds the {maximum} byte limit"
+        )));
+    }
+    result?;
+    writer
+        .flush()
+        .map_err(|e| err(format!("value is not canonical JSON: {e}")))?;
+    Ok(format!(
+        "sha256:{:x}",
+        sha2::Digest::finalize(writer.inner.get_ref().0.clone())
+    ))
 }
 fn schema(v: &Value, name: &str) -> Result<(), AnalysisError> {
     validate_schema(v, name).map_err(|e| err(e.to_string()))
@@ -792,9 +864,12 @@ pub fn compare_validated_runs(
                 .iter()
                 .collect::<Vec<_>>();
             rows.sort_by_key(|r| text(r, "id"));
-            let cases = json!({"format":"invarlock/evaluation-case-set-v1","cases":rows.into_iter().map(|r|json!({"id":r["id"],"input":r["input"],"expected":r["expected"],"metadata":r["metadata"]})).collect::<Vec<_>>()});
-            schema(&cases, "case_set")?;
-            if digest(&cases)? != expected.as_str().unwrap() {
+            // ValidatedRun proves the projected fields and record bounds satisfy
+            // case_set: id/input/expected/metadata schemas are identical, and this
+            // encoder supplies its closed object shape and constant format.
+            // Tests assert the complete packaged-schema implication to catch drift.
+            // Keep the case-set encoded-size preflight while hashing in one pass.
+            if case_set_digest(&rows)? != expected.as_str().unwrap() {
                 return Err(err(format!(
                     "run {} does not match the planned case set",
                     invarlock_native_contracts::python_repr(&run["run_id"])
@@ -957,6 +1032,120 @@ mod seed_tests {
         case_seed_to_writer(&pairs, &mut actual).unwrap();
         assert_eq!(actual, expected);
         assert_eq!(case_seed(&pairs).unwrap(), sha256_digest(&expected));
+    }
+
+    fn owned_case_set(rows: &[&Value]) -> Value {
+        json!({"format":"invarlock/evaluation-case-set-v1","cases":rows.iter().map(|row|
+            json!({"id":row["id"],"input":row["input"],"expected":row["expected"],"metadata":row["metadata"]})
+        ).collect::<Vec<_>>()})
+    }
+    #[test]
+    fn validated_run_schema_implies_the_complete_projected_case_schema() {
+        use invarlock_native_contracts::packaged_schema;
+        let run = packaged_schema("run").unwrap();
+        let cases = packaged_schema("case_set").unwrap();
+        let records = &run["properties"]["records"];
+        let item = &records["items"];
+        assert_eq!(records["type"], "array");
+        assert_eq!(item["type"], "object");
+        assert!(run["required"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("records")));
+        let mut properties = serde_json::Map::new();
+        for key in ["id", "input", "expected", "metadata"] {
+            assert!(item["required"].as_array().unwrap().contains(&json!(key)));
+            properties.insert(key.into(), item["properties"][key].clone());
+        }
+        let implied = json!({
+            "$schema":run["$schema"],"$id":cases["$id"],"type":"object","additionalProperties":false,
+            "properties":{"format":{"const":"invarlock/evaluation-case-set-v1"},
+                "cases":{"type":"array","minItems":records["minItems"],"maxItems":records["maxItems"],
+                    "items":{"type":"object","additionalProperties":false,"properties":properties,
+                        "required":["id","input","expected","metadata"]}}},
+            "required":["format","cases"]
+        });
+        assert_eq!(
+            cases, implied,
+            "case-set schema drift requires revisiting the validated-run projection proof"
+        );
+    }
+    #[test]
+    fn projected_schema_boundaries_match_validated_run_fields() {
+        let row = json!({"id":"one","input":[null,{"nested":true}],"expected":null,"metadata":{},
+            "output":null,"scores":{},"context":{},"error":null});
+        let mut variants = vec![(row.clone(), true)];
+        for id in ["", "bad\n", &"a".repeat(129)] {
+            let mut invalid = row.clone();
+            invalid["id"] = json!(id);
+            variants.push((invalid, false));
+        }
+        let mut boundary = row.clone();
+        boundary["id"] = json!("é".repeat(128));
+        boundary["metadata"] = json!({"key":"😀".repeat(4096)});
+        variants.push((boundary, true));
+        for metadata in [
+            json!(false),
+            json!({"key":false}),
+            json!({"key":"x".repeat(4097)}),
+            Value::Object((0..101).map(|i| (i.to_string(), json!("value"))).collect()),
+        ] {
+            let mut invalid = row.clone();
+            invalid["metadata"] = metadata;
+            variants.push((invalid, false));
+        }
+        for (row, valid) in variants {
+            let run = json!({"format":"invarlock/evaluation-run-v1","run_id":"run",
+                "artifact_digest":sha256_digest(b"artifact"),"source_digest":null,
+                "source":{"name":"fixture","version":"1"},"score_provenance":{},"records":[row]});
+            let rows: Vec<_> = run["records"].as_array().unwrap().iter().collect();
+            assert_eq!(schema(&run, "run").is_ok(), valid);
+            assert_eq!(schema(&owned_case_set(&rows), "case_set").is_ok(), valid);
+        }
+    }
+    #[test]
+    fn streamed_case_set_preserves_sorted_bytes_digest_and_size_error_order() {
+        let records: Vec<Value> = serde_json::from_str(r#"[
+            {"id":"😀","input":{"z":-0.0,"a":[1e-7,1e16,18446744073709551616]},"expected":"é\n\t\"\\","metadata":{"group":"all"}},
+            {"id":"A","input":null,"expected":[true,false],"metadata":{}},
+            {"id":"é","input":"large","expected":0,"metadata":{}}
+        ]"#).unwrap();
+        let mut rows: Vec<_> = records.iter().collect();
+        rows.sort_by_key(|row| text(row, "id"));
+        let expected = canonical(&owned_case_set(&rows)).unwrap();
+        let mut actual = Vec::new();
+        case_set_to_writer(&rows, &mut actual).unwrap();
+        assert_eq!(actual, expected);
+        assert_eq!(case_set_digest(&rows).unwrap(), sha256_digest(&expected));
+        assert_eq!(
+            case_set_digest_with_limit(&rows, expected.len()).unwrap(),
+            sha256_digest(&expected)
+        );
+        let maximum = expected.len() - 1;
+        assert_eq!(
+            case_set_digest_with_limit(&rows, maximum)
+                .unwrap_err()
+                .message,
+            format!("invalid case_set: case_set exceeds the {maximum} byte limit")
+        );
+        let large =
+            json!({"id":"large","input":"😀\n".repeat(70_000),"expected":null,"metadata":{}});
+        let rows = [&large];
+        assert_eq!(
+            case_set_digest(&rows).unwrap(),
+            digest(&owned_case_set(&rows)).unwrap()
+        );
+        let nonfinite: Value = serde_json::from_str("1e999").unwrap();
+        let invalid = json!({"id":"bad","input":nonfinite,"expected":null,"metadata":{}});
+        let rows = [&invalid];
+        assert_eq!(
+            case_set_digest(&rows).unwrap_err(),
+            schema(&owned_case_set(&rows), "case_set").unwrap_err()
+        );
+        assert_eq!(
+            case_set_digest_with_limit(&rows, 0).unwrap_err().message,
+            "invalid case_set: case_set exceeds the 0 byte limit"
+        );
     }
 
     #[test]

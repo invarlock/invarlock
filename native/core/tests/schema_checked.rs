@@ -140,3 +140,48 @@ fn reused_schema_still_checks_projection_and_likelihood_before_duplicate_ids() {
         assert!(error.message.contains(expected), "{}", error.message);
     }
 }
+
+#[test]
+fn planned_case_digest_preserves_matching_outputs_and_side_error_order() {
+    let baseline = artifact("baseline.json");
+    let mut subject = artifact("subject-pass.json");
+    let mut policy = artifact("policy.json");
+    let mut rows: Vec<_> = baseline["records"].as_array().unwrap().iter().collect();
+    rows.sort_by_key(|row| row["id"].as_str().unwrap());
+    let cases = json!({"format":"invarlock/evaluation-case-set-v1","cases":rows.iter().map(|row|
+        json!({"id":row["id"],"input":row["input"],"expected":row["expected"],"metadata":row["metadata"]})
+    ).collect::<Vec<_>>()});
+    policy["expected_case_set_digest"] =
+        json!(invarlock_native_contracts::canonical_json_digest(&cases).unwrap());
+    let ordinary = compare_runs(&baseline, &subject, &policy, None).unwrap();
+    assert_eq!(ordinary["decision"], "pass");
+    let checked_baseline = SchemaCheckedValue::new(baseline.clone(), "run").unwrap();
+    let checked_subject = SchemaCheckedValue::new(subject.clone(), "run").unwrap();
+    let checked_policy = SchemaCheckedValue::new(policy.clone(), "policy").unwrap();
+    let reused = compare_validated_runs(
+        &ValidatedRun::from_schema_checked(&checked_baseline).unwrap(),
+        &ValidatedRun::from_schema_checked(&checked_subject).unwrap(),
+        &ValidatedPolicy::from_schema_checked(&checked_policy).unwrap(),
+        None,
+    )
+    .unwrap();
+    assert_eq!(
+        canonical_json(&ordinary).unwrap(),
+        canonical_json(&reused).unwrap()
+    );
+    subject["records"][0]["input"] = json!("changed");
+    assert_eq!(
+        compare_runs(&baseline, &subject, &policy, None)
+            .unwrap_err()
+            .message,
+        "run 'subject' does not match the planned case set"
+    );
+    let mut baseline = baseline;
+    baseline["records"][0]["input"] = json!("also changed");
+    assert_eq!(
+        compare_runs(&baseline, &subject, &policy, None)
+            .unwrap_err()
+            .message,
+        "run 'baseline' does not match the planned case set"
+    );
+}

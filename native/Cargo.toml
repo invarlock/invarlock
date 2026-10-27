@@ -1,7 +1,7 @@
 [workspace]
 members = ["core", "bindings", "contracts", "filesystem", "evidence", "cli", "execution", "control-cli"]
 default-members = ["core"]
-exclude = ["vendor/jsonschema"]
+exclude = ["vendor/jsonschema", "vendor/serde_json"]
 resolver = "2"
 
 [workspace.package]
@@ -16,3 +16,4 @@ lto = "thin"
 
 [patch.crates-io]
 jsonschema = { path = "vendor/jsonschema" }
+serde_json = { path = "vendor/serde_json" }

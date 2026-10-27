@@ -1,0 +1,211 @@
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -11,7 +11,7 @@
+ 
+ [package]
+ edition = "2021"
+-rust-version = "1.68"
++rust-version = "1.94"
+ name = "serde_json"
+ version = "1.0.149"
+ authors = [
+--- a/src/map.rs
++++ b/src/map.rs
+@@ -27,20 +27,157 @@
+ 
+ /// Represents a JSON key/value type.
+ pub struct Map<K, V> {
+-    map: MapImpl<K, V>,
++    map: MapStorage<K, V>,
+ }
+ 
+ #[cfg(not(feature = "preserve_order"))]
+ type MapImpl<K, V> = BTreeMap<K, V>;
++
++#[cfg(not(feature = "preserve_order"))]
++type MapStorage<K, V> = MapImpl<K, V>;
+ #[cfg(feature = "preserve_order")]
+-type MapImpl<K, V> = IndexMap<K, V>;
++type MapStorage<K, V> = compact::Storage<K, V>;
++
++// Preserve IndexMap's ordering and APIs while keeping its large header out of
++// every Value slot. Empty maps do not need a boxed header until first insertion.
++#[cfg(feature = "preserve_order")]
++mod compact {
++    use super::*;
++    use alloc::boxed::Box;
++    use core::ops::{Deref, DerefMut};
++    use std::sync::OnceLock;
++
++    #[derive(Clone)]
++    pub(super) struct Storage<K, V>(Option<Box<IndexMap<K, V>>>);
++    impl Storage<String, Value> {
++        pub(super) fn new() -> Self {
++            Self(None)
++        }
++        pub(super) fn with_capacity(capacity: usize) -> Self {
++            if capacity == 0 {
++                Self::new()
++            } else {
++                Self(Some(Box::new(IndexMap::with_capacity(capacity))))
++            }
++        }
++        fn into_inner(self) -> IndexMap<String, Value> {
++            self.0.map(|map| *map).unwrap_or_default()
++        }
++        pub(super) fn into_values(self) -> indexmap::map::IntoValues<String, Value> {
++            self.into_inner().into_values()
++        }
++        pub(super) fn get_mut<Q>(&mut self, key: &Q) -> Option<&mut Value>
++        where
++            String: Borrow<Q>,
++            Q: ?Sized + Eq + Hash,
++        {
++            self.0.as_deref_mut()?.get_mut(key)
++        }
++        pub(super) fn swap_remove<Q>(&mut self, key: &Q) -> Option<Value>
++        where
++            String: Borrow<Q>,
++            Q: ?Sized + Eq + Hash,
++        {
++            self.0.as_deref_mut()?.swap_remove(key)
++        }
++        pub(super) fn swap_remove_entry<Q>(&mut self, key: &Q) -> Option<(String, Value)>
++        where
++            String: Borrow<Q>,
++            Q: ?Sized + Eq + Hash,
++        {
++            self.0.as_deref_mut()?.swap_remove_entry(key)
++        }
++        pub(super) fn shift_remove<Q>(&mut self, key: &Q) -> Option<Value>
++        where
++            String: Borrow<Q>,
++            Q: ?Sized + Eq + Hash,
++        {
++            self.0.as_deref_mut()?.shift_remove(key)
++        }
++        pub(super) fn shift_remove_entry<Q>(&mut self, key: &Q) -> Option<(String, Value)>
++        where
++            String: Borrow<Q>,
++            Q: ?Sized + Eq + Hash,
++        {
++            self.0.as_deref_mut()?.shift_remove_entry(key)
++        }
++        pub(super) fn clear(&mut self) {
++            if let Some(map) = &mut self.0 {
++                map.clear();
++            }
++        }
++        pub(super) fn iter_mut(&mut self) -> indexmap::map::IterMut<'_, String, Value> {
++            self.0
++                .as_deref_mut()
++                .map(IndexMap::iter_mut)
++                .unwrap_or_default()
++        }
++        pub(super) fn values_mut(&mut self) -> indexmap::map::ValuesMut<'_, String, Value> {
++            self.0
++                .as_deref_mut()
++                .map(IndexMap::values_mut)
++                .unwrap_or_default()
++        }
++        pub(super) fn retain<F: FnMut(&String, &mut Value) -> bool>(&mut self, f: F) {
++            if let Some(map) = &mut self.0 {
++                map.retain(f);
++            }
++        }
++        pub(super) fn sort_unstable_keys(&mut self) {
++            if let Some(map) = &mut self.0 {
++                map.sort_unstable_keys();
++            }
++        }
++    }
++    impl Default for Storage<String, Value> {
++        fn default() -> Self {
++            Self::new()
++        }
++    }
++    impl Deref for Storage<String, Value> {
++        type Target = IndexMap<String, Value>;
++        fn deref(&self) -> &Self::Target {
++            static EMPTY: OnceLock<IndexMap<String, Value>> = OnceLock::new();
++            self.0
++                .as_deref()
++                .unwrap_or_else(|| EMPTY.get_or_init(IndexMap::new))
++        }
++    }
++    impl DerefMut for Storage<String, Value> {
++        fn deref_mut(&mut self) -> &mut Self::Target {
++            self.0.get_or_insert_with(|| Box::new(IndexMap::new()))
++        }
++    }
++    impl FromIterator<(String, Value)> for Storage<String, Value> {
++        fn from_iter<T: IntoIterator<Item = (String, Value)>>(iter: T) -> Self {
++            let mut map = Self::new();
++            map.extend(iter);
++            map
++        }
++    }
++    impl Extend<(String, Value)> for Storage<String, Value> {
++        fn extend<T: IntoIterator<Item = (String, Value)>>(&mut self, iter: T) {
++            let mut iter = iter.into_iter();
++            if let Some(first) = iter.next() {
++                self.deref_mut().extend(core::iter::once(first).chain(iter));
++            }
++        }
++    }
++    impl IntoIterator for Storage<String, Value> {
++        type Item = (String, Value);
++        type IntoIter = indexmap::map::IntoIter<String, Value>;
++        fn into_iter(self) -> Self::IntoIter {
++            self.into_inner().into_iter()
++        }
++    }
++}
+ 
+ impl Map<String, Value> {
+     /// Makes a new empty Map.
+     #[inline]
+     pub fn new() -> Self {
+         Map {
+-            map: MapImpl::new(),
++            map: MapStorage::new(),
+         }
+     }
+ 
+@@ -55,7 +192,7 @@
+                 BTreeMap::new()
+             },
+             #[cfg(feature = "preserve_order")]
+-            map: IndexMap::with_capacity(capacity),
++            map: MapStorage::with_capacity(capacity),
+         }
+     }
+ 
+@@ -263,8 +400,7 @@
+     #[inline]
+     pub fn append(&mut self, other: &mut Self) {
+         #[cfg(feature = "preserve_order")]
+-        self.map
+-            .extend(mem::replace(&mut other.map, MapImpl::default()));
++        self.map.extend(mem::take(&mut other.map));
+         #[cfg(not(feature = "preserve_order"))]
+         self.map.append(&mut other.map);
+     }
+@@ -387,7 +523,7 @@
+     #[inline]
+     fn default() -> Self {
+         Map {
+-            map: MapImpl::new(),
++            map: MapStorage::new(),
+         }
+     }
+ }
+@@ -424,7 +560,7 @@
+ 
+         #[cfg(feature = "preserve_order")]
+         {
+-            let mut kv = Vec::from_iter(&self.map);
++            let mut kv = Vec::from_iter(self.map.iter());
+             kv.sort_unstable_by(|a, b| a.0.cmp(b.0));
+             kv.hash(state);
+         }

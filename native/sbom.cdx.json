@@ -1967,10 +1967,54 @@
           "expression": "MIT OR Apache-2.0"
         }
       ],
-      "hashes": [
+      "pedigree": {
+        "notes": "Locally modified upstream dependency"
+      },
+      "externalReferences": [
         {
-          "alg": "SHA-256",
-          "content": "83fc039473c5595ace860d8c4fafa220ff474b3fc6bfdb4293327f1a37e94d86"
+          "type": "distribution",
+          "url": "https://static.crates.io/crates/serde_json/serde_json-1.0.149.crate",
+          "comment": "Original upstream registry archive; excludes local patch",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "83fc039473c5595ace860d8c4fafa220ff474b3fc6bfdb4293327f1a37e94d86"
+            }
+          ]
+        }
+      ],
+      "properties": [
+        {
+          "name": "source-classification",
+          "value": "vendored-third-party-modified"
+        },
+        {
+          "name": "provenance_path",
+          "value": "vendor/serde_json/source-provenance.json"
+        },
+        {
+          "name": "provenance_sha256",
+          "value": "667fa6f31b35d30d0e6b8ac0d4c18dd1ab4b5e8c4596c5f77ac687436b9ac3e0"
+        },
+        {
+          "name": "patch_sha256",
+          "value": "b88ed7f8ef67e88a3f2b0da22d135cb681ecac33390c100e270c659efedb4ead"
+        },
+        {
+          "name": "upstream_file_hashes_sha256",
+          "value": "8894549357f078b601c0a218747d974c8fb0a0439cbad7fd8a296ea0c68c1620"
+        },
+        {
+          "name": "patched_file_hashes_sha256",
+          "value": "8757d68425c82b636a28d793095229819c2f124d2b037be5a411ebd052d26947"
+        },
+        {
+          "name": "patched_source_tree_sha256",
+          "value": "4cc5e222d85b84aef72e68a7423f59ac0ef4ee5d72d63a940d316a2af1762ce6"
+        },
+        {
+          "name": "patched_source_tree_algorithm",
+          "value": "SHA-256 of UTF-8 JSON mapping retained upstream relative paths to current SHA-256 hashes, sorted keys, compact separators, no trailing newline; excludes local provenance and documentation files."
         }
       ]
     },

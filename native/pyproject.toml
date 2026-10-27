@@ -9,7 +9,7 @@ requires-python = ">=3.12,<3.13"
 description = "Experimental native evidence, analysis and execution core"
 readme = "README.md"
 license = "Apache-2.0 AND PSF-2.0"
-license-files = ["LICENSE", "licenses/**/*", "vendor/jsonschema/LICENSE"]
+license-files = ["LICENSE", "licenses/**/*", "vendor/jsonschema/LICENSE", "vendor/serde_json/LICENSE-APACHE", "vendor/serde_json/LICENSE-MIT"]
 
 [tool.maturin]
 sdist-generator = "git"
@@ -24,6 +24,7 @@ include = [
   { path = "core/**/*", format = "sdist" },
   { path = "contracts/**/*", format = "sdist" },
   { path = "vendor/jsonschema/**/*", format = "sdist" },
+  { path = "vendor/serde_json/**/*", format = "sdist" },
   { path = "filesystem/**/*", format = "sdist" },
   { path = "evidence/**/*", format = "sdist" },
   { path = "execution/**/*", format = "sdist" },

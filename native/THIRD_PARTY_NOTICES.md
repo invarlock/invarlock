@@ -40,3 +40,13 @@ The accompanying provenance record separates the upstream archive hash from
 the exact patch and patched source-tree hashes. The dependency inventory and
 SBOM identify this as modified third-party code rather than a workspace crate.
 The upstream archive hash does not identify the patched compiled source.
+
+## Modified JSON dependency
+
+`vendor/serde_json` retains `serde_json` 1.0.149 under `MIT OR Apache-2.0` with
+its original license and copyright notices. Its local representation patch
+stores ordered map headers behind lazy boxes, keeping them out of each JSON
+value slot while preserving insertion order and public map behavior. The source
+provenance separates the unchanged upstream archive identity from the patch
+and patched source-tree identities. This dependency patch adds maintenance
+cost; resource effects require workload and deployment-platform qualification.

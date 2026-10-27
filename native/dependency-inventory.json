@@ -1646,8 +1646,35 @@
     "name": "serde_json",
     "version": "1.0.149",
     "license": "MIT OR Apache-2.0",
-    "source": "registry+https://github.com/rust-lang/crates.io-index",
+    "source": "path+vendor/serde_json",
     "archive_sha256": "83fc039473c5595ace860d8c4fafa220ff474b3fc6bfdb4293327f1a37e94d86",
+    "archive_sha256_scope": "Original upstream registry archive, not modified source",
+    "source_classification": "vendored-third-party-modified",
+    "vendored_provenance": {
+      "name": "serde_json",
+      "version": "1.0.149",
+      "origin": "external upstream dependency; not InvarLock implementation",
+      "source_url": "https://static.crates.io/crates/serde_json/serde_json-1.0.149.crate",
+      "archive_sha256": "83fc039473c5595ace860d8c4fafa220ff474b3fc6bfdb4293327f1a37e94d86",
+      "license": "MIT OR Apache-2.0",
+      "omitted_archive_files": [
+        "Cargo.lock"
+      ],
+      "modified_upstream_files": [
+        "Cargo.toml",
+        "src/map.rs"
+      ],
+      "patch": "compact-map.patch",
+      "upstream_file_hashes": "upstream-files.sha256.json",
+      "patch_sha256": "b88ed7f8ef67e88a3f2b0da22d135cb681ecac33390c100e270c659efedb4ead",
+      "patched_file_hashes": "patched-files.sha256.json",
+      "patched_source_tree_sha256": "4cc5e222d85b84aef72e68a7423f59ac0ef4ee5d72d63a940d316a2af1762ce6",
+      "patched_source_tree_algorithm": "SHA-256 of UTF-8 JSON mapping retained upstream relative paths to current SHA-256 hashes, sorted keys, compact separators, no trailing newline; excludes local provenance and documentation files.",
+      "provenance_path": "vendor/serde_json/source-provenance.json",
+      "provenance_sha256": "667fa6f31b35d30d0e6b8ac0d4c18dd1ab4b5e8c4596c5f77ac687436b9ac3e0",
+      "upstream_file_hashes_sha256": "8894549357f078b601c0a218747d974c8fb0a0439cbad7fd8a296ea0c68c1620",
+      "patched_file_hashes_sha256": "8757d68425c82b636a28d793095229819c2f124d2b037be5a411ebd052d26947"
+    },
     "notices": [
       {
         "path": "licenses/dependencies/serde_json-1.0.149/LICENSE-APACHE",

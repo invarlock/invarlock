@@ -160,9 +160,21 @@ all internal copies and validation passes have been eliminated.
 
 ## Memory and publication changes
 
-The optimization candidate deduplicates compiled schema references, streams the
-case-set seed into its hash, and moves report snapshots into the returned result.
-It retains schema checks, numerical methods and pinned input verification.
+The optimization candidate deduplicates compiled schema references, streams
+canonical comparisons and hashes, and releases captured file bytes as each
+payload is decoded. Deferred validation results preserve diagnostic order, and
+the source guard retains the final pinned inventory check. Immutable schema
+proofs and digests belong to the values they describe. Planned case-set digests
+stream sorted borrowed records; tests assert that the validated run schema
+implies every projected case-set constraint, with the encoded-size limit retained.
+
+The ordered JSON map uses a locally patched `serde_json` representation: its
+map header is boxed only when needed, reducing the size of each JSON value while
+retaining insertion order. Empty objects allocate no map header. This patch adds
+maintenance work: dependency updates must recheck the map APIs, schema diagnostic
+order, canonical bytes, and complete output parity. Its upstream source, dual
+licenses, exact patch and removal criteria are retained in
+[`vendor/serde_json/LOCAL_CHANGES.md`](vendor/serde_json/LOCAL_CHANGES.md).
 
 The schema dependency is a documented, locally patched third-party copy. Its
 custom validators must retain reference traversal when reporting errors; dropping
