@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "invarlock"
-version = "0.17.1"
+version = "0.17.3"
 description = "Paired model release-regression evaluation with independently verifiable evidence"
 authors = [{ name = "InvarLock Team", email = "oss@invarlock.dev" }]
 maintainers = [{ name = "InvarLock Maintainers", email = "support@invarlock.dev" }]
@@ -38,9 +38,9 @@ dependencies = [
 [project.urls]
 Homepage = "https://invarlock.ai"
 Repository = "https://github.com/invarlock/invarlock"
-Documentation = "https://invarlock.github.io/invarlock/0.17.1/"
+Documentation = "https://invarlock.github.io/invarlock/0.17.3/"
 Issues = "https://github.com/invarlock/invarlock/issues"
-Changelog = "https://github.com/invarlock/invarlock/blob/v0.17.1/CHANGELOG.md"
+Changelog = "https://github.com/invarlock/invarlock/blob/v0.17.3/CHANGELOG.md"
 
 [project.optional-dependencies]
 # Optional user-facing runtime and evidence features. Maintainer tooling lives
@@ -71,6 +71,7 @@ lint = [
   "types-jsonschema>=4.26",
 ]
 docs = [
+  "dnspython>=2.9.0",
   "linkchecker>=10.6.0",
   "mkdocs>=1.5",
   "mkdocs-material>=9.7.7",

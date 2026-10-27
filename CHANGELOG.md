@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.3] - 2026-10-27
+
+Supersedes the unpublished `0.17.2` tag, whose release build stopped at the
+dependency-security gate. The changes documented for `0.17.2` are retained.
+
+### Security
+
+- Raise `dnspython` to at least 2.9.0 in documentation tooling and maintained CI
+  locks for GHSA-45c3-73f7-pv4m, and preserve the floor during regeneration.
+- Raise the MessagePack floor for security tooling to 1.2.3 and refresh its
+  hashed locks to 1.2.4 for GHSA-j586-36cw-2gc2. Preserve the floor during
+  future lock regeneration.
+
+## [0.17.2] - 2026-10-27
+
 ### Added
 
 - Add reusable client handoff packages through `report --review-context --package`
@@ -25,6 +40,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Refresh pinned GitHub Actions for Python and uv setup, CodeQL analysis, and
+  package publication. Keep the pinned uv version and hash-locked dependency
+  installation checks.
 - Redesign native, captured, judge and combined HTML and Markdown reports around
   decision context, the scoped policy result, numbered findings, limitations and
   the next review action. Link findings to supporting records and preserve the
@@ -36,15 +54,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Return a structured numeric-range error when paired score differences or
+  bootstrap sums overflow, without publishing evidence. Preserve finite-result
+  behavior and document binary64 rounding, underflow and zero-denominator limits.
 - Accept a late subprocess signal-permission error only after confirming that
   the process group has exited. Preserve execution and cleanup errors for live
   or unverified groups in integration examples.
 
 ### Security
 
-- Raise the MessagePack floor for security tooling to 1.2.3 and refresh its
-  hashed locks to 1.2.4 for GHSA-j586-36cw-2gc2. Preserve the floor during
-  future lock regeneration.
 - Upgrade maintained `filelock` and setuptools locks above their advisory floors,
   and preserve those floors during regeneration. Remove the unused Snowflake
   connector from the restricted local Evals Match profile so patched `filelock`
