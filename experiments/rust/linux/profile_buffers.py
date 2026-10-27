@@ -9,6 +9,7 @@ import json
 import subprocess
 import sys
 import time
+import zipfile
 from pathlib import Path
 
 
@@ -53,8 +54,21 @@ def run(args):
     if digest(supervisor["path"]) != supervisor["sha256"].removeprefix("sha256:"):
         raise ValueError("measurement supervisor changed")
     bindings = {}
+    modules = {}
     for name, candidate in (("before", "rust-ffi-before"), ("after", "rust-ffi")):
         runtime = metadata["runtimes"][candidate]
+        runtime_metadata = json.loads(Path(runtime["metadata"]).read_bytes())
+        with zipfile.ZipFile(runtime_metadata["native_wheel"]["path"]) as wheel:
+            modules[name] = {
+                Path(member.filename).name: hashlib.sha256(
+                    wheel.read(member)
+                ).hexdigest()
+                for member in wheel.infolist()
+                if member.filename.startswith("invarlock_native/")
+                and member.filename.endswith(".so")
+            }
+        if not modules[name]:
+            raise ValueError("native wheel has no extension module")
         bindings[name] = json.loads(
             subprocess.check_output(
                 [
@@ -76,6 +90,7 @@ def run(args):
         "retry_rule": "No retries or exclusions; stop on first failure and retain all attempts.",
         "scope": "Fresh-process input read, native canonicalization, output hash, and native module hash; no wheel checks inside the measured process. Distinct from the full-workflow measurement boundary.",
         "bindings": bindings,
+        "native_modules": modules,
         "metadata_sha256": digest(work / "metadata.json"),
         "script_sha256": digest(__file__),
         "measurement_supervisor": supervisor,
@@ -140,7 +155,7 @@ def run(args):
                         or record["timed_out"]
                         or payload["output_sha256"] != expected.hexdigest()
                         or payload["output_bytes"] != source.stat().st_size + 1
-                        or not payload["native_modules"]
+                        or payload["native_modules"] != modules[name]
                     ):
                         raise ValueError(f"buffer diagnostic failed: {directory.name}")
     print(

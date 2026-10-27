@@ -1,5 +1,13 @@
 # Independent review of the Python comparison reference
 
+> **Reference**
+>
+> **Surface:** Independent arithmetic and evidence checks for the Python reference
+>
+> **Stability:** Historical audit of retained experimental fixtures
+>
+> **Use this page when:** Assessing what the comparison reference establishes and where it needed fixes
+
 The inspected benchmark outputs have coherent arithmetic, policy decisions,
 signatures, receipts and reports under the checks below. This is stronger than
 Python/Rust agreement, but does not establish universal verifier correctness or
