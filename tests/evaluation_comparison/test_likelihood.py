@@ -202,6 +202,24 @@ def test_native_bootstrap_zero_denominator_fails_closed():
         )
 
 
+def test_identical_nll_can_have_undefined_bootstrap_ratio():
+    baseline = run([row("a", 0), row("b", -2)])
+    with pytest.raises(
+        EvaluationRecordsError, match="baseline mean must be greater than zero"
+    ):
+        compare_runs(baseline, baseline, policy())
+
+
+def test_subnormal_nll_preserves_binary64_mean_underflow():
+    # Each score is 5e-324 after division by the two reference bytes.
+    baseline = run([row("a", -1e-323), row("b", -1e-323)])
+    subject = run([row("a", -1e-323), row("b", 0)])
+    result = compare_runs(baseline, subject, policy())["metrics"][0]
+    assert result["baseline_mean"] == 5e-324
+    assert result["subject_mean"] == result["ratio"] == 0
+    assert (result["interval"]["lower"], result["interval"]["upper"]) == (0, 1)
+
+
 def test_overflow_means_fail_closed():
     with pytest.raises(EvaluationRecordsError, match="finite numeric range"):
         compare_runs(
@@ -216,6 +234,16 @@ def test_ratio_overflow_fails_closed():
         compare_runs(
             run([row(logprob=-1e-320)]), run([row(logprob=-1.7e308)]), policy()
         )
+
+
+def test_finite_nll_means_with_overflowing_bootstrap_sum_fail_closed():
+    records = [row("a", -1e308), row("b", -1)]
+    for record in records:
+        record["expected"] = "x"
+        record["likelihood"].update(reference_digest=digest("x"), utf8_byte_count=1)
+    baseline = run(records)
+    with pytest.raises(EvaluationRecordsError, match="captured normalized NLL"):
+        compare_runs(baseline, baseline, policy())
 
 
 def test_missing_or_errored_likelihood_does_not_select_complete_subset():
