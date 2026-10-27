@@ -37,9 +37,33 @@ def _real_cli_transport(monkeypatch, module, *, fault=None):
     monkeypatch.setenv("PYTHONPATH", "/untrusted/checkout")
     monkeypatch.setenv("INVARLOCK_SIGNING_KEY", "/untrusted/private.pem")
 
+    real_run = subprocess.run
+
     def run(command, *, cwd, env, capture_output, text, check):
+        if command[0] == "/bin/sh":
+            # Source-level harness: execute the guide with a real shell and CLI.
+            # The maintained wheel consumer separately proves installed imports.
+            commands = cwd.parent / "test-commands"
+            commands.mkdir(exist_ok=True)
+            shim = commands / "invarlock"
+            shim.write_text(
+                f"#!{sys.executable}\nimport sys\n"
+                f"sys.path.insert(0, {str(ROOT / 'src')!r})\n"
+                "from invarlock.cli.app import app\napp()\n"
+            )
+            shim.chmod(0o700)
+            shell_env = dict(env)
+            shell_env["PATH"] = str(commands) + os.pathsep + env["PATH"]
+            return real_run(
+                command,
+                cwd=cwd,
+                env=shell_env,
+                capture_output=capture_output,
+                text=text,
+                check=check,
+            )
         assert command[0] == executable
-        assert capture_output is True and text is True and check is False
+        assert capture_output is True and text is True
         assert "PYTHONPATH" not in env and "INVARLOCK_SIGNING_KEY" not in env
         assert env["PYTHONSAFEPATH"] == "1"
         assert not cwd.is_relative_to(ROOT)
@@ -55,6 +79,8 @@ def _real_cli_transport(monkeypatch, module, *, fault=None):
         calls.append(completed)
         if fault is not None:
             fault(completed, cwd)
+        if check:
+            completed.check_returncode()
         return completed
 
     monkeypatch.setattr(module.subprocess, "run", run)
@@ -171,7 +197,11 @@ def test_wheel_smoke_rejects_incomplete_or_contradictory_results(
             status = json.loads(completed.stdout)
             status["integrity_ok"] = False
             completed.stdout = json.dumps(status)
-        elif command[1] == "report" and completed.returncode == 0:
+        elif (
+            command[1] == "report"
+            and "--package" not in command
+            and completed.returncode == 0
+        ):
             if fault_name == "missing_report":
                 (root / "classification.html").unlink()
             elif fault_name == "empty_report":

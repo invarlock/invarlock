@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add reusable client handoff packages through `report --review-context --package`
+  and `build_client_review`. Include a concise decision brief, full attributed
+  review, technical appendix, recipient verification guide, unchanged evidence,
+  file inventories and ZIP. Missing owner decisions remain pending. Optional
+  historical receipts retain their bytes and are labeled as unverified attachments;
+  recipient verification uses separately approved inputs and a new result.
+
 - Add client-review examples with separately attributed fictional
   context, recommendations, decisions and follow-up actions around retained real
   comparisons. Each package includes HTML and Markdown reviews alongside original

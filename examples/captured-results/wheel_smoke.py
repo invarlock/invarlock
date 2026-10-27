@@ -5,10 +5,12 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
 from pathlib import Path
+from zipfile import ZipFile
 
 from invarlock.engine import (
     CapturedTrustInputs,
@@ -20,6 +22,104 @@ from invarlock.engine import (
     verify_signed_verification_receipt,
 )
 from invarlock.evidence_pack_contract import canonical_json_bytes
+
+
+def check_client_handoff(
+    command, environment, root, evidence, profile, receipt_path, *, expected
+):
+    """Run the delivered guide after extraction, using preapproved external inputs."""
+    name = "accepted-handoff" if expected == 0 else "rejected-handoff"
+    context = root / f"{name}-context.json"
+    context.write_text(
+        json.dumps(
+            {
+                "format": "invarlock/client-review-context-v1",
+                "title": "Installed recipient handoff fixture",
+                "review_date": "2026-10-27",
+                "byline": "Fixture review owner",
+                "context": [["Intended use", "Qualify an offline evidence handoff"]],
+                "next_action": "Review the independently verified result before deciding on release.",
+            }
+        )
+    )
+    package = root / name
+    build = subprocess.run(
+        [
+            *command,
+            "report",
+            str(evidence),
+            "--review-context",
+            str(context),
+            "--package",
+            str(package),
+            "--retained-receipt",
+            str(receipt_path),
+            "--json",
+        ],
+        cwd=root,
+        env=environment,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    assert json.loads(build.stdout)["recipient_verification"] == "not_performed"
+    extracted = root / (name + "-extracted")
+    with ZipFile(package / "handoff.zip") as archive:
+        archive.extractall(extracted)
+    originals = {
+        p.relative_to(extracted / "evidence"): p.read_bytes()
+        for p in (extracted / "evidence").rglob("*")
+        if p.is_file()
+    }
+    guide = (extracted / "verification.md").read_text()
+    commands = re.findall(r"```sh\n(.*?)```", guide, flags=re.DOTALL)
+    verify_command = next(
+        text for text in commands if "invarlock verify ./evidence" in text
+    )
+    result_dir = root / (name + "-recipient")
+    env = dict(environment, TRUST_PROFILE=str(profile), RESULT_DIR=str(result_dir))
+    env["PATH"] = str(Path(command[0]).parent) + os.pathsep + env.get("PATH", "")
+    verified = subprocess.run(
+        ["/bin/sh", "-c", verify_command],
+        cwd=extracted,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert verified.returncode == expected, verified.stdout + verified.stderr
+    value = json.loads((result_dir / "verification.result.json").read_text())
+    assert value["integrity_ok"] is True and value["replay_status"] == "completed"
+    assert value["ok"] is (expected == 0)
+    anchors = load_trust_inputs(profile)
+    assert isinstance(anchors, CapturedTrustInputs)
+    from cryptography.hazmat.primitives import serialization
+
+    from invarlock.evidence_pack_integrity import public_key_fingerprint
+
+    key = serialization.load_pem_private_key(
+        anchors.verifier_signing_key_bytes, password=None
+    )
+    checked = verify_signed_verification_receipt(
+        result_dir / "verification.receipt.json",
+        extracted / "evidence",
+        policy_path=anchors.policy_path,
+        expected_run_digests=dict(anchors.expected_run_digests),
+        expected_request_digest=anchors.expected_request_digest,
+        expected_pack_signer_fingerprint=anchors.expected_signer_fingerprint,
+        expected_verifier_identity=anchors.verifier_identity,
+        expected_verifier_fingerprint=public_key_fingerprint(key.public_key()),
+        expected_trust_profile_digest=anchors.profile_digest,
+    )
+    assert checked.ok, checked.errors
+    assert originals == {
+        p.relative_to(extracted / "evidence"): p.read_bytes()
+        for p in (extracted / "evidence").rglob("*")
+        if p.is_file()
+    }
+    print(
+        f"{name}: extracted package guide, independent receipt and unchanged evidence pass"
+    )
 
 
 def main() -> None:
@@ -195,6 +295,16 @@ def main() -> None:
                 for p in evidence.rglob("*")
                 if p.is_file()
             }
+            if example == "classification":
+                check_client_handoff(
+                    command,
+                    environment,
+                    root,
+                    evidence,
+                    profile,
+                    receipt_path,
+                    expected=0,
+                )
             run("report", str(evidence), *options, "--json", expected=2)
             terminal = run(
                 "evaluate",
@@ -286,6 +396,17 @@ def main() -> None:
             )
             assert rejected["ok"] is False and rejected["decision"] == decision
             assert rejected["integrity_ok"] is True
+            if name == "regressed":
+                check_client_handoff(
+                    command,
+                    environment,
+                    root,
+                    Path(result["evidence"]),
+                    profile,
+                    root / f"{name}.receipt.json",
+                    expected=7,
+                )
+
             run("report", result["evidence"], "--junit", f"{name}.xml", "--json")
             assert ("<failure" if name == "regressed" else "<error") in (
                 root / f"{name}.xml"

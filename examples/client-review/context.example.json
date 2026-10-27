@@ -1,0 +1,28 @@
+{
+  "format": "invarlock/client-review-context-v1",
+  "title": "Candidate change review",
+  "review_date": "2026-10-27",
+  "byline": "Evaluation owner — replace with your name and role",
+  "context": [
+    [
+      "Intended use",
+      "Describe the workload and users this decision covers."
+    ],
+    [
+      "Proposed change",
+      "Describe the baseline-to-candidate change and business purpose."
+    ],
+    [
+      "Decision owner",
+      "Name the person accountable for the release decision."
+    ]
+  ],
+  "recommendation": "Review the recorded requirements and workload coverage before deciding.",
+  "basis": [
+    [
+      "Policy rationale",
+      "Explain why these requirements address the intended use; distinguish assumptions from measured facts."
+    ]
+  ],
+  "next_action": "Assign the independent verification and release decision to named owners with a due date."
+}

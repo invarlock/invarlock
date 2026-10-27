@@ -55,7 +55,10 @@ A client handover supplies that context as separately attributed commentary.
 The shared presentation view can include an `AuthoredReview`: a label, author,
 context, recommendation, decision, rationale and next action. It appears in both
 HTML and Markdown without changing the technical result, evidence or receipt.
-This presentation helper is not an approval system or a new CLI input contract.
+Use `invarlock report --review-context context.json --package handoff` to supply
+the versioned context and generate a decision brief, full review, technical
+appendix and recipient guide. See [client review packages](../user-guide/client-handoff.md).
+This workflow does not change signed evidence or act as an approval system.
 
 The [completed worked examples](https://github.com/invarlock/invarlock/blob/main/examples/client-review/README.md) choose all
 those fields using clearly labeled fictional organizations and owners around real

@@ -497,9 +497,21 @@ their own contracts. None of these paths performs recipient acceptance.
 | `--junit PATH` | No | Write recorded policy checks as JUnit XML outside the pack |
 | `--explain` | No | Add a concise explanation of the decision and evidence bindings |
 | `--case-id ID` | No | Select one retained judge case for detailed inspection; repeat for up to 50 cases |
+| `--review-context PATH` | With `--package` | Read separately attributed client context |
+| `--package PATH` | With `--review-context` | Publish a new client handoff directory and ZIP |
+| `--retained-receipt PATH` | No | Attach a matching historical receipt without authenticating it |
 | `--json` | No | Emit one compact machine-readable rendering result instead of the text view |
 
-Every output option refuses to overwrite an existing file. By default, `report`
+Package mode requires `--review-context` and `--package` together and cannot mix
+with individual report outputs, `--explain` or `--case-id`. It publishes a complete
+new directory only after preparation and source checks. With `--json`, success
+returns `invarlock/client-review-package-v1`, `ok`, `kind`, `output`, `brief`,
+`archive`, `evidence_statement_sha256` and `recipient_verification: not_performed`.
+Failure returns the same format identifier, `ok: false` and `errors`, with exit 2.
+See [client review packages](../user-guide/client-handoff.md) for context fields,
+output contents and recipient instructions.
+
+For individual reports, every output option refuses to overwrite an existing file. By default, `report`
 emits the text view to standard output and prints the written path when HTML is
 requested. With `--json`, it instead emits one compact
 `invarlock/evidence-report-v2` object for native and captured evidence, for every

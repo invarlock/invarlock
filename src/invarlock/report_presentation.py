@@ -295,6 +295,20 @@ class ReportView:
     context: tuple[tuple[str, str], ...] = ()
     changes: tuple[str, ...] = ()
     review: AuthoredReview | None = None
+    handoff_links: tuple[tuple[str, str], ...] = ()
+
+
+def _handoff_links(view: ReportView, *, markdown: bool = False) -> str:
+    links = []
+    for label, target in view.handoff_links:
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", target):
+            raise ValueError("handoff links must name local package files")
+        links.append(
+            f"[{escape(label)}]({target})"
+            if markdown
+            else f'<a href="{target}">{escape(label)}</a>'
+        )
+    return " · ".join(links)
 
 
 def _metric_identifier_details(view: ReportView) -> tuple[tuple[str, Any], ...]:
@@ -1029,6 +1043,9 @@ def render_html(view: ReportView) -> str:
         f"<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none';{script_policy}\">",
         f"<title>{e(decision_label(view.decision))} · {e(view.title)}</title><style>{_CSS}</style></head><body><main>",
         f'<header class="brand">{_BRAND_MARK} InvarLock<span class="family">{e(view.family)}</span></header>',
+        ('<nav aria-label="Review package">' + _handoff_links(view) + "</nav>")
+        if view.handoff_links
+        else "",
         f'<div class="report-heading"><p class="eyebrow">Comparison / Review / Evidence</p><h1>{"Client review package" if view.review else "Model change review"}</h1><p>{e(view.title)}</p></div>',
         f'<p class="interpretation-note">{_interpretation_note(view)}</p>',
         _review_context_html(view),
@@ -1235,6 +1252,7 @@ def render_markdown(view: ReportView, *, include_details: bool = False) -> str:
     lines = [
         f"# {clean(view.title)}",
         "",
+        *([_handoff_links(view, markdown=True), ""] if view.handoff_links else []),
         "## Decision context",
         "",
         _interpretation_note(view),

@@ -1250,6 +1250,24 @@ def report(
         ),
         rich_help_panel="Output and workflow",
     ),
+    review_context: Path | None = typer.Option(
+        None,
+        "--review-context",
+        help="Client-authored context JSON; use with --package.",
+        rich_help_panel="Client handoff",
+    ),
+    package: Path | None = typer.Option(
+        None,
+        "--package",
+        help="Create a fresh client handoff directory and ZIP.",
+        rich_help_panel="Client handoff",
+    ),
+    retained_receipt: Path | None = typer.Option(
+        None,
+        "--retained-receipt",
+        help="Attach a historical receipt without authenticating it; package mode only.",
+        rich_help_panel="Client handoff",
+    ),
     json_out: bool = typer.Option(
         False,
         "--json",
@@ -1258,6 +1276,49 @@ def report(
     ),
 ) -> None:
     """Render EVIDENCE without changing any evidence-pack byte."""
+
+    if any(value is not None for value in (review_context, package, retained_receipt)):
+        from invarlock.client_review import ClientReviewError, build_client_review
+
+        try:
+            if review_context is None or package is None:
+                raise ClientReviewError(
+                    "--review-context and --package must be supplied together"
+                )
+            if (
+                any(value is not None for value in (html, markdown, junit))
+                or explain
+                or case_id
+            ):
+                raise ClientReviewError(
+                    "--package cannot be combined with individual report outputs, --explain or --case-id"
+                )
+            handoff = build_client_review(
+                evidence,
+                context_path=review_context,
+                output=package,
+                retained_receipt=retained_receipt,
+            )
+        except ClientReviewError as exc:
+            if json_out:
+                _echo_json(
+                    json.dumps(
+                        {
+                            "format_version": "invarlock/client-review-package-v1",
+                            "ok": False,
+                            "errors": [str(exc)],
+                        }
+                    )
+                )
+            else:
+                console.print(f"FAIL {_terminal_text(exc)}")
+            raise typer.Exit(2) from exc
+        if json_out:
+            _echo_json(json.dumps(handoff))
+        else:
+            console.print(f"Client handoff: {_terminal_text(handoff['output'])}")
+            console.print("Recipient verification has not been performed by packaging.")
+        return
 
     from invarlock.evidence_reporting import (
         EvidenceReportError,

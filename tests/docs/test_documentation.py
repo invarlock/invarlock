@@ -80,6 +80,7 @@ EXPECTED_DOC_PAGES = {
     "user-guide/public-evidence.md",
     "user-guide/getting-started.md",
     "user-guide/captured-results.md",
+    "user-guide/client-handoff.md",
     "user-guide/hosted-service-requalification.md",
     "user-guide/key-management.md",
     "user-guide/modelkit-handoff.md",
