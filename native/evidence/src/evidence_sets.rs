@@ -281,8 +281,9 @@ pub(crate) fn load_captured(path: &Path) -> Result<captured::CapturedInputs> {
             &dirs,
         )
         .map_err(io_error)?;
-    let loaded = captured::load_inputs(snapshot.entries())?;
-    snapshot.verify_source().map_err(io_error)?;
+    let (entries, source_guard) = snapshot.into_parts();
+    let loaded = captured::load_owned_inputs(entries)?;
+    source_guard.verify_source().map_err(io_error)?;
     Ok(loaded)
 }
 static NEXT_TEMP: AtomicU64 = AtomicU64::new(0);

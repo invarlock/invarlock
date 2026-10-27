@@ -3,11 +3,53 @@ use invarlock_native_core::{compare_runs, compare_validated_runs, ValidatedPolic
 use serde_json::json;
 
 fn artifact(name: &str) -> Value {
-    let corpus: Value = serde_json::from_str(include_str!(
-        "../../../tests/fixtures/evaluation_contracts/captured-v2.json"
-    ))
-    .unwrap();
-    serde_json::from_str(corpus["artifacts"][name]["bytes"].as_str().unwrap()).unwrap()
+    match name {
+        "baseline.json" | "subject-pass.json" => {
+            let subject = name == "subject-pass.json";
+            let provenance = json!({"kind":"measurement","rubric_digest":null,
+                "source":"reviewed-meter","unit":"points","version":"1"});
+            json!({
+                "format":"invarlock/evaluation-run-v1",
+                "artifact_digest":format!("sha256:{}", if subject { "2" } else { "1" }.repeat(64)),
+                "run_id":if subject {"subject"} else {"baseline"},
+                "source":{"name":"reviewed-export","version":"1"},"source_digest":null,
+                "score_provenance":{"quality":provenance},
+                "records":[
+                    {"id":"a","input":"first","expected":"yes","output":"yes","metadata":{},
+                        "context":{},"error":null,"scores":{"quality":if subject {3} else {2}}},
+                    {"id":"b","input":"second","expected":"yes","output":"yes","metadata":{},
+                        "context":{},"error":null,"scores":{"quality":if subject {5} else {4}}}
+                ]
+            })
+        }
+        "policy.json" => json!({
+            "format":"invarlock/comparison-policy-v1","slices":[],
+            "metrics":[{"name":"quality","kind":"recorded","score_key":"quality",
+                "configuration":{},"direction":"higher","unit":"points","aggregation":"mean",
+                "minimum_count":2,"maximum_regression":0,"maximum_interval_width":0.5,
+                "accepted_provenance":{"kind":"measurement","rubric_digest":null,
+                    "source":"reviewed-meter","unit":"points","version":"1"}}]
+        }),
+        "comparison-pass.json" => json!({
+            "format":"invarlock/multi-metric-comparison-v1","decision":"pass",
+            "bindings":{
+                "baseline":"sha256:e6726ae30d25ba44c44308219a917614ebfeccb53b7ced4eb814fa529be4179a",
+                "subject":"sha256:f109b400703450ce2fa947935e36221756385d73389b75ce3642e565a7ec35e9",
+                "policy":"sha256:f07ed71980fb1fd9cfee05bd55cdab1b7c73fadf7be911af26ce9c8f387a4a43"},
+            "limitations":[
+                "Recorded scores retain source judgments; only their aggregation is recomputed.",
+                "Intervals describe the paired schedule under the stated method; representativeness requires an external sampling design.",
+                "Metric and slice intervals are marginal, not a simultaneous family-wide confidence guarantee.",
+                "A policy pass does not establish truthful model execution, general quality, safety or compliance."],
+            "metrics":[{"name":"quality","kind":"recorded","slice":"overall",
+                "direction":"higher","unit":"points","aggregation":"mean","count":2,
+                "baseline_mean":3.0,"subject_mean":4.0,"delta":1.0,"decision":"pass",
+                "missing_ids":[],"reasons":[],"scoring_assurance":"recorded",
+                "interval":{"lower":1.0,"upper":1.0,"mass":0.95,
+                    "method":"paired_mean_shake256_percentile_v1","replicates":2048}}]
+        }),
+        _ => panic!("unknown test artifact: {name}"),
+    }
 }
 
 #[test]

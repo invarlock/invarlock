@@ -335,30 +335,82 @@ pub struct CapturedInputs {
     pub payloads: CapturedPayloads,
     pub signer: String,
 }
+enum CapturedEntry<'a> {
+    Borrowed(&'a fs::SnapshotEntry),
+    Owned(fs::SnapshotEntry),
+}
+impl CapturedEntry<'_> {
+    fn entry(&self) -> &fs::SnapshotEntry {
+        match self {
+            Self::Borrowed(entry) => entry,
+            Self::Owned(entry) => entry,
+        }
+    }
+}
+fn required_entry<'a>(
+    entries: &'a BTreeMap<String, CapturedEntry<'_>>,
+    name: &str,
+) -> Result<&'a fs::SnapshotEntry> {
+    entries
+        .get(name)
+        .map(CapturedEntry::entry)
+        .ok_or_else(|| EvidenceError::contract("captured evidence file inventory is incomplete"))
+}
 pub fn load_inputs(entries: &BTreeMap<String, fs::SnapshotEntry>) -> Result<CapturedInputs> {
-    let get_entry = |name: &str| {
-        entries.get(name).ok_or_else(|| {
-            EvidenceError::contract("captured evidence file inventory is incomplete")
-        })
-    };
-    let get = |name: &str| get_entry(name).map(fs::SnapshotEntry::bytes);
-    let manifest_raw = get("manifest.json")?;
+    load_input_entries(
+        entries
+            .iter()
+            .map(|(name, entry)| (name.clone(), CapturedEntry::Borrowed(entry)))
+            .collect(),
+    )
+}
+pub(crate) fn load_owned_inputs(
+    entries: BTreeMap<String, fs::SnapshotEntry>,
+) -> Result<CapturedInputs> {
+    load_input_entries(
+        entries
+            .into_iter()
+            .map(|(name, entry)| (name, CapturedEntry::Owned(entry)))
+            .collect(),
+    )
+}
+fn load_input_entries(mut entries: BTreeMap<String, CapturedEntry<'_>>) -> Result<CapturedInputs> {
+    let manifest_raw = required_entry(&entries, "manifest.json")?.bytes();
     let manifest = object(manifest_raw, "captured manifest", true)?;
     validate_manifest(&manifest)?;
     let signer = if manifest["authentication"] == "signed" {
-        authenticate(&manifest, manifest_raw, get("manifest.signature.json")?)?
+        authenticate(
+            &manifest,
+            manifest_raw,
+            required_entry(&entries, "manifest.signature.json")?.bytes(),
+        )?
     } else {
         "Unsigned local evidence".to_string()
     };
     let mut payloads = Map::new();
+    let mut payload_hashes = BTreeMap::new();
+    let mut canonical_checks = BTreeMap::new();
     for (role, name) in PAYLOADS {
-        let raw = get(name)?;
-        if manifest["files"][role]["digest"] != format!("sha256:{}", get_entry(name)?.sha256()) {
+        let entry = entries.remove(name).ok_or_else(|| {
+            EvidenceError::contract("captured evidence file inventory is incomplete")
+        })?;
+        let raw = entry.entry().bytes();
+        let hash = entry.entry().sha256();
+        if manifest["files"][role]["digest"] != format!("sha256:{hash}") {
             return Err(EvidenceError::integrity(format!(
                 "captured {role} binding is invalid"
             )));
         }
-        payloads.insert(role.into(), object(raw, role, false)?);
+        let value = object(raw, role, false)?;
+        // Retain the result, not the bytes. Syntax and record-limit errors from
+        // any payload still precede canonical/schema errors at the phase below.
+        canonical_checks.insert(
+            role,
+            canonical_json_matches(&value, raw).map_err(EvidenceError::from),
+        );
+        payload_hashes.insert(name, hash.to_owned());
+        payloads.insert(role.into(), value);
+        drop(entry);
     }
     for role in ["baseline", "subject"] {
         if payloads[role]["records"]
@@ -371,8 +423,11 @@ pub fn load_inputs(entries: &BTreeMap<String, fs::SnapshotEntry>) -> Result<Capt
         }
     }
     let mut checked = BTreeMap::new();
-    for (role, name) in PAYLOADS {
-        if !canonical_json_matches(&payloads[role], get(name)?)? {
+    for (role, _) in PAYLOADS {
+        if !canonical_checks
+            .remove(role)
+            .expect("checked parsed payload")?
+        {
             return Err(EvidenceError::contract(format!(
                 "{role} must be canonical JSON"
             )));
@@ -391,12 +446,9 @@ pub fn load_inputs(entries: &BTreeMap<String, fs::SnapshotEntry>) -> Result<Capt
             checked.insert(role.to_owned(), value);
         }
     }
-    let ledger = get("checksums.sha256")?;
-    if manifest["checksums_sha256_digest"]
-        != get_entry("checksums.sha256")?
-            .sha256()
-            .trim_start_matches("sha256:")
-    {
+    let ledger_entry = required_entry(&entries, "checksums.sha256")?;
+    let ledger = ledger_entry.bytes();
+    if manifest["checksums_sha256_digest"] != ledger_entry.sha256().trim_start_matches("sha256:") {
         return Err(EvidenceError::integrity(
             "captured checksum ledger binding is invalid",
         ));
@@ -406,7 +458,7 @@ pub fn load_inputs(entries: &BTreeMap<String, fs::SnapshotEntry>) -> Result<Capt
     for name in sorted {
         expected_ledger.push_str(&format!(
             "{}  {name}\n",
-            get_entry(name)?.sha256().trim_start_matches("sha256:")
+            payload_hashes[name].trim_start_matches("sha256:")
         ));
     }
     if ledger != expected_ledger.as_bytes() {
@@ -440,8 +492,8 @@ pub fn load_inputs(entries: &BTreeMap<String, fs::SnapshotEntry>) -> Result<Capt
     )?;
     checked.insert("request".into(), request);
     let payloads = CapturedPayloads { values: checked };
-    let bindings = json!({"baseline":format!("sha256:{}",get_entry("records/baseline.json")?.sha256()),
-        "subject":format!("sha256:{}",get_entry("records/subject.json")?.sha256()),"policy":format!("sha256:{}",get_entry("inputs/policy.json")?.sha256())});
+    let bindings = json!({"baseline":format!("sha256:{}",payload_hashes["records/baseline.json"]),
+        "subject":format!("sha256:{}",payload_hashes["records/subject.json"]),"policy":format!("sha256:{}",payload_hashes["inputs/policy.json"])});
     if payloads["report"]["bindings"] != bindings {
         return Err(EvidenceError::integrity(
             "captured comparison contradicts its bound inputs",
@@ -734,7 +786,16 @@ pub fn verify_with_inputs(
         {
             return Err(EvidenceError::integrity("manifest changed after detection"));
         }
-        let loaded = load_inputs(snapshot.entries())?;
+        let policy_matches = snapshot
+            .entries()
+            .get("inputs/policy.json")
+            .map(|entry| canonical_json_matches(input.policy.value(), entry.bytes()));
+        let stored_report = snapshot
+            .entries()
+            .get("reports/evaluation.report.json")
+            .map(|entry| entry.bytes().to_vec());
+        let (entries, source_guard) = snapshot.into_parts();
+        let loaded = load_owned_inputs(entries)?;
         if loaded.manifest["authentication"] != "signed" {
             return Err(EvidenceError::integrity(
                 "captured verification requires signed evidence",
@@ -757,18 +818,12 @@ pub fn verify_with_inputs(
                 )));
             }
         }
-        if !canonical_json_matches(
-            input.policy.value(),
-            snapshot.entries()["inputs/policy.json"].bytes(),
-        )? {
+        if !policy_matches.expect("loaded policy entry")? {
             return Err(EvidenceError::integrity(
                 "captured policy differs from independent policy",
             ));
         }
-        let stored_report = snapshot.entries()["reports/evaluation.report.json"]
-            .bytes()
-            .to_vec();
-        let source_guard = snapshot.into_source_guard();
+        let stored_report = stored_report.expect("loaded report entry");
         replay = "failed";
         let comparison = (|| {
             let baseline = analysis::ValidatedRun::from_schema_checked(
@@ -1129,29 +1184,66 @@ mod immutable_input_tests {
             let _ = std::fs::remove_dir_all(&self.0);
         }
     }
-    fn load_fixture(mutate: impl FnOnce(&mut BTreeMap<String, Vec<u8>>)) -> Result<CapturedInputs> {
-        let corpus: Value = serde_json::from_str(include_str!(
-            "../../../tests/fixtures/evaluation_contracts/captured-v2.json"
-        ))
-        .unwrap();
-        let mut files = BTreeMap::new();
-        for (name, artifact) in corpus["cases"]["pass"]["payloads"].as_object().unwrap() {
-            files.insert(
-                name.clone(),
-                corpus["artifacts"][artifact.as_str().unwrap()]["bytes"]
-                    .as_str()
-                    .unwrap()
-                    .as_bytes()
-                    .to_vec(),
+    fn load_fixture(
+        mutate: impl FnOnce(&mut BTreeMap<String, Vec<u8>>),
+        owned: bool,
+        mutate_source: bool,
+    ) -> Result<CapturedInputs> {
+        let run = |side: &str| {
+            json!({
+                "format":"invarlock/evaluation-run-v1", "run_id":side,
+                "artifact_digest":digest(&json!(side)).unwrap(), "source_digest":null,
+                "source":{"name":"fixture","version":"1"}, "score_provenance":{},
+                "records":[{"id":"one","input":"question","expected":"yes","output":"yes",
+                    "scores":{},"metadata":{},"error":null,"context":{}}]
+            })
+        };
+        let baseline = run("baseline");
+        let subject = run("subject");
+        let policy = json!({
+            "format":"invarlock/comparison-policy-v1", "slices":[],
+            "metrics":[{"name":"exact","kind":"exact_match","configuration":{},
+                "direction":"higher","unit":"score","aggregation":"mean",
+                "minimum_count":1,"maximum_regression":0,"maximum_interval_width":100}]
+        });
+        let request = json!({
+            "format":"invarlock/evaluation-request-v2", "execution":{"mode":"captured"},
+            "comparison":{"baseline":{"adapter":"invarlock","run_digest":digest(&baseline).unwrap()},
+                "subject":{"adapter":"invarlock","run_digest":digest(&subject).unwrap()},
+                "policy_digest":digest(&policy).unwrap()}
+        });
+        let report = analysis::compare_runs(&baseline, &subject, &policy, None).unwrap();
+        let mut files = BTreeMap::from([
+            ("request.json".into(), canonical(&request).unwrap()),
+            ("inputs/policy.json".into(), canonical(&policy).unwrap()),
+            (
+                "records/baseline.json".into(),
+                canonical(&baseline).unwrap(),
+            ),
+            ("records/subject.json".into(), canonical(&subject).unwrap()),
+            (
+                "reports/evaluation.report.json".into(),
+                canonical(&report).unwrap(),
+            ),
+        ]);
+        let mut references = Map::new();
+        for (role, name) in PAYLOADS {
+            references.insert(
+                role.into(),
+                json!({"path":name,"digest":sha256_digest(&files[name])}),
             );
         }
+        let request_digest = references["request"]["digest"].as_str().unwrap();
+        let mut manifest = json!({
+            "format":PACK_FORMAT,"kind":"captured","authentication":"unsigned_local",
+            "signing_key_fingerprint":null,"checksums":"checksums.sha256",
+            "comparison_id":comparison_id(request_digest,
+                references["baseline"]["digest"].as_str().unwrap(),
+                references["subject"]["digest"].as_str().unwrap(),
+                references["policy"]["digest"].as_str().unwrap()).unwrap(),
+            "request_digest":request_digest,"files":references
+        });
         mutate(&mut files);
-        let mut manifest: Value = serde_json::from_str(
-            corpus["artifacts"]["manifest-pass-unsigned.json"]["bytes"]
-                .as_str()
-                .unwrap(),
-        )
-        .unwrap();
         for (role, name) in PAYLOADS {
             manifest["files"][role]["digest"] = json!(sha256_digest(&files[name]));
         }
@@ -1177,27 +1269,46 @@ mod immutable_input_tests {
             .into_iter()
             .map(String::from)
             .collect();
+        drop(files);
         let snapshot = root
             .capture_selected(fs::SnapshotLimits::default(), &names, &dirs)
             .unwrap();
-        load_inputs(snapshot.entries())
+        let (entries, guard) = snapshot.into_parts();
+        let loaded = if owned {
+            load_owned_inputs(entries)?
+        } else {
+            load_inputs(&entries)?
+        };
+        if mutate_source {
+            std::fs::write(temporary.0.join("records/baseline.json"), b"{}\n").unwrap();
+        }
+        guard
+            .verify_source()
+            .map_err(|_| EvidenceError::integrity("captured inventory changed after capture"))?;
+        Ok(loaded)
     }
     #[test]
     fn later_syntax_failure_precedes_earlier_canonical_or_schema_failure() {
-        for earlier in [b"{ }\n".as_slice(), b"{}\n"] {
-            let failure = load_fixture(|files| {
-                files.insert("inputs/policy.json".into(), earlier.to_vec());
-                files.insert("reports/evaluation.report.json".into(), b"{".to_vec());
-            })
-            .err()
-            .unwrap();
-            assert_eq!(failure.message, "report is not strict JSON");
-            assert_eq!(failure.exit_code, 4);
+        for owned in [false, true] {
+            for earlier in [b"{ }\n".as_slice(), b"{}\n"] {
+                let failure = load_fixture(
+                    |files| {
+                        files.insert("inputs/policy.json".into(), earlier.to_vec());
+                        files.insert("reports/evaluation.report.json".into(), b"{".to_vec());
+                    },
+                    owned,
+                    false,
+                )
+                .err()
+                .unwrap();
+                assert_eq!(failure.message, "report is not strict JSON");
+                assert_eq!(failure.exit_code, 4);
+            }
         }
     }
     #[test]
     fn loaded_schema_evidence_owns_values_after_snapshot_release() {
-        let loaded = load_fixture(|_| {}).unwrap();
+        let loaded = load_fixture(|_| {}, true, false).unwrap();
         let baseline = loaded.payloads.schema_checked("baseline").unwrap();
         let digest = baseline.canonical_digest().unwrap().to_owned();
         let mut copy = loaded.payloads["baseline"].clone();
@@ -1215,5 +1326,67 @@ mod immutable_input_tests {
         );
         values["baseline"]["records"] = Value::Null;
         assert!(SchemaCheckedValue::new(values.remove("baseline").unwrap(), "run").is_err());
+    }
+    #[test]
+    fn owned_and_borrowed_loads_match_and_reject_source_changes() {
+        let borrowed = load_fixture(|_| {}, false, false).unwrap();
+        let owned = load_fixture(|_| {}, true, false).unwrap();
+        assert_eq!(
+            canonical(&borrowed.manifest).unwrap(),
+            canonical(&owned.manifest).unwrap()
+        );
+        assert_eq!(borrowed.signer, owned.signer);
+        assert_eq!(
+            canonical(&Value::Object(borrowed.payloads.into_values())).unwrap(),
+            canonical(&Value::Object(owned.payloads.into_values())).unwrap()
+        );
+        for owned in [false, true] {
+            let error = load_fixture(|_| {}, owned, true).err().unwrap();
+            assert_eq!(error.message, "captured inventory changed after capture");
+            assert_eq!(error.exit_code, 6);
+        }
+    }
+    #[test]
+    fn record_limits_precede_deferred_canonical_results() {
+        for owned in [false, true] {
+            let error = load_fixture(
+                |files| {
+                    files.insert("inputs/policy.json".into(), b"{ }\n".to_vec());
+                    let mut run = object(&files["records/baseline.json"], "run", false).unwrap();
+                    run["records"] = Value::Array(vec![Value::Null; 50_001]);
+                    files.insert("records/baseline.json".into(), canonical(&run).unwrap());
+                },
+                owned,
+                false,
+            )
+            .err()
+            .unwrap();
+            assert_eq!(error.message, "run exceeds the 50,000-record limit");
+            assert_eq!(error.exit_code, 4);
+        }
+    }
+    #[test]
+    fn deferred_canonical_and_schema_errors_keep_payload_order() {
+        for owned in [false, true] {
+            for (policy_raw, canonical_error) in [(b"{ }\n".as_slice(), true), (b"{}\n", false)] {
+                let error = load_fixture(
+                    |files| {
+                        files.insert("inputs/policy.json".into(), policy_raw.to_vec());
+                        files.insert("records/baseline.json".into(), b"{ }\n".to_vec());
+                    },
+                    owned,
+                    false,
+                )
+                .err()
+                .unwrap();
+                if canonical_error {
+                    assert_eq!(error.message, "policy must be canonical JSON");
+                } else {
+                    let expected = validate_schema(&json!({}), "policy").unwrap_err();
+                    assert_eq!(error.message, bounded(&expected.to_string()));
+                }
+                assert_eq!(error.exit_code, 4);
+            }
+        }
     }
 }

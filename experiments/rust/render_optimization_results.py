@@ -115,6 +115,134 @@ def order(round_index, workload_index):
     return base[shift:] + base[:shift]
 
 
+def median_comparison(candidate_median, python_median):
+    """Describe observed medians without imposing a significance threshold."""
+    require(
+        all(
+            isinstance(value, (int, float))
+            and not isinstance(value, bool)
+            and math.isfinite(value)
+            and value >= 0
+            for value in (candidate_median, python_median)
+        ),
+        "invalid median for comparison",
+    )
+    status = (
+        "win"
+        if candidate_median < python_median
+        else "loss"
+        if candidate_median > python_median
+        else "tie"
+    )
+    ratio = candidate_median / python_median if python_median else None
+    reason = "zero_python_median" if python_median == 0 else None
+    if ratio is not None and not math.isfinite(ratio):
+        ratio, reason = None, "ratio_not_finite"
+    return {
+        "candidate_median": candidate_median,
+        "python_median": python_median,
+        "candidate_over_python_median_ratio": ratio,
+        "ratio_unavailable_reason": reason,
+        "observed_median_status": status,
+        "observed_median_win": status == "win",
+    }
+
+
+def derived_metrics(samples, retained_summary):
+    """Sum CPU components per timed attempt, then summarize those totals."""
+    cells = {(item["workload"], item["candidate"]): item for item in retained_summary}
+    require(len(cells) == len(retained_summary), "duplicate retained summary cell")
+    totals, groups, seen = [], {}, set()
+    for sample in samples:
+        if sample["phase"] != "measurement":
+            continue
+        key = (sample["workload"], sample["candidate"])
+        require(key in cells, "timed CPU sample has no retained summary cell")
+        identity = (*key, sample["round"])
+        require(identity not in seen, "duplicate timed CPU sample round")
+        seen.add(identity)
+        components = [
+            sample["metrics"][metric]
+            for metric in ("user_cpu_seconds", "system_cpu_seconds")
+        ]
+        require(
+            all(
+                isinstance(value, (int, float))
+                and not isinstance(value, bool)
+                and math.isfinite(value)
+                and value >= 0
+                for value in components
+            ),
+            "invalid per-attempt CPU components",
+        )
+        total = sum(components)
+        require(math.isfinite(total), "non-finite per-attempt CPU total")
+        item = {
+            "attempt": sample["attempt"],
+            "workload": sample["workload"],
+            "candidate": sample["candidate"],
+            "round": sample["round"],
+            "total_cpu_seconds": total,
+        }
+        totals.append(item)
+        groups.setdefault(key, []).append(item)
+    require(set(groups) == set(cells), "timed CPU samples are missing a summary cell")
+    cpu_summary, cpu_cells = [], {}
+    for key, rows in sorted(groups.items()):
+        require(
+            len(rows) == 4 and {row["round"] for row in rows} == set(range(4)),
+            "total CPU requires four distinct timed rounds per cell",
+        )
+        values = [row["total_cpu_seconds"] for row in rows]
+        statistics_for_cell = {
+            "median": statistics.median(values),
+            "minimum": min(values),
+            "maximum": max(values),
+        }
+        cpu_cells[key] = statistics_for_cell
+        cpu_summary.append(
+            {
+                "workload": key[0],
+                "candidate": key[1],
+                "n": len(rows),
+                "total_cpu_seconds": statistics_for_cell,
+            }
+        )
+    comparisons = []
+    for workload in sorted({key[0] for key in cells}):
+        reference_key = (workload, "reference")
+        require(reference_key in cells, "Python comparison cell is missing")
+        for candidate in ("rust-ffi", "rust-standalone"):
+            key = (workload, candidate)
+            require(key in cells, "new native comparison cell is missing")
+            metrics = {}
+            for metric in ("wall_seconds", "total_cpu_seconds", "max_rss_bytes"):
+                if metric == "total_cpu_seconds":
+                    left, right = cpu_cells[key], cpu_cells[reference_key]
+                else:
+                    left, right = cells[key][metric], cells[reference_key][metric]
+                metrics[metric] = median_comparison(left["median"], right["median"])
+            comparisons.append(
+                {
+                    "workload": workload,
+                    "candidate": candidate,
+                    "reference": "reference",
+                    "metrics": metrics,
+                    "all_three_observed_medians_lower": all(
+                        value["observed_median_win"] for value in metrics.values()
+                    ),
+                }
+            )
+    return {
+        "total_cpu_definition": "user_cpu_seconds + system_cpu_seconds for each measurement attempt; median/minimum/maximum are computed from those per-attempt totals, never from component medians.",
+        "comparison_definition": "Candidate median divided by Python median; lower is better for wall time, total CPU and RSS. Win/tie/loss compares unrounded observed medians strictly, with no percent threshold or statistical significance claim. A zero Python median makes the ratio unavailable.",
+        "qualification_samples_included": False,
+        "total_cpu_samples": totals,
+        "total_cpu_summary": cpu_summary,
+        "versus_python": comparisons,
+    }
+
+
 def validate_sources(metadata, expected_python, expected_before, expected_after):
     for label, expected, actual in (
         ("Python baseline", expected_python, metadata["source_commit"]),
@@ -491,21 +619,42 @@ def validate(
         },
         "summary": computed,
         "samples": samples,
+        "derived": derived_metrics(samples, computed),
     }
 
 
-def charts(report, output):
+def charts(report, output, *, include_total_cpu=False):
     import matplotlib
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    cells = {(item["workload"], item["candidate"]): item for item in report["summary"]}
-    colors = ("#334155", "#D97706", "#2563EB", "#0D9488")
-    for metric, filename, title, unit, divisor in (
+    cells = {
+        (item["workload"], item["candidate"]): dict(item) for item in report["summary"]
+    }
+    chart_specs = [
         ("wall_seconds", "wall-time", "Fresh-process wall time", "Seconds", 1),
         ("max_rss_bytes", "peak-rss", "Peak process memory", "MiB", 1024 * 1024),
-    ):
+    ]
+    if include_total_cpu:
+        derived = report.get("derived")
+        if derived is None:
+            derived = derived_metrics(report["samples"], report["summary"])
+        for item in derived["total_cpu_summary"]:
+            cells[item["workload"], item["candidate"]]["total_cpu_seconds"] = item[
+                "total_cpu_seconds"
+            ]
+        chart_specs.append(
+            (
+                "total_cpu_seconds",
+                "total-cpu",
+                "Total process CPU time (user + system)",
+                "CPU seconds",
+                1,
+            )
+        )
+    colors = ("#334155", "#D97706", "#2563EB", "#0D9488")
+    for metric, filename, title, unit, divisor in chart_specs:
         figure, axes = plt.subplots(1, 2, figsize=(13.5, 5.6))
         for panel, indexes in enumerate((range(4), range(4, 8))):
             axis = axes[panel]
@@ -532,7 +681,15 @@ def charts(report, output):
                     capsize=2,
                     error_kw={"elinewidth": 1},
                 )
-            logarithmic = metric == "wall_seconds" and panel == 0
+            logarithmic = (
+                metric in ("wall_seconds", "total_cpu_seconds")
+                and panel == 0
+                and all(
+                    cells[WORKLOADS[index], candidate][metric]["minimum"] > 0
+                    for index in indexes
+                    for candidate in CANDIDATES
+                )
+            )
             if logarithmic:
                 axis.set_yscale("log")
             else:
@@ -587,6 +744,11 @@ def main():
     parser.add_argument("--expected-python", default=BASELINE_COMMIT)
     parser.add_argument("--expected-before", default=BEFORE_COMMIT)
     parser.add_argument("--expected-after", default=AFTER_COMMIT)
+    parser.add_argument(
+        "--include-total-cpu",
+        action="store_true",
+        help="also render a third chart from per-attempt user + system CPU totals",
+    )
     args = parser.parse_args()
     report = validate(
         args.run.resolve(),
@@ -597,15 +759,16 @@ def main():
         expected_after=args.expected_after,
     )
     args.output.mkdir(parents=True, exist_ok=False)
-    charts(report, args.output)
+    charts(report, args.output, include_total_cpu=args.include_total_cpu)
     report["charts"] = {
         path.name: sha(path)
         for path in sorted(args.output.iterdir())
         if path.suffix in (".png", ".svg")
     }
     (args.output / "results-linux-arm64.json").write_bytes(canonical(report) + b"\n")
+    chart_count = 3 if args.include_total_cpu else 2
     print(
-        f"Validated 32 qualifications and 128 timings; wrote results and two PNG/SVG charts to {args.output}"
+        f"Validated 32 qualifications and 128 timings; wrote results and {chart_count} PNG/SVG charts to {args.output}"
     )
 
 

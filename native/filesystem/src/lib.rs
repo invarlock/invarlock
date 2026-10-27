@@ -717,9 +717,14 @@ impl<'a> SelectedSnapshot<'a> {
             &self.dirs,
         )
     }
-    /// Release captured payloads while retaining every source identity and
-    /// inventory check needed for a final verification after replay.
-    pub fn into_source_guard(self) -> SelectedSnapshotSourceGuard<'a> {
+    /// Separate captured entries from the unchanged source verification state,
+    /// allowing a consumer to release each entry as it finishes decoding it.
+    pub fn into_parts(
+        self,
+    ) -> (
+        BTreeMap<String, SnapshotEntry>,
+        SelectedSnapshotSourceGuard<'a>,
+    ) {
         let Self {
             root,
             inventory,
@@ -728,14 +733,21 @@ impl<'a> SelectedSnapshot<'a> {
             files,
             dirs,
         } = self;
-        drop(entries);
-        SelectedSnapshotSourceGuard {
+        let guard = SelectedSnapshotSourceGuard {
             root,
             inventory,
             limits,
             files,
             dirs,
-        }
+        };
+        (entries, guard)
+    }
+    /// Release captured payloads while retaining every source identity and
+    /// inventory check needed for a final verification after replay.
+    pub fn into_source_guard(self) -> SelectedSnapshotSourceGuard<'a> {
+        let (entries, guard) = self.into_parts();
+        drop(entries);
+        guard
     }
 }
 /// Source identities retained after a selected snapshot's captured bytes are
@@ -1839,6 +1851,29 @@ mod tests {
             SnapshotLimits::default().max_file_bytes
         );
         guard.verify_source().unwrap();
+        std::fs::remove_dir_all(p).unwrap();
+    }
+    #[test]
+    fn selected_parts_move_entries_and_keep_guard_after_individual_release() {
+        let p = temp();
+        std::fs::write(p.join("one"), b"one").unwrap();
+        std::fs::write(p.join("two"), b"two").unwrap();
+        let root = PinnedDirectory::open(&p, false).unwrap();
+        let files = BTreeMap::from([("one".into(), 8), ("two".into(), 8)]);
+        let snapshot = root
+            .capture_selected(SnapshotLimits::default(), &files, &BTreeSet::new())
+            .unwrap();
+        let pointer = snapshot.entries()["one"].bytes().as_ptr();
+        let (mut entries, guard) = snapshot.into_parts();
+        let one = entries.remove("one").unwrap();
+        assert_eq!(one.bytes().as_ptr(), pointer);
+        assert_eq!(one.bytes(), b"one");
+        drop(one);
+        guard.verify_source().unwrap();
+        drop(entries);
+        guard.verify_source().unwrap();
+        std::fs::write(p.join("one"), b"changed").unwrap();
+        assert!(guard.verify_source().is_err());
         std::fs::remove_dir_all(p).unwrap();
     }
     #[test]
