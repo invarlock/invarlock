@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.3] - 2026-10-27
+
+Supersedes the unpublished `0.17.2` tag, whose release build stopped at the
+dependency-security gate. The changes documented for `0.17.2` are retained.
+
+### Security
+
+- Raise `dnspython` to at least 2.9.0 in documentation tooling and maintained CI
+  locks for GHSA-45c3-73f7-pv4m, and preserve the floor during regeneration.
+- Raise the MessagePack floor for security tooling to 1.2.3 and refresh its
+  hashed locks to 1.2.4 for GHSA-j586-36cw-2gc2. Preserve the floor during
+  future lock regeneration.
+
 ## [0.17.2] - 2026-10-27
 
 ### Added

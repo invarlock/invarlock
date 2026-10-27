@@ -3,3 +3,7 @@
 # setuptools: GHSA-xmj3-9gf7-h52w.
 filelock>=4.2.1
 setuptools>=84.1.0
+# msgpack: GHSA-j586-36cw-2gc2.
+msgpack>=1.2.3
+# dnspython: GHSA-45c3-73f7-pv4m.
+dnspython>=2.9.0
