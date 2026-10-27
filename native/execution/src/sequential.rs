@@ -1,6 +1,6 @@
 //! Source-compatible sequential admission for retained runtime/HTTP collections.
 //! A persisted admission without a result is ambiguous and never dispatched again.
-use crate::{Error, Result};
+use crate::{advisory_lock::AdvisoryLock, Error, Result};
 use invarlock_native_contracts::{canonical_json_no_newline as canonical, parse_json, Value};
 use invarlock_native_core as core;
 use invarlock_native_filesystem::{
@@ -34,6 +34,7 @@ struct Slot {
 pub struct SequentialCoordinator {
     directory: PathBuf,
     pinned: PinnedDirectory,
+    lock: AdvisoryLock,
     identities: BTreeMap<String, FileIdentity>,
     identity: Value,
     plan: Value,
@@ -248,9 +249,8 @@ impl SequentialCoordinator {
                 "checkpoint directory must be caller-owned and private (0700)",
             ));
         }
-        if unsafe { libc::flock(pinned.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } != 0 {
-            return Err(bad("checkpoint is already locked"));
-        }
+        let lock = AdvisoryLock::duplicate_and_acquire(pinned.as_raw_fd())
+            .map_err(|_| bad("checkpoint is already locked"))?;
         let profile = if runtime {
             "retained-runtime-provider-judge-v1"
         } else {
@@ -260,6 +260,7 @@ impl SequentialCoordinator {
         let mut state = Self {
             directory: directory.into(),
             pinned,
+            lock,
             identities: BTreeMap::new(),
             identity,
             plan,
@@ -357,6 +358,7 @@ impl SequentialCoordinator {
         })?)
     }
     pub fn verify(&self) -> Result<()> {
+        self.lock.verify_owner()?;
         if self.poisoned {
             return Err(bad("checkpoint transaction is uncertain"));
         }

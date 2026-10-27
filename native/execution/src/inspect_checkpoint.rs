@@ -4,7 +4,7 @@
 //! validated plan. This module preserves checkpoint identity, admission/result
 //! precedence and attempt order; provider-event validity belongs to the retained
 //! source contract validator and must be checked before live dispatch resumes.
-use crate::{Error, Result};
+use crate::{advisory_lock::AdvisoryLock, Error, Result};
 use invarlock_native_contracts::{canonical_json_no_newline as canonical_json, parse_json, Value};
 use invarlock_native_filesystem::{write_file_no_replace, FileIdentity, PinnedDirectory};
 use std::{
@@ -37,7 +37,7 @@ pub struct InspectAttempt {
 pub struct InspectCheckpoint {
     directory: PathBuf,
     pinned: PinnedDirectory,
-    lock: File,
+    lock: AdvisoryLock,
     header: Value,
     empty_export: Value,
     attempts: BTreeMap<(String, u64), InspectAttempt>,
@@ -72,9 +72,8 @@ impl InspectCheckpoint {
         {
             return Err(bad("collection lock is not a safe regular file"));
         }
-        if unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } != 0 {
-            return Err(bad("another collector is already using this checkpoint"));
-        }
+        let lock = AdvisoryLock::acquire(lock)
+            .map_err(|_| bad("another collector is already using this checkpoint"))?;
         match pinned.read_regular(Path::new(HEADER), 65536) {
             Ok((bytes, _)) => {
                 if bytes != raw {
@@ -345,6 +344,7 @@ impl InspectCheckpoint {
     }
     #[allow(clippy::unnecessary_cast)]
     pub fn verify(&self) -> Result<()> {
+        self.lock.verify_owner()?;
         if self.poisoned {
             return Err(bad(
                 "checkpoint publication was ambiguous; close and resume before dispatch",

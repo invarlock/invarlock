@@ -27,7 +27,8 @@
     "tmp/**",
     "tmp_*/**",
     "htmlcov/**",
-    "*.egg-info/**"
+    "*.egg-info/**",
+    "native/vendor/jsonschema/README.md"
   ],
   "words": [
     "subtests",

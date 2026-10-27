@@ -18,3 +18,6 @@ tmp/**
 tmp_*/**
 htmlcov/**
 *.egg-info/**
+
+# Preserve the retained upstream dependency documentation byte-for-byte.
+native/vendor/jsonschema/README.md

@@ -30,6 +30,12 @@ reference's `fsync` contract. On macOS this replaces the stronger `F_FULLFSYNC`
 operation previously used by Rust. Linux already used `fsync`; this change is
 not a Linux speedup claim.
 
+Linux qualification also exposed a lease-lifetime defect: closing the owner file
+could leave its lock held by a descriptor inherited during child-process launch.
+All four execution lease types now explicitly release owner locks and reject
+inherited mutation authority. Deterministic retained-descriptor tests and actual
+Linux executable-descriptor launch cover these boundaries.
+
 ## Evidence boundaries
 
 The macOS allocator probe measures requested live allocations, not peak RSS.

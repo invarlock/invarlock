@@ -3,6 +3,7 @@
 //! Reservations bound admission; they are not a claim about provider billing.
 #![deny(unsafe_op_in_unsafe_fn)]
 pub mod admission;
+mod advisory_lock;
 mod checkpoint;
 pub mod collection;
 pub mod inspect_checkpoint;

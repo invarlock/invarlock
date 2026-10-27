@@ -1,7 +1,7 @@
 //! Immutable, hash-chained journal. Admission is durable before work may start;
 //! a missing completion remains charged and ambiguous after resume. Completion
 //! never refunds a reservation, and unknown final usage stays unknown.
-use crate::{Error, Result};
+use crate::{advisory_lock::AdvisoryLock, Error, Result};
 use invarlock_native_filesystem::{write_file_no_replace, PinnedDirectory};
 use sha2::{Digest, Sha256};
 use std::{
@@ -137,7 +137,7 @@ pub struct Transaction {
 pub struct Checkpoint {
     directory: PathBuf,
     pinned: PinnedDirectory,
-    lock: File,
+    lock: AdvisoryLock,
     budget: Budget,
     transactions: BTreeMap<String, Transaction>,
     next: u64,
@@ -177,11 +177,9 @@ impl Checkpoint {
                 "collection lock is not a safe regular file".into(),
             ));
         }
-        if unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } != 0 {
-            return Err(Error::Checkpoint(
-                "another collector is already using this checkpoint".into(),
-            ));
-        }
+        let lock = AdvisoryLock::acquire(lock).map_err(|_| {
+            Error::Checkpoint("another collector is already using this checkpoint".into())
+        })?;
         let mut header = b"IVLJNL01".to_vec();
         put_bytes(&mut header, identity);
         put_amounts(&mut header, maximum);
@@ -318,6 +316,7 @@ impl Checkpoint {
     // libc inode/device widths vary between supported Unix targets.
     #[allow(clippy::unnecessary_cast)]
     fn verify_lock(&self) -> Result<()> {
+        self.lock.verify_owner()?;
         if self.poisoned {
             return Err(Error::Checkpoint(
                 "checkpoint publication was ambiguous; close and resume before dispatch".into(),
@@ -560,11 +559,14 @@ mod tests {
     #[test]
     fn interrupted_admission_remains_charged_on_resume() {
         let path = temp();
+        let inherited;
         {
             let mut c = Checkpoint::open(&path, b"config", allowance()).unwrap();
+            inherited = c.lock.test_duplicate().unwrap();
             c.admit("one", reservation()).unwrap();
         }
         let mut c = Checkpoint::open(&path, b"config", allowance()).unwrap();
+        drop(inherited);
         assert_eq!(c.pending(), vec!["one"]);
         assert_eq!(c.budget().reserved().calls, 1);
         assert!(c.admit("one", reservation()).is_err());
@@ -576,6 +578,23 @@ mod tests {
             c.transactions()["one"].status,
             TransactionStatus::Complete { observed: None, .. }
         ));
+        std::fs::remove_dir_all(path).unwrap();
+    }
+    #[test]
+    fn foreign_process_checkpoint_rejects_mutation_before_publication() {
+        let path = temp();
+        let mut checkpoint = Checkpoint::open(&path, b"config", allowance()).unwrap();
+        checkpoint.lock.test_set_owner_pid(0);
+        let error = checkpoint.admit("foreign", reservation()).unwrap_err();
+        assert!(matches!(error, Error::Io(e) if e.kind() == io::ErrorKind::PermissionDenied));
+        assert!(!path.join("00000000000000000001.event").exists());
+        assert_eq!(checkpoint.budget().reserved().calls, 0);
+        checkpoint
+            .lock
+            .test_set_owner_pid(unsafe { libc::getpid() });
+        checkpoint.admit("owner", reservation()).unwrap();
+        assert!(path.join("00000000000000000001.event").is_file());
+        drop(checkpoint);
         std::fs::remove_dir_all(path).unwrap();
     }
     #[test]

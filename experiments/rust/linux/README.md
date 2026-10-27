@@ -53,7 +53,7 @@ Provision these separately before invoking `prepare`:
   `--no-index`; macOS-only wheels cannot satisfy native Linux requirements.
 - A new work directory on ext2/ext3/ext4 storage with adequate capacity for two
   release builds, caches, installed environments and retained attempts. This
-  wrapper rejects overlay, VirtioFS host sharing, tmpfs and unknown filesystem
+  wrapper rejects overlay, `VirtioFS` host sharing, `tmpfs` and unknown filesystem
   types for the work directory. It makes no storage or elapsed-time guarantee.
 
 On a Linux machine, copy the input bundle and dependency wheelhouse locally, then:

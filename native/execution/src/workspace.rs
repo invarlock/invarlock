@@ -1,5 +1,5 @@
 //! Source-compatible private evaluation-workspace capabilities.
-use crate::{Error, Result};
+use crate::{advisory_lock::AdvisoryLock, Error, Result};
 use invarlock_native_contracts::{canonical_json_no_newline as canonical, parse_json};
 use invarlock_native_filesystem::{write_file_no_replace, FileIdentity, PinnedDirectory};
 use sha2::{Digest, Sha256};
@@ -19,7 +19,7 @@ fn bad(s: &str) -> Error {
 pub struct Workspace {
     path: PathBuf,
     root: PinnedDirectory,
-    lock: File,
+    lock: AdvisoryLock,
     retained: BTreeMap<String, FileIdentity>,
 }
 impl Workspace {
@@ -52,9 +52,8 @@ impl Workspace {
         {
             return Err(bad("judge workspace lock is unsafe"));
         }
-        if unsafe { libc::flock(fd, libc::LOCK_EX | libc::LOCK_NB) } != 0 {
-            return Err(bad("another evaluation is using this judge workspace"));
-        }
+        let lock = AdvisoryLock::acquire(lock)
+            .map_err(|_| bad("another evaluation is using this judge workspace"))?;
         let result = Self {
             path: path.into(),
             root,
@@ -65,6 +64,7 @@ impl Workspace {
         Ok(result)
     }
     pub fn verify(&self) -> Result<()> {
+        self.lock.verify_owner()?;
         self.root.verify()?;
         let held = self.lock.metadata()?;
         let named = self.root.inspect(Path::new(".evaluation.lock"))?;
