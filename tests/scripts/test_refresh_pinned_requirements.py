@@ -71,6 +71,7 @@ def test_refresh_filters_evaluator_locks_and_fails_closed(
         "assert sys.argv[sys.argv.index('--find-links') + 1] == 'runtime/wheels'\n"
         "assert sys.argv[sys.argv.index('--constraint') + 1] == 'requirements/security-constraints.in'\n"
         "assert 'filelock>=4.2.1' in Path('requirements/security-constraints.in').read_text()\n"
+        "assert 'msgpack>=1.2.3' in Path('requirements/security-constraints.in').read_text()\n"
         "output = Path(sys.argv[sys.argv.index('--output-file') + 1])\n"
         "if '-full-' in output.name and os.environ['RETAINED_LOCK'] == '1':\n"
         "    assert output.read_text() == 'retained==1.0\\n'\n"

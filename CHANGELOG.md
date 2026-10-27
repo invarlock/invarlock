@@ -42,6 +42,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- Raise the MessagePack floor for security tooling to 1.2.3 and refresh its
+  hashed locks to 1.2.4 for GHSA-j586-36cw-2gc2. Preserve the floor during
+  future lock regeneration.
 - Upgrade maintained `filelock` and setuptools locks above their advisory floors,
   and preserve those floors during regeneration. Remove the unused Snowflake
   connector from the restricted local Evals Match profile so patched `filelock`
