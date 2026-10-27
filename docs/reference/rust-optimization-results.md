@@ -8,6 +8,10 @@
 >
 > **Use this page when:** Assessing resource use before selecting the Rust backend
 
+These measurements describe the earlier `5e4c0c53` candidate. The subsequent
+[compact Rust results](rust-compact-results.md) measure further layout changes
+against an already optimized Rust build.
+
 The optimized standalone Rust candidate used **44.7–93.6% less peak memory**
 than the previous Rust build in these eight Linux fixture workflows. It was
 **5.72–14.31 times as fast as Python** by median complete-process elapsed time.

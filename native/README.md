@@ -178,11 +178,12 @@ shared. Production captured reporting returns the view and required shared-input
 projections without reconstructing complete JSON runs.
 
 Existing public `Value` helpers remain available and materialize ordinary JSON
-on demand. A failed, unsupported or noncanonical compact parse discards its
-partial compact state and reparses the original bytes through the strict generic
-parser. Deferred checks retain the established canonical, schema and semantic
-error stages. Fallback stays within Rust and can add CPU work for rejected or
-noncanonical inputs; its resource behavior requires separate qualification.
+on demand. A failed or unsupported compact parse, including input outside
+canonical form, discards its partial compact state and parses the original
+bytes again through the strict generic parser. Deferred checks retain the
+established canonical, schema and semantic error stages. Fallback stays within
+Rust. Rejected inputs and inputs outside canonical form can require more CPU
+work; those resource costs need separate qualification.
 
 The ordered JSON map uses a locally patched `serde_json` representation: its
 map header is boxed only when needed, reducing the size of each JSON value while

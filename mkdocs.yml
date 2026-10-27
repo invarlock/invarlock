@@ -37,6 +37,7 @@ nav:
       - Rust comparison protocol: reference/rust-comparison-protocol.md
       - Expanded Rust results: reference/rust-expanded-results.md
       - Rust optimization results: reference/rust-optimization-results.md
+      - Rust compact results: reference/rust-compact-results.md
       - Contracts: reference/contracts.md
       - Evaluation records: reference/evaluation-records.md
       - Evaluation capacity: reference/evaluation-capacity.md

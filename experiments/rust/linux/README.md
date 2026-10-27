@@ -13,6 +13,10 @@ source identities, environment and limits. A cached `python:3.12-slim` image alo
 is insufficient: it lacks Rust and the required offline build/dependency caches.
 The instructions below describe how to prepare a separate run.
 
+The later [compact Rust comparison](../../../docs/reference/rust-compact-results.md)
+rebuilds `088bf57` as its prior Rust control and compares it with `673d492`.
+Its elapsed, total CPU and peak RSS results are retained separately.
+
 ## Prepare the inputs on the current host
 
 Commit the intended native changes before selecting `--after`. Export uses Git
