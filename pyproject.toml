@@ -71,6 +71,7 @@ lint = [
   "types-jsonschema>=4.26",
 ]
 docs = [
+  "dnspython>=2.9.0",
   "linkchecker>=10.6.0",
   "mkdocs>=1.5",
   "mkdocs-material>=9.7.7",
