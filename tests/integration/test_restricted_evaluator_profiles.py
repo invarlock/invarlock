@@ -131,11 +131,12 @@ def test_lm_hf_generation_and_exact_match_without_nltk(
     )
 
 
-def test_openai_native_match_runs_hf_without_nltk(
+def test_openai_native_match_runs_hf_without_nltk_or_snowflake(
     tiny_model: Path, monkeypatch
 ) -> None:
     monkeypatch.setenv("INVARLOCK_EVALUATOR", "openai-evals")
-    assert importlib.metadata.version("evals") == "3.0.1.post1+invarlock.match.1"
+    assert importlib.metadata.version("evals") == "3.0.1.post1+invarlock.match.2"
+    assert importlib.util.find_spec("snowflake") is None
     from examples.integrations.evaluator_transaction.adapters import _run_openai_evals
     from examples.integrations.evaluator_transaction.corpora import (
         quick_records,

@@ -193,8 +193,12 @@ def test_legacy_context_is_unavailable_without_inferred_model_or_execution(tmp_p
         '<th scope="row">Artifact<span class="different-label">Differs</span></th>'
         in html
     )
-    assert "<dt>Baseline artifact</dt>" not in html
-    assert "<dt>Candidate artifact</dt>" not in html
+    # The cover repeats retained identities; the comparison still aligns the pair.
+    assert "<dt>Baseline artifact</dt><dd>fixture://baseline</dd>" in html
+    assert "<dt>Candidate artifact</dt><dd>fixture://subject</dd>" in html
+    comparison = html.split('id="comparison-context"', 1)[1].split("</section>", 1)[0]
+    assert "<dt>Baseline artifact</dt>" not in comparison
+    assert "<dt>Candidate artifact</dt>" not in comparison
 
 
 def test_context_tampering_is_rejected_before_html_publication(tmp_path):

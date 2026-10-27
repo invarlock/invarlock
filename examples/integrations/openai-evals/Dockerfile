@@ -11,7 +11,7 @@ LABEL org.invarlock.example.base-image-id="${BASE_IMAGE_ID}"
 LABEL org.invarlock.example.source-commit="${SOURCE_COMMIT}"
 LABEL org.invarlock.example.source-bundle-sha256="${SOURCE_BUNDLE_SHA256}"
 LABEL org.invarlock.example.evaluator="openai-evals"
-LABEL org.invarlock.example.evaluator-version="3.0.1.post1+invarlock.match.1"
+LABEL org.invarlock.example.evaluator-version="3.0.1.post1+invarlock.match.2"
 LABEL org.invarlock.example.evaluator-lock-sha256="sha256:${EVALUATOR_LOCK_SHA256}"
 LABEL org.invarlock.example.evaluator-runtime="${EVALUATOR_RUNTIME}"
 
@@ -46,9 +46,9 @@ RUN case "${EVALUATOR_RUNTIME}" in cpu|cu129) ;; *) exit 2 ;; esac \
     && python -m pip install \
       --no-compile \
       --no-deps \
-      /tmp/openai-evals-derived/evals-3.0.1.post1+invarlock.match.1-py3-none-any.whl \
+      /tmp/openai-evals-derived/evals-3.0.1.post1+invarlock.match.2-py3-none-any.whl \
     && python -m pip check \
-    && python -c 'import importlib.metadata, importlib.util; assert importlib.metadata.version("evals") == "3.0.1.post1+invarlock.match.1"; assert all(importlib.util.find_spec(name) is None for name in ("nltk", "rouge_score"))'
+    && python -c 'import importlib.metadata, importlib.util; assert importlib.metadata.version("evals") == "3.0.1.post1+invarlock.match.2"; assert all(importlib.util.find_spec(name) is None for name in ("nltk", "rouge_score", "snowflake"))'
 
 # Ship the evaluator transaction as a package and keep its caller-owned trust
 # and image-inspection helpers beside it for direct module execution.

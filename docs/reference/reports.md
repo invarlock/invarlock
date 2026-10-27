@@ -25,14 +25,48 @@ produce judge analysis and verification results described in
 
 ## Report appearance
 
-HTML reports use a light palette regardless of the browser or operating system
-color preference, keeping the transition from the website consistent. Reports
-have no theme control or stored theme preference. Printing also uses light colors.
+HTML reports use a paper-style review memo: comparison identities and decision
+context, a scoped result, findings to review, limitations and the next decision,
+followed by detailed results and supporting evidence. A restrained light palette,
+readable tables and numbered results work on screen and paper. Status words
+accompany color so the result remains readable in monochrome.
+
+The paper lockup retains InvarLock's bracket-and-signal geometry with a single
+ink stroke and live-text name. It omits the app icon's tile, translucent overlays
+and small center dot. This is a report-specific rendition, not a replacement for
+the website or application identity. The report uses no remote fonts or images.
+
+This structure draws on the intended-use and evaluation context in
+[Model Cards for Model Reporting](https://research.google/pubs/model-cards-for-model-reporting/)
+and [SageMaker Model Cards](https://docs.aws.amazon.com/sagemaker/latest/dg/model-cards.html).
+[Promptfoo's exports](https://www.promptfoo.dev/docs/configuration/outputs/) also
+separate stakeholder reports from full evaluation data. InvarLock applies these
+patterns to a specific baseline-to-subject change, with recorded requirements,
+supporting file locations and separate recipient verification.
 
 ## Reading a report for a release review
 
-The heading names the recorded policy result; the opening explains what led
-to it before the chart. A passing description identifies the satisfied interval
+The evidence-only report starts with **Decision context**, including the compared
+identities. When no authored review is provided, intended use, business context,
+decision owner and recommendation are explicitly marked as not supplied. The
+renderer does not infer them from technical provenance or a passing result.
+
+A client handover supplies that context as separately attributed commentary.
+The shared presentation view can include an `AuthoredReview`: a label, author,
+context, recommendation, decision, rationale and next action. It appears in both
+HTML and Markdown without changing the technical result, evidence or receipt.
+Use `invarlock report --review-context context.json --package handoff` to supply
+the versioned context and generate a decision brief, full review, technical
+appendix and recipient guide. See [client review packages](../user-guide/client-handoff.md).
+This workflow does not change signed evidence or act as an approval system.
+
+The [completed worked examples](https://github.com/invarlock/invarlock/blob/main/examples/client-review/README.md) choose all
+those fields using clearly labeled fictional organizations and owners around real
+retained comparisons. Their primary reviews contain completed decisions; missing
+context remains appropriate for evidence-only views and missing-data test cases.
+
+The result heading names the recorded policy result; its explanation states what
+led to it before the chart. A passing description identifies the satisfied interval
 requirements instead of repeating the heading. A failed bound can mean the observed
 change exceeded the allowance or that uncertainty prevented establishing the
 required result. Too few records, a wide interval or an unmet absolute score
@@ -43,6 +77,28 @@ unresolved result without ranking unlike metrics by their numeric values.
 Combined evidence reports name both required component outcomes. Advisory
 judge reports identify their advisory role in the title and at the start of
 the explanation. Browser-tab titles include the recorded outcome.
+
+**Findings to review** highlights failed or unresolved metric/scope results and
+links to their numbered checks. If more than five need review, the report says
+how many remain and retains every result below. It does not rank unrelated
+metrics by numerical severity. **Scope and limitations** and **Next decision**
+remain visible before the detailed statistics.
+
+The opening also gives a **Review action** appropriate to the recorded result.
+This is generated guidance, not an owner's recommendation. The **Change context**
+preview quotes a retained comparison note and identifies any additional notes
+below; missing context is not counted as an observed change. Outcome counts refer
+to metric/scope results, not independent cases. An unavailable outcome uses a
+neutral treatment, and absent limitations or check details are explicitly labeled.
+When an authored review is supplied, its **Owner recommendation**, **Owner decision**,
+**Review rationale** and **Decision follow-up** replace the generic business-context
+placeholders and next-decision guidance. Their attribution stays visible in print.
+
+Each metric's **Supporting record** gives a path relative to the evidence root
+and a JSON pointer after `#`; an empty pointer identifies the whole JSON object.
+Captured metric pointers retain original array positions even when the display
+puts failures first. Combined reports prefix the component's actual member path.
+These references locate the recorded result; they do not authenticate it.
 
 **What was checked** states the operations performed by reporting. Some workflows
 authenticate retained records without replaying the comparison; see
@@ -85,6 +141,38 @@ as `grounded_qa-judge-quality` becoming **Grounded QA judge quality**. The origi
 identifiers for these formatted labels remain in **Recorded metric and scope
 identifiers**. Display formatting does not change grouping, verification inputs
 or existing JUnit identifiers.
+
+### Deliver a complete review package
+
+An **original technical report** and its evidence remain unchanged when shared.
+A **client review package** also includes the interpretation, intended use,
+change rationale, known limitations and the owner's recommendation or an explicit
+statement that these were not supplied. Label authored commentary separately
+from signed evidence, and keep the independent verification receipt and any
+organizational approval as distinct records. A rendered report alone does not
+contain these additional decisions.
+
+Keep the explanation in the downloaded and printed package, not only on the
+surrounding web page. This renderer's HTML and Markdown preserve the review
+context; print styles expose collapsed explanations and all metric tabs. Open
+raw evidence details before printing to include them in the printout. Original
+evidence files, hashes and signatures are unaffected by rendering. Generating a
+new presentation does not replace a historical canonical download.
+
+Print layouts place the result and review action together, then let assurance
+checks flow below. Running page numbers help keep longer copies in order.
+Identity labels stay with their values, and keyboard focus outlines are omitted
+from paper. These print features are exercised in Chromium on A4 and US Letter;
+other print engines may handle pagination differently.
+
+The accessibility checks draw on W3C guidance for
+[reflow](https://www.w3.org/WAI/WCAG22/Understanding/reflow.html),
+[contrast](https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html),
+[text spacing](https://www.w3.org/WAI/WCAG22/Understanding/text-spacing.html) and
+[keyboard tabs](https://www.w3.org/WAI/ARIA/apg/patterns/tabs/).
+They exercise narrow layouts, explicit status words, local navigation and text
+equivalents for interval graphics. They do not establish full accessibility
+conformance or substitute for assistive-technology testing with users.
 
 ## Where the interval comes from
 
@@ -593,8 +681,9 @@ regression as failure and insufficient evidence as error.
 
 ### Read the result and its requirements
 
-The report leads with **Policy satisfied** or **Policy not met**, the recorded
-verdict and the checks responsible for it. HTML places the assurance checks
+After the decision context, the report shows **Policy satisfied**, **Policy not
+met** or **More evidence needed**, the recorded verdict and its explanation.
+HTML places the assurance checks
 beside the verdict, with signature validation and independent recipient
 acceptance kept separate. Each metric shows baseline and
 candidate values, change, observed pair count, an interval and the configured
@@ -703,7 +792,31 @@ must not be added together as though they were separate cases.
 The report remains one offline HTML file. A fixed, hash-authorized script handles
 navigation only; no evidence labels or values are inserted into executable code.
 Without JavaScript, all metric details remain visible and section links still
-work. Printing includes every metric, even when only one tab is selected.
+work. Printing includes every metric, even when only one tab is selected, and
+the contents of closed explanations, including interval methods. Raw evidence
+details print when opened, keeping the default review from expanding into a long
+dump of technical data. Complete exact values remain in the HTML and original
+evidence either way.
+
+The optional real-browser regressions check default and expanded PDF text on A4
+and US Letter, including printing without backgrounds, first-page review actions,
+page numbering and 320-pixel overflow for native, captured, judge and combined
+evidence. A separate synthetic stress fixture checks keyboard navigation,
+hidden-result links, computed text/graphic contrast, enlarged text spacing,
+long identifiers, offline use and operation without JavaScript. With an installed
+Playwright Node module and a Python interpreter containing `pypdf`, run:
+
+```bash
+INVARLOCK_REPORT_PLAYWRIGHT_MODULE=/absolute/path/to/playwright \
+INVARLOCK_REPORT_PDF_PYTHON=/absolute/path/to/python \
+PYTHONPATH=src python -m pytest \
+  tests/reporting/test_report_browser_print.py \
+  tests/reporting/test_report_browser_access.py
+```
+
+The check makes no model calls or dependency downloads. It is skipped when the
+two tool paths are not supplied; ordinary unit tests do not prove browser print
+behavior.
 
 ### Keep rendering separate from recipient acceptance
 

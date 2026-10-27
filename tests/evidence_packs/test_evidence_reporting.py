@@ -301,7 +301,7 @@ def test_render_html_is_self_contained_and_no_clobber(tmp_path: Path) -> None:
 
     assert result.written_outputs == {"html": str(html)}
     rendered = html.read_text(encoding="utf-8")
-    assert '<h1 id="decision">Policy satisfied</h1>' in rendered
+    assert '<h2 id="decision">Policy satisfied</h2>' in rendered
     assert "This report summarizes the evidence bundle." in rendered
     assert signer in rendered
     assert "fixture://baseline" in rendered

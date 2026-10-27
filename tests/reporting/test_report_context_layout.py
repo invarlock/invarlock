@@ -33,14 +33,16 @@ def test_context_layout_is_optional_and_precedes_results(subjects, context, chan
         if changes:
             assert "System instruction added." in output
         if any((subjects, context, changes)):
-            if render is render_html:
-                assert output.index("What was checked") < output.index(
-                    "What was compared"
-                )
-            else:
-                assert output.index("What was compared") < output.index(
-                    "What was checked"
-                )
+            comparison_heading = (
+                "What was compared</h2>"
+                if render is render_html
+                else "## What was compared"
+            )
+            assert output.index("What was checked") < output.index(comparison_heading)
+            assert output.index("Scope and limitations") < output.index(
+                comparison_heading
+            )
+            assert output.index("Next decision") < output.index(comparison_heading)
 
 
 def test_untrusted_context_is_escaped_in_both_formats():

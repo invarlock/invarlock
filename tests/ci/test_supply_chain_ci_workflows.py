@@ -125,6 +125,12 @@ def test_promptfoo_sdk_gate_uses_a_required_dependency_lock() -> None:
     assert manifest["overrides"] == {
         "promptfoo": {"js-yaml": "5.4.2", "simple-git": "4.0.2"},
         "get-uri": {"basic-ftp": "6.2.1"},
+        "body-parser": "2.4.0",
+        "fast-uri": "3.1.9",
+        "ip-address": "10.7.4",
+        "undici@^6.0.0": "6.29.1",
+        "undici@^7.0.0": "7.30.1",
+        "zod": "4.6.7",
     }
     assert lock["lockfileVersion"] == 3
     assert lock["packages"][""]["dependencies"] == manifest["dependencies"]
@@ -135,8 +141,18 @@ def test_promptfoo_sdk_gate_uses_a_required_dependency_lock() -> None:
         "simple-git": "4.0.2",
         "@simple-git/argv-parser": "2.0.1",
         "basic-ftp": "6.2.1",
+        "body-parser": "2.4.0",
+        "fast-uri": "3.1.9",
+        "ip-address": "10.7.4",
+        "zod": "4.6.7",
     }.items():
         assert lock["packages"][f"node_modules/{package}"]["version"] == version
+    undici_versions = {
+        package["version"]
+        for path, package in lock["packages"].items()
+        if path.endswith("/undici")
+    }
+    assert undici_versions == {"6.29.1", "7.30.1"}
     assert all(
         package.get("integrity")
         and package.get("resolved", "").startswith("https://registry.npmjs.org/")

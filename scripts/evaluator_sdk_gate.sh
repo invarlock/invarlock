@@ -145,14 +145,19 @@ if [ "$SDK_NAME" = "promptfoo" ]; then
          archive?.integrity!==pins.integrity || lock.lockfileVersion!==3) {
         throw Error("Promptfoo npm lock differs from its maintained identity pin");
       }
-      const patches={"js-yaml":"5.4.2", "simple-git":"4.0.2", "basic-ftp":"6.2.1", "@simple-git/argv-parser":"2.0.1"};
+      const patches={"js-yaml":"5.4.2", "simple-git":"4.0.2", "basic-ftp":"6.2.1", "@simple-git/argv-parser":"2.0.1", "body-parser":"2.4.0", "fast-uri":"3.1.9", "ip-address":"10.7.4", "zod":"4.6.7"};
       if(manifest.overrides?.promptfoo?.["js-yaml"]!==patches["js-yaml"] ||
          manifest.overrides?.promptfoo?.["simple-git"]!==patches["simple-git"] ||
          manifest.overrides?.["get-uri"]?.["basic-ftp"]!==patches["basic-ftp"] ||
+         ["body-parser","fast-uri","ip-address","zod"].some(name=>manifest.overrides?.[name]!==patches[name]) ||
+         manifest.overrides?.["undici@^6.0.0"]!=="6.29.1" || manifest.overrides?.["undici@^7.0.0"]!=="7.30.1" ||
          Object.entries(patches).some(([name,version])=>lock.packages?.[`node_modules/${name}`]?.version!==version)) {
         throw Error("Promptfoo npm lock is missing a reviewed dependency patch");
       }
       for(const [entry, pkg] of Object.entries(lock.packages)) {
+        if(entry.endsWith("/undici") && !["6.29.1","7.30.1"].includes(pkg.version)) {
+          throw Error("Promptfoo npm lock has an unpatched undici dependency");
+        }
         if(pkg.optional===true || pkg.optionalDependencies) {
           throw Error("Promptfoo npm lock includes an unused optional dependency");
         }

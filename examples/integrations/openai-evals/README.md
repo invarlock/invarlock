@@ -65,11 +65,13 @@ the transaction at a specific new path. The evidence and verifier keys must be c
 outside the transaction; the trust root is created outside the transaction.
 
 The command builds the source-authenticated CPU runtime and adds
-`evals==3.0.1.post1+invarlock.match.1`, derived from the hash-pinned upstream
+`evals==3.0.1.post1+invarlock.match.2`, derived from the hash-pinned upstream
 3.0.1.post1 wheel. Every upstream code file is unchanged; package metadata
-removes the unused NLTK dependency and records the derived version. This image
-supports `basic.Match` with the repository's HF completion adapter. NLTK-based
-suites and data-generation helpers are unsupported; their upstream modules
+removes the unused NLTK and Snowflake connector dependencies and records the
+derived version. This permits the patched `filelock` dependency without introducing
+incompatible Snowflake/protobuf requirements. This image supports `basic.Match`
+with the repository's HF completion adapter and local recording. Snowflake
+recording, NLTK-based suites and data-generation helpers are unsupported; their upstream modules
 can fail on missing optional dependencies.
 The broader qualification profile and historical evidence keep their original
 dependency identities.

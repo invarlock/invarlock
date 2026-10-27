@@ -60,6 +60,15 @@ def _terminate(process: subprocess.Popen[bytes]) -> None:
                 os.killpg(process_id, signal.SIGKILL)
             except ProcessLookupError:
                 pass
+            except PermissionError:
+                # A group can disappear while the final signal is delivered.
+                # Suppress a late denial only after confirming it no longer exists.
+                try:
+                    os.killpg(process_id, 0)
+                except ProcessLookupError:
+                    pass
+                else:
+                    raise
 
 
 def run_bounded_command(
@@ -98,6 +107,7 @@ def run_bounded_command(
     source = None
     destination = None
     completed = False
+    process_started = False
     try:
         if stdin_path is not None:
             source = stdin_path.open("rb")
@@ -114,6 +124,7 @@ def run_bounded_command(
             bufsize=0,
             start_new_session=os.name == "posix",
         )
+        process_started = True
         returncode, stdout, stderr = communicate_bounded(
             process,
             input_bytes=b"",
@@ -129,7 +140,12 @@ def run_bounded_command(
         )
         completed = True
     except OSError as exc:
-        raise RuntimeError(f"could not start command: {' '.join(argv)}") from exc
+        context = (
+            "command execution or cleanup failed"
+            if process_started
+            else "could not start command"
+        )
+        raise RuntimeError(f"{context}: {' '.join(argv)}") from exc
     finally:
         try:
             if source is not None:

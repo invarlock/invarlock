@@ -54,9 +54,9 @@ def test_standard_setup_preserves_pins_bytecode_and_selected_python(name):
     steps = _jobs()[name]["steps"]
     setup = next(step for step in steps if step["name"] == "Set up uv")
     assert (
-        setup["uses"] == "astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884"
+        setup["uses"] == "astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e"
     )
-    assert setup["with"] == {"version": "0.10.10", "enable-cache": False}
+    assert setup["with"] == {"version": "0.13.4", "enable-cache": False}
     installs = [step for step in steps if "uv pip install" in step.get("run", "")]
     assert installs
     for install in installs:

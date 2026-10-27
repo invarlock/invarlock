@@ -18,6 +18,7 @@ The facade deliberately groups these stable surfaces:
 
 | Surface | Exports |
 | --- | --- |
+| Client handoffs | `build_client_review`, `ClientReviewError`, `CLIENT_REVIEW_CONTEXT_FORMAT` |
 | Transactions | `evaluate_request_file`, `verify_evidence`, `render_evidence`, native/captured receipt verification, judge verification and signed judge receipts, acceptance attestations |
 | Request | `load_evaluation_request`, `EvaluationRequest`, `EvaluationRequestError` |
 | Captured authoring | `CapturedEvaluationRequest`, `make_run`, `load_run`, `write_run`, `run_digest`, `physical_file_digest`, `freeze_case_set`, `case_set_digest`, `validate_run_case_set`, `compare_runs`, `comparison_policy_digest`, `normalize_captured_request`, `captured_request_digest`, `EvaluationRecordsError`, `DEFAULT_MAX_BOOTSTRAP_DRAWS` |
@@ -927,3 +928,25 @@ replay completed; inspect the exception payload for `signed_receipt`.
   conformance obligations.
 - [Reports and receipts](reports.md) explains the trust meaning of result and
   receipt objects.
+
+## Client handoff packages
+
+```python
+from pathlib import Path
+from invarlock.engine import build_client_review
+
+result = build_client_review(
+    Path("evidence"),
+    context_path=Path("review-context.json"),
+    output=Path("client-handoff"),
+)
+```
+
+The builder returns the same success dictionary as CLI package mode and raises
+`ClientReviewError` on invalid input or publication failure. Optional
+`retained_receipt=Path(...)` attaches a matching historical receipt without
+recipient authentication. Optional `supporting_files={"source-reference.md": Path(...)}`
+copies explicit public attachments with safe, distinct basenames (up to 32 files,
+32 MiB each). Review them for disclosure before including them; never include
+private keys. They cannot replace generated package files and are not trust anchors.
+See the [handoff guide](../user-guide/client-handoff.md) for the context contract.

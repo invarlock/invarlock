@@ -25,8 +25,8 @@ from examples.qualification import k2_runtime_source as source
 ROOT = Path(__file__).resolve().parents[2]
 RUNTIME = ROOT / "examples/qualification/k2-horizon/runtime"
 LOCK = ROOT / "requirements/workflows/k2-campaign-py312.txt"
-PIP_WHEEL = "pip-26.2-py3-none-any.whl"
-PIP_WHEEL_SHA256 = "931c303696af6fa3417112103b1cad26890e5a07eccb5b99783700e33f2b8aad"
+PIP_WHEEL = "pip-26.2.2-py3-none-any.whl"
+PIP_WHEEL_SHA256 = "fd7f4dfa8190e014013b9f08f3e973f4e4c26ffd179a204895533a7254813a70"
 
 
 def _read(path, limit):
@@ -117,7 +117,7 @@ def _pip_inputs(path, lock):
     ]
     if (
         len(records) != 1
-        or re.fullmatch(r"pip==26\.2(?:\s+--hash=sha256:[0-9a-f]{64})+", records[0])
+        or re.fullmatch(r"pip==26\.2\.2(?:\s+--hash=sha256:[0-9a-f]{64})+", records[0])
         is None
         or PIP_WHEEL_SHA256
         not in re.findall(r"--hash=sha256:([0-9a-f]{64})", records[0])

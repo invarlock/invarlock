@@ -7,6 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.2] - 2026-10-27
+
+### Added
+
+- Add reusable client handoff packages through `report --review-context --package`
+  and `build_client_review`. Include a concise decision brief, full attributed
+  review, technical appendix, recipient verification guide, unchanged evidence,
+  file inventories and ZIP. Missing owner decisions remain pending. Optional
+  historical receipts retain their bytes and are labeled as unverified attachments;
+  recipient verification uses separately approved inputs and a new result.
+
+- Add client-review examples with separately attributed fictional
+  context, recommendations, decisions and follow-up actions around retained real
+  comparisons. Each package includes HTML and Markdown reviews alongside original
+  signed evidence, a receipt, public keys, source references and a file-hash
+  inventory, with a ZIP copy of those files.
+  Authored commentary does not change evidence or grant recipient approval.
+
+### Changed
+
+- Refresh pinned GitHub Actions for Python and uv setup, CodeQL analysis, and
+  package publication. Keep the pinned uv version and hash-locked dependency
+  installation checks.
+- Redesign native, captured, judge and combined HTML and Markdown reports around
+  decision context, the scoped policy result, numbered findings, limitations and
+  the next review action. Link findings to supporting records and preserve the
+  distinction between a passing comparison and suitability for an application.
+- Preserve review explanations and all metric tabs when printing reports, with
+  A4 and US Letter layouts, page numbering and readable monochrome output.
+  Improve keyboard navigation and narrow-screen presentation. Browser and print
+  checks cover Chromium; they do not establish full accessibility conformance.
+
+### Fixed
+
+- Return a structured numeric-range error when paired score differences or
+  bootstrap sums overflow, without publishing evidence. Preserve finite-result
+  behavior and document binary64 rounding, underflow and zero-denominator limits.
+- Accept a late subprocess signal-permission error only after confirming that
+  the process group has exited. Preserve execution and cleanup errors for live
+  or unverified groups in integration examples.
+
+### Security
+
+- Upgrade maintained `filelock` and setuptools locks above their advisory floors,
+  and preserve those floors during regeneration. Remove the unused Snowflake
+  connector from the restricted local Evals Match profile so patched `filelock`
+  can be installed without unrelated dependency downgrades.
+- Patch the Promptfoo integration's HTTP, URI, address, and schema dependencies
+  while preserving the pinned evaluator archive and omitting unused integrations.
+- Upgrade pip to 26.2.2 and uv to 0.13.4 for their independent certificate-bundle
+  fixes, including hashed bootstrap and audit locks, CI selections, and the
+  authenticated K2 installer wheel. Application `certifi` updates remain separate.
+
 ## [0.17.1] - 2026-10-23
 
 ### Changed

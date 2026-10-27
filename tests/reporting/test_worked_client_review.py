@@ -1,0 +1,141 @@
+"""Complete worked scenarios preserve the source pack and exported commentary."""
+
+import hashlib
+import json
+import os
+import re
+import runpy
+import subprocess
+from pathlib import Path
+from zipfile import ZipFile
+
+import pytest
+
+ROOT = Path(__file__).resolve().parents[2]
+EXAMPLE = ROOT / "examples/client-review"
+
+
+def test_worked_examples_keep_original_evidence_and_populate_the_review(tmp_path):
+    build = runpy.run_path(str(EXAMPLE / "build.py"))["build"]
+    output = tmp_path / "worked"
+    inventories = build(output)
+    scenarios = json.loads((EXAMPLE / "scenarios.json").read_text())
+    for name, scenario in scenarios.items():
+        destination = output / name
+        source = ROOT / scenario["reference"]
+        original_files = [p for p in (source / "evidence").rglob("*") if p.is_file()]
+        for original in original_files:
+            relative = original.relative_to(source)
+            assert (destination / relative).read_bytes() == original.read_bytes()
+            assert (
+                inventories[name][str(relative)]
+                == hashlib.sha256(original.read_bytes()).hexdigest()
+            )
+        with ZipFile(output / f"{name}.zip") as archive:
+            for relative, expected in inventories[name].items():
+                assert hashlib.sha256(archive.read(relative)).hexdigest() == expected
+            assert (
+                archive.read("review.html")
+                == (destination / "review.html").read_bytes()
+            )
+        for suffix in ("html", "md"):
+            review = (destination / f"review.{suffix}").read_text()
+            assert scenario["label"] in review
+            assert scenario["decision"] in review
+            assert "Decision owner and recommendation: Not supplied" not in review
+            assert "Organizational approval: Not recorded by this report" not in review
+            assert scenario["next_action"] in review
+            assert "evidence/reports/evaluation.report.json#/metrics/0" in review
+        assert (
+            "Decision owner and recommendation: Not supplied"
+            in (destination / "technical-report.html").read_text()
+        )
+        for match in re.finditer(
+            r"((?:evidence/|verification\.)[\w/.-]+\.json)#(/[^\s.]+)",
+            json.dumps(scenario),
+        ):
+            path, pointer = match.groups()
+            node = json.loads((destination / path).read_text())
+            for key in pointer.rstrip('"').split("/")[1:]:
+                node = node[int(key)] if isinstance(node, list) else node[key]
+    with pytest.raises(FileExistsError):
+        build(output)
+
+
+@pytest.mark.manual
+@pytest.mark.parametrize("name", ["likelihood-adverse", "hosted-pass"])
+@pytest.mark.parametrize("paper", ["A4", "Letter"])
+def test_worked_review_context_survives_actual_print(tmp_path, name, paper):
+    module = os.environ.get("INVARLOCK_REPORT_PLAYWRIGHT_MODULE")
+    pdf_python = os.environ.get("INVARLOCK_REPORT_PDF_PYTHON")
+    if not module or not pdf_python:
+        pytest.skip("Set the report browser and PDF reader paths for this check")
+    build = runpy.run_path(str(EXAMPLE / "build.py"))["build"]
+    output = tmp_path / "worked"
+    build(output)
+    root = output / name
+    pdf = root / "review.pdf"
+    subprocess.run(
+        ["node", str(EXAMPLE / "print.cjs"), module, str(root), paper],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    result = subprocess.run(
+        [
+            pdf_python,
+            "-c",
+            "from pypdf import PdfReader; import json,sys; print(json.dumps([p.extract_text() for p in PdfReader(sys.argv[1]).pages]))",
+            str(pdf),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    pages = json.loads(result.stdout)
+    scenario = json.loads((root / "authored-scenario.json").read_text())
+
+    def compact(text):
+        return re.sub(r"\s+", "", text).casefold()
+
+    assert compact(scenario["decision"]) in compact(pages[0])
+    body = compact(
+        " ".join(
+            re.sub(r"Page \d+ of \d+|InvarLock · Model change review", "", page)
+            for page in pages
+        )
+    )
+    values = [
+        scenario[key]
+        for key in ("label", "byline", "recommendation", "decision", "next_action")
+    ]
+    values.extend(value for _, value in scenario["context"] + scenario["basis"])
+    for value in values:
+        assert compact(value) in body, value
+    assert "Decisionownerandrecommendation:Notsupplied".casefold() not in body
+
+    brief_result = subprocess.run(
+        [
+            pdf_python,
+            "-c",
+            "from pypdf import PdfReader; import json,sys; print(json.dumps([p.extract_text() for p in PdfReader(sys.argv[1]).pages]))",
+            str(root / "brief.pdf"),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    brief_pages = json.loads(brief_result.stdout)
+    assert len(brief_pages) == 1
+    brief_text = compact(brief_pages[0])
+    for value in (
+        scenario["decision"],
+        scenario["next_action"],
+        "Recorded policy result",
+        "Not performed for this recipient",
+        "Evidence statement identity",
+    ):
+        assert compact(value) in brief_text
