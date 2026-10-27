@@ -4,6 +4,7 @@
 //! Compile using ordinary Rust floating-point semantics; fast-math and fused
 //! replacement expressions are outside this experiment's supported configuration.
 
+#[cfg(test)]
 use sha2::{Digest, Sha256};
 use std::fmt;
 
@@ -139,15 +140,23 @@ fn indexes(seed: &[u8; 32], count: usize, replicate: u64) -> Vec<usize> {
 }
 
 fn indexes_into(seed: &[u8; 32], count: usize, replicate: u64, draws: &mut Vec<usize>) {
-    let mut input = [0u8; 48];
-    input[..32].copy_from_slice(seed);
-    input[32..40].copy_from_slice(&replicate.to_be_bytes());
+    // The protocol always hashes exactly 48 bytes, so padding is fixed. Use
+    // sha2's existing compression backend (including runtime CPU selection).
+    // This removes general-purpose buffering/finalization, not any hash rounds.
+    let mut block = sha2::digest::generic_array::GenericArray::default();
+    block[..32].copy_from_slice(seed);
+    block[32..40].copy_from_slice(&replicate.to_be_bytes());
+    block[48] = 0x80;
+    block[56..].copy_from_slice(&384u64.to_be_bytes());
     draws.clear();
     draws.extend((0..count).map(|draw| {
-        input[40..].copy_from_slice(&(draw as u64).to_be_bytes());
-        let digest = Sha256::digest(input);
-        (u64::from_be_bytes(digest[..8].try_into().expect("eight digest bytes")) % count as u64)
-            as usize
+        block[40..48].copy_from_slice(&(draw as u64).to_be_bytes());
+        let mut state = [
+            0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab,
+            0x5be0cd19,
+        ];
+        sha2::compress256(&mut state, std::slice::from_ref(&block));
+        (((state[0] as u64) << 32 | state[1] as u64) % count as u64) as usize
     }));
 }
 
@@ -432,6 +441,62 @@ mod bootstrap_tests {
 
     const SEED: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
+    // Independent high-level digest oracle retains the original protocol.
+    fn reference_indexes(seed: &[u8; 32], count: usize, replicate: u64) -> Vec<usize> {
+        let mut input = [0u8; 48];
+        input[..32].copy_from_slice(seed);
+        input[32..40].copy_from_slice(&replicate.to_be_bytes());
+        (0..count)
+            .map(|draw| {
+                input[40..].copy_from_slice(&(draw as u64).to_be_bytes());
+                let digest = Sha256::digest(input);
+                (u64::from_be_bytes(digest[..8].try_into().unwrap()) % count as u64) as usize
+            })
+            .collect()
+    }
+
+    #[test]
+    fn fixed_block_draws_match_independent_digest() {
+        for seed in [[0; 32], [255; 32], std::array::from_fn(|i| i as u8)] {
+            for count in [1, 2, 3, 17, 257, 4097] {
+                for replicate in [0, 1, 2047, u32::MAX as u64, u64::MAX] {
+                    assert_eq!(
+                        indexes(&seed, count, replicate),
+                        reference_indexes(&seed, count, replicate)
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    #[ignore = "bounded timing diagnostic; run explicitly in release mode"]
+    fn fixed_block_microcases() {
+        for count in [64, 1024, 50_000] {
+            for round in 0..5 {
+                for fixed in if round % 2 == 0 {
+                    [false, true]
+                } else {
+                    [true, false]
+                } {
+                    let start = std::time::Instant::now();
+                    for replicate in 0..32 {
+                        let result = if fixed {
+                            indexes(&[0xa5; 32], count, replicate)
+                        } else {
+                            reference_indexes(&[0xa5; 32], count, replicate)
+                        };
+                        std::hint::black_box(result);
+                    }
+                    eprintln!(
+                        "count={count} round={round} fixed={fixed} seconds={:.9}",
+                        start.elapsed().as_secs_f64()
+                    );
+                }
+            }
+        }
+    }
+
     // Keep the allocation-per-replicate reference to check scratch reuse as well
     // as scheduling. This deliberately follows the previous serial implementation.
     fn serial_reference(
@@ -443,7 +508,7 @@ mod bootstrap_tests {
         let seed = validate(baseline, subject, SEED)?;
         (0..replicates)
             .map(|replicate| {
-                let draws = indexes(&seed, baseline.len(), replicate as u64);
+                let draws = reference_indexes(&seed, baseline.len(), replicate as u64);
                 let count = baseline.len() as f64;
                 if metric != "normalized_nll_per_utf8_byte" {
                     return Ok(

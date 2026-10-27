@@ -26,7 +26,8 @@ authorized scorer callback can run in Python; Rust checks its returned facts.
 Differential tests cover the existing digest domains, canonical newlines, numerical
 methods, historical report versions and independent recipient trust on the
 qualified fixtures and retained corpus. This is not an all-input equivalence claim. It uses
-owned inputs, checked records and descriptor-backed snapshots. Long operations
+immutable borrowed byte inputs (with owned snapshots for mutable buffers),
+checked records and descriptor-backed snapshots. Long operations
 release the Python GIL; an authorized callback reacquires it only for that call.
 Publication cannot replace an existing destination. Interrupted admitted work
 cannot be silently dispatched again.
@@ -44,7 +45,8 @@ own qualification. The toolchain and Cargo dependency versions are pinned.
 ARM builds enable runtime SHA-256 acceleration through the locked `sha2`
 assembly feature and require a working C/assembly compiler. Linux dispatch checks
 CPU support and retains the software implementation when SHA instructions are
-unavailable. The x86 dependency feature selection is unchanged.
+unavailable. The fixed 48-byte draw protocol uses the same compression backend with
+precomputed SHA-256 padding; the digest bytes and draw order stay unchanged.
 
 Paired bootstrap replay uses at most eight workers, capped by the operating
 system's reported available parallelism. Small workloads stay serial; failed
@@ -79,6 +81,9 @@ invarlock report evidence --html report.html --backend rust
 ```
 
 `evaluate --execution-backend rust` remains an alias for the same selection.
+Client handoff packages (`report --package`) currently require `--backend python`;
+requesting Rust returns an explicit error before creating a package.
+
 Provider discovery, strict YAML decoding, external evaluator format adapters,
 SDK calls and model execution remain Python integrations. Rust owns the portable
 analysis/evidence path and the selected process, admission and checkpoint work.

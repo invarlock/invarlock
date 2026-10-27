@@ -692,6 +692,9 @@ fn interval(b: &[f64], s: &[f64], seed: &str, is_binary: bool) -> Result<Value, 
         );
     }
     let differences = b.iter().zip(s).map(|(b, s)| s - b).collect::<Vec<_>>();
+    if differences.iter().any(|v| !v.is_finite()) {
+        return Err(err("metric arithmetic exceeded finite numeric range"));
+    }
     let count = differences.len();
     let first = differences[0];
     let (lower, upper) = if differences.iter().all(|v| *v == first) {
@@ -719,7 +722,15 @@ fn interval(b: &[f64], s: &[f64], seed: &str, is_binary: bool) -> Result<Value, 
                 }
                 block += 1
             }
-            draws.push(fsum(values).map_err(|e| err(e.to_string()))? / count as f64)
+            draws.push(
+                fsum(values).map_err(|e| {
+                    if e == crate::IntervalError::IntermediateOverflow {
+                        err("metric arithmetic exceeded finite numeric range")
+                    } else {
+                        err(e.to_string())
+                    }
+                })? / count as f64,
+            )
         }
         draws.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
         let percentile = |q: f64| {

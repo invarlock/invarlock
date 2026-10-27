@@ -1,8 +1,20 @@
-//! Coarse Python boundaries. Inputs are copied once into owned native bytes.
+//! Coarse Python boundaries. Immutable byte inputs stay borrowed while detached.
 use invarlock_native_contracts as contracts;
 use invarlock_native_core as analysis;
 use invarlock_native_evidence as evidence;
 use pyo3::{exceptions::PyValueError, prelude::*, types::PyBytes};
+use std::borrow::Cow;
+
+// Only immutable Python bytes may be borrowed while the GIL is released. The
+// caller retains their owner until detach returns. Mutable buffers and sequences
+// keep the prior owned-snapshot extraction semantics.
+fn request_bytes<'a>(raw: &'a Bound<'_, PyAny>) -> PyResult<Cow<'a, [u8]>> {
+    if let Ok(bytes) = raw.cast::<PyBytes>() {
+        Ok(Cow::Borrowed(bytes.as_bytes()))
+    } else {
+        raw.extract::<Vec<u8>>().map(Cow::Owned)
+    }
+}
 
 pyo3::create_exception!(invarlock_native, NativeVerificationError, PyValueError);
 
@@ -15,7 +27,12 @@ fn evidence_error(py: Python<'_>, error: evidence::EvidenceError) -> PyErr {
 }
 #[pyfunction]
 #[pyo3(signature=(raw, *, newline=true))]
-fn canonicalize_json(py: Python<'_>, raw: Vec<u8>, newline: bool) -> PyResult<Py<PyBytes>> {
+fn canonicalize_json(
+    py: Python<'_>,
+    raw: &Bound<'_, PyAny>,
+    newline: bool,
+) -> PyResult<Py<PyBytes>> {
+    let raw = request_bytes(raw)?;
     let bytes = py
         .detach(move || {
             let value = contracts::parse_json(&raw, "JSON input")?;
@@ -29,7 +46,8 @@ fn canonicalize_json(py: Python<'_>, raw: Vec<u8>, newline: bool) -> PyResult<Py
     Ok(PyBytes::new(py, &bytes).unbind())
 }
 #[pyfunction]
-fn validate_json_schema(py: Python<'_>, raw: Vec<u8>, schema: String) -> PyResult<()> {
+fn validate_json_schema(py: Python<'_>, raw: &Bound<'_, PyAny>, schema: String) -> PyResult<()> {
+    let raw = request_bytes(raw)?;
     py.detach(move || {
         let value = contracts::parse_json(&raw, "JSON input")?;
         contracts::validate_schema(&value, &schema)
@@ -37,7 +55,8 @@ fn validate_json_schema(py: Python<'_>, raw: Vec<u8>, schema: String) -> PyResul
     .map_err(|e| PyValueError::new_err(e.to_string()))
 }
 #[pyfunction]
-fn compare_runs_json(py: Python<'_>, raw: Vec<u8>) -> PyResult<Py<PyBytes>> {
+fn compare_runs_json(py: Python<'_>, raw: &Bound<'_, PyAny>) -> PyResult<Py<PyBytes>> {
+    let raw = request_bytes(raw)?;
     let result = py.detach(move || {
         let input = contracts::parse_json(&raw, "comparison request")
             .map_err(|e| (e.to_string(), "invalid_evaluation_records"))?;
@@ -66,7 +85,8 @@ fn compare_runs_json(py: Python<'_>, raw: Vec<u8>) -> PyResult<Py<PyBytes>> {
     }
 }
 #[pyfunction]
-fn verify_captured_json(py: Python<'_>, raw: Vec<u8>) -> PyResult<Py<PyBytes>> {
+fn verify_captured_json(py: Python<'_>, raw: &Bound<'_, PyAny>) -> PyResult<Py<PyBytes>> {
+    let raw = request_bytes(raw)?;
     let result = py.detach(move || {
         let config = contracts::parse_json(&raw, "verification request")?;
         let result = evidence::captured::verify(&config)?;
@@ -119,11 +139,12 @@ impl evidence::native_pack::ScorerReplay for PythonScorer {
 fn dispatch_json(
     py: Python<'_>,
     operation: String,
-    raw: Vec<u8>,
+    raw: &Bound<'_, PyAny>,
     scorer_callback: Option<Py<PyAny>>,
     policy_bytes: Option<Vec<u8>>,
     signing_key_bytes: Option<Vec<u8>>,
 ) -> PyResult<Py<PyBytes>> {
+    let raw = request_bytes(raw)?;
     let outcome=py.detach(move ||->evidence::Result<Vec<u8>> {
         let config=contracts::parse_json(&raw,"native transaction request")?;
         let bridge=scorer_callback.map(|callback|PythonScorer{callback});

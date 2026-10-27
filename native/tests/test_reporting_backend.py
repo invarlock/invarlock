@@ -72,3 +72,16 @@ def test_native_report_facade_and_cli(family, tmp_path, monkeypatch):
     )
     assert result.exit_code == 0, result.output
     assert json.loads(result.stdout) == json.loads(plain.as_json())
+
+
+def test_client_handoff_requires_implemented_backend(tmp_path):
+    from invarlock.cli.app import app
+
+    destination = tmp_path / "handoff"
+    result = CliRunner().invoke(
+        app,
+        ["report", str(tmp_path), "--package", str(destination), "--backend", "rust"],
+    )
+    assert result.exit_code == 2
+    assert "Client handoff packages require --backend python" in result.output
+    assert not destination.exists()

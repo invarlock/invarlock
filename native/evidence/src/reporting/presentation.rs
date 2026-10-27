@@ -491,5 +491,5 @@ pub(super) fn check(
     json!({"name":name,"observed":observed,"required":required,"passed":passed,"explanation":explanation})
 }
 pub(super) fn empty_view() -> Value {
-    json!({"title":"","family":"","decision":"","summary":"","metrics":[],"assurance":[],"identity":[],"subjects":[],"next_steps":[],"limitations":[],"details":[],"technical":{},"context":[],"changes":[],"review":null})
+    json!({"title":"","family":"","decision":"","summary":"","metrics":[],"assurance":[],"identity":[],"subjects":[],"next_steps":[],"limitations":[],"details":[],"technical":{},"context":[],"changes":[],"review":null,"handoff_links":[]})
 }

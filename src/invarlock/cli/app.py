@@ -1315,7 +1315,9 @@ def report(
 
     if any(value is not None for value in (review_context, package, retained_receipt)):
         if backend != "python":
-            raise typer.BadParameter("Client handoff packages require --backend python.")
+            raise typer.BadParameter(
+                "Client handoff packages require --backend python."
+            )
         from invarlock.client_review import ClientReviewError, build_client_review
 
         try:
