@@ -21,3 +21,5 @@ htmlcov/**
 
 # Preserve the retained upstream dependency documentation byte-for-byte.
 native/vendor/jsonschema/README.md
+native/vendor/serde_json/README.md
+native/vendor/serde_json/CONTRIBUTING.md

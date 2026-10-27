@@ -28,9 +28,11 @@
     "tmp_*/**",
     "htmlcov/**",
     "*.egg-info/**",
-    "native/vendor/jsonschema/README.md"
+    "native/vendor/jsonschema/README.md",
+    "native/vendor/serde_json/README.md"
   ],
   "words": [
+    "serde",
     "subtests",
     "Clippy",
     "IDNA",

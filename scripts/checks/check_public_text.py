@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import re
 import subprocess
 import sys
@@ -128,6 +130,83 @@ RULES: tuple[Rule, ...] = (
 )
 
 
+# Only this wording rule is stylistic. Operational/privacy rules always apply.
+UNCHANGED_VENDOR_STYLE_RULES = frozenset({"review_staffing_language"})
+
+
+def unchanged_vendored_markdown(path: Path, root: Path, raw: bytes) -> bool:
+    """Recognize unchanged upstream bytes; missing or ambiguous evidence denies exemption."""
+
+    def unique_object(pairs):
+        value = {}
+        for key, item in pairs:
+            if key in value:
+                raise ValueError("duplicate provenance key")
+            value[key] = item
+        return value
+
+    try:
+        relative = path.absolute().relative_to(root.resolve())
+        if (
+            relative.parts[:2] != ("native", "vendor")
+            or len(relative.parts) < 4
+            or path.suffix.lower() != ".md"
+            or path.resolve() != path.absolute()
+        ):
+            return False
+        package = root.resolve().joinpath(*relative.parts[:3])
+        provenance_path = package / "source-provenance.json"
+        if provenance_path.is_symlink():
+            return False
+        provenance = json.loads(
+            provenance_path.read_text(encoding="utf-8"), object_pairs_hook=unique_object
+        )
+        if not isinstance(provenance, dict):
+            return False
+        name, version = provenance["name"], provenance["version"]
+        if (
+            name != package.name
+            or not isinstance(version, str)
+            or not version
+            or provenance["origin"]
+            != "external upstream dependency; not InvarLock implementation"
+            or provenance["source_url"]
+            != f"https://static.crates.io/crates/{name}/{name}-{version}.crate"
+            or re.fullmatch(r"[0-9a-f]{64}", provenance["archive_sha256"]) is None
+        ):
+            return False
+        document = path.relative_to(package).as_posix()
+        modified = provenance["modified_upstream_files"]
+        if (
+            not isinstance(modified, list)
+            or not all(isinstance(item, str) for item in modified)
+            or document in modified
+        ):
+            return False
+        actual = hashlib.sha256(raw).hexdigest()
+        for field in ("upstream_file_hashes", "patched_file_hashes"):
+            filename = provenance[field]
+            if (
+                not isinstance(filename, str)
+                or not filename
+                or Path(filename).name != filename
+                or filename in (".", "..")
+            ):
+                return False
+            manifest_path = package / filename
+            if manifest_path.is_symlink():
+                return False
+            manifest = json.loads(
+                manifest_path.read_text(encoding="utf-8"),
+                object_pairs_hook=unique_object,
+            )
+            if not isinstance(manifest, dict) or manifest.get(document) != actual:
+                return False
+        return True
+    except (OSError, UnicodeError, ValueError, TypeError, KeyError):
+        return False
+
+
 def tracked_markdown_paths(root: Path) -> list[Path]:
     """Return every Markdown path tracked by Git under *root*."""
 
@@ -193,7 +272,17 @@ def scan_paths(paths: list[Path], root: Path) -> list[Finding]:
             source = path.relative_to(root).as_posix()
         except ValueError:
             source = "<external-file>"
-        findings.extend(findings_for_text(source, path.read_text(encoding="utf-8")))
+        raw = path.read_bytes()
+        selected = findings_for_text(source, raw.decode("utf-8"))
+        if any(
+            finding.rule.name in UNCHANGED_VENDOR_STYLE_RULES for finding in selected
+        ) and unchanged_vendored_markdown(path, root, raw):
+            selected = [
+                finding
+                for finding in selected
+                if finding.rule.name not in UNCHANGED_VENDOR_STYLE_RULES
+            ]
+        findings.extend(selected)
     return findings
 
 
@@ -220,7 +309,7 @@ def main(argv: list[str] | None = None) -> int:
 
     root = args.root.resolve()
     try:
-        paths = [path.resolve() for path in args.paths]
+        paths = [path.absolute() for path in args.paths]
         if not paths:
             paths = working_tree_markdown_paths(root)
         findings = scan_paths(paths, root)

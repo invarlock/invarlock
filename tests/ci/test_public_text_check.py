@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import importlib.util
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -220,3 +222,167 @@ def test_discovery_race_and_explicit_deleted_path_fail_closed(
     assert public_text.main(["--root", str(tmp_path)]) == 2
     assert public_text.main([str(missing)]) == 2
     assert "passed" not in capsys.readouterr().out
+
+
+def vendored_document(root, text="A human-readable format.\n"):
+    package = root / "native/vendor/example"
+    package.mkdir(parents=True)
+    document = package / "README.md"
+    document.write_text(text, encoding="utf-8")
+    digest = hashlib.sha256(document.read_bytes()).hexdigest()
+    provenance = {
+        "name": "example",
+        "version": "1.0.0",
+        "origin": "external upstream dependency; not InvarLock implementation",
+        "source_url": "https://static.crates.io/crates/example/example-1.0.0.crate",
+        "archive_sha256": "a" * 64,
+        "modified_upstream_files": [],
+        "upstream_file_hashes": "upstream-files.sha256.json",
+        "patched_file_hashes": "patched-files.sha256.json",
+    }
+    (package / "source-provenance.json").write_text(json.dumps(provenance))
+    for key in ("upstream_file_hashes", "patched_file_hashes"):
+        (package / provenance[key]).write_text(json.dumps({"README.md": digest}))
+    return document, provenance
+
+
+def test_unchanged_upstream_markdown_style_is_permitted(public_text, tmp_path):
+    document, _ = vendored_document(tmp_path)
+    assert public_text.scan_paths([document], tmp_path) == []
+    # A text-only scan never assumes that the content is an upstream artifact.
+    assert public_text.findings_for_text("README.md", document.read_text())
+
+
+@pytest.mark.parametrize(
+    "kind", ["modified", "local-document", "outside-vendor", "declared-modified"]
+)
+def test_local_or_changed_markdown_is_still_checked(public_text, tmp_path, kind):
+    document, provenance = vendored_document(tmp_path)
+    if kind == "modified":
+        document.write_text(document.read_text() + "Local addition.\n")
+    elif kind == "local-document":
+        document = document.with_name("LOCAL.md")
+        document.write_text("A human-readable format.\n")
+    elif kind == "outside-vendor":
+        local = tmp_path / "docs/README.md"
+        local.parent.mkdir()
+        local.write_bytes(document.read_bytes())
+        document = local
+    else:
+        provenance["modified_upstream_files"] = ["README.md"]
+        (document.parent / "source-provenance.json").write_text(json.dumps(provenance))
+    assert {
+        finding.rule.name for finding in public_text.scan_paths([document], tmp_path)
+    } == {"review_staffing_language"}
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        (
+            "A human-readable format. api_key=abcdefghijklmnop",
+            "credential_like_assignment",
+        ),
+        (
+            "A human-readable format. /Users/alice/private/report.md",
+            "absolute_home_path",
+        ),
+        ("A human-readable format. root@example.invalid", "root_ssh_target"),
+        ("A human-readable format. /private/tmp/private-report", "private_temp_path"),
+        ("A human-readable format. Privacy gate passed.", "review_process_status"),
+    ],
+)
+def test_unchanged_upstream_never_suppresses_sensitive_or_other_rules(
+    public_text, tmp_path, text, expected
+):
+    document, _ = vendored_document(tmp_path, text)
+    names = {
+        finding.rule.name for finding in public_text.scan_paths([document], tmp_path)
+    }
+    assert expected in names
+    assert "review_staffing_language" not in names
+
+
+@pytest.mark.parametrize(
+    "kind",
+    [
+        "absent",
+        "invalid-json",
+        "not-object",
+        "missing-field",
+        "bad-archive-hash",
+        "wrong-upstream-hash",
+        "wrong-patched-hash",
+        "malformed-manifest",
+        "escaping-manifest",
+        "duplicate-provenance-key",
+        "duplicate-manifest-key",
+    ],
+)
+def test_malformed_or_inconsistent_vendor_provenance_fails_closed(
+    public_text, tmp_path, kind
+):
+    document, provenance = vendored_document(tmp_path)
+    path = document.parent / "source-provenance.json"
+    if kind == "absent":
+        path.unlink()
+    elif kind == "invalid-json":
+        path.write_text("{")
+    elif kind == "not-object":
+        path.write_text("[]")
+    elif kind == "missing-field":
+        del provenance["patched_file_hashes"]
+        path.write_text(json.dumps(provenance))
+    elif kind == "bad-archive-hash":
+        provenance["archive_sha256"] = 123
+        path.write_text(json.dumps(provenance))
+    elif kind in ("wrong-upstream-hash", "wrong-patched-hash", "malformed-manifest"):
+        key = (
+            "patched_file_hashes"
+            if kind == "wrong-patched-hash"
+            else "upstream_file_hashes"
+        )
+        (document.parent / provenance[key]).write_text(
+            "[]"
+            if kind == "malformed-manifest"
+            else json.dumps({"README.md": "f" * 64})
+        )
+    elif kind == "escaping-manifest":
+        provenance["upstream_file_hashes"] = "../elsewhere.json"
+        path.write_text(json.dumps(provenance))
+    elif kind == "duplicate-provenance-key":
+        path.write_text('{"name":"example",' + json.dumps(provenance)[1:])
+    else:
+        digest = hashlib.sha256(document.read_bytes()).hexdigest()
+        (document.parent / provenance["upstream_file_hashes"]).write_text(
+            '{"README.md":"' + digest + '","README.md":"' + digest + '"}'
+        )
+    assert {
+        finding.rule.name for finding in public_text.scan_paths([document], tmp_path)
+    } == {"review_staffing_language"}
+
+
+@pytest.mark.parametrize("target", ["document", "provenance", "manifest"])
+def test_vendor_symlinks_do_not_gain_style_exemptions(public_text, tmp_path, target):
+    document, provenance = vendored_document(tmp_path)
+    selected = {
+        "document": document,
+        "provenance": document.parent / "source-provenance.json",
+        "manifest": document.parent / provenance["upstream_file_hashes"],
+    }[target]
+    moved = selected.with_name(selected.name + ".copy")
+    selected.rename(moved)
+    selected.symlink_to(moved)
+    assert {
+        finding.rule.name for finding in public_text.scan_paths([document], tmp_path)
+    } == {"review_staffing_language"}
+
+
+def test_explicit_local_symlink_does_not_gain_upstream_exemption(
+    public_text, tmp_path, capsys
+):
+    document, _ = vendored_document(tmp_path)
+    alias = tmp_path / "local.md"
+    alias.symlink_to(document)
+    assert public_text.main(["--root", str(tmp_path), str(alias)]) == 1
+    assert "review_staffing_language" in capsys.readouterr().err
