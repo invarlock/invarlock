@@ -509,6 +509,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../user-guide/client-handoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Client review packages
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../user-guide/modelkit-handoff/" class="md-nav__link">
         
   
@@ -2951,13 +2979,36 @@ their own contracts. None of these paths performs recipient acceptance.</p>
 <td>Select one retained judge case for detailed inspection; repeat for up to 50 cases</td>
 </tr>
 <tr>
+<td><code>--review-context PATH</code></td>
+<td>With <code>--package</code></td>
+<td>Read separately attributed client context</td>
+</tr>
+<tr>
+<td><code>--package PATH</code></td>
+<td>With <code>--review-context</code></td>
+<td>Publish a new client handoff directory and ZIP</td>
+</tr>
+<tr>
+<td><code>--retained-receipt PATH</code></td>
+<td>No</td>
+<td>Attach a matching historical receipt without authenticating it</td>
+</tr>
+<tr>
 <td><code>--json</code></td>
 <td>No</td>
 <td>Emit one compact machine-readable rendering result instead of the text view</td>
 </tr>
 </tbody>
 </table>
-<p>Every output option refuses to overwrite an existing file. By default, <code>report</code>
+<p>Package mode requires <code>--review-context</code> and <code>--package</code> together and cannot mix
+with individual report outputs, <code>--explain</code> or <code>--case-id</code>. It publishes a complete
+new directory only after preparation and source checks. With <code>--json</code>, success
+returns <code>invarlock/client-review-package-v1</code>, <code>ok</code>, <code>kind</code>, <code>output</code>, <code>brief</code>,
+<code>archive</code>, <code>evidence_statement_sha256</code> and <code>recipient_verification: not_performed</code>.
+Failure returns the same format identifier, <code>ok: false</code> and <code>errors</code>, with exit 2.
+See <a href="../../user-guide/client-handoff/">client review packages</a> for context fields,
+output contents and recipient instructions.</p>
+<p>For individual reports, every output option refuses to overwrite an existing file. By default, <code>report</code>
 emits the text view to standard output and prints the written path when HTML is
 requested. With <code>--json</code>, it instead emits one compact
 <code>invarlock/evidence-report-v2</code> object for native and captured evidence, for every

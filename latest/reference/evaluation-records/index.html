@@ -509,6 +509,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../user-guide/client-handoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Client review packages
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../user-guide/modelkit-handoff/" class="md-nav__link">
         
   
@@ -2602,6 +2630,18 @@ replay without issuing a receipt. <code>recorded</code> instead selects a <code>
 exact <code>accepted_provenance</code> (<code>kind</code>, <code>source</code>, <code>version</code>, <code>unit</code>, <code>rubric_digest</code>).
 The verifier authenticates attributed values and paired arithmetic; it does not
 reproduce or authenticate the original scoring process.</p>
+<p>Recorded scores are converted to binary64 floats before comparison. Large JSON
+integers can lose distinctions during conversion, and subtracting rounded means
+can differ from the exact mean of paired differences. Finite inputs can also
+overflow intermediate sums or differences; these comparisons raise
+<code>EvaluationRecordsError</code> with a finite-numeric-range message. The captured CLI
+returns a structured failure without publishing evidence. This refusal does not
+imply that the exact mathematical mean is infinite.</p>
+<p>Normalized NLL uses binary64 arithmetic too: subnormal means can underflow and
+alter a ratio. Every sampled baseline mean must be positive, so even identical
+<code>[0, 1]</code> inputs can be refused when a bootstrap draw contains only zeros. Failed
+draws are not discarded or retried. These comparisons do not promise exact
+integer or real arithmetic.</p>
 <p>An independent planned case set can be pinned in policy as
 <code>expected_case_set_digest</code>. Use <code>freeze_case_set</code>, <code>case_set_digest</code>, and
 <code>validate_run_case_set</code> to require the reviewed schedule, not merely agreement

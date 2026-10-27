@@ -507,6 +507,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../user-guide/client-handoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Client review packages
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../user-guide/modelkit-handoff/" class="md-nav__link">
         
   
@@ -1912,6 +1940,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#installer-certificate-bundles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installer certificate bundles
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#regenerating-patched-dependency-locks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Regenerating patched dependency locks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#documentation-dependencies" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2075,6 +2125,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#installer-certificate-bundles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installer certificate bundles
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#regenerating-patched-dependency-locks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Regenerating patched dependency locks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#documentation-dependencies" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2230,6 +2302,55 @@ block the repository; it is not a declaration that the dependency is safe.</p>
 </ol>
 <p>Do not add an exception merely because exploitation was not reproduced. Lack
 of a local proof is not evidence that a vulnerability is unreachable.</p>
+<h2 id="installer-certificate-bundles">Installer certificate bundles<a class="headerlink" href="#installer-certificate-bundles" title="Permanent link">&para;</a></h2>
+<p>Keep installer trust stores in the security review alongside application
+dependencies. Updating the application's <code>certifi</code> does not update the separate
+certificate bundles embedded in pip and uv.</p>
+<p>The <a href="https://discuss.python.org/t/information-for-python-users-regarding-emudhra-emsign-ca-certificate-security-incident/109576/1">Python incident notice</a>
+requires pip 26.2.2 or newer and recommends <code>certifi</code> 2026.10.19 or newer.
+The <a href="https://github.com/astral-sh/uv/security/advisories/GHSA-hq85-5cpj-mr62">uv advisory</a>
+identifies 0.13.4 as the first patched uv release. The maintained installer pins
+use those pip and uv versions, including CI, release tooling and the authenticated
+K2 bootstrap wheel. The project also rejects uv versions older than 0.13.4 before
+dependency operations. This remediation is separate from the earlier dependency
+audit findings; affected tooling alone is not evidence of repository compromise.</p>
+<p>For a new or existing development environment, upgrade pip through the maintained
+hash-checked bootstrap before using it to install uv:</p>
+<div class="codehilite"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--require-hashes<span class="w"> </span>-r<span class="w"> </span>requirements/workflows/pip-bootstrap.txt
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="nv">uv</span><span class="o">==</span><span class="m">0</span>.13.4
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>--version
+uv<span class="w"> </span>--version
+make<span class="w"> </span>lock-sync
+make<span class="w"> </span>security
+</code></pre></div>
+
+<p>An OS trust-store update alone does not remove pip's vendored trust anchors.
+Retain artifact hashes while bootstrapping from an older installer. Validate the
+actual installed versions, pip's vendored bundle, hash rejection and the affected
+installation workflows; an application dependency audit alone does not exercise
+these boundaries.</p>
+<p>Existing environments and built images need their own update. Rebuild affected
+containers without layer caching and refresh their OS certificates as directed
+by the upstream notice. A pin change does not establish that an existing image
+or deployed environment has been rebuilt. Keep historical evidence and its
+recorded dependency identities unchanged.</p>
+<h2 id="regenerating-patched-dependency-locks">Regenerating patched dependency locks<a class="headerlink" href="#regenerating-patched-dependency-locks" title="Permanent link">&para;</a></h2>
+<p><code>requirements/security-constraints.in</code> keeps <code>filelock</code> at 4.2.1 or newer and
+setuptools at 84.1.0 or newer when workflow and runtime locks are regenerated.
+The project groups and build requirements carry the same security floors.
+Refresh through <code>scripts/security/refresh_pinned_requirements.sh --write</code> and
+run <code>make lock-sync security verify</code> after reviewing the resolved changes.</p>
+<p>The floors address the upstream
+<a href="https://github.com/tox-dev/filelock/releases/tag/4.2.1"><code>filelock</code> advisories</a> and
+<a href="https://github.com/pypa/setuptools/security/advisories/GHSA-xmj3-9gf7-h52w">setuptools namespace-path advisory</a>.
+Keep hash-checked installation checks alongside the audit: project-wide uv
+constraints also apply during installation and can reject hashed locks if
+their requirements are not exact pins.</p>
+<p><code>filelock</code> 4 changes the on-disk <code>SoftReadWriteLock</code> protocol. Any external
+participants using that lock type on a shared path must be stopped, upgraded
+together and restarted, as described in the
+<a href="https://py-filelock.readthedocs.io/en/latest/changelog.html">upstream migration notes</a>.
+The maintained HF cache path uses <code>FileLock</code> and its <code>SoftFileLock</code> fallback.</p>
 <h2 id="documentation-dependencies">Documentation dependencies<a class="headerlink" href="#documentation-dependencies" title="Permanent link">&para;</a></h2>
 <p>Documentation CI runs <code>npm audit --audit-level=low</code> after installing the root
 lock. The Markdown CLI uses the existing rule configuration while avoiding the
@@ -2239,15 +2360,28 @@ for the documented Node.js minimum; newer parser dependencies require a newer
 Node.js release. Recheck both lint behavior and the audit when changing these
 constraints.</p>
 <h2 id="restricted-evaluator-images">Restricted evaluator images<a class="headerlink" href="#restricted-evaluator-images" title="Permanent link">&para;</a></h2>
+<p>The separate Promptfoo capture gate audits and installs its reviewed npm lock.
+Its overrides retain patched <code>body-parser</code>, <code>fast-uri</code>, <code>ip-address</code>, <code>undici</code>
+and <code>zod</code> versions while preserving the pinned Promptfoo archive. Both <code>undici</code>
+major versions remain on their compatible patched release lines. Optional
+integrations remain excluded, and the actual SDK capture and recipient checks
+must pass after lock updates.</p>
 <p>The maintained LM Evaluation Harness and OpenAI Evals example images support
 specific evaluator paths. Their build helpers authenticate the complete
 upstream wheel by SHA-256, validate its <code>RECORD</code>, apply exact expected changes,
 and regenerate <code>RECORD</code> under an explicit local package version. A changed
 upstream input fails the derivation.</p>
 <p>The LM image omits response caching, ROUGE, and NLTK; the OpenAI Evals image
-omits NLTK. Selected exact-match scorer code remains unchanged. These images
+omits NLTK and the unused Snowflake connector. Selected exact-match scorer code remains unchanged. These images
 do not provide the removed task and metric dependencies. Their respective
 example READMEs describe the supported execution paths.</p>
+<p>The Evals lock is resolved from the authenticated <code>invarlock.match.2</code> wheel,
+prepared by <code>build_restricted_openai_evals_wheel.py bootstrap</code>. This keeps its
+local Match dependencies compatible with patched <code>filelock</code>. The older Snowflake
+connector requires <code>filelock</code> below 4, while current connectors conflict with the
+protobuf range required by Evals' Gemini dependency. The maintained local Match
+profile does not support Snowflake recording. Bootstrap rebuilds the complete
+wheel before accepting an existing generated artifact.</p>
 <p>Keep the original package names and versions in the hash-pinned
 <code>requirements/workflows/*-upstream-wheel.txt</code> inputs. The maintained-lock audit
 scans these files as well as runtime locks, so a derived package version does

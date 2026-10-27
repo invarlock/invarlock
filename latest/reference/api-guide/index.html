@@ -509,6 +509,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../user-guide/client-handoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Client review packages
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../user-guide/modelkit-handoff/" class="md-nav__link">
         
   
@@ -1659,6 +1687,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#client-handoff-packages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Client handoff packages
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -2364,6 +2403,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#client-handoff-packages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Client handoff packages
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -2404,6 +2454,10 @@ individual bundle files remain internal unless explicitly documented.</p>
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>Client handoffs</td>
+<td><code>build_client_review</code>, <code>ClientReviewError</code>, <code>CLIENT_REVIEW_CONTEXT_FORMAT</code></td>
+</tr>
 <tr>
 <td>Transactions</td>
 <td><code>evaluate_request_file</code>, <code>verify_evidence</code>, <code>render_evidence</code>, native/captured receipt verification, judge verification and signed judge receipts, acceptance attestations</td>
@@ -3424,6 +3478,25 @@ replay completed; inspect the exception payload for <code>signed_receipt</code>.
 <li><a href="../reports/">Reports and receipts</a> explains the trust meaning of result and
   receipt objects.</li>
 </ul>
+<h2 id="client-handoff-packages">Client handoff packages<a class="headerlink" href="#client-handoff-packages" title="Permanent link">&para;</a></h2>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.engine</span><span class="w"> </span><span class="kn">import</span> <span class="n">build_client_review</span>
+
+<span class="n">result</span> <span class="o">=</span> <span class="n">build_client_review</span><span class="p">(</span>
+    <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;evidence&quot;</span><span class="p">),</span>
+    <span class="n">context_path</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;review-context.json&quot;</span><span class="p">),</span>
+    <span class="n">output</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;client-handoff&quot;</span><span class="p">),</span>
+<span class="p">)</span>
+</code></pre></div>
+
+<p>The builder returns the same success dictionary as CLI package mode and raises
+<code>ClientReviewError</code> on invalid input or publication failure. Optional
+<code>retained_receipt=Path(...)</code> attaches a matching historical receipt without
+recipient authentication. Optional <code>supporting_files={"source-reference.md": Path(...)}</code>
+copies explicit public attachments with safe, distinct basenames (up to 32 files,
+32 MiB each). Review them for disclosure before including them; never include
+private keys. They cannot replace generated package files and are not trust anchors.
+See the <a href="../../user-guide/client-handoff/">handoff guide</a> for the context contract.</p>
 
 
 

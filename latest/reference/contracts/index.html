@@ -509,6 +509,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../user-guide/client-handoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Client review packages
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../user-guide/modelkit-handoff/" class="md-nav__link">
         
   
@@ -1446,6 +1474,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#authored-client-review-context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authored client review context
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -2324,6 +2363,17 @@
     <span class="md-ellipsis">
       
         Related documentation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authored-client-review-context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authored client review context
       
     </span>
   </a>
@@ -3337,6 +3387,14 @@ images or source-checkout dependency groups. See <a href="../release-verificatio
 <li><a href="../release-verification/">Release verification</a> separates package versioning
   from evidence-format and provider-ABI compatibility.</li>
 </ul>
+<h2 id="authored-client-review-context">Authored client review context<a class="headerlink" href="#authored-client-review-context" title="Permanent link">&para;</a></h2>
+<p><code>invarlock/client-review-context-v1</code> is a closed commentary input validated by the
+client handoff builder. Its fields, size bounds and pending-decision behavior are
+specified in the <a href="../../user-guide/client-handoff/">client handoff guide</a>. It is
+separate from signed evidence and recipient trust inputs. The package inventory
+and CLI response use <code>invarlock/client-review-package-v1</code> and explicitly record
+that packaging has not performed recipient verification. These presentation
+records do not extend or replace an evidence or acceptance contract.</p>
 
 
 

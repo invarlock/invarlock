@@ -509,6 +509,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../user-guide/client-handoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Client review packages
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../user-guide/modelkit-handoff/" class="md-nav__link">
         
   
@@ -1525,6 +1553,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Reading a report for a release review">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#deliver-a-complete-review-package" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deliver a complete review package
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2229,6 +2274,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Reading a report for a release review">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#deliver-a-complete-review-package" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deliver a complete review package
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2515,12 +2577,41 @@ produce judge analysis and verification results described in
 <a href="../judge-measurements/">judge measurements</a>; they do not use the native
 <code>invarlock/comparison-report-v3</code> shape. All are rendered by <code>invarlock report</code>.</p>
 <h2 id="report-appearance">Report appearance<a class="headerlink" href="#report-appearance" title="Permanent link">&para;</a></h2>
-<p>HTML reports use a light palette regardless of the browser or operating system
-color preference, keeping the transition from the website consistent. Reports
-have no theme control or stored theme preference. Printing also uses light colors.</p>
+<p>HTML reports use a paper-style review memo: comparison identities and decision
+context, a scoped result, findings to review, limitations and the next decision,
+followed by detailed results and supporting evidence. A restrained light palette,
+readable tables and numbered results work on screen and paper. Status words
+accompany color so the result remains readable in monochrome.</p>
+<p>The paper lockup retains InvarLock's bracket-and-signal geometry with a single
+ink stroke and live-text name. It omits the app icon's tile, translucent overlays
+and small center dot. This is a report-specific rendition, not a replacement for
+the website or application identity. The report uses no remote fonts or images.</p>
+<p>This structure draws on the intended-use and evaluation context in
+<a href="https://research.google/pubs/model-cards-for-model-reporting/">Model Cards for Model Reporting</a>
+and <a href="https://docs.aws.amazon.com/sagemaker/latest/dg/model-cards.html">SageMaker Model Cards</a>.
+<a href="https://www.promptfoo.dev/docs/configuration/outputs/">Promptfoo's exports</a> also
+separate stakeholder reports from full evaluation data. InvarLock applies these
+patterns to a specific baseline-to-subject change, with recorded requirements,
+supporting file locations and separate recipient verification.</p>
 <h2 id="reading-a-report-for-a-release-review">Reading a report for a release review<a class="headerlink" href="#reading-a-report-for-a-release-review" title="Permanent link">&para;</a></h2>
-<p>The heading names the recorded policy result; the opening explains what led
-to it before the chart. A passing description identifies the satisfied interval
+<p>The evidence-only report starts with <strong>Decision context</strong>, including the compared
+identities. When no authored review is provided, intended use, business context,
+decision owner and recommendation are explicitly marked as not supplied. The
+renderer does not infer them from technical provenance or a passing result.</p>
+<p>A client handover supplies that context as separately attributed commentary.
+The shared presentation view can include an <code>AuthoredReview</code>: a label, author,
+context, recommendation, decision, rationale and next action. It appears in both
+HTML and Markdown without changing the technical result, evidence or receipt.
+Use <code>invarlock report --review-context context.json --package handoff</code> to supply
+the versioned context and generate a decision brief, full review, technical
+appendix and recipient guide. See <a href="../../user-guide/client-handoff/">client review packages</a>.
+This workflow does not change signed evidence or act as an approval system.</p>
+<p>The <a href="https://github.com/invarlock/invarlock/blob/main/examples/client-review/README.md">completed worked examples</a> choose all
+those fields using clearly labeled fictional organizations and owners around real
+retained comparisons. Their primary reviews contain completed decisions; missing
+context remains appropriate for evidence-only views and missing-data test cases.</p>
+<p>The result heading names the recorded policy result; its explanation states what
+led to it before the chart. A passing description identifies the satisfied interval
 requirements instead of repeating the heading. A failed bound can mean the observed
 change exceeded the allowance or that uncertainty prevented establishing the
 required result. Too few records, a wide interval or an unmet absolute score
@@ -2531,6 +2622,25 @@ unresolved result without ranking unlike metrics by their numeric values.
 Combined evidence reports name both required component outcomes. Advisory
 judge reports identify their advisory role in the title and at the start of
 the explanation. Browser-tab titles include the recorded outcome.</p>
+<p><strong>Findings to review</strong> highlights failed or unresolved metric/scope results and
+links to their numbered checks. If more than five need review, the report says
+how many remain and retains every result below. It does not rank unrelated
+metrics by numerical severity. <strong>Scope and limitations</strong> and <strong>Next decision</strong>
+remain visible before the detailed statistics.</p>
+<p>The opening also gives a <strong>Review action</strong> appropriate to the recorded result.
+This is generated guidance, not an owner's recommendation. The <strong>Change context</strong>
+preview quotes a retained comparison note and identifies any additional notes
+below; missing context is not counted as an observed change. Outcome counts refer
+to metric/scope results, not independent cases. An unavailable outcome uses a
+neutral treatment, and absent limitations or check details are explicitly labeled.
+When an authored review is supplied, its <strong>Owner recommendation</strong>, <strong>Owner decision</strong>,
+<strong>Review rationale</strong> and <strong>Decision follow-up</strong> replace the generic business-context
+placeholders and next-decision guidance. Their attribution stays visible in print.</p>
+<p>Each metric's <strong>Supporting record</strong> gives a path relative to the evidence root
+and a JSON pointer after <code>#</code>; an empty pointer identifies the whole JSON object.
+Captured metric pointers retain original array positions even when the display
+puts failures first. Combined reports prefix the component's actual member path.
+These references locate the recorded result; they do not authenticate it.</p>
 <p><strong>What was checked</strong> states the operations performed by reporting. Some workflows
 authenticate retained records without replaying the comparison; see
 <a href="#keep-rendering-separate-from-recipient-acceptance">rendering and recipient acceptance</a>.
@@ -2591,6 +2701,33 @@ as <code>grounded_qa-judge-quality</code> becoming <strong>Grounded QA judge qua
 identifiers for these formatted labels remain in <strong>Recorded metric and scope
 identifiers</strong>. Display formatting does not change grouping, verification inputs
 or existing JUnit identifiers.</p>
+<h3 id="deliver-a-complete-review-package">Deliver a complete review package<a class="headerlink" href="#deliver-a-complete-review-package" title="Permanent link">&para;</a></h3>
+<p>An <strong>original technical report</strong> and its evidence remain unchanged when shared.
+A <strong>client review package</strong> also includes the interpretation, intended use,
+change rationale, known limitations and the owner's recommendation or an explicit
+statement that these were not supplied. Label authored commentary separately
+from signed evidence, and keep the independent verification receipt and any
+organizational approval as distinct records. A rendered report alone does not
+contain these additional decisions.</p>
+<p>Keep the explanation in the downloaded and printed package, not only on the
+surrounding web page. This renderer's HTML and Markdown preserve the review
+context; print styles expose collapsed explanations and all metric tabs. Open
+raw evidence details before printing to include them in the printout. Original
+evidence files, hashes and signatures are unaffected by rendering. Generating a
+new presentation does not replace a historical canonical download.</p>
+<p>Print layouts place the result and review action together, then let assurance
+checks flow below. Running page numbers help keep longer copies in order.
+Identity labels stay with their values, and keyboard focus outlines are omitted
+from paper. These print features are exercised in Chromium on A4 and US Letter;
+other print engines may handle pagination differently.</p>
+<p>The accessibility checks draw on W3C guidance for
+<a href="https://www.w3.org/WAI/WCAG22/Understanding/reflow.html">reflow</a>,
+<a href="https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html">contrast</a>,
+<a href="https://www.w3.org/WAI/WCAG22/Understanding/text-spacing.html">text spacing</a> and
+<a href="https://www.w3.org/WAI/ARIA/apg/patterns/tabs/">keyboard tabs</a>.
+They exercise narrow layouts, explicit status words, local navigation and text
+equivalents for interval graphics. They do not establish full accessibility
+conformance or substitute for assistive-technology testing with users.</p>
 <h2 id="where-the-interval-comes-from">Where the interval comes from<a class="headerlink" href="#where-the-interval-comes-from" title="Permanent link">&para;</a></h2>
 <p><strong>How this interval was calculated</strong> explains the retained method and sample
 structure beside the chart. The marker is the observed comparison; the bar spans
@@ -3103,8 +3240,9 @@ the failed format. Rendering does not discover or authenticate adjacent receipts
 Unsigned captured packs remain explicitly unsigned local reports. JUnit records
 regression as failure and insufficient evidence as error.</p>
 <h3 id="read-the-result-and-its-requirements">Read the result and its requirements<a class="headerlink" href="#read-the-result-and-its-requirements" title="Permanent link">&para;</a></h3>
-<p>The report leads with <strong>Policy satisfied</strong> or <strong>Policy not met</strong>, the recorded
-verdict and the checks responsible for it. HTML places the assurance checks
+<p>After the decision context, the report shows <strong>Policy satisfied</strong>, <strong>Policy not
+met</strong> or <strong>More evidence needed</strong>, the recorded verdict and its explanation.
+HTML places the assurance checks
 beside the verdict, with signature validation and independent recipient
 acceptance kept separate. Each metric shows baseline and
 candidate values, change, observed pair count, an interval and the configured
@@ -3197,7 +3335,28 @@ must not be added together as though they were separate cases.</p>
 <p>The report remains one offline HTML file. A fixed, hash-authorized script handles
 navigation only; no evidence labels or values are inserted into executable code.
 Without JavaScript, all metric details remain visible and section links still
-work. Printing includes every metric, even when only one tab is selected.</p>
+work. Printing includes every metric, even when only one tab is selected, and
+the contents of closed explanations, including interval methods. Raw evidence
+details print when opened, keeping the default review from expanding into a long
+dump of technical data. Complete exact values remain in the HTML and original
+evidence either way.</p>
+<p>The optional real-browser regressions check default and expanded PDF text on A4
+and US Letter, including printing without backgrounds, first-page review actions,
+page numbering and 320-pixel overflow for native, captured, judge and combined
+evidence. A separate synthetic stress fixture checks keyboard navigation,
+hidden-result links, computed text/graphic contrast, enlarged text spacing,
+long identifiers, offline use and operation without JavaScript. With an installed
+Playwright Node module and a Python interpreter containing <code>pypdf</code>, run:</p>
+<div class="codehilite"><pre><span></span><code><span class="nv">INVARLOCK_REPORT_PLAYWRIGHT_MODULE</span><span class="o">=</span>/absolute/path/to/playwright<span class="w"> </span><span class="se">\</span>
+<span class="nv">INVARLOCK_REPORT_PDF_PYTHON</span><span class="o">=</span>/absolute/path/to/python<span class="w"> </span><span class="se">\</span>
+<span class="nv">PYTHONPATH</span><span class="o">=</span>src<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>tests/reporting/test_report_browser_print.py<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>tests/reporting/test_report_browser_access.py
+</code></pre></div>
+
+<p>The check makes no model calls or dependency downloads. It is skipped when the
+two tool paths are not supplied; ordinary unit tests do not prove browser print
+behavior.</p>
 <h3 id="keep-rendering-separate-from-recipient-acceptance">Keep rendering separate from recipient acceptance<a class="headerlink" href="#keep-rendering-separate-from-recipient-acceptance" title="Permanent link">&para;</a></h3>
 <p>The assurance panel distinguishes embedded bundle authentication from
 independent recipient acceptance. A bundle's embedded signer is not a

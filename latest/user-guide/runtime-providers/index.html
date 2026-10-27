@@ -512,6 +512,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../client-handoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Client review packages
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../modelkit-handoff/" class="md-nav__link">
         
   
@@ -2463,7 +2491,7 @@ Supply vision-text, GGUF and TensorRT-LLM resources through the
 <p><code>hf_transformers</code> is the canonical built-in provider. The public core package
 supplies the host CLI; the maintained runtime image supplies model execution
 dependencies. For host-side model preparation or development, run from the
-matching source checkout with <code>uv</code> 0.10.10:</p>
+matching source checkout with <code>uv</code> 0.13.4:</p>
 <div class="codehilite"><pre><span></span><code>python<span class="w"> </span>scripts/security/build_hardened_accelerate_wheel.py<span class="w"> </span>bootstrap
 uv<span class="w"> </span>sync<span class="w"> </span>--locked<span class="w"> </span>--group<span class="w"> </span>hf
 </code></pre></div>
