@@ -324,6 +324,49 @@ fn parse<R: Read>(input: R, size: u64) -> Result<(String, String, String)> {
         records_digest(tokenizers)?,
     ))
 }
+// The metadata timestamps on some Linux filesystems do not advance for every
+// write. Bind parsed metadata to the complete byte stream from this inspection
+// pass, and compare it with the initial content digest before returning identity.
+struct DigestReader<R> {
+    input: R,
+    hash: Sha256,
+    count: u64,
+    limit: u64,
+}
+impl<R: Read> Read for DigestReader<R> {
+    fn read(&mut self, output: &mut [u8]) -> std::io::Result<usize> {
+        let count = self.input.read(output)?;
+        self.count += count as u64;
+        if self.count > self.limit {
+            return Err(std::io::Error::other("GGUF artifact grew while being read"));
+        }
+        self.hash.update(&output[..count]);
+        Ok(count)
+    }
+}
+fn inspect_content<R: Read>(
+    input: R,
+    size: u64,
+    expected: &str,
+) -> Result<(String, String, String)> {
+    let mut reader = BufReader::with_capacity(
+        64 * 1024,
+        DigestReader {
+            input,
+            hash: Sha256::new(),
+            count: 0,
+            limit: size,
+        },
+    );
+    let parsed = parse(&mut reader, size)?;
+    std::io::copy(&mut reader, &mut std::io::sink())
+        .map_err(|_| error("GGUF artifact changed while being read"))?;
+    let checked = reader.into_inner();
+    if checked.count != size || format!("{:x}", checked.hash.finalize()) != expected {
+        return Err(error("GGUF artifact changed while being read"));
+    }
+    Ok(parsed)
+}
 fn absolute(path: &Path) -> Result<PathBuf> {
     if path.as_os_str().as_bytes().contains(&0) {
         return Err(error("GGUF artifact path is invalid"));
@@ -385,10 +428,10 @@ fn read_with(path: &Path, after_hash: impl FnOnce()) -> Result<Value> {
             .try_clone_to_owned()
             .map_err(|_| error("GGUF artifact cannot be inspected safely"))?,
     );
-    let (metadata_digest, tensor_digest, tokenizer_digest) =
-        parse(BufReader::with_capacity(64 * 1024, file), size)?;
+    let (metadata_digest, tensor_digest, tokenizer_digest) = inspect_content(file, size, &digest)?;
+    // inspect_content has already checked the complete consumed stream digest.
     artifact
-        .verify()
+        .verify_binding()
         .map_err(|_| error("GGUF artifact changed while being read"))?;
     Ok(
         json!({"artifact_name":format!("gguf-sha256-{digest}.gguf"),"sha256":digest,"byte_length":size,"gguf_metadata_sha256":metadata_digest,"tensor_inventory_sha256":tensor_digest,"tokenizer_metadata_sha256":tokenizer_digest}),
@@ -428,6 +471,21 @@ mod tests {
             std::process::id(),
             NEXT.fetch_add(1, Ordering::Relaxed)
         ))
+    }
+    #[test]
+    fn inspection_checks_content_without_relying_on_timestamps() {
+        let mut original = fixture();
+        original.push(0);
+        let expected = format!("{:x}", Sha256::digest(&original));
+        assert!(inspect_content(Cursor::new(&original), original.len() as u64, &expected).is_ok());
+        // The change is outside the parsed header; a header-only check misses it.
+        original[32] = 1;
+        assert_eq!(
+            inspect_content(Cursor::new(&original), original.len() as u64, &expected)
+                .unwrap_err()
+                .message,
+            "GGUF artifact changed while being read"
+        );
     }
     #[test]
     fn reject_same_size_mutation_after_hash() {

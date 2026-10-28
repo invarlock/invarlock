@@ -1,6 +1,6 @@
 use super::presentation::*;
 use serde_json::{json, Value};
-fn clean(value: &str) -> String {
+pub(super) fn clean(value: &str) -> String {
     let mut value = escape(value, false).replace(['\n', '\r'], " ");
     for c in "|\\`*[]()".chars() {
         value = value.replace(c, &format!("&#{};", c as u32))
@@ -43,6 +43,9 @@ pub fn render_markdown(v: &Value, include_details: bool) -> String {
         interpretation(v).into(),
         String::new(),
     ];
+    if !a(v, "handoff_links").is_empty() {
+        lines.splice(2..2, [handoff_links(v, true), String::new()]);
+    }
     pairs(&mut lines, a(v, "subjects"));
     lines.push(String::new());
     if authored {

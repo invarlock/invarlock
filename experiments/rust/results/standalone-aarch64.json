@@ -1,0 +1,466 @@
+{
+  "identity": {
+    "reference_revision": "1dc9cb644684dc915810da77326f6da8764c58c1",
+    "python": {
+      "version": "0.17.3",
+      "source": "/work/optimization-v5-candidate/venv/lib/python3.12/site-packages/invarlock/__init__.py"
+    },
+    "python_package_files": {
+      "__init__.py": "b92b7d90424d91a834c5b937c1c302c50ea12c6d4b4dd7d5887ee8ab021be563",
+      "__main__.py": "7df86829cb70f3d8fe85e9e64174e16c70c8765bcaf5f05fb32f0ba6384e1177",
+      "_bounded_subprocess.py": "fde86c3c1ba5b7e056b3651738d18172bc3a6deb83ccc1a609ef0711b1f6c23d",
+      "_data/contracts/acceptance_predicate.schema.json": "d7b06f44582611fa6345425911768bd9ff8898477bf9124c86e0eb1ff18a6068",
+      "_data/contracts/comparison_policy.schema.json": "b1c37db1087a963c6e89e76dc8305958c66d8bf6008737b841a5d583a73d31a0",
+      "_data/contracts/evaluation_case_set.schema.json": "83fa93d1f73bcf65db909becd843d0ccc24555f5d79eff01a79c8428d1ac7798",
+      "_data/contracts/evaluation_request.schema.json": "eb79afa6725e9559718706d6686fc38cc9f47dcce52286bb8b5b92e2e99523e4",
+      "_data/contracts/evaluation_request_v2.schema.json": "baf5a04f76501814c9336b32b30228c9e9a69a79feb95107bc2b8a947f534e17",
+      "_data/contracts/evaluation_request_v3.schema.json": "1c83adca77b63d16d63e20f78b477c598325e5ddd49eaea61dbeebb023abb406",
+      "_data/contracts/evaluation_run.schema.json": "612ca0dcbaa3c4683d4300ddd129c0b080fcc6a01e9f6ffac581e048a75d165f",
+      "_data/contracts/evaluation_setup_result.schema.json": "1010d0c00c5c3663f163084d0bc3e24fb805564bc11ab100ba356d56446a0aa5",
+      "_data/contracts/evaluator_export.schema.json": "5f42e287a0b6db3ec6383fcf20b86179cef958528a5b20809be3acba96451e71",
+      "_data/contracts/evaluator_qualification_export.schema.json": "571c9d43327c2d46cca89617cdfc5d8408df5a75810f4c9e9e745fe9f5f55d95",
+      "_data/contracts/evaluator_qualification_profile.schema.json": "bb9f50011363ad438cb399b28251984bf7ba98d59fb80fef3684764325e6a8ee",
+      "_data/contracts/evaluator_qualification_result.schema.json": "e36a25cc22c9b86b09e611eeeba9002eefc9d6a1d40cf2cfc71b5e5333d52eda",
+      "_data/contracts/evaluator_qualification_schedule.schema.json": "1f69dfa16009b4a570d0e65d468e19936cec4e078bcde9dba11d191f6cfe7e7b",
+      "_data/contracts/evidence_observation.schema.json": "639ec97eb7af00f93093fdea9cb6b25cff5e383f0dc382ab2f0751a79d9d3dd6",
+      "_data/contracts/evidence_pack.schema.json": "cc5af81dacee34189c9ace7faa9020083930e3be6357dcb33cd44950c2f6a76c",
+      "_data/contracts/evidence_pack_v2.schema.json": "e1684eb84c4d2e3e4f82b5bf1519645d3afadfd7c4e45eb852945f4ba73d601f",
+      "_data/contracts/evidence_set.schema.json": "59cdfbc091ecad301be5e5002872ac09adfd200bb235f774c19e7c5b9088b2ef",
+      "_data/contracts/evidence_set_recipient_policy.schema.json": "5397cf64f3c7b1fed331c79fa41ddb65cb44302731dfa9cf6e10d5db940f6d50",
+      "_data/contracts/evidence_set_verification.schema.json": "dcb19ce9320aa30902348b7b5124fb4c5d065d061f826490ad363088dfc51bbc",
+      "_data/contracts/evidence_verification_receipt_v3.schema.json": "f341a9eed6f70fc3e9708314aab6852d2181bfb3edc962880a9f9c20fb98e3f6",
+      "_data/contracts/judge_analysis_policy.schema.json": "be9217271f044bd4f62598ca60f255d74c4d8d9c50955c2fd270d946cb36b0e9",
+      "_data/contracts/judge_measurement_evidence.schema.json": "ab41d9782648c8bab76f1bdf067771e2b3c258e4fd9c9d39bc8a86329f135dfe",
+      "_data/contracts/judge_measurement_plan.schema.json": "317e196c42cb6611584ebd5af26d9cf5ffa74d2516bd3f774bd7d64576495954",
+      "_data/contracts/judge_measurement_recipient_policy.schema.json": "57a30d59db97476ea3fcdc74cbf5bdb46384a14ad9b28ba2f5d73c1d4d0b2f72",
+      "_data/contracts/judge_measurement_verification_receipt.schema.json": "7ad096808d7a0be01576bd3ba18aaa452f240e7e67b70aeee6eedcf2862c3310",
+      "_data/contracts/judge_measurements.schema.json": "5ce2af735a37b11150268727af7d76e3ce98bad97aa692ab811ad9b2033c5899",
+      "_data/contracts/judge_verification_result.schema.json": "711de58e6c2634758df7b2e029469c23dabebf157c572851a8b69e22cb820aa1",
+      "_data/contracts/model_artifact_identity.schema.json": "a812eee502eb4d466fdf4ce4368e87fa2b81b0800f035751dacf5ee6b904be98",
+      "_data/contracts/multi_metric_comparison.schema.json": "fc7057e638d608586d59be8e2243ba178db4c6eb14b623dcdf7145e0e141637f",
+      "_data/contracts/normalized_captured_request.schema.json": "1ba7e3672cfa6c3f6bfb1254509a336011c31cc9f3dc5d32a820151259cb6f2d",
+      "_data/contracts/recipient_acceptance_policy.schema.json": "17f7243d8783058277d2d771478068d3a7294aa2ad32737d41704e68f7314271",
+      "_data/contracts/runtime_behavioral_schedule.schema.json": "95fb0012706f163fa97f5af986825102ff4f4e0cf823da216032624a5502b427",
+      "_data/contracts/runtime_manifest.schema.json": "2ee1a0b64111b678d6c9552b196504f3601215c8c24ac776b0bfce2b13b050a6",
+      "_data/contracts/runtime_provider_capabilities.json": "b9281b803fac6878a599985ae1cbab17d480300991853369dc6dbdec977f5c4b",
+      "_data/contracts/runtime_provider_receipt.schema.json": "729940e0b4c6ec5723be63aa5cfcbc3cb5bf1f169505fc153fbc0799f5d98490",
+      "_data/contracts/runtime_scoring_observation.schema.json": "219c81eaa0592277bc9c3e741b342b812d3bcbb70f60781852b2209eee6c95b3",
+      "_data/contracts/scorer_extension_binding.schema.json": "8ab77f58150aec9ab730359fa6e5f77c0823f617f010b96d9c2846c1fece51d3",
+      "_data/contracts/scorer_extension_descriptor.schema.json": "bae138857db687d951f89e4cf8d149515c31b8a34698e5abbfd3a296c79e4803",
+      "_data/contracts/scorer_extension_result.schema.json": "6981fe4144d1cddc7284b4bc9839d0219f3fc515ff1d83300f62c87df55196ce",
+      "_data/contracts/trust_inputs.schema.json": "d7e3bcfcda8d2b9ce9a1eb881fb0bccce9216e40b543dbde11f3967e1a506da9",
+      "_data/contracts/trust_inputs_v2.schema.json": "631a0a5df838a0b47c3a67627cbb167026ee0558dc8f246c2681217840f9581e",
+      "_data/examples/native-judge/README.md": "0e2a3efb6facaaa020978a6a3c5b53c1fcb4f9694a526c20d550766048647462",
+      "_data/examples/native-judge/cases.jsonl": "5a5e31e9c33c901ef587df59053822a3c3397c00b6c84e3bfd1a50e6afae30a7",
+      "_data/examples/native-judge/judge-policy.json": "b6b250bbd2c72351a2dd8d82926dec87c5f4e950b78e822510c94e879f3556a2",
+      "_data/examples/native-judge/request.yaml": "67f4a8343c821e51927bafe414bfb6ed6eb4152c63d657733e581712e46fc749",
+      "_data/public_evidence/evidence_index.json": "0c992346ae687a070a83d480f5a5e5f09811c06c905fbb444c6349966eca5bfe",
+      "_optional_runtime_profiles.py": "6bbf1fc69fc2150c7a98815893a82fe7f72e51ffd82730cae71b3cfdacf318e1",
+      "acceptance_attestation.py": "48873f747efba32deeb9552d8a3d5fa8505be6b4ee36b073473924f09ca88758",
+      "captured_contracts.py": "cc1a8e71b60253c4ad36b6ea1a705a6354105fb1d1da35a297995e709944563d",
+      "captured_evaluation.py": "e47b0a7181317e0999dd0b6dd67163a6a759004c93473675fa5d9bc3fbc5db4c",
+      "captured_evidence_publication.py": "297cad330d7f574e766feb76e5c3d8fbc806ceb1fe12ba087709b64da6928e9e",
+      "captured_normalization.py": "7f6ff738f18d4c11d59ddf54e0c6e8b45e6af8dd51ae9c53f2ec7da437f72ade",
+      "captured_reporting.py": "1e2f4ba810c424770efa459431c823bfe47c16cc3ae874894aa7e41fea61beb2",
+      "captured_verification.py": "81ae98cb896537efd9623fcd795e923ed78fd38a1b0bbe2f20fb4d69706fc079",
+      "cli/__init__.py": "ce99739636db6e0152f6669e18d806e66a2f4fa05e287bc62a3c353740dbc025",
+      "cli/app.py": "0bf3c0b9ac9f4836ce87023ca1b196ed53dc62c9b303c0f8b00c4ae8fa5d18d4",
+      "cli/evaluation_setup.py": "edf7d3b9c92af62b4843dfeba6ff4171a195dbd5bfb9cde1aaa75bd2bbdbe44c",
+      "cli/evaluation_workflow.py": "92346a0eced7fd1af65ab4ef48b139fba66142fd6472f34fec5b9ca2ca011edb",
+      "cli/runtime_profile.py": "d707ec63291f322487e95ce3a57cac1d8b2eafafcb954658f34d4b71baf36e7f",
+      "cli/verification_workflow.py": "2a1e7fd86f353c4485e11dffaa38a206e7bdefedb8918143c058f414158f8ae6",
+      "client_review.py": "16be036c9b89dc9efaaa8b0c057d561eeea62f8f2de7e9afa966636f52bc3192",
+      "client_review_files.py": "4c8c83561f30bc305dbeed3a0eccd477ec7db1624703ea06d0b7001bed551ff0",
+      "client_review_presentation.py": "739ed3321691aefdfb9bc52806b6c860724a7373e7e9d807f3a25de6a7e2fbc9",
+      "core/__init__.py": "13e74efac113cf80e334046c51b38441a2ff4655543202199b10952a704cb5a1",
+      "core/builtin_plugin_catalog.py": "341be35db58225cbb0178b5667ab19bb3d8aec9f0649c5e0935984a18db0de30",
+      "core/builtin_scorers.py": "d1d9b1b23b972277a2c3690b98e87f56469ee717430fa8954fcd1db2d8c19281",
+      "core/checkpoint_identity.py": "240193bff467526aab9c28d6837f92aba43c91b2cbdb5146631f71f1b83bef7e",
+      "core/dataset_identity.py": "2a5f1711e108439ca661c59c2f746b3550c3ef3cd135a31bc377e8f1151bd9c6",
+      "core/evaluation_request.py": "336cdfd5102a40fa213ee1b0b56609a4f704474ad1369888614eaaf5669f020b",
+      "core/registry.py": "2c6763abb707d0289a49e7d6eb64269b096f11ec788bbf07f2d715d7a008ff77",
+      "core/runtime_provider/__init__.py": "0e51607770f02fbb5d6c7045b1cae95e3f055be1aedb5235c2f917b1a7407bf2",
+      "core/runtime_provider/behavioral_observation.py": "798111188ded44d95cdbf0f8ec907c859e9850420f4679b672ce1c43149979c6",
+      "core/runtime_provider/behavioral_schedule.py": "8cd8724d0f4ca4da5d6ac0c165a1885125d484f9c930391f19d4519abf764611",
+      "core/runtime_provider/request_bindings.py": "a03e435f71683b35b0368773c545dcd6f9a31301161f306192eccd40b8e230dd",
+      "core/runtime_provider/types.py": "24d653dac686bbe0fdf964246449d3771fffe51d7595c0264b3af6e560c09bdf",
+      "core/schedule_preparation.py": "e0220d6cfda2db1e15660f56bf6887fc54fefc14e17086d4fa0a8d5e315f4c90",
+      "core/scorer_extension.py": "a1200814f9ea6d1f1e04b50dbcb61aca5bf4f03b383d79c5aba20d0c9c055716",
+      "core/scoring.py": "0e0386328f06600690c065e6a4127a158711cd950b26db7c694d6ad0dfa28321",
+      "diagnostics/__init__.py": "b1d5a357ac4ff2799e146e2864541e320d71ff76e7de5a04775f63fa93597408",
+      "diagnostics/observations.py": "30275cab50ec77cab4cd6cde0f1379947024cef0cafacf3448a3566ae9ac6856",
+      "engine.py": "3663943dcb0642720b4bfb4ba97b4ac11ddea3acd7db768751af7eb8052a3e91",
+      "evaluation_comparison/__init__.py": "e574c7d74c1b06e6fb374c9208c5438bc5bfffcc3322cfbfeb16de9e3c985020",
+      "evaluation_comparison/capacity.py": "4187dad4a5301b01fce45fa01b615c71eda658a716fea2e620b7713ea4bcc4fd",
+      "evaluation_comparison/comparison.py": "d22ea11f971f8df5cfe047594da4443559ae82e6b20ee4ea820e9a01f9662bec",
+      "evaluation_comparison/likelihood.py": "989bf9ee76b76600d8017ccd90e726d714766f5c00eaef83d7c21595194859f3",
+      "evaluation_oci.py": "6a52aecbfc9174b6085bd503e8b8d236a7e744b528df313b1bdaf8fd4489ddf7",
+      "evaluation_record_contracts/__init__.py": "b7ccfd4ab468411e109d62176693417765eabc306cd3e0ed24b7edafe1d5f143",
+      "evaluation_record_contracts/contracts.py": "0e3bca27497de920832f31071fc0bd92c5f095fcfebe1e35e701c43d30e51609",
+      "evaluation_record_contracts/validation_limits.py": "cca5e68e3d962ff00f4262080598e0450ac4e942ecaebd4dfc534279626f98b9",
+      "evaluation_records/__init__.py": "22810bf93f62557376a1143c3bbde110ffeeca395fe8fa62b09e4ff0ef1ab8c7",
+      "evaluation_records/adapters.py": "f9234de33e63722c5353b4d4c91d6ca141a2825fa06eee2b6e34f180eb354fe7",
+      "evaluation_records/batch_integrations.py": "a06d6331ed8852132536ac194b58198b60dee986a92e5f2f951dfcb0ff54d2c4",
+      "evaluation_records/capture_facts.py": "ca2b46390dd1b3996eda9f7aa2df365c6d1d5c9cc3434424e7ac426c24de40c4",
+      "evaluation_records/cases.py": "e5565b61bf09094ee78b62881d27af770c46c7795da6e2db1eaf70f8033033d1",
+      "evaluation_records/identity.py": "2a857d9d7247c21fe4b62a6cd811c3bddbd61ebd293bde5103c89f5acf74a882",
+      "evaluation_records/integrations.py": "2f6fc1b86fef81c258451dcd6dc96afb2efd6e5779679ed191f0cc36791be16b",
+      "evaluation_records/io.py": "b71f7236cc3307108aa02c762bb6a077fb1f8acb7fb792592ea7e56313f96e0f",
+      "evaluation_records/langfuse.py": "1b7282ae1347951438ae43ff89c15cf9d5a0d9283ec82a7066e790fff5c8a3d4",
+      "evaluation_records/scalar_integrations.py": "51a24bae869e5065b6be21034ac0f2fc9247d3372e19926ad4a1e4608b3bdcb7",
+      "evaluation_records/templates.py": "4422afa964967fef120a43f35629c444867450214a0c8df0b8822d34748b9f44",
+      "evaluation_run.py": "ce52ea1059d71696284ca1affa70750a07074ccc31855a7cc2dbf5ddb0632fd6",
+      "evaluation_runtime.py": "7a891e6fc067e538c03ef9a224c9887d49fc013cac3cd0c1bd1dd9f3345d22bf",
+      "evaluation_side_worker.py": "a4e38b0f243da00fdf77d0bbacef72d4c44c58d9b6b360d579e55200be0d8fe4",
+      "evaluation_transaction.py": "dd91bd49b9051e42cfca687b7db505f1dd2f9baf73f484f1b745a06dfafbad5b",
+      "evaluator_capture.py": "7638d1f953426f80106eaa0d261f7e2e492d2b85c35ceb9119f0b9aec419ad39",
+      "evaluator_qualification.py": "76d915f6bd81ce75d02f8d1517f59b3736a28b5599c9600b302734c4c583ec9e",
+      "evaluator_qualification_cli.py": "b8ce7a078a50803eac27305c5b149fe99caa1dca2c403d9fe5d1fb2cdf05180b",
+      "evidence_explanation.py": "bc9d5e2ab16723e0b58654b53bdb7612335cca4de873fbd8564911de4a6c767f",
+      "evidence_pack.py": "6691c8ea04446f4b51f470a39028eb9ee8180bfe6c4a774d59dc66c40f8e7a2e",
+      "evidence_pack_contract.py": "86cae6b6befb1403af3d80a576cc5463f9eee9f1507fdf3da2ea5c18ded0fa47",
+      "evidence_pack_integrity.py": "ed46a40bbf941109aa2b0c2f5a97cfbe47fb013798eb2db122dcd6bb20f556dd",
+      "evidence_pack_json.py": "d8b35acdbdaa7299d211ef5b455482016ccebc7bb504d6628d43283d7f824648",
+      "evidence_pack_publication.py": "8ee0825cf8c56f28c32e0f76637d580ee91c8774db7fff3a5640c8a3f56bb4ba",
+      "evidence_pack_snapshot.py": "e7b4378c99d8c87144f96d4a411d65c31df987e7dd87714bb820144b737cc6d7",
+      "evidence_pack_support.py": "8d1c0cfde615352ad27aece33a1df3f19020363f9de6e5d0f2d90fafc536e340",
+      "evidence_pack_verification.py": "de0c3b40ccfba0be3bc2f56d94425fe7fb126a5d75a49448eb85f8660d2fc19b",
+      "evidence_receipt.py": "e91566078d04fde121b88bc26211985a97f70e66477e46c021c9f67c738dcc56",
+      "evidence_reporting.py": "62267dd5c567911ec0aea4bbfc382dccdebd7df9ffde8878c48998689d7a6e82",
+      "evidence_sets/__init__.py": "6a6cb1e5d0e4f21f4b5956505492c0f087d3276ca29fbf725cc49c79333a80d8",
+      "evidence_sets/cli.py": "e9f2d691f5a4700eefb9e264697ac901a26055a080ee84d830bf931ca240a5f3",
+      "evidence_sets/contracts.py": "1bfce5ce4fdf4f00d1447b1d1d2fd3b8e4ccba97eebda6e7c62ff90f6e877b96",
+      "evidence_sets/reporting.py": "9f624e8651c78e79a4d7c4a1a669b0c18ae0f63f7456d85d6d12db2f06fa4548",
+      "evidence_sets/verification.py": "6fee52170ba7c167d5d5262097731677cc9bbd8af90bba3299f26236775602a5",
+      "evidence_verification.py": "56a459fe932ba36bb7f8d09a950eb70cf419460b0de9d8a0183fe88826197bd0",
+      "exact_match_sensitivity.py": "b05cd7011134f16ca9d67210993f0d0c8e35dd52c6e4059af20cf2777129d29b",
+      "filesystem/__init__.py": "3c61a31733a8169cafc28cf35480b045ab8c8fbd2e62ceb39eaee0b95fbaaa90",
+      "filesystem/atomic_directory.py": "8982369180c93c57d6fef31cdea6a0171ac44da55e9c6d048667a1e6c14cdaf0",
+      "filesystem/atomic_file.py": "8c13b55e15c680bd673906d0e6820fd2309104f80b2522f8cc162c5d9813687c",
+      "filesystem/paths.py": "e6a0d22a9b1e33b7f83909e99ccb318b1f253fb3e76e5a22d2fcdf288d1d39ce",
+      "filesystem/staged_directory.py": "827666cfec4eac7bb1d4d55194c8fbc1d6beb7a6af448e2e1b1c278d1ae7f710",
+      "judge_evidence_types.py": "6c8618c5245b045296721af182753d53757ce7f97ecaa1b615b836de83bd981a",
+      "judge_measurement_types.py": "e5f0f9bc46e78d737547fd65d7e3ded96fb34d8ea8d3a83575d3e6361a148184",
+      "judge_measurements/__init__.py": "afdb44a910b4f58f1d58d3c8dcde411425598445aa31e2722e4da79d98d7cc2c",
+      "judge_measurements/acceptance.py": "efe88ae531099a0998fefe4b84f6768968d7fae682d7e04513d8cb85ff2d94bd",
+      "judge_measurements/analysis.py": "5160cfab51a90be29d131b3c53ebe474913cbd9d55d34947e0f792b93b57bfbc",
+      "judge_measurements/captured_workflow.py": "1c0a070d2cd765e3a8fe6b5f9517100de4951f12a3301c1d526145a676c3090c",
+      "judge_measurements/cli_verification.py": "2d9597dda34f44bfb00f692817fd8944ac94068e106e7737758e094c0ed605a9",
+      "judge_measurements/collector.py": "082018f1ec10e4688d95c3702eac7468da2ced553c5f0d3cd6c7940914a8be39",
+      "judge_measurements/configured.py": "1a50326e2351bf9bfdbb3621b3963ed5e5f294559590e35f117f33dfec18f0a9",
+      "judge_measurements/contracts.py": "877aaa949390315cfdaf2a6b1516c9dd554d55f2b96791d4a9272e1d8da52e15",
+      "judge_measurements/evidence.py": "e79748f0ba3b156219b2313b52453ebd5b5fbd426abad0ed3158c6d91a850500",
+      "judge_measurements/native_capture.py": "38fd33ec094754102875bd0f0cedd6083484f96b6bbdb1156d8bc55ff7789a28",
+      "judge_measurements/native_recipe.py": "d428985c49a46f3856821ff2f45961c690d86032700117fb0b0ffe72777eafde",
+      "judge_measurements/native_workflow.py": "70a60b2e4dc3eb4eb51b3d86a8338ee67d35c4a60c5e37b99c011c32ea9d4182",
+      "judge_measurements/openai_compatible.py": "a7e44426bb51e75c52f5a35553546eb3bc596045026e99fa368fb682399214ba",
+      "judge_measurements/openai_compatible_contract.py": "5d66778b34d3ecbd47dfffea655961ad074949c918ebbb4142d4755105e1d79d",
+      "judge_measurements/precision.py": "72e112f0df3ee2e164c4eef76bf799d6ffae6afee11bb50dd1541be8afbf0625",
+      "judge_measurements/reporting.py": "6804bf15cd82398fce4ca641b5dc483aec635df11cd6d014e49b54aa12b07d2b",
+      "judge_measurements/runner.py": "0f379997f0703e9deca9b8e3a837169cf109b59189ed0b3fd2559e1bb82b7eea",
+      "judge_measurements/runtime_provider.py": "55371964f8787a9ff524fe3110f2052b20e1b5f6c5a39c021941c4c08cb840cb",
+      "judge_measurements/source_import.py": "57c36e386942ec1030297253019f60cfe1ab6b33f46129b4844519d0df7cfca1",
+      "judge_measurements/statistics.py": "af2bc39e6bea667afedeeb5499c652396ef8dfe69879ea12c527fc71c132d078",
+      "judge_measurements/workflow.py": "aab5a24641e897beb3a58b71718c45171c89a620e71fd6b2e67b67a730855a76",
+      "output_text_contract.py": "58ccb22a27e43ed2d594b2613d171ee48fe6a05022696d4f3625e3435d7c9524",
+      "paired_exact_match.py": "97eaaa066e139baee5a43259db8359328ee31228d2b7dcbd4c710fb3c0de0b77",
+      "public_contracts.py": "dda207328044bb46be57d886a8289d7352d3cc33e9812d4d218f4ed3201eb12a",
+      "py.typed": "2c23e665e13fbc03555490cdbeeabd034ee2ee383d371aeae9fd7451eb8d7d97",
+      "record_reporting.py": "010d1ac57f4b393a3fc2cb46970fede0427b0486b48664ffa2ac1ec4a013cbbf",
+      "report_presentation.py": "30ceb2c047c4603f9c0e6b2ce022dc4667093af0ab96008f810a422780d69ccf",
+      "report_publication.py": "7d2d7a75d0ec6cfad2965259bd649ae7baa89942ef9682ff8ddcccfd882ee736",
+      "runtime_behavior/__init__.py": "b649a0485de77858450c79ae44d3ef2c6db2e5723d3bb9fbbd9277651d78ba73",
+      "runtime_behavior/transaction.py": "56091db4f3e1ea597f8afa7190a3b3b0e771d8e20a1359d218a79ebf2b173171",
+      "runtime_import_authoring.py": "095b636e5f8438a1b2c979255f8b43f8d43bab784b31e50210616729bda0d6b5",
+      "runtime_manifest.py": "8a36540e736084534b63884858b9d23efeda781f811b1f3c12b750ee38c317a8",
+      "runtime_provider_evidence.py": "49b1daa50ab38a284c09f2bfb4f2a92289e4807ab676a60d31e420d6962149ea",
+      "runtime_providers/__init__.py": "aaa1f30658d9a969a82c34eb071bfd92205904db93a5fcb7fb91baefcbaea610",
+      "runtime_providers/_hf_safetensors_identity.py": "6d6b6c5d3148dd67214e9986e83fe353add1899c9cf06dd0aaed8390a94aceb0",
+      "runtime_providers/_hf_transformers_identity.py": "ea1ea1bab2442996c6c926be0328d17b9514f050e7458dd5fb05e3a271e4ff04",
+      "runtime_providers/_tensorrt_llm_execution.py": "9195e7a2d0f2e3ef0a6da02d5885024aabd3019035bb68feb4f854f33fac3a63",
+      "runtime_providers/_tensorrt_llm_inspection.py": "0557f12cf119325ca4940e4554d22fc33ceafa32723034934e2fee08a8be6d48",
+      "runtime_providers/gguf_identity.py": "9263e5c16803d29882fba20785db8e22b3a6cd2fc26150272c6893c35af6aaa9",
+      "runtime_providers/hf_transformers.py": "2cf46cc84d0bb1f647122de155e909064b616f60b3f7e5ad9297c53cfa0cdca6",
+      "runtime_providers/hf_vision_text.py": "921274dcd8ea7a60dc2e049de904b7fe97a36d5dbce3bc367c6c71d3c8554a1e",
+      "runtime_providers/hf_vision_text_conformance.py": "ab0f080541f1dec2b9068d5473aa4a8641411a707dfc6fbac8b99687580be10f",
+      "runtime_providers/llama_cpp.py": "9b5c55e4402d1b08e2206e6d607c0d0c07d87c56ec2c628ed0490794cc4d8ffe",
+      "runtime_providers/llama_cpp_conformance.py": "03845fedee88cda7b679bef10ca2fa1cbdc8c8fecde9564f3c982544fceb5df8",
+      "runtime_providers/llama_cpp_session.py": "8263aac3cce37c77730693502a3dfd0c54e18e4fd4281e9a23af51ecc9729a3a",
+      "runtime_providers/tensorrt_llm.py": "13da0033ecfb30def2a6a60a448029558d9b9a4cf6e5ff1b70135b26dac7a227",
+      "runtime_providers/tensorrt_llm_canary.py": "8b33c401906b692edcccff8650e9bc142efdad25ae848e0810302b5a0a9bb7c5",
+      "runtime_providers/tensorrt_llm_conformance.py": "8e36e4542243b52ef05e26c1250ce496b21d814b3a58e94bed6e8531fce2621c",
+      "runtime_providers/tensorrt_llm_identity.py": "ac752f70ce8021013691c45cb1eaba077ed796849b60ef0ef34aac9895b1626e",
+      "runtime_providers/tensorrt_llm_runner.py": "397dd1cef0581854d3cad623bfdf973473e6bdd4a590933333215332ff2f1ae7",
+      "runtime_providers/tensorrt_llm_session.py": "a8e67d8206e141fe5ff19d66aa93d6a11a55f6fe92583942348ed55741280275",
+      "runtime_security.py": "691b2255ee1e42b94202d307b66f8b57d14b528d3203016e7f052f12e77204da",
+      "runtime_security_helpers.py": "823f09b05764d52003ebeb23a2058acf8d5caeb89ade1f305312191afd128221",
+      "runtime_verify.py": "18caf8f09e94186bc6be2162e0e15fb48170830c403f34c5230bc8b604fe1213",
+      "security.py": "31521eb162e9bf9615c701ca4e17755f11bb12945c87ce8e0cee91c0d991381a",
+      "trust_inputs.py": "ca5c3da7788ac9c208110cf62994ba01404e4d713d30045f5bd549c7bc9d75e5"
+    },
+    "native_sha256": "9d2f8399ef4ccabf32515abae996f2d7ec0d96fd9fe8372d1489e54c005a4e3c",
+    "source_archive_sha256": "c5b725d14623bccc15e0c4d7438e9a525d2fcd43931bbd2f4a0280975ce78223",
+    "supervisor_sha256": "6a9c5df0dc97785613ef48e174a05657d2fd8956de5188b9e68db52f0eb9ae24",
+    "platform": "Linux-7.0.14-linuxkit-aarch64-with-glibc2.41",
+    "machine": "aarch64",
+    "cpu_quota": "400000 100000\n",
+    "memory_limit": "12884901888\n",
+    "rounds": 5,
+    "timeout_seconds": 600,
+    "seed": 4127,
+    "normalizations": [
+      "Per-attempt output directory paths",
+      "package-manifest generator_source_sha256",
+      "ZIP compressed bytes and metadata; all uncompressed member bytes checked against delivered files"
+    ],
+    "identity_checks": "outside all measured workers",
+    "retries": 0,
+    "exclusions": 0
+  },
+  "outcomes": 192,
+  "qualified": 32,
+  "timed": 160,
+  "all_matched": true,
+  "rows": [
+    {
+      "workload": "evaluate-nll-1000",
+      "python": {
+        "elapsed_seconds": 3.37871246,
+        "cpu_seconds": 3.370952,
+        "peak_rss_mib": 63.31640625,
+        "samples": 5
+      },
+      "rust": {
+        "elapsed_seconds": 0.104408958,
+        "cpu_seconds": 0.184596,
+        "peak_rss_mib": 22.6796875,
+        "samples": 5
+      }
+    },
+    {
+      "workload": "evaluate-nll-5000",
+      "python": {
+        "elapsed_seconds": 15.726432423,
+        "cpu_seconds": 15.719545,
+        "peak_rss_mib": 113.98828125,
+        "samples": 5
+      },
+      "rust": {
+        "elapsed_seconds": 0.479817375,
+        "cpu_seconds": 0.890525,
+        "peak_rss_mib": 68.78515625,
+        "samples": 5
+      }
+    },
+    {
+      "workload": "evaluate-nll-12000",
+      "python": {
+        "elapsed_seconds": 38.235635351,
+        "cpu_seconds": 38.219941,
+        "peak_rss_mib": 194.3984375,
+        "samples": 5
+      },
+      "rust": {
+        "elapsed_seconds": 1.188241626,
+        "cpu_seconds": 2.189949,
+        "peak_rss_mib": 150.78125,
+        "samples": 5
+      }
+    },
+    {
+      "workload": "evaluate-nll-50000",
+      "python": {
+        "elapsed_seconds": 156.893102198,
+        "cpu_seconds": 156.840025,
+        "peak_rss_mib": 618.421875,
+        "samples": 5
+      },
+      "rust": {
+        "elapsed_seconds": 4.995075586,
+        "cpu_seconds": 9.173789,
+        "peak_rss_mib": 595.4609375,
+        "samples": 5
+      }
+    },
+    {
+      "workload": "verify-captured",
+      "python": {
+        "elapsed_seconds": 0.247995083,
+        "cpu_seconds": 0.247124,
+        "peak_rss_mib": 52.453125,
+        "samples": 5
+      },
+      "rust": {
+        "elapsed_seconds": 0.009181042,
+        "cpu_seconds": 0.009433,
+        "peak_rss_mib": 10.5390625,
+        "samples": 5
+      }
+    },
+    {
+      "workload": "report-captured",
+      "python": {
+        "elapsed_seconds": 0.232454625,
+        "cpu_seconds": 0.228517,
+        "peak_rss_mib": 52.375,
+        "samples": 5
+      },
+      "rust": {
+        "elapsed_seconds": 0.010831958,
+        "cpu_seconds": 0.008096,
+        "peak_rss_mib": 10.5,
+        "samples": 5
+      }
+    },
+    {
+      "workload": "package-captured",
+      "python": {
+        "elapsed_seconds": 0.233554375,
+        "cpu_seconds": 0.233448,
+        "peak_rss_mib": 52.67578125,
+        "samples": 5
+      },
+      "rust": {
+        "elapsed_seconds": 0.023070625,
+        "cpu_seconds": 0.013704999999999998,
+        "peak_rss_mib": 10.54296875,
+        "samples": 5
+      }
+    },
+    {
+      "workload": "verify-native",
+      "python": {
+        "elapsed_seconds": 0.270735667,
+        "cpu_seconds": 0.258961,
+        "peak_rss_mib": 52.69140625,
+        "samples": 5
+      },
+      "rust": {
+        "elapsed_seconds": 0.014581333,
+        "cpu_seconds": 0.011961,
+        "peak_rss_mib": 11.46875,
+        "samples": 5
+      }
+    },
+    {
+      "workload": "report-native",
+      "python": {
+        "elapsed_seconds": 0.247577292,
+        "cpu_seconds": 0.235648,
+        "peak_rss_mib": 52.24609375,
+        "samples": 5
+      },
+      "rust": {
+        "elapsed_seconds": 0.00857925,
+        "cpu_seconds": 0.005207,
+        "peak_rss_mib": 9.578125,
+        "samples": 5
+      }
+    },
+    {
+      "workload": "package-native",
+      "python": {
+        "elapsed_seconds": 0.248451458,
+        "cpu_seconds": 0.23974499999999999,
+        "peak_rss_mib": 52.5546875,
+        "samples": 5
+      },
+      "rust": {
+        "elapsed_seconds": 0.028971958,
+        "cpu_seconds": 0.016638,
+        "peak_rss_mib": 9.875,
+        "samples": 5
+      }
+    },
+    {
+      "workload": "verify-judge",
+      "python": {
+        "elapsed_seconds": 0.242478875,
+        "cpu_seconds": 0.24155,
+        "peak_rss_mib": 53.05078125,
+        "samples": 5
+      },
+      "rust": {
+        "elapsed_seconds": 0.013458542,
+        "cpu_seconds": 0.012651,
+        "peak_rss_mib": 11.625,
+        "samples": 5
+      }
+    },
+    {
+      "workload": "report-judge",
+      "python": {
+        "elapsed_seconds": 0.251743875,
+        "cpu_seconds": 0.247904,
+        "peak_rss_mib": 51.74609375,
+        "samples": 5
+      },
+      "rust": {
+        "elapsed_seconds": 0.016049542,
+        "cpu_seconds": 0.013342,
+        "peak_rss_mib": 11.89453125,
+        "samples": 5
+      }
+    },
+    {
+      "workload": "package-judge",
+      "python": {
+        "elapsed_seconds": 0.250901792,
+        "cpu_seconds": 0.250813,
+        "peak_rss_mib": 51.80078125,
+        "samples": 5
+      },
+      "rust": {
+        "elapsed_seconds": 0.028483416,
+        "cpu_seconds": 0.020096,
+        "peak_rss_mib": 12.03125,
+        "samples": 5
+      }
+    },
+    {
+      "workload": "verify-evidence_set",
+      "python": {
+        "elapsed_seconds": 0.270692416,
+        "cpu_seconds": 0.26527,
+        "peak_rss_mib": 53.3046875,
+        "samples": 5
+      },
+      "rust": {
+        "elapsed_seconds": 0.026617917,
+        "cpu_seconds": 0.023425,
+        "peak_rss_mib": 14.265625,
+        "samples": 5
+      }
+    },
+    {
+      "workload": "report-evidence_set",
+      "python": {
+        "elapsed_seconds": 0.261936125,
+        "cpu_seconds": 0.259416,
+        "peak_rss_mib": 53.37109375,
+        "samples": 5
+      },
+      "rust": {
+        "elapsed_seconds": 0.022404542,
+        "cpu_seconds": 0.020151,
+        "peak_rss_mib": 13.69140625,
+        "samples": 5
+      }
+    },
+    {
+      "workload": "package-evidence_set",
+      "python": {
+        "elapsed_seconds": 0.267612208,
+        "cpu_seconds": 0.26753,
+        "peak_rss_mib": 53.30078125,
+        "samples": 5
+      },
+      "rust": {
+        "elapsed_seconds": 0.044223709,
+        "cpu_seconds": 0.032058,
+        "peak_rss_mib": 13.859375,
+        "samples": 5
+      }
+    }
+  ]
+}

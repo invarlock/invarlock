@@ -16,3 +16,8 @@ invarlock-native-core = { path = "../core" }
 invarlock-native-evidence = { path = "../evidence" }
 invarlock-native-filesystem = { path = "../filesystem" }
 serde_json = { version = "=1.0.149", features = ["arbitrary_precision", "preserve_order"] }
+yaml-rust2 = "=0.10.4"
+
+regex = "=1.13.1"
+
+ed25519-dalek = {version="=2.2.0", features=["pkcs8","pem"]}

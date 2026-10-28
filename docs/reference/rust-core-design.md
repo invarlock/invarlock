@@ -25,7 +25,8 @@ analysis, filesystem snapshots, evidence transactions, execution, Python binding
 an offline verifier and a separate control executable. Public evaluation,
 verification and reporting commands accept an explicit Rust backend. Python
 continues to supply model frameworks, provider SDKs, external format adapters,
-YAML decoding and resource negotiation.
+resource negotiation and Python facade YAML loading. The standalone executable
+has its own bounded strict YAML decoder.
 
 The candidate includes captured/native/judge publication and replay, independent
 recipient trust and receipts, evidence sets, qualification and attestations,
@@ -53,6 +54,16 @@ Complete transaction measurements use separately retained artifacts and the
 expanded comparison protocol. The [expanded results](rust-expanded-results.md)
 show faster captured NLL transactions, slower small transactions and higher peak
 RSS in every measured workload. Python remains the default backend.
+
+## Standalone checkpoint
+
+The standalone executable now covers canonical captured evaluation, verification,
+reports and handoff packages for all four evidence families, plus setup. The
+[Linux standalone comparison](rust-standalone-results.md) retains completed
+ARM64 and x86_64 results against corrected Python 0.17.3. Those results supersede
+neither the historical FFI timing boundary nor the remaining migration work.
+External-format import, public runtime-import assembly, explicit compatibility
+workers and complete CLI/distribution behavior remain unfinished.
 
 ## Objective and constraints
 

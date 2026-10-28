@@ -1,4 +1,6 @@
-//! Offline command front door. All verification uses the native evidence core.
+mod offline;
+mod request;
+// Offline command front door. All verification uses the native evidence core.
 use invarlock_native_contracts as contracts;
 use invarlock_native_evidence::{self as evidence, EvidenceError};
 use invarlock_native_filesystem as fs;
@@ -10,6 +12,9 @@ use std::{
 
 const MAX_REQUEST: usize = 384 * 1024 * 1024;
 fn execute(command: &str, input: &[u8]) -> Result<(Vec<u8>, u8), EvidenceError> {
+    if command == "decode-request" {
+        return Ok((contracts::canonical_json(&request::parse(input)?)?, 0));
+    }
     let config = contracts::parse_json(input, "command request")?;
     let result = evidence::transaction::dispatch(command, &config, None, None, None)?;
     Ok((contracts::canonical_json(&result.payload)?, result.status))
@@ -17,7 +22,7 @@ fn execute(command: &str, input: &[u8]) -> Result<(Vec<u8>, u8), EvidenceError> 
 fn run() -> Result<u8, EvidenceError> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.is_empty() || args[0] == "--help" || args[0] == "help" {
-        println!("invarlock-native-verify COMMAND --request PATH\nUse --request - for bounded JSON stdin.\nCommands: {}",evidence::transaction::COMMANDS.join(", "));
+        println!("invarlock-native-verify evaluate REQUEST --signing-key KEY [--preflight] [--json]\ninvarlock-native-verify verify EVIDENCE --trust-profile TRUST --receipt RECEIPT --json\ninvarlock-native-verify report EVIDENCE [--html PATH] [--markdown PATH] [--junit PATH] --json\ninvarlock-native-verify report EVIDENCE --review-context CONTEXT --package OUTPUT --json\nLow-level transactions: COMMAND --request PATH\nUse --request - for bounded JSON stdin.\nCommands: {}",evidence::transaction::COMMANDS.join(", "));
         return Ok(0);
     }
     if args[0] == "--version" {
@@ -32,6 +37,15 @@ fn run() -> Result<u8, EvidenceError> {
             "network":false,"provider_execution":false,"automatic_fallback":false}))?)
             .map_err(|_| EvidenceError::incomplete("output_io_error"))?;
         return Ok(0);
+    }
+    if ["evaluate", "verify", "report"].contains(&args[0].as_str())
+        && args.get(1).map(String::as_str) != Some("--request")
+    {
+        let result = offline::run(&args[0], &args[1..])?;
+        io::stdout()
+            .write_all(&contracts::canonical_json(&result.payload)?)
+            .map_err(|_| EvidenceError::incomplete("output_io_error"))?;
+        return Ok(result.status);
     }
     if args.len() != 3 || args[1] != "--request" {
         return Err(EvidenceError::incomplete("expected COMMAND --request PATH"));

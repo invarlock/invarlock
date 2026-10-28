@@ -380,6 +380,9 @@ pub fn render_html(v: &Value) -> String {
         String::new()
     };
     let mut out=format!("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none';{script_policy}\"><title>{} · {}</title><style>{CSS}</style></head><body><main><header class=\"brand\">{BRAND} InvarLock<span class=\"family\">{}</span></header><div class=\"report-heading\"><p class=\"eyebrow\">Comparison / Review / Evidence</p><h1>{}</h1><p>{}</p></div><p class=\"interpretation-note\">{}</p>{}<section class=\"hero {}\" aria-labelledby=\"decision\"><div class=\"verdict\"><p class=\"eyebrow\">Recorded policy result</p><h2 id=\"decision\">{}</h2><p class=\"decision-summary\">{}</p>",e(decision(t(v,"decision"))),e(t(v,"title")),e(t(v,"family")),if authored{"Client review package"}else{"Model change review"},e(t(v,"title")),interpretation(v),review_context(v),tone(t(v,"decision")),e(decision(t(v,"decision"))),summary(v));
+    if !a(v, "handoff_links").is_empty() {
+        out=out.replacen("</header><div class=\"report-heading\">",&format!("</header><nav aria-label=\"Review package\">{}</nav><div class=\"report-heading\">",handoff_links(v,false)),1);
+    }
     if multiple {
         out+=&format!("<div class=\"summary-row\"><span class=\"pill\">{} metric / scope results</span></div>",metrics.len())
     }

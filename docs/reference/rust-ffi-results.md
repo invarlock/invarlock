@@ -170,7 +170,7 @@ within each path share the same boundary; no measured time or memory is subtract
 
 Qualification included:
 
-- Linux: 135 Rust tests and three doctests passed. Two timing diagnostics are
+- Linux: 135 Rust tests and three documentation tests passed. Two timing diagnostics are
   excluded from ordinary tests; the fixed-block diagnostic was run separately.
 - The installed Linux extension passed six numerical differential tests and
   matched six corrected overflow refusals, five finite report controls and four

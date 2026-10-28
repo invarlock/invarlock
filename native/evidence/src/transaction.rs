@@ -15,6 +15,7 @@ pub struct Outcome {
 }
 pub const COMMANDS: &[&str] = &[
     "report",
+    "client-review",
     "gguf-identity",
     "canonicalize",
     "validate",
@@ -64,6 +65,7 @@ pub fn dispatch(
     key_bytes: Option<&[u8]>,
 ) -> Result<Outcome> {
     let value = match command {
+        "client-review" => crate::reporting::handoff::build(config)?,
         "report" => {
             let output = crate::reporting::render(config);
             return Ok(Outcome {

@@ -508,7 +508,9 @@ mod tests {
             program: engine,
             args: vec!["run".into(), "--cidfile".into(), cid.as_os_str().into()],
             input: vec![],
-            timeout: Duration::from_millis(100),
+            // The fixture must start and write its CID before its deadline.
+            // A 100 ms startup assumption is unreliable on a loaded host.
+            timeout: Duration::from_secs(2),
             stdout_limit: 1,
             stderr_limit: 1,
             env: Some(env),
@@ -516,7 +518,11 @@ mod tests {
         };
         let result = run_side_worker(&spec, &AtomicBool::new(false)).unwrap();
         assert_eq!(result.output.status, 124);
-        assert!(result.cleanup_errors.is_empty());
+        assert!(
+            result.cleanup_errors.is_empty(),
+            "{:?}",
+            result.cleanup_errors
+        );
         assert_eq!(std::fs::read_to_string(log).unwrap(), "stop\nkill\n");
         assert!(cid.exists());
         std::fs::remove_dir_all(root).unwrap();

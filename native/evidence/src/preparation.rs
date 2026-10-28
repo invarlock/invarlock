@@ -169,9 +169,15 @@ pub fn prepare_captured(config: &Value) -> Result<Value> {
     }
     pinned.verify().map_err(io_error)?;
     let preflight = json!({"format_version":"invarlock/evaluation-preflight-v3","kind":"captured","ok":true,"execution_mode":"captured","requested_authentication":if unsigned{"unsigned_local"}else{"signed"},"baseline_run_digest":normalized["comparison"]["baseline"]["run_digest"],"subject_run_digest":normalized["comparison"]["subject"]["run_digest"],"policy_digest":normalized["comparison"]["policy_digest"],"record_count":capacity["record_count"],"required_bootstrap_draws":capacity["required_bootstrap_draws"],"missing_id_bytes":capacity["missing_id_bytes"],"checks":["request","run_bindings","policy","paired_capacity","output_destination","signing_mode"],"request_digest":sha256_digest(&canonical_json(&normalized)?),"output":destination.to_string_lossy(),"max_bootstrap_draws":budget,"scope_count":capacity["scope_count"]});
-    Ok(
-        json!({"baseline":baseline,"subject":subject,"policy":policy,"normalized_request":normalized,"preflight":preflight}),
-    )
+    // Transfer ownership of the large run trees. json! serializes borrowed
+    // expressions and would temporarily duplicate both complete record sets.
+    Ok(Value::Object(serde_json::Map::from_iter([
+        ("baseline".into(), baseline),
+        ("subject".into(), subject),
+        ("policy".into(), policy),
+        ("normalized_request".into(), normalized),
+        ("preflight".into(), preflight),
+    ])))
 }
 
 fn runtime_read(

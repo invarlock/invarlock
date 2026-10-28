@@ -638,7 +638,7 @@ def test_native_coordinator_rejects_invalid_callback_without_retaining_result(
 
 
 @pytest.mark.parametrize("parallel", [False, True])
-@pytest.mark.parametrize("failure", [False, True])
+@pytest.mark.parametrize("failure", [False, "ready", "incomplete"])
 def test_native_oci_pair_owns_launch_cancellation_and_resource_checks(
     tmp_path, monkeypatch, parallel, failure
 ):
@@ -662,10 +662,22 @@ if args[:2]==['image','inspect']:
  print(json.dumps([{{'Id':args[2],'RepoDigests':[]}}]));sys.exit(0)
 with log.open('a') as f:f.write(json.dumps(args)+'\\n')
 if args[0] in ['stop','kill']:sys.exit(0)
-cid=pathlib.Path(args[args.index('--cidfile')+1]);cid.write_text('a'*64)
+cid=pathlib.Path(args[args.index('--cidfile')+1])
 role=cid.parent.name
+if {failure!r}=='incomplete' and role=='subject':
+ cid.write_text('');cid.with_suffix('.ready').touch();time.sleep(30)
+cid.write_text('a'*64)
 if {failure!r}:
- if role=='baseline':sys.exit(7)
+ if role=='baseline':
+  if {parallel!r}:
+   other=cid.parent.parent/'subject'/'container.cid'
+   deadline=time.monotonic()+3
+   while True:
+    ready=other.with_suffix('.ready').exists() if {failure!r}=='incomplete' else other.exists() and other.read_text()=='a'*64
+    if ready:break
+    if time.monotonic()>deadline:raise RuntimeError('fixture subject did not become ready')
+    time.sleep(.005)
+  sys.exit(7)
  time.sleep(30)
 os.write(1,b'o'*200000);os.write(2,b'e'*200000)
 """
@@ -707,6 +719,16 @@ os.write(1,b'o'*200000);os.write(2,b'e'*200000)
             AssertionError("Python launch path used")
         ),
     )
+    if parallel and failure == "incomplete":
+        # A cancelled engine that has not published its identity cannot claim
+        # successful daemon cleanup. Preserve that uncertainty and its files.
+        with pytest.raises(
+            evaluation_oci.OciEvaluationError, match="cleanup is uncertain"
+        ) as raised:
+            evaluation_oci._run_native_workers(workers, parallel=True)
+        assert raised.value.retain_worker_root
+        assert (root / "subject/container.cid").exists()
+        return
     started = time.monotonic()
     result = evaluation_oci._run_native_workers(workers, parallel=parallel)
     assert time.monotonic() - started < 5

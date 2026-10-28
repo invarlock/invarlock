@@ -57,7 +57,7 @@
         "Malformed and noncanonical inputs, 16 MiB raw bounds, record bounds, and accepted material containing 128 nested unused JSON arrays."
       ],
       "remaining_boundaries": [
-        "YAML authored-request token decoding remains an explicit Python loading adapter.",
+        "The Python facade retains its YAML adapter; the standalone front door now decodes bounded strict YAML independently.",
         "Provider loading and content materialization are outside the portable schedule contract."
       ],
       "status": "qualified_on_listed_fixtures",
@@ -86,7 +86,7 @@
         "Actual source facade projections for run and import requests; explicit JSONL import followed by native publication."
       ],
       "remaining_boundaries": [
-        "Provider registry admission, configuration hooks, artifact resources, and YAML decoding remain explicit host adapters.",
+        "Provider registry admission, configuration hooks, and artifact resources remain explicit host adapters; standalone YAML decoding is implemented.",
         "External evaluator formats remain Python import adapters; native preparation checks imported canonical values and their physical source digest against owned input bytes.",
         "Malformed filesystem OS error text has not been exhaustively matched."
       ],
@@ -679,6 +679,17 @@
       "required_files_verified": 424,
       "measured_runtime_artifacts_unchanged": true,
       "nonfunctional_delta": "One AST-identical Python test formatting change and parsed-TOML-identical CLI manifest whitespace; binary hashes unchanged."
+    },
+    "standalone_checkpoint": {
+      "results": [
+        "experiments/rust/results/standalone-aarch64.json",
+        "experiments/rust/results/standalone-x86_64.json"
+      ],
+      "report": "docs/reference/rust-standalone-results.md",
+      "qualified_executions": 64,
+      "timed_executions": 320,
+      "all_matched": true,
+      "scope": "Canonical captured evaluation; four-family verification, reports and handoff packages; strict authored JSON/YAML and setup have separate fixture coverage. External formats, public runtime import and compatibility workers remain incomplete."
     }
   }
 }

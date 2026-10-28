@@ -11,7 +11,7 @@ pub mod oci;
 pub mod sequential;
 pub mod workspace;
 pub use checkpoint::{Amounts, Budget, Checkpoint, Transaction, TransactionStatus};
-use invarlock_native_filesystem::{FileIdentity, PinnedDirectory};
+use invarlock_native_filesystem::{FileIdentity, PinnedDirectory, PinnedRegularFile};
 use std::{
     collections::BTreeMap,
     ffi::OsString,
@@ -597,6 +597,7 @@ pub struct PinnedResource {
     parent: PinnedDirectory,
     name: PathBuf,
     identity: FileIdentity,
+    file: PinnedRegularFile,
     bytes: Box<[u8]>,
 }
 impl PinnedResource {
@@ -606,11 +607,20 @@ impl PinnedResource {
             path.file_name()
                 .ok_or_else(|| Error::Invalid("resource must name a file".into()))?,
         );
-        let (bytes, identity) = parent.read_regular(&name, max_bytes)?;
+        // Keep the original inode alive: a metadata-only guard can miss unlink
+        // and recreation when the filesystem reuses both inode and timestamps.
+        let file = PinnedRegularFile::open(path)?;
+        let identity = file.metadata().identity.clone();
+        if identity.size > max_bytes as u64 {
+            return Err(Error::Invalid("resource exceeds its byte limit".into()));
+        }
+        let mut bytes = Vec::with_capacity(identity.size as usize);
+        file.copy_to(&mut bytes, max_bytes as u64)?;
         Ok(Self {
             parent,
             name,
             identity,
+            file,
             bytes: bytes.into_boxed_slice(),
         })
     }
@@ -622,6 +632,24 @@ impl PinnedResource {
     }
     pub fn verify(&self) -> Result<()> {
         self.parent.verify_regular(&self.name, &self.identity)?;
+        struct Compare<'a>(&'a [u8]);
+        impl io::Write for Compare<'_> {
+            fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+                if !self.0.starts_with(bytes) {
+                    return Err(io::Error::other("pinned resource contents changed"));
+                }
+                self.0 = &self.0[bytes.len()..];
+                Ok(bytes.len())
+            }
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+        let mut expected = Compare(&self.bytes);
+        self.file.copy_to(&mut expected, self.bytes.len() as u64)?;
+        if !expected.0.is_empty() {
+            return Err(Error::Invalid("pinned resource contents changed".into()));
+        }
         Ok(())
     }
 }
@@ -729,6 +757,21 @@ mod tests {
             &[&resource]
         )
         .is_err());
+        assert_eq!(resource.bytes(), b"before");
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn pinned_resource_rejects_same_size_content_change() {
+        let path = std::env::temp_dir()
+            .canonicalize()
+            .unwrap()
+            .join(format!("invarlock-resource-content-{}", std::process::id()));
+        std::fs::write(&path, b"before").unwrap();
+        let resource = PinnedResource::capture(&path, 64).unwrap();
+        assert!(resource.verify().is_ok());
+        std::fs::write(&path, b"after!").unwrap();
+        assert!(resource.verify().is_err());
         assert_eq!(resource.bytes(), b"before");
         std::fs::remove_file(path).unwrap();
     }

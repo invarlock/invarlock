@@ -493,3 +493,17 @@ pub(super) fn check(
 pub(super) fn empty_view() -> Value {
     json!({"title":"","family":"","decision":"","summary":"","metrics":[],"assurance":[],"identity":[],"subjects":[],"next_steps":[],"limitations":[],"details":[],"technical":{},"context":[],"changes":[],"review":null,"handoff_links":[]})
 }
+
+pub(super) fn handoff_links(v: &Value, markdown: bool) -> String {
+    a(v, "handoff_links")
+        .iter()
+        .map(|p| {
+            if markdown {
+                format!("[{}]({})", e(s(&p[0])), s(&p[1]))
+            } else {
+                format!("<a href=\"{}\">{}</a>", e(s(&p[1])), e(s(&p[0])))
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" · ")
+}

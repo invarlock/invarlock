@@ -101,7 +101,10 @@ def main() -> None:
             p
             for p in directory.iterdir()
             if p.is_file()
-            and p.name.upper().startswith(("LICENSE", "COPYING", "NOTICE", "COPYRIGHT"))
+            and (
+                p.name.upper().startswith(("LICENSE", "COPYING", "NOTICE", "COPYRIGHT"))
+                or p.name.upper().endswith("-LICENSE")
+            )
         ]
         if package.get("license_file"):
             candidates.append(directory / package["license_file"])

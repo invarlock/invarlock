@@ -16,7 +16,10 @@ use std::{
         unix::{ffi::OsStrExt, fs::MetadataExt},
     },
     path::{Component, Path},
-    sync::atomic::{AtomicU64, Ordering},
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        OnceLock,
+    },
 };
 
 #[derive(Debug)]
@@ -184,6 +187,7 @@ pub struct PinnedRegularFile {
     name: CString,
     file: File,
     metadata: EntryMetadata,
+    content_digest: OnceLock<String>,
 }
 impl PinnedRegularFile {
     pub fn open(path: &Path) -> Result<Self> {
@@ -213,32 +217,101 @@ impl PinnedRegularFile {
             name,
             file,
             metadata,
+            content_digest: OnceLock::new(),
         };
         result.verify()?;
         Ok(result)
     }
+    /// Stream a pinned file without an input-sized allocation. The first
+    /// completed read binds its digest; later reads must match those bytes.
+    pub fn copy_to(&self, output: &mut impl Write, max_bytes: u64) -> Result<u64> {
+        use std::os::unix::fs::FileExt;
+        self.verify_binding()?;
+        let size = self.metadata.identity.size;
+        if size > max_bytes {
+            return Err(Error::Limit("copy byte limit exceeded".into()));
+        }
+        let mut offset = 0;
+        let mut hash = Sha256::new();
+        let mut buffer = [0u8; 65536];
+        while offset < size {
+            let wanted = (size - offset).min(buffer.len() as u64) as usize;
+            let count = match self.file.read_at(&mut buffer[..wanted], offset) {
+                Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+                result => result?,
+            };
+            if count == 0 {
+                return Err(Error::Changed("copy source shrank".into()));
+            }
+            hash.update(&buffer[..count]);
+            output.write_all(&buffer[..count])?;
+            offset += count as u64;
+        }
+        self.verify_binding()?;
+        self.bind_digest(format!("{:x}", hash.finalize()))?;
+        Ok(offset)
+    }
+    fn bind_digest(&self, digest: String) -> Result<()> {
+        let expected = self.content_digest.get_or_init(|| digest.clone());
+        if expected != &digest {
+            return Err(Error::Changed(
+                "pinned regular file contents changed".into(),
+            ));
+        }
+        Ok(())
+    }
     pub fn sha256_digest(&self, max_bytes: u64) -> Result<String> {
-        self.verify()?;
+        self.verify_binding()?;
         let digest = hash_file(&self.file, &self.metadata.identity, max_bytes)?;
-        self.verify()?;
+        self.verify_binding()?;
+        self.bind_digest(digest.clone())?;
         Ok(digest)
     }
     /// Append raw bytes to a caller-owned digest. Discard that digest on error.
     pub fn hash_into(&self, hash: &mut Sha256, max_bytes: u64) -> Result<()> {
-        self.verify()?;
-        hash_file_into(&self.file, &self.metadata.identity, max_bytes, hash)?;
-        self.verify()
+        struct HashWriter<'a>(&'a mut Sha256);
+        impl Write for HashWriter<'_> {
+            fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+                self.0.update(bytes);
+                Ok(bytes.len())
+            }
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+        self.copy_to(&mut HashWriter(hash), max_bytes)?;
+        Ok(())
     }
     pub fn metadata(&self) -> &EntryMetadata {
         &self.metadata
     }
-    pub fn verify(&self) -> Result<()> {
+    /// Check inode, path and metadata only. A caller using this weaker check
+    /// must independently bind every consumed byte to its expected digest.
+    pub fn verify_binding(&self) -> Result<()> {
         if id(&self.file)? != self.metadata.identity
             || stat_at(self.parent.as_raw_fd(), &self.name)? != self.metadata.identity
         {
             return Err(Error::Changed("pinned regular file changed".into()));
         }
         self.parent.verify()
+    }
+    /// Recheck the bytes of a completed read as well as the retained binding.
+    pub fn verify(&self) -> Result<()> {
+        self.verify_binding()?;
+        if let Some(expected) = self.content_digest.get() {
+            let actual = hash_file(
+                &self.file,
+                &self.metadata.identity,
+                self.metadata.identity.size,
+            )?;
+            if &actual != expected {
+                return Err(Error::Changed(
+                    "pinned regular file contents changed".into(),
+                ));
+            }
+            self.verify_binding()?;
+        }
+        Ok(())
     }
 }
 impl AsRawFd for PinnedRegularFile {
@@ -598,6 +671,10 @@ impl PinnedDirectory {
         Ok(SelectedSnapshot {
             root: self,
             inventory: before,
+            digests: entries
+                .iter()
+                .map(|(name, entry)| (name.clone(), entry.sha256.clone()))
+                .collect(),
             entries,
             limits,
             files: files.clone(),
@@ -700,6 +777,7 @@ pub struct SelectedSnapshot<'a> {
     root: &'a PinnedDirectory,
     inventory: BTreeMap<String, FileIdentity>,
     entries: BTreeMap<String, SnapshotEntry>,
+    digests: BTreeMap<String, String>,
     limits: SnapshotLimits,
     files: BTreeMap<String, usize>,
     dirs: BTreeSet<String>,
@@ -715,6 +793,7 @@ impl<'a> SelectedSnapshot<'a> {
             self.limits,
             &self.files,
             &self.dirs,
+            &self.digests,
         )
     }
     /// Separate captured entries from the unchanged source verification state,
@@ -729,6 +808,7 @@ impl<'a> SelectedSnapshot<'a> {
             root,
             inventory,
             entries,
+            digests,
             limits,
             files,
             dirs,
@@ -736,6 +816,7 @@ impl<'a> SelectedSnapshot<'a> {
         let guard = SelectedSnapshotSourceGuard {
             root,
             inventory,
+            digests,
             limits,
             files,
             dirs,
@@ -750,11 +831,12 @@ impl<'a> SelectedSnapshot<'a> {
         guard
     }
 }
-/// Source identities retained after a selected snapshot's captured bytes are
-/// released. Verification inspects the pinned inventory without rereading data.
+/// Compact source identities and content digests retained after payload release.
+/// Verification rereads bounded source bytes; timestamps alone are insufficient.
 pub struct SelectedSnapshotSourceGuard<'a> {
     root: &'a PinnedDirectory,
     inventory: BTreeMap<String, FileIdentity>,
+    digests: BTreeMap<String, String>,
     limits: SnapshotLimits,
     files: BTreeMap<String, usize>,
     dirs: BTreeSet<String>,
@@ -767,6 +849,7 @@ impl SelectedSnapshotSourceGuard<'_> {
             self.limits,
             &self.files,
             &self.dirs,
+            &self.digests,
         )
     }
 }
@@ -776,12 +859,21 @@ fn verify_selected_source(
     limits: SnapshotLimits,
     files: &BTreeMap<String, usize>,
     dirs: &BTreeSet<String>,
+    digests: &BTreeMap<String, String>,
 ) -> Result<()> {
     root.verify()?;
     if selected_inventory(root, limits, files, dirs)? != *inventory {
         return Err(Error::Changed(
             "snapshot sources changed after capture".into(),
         ));
+    }
+    for (name, expected) in digests {
+        if root.sha256_file(Path::new(name), files[name] as u64)? != *expected {
+            return Err(Error::Changed(
+                "snapshot source contents changed after capture".into(),
+            ));
+        }
+        root.verify_regular(Path::new(name), &inventory[name])?;
     }
     root.verify()
 }
@@ -835,6 +927,18 @@ impl PackSnapshot {
         self.root.verify()?;
         if inventory(&self.root, self.limits)? != self.inventory {
             return Err(Error::Changed("pack snapshot changed after capture".into()));
+        }
+        for (name, entry) in &self.entries {
+            if self
+                .root
+                .sha256_file(Path::new(name), self.limits.max_file_bytes as u64)?
+                != entry.sha256
+            {
+                return Err(Error::Changed(
+                    "pack snapshot contents changed after capture".into(),
+                ));
+            }
+            self.root.verify_regular(Path::new(name), &entry.identity)?;
         }
         self.root.verify()
     }
@@ -1255,6 +1359,8 @@ pub fn publish_directory_no_replace(staging: &Path, destination: &Path) -> Resul
 /// publication. Drop removes only retained, identity-matching staged entries;
 /// a destination that reached rename is never rolled back by pathname.
 pub struct StagedDirectory {
+    limits: SnapshotLimits,
+    path: std::path::PathBuf,
     parent: PinnedDirectory,
     stage: File,
     stage_name: CString,
@@ -1266,6 +1372,17 @@ pub struct StagedDirectory {
 }
 impl StagedDirectory {
     pub fn new(destination: &Path) -> Result<Self> {
+        Self::with_limits(
+            destination,
+            SnapshotLimits {
+                max_entries: 256,
+                max_files: 256,
+                max_file_bytes: 128 * 1024 * 1024,
+                max_total_bytes: 512 * 1024 * 1024,
+            },
+        )
+    }
+    pub fn with_limits(destination: &Path, limits: SnapshotLimits) -> Result<Self> {
         let leaf = name(
             destination
                 .file_name()
@@ -1306,7 +1423,13 @@ impl StagedDirectory {
                 "private staging directory identity changed".into(),
             ));
         }
+        let path = destination
+            .parent()
+            .unwrap_or(Path::new("."))
+            .join(OsStr::from_bytes(stage_name.as_bytes()));
         Ok(Self {
+            limits,
+            path,
             parent,
             stage,
             stage_name,
@@ -1316,6 +1439,11 @@ impl StagedDirectory {
             published: false,
             total_bytes: 0,
         })
+    }
+    /// Path is usable only while this owned stage remains bound to its parent.
+    pub fn path(&self) -> Result<&Path> {
+        self.verify()?;
+        Ok(&self.path)
     }
     fn directory_fd(&self, relative: &str) -> RawFd {
         if relative.is_empty() {
@@ -1337,7 +1465,7 @@ impl StagedDirectory {
                 format!("{prefix}/{part}")
             };
             if !self.directories.contains_key(&next) {
-                if self.directories.len() + self.files.len() >= 256 {
+                if self.directories.len() + self.files.len() >= self.limits.max_entries {
                     return Err(Error::Limit("staged entry limit exceeded".into()));
                 }
                 let parent = self.directory_fd(&prefix);
@@ -1352,6 +1480,24 @@ impl StagedDirectory {
         Ok(())
     }
     pub fn write(&mut self, relative: &Path, payload: &[u8], mode: u32) -> Result<()> {
+        if payload.len() > self.limits.max_file_bytes
+            || self.total_bytes.saturating_add(payload.len() as u64)
+                > self.limits.max_total_bytes as u64
+        {
+            return Err(Error::Limit("staged file or byte limit exceeded".into()));
+        }
+        self.write_with(relative, mode, |file| {
+            file.write_all(payload)?;
+            Ok(())
+        })
+    }
+    /// Write an owned staged file with bounded producers (for streaming copies and archives).
+    pub fn write_with(
+        &mut self,
+        relative: &Path,
+        mode: u32,
+        producer: impl FnOnce(&mut File) -> Result<()>,
+    ) -> Result<()> {
         safe_relative(relative)?;
         if mode & !0o777 != 0 {
             return Err(Error::UnsafePath("unsupported permission bits".into()));
@@ -1364,9 +1510,8 @@ impl StagedDirectory {
                 io::Error::new(io::ErrorKind::AlreadyExists, "staged file already exists").into(),
             );
         }
-        if self.files.len() + self.directories.len() >= 256
-            || payload.len() > 128 * 1024 * 1024
-            || self.total_bytes.saturating_add(payload.len() as u64) > 512 * 1024 * 1024
+        if self.files.len() + self.directories.len() >= self.limits.max_entries
+            || self.files.len() >= self.limits.max_files
         {
             return Err(Error::Limit("staged file or byte limit exceeded".into()));
         }
@@ -1390,14 +1535,20 @@ impl StagedDirectory {
         let initial = id(&file)?;
         self.files
             .insert(relative_text.into(), (file.try_clone()?, initial));
-        file.write_all(payload)?;
+        producer(&mut file)?;
+        let size = file.metadata()?.len();
+        if size > self.limits.max_file_bytes as u64
+            || self.total_bytes.saturating_add(size) > self.limits.max_total_bytes as u64
+        {
+            return Err(Error::Limit("staged file or byte limit exceeded".into()));
+        }
         if unsafe { libc::fchmod(file.as_raw_fd(), mode as libc::mode_t) } != 0 {
             return Err(io::Error::last_os_error().into());
         }
         fsync_file(&file)?;
         let expected = id(&file)?;
         self.files.insert(relative_text.into(), (file, expected));
-        self.total_bytes += payload.len() as u64;
+        self.total_bytes += size;
         Ok(())
     }
     fn verify(&self) -> Result<()> {
@@ -1405,12 +1556,7 @@ impl StagedDirectory {
         walk(
             self.stage.as_raw_fd(),
             "",
-            SnapshotLimits {
-                max_entries: 256,
-                max_files: 256,
-                max_file_bytes: 128 * 1024 * 1024,
-                max_total_bytes: 512 * 1024 * 1024,
-            },
+            self.limits,
             &mut observed,
             &mut 0,
             &mut 0,
@@ -1872,7 +2018,7 @@ mod tests {
         guard.verify_source().unwrap();
         drop(entries);
         guard.verify_source().unwrap();
-        std::fs::write(p.join("one"), b"changed").unwrap();
+        std::fs::write(p.join("one"), b"new").unwrap();
         assert!(guard.verify_source().is_err());
         std::fs::remove_dir_all(p).unwrap();
     }
@@ -1904,7 +2050,7 @@ mod tests {
                     std::fs::write(p.join("replacement"), b"abc").unwrap();
                     std::fs::rename(p.join("replacement"), p.join("inputs/a")).unwrap();
                 }
-                "content" => std::fs::write(p.join("inputs/a"), b"changed").unwrap(),
+                "content" => std::fs::write(p.join("inputs/a"), b"xyz").unwrap(),
                 "metadata" => {
                     let current = std::fs::metadata(p.join("inputs/a")).unwrap().mode();
                     std::fs::set_permissions(

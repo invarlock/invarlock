@@ -18,6 +18,24 @@
   "components": [
     {
       "type": "library",
+      "bom-ref": "pkg:cargo/adler2@2.0.1",
+      "name": "adler2",
+      "version": "2.0.1",
+      "purl": "pkg:cargo/adler2@2.0.1",
+      "licenses": [
+        {
+          "expression": "0BSD OR MIT OR Apache-2.0"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "bom-ref": "pkg:cargo/ahash@0.8.12",
       "name": "ahash",
       "version": "0.8.12",
@@ -67,6 +85,42 @@
         {
           "alg": "SHA-256",
           "content": "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/arbitrary@1.5.0",
+      "name": "arbitrary",
+      "version": "1.5.0",
+      "purl": "pkg:cargo/arbitrary@1.5.0",
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "3bc62ac97cc33321f50863d514c3bc38a453947a8f9e781137e47c7401020aed"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/arraydeque@0.5.1",
+      "name": "arraydeque",
+      "version": "0.5.1",
+      "purl": "pkg:cargo/arraydeque@0.5.1",
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "7d902e3d592a523def97af8f317b08ce16b7ab854c1985a0c671e6f15cebc236"
         }
       ]
     },
@@ -306,6 +360,24 @@
     },
     {
       "type": "library",
+      "bom-ref": "pkg:cargo/core_detect@1.0.0",
+      "name": "core_detect",
+      "version": "1.0.0",
+      "purl": "pkg:cargo/core_detect@1.0.0",
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "7f8f80099a98041a3d1622845c271458a2d73e688351bf3cb999266764b81d48"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "bom-ref": "pkg:cargo/cpufeatures@0.2.17",
       "name": "cpufeatures",
       "version": "0.2.17",
@@ -319,6 +391,42 @@
         {
           "alg": "SHA-256",
           "content": "59ed5838eebb26a2bb2e58f6d5b5316989ae9d08bab10e0e6d103e656d1b0280"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/crc32fast@1.5.3",
+      "name": "crc32fast",
+      "version": "1.5.3",
+      "purl": "pkg:cargo/crc32fast@1.5.3",
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "0ba106e844045ddc02c20768ac4b0b7cb45f2cc2ecbd833ac9f5dacb183c2055"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/crossbeam-utils@0.8.23",
+      "name": "crossbeam-utils",
+      "version": "0.8.23",
+      "purl": "pkg:cargo/crossbeam-utils@0.8.23",
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "a31eee39dddec8330830986fcd7625edb5a24ec90ea038215273bbc3adb08ac6"
         }
       ]
     },
@@ -414,6 +522,24 @@
     },
     {
       "type": "library",
+      "bom-ref": "pkg:cargo/derive_arbitrary@1.5.0",
+      "name": "derive_arbitrary",
+      "version": "1.5.0",
+      "purl": "pkg:cargo/derive_arbitrary@1.5.0",
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "1b034bd7d5f032402a2479444dcc6f74e36a03f31854d41680fb240ef682a1ac"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "bom-ref": "pkg:cargo/digest@0.10.7",
       "name": "digest",
       "version": "0.10.7",
@@ -504,6 +630,24 @@
     },
     {
       "type": "library",
+      "bom-ref": "pkg:cargo/encoding_rs@0.8.42",
+      "name": "encoding_rs",
+      "version": "0.8.42",
+      "purl": "pkg:cargo/encoding_rs@0.8.42",
+      "licenses": [
+        {
+          "expression": "(Apache-2.0 OR MIT) AND BSD-3-Clause"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "8e985e0451871ad22fb8d2b6b076e2028a502a0d3950998c2c5c0a4f9b5d9679"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "bom-ref": "pkg:cargo/equivalent@1.0.3",
       "name": "equivalent",
       "version": "1.0.3",
@@ -576,6 +720,24 @@
     },
     {
       "type": "library",
+      "bom-ref": "pkg:cargo/flate2@1.1.10",
+      "name": "flate2",
+      "version": "1.1.10",
+      "purl": "pkg:cargo/flate2@1.1.10",
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "6e634e2e0ebac1ee034020da1ca582e17ffe4e0f5e985823721e168928136dcb"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "bom-ref": "pkg:cargo/fluent-uri@0.4.1",
       "name": "fluent-uri",
       "version": "0.4.1",
@@ -589,6 +751,24 @@
         {
           "alg": "SHA-256",
           "content": "bc74ac4d8359ae70623506d512209619e5cf8f347124910440dbc221714b328e"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/foldhash@0.1.5",
+      "name": "foldhash",
+      "version": "0.1.5",
+      "purl": "pkg:cargo/foldhash@0.1.5",
+      "licenses": [
+        {
+          "expression": "Zlib"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "d9c4f5dac5e15c24eb999c26181a6ca40b39fe946cbe4c263c7209467bc83af2"
         }
       ]
     },
@@ -684,6 +864,24 @@
     },
     {
       "type": "library",
+      "bom-ref": "pkg:cargo/hashbrown@0.15.5",
+      "name": "hashbrown",
+      "version": "0.15.5",
+      "purl": "pkg:cargo/hashbrown@0.15.5",
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "9229cfe53dfd69f0609a49f65461bd93001ea1ef889cd5529dd176593f5338a1"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "bom-ref": "pkg:cargo/hashbrown@0.16.1",
       "name": "hashbrown",
       "version": "0.16.1",
@@ -715,6 +913,24 @@
         {
           "alg": "SHA-256",
           "content": "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/hashlink@0.10.0",
+      "name": "hashlink",
+      "version": "0.10.0",
+      "purl": "pkg:cargo/hashlink@0.10.0",
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "7382cf6263419f2d8df38c55d7da83da5c18aef87fc7a7fc1fb1e344edfe14c1"
         }
       ]
     },
@@ -1202,6 +1418,24 @@
     },
     {
       "type": "library",
+      "bom-ref": "pkg:cargo/log@0.4.34",
+      "name": "log",
+      "version": "0.4.34",
+      "purl": "pkg:cargo/log@0.4.34",
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "f9f8bd3e56ce4dfc153cf470fffbfa98c7620958b312ca5c3a4b8d5181fd13c6"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "bom-ref": "pkg:cargo/memchr@2.8.3",
       "name": "memchr",
       "version": "2.8.3",
@@ -1215,6 +1449,42 @@
         {
           "alg": "SHA-256",
           "content": "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/miniz_oxide@0.9.1",
+      "name": "miniz_oxide",
+      "version": "0.9.1",
+      "purl": "pkg:cargo/miniz_oxide@0.9.1",
+      "licenses": [
+        {
+          "expression": "MIT OR Zlib OR Apache-2.0"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "b63fbc4a50860e98e7b2aa7804ded1db5cbc3aff9193adaff57a6931bf7c4b4c"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/multiversion_no_op@1.0.0",
+      "name": "multiversion_no_op",
+      "version": "1.0.0",
+      "purl": "pkg:cargo/multiversion_no_op@1.0.0",
+      "licenses": [
+        {
+          "expression": "Apache-2.0 OR MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "743fb55ba31b18fb1ecef6bdc9aa2743314978ac084044301a7eee33fb99a20d"
         }
       ]
     },
@@ -2110,6 +2380,42 @@
     },
     {
       "type": "library",
+      "bom-ref": "pkg:cargo/simd-adler32@0.3.10",
+      "name": "simd-adler32",
+      "version": "0.3.10",
+      "purl": "pkg:cargo/simd-adler32@0.3.10",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "3a219298ac11a56ea9a6d2120044824d6f01aeb034955e7af7bc16858527deea"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/simdutf8@0.1.5",
+      "name": "simdutf8",
+      "version": "0.1.5",
+      "purl": "pkg:cargo/simdutf8@0.1.5",
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "e3a9fe34e3e7a50316060351f37187a3f546bce95496156754b601a5fa71b76e"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "bom-ref": "pkg:cargo/smallvec@1.16.4",
       "name": "smallvec",
       "version": "1.16.4",
@@ -2560,6 +2866,24 @@
     },
     {
       "type": "library",
+      "bom-ref": "pkg:cargo/yaml-rust2@0.10.4",
+      "name": "yaml-rust2",
+      "version": "0.10.4",
+      "purl": "pkg:cargo/yaml-rust2@0.10.4",
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "2462ea039c445496d8793d052e13787f2b90e750b833afee748e601c17621ed9"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "bom-ref": "pkg:cargo/yoke-derive@0.8.4",
       "name": "yoke-derive",
       "version": "0.8.4",
@@ -2740,6 +3064,24 @@
     },
     {
       "type": "library",
+      "bom-ref": "pkg:cargo/zip@2.6.1",
+      "name": "zip",
+      "version": "2.6.1",
+      "purl": "pkg:cargo/zip@2.6.1",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "1dcb24d0152526ae49b9b96c1dcf71850ca1e0b882e4e28ed898a93c41334744"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "bom-ref": "pkg:cargo/zmij@1.0.23",
       "name": "zmij",
       "version": "1.0.23",
@@ -2755,9 +3097,31 @@
           "content": "29666d0abbfad1e3dc4dcf6144730dd3a3ab225bbbdac83319345b1b44ccfc1b"
         }
       ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:cargo/zopfli@0.8.4",
+      "name": "zopfli",
+      "version": "0.8.4",
+      "purl": "pkg:cargo/zopfli@0.8.4",
+      "licenses": [
+        {
+          "expression": "Apache-2.0"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "aaf7fc5d30c28483d93805c4a5e12b05bbb52407fa67c5f8bd552374cd01fb11"
+        }
+      ]
     }
   ],
   "dependencies": [
+    {
+      "ref": "pkg:cargo/adler2@2.0.1",
+      "dependsOn": []
+    },
     {
       "ref": "pkg:cargo/ahash@0.8.12",
       "dependsOn": [
@@ -2777,6 +3141,16 @@
     },
     {
       "ref": "pkg:cargo/allocator-api2@0.2.21",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:cargo/arbitrary@1.5.0",
+      "dependsOn": [
+        "pkg:cargo/derive_arbitrary@1.5.0"
+      ]
+    },
+    {
+      "ref": "pkg:cargo/arraydeque@0.5.1",
       "dependsOn": []
     },
     {
@@ -2839,10 +3213,24 @@
       "dependsOn": []
     },
     {
+      "ref": "pkg:cargo/core_detect@1.0.0",
+      "dependsOn": []
+    },
+    {
       "ref": "pkg:cargo/cpufeatures@0.2.17",
       "dependsOn": [
         "pkg:cargo/libc@0.2.186"
       ]
+    },
+    {
+      "ref": "pkg:cargo/crc32fast@1.5.3",
+      "dependsOn": [
+        "pkg:cargo/cfg-if@1.0.4"
+      ]
+    },
+    {
+      "ref": "pkg:cargo/crossbeam-utils@0.8.23",
+      "dependsOn": []
     },
     {
       "ref": "pkg:cargo/crypto-common@0.1.7",
@@ -2885,6 +3273,14 @@
       ]
     },
     {
+      "ref": "pkg:cargo/derive_arbitrary@1.5.0",
+      "dependsOn": [
+        "pkg:cargo/proc-macro2@1.0.107",
+        "pkg:cargo/quote@1.0.47",
+        "pkg:cargo/syn@3.0.9"
+      ]
+    },
+    {
       "ref": "pkg:cargo/digest@0.10.7",
       "dependsOn": [
         "pkg:cargo/block-buffer@0.10.4",
@@ -2924,6 +3320,17 @@
       ]
     },
     {
+      "ref": "pkg:cargo/encoding_rs@0.8.42",
+      "dependsOn": [
+        "pkg:cargo/cfg-if@1.0.4",
+        "pkg:cargo/core_detect@1.0.0",
+        "pkg:cargo/multiversion_no_op@1.0.0",
+        "pkg:cargo/rustversion@1.0.23",
+        "pkg:cargo/scopeguard@1.2.0",
+        "pkg:cargo/simdutf8@0.1.5"
+      ]
+    },
+    {
       "ref": "pkg:cargo/equivalent@1.0.3",
       "dependsOn": []
     },
@@ -2944,12 +3351,23 @@
       "dependsOn": []
     },
     {
+      "ref": "pkg:cargo/flate2@1.1.10",
+      "dependsOn": [
+        "pkg:cargo/crc32fast@1.5.3",
+        "pkg:cargo/miniz_oxide@0.9.1"
+      ]
+    },
+    {
       "ref": "pkg:cargo/fluent-uri@0.4.1",
       "dependsOn": [
         "pkg:cargo/borrow-or-share@0.2.4",
         "pkg:cargo/ref-cast@1.0.27",
         "pkg:cargo/serde@1.0.229"
       ]
+    },
+    {
+      "ref": "pkg:cargo/foldhash@0.1.5",
+      "dependsOn": []
     },
     {
       "ref": "pkg:cargo/foldhash@0.2.0",
@@ -2989,6 +3407,12 @@
       ]
     },
     {
+      "ref": "pkg:cargo/hashbrown@0.15.5",
+      "dependsOn": [
+        "pkg:cargo/foldhash@0.1.5"
+      ]
+    },
+    {
       "ref": "pkg:cargo/hashbrown@0.16.1",
       "dependsOn": [
         "pkg:cargo/allocator-api2@0.2.21",
@@ -2999,6 +3423,12 @@
     {
       "ref": "pkg:cargo/hashbrown@0.17.1",
       "dependsOn": []
+    },
+    {
+      "ref": "pkg:cargo/hashlink@0.10.0",
+      "dependsOn": [
+        "pkg:cargo/hashbrown@0.15.5"
+      ]
     },
     {
       "ref": "pkg:cargo/heck@0.5.0",
@@ -3142,7 +3572,8 @@
         "pkg:cargo/invarlock-native-core@0.1.0",
         "pkg:cargo/invarlock-native-filesystem@0.1.0",
         "pkg:cargo/serde_json@1.0.149",
-        "pkg:cargo/sha2@0.10.9"
+        "pkg:cargo/sha2@0.10.9",
+        "pkg:cargo/zip@2.6.1"
       ]
     },
     {
@@ -3166,11 +3597,14 @@
     {
       "ref": "pkg:cargo/invarlock-native-verifier@0.1.0",
       "dependsOn": [
+        "pkg:cargo/ed25519-dalek@2.2.0",
         "pkg:cargo/invarlock-native-contracts@0.1.0",
         "pkg:cargo/invarlock-native-core@0.1.0",
         "pkg:cargo/invarlock-native-evidence@0.1.0",
         "pkg:cargo/invarlock-native-filesystem@0.1.0",
-        "pkg:cargo/serde_json@1.0.149"
+        "pkg:cargo/regex@1.13.1",
+        "pkg:cargo/serde_json@1.0.149",
+        "pkg:cargo/yaml-rust2@0.10.4"
       ]
     },
     {
@@ -3233,7 +3667,22 @@
       ]
     },
     {
+      "ref": "pkg:cargo/log@0.4.34",
+      "dependsOn": []
+    },
+    {
       "ref": "pkg:cargo/memchr@2.8.3",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:cargo/miniz_oxide@0.9.1",
+      "dependsOn": [
+        "pkg:cargo/adler2@2.0.1",
+        "pkg:cargo/simd-adler32@0.3.10"
+      ]
+    },
+    {
+      "ref": "pkg:cargo/multiversion_no_op@1.0.0",
       "dependsOn": []
     },
     {
@@ -3547,6 +3996,14 @@
       ]
     },
     {
+      "ref": "pkg:cargo/simd-adler32@0.3.10",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:cargo/simdutf8@0.1.5",
+      "dependsOn": []
+    },
+    {
       "ref": "pkg:cargo/smallvec@1.16.4",
       "dependsOn": []
     },
@@ -3687,6 +4144,14 @@
       "dependsOn": []
     },
     {
+      "ref": "pkg:cargo/yaml-rust2@0.10.4",
+      "dependsOn": [
+        "pkg:cargo/arraydeque@0.5.1",
+        "pkg:cargo/encoding_rs@0.8.42",
+        "pkg:cargo/hashlink@0.10.0"
+      ]
+    },
+    {
       "ref": "pkg:cargo/yoke-derive@0.8.4",
       "dependsOn": [
         "pkg:cargo/proc-macro2@1.0.107",
@@ -3761,8 +4226,29 @@
       ]
     },
     {
+      "ref": "pkg:cargo/zip@2.6.1",
+      "dependsOn": [
+        "pkg:cargo/arbitrary@1.5.0",
+        "pkg:cargo/crc32fast@1.5.3",
+        "pkg:cargo/crossbeam-utils@0.8.23",
+        "pkg:cargo/flate2@1.1.10",
+        "pkg:cargo/indexmap@2.14.2",
+        "pkg:cargo/memchr@2.8.3",
+        "pkg:cargo/zopfli@0.8.4"
+      ]
+    },
+    {
       "ref": "pkg:cargo/zmij@1.0.23",
       "dependsOn": []
+    },
+    {
+      "ref": "pkg:cargo/zopfli@0.8.4",
+      "dependsOn": [
+        "pkg:cargo/bumpalo@3.20.3",
+        "pkg:cargo/crc32fast@1.5.3",
+        "pkg:cargo/log@0.4.34",
+        "pkg:cargo/simd-adler32@0.3.10"
+      ]
     }
   ]
 }

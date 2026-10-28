@@ -81,11 +81,14 @@ invarlock report evidence --html report.html --backend rust
 ```
 
 `evaluate --execution-backend rust` remains an alias for the same selection.
-Client handoff packages (`report --package`) currently require `--backend python`;
-requesting Rust returns an explicit error before creating a package.
+The Python CLI still requires `--backend python` for client handoff packages.
+The standalone executable now provides its own `report --package` workflow; see
+[standalone offline workflows](../experiments/rust/STANDALONE.md) for the implemented
+commands, parity boundaries and remaining migration work.
 
-Provider discovery, strict YAML decoding, external evaluator format adapters,
-SDK calls and model execution remain Python integrations. Rust owns the portable
+Provider discovery, external evaluator format adapters, SDK calls and model
+execution remain Python integrations. The standalone front door has its own
+bounded strict YAML decoder for captured requests. Rust owns the portable
 analysis/evidence path and the selected process, admission and checkpoint work.
 OCI worker images must contain the native extension when Rust is selected.
 The selection also scopes host provider hooks, GGUF inspection and worker-side
@@ -168,7 +171,7 @@ all internal copies and validation passes have been eliminated.
 The optimization candidate deduplicates compiled schema references, streams
 canonical comparisons and hashes, and releases captured file bytes as each
 payload is decoded. Deferred validation results preserve diagnostic order, and
-the source guard retains the final pinned inventory check. Immutable schema
+the source guard retains the final pinned inventory and content-digest checks. Immutable schema
 proofs and digests belong to the values they describe. Planned case-set digests
 stream sorted borrowed records; tests assert that the validated run schema
 implies every projected case-set constraint, with the encoded-size limit retained.

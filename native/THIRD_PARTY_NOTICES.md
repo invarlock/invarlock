@@ -51,3 +51,7 @@ value slot while preserving insertion order and public map behavior. The source
 provenance separates the unchanged upstream archive identity from the patch
 and patched source-tree identities. This dependency patch adds maintenance
 cost; resource effects require workload and deployment-platform qualification.
+
+## YAML scalar resolution
+
+The standalone request loader retains PyYAML 6.0.3 scalar resolver patterns to preserve the Python request contract. These patterns are covered by the MIT notice in `licenses/PyYAML-LICENSE.txt`. YAML syntax parsing uses the separately inventoried yaml-rust2 crate.
