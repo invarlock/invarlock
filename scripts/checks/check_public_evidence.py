@@ -22,6 +22,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from invarlock.ed25519 import verify_ed25519_signature  # noqa: E402
 from invarlock.evidence_pack_integrity import (  # noqa: E402
     public_key_fingerprint,
 )
@@ -336,7 +337,9 @@ def _check_signed_receipt(
         if not isinstance(encoded_signature, str):
             raise ValueError("signature value is not text")
         signature_bytes = base64.b64decode(encoded_signature, validate=True)
-        public_key.verify(signature_bytes, _canonical_json_bytes(statement))
+        verify_ed25519_signature(
+            public_key, signature_bytes, _canonical_json_bytes(statement)
+        )
     except (
         InvalidSignature,
         TypeError,

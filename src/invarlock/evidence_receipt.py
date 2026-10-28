@@ -15,6 +15,7 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
+from invarlock.ed25519 import verify_ed25519_signature
 from invarlock.evidence_pack_integrity import (
     normalize_expected_fingerprint,
     public_key_fingerprint,
@@ -731,7 +732,9 @@ def verify_signed_verification_receipt(
             if not isinstance(encoded_signature, str):
                 raise ValueError("signature value is not text")
             signature_bytes = base64.b64decode(encoded_signature, validate=True)
-            public_key.verify(signature_bytes, _canonical_json_bytes(statement))
+            verify_ed25519_signature(
+                public_key, signature_bytes, _canonical_json_bytes(statement)
+            )
         except (InvalidSignature, TypeError, ValueError):
             errors.append("signed receipt signature verification failed")
 
