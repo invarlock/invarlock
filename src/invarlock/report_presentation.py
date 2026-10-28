@@ -276,6 +276,7 @@ class AuthoredReview:
     decision: str
     basis: tuple[tuple[str, str], ...]
     next_action: str
+    summary: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -296,6 +297,7 @@ class ReportView:
     changes: tuple[str, ...] = ()
     review: AuthoredReview | None = None
     handoff_links: tuple[tuple[str, str], ...] = ()
+    decision_scope: str = ""
 
 
 def _handoff_links(view: ReportView, *, markdown: bool = False) -> str:
@@ -335,6 +337,19 @@ def decision_label(value: str) -> str:
         "regression": "Policy not met",
         "insufficient_evidence": "More evidence needed",
     }.get(value, "Decision unavailable")
+
+
+def decision_reading(value: str) -> str:
+    """Explain the recorded status without inferring improvement or approval."""
+    return {
+        "pass": "The comparison passed its recorded checks. This alone does not establish an improvement or suitability for release.",
+        "fail": "The comparison did not meet its recorded requirements. The detailed checks explain whether scores, uncertainty or missing results prevented a pass.",
+        "regression": "The comparison did not meet its recorded requirements. The detailed checks explain whether scores, uncertainty or missing results prevented a pass.",
+        "insufficient_evidence": "The available evidence is insufficient to meet the recorded requirements. More evidence is needed before drawing a conclusion.",
+    }.get(
+        value,
+        "The recorded outcome is unavailable. Establish it before drawing a conclusion.",
+    )
 
 
 def number(value: float, *, signed: bool = False) -> str:
@@ -987,6 +1002,16 @@ def _review_context_html(view: ReportView) -> str:
                 f"<p><strong>{escape(label)}.</strong> {escape(value)}</p>"
                 for label, value in review.context
             )
+            + (
+                '<div class="reader-summary"><h3>In plain language</h3><p class="scope">Summary by the review author.</p>'
+                + "".join(
+                    f"<p><strong>{escape(label)}.</strong> {escape(value)}</p>"
+                    for label, value in review.summary
+                )
+                + "</div>"
+                if review.summary
+                else ""
+            )
             + "</section>"
             + f'<p class="change-summary"><strong>Change context.</strong> {escape(_change_summary(view))}</p>'
         )
@@ -1049,7 +1074,7 @@ def render_html(view: ReportView) -> str:
         f'<div class="report-heading"><p class="eyebrow">Comparison / Review / Evidence</p><h1>{"Client review package" if view.review else "Model change review"}</h1><p>{e(view.title)}</p></div>',
         f'<p class="interpretation-note">{_interpretation_note(view)}</p>',
         _review_context_html(view),
-        f'<section class="hero {_tone(view.decision)}" aria-labelledby="decision"><div class="verdict"><p class="eyebrow">Recorded policy result</p><h2 id="decision">{e(decision_label(view.decision))}</h2><p class="decision-summary">{_summary_html(view)}</p>',
+        f'<section class="hero {_tone(view.decision)}" aria-labelledby="decision"><div class="verdict"><p class="eyebrow">Recorded policy result</p><h2 id="decision">{e(decision_label(view.decision))}</h2><p class="result-reading">{e(decision_reading(view.decision))}</p><p class="decision-summary">{_summary_html(view)}</p>',
     ]
     if multiple_results:
         parts.append(
@@ -1268,6 +1293,21 @@ def render_markdown(view: ReportView, *, include_details: bool = False) -> str:
                 clean(view.review.byline),
                 "",
                 *(f"- **{clean(k)}:** {clean(v)}" for k, v in view.review.context),
+                *(
+                    [
+                        "",
+                        "### In plain language",
+                        "",
+                        "Summary by the review author.",
+                        "",
+                        *(
+                            f"- **{clean(k)}:** {clean(v)}"
+                            for k, v in view.review.summary
+                        ),
+                    ]
+                    if view.review.summary
+                    else []
+                ),
             ]
             if view.review
             else [f"- {item}" for item in _DECISION_CONTEXT]
@@ -1276,6 +1316,8 @@ def render_markdown(view: ReportView, *, include_details: bool = False) -> str:
         f"**Change context:** {clean(_change_summary(view))}",
         "",
         f"**Recorded policy result: {decision_label(view.decision)}**",
+        "",
+        decision_reading(view.decision),
         "",
         clean(view.summary),
         "",

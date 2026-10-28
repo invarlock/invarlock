@@ -2,41 +2,137 @@
   "likelihood-adverse": {
     "reference": "examples/captured-results/references/mistral-7b-likelihood",
     "label": "Fictional worked example · Authored scenario; retained measurements are real",
-    "byline": "Maya Chen, model quality lead and decision owner · Rowan Editorial (fictional) · 24 October 2026",
+    "byline": "Maya Chen, model quality lead and decision owner · Rowan Editorial (fictional)",
     "context": [
-      ["Intended use", "Offline prose-completion assistance for editorial staff, with a person reviewing every suggestion."],
-      ["Change under review", "Replace Mistral-7B-v0.1 with Mistral-7B-Instruct-v0.1 while retaining the plain-text completion interface."],
-      ["Business purpose", "Assess whether the instruction-tuned checkpoint can be considered for the existing completion workflow without exceeding its reference-text likelihood allowance."]
+      [
+        "Intended use",
+        "Offline prose-completion assistance for editorial staff, with a person reviewing every suggestion."
+      ],
+      [
+        "Change under review",
+        "Replace Mistral-7B-v0.1 with Mistral-7B-Instruct-v0.1 while retaining the plain-text completion interface."
+      ],
+      [
+        "Business purpose",
+        "Check whether the proposed model can replace the current model for plain-text completion within the agreed tolerance."
+      ]
     ],
-    "recommendation": "Retain the baseline for this workflow. The recorded NLL ratio is 1.091, with a 95% interval of 1.085–1.098, above the 1.05 limit. Supporting record: evidence/reports/evaluation.report.json#/metrics/0.",
-    "decision": "Replacement declined. Keep the current checkpoint; approve a separate instruction-following evaluation before considering a different use.",
+    "recommendation": "Keep the current model for this completion workload.",
+    "decision": "Replacement declined. Keep the current model; assess instruction-following separately before considering another use.",
     "basis": [
-      ["Why 400 cases", "Documented provenance: the study reused the existing 400-passage LAMBADA subset; all passages qualified for the derived continuation task. Fictional review rationale: reuse that entire fixed set for a bounded migration check with a stable comparison basis. The count is a scope choice, not a power calculation or a claim that it represents editorial traffic. Source: source-reference.md, Data and measurement."],
-      ["Why these requirements", "For this fictional review, the owner chooses the retained 5% NLL allowance as a tolerance for a preliminary migration screen, requires all 400 pairs to keep coverage fixed, and uses the 0.10 ratio-interval width limit to flag imprecise comparisons. These are illustrative review choices; the actual policy was frozen before measurement, and this business rationale is authored afterward. Recorded requirements: evidence/inputs/policy.json#/metrics/0."],
-      ["Recipient result", "The retained recipient receipt records intact evidence, completed replay and a failed comparison policy. It confirms the rejection was reproduced. Receipt: verification.receipt.json#/statement/verdict and #/statement/replay_status."],
-      ["Decision scope", "The completed fictional decision applies to this checkpoint replacement for plain-text completion. It leaves instruction-following quality, production representativeness, latency, cost and safety to a separate assessment. This review makes no new numerical claims about those properties."],
-      ["Authorship", "Rowan Editorial, Maya Chen and the business decision are invented for this worked example. Measurements, policy values, model identities and the retained recipient outcome are copied from the cited reference."]
+      [
+        "Why 400 cases",
+        "Documented provenance: the study reused the existing 400-passage LAMBADA subset; all passages qualified for the derived continuation task. Fictional review rationale: reuse that entire fixed set for a bounded migration check with a stable comparison basis. The count is a scope choice, not a power calculation or a claim that it represents editorial traffic. Source: source-reference.md, Data and measurement."
+      ],
+      [
+        "Why these requirements",
+        "For this fictional review, the owner chooses the retained 5% NLL allowance as a tolerance for a preliminary migration screen, requires all 400 pairs to keep coverage fixed, and uses the 0.10 ratio-interval width limit to flag imprecise comparisons. These are illustrative review choices; the actual policy was frozen before measurement, and this business rationale is authored afterward. Recorded requirements: evidence/inputs/policy.json#/metrics/0."
+      ],
+      [
+        "Recipient result",
+        "The retained recipient receipt records intact evidence, completed replay and a failed comparison policy. It confirms the rejection was reproduced. Receipt: verification.receipt.json#/statement/verdict and #/statement/replay_status."
+      ],
+      [
+        "Decision scope",
+        "The completed fictional decision applies to this checkpoint replacement for plain-text completion. It leaves instruction-following quality, production representativeness, latency, cost and safety to a separate assessment. This review makes no new numerical claims about those properties."
+      ],
+      [
+        "Authorship",
+        "Rowan Editorial, Maya Chen and the business decision are invented for this worked example. Measurements, policy values, model identities and the retained recipient outcome are copied from the cited reference."
+      ]
     ],
-    "next_action": "Maya Chen will keep the baseline in the editorial configuration and deliver a separate instruction-following evaluation plan by 30 October 2026. The next review will decide whether that different workload merits a candidate trial."
+    "next_action": "Maya Chen will keep the baseline in use and deliver an instruction-following evaluation plan by 30 October 2026.",
+    "summary": [
+      [
+        "What was tested",
+        "Both model versions were evaluated on the same 400 retained text passages, measuring how well they predicted the reference continuation."
+      ],
+      [
+        "What happened",
+        "The candidate's text-prediction loss (NLL, where lower is better) was about 9.1% higher. The recorded allowance was 5%. The comparison failed that requirement."
+      ],
+      [
+        "What this means",
+        "The proposed replacement did not meet this completion workflow's requirements. This does not measure how well the candidate follows instructions or answers questions."
+      ],
+      [
+        "What remains unknown",
+        "These fixed passages do not establish performance on editorial traffic. Production quality, latency, cost and safety remain unassessed by this comparison."
+      ]
+    ]
   },
   "hosted-pass": {
     "reference": "examples/hosted-service/references/mistral-7b-http",
     "label": "Fictional worked example · Authored scenario; retained measurements are real",
-    "byline": "Eli Morgan, evaluation engineering lead and decision owner · Rowan Editorial (fictional) · 24 October 2026",
+    "byline": "Eli Morgan, evaluation lead and decision owner · Rowan Editorial (fictional)",
     "context": [
-      ["Intended use", "An internal engineering rehearsal of HTTP capture, paired comparison and recipient handover before selecting a service for an editorial application."],
-      ["Change under review", "Switch the local HTTP service from Mistral-7B-v0.1 to Mistral-7B-Instruct-v0.1 under the same requested alias and decoding settings."],
-      ["Business purpose", "Exercise a complete evidence handover using two real checkpoints, so the team can review both a passing comparison and its task-quality limits."]
+      [
+        "Intended use",
+        "An internal engineering rehearsal: collect results from two model services, compare them, and hand over the evidence for review."
+      ],
+      [
+        "Change under review",
+        "Replace the baseline Mistral-7B model with its instruction-tuned version in the local service, keeping the same request settings."
+      ],
+      [
+        "Business purpose",
+        "Exercise a complete evidence handover using two real checkpoints, so the team can review both a passing comparison and its task-quality limits."
+      ]
     ],
-    "recommendation": "Accept this run as the capture-and-handover rehearsal; exclude both services from application release on this evidence. The comparative policy passes, but literal exact-match scores are only 20/400 and 24/400. Supporting record: evidence/reports/evaluation.report.json#/metrics/0.",
+    "recommendation": "Assess application quality before considering a release.",
     "decision": "Engineering rehearsal accepted. Application release declined; retain the current application configuration and commission a workload-specific quality evaluation.",
     "basis": [
-      ["Why 400 cases", "Documented provenance: the campaign reused the existing 400 public LAMBADA passages and case IDs, making 400 requests to each deployment. Fictional review rationale: exercise a full fixed-set handover with an explicit bound of 800 completed requests. This is a practical demonstration budget, not proof of production coverage or statistical power. Source: source-reference.md, Data and execution."],
-      ["Why these requirements", "For the fictional rehearsal, the owner adopts the retained 2 percentage-point regression allowance, all 400 pairs and a 10 percentage-point interval-width limit to demonstrate three distinct comparison checks. The policy has no absolute quality floor because this scenario approves an engineering rehearsal, not an application release. The real policy predates measurement; this business explanation is illustrative. Recorded requirements: evidence/inputs/policy.json#/metrics/0."],
-      ["Recipient result", "The retained recipient receipt records completed replay and a passing comparison policy. This is separate from the fictional owner's restricted engineering approval. Receipt: verification.receipt.json#/statement/verdict and #/statement/replay_status."],
-      ["Decision scope", "The observed gain is 1 percentage point with a paired 95% interval of approximately −1.444 to 3.526 points. The owner makes no claim of a demonstrated quality improvement. The service's literal first-field scoring is not standard LAMBADA accuracy; low absolute scores and the inherited subset selection limit application conclusions."],
-      ["Authorship", "Rowan Editorial, Eli Morgan and the business decision are invented for this worked example. Measurements, policy values, service identities and the retained recipient outcome are copied from the cited reference."]
+      [
+        "Why 400 cases",
+        "Documented provenance: the campaign reused the existing 400 public LAMBADA passages and case IDs, making 400 requests to each deployment. Fictional review rationale: exercise a full fixed-set handover with an explicit bound of 800 completed requests. This is a practical demonstration budget, not proof of production coverage or statistical power. Source: source-reference.md, Data and execution."
+      ],
+      [
+        "Why these requirements",
+        "For the fictional rehearsal, the owner adopts the retained 2 percentage-point regression allowance, all 400 pairs and a 10 percentage-point interval-width limit to demonstrate three distinct comparison checks. The policy has no absolute quality floor because this scenario approves an engineering rehearsal, not an application release. The real policy predates measurement; this business explanation is illustrative. Recorded requirements: evidence/inputs/policy.json#/metrics/0."
+      ],
+      [
+        "Recipient result",
+        "The retained recipient receipt records completed replay and a passing comparison policy. This is separate from the fictional owner's restricted engineering approval. Receipt: verification.receipt.json#/statement/verdict and #/statement/replay_status."
+      ],
+      [
+        "Decision scope",
+        "The observed gain is 1 percentage point with a paired 95% interval of approximately −1.444 to 3.526 points. The owner makes no claim of a demonstrated quality improvement. The service's literal first-field scoring is not standard LAMBADA accuracy; low absolute scores and the inherited subset selection limit application conclusions."
+      ],
+      [
+        "Authorship",
+        "Rowan Editorial, Eli Morgan and the business decision are invented for this worked example. Measurements, policy values, service identities and the retained recipient outcome are copied from the cited reference."
+      ],
+      [
+        "How examples were selected",
+        "The following illustrations are the first candidate-only match and the first baseline-only match in retained record order. They explain the scoring rule; they do not establish how frequent either behavior is. All 400 cases determine the aggregate result."
+      ],
+      [
+        "Example: punctuation changed the score",
+        "Case lambada-openai-0379 expected “ultrasound”. The baseline's scored output was “ultrasound.” and failed the literal match; the candidate's was “ultrasound” and passed. This illustrates a formatting difference, not a demonstrated gain in understanding. Sources: evidence/records/baseline.json#/records/34 and evidence/records/subject.json#/records/34."
+      ],
+      [
+        "Example: the candidate lost a match",
+        "Case lambada-openai-0671 expected “Hank”. The baseline's scored output was “Hank” and passed; the candidate's was “a” and failed. Sources: evidence/records/baseline.json#/records/56 and evidence/records/subject.json#/records/56."
+      ]
     ],
-    "next_action": "Eli Morgan will archive the accepted rehearsal package and prepare a task-specific evaluation with a business-justified absolute quality floor by 30 October 2026. Application release remains declined until a separate review approves it."
+    "next_action": "Eli Morgan will archive the rehearsal and propose an application-specific test with a minimum acceptable accuracy by 30 October 2026.",
+    "summary": [
+      [
+        "What was tested",
+        "The two services answered the same 400 test cases. The check compared the first returned word with the exact expected word, including punctuation and capitalization."
+      ],
+      [
+        "What happened",
+        "The candidate matched 24 of 400 expected words (6%); the baseline matched 20 (5%). The comparison passed its recorded requirements, which did not set a minimum acceptable accuracy."
+      ],
+      [
+        "What this means",
+        "The recorded uncertainty does not establish an improvement. Low match rates under this scoring rule support the example owner's decision to decline application release."
+      ],
+      [
+        "What remains unknown",
+        "This rehearsal does not establish quality on the intended application, production service behavior, latency, cost or safety. A workload-specific evaluation is still needed."
+      ]
+    ]
   }
 }

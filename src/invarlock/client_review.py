@@ -55,7 +55,7 @@ def load_review_context(path: Path) -> tuple[dict[str, Any], bytes]:
     raw = read_file(path, CONTEXT_LIMIT)
     value = parse_json_bytes(raw, label="review context")
     required = {"format", "title", "review_date", "byline", "context", "next_action"}
-    optional = {"label", "recommendation", "decision", "basis"}
+    optional = {"label", "recommendation", "decision", "basis", "summary"}
     if (
         not isinstance(value, dict)
         or not required <= value.keys()
@@ -64,7 +64,7 @@ def load_review_context(path: Path) -> tuple[dict[str, Any], bytes]:
         raise ClientReviewError("review context has missing or unsupported fields")
     if value["format"] != CONTEXT_FORMAT:
         raise ClientReviewError("unsupported review context format")
-    for key in (required | optional) - {"context", "basis"}:
+    for key in (required | optional) - {"context", "basis", "summary"}:
         if key not in value:
             continue
         field = value[key]
@@ -77,11 +77,13 @@ def load_review_context(path: Path) -> tuple[dict[str, Any], bytes]:
             raise ClientReviewError(
                 f"review context {key} must be nonempty text of at most 4000 characters"
             )
-    for key in ("context", "basis"):
+    for key in ("context", "basis", "summary"):
         rows = value.get(key, [])
-        if not isinstance(rows, list) or len(rows) > 32:
+        row_limit = 4 if key == "summary" else 32
+        text_limit = 600 if key == "summary" else 4000
+        if not isinstance(rows, list) or len(rows) > row_limit:
             raise ClientReviewError(
-                f"review context {key} must contain at most 32 labeled rows"
+                f"review context {key} must contain at most {row_limit} labeled rows"
             )
         for row in rows:
             if (
@@ -90,13 +92,13 @@ def load_review_context(path: Path) -> tuple[dict[str, Any], bytes]:
                 or any(
                     not isinstance(x, str)
                     or not x.strip()
-                    or len(x) > 4000
+                    or len(x) > text_limit
                     or any(ord(c) < 32 and c not in "\n\t" for c in x)
                     for x in row
                 )
             ):
                 raise ClientReviewError(
-                    f"review context {key} rows require two nonempty strings"
+                    f"review context {key} rows require two nonempty strings of at most {text_limit} characters"
                 )
     if not value["context"]:
         raise ClientReviewError(
@@ -259,6 +261,7 @@ def build_client_review(
                     decision=context.get("decision", "Pending owner decision"),
                     basis=tuple(tuple(row) for row in context.get("basis", [])),
                     next_action=context["next_action"],
+                    summary=tuple(tuple(row) for row in context.get("summary", [])),
                 )
                 review = replace(
                     technical,

@@ -818,6 +818,11 @@ def _view(
         if required
         else "Advisory judge measurement evidence",
         decision=analysis["decision"],
+        decision_scope=(
+            "Required judge comparison. A pass covers only the recorded judge requirements."
+            if required
+            else "Advisory judge result. It cannot satisfy a required release check."
+        ),
         summary=explanation
         + (
             f" Across {counts['complete_units']:,} complete independent units, the subject's mean rubric score was {number(float(subject['mean']))}, "

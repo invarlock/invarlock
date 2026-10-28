@@ -48,9 +48,9 @@ def build(output: Path) -> dict[str, dict[str, str]]:
                 format=CLIENT_REVIEW_CONTEXT_FORMAT,
                 review_date="2026-10-24",
                 title=(
-                    "Editorial checkpoint replacement"
+                    "Editorial model replacement"
                     if name == "likelihood-adverse"
-                    else "HTTP capture and handover rehearsal"
+                    else "Model service handover rehearsal"
                 ),
             )
             context_path = temporary / "context.json"

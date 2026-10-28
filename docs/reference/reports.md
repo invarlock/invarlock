@@ -44,6 +44,16 @@ separate stakeholder reports from full evaluation data. InvarLock applies these
 patterns to a specific baseline-to-subject change, with recorded requirements,
 supporting file locations and separate recipient verification.
 
+For non-specialist readers, client briefs also draw on
+[Anthropic's summary-to-system-card structure](https://www.anthropic.com/transparency),
+[Braintrust's behavioral explanations of comparison results](https://www.braintrust.dev/foundations/how-to-analyze-your-eval-results),
+and [Promptfoo's findings-to-actions structure](https://www.promptfoo.dev/docs/enterprise/remediation-reports/).
+An optional attributed summary explains the tested task, observed result, practical
+meaning and unknowns. The owner decision and next action appear first. Exact
+measurements and methods remain available in the full review and technical appendix.
+These presentation choices do not establish comprehension; that requires testing
+with the intended readers.
+
 ## Reading a report for a release review
 
 The evidence-only report starts with **Decision context**, including the compared

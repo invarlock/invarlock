@@ -24,5 +24,23 @@
       "Explain why these requirements address the intended use; distinguish assumptions from measured facts."
     ]
   ],
-  "next_action": "Assign the independent verification and release decision to named owners with a due date."
+  "next_action": "Assign the independent verification and release decision to named owners with a due date.",
+  "summary": [
+    [
+      "What was tested",
+      "Describe the task, number of cases and what the score measures in everyday language."
+    ],
+    [
+      "What happened",
+      "State the observed baseline and candidate results, the applicable requirement, and whether it was met."
+    ],
+    [
+      "What this means",
+      "Explain the result for the intended use. Distinguish observed differences, uncertainty and the owner's decision."
+    ],
+    [
+      "What remains unknown",
+      "Name the important untested uses and limitations. Do not assume the test cases represent production."
+    ]
+  ]
 }

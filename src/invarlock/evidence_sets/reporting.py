@@ -197,6 +197,11 @@ def build_evidence_set_view(
         title="InvarLock combined comparison report",
         family="Deterministic and bounded judge evidence",
         decision=decision,
+        decision_scope=(
+            f"Direct-score comparison: {decision_label(first.decision)}. "
+            f"Judge comparison: {decision_label(second.decision)}. "
+            "Both comparisons must meet their own requirements for the combined result to pass."
+        ),
         summary=(
             f"Deterministic comparison: {decision_label(first.decision).lower()}. "
             f"Judge comparison: {decision_label(second.decision).lower()}. "

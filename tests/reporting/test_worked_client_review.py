@@ -46,6 +46,12 @@ def test_worked_examples_keep_original_evidence_and_populate_the_review(tmp_path
             assert "Organizational approval: Not recorded by this report" not in review
             assert scenario["next_action"] in review
             assert "evidence/reports/evaluation.report.json#/metrics/0" in review
+            from html import unescape
+
+            brief = (destination / f"brief.{suffix}").read_text()
+            for _, value in scenario["summary"]:
+                assert value in unescape(review)
+                assert value in unescape(brief)
         assert (
             "Decision owner and recommendation: Not supplied"
             in (destination / "technical-report.html").read_text()
@@ -60,6 +66,34 @@ def test_worked_examples_keep_original_evidence_and_populate_the_review(tmp_path
                 node = node[int(key)] if isinstance(node, list) else node[key]
     with pytest.raises(FileExistsError):
         build(output)
+
+
+def test_worked_case_illustrations_match_retained_outputs_and_selection_rule():
+    scenario = json.loads((EXAMPLE / "scenarios.json").read_text())["hosted-pass"]
+    root = ROOT / scenario["reference"] / "evidence/records"
+    baseline = json.loads((root / "baseline.json").read_text())["records"]
+    candidate = json.loads((root / "subject.json").read_text())["records"]
+    assert [row["id"] for row in baseline] == [row["id"] for row in candidate]
+    pairs = [
+        (b["output"] == b["expected"], c["output"] == c["expected"])
+        for b, c in zip(baseline, candidate, strict=True)
+    ]
+    assert len(pairs) == 400
+    assert sum(b for b, _ in pairs) == 20
+    assert sum(c for _, c in pairs) == 24
+    for index, expected, old, new, outcome in (
+        (34, "ultrasound", "ultrasound.", "ultrasound", (False, True)),
+        (56, "Hank", "Hank", "a", (True, False)),
+    ):
+        assert pairs.index(outcome) == index
+        assert baseline[index]["expected"] == candidate[index]["expected"] == expected
+        assert baseline[index]["output"] == old and candidate[index]["output"] == new
+        illustration = next(
+            value for _, value in scenario["basis"] if f"#/records/{index}" in value
+        )
+        assert baseline[index]["id"] in illustration
+        for word in (expected, old, new):
+            assert f"“{word}”" in illustration
 
 
 @pytest.mark.manual
@@ -111,7 +145,10 @@ def test_worked_review_context_survives_actual_print(tmp_path, name, paper):
         scenario[key]
         for key in ("label", "byline", "recommendation", "decision", "next_action")
     ]
-    values.extend(value for _, value in scenario["context"] + scenario["basis"])
+    values.extend(
+        value
+        for _, value in scenario["context"] + scenario["basis"] + scenario["summary"]
+    )
     for value in values:
         assert compact(value) in body, value
     assert "Decisionownerandrecommendation:Notsupplied".casefold() not in body
@@ -131,6 +168,8 @@ def test_worked_review_context_survives_actual_print(tmp_path, name, paper):
     brief_pages = json.loads(brief_result.stdout)
     assert len(brief_pages) == 1
     brief_text = compact(brief_pages[0])
+    for _, value in scenario["summary"]:
+        assert compact(value) in brief_text
     for value in (
         scenario["decision"],
         scenario["next_action"],

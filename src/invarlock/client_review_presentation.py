@@ -4,13 +4,18 @@ from __future__ import annotations
 
 import re
 
-from invarlock.report_presentation import ReportView, decision_label, escape
+from invarlock.report_presentation import (
+    ReportView,
+    decision_label,
+    decision_reading,
+    escape,
+)
 
 _STYLE = """
 :root{color-scheme:light}*{box-sizing:border-box}body{margin:0;background:#f1f3ed;color:#20251f;font:16px/1.5 system-ui,sans-serif}main{max-width:960px;margin:24px auto;padding:32px;background:white;border-top:4px solid #20251f}h1{font-size:30px;line-height:1.15;margin:8px 0 16px}h2{font-size:18px;margin:18px 0 8px}p{margin:8px 0}.brand,.scope,footer{font-size:12px;color:#586054}.brand{font-weight:700}a{color:#145d7b}a:focus-visible{outline:3px solid #145d7b;outline-offset:3px}nav{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:13px;margin:14px 0}.decision{border-left:4px solid #586054;padding:8px 14px;background:#f3f5f0}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}table{border-collapse:collapse;width:100%;font-size:13px;table-layout:fixed}th,td{text-align:left;vertical-align:top;border-bottom:1px solid #d9dfd3;padding:7px;overflow-wrap:anywhere}pre{padding:14px;background:#f3f5f0;white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px}p,li,code{overflow-wrap:anywhere}.identity{font:11px/1.4 ui-monospace,monospace;overflow-wrap:anywhere}footer{margin-top:20px;border-top:1px solid #d9dfd3;padding-top:10px}.context{font-size:14px}.scope{font-size:12px}.scroll{overflow-x:auto}
 @media(max-width:600px){main{padding:18px;margin:0}.grid{display:block}h1{font-size:25px}table{font-size:12px}th,td{padding:5px}}
 @page{margin:14mm;@bottom-right{content:"Page " counter(page) " of " counter(pages);font:8pt sans-serif}}
-@media print{body{background:white;font-size:9pt;line-height:1.35}main{padding:0;margin:0;max-width:none;border:0}h1{font-size:20pt;margin-bottom:8px}h2{font-size:11pt;margin-top:12px}.context{font-size:9pt}.scope,.brand,footer{font-size:8pt}nav{font-size:8pt}table{font-size:8pt}th,td{padding:5px}.decision{padding:7px 10px}h1,h2,thead{break-after:avoid}tr,.decision{break-inside:avoid}a{color:inherit}.identity{font-size:7pt}.scroll{overflow:visible}}
+@media print{body{background:white;font-size:9pt;line-height:1.35}p{margin:5px 0}main{padding:0;margin:0;max-width:none;border:0}h1{font-size:20pt;margin-bottom:8px}h2{font-size:11pt;margin-top:9px;margin-bottom:5px}.context{font-size:9pt}.scope,.brand,footer{font-size:8pt}nav{font-size:8pt;margin:8px 0}table{font-size:8pt}th,td{padding:5px}.decision{padding:7px 10px}h1,h2,thead{break-after:avoid}tr,.decision{break-inside:avoid}a{color:inherit}.identity{font-size:7pt}footer{margin-top:10px;padding-top:6px}.scroll{overflow:visible}}
 """
 
 
@@ -46,7 +51,7 @@ def brief(view: ReportView, *, digest: str, receipt: bool, html: bool) -> str:
         " ".join(view.limitations[:2])
         or "No limitations were supplied. Confirm workload coverage before deciding."
     )
-    intro = "Authored commentary is separate from signed evidence. A policy result is not organizational approval."
+    intro = "The review author supplies the decision and interpretation. The recorded test result is separate from release approval."
     if not html:
 
         def clean(value: str) -> str:
@@ -70,15 +75,42 @@ def brief(view: ReportView, *, digest: str, receipt: bool, html: bool) -> str:
             "",
             f"**Recorded policy result:** {clean(decision_label(view.decision))}",
             "",
-            clean(view.summary),
+            decision_reading(view.decision),
             "",
+            *([clean(view.decision_scope), ""] if view.decision_scope else []),
             f"**Recommendation:** {clean(_excerpt(review.recommendation))}",
+            "",
+            f"**Next action:** {clean(_excerpt(review.next_action))}",
             "",
             "## Intended use and review context",
             "",
         ]
         lines += [f"- **{clean(k)}:** {clean(_excerpt(v))}" for k, v in context]
+        if review.summary:
+            lines += [
+                "",
+                "## In plain language",
+                "",
+                "Summary by the review author.",
+                "",
+            ]
+            lines += [f"- **{clean(k)}:** {clean(v)}" for k, v in review.summary]
+        else:
+            lines += [
+                "",
+                "## Recorded measurement summary",
+                "",
+                clean(view.summary),
+                "",
+            ]
+            lines += [
+                "An application-specific interpretation was not supplied. Ask the review owner how these results apply to the intended use."
+            ]
         lines += ["", "## Results at a glance", "", more, ""]
+        lines += [
+            "Baseline is the reference version; candidate is the version being assessed. Each result applies only to its named measure and test group.",
+            "",
+        ]
         lines += [
             f"- {clean(m.display_name)} / {clean(m.display_scope)}: baseline {clean(m.baseline)}; candidate {clean(m.candidate)}; change {clean(m.change)}; {clean(decision_label(m.decision))}."
             for m in metrics
@@ -96,10 +128,6 @@ def brief(view: ReportView, *, digest: str, receipt: bool, html: bool) -> str:
             "Not performed for this recipient. Follow the verification guide with separately approved inputs.",
             "",
             receipt_note,
-            "",
-            "## Next action",
-            "",
-            clean(_excerpt(review.next_action)),
             "",
             f"Evidence statement: {digest}",
             "",
@@ -120,19 +148,30 @@ def brief(view: ReportView, *, digest: str, receipt: bool, html: bool) -> str:
         f'<p class="scope">{e(review.label)} · {e(review.byline)}</p><p class="scope">{intro}</p>'
         f'<nav aria-label="Review package">{navigation}</nav>'
         f'<section class="decision"><p><strong>Owner decision.</strong> {e(_excerpt(review.decision, 600))}</p>'
-        f"<p><strong>Recorded policy result.</strong> {e(decision_label(view.decision))}</p><p>{e(view.summary)}</p>"
-        f"<p><strong>Recommendation.</strong> {e(_excerpt(review.recommendation))}</p></section>"
+        f"<p><strong>Recorded policy result.</strong> {e(decision_label(view.decision))}</p><p>{e(decision_reading(view.decision))}</p>"
+        + (f"<p>{e(view.decision_scope)}</p>" if view.decision_scope else "")
+        + f"<p><strong>Recommendation.</strong> {e(_excerpt(review.recommendation))}</p>"
+        f"<p><strong>Next action.</strong> {e(_excerpt(review.next_action))}</p></section>"
         "<section><h2>Intended use and review context</h2>"
         + "".join(
             f'<p class="context"><strong>{e(k)}.</strong> {e(_excerpt(v))}</p>'
             for k, v in context
         )
         + '<p class="scope">Full context and attributed rationale: <a href="review.html">full review</a>.</p></section>'
-        f'<section><h2>Results at a glance</h2><p class="scope">{more}</p><div class="scroll"><table><thead><tr><th scope="col">Metric / scope</th><th scope="col">Baseline</th><th scope="col">Candidate</th><th scope="col">Change</th><th scope="col">Recorded result</th></tr></thead><tbody>{rows}</tbody></table></div></section>'
+        + (
+            '<section class="reader-summary"><h2>In plain language</h2><p class="scope">Summary by the review author.</p>'
+            + "".join(
+                f"<p><strong>{e(k)}.</strong> {e(v)}</p>" for k, v in review.summary
+            )
+            + "</section>"
+            if review.summary
+            else f"<section><h2>Recorded measurement summary</h2><p>{e(view.summary)}</p><p>An application-specific interpretation was not supplied. Ask the review owner how these results apply to the intended use.</p></section>"
+        )
+        + f'<section><h2>Results at a glance</h2><p class="scope">{more}</p><p class="scope">Baseline is the reference version; candidate is the version being assessed. Each result applies only to its named measure and test group.</p><div class="scroll"><table><thead><tr><th scope="col">Metric / scope</th><th scope="col">Baseline</th><th scope="col">Candidate</th><th scope="col">Change</th><th scope="col">Recorded result</th></tr></thead><tbody>{rows}</tbody></table></div></section>'
         '<div class="grid"><section><h2>Decision limits</h2>'
-        f'<p>{e(_excerpt(limits, 600))}</p><p class="scope">Full recorded limitations and authored rationale remain in the review and appendix.</p></section>'
+        + f"<p>{e(_excerpt(limits, 600))}</p>"
+        + '<p class="scope">Full recorded limitations and authored rationale remain in the review and appendix.</p></section>'
         f'<section><h2>Recipient check</h2><p><strong>Not performed for this recipient.</strong> Follow the verification guide with separately approved inputs.</p><p class="scope">{receipt_note}</p></section></div>'
-        f"<section><h2>Next action</h2><p>{e(_excerpt(review.next_action))}</p></section>"
         f'<footer>Evidence statement identity (not approval): <span class="identity">{e(digest)}</span><br>Keep this brief with the full review, technical appendix, immutable evidence and separate recipient result.</footer>'
     )
     return _document(view.title, body)

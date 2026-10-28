@@ -73,6 +73,7 @@ def test_package_retains_evidence_receipt_context_and_separate_pending_decision(
     assert "Not authenticated by packaging" in brief
     assert "Not performed for this recipient" in brief
     assert "Signed manifest verified" not in brief  # not a recipient-acceptance badge
+    assert "An application-specific interpretation was not supplied" in brief
     assert 'href="brief.html"' in (output / "review.html").read_text()
     manifest = json.loads((output / "package-manifest.json").read_text())
     assert "review-context.json" in manifest["files"]
@@ -326,6 +327,103 @@ def test_commentary_is_bounded_and_brief_preserves_a_link_to_full_text(tmp_path)
         build_client_review(
             REFERENCE / "evidence", context_path=ctx, output=tmp_path / "large"
         )
+
+
+def test_plain_language_summary_is_attributed_escaped_and_separate_from_evidence(
+    tmp_path,
+):
+    from html import unescape
+
+    summary = [
+        ["What was tested", "A fixed test set <not production traffic>."],
+        ["What happened", "The replacement did not meet the recorded requirement."],
+        ["What this means", "Keep the current model pending review."],
+        ["What remains unknown", "Application suitability has not been established."],
+    ]
+    ctx = context(tmp_path, summary=summary)
+    output = tmp_path / "handoff"
+    before = inventory(REFERENCE / "evidence")
+    build_client_review(REFERENCE / "evidence", context_path=ctx, output=output)
+    assert inventory(output / "evidence") == before == inventory(REFERENCE / "evidence")
+    assert (output / "review-context.json").read_bytes() == ctx.read_bytes()
+    for suffix in ("html", "md"):
+        for name in ("brief", "review"):
+            text = (output / f"{name}.{suffix}").read_text()
+            assert "Summary by the review author" in text
+            assert "Pending owner decision" in text
+            assert "Policy not met" in text
+            assert "<not production traffic>" not in text
+            assert all(value in unescape(text) for _, value in summary)
+        brief = (output / f"brief.{suffix}").read_text()
+        assert brief.index("Next action") < brief.index("In plain language")
+        assert brief.index("In plain language") < brief.index("Results at a glance")
+        technical = (output / f"technical-report.{suffix}").read_text()
+        assert summary[1][1] not in technical
+        assert "1.091" in technical and "1.05" in technical
+        assert "paired" in technical
+
+
+@pytest.mark.parametrize(
+    "summary",
+    [
+        "not rows",
+        [["Label", "text"]] * 5,
+        [["Label", "x" * 601]],
+        [["Label", ""]],
+        [["Label", "value", "extra"]],
+        [["Label", "bad\x00text"]],
+    ],
+)
+def test_plain_language_summary_rejects_invalid_or_oversized_input(tmp_path, summary):
+    with pytest.raises(ClientReviewError, match="summary"):
+        build_client_review(
+            REFERENCE / "evidence",
+            context_path=context(tmp_path, summary=summary),
+            output=tmp_path / "out",
+        )
+    assert not (tmp_path / "out").exists()
+
+
+@pytest.mark.parametrize("family", ["required", "advisory", "combined"])
+def test_authored_summary_cannot_hide_judge_role_or_combined_requirements(
+    tmp_path, family
+):
+    if family == "combined":
+        from tests.evidence_sets.test_verification import fixture
+
+        source = fixture(tmp_path)[0]
+        expected = (
+            "Direct-score comparison:",
+            "Judge comparison:",
+            "Both comparisons must meet",
+        )
+    else:
+        from tests.judge_measurements.test_evidence_acceptance import _publish
+
+        source = _publish(tmp_path, role=family)[0].path
+        expected = (
+            ("Advisory judge result", "cannot satisfy a required release check")
+            if family == "advisory"
+            else (
+                "Required judge comparison",
+                "covers only the recorded judge requirements",
+            )
+        )
+    output = tmp_path / "handoff"
+    build_client_review(
+        source,
+        output=output,
+        context_path=context(
+            tmp_path,
+            summary=[["What this means", "Review this result before deciding."]],
+        ),
+    )
+    for suffix in ("html", "md"):
+        brief = (output / f"brief.{suffix}").read_text()
+        assert "Pending owner decision" in brief
+        for text in expected:
+            assert text in brief
+            assert brief.index(text) < brief.index("In plain language")
 
 
 def test_cli_rejects_mixed_output_modes_before_writing(tmp_path):

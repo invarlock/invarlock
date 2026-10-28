@@ -6,6 +6,14 @@ recommendation, completed decision and a dated next action. The fictional
 organization and owners are labeled in the opening. Measurements, policies,
 identities and recipient outcomes come from retained real references.
 
+Each brief leads with the owner's decision and next action, then explains what
+was tested, what happened, what it means and what remains unknown in ordinary
+language. This optional authored `summary` is kept separate from the recorded
+result. The full review retains the exact measurements and statistical methods.
+The HTTP example also cites two retained cases: a punctuation difference that
+changes a literal-match score and a match lost by the candidate. Their selection
+rule is explicit; these illustrations do not replace the 400-case comparison.
+
 | Example | Technical result | Fictional owner decision |
 | --- | --- | --- |
 | Mistral likelihood comparison | Regression under the recorded policy | Decline the checkpoint replacement; retain the baseline and assess instruction following separately. |
