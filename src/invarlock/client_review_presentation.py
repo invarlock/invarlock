@@ -5,17 +5,25 @@ from __future__ import annotations
 import re
 
 from invarlock.report_presentation import (
+    MetricView,
     ReportView,
     decision_label,
-    decision_reading,
     escape,
+)
+from invarlock.report_reading import (
+    observed_change,
+    range_reading,
+    score_caption,
+    score_scale,
+    suggested_action,
 )
 
 _STYLE = """
 :root{color-scheme:light}*{box-sizing:border-box}body{margin:0;background:#f1f3ed;color:#20251f;font:16px/1.5 system-ui,sans-serif}main{max-width:960px;margin:24px auto;padding:32px;background:white;border-top:4px solid #20251f}h1{font-size:30px;line-height:1.15;margin:8px 0 16px}h2{font-size:18px;margin:18px 0 8px}p{margin:8px 0}.brand,.scope,footer{font-size:12px;color:#586054}.brand{font-weight:700}a{color:#145d7b}a:focus-visible{outline:3px solid #145d7b;outline-offset:3px}nav{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:13px;margin:14px 0}.decision{border-left:4px solid #586054;padding:8px 14px;background:#f3f5f0}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}table{border-collapse:collapse;width:100%;font-size:13px;table-layout:fixed}th,td{text-align:left;vertical-align:top;border-bottom:1px solid #d9dfd3;padding:7px;overflow-wrap:anywhere}pre{padding:14px;background:#f3f5f0;white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px}p,li,code{overflow-wrap:anywhere}.identity{font:11px/1.4 ui-monospace,monospace;overflow-wrap:anywhere}footer{margin-top:20px;border-top:1px solid #d9dfd3;padding-top:10px}.context{font-size:14px}.scope{font-size:12px}.scroll{overflow-x:auto}
-@media(max-width:600px){main{padding:18px;margin:0}.grid{display:block}h1{font-size:25px}table{font-size:12px}th,td{padding:5px}}
+.score-card{border-top:1px solid #d9dfd3;padding:10px 0}.score-card h3{font-size:16px;margin:0 0 5px;overflow-wrap:anywhere}.score-row{display:grid;grid-template-columns:75px minmax(50px,1fr) 230px;gap:10px;align-items:center;font-size:14px}.score-row strong{text-align:right}.track{height:12px;background:#f1f3ed;border-bottom:1px solid #c5cfc0}.bar{display:block;height:100%;background:#73816d}.bar.candidate{background:#185c78}.score-detail{font-size:12px;font-weight:400;color:#586054}.score-card .scope{margin:3px 0}.result-line{margin-top:8px}summary{cursor:pointer}summary:focus-visible{outline:3px solid #145d7b}
+@media(max-width:600px){main{padding:18px;margin:0}.grid{display:block}.score-row{grid-template-columns:65px minmax(20px,1fr) 95px;font-size:12px;gap:6px}.score-detail{display:block;font-size:11px}h1{font-size:25px}table{font-size:12px}th,td{padding:5px}}
 @page{margin:14mm;@bottom-right{content:"Page " counter(page) " of " counter(pages);font:8pt sans-serif}}
-@media print{body{background:white;font-size:9pt;line-height:1.35}p{margin:5px 0}main{padding:0;margin:0;max-width:none;border:0}h1{font-size:20pt;margin-bottom:8px}h2{font-size:11pt;margin-top:9px;margin-bottom:5px}.context{font-size:9pt}.scope,.brand,footer{font-size:8pt}nav{font-size:8pt;margin:8px 0}table{font-size:8pt}th,td{padding:5px}.decision{padding:7px 10px}h1,h2,thead{break-after:avoid}tr,.decision{break-inside:avoid}a{color:inherit}.identity{font-size:7pt}footer{margin-top:10px;padding-top:6px}.scroll{overflow:visible}}
+@media print{footer{display:none}.grid{break-inside:avoid}.score-card{padding:5px 0;break-inside:avoid}.score-card h3{font-size:10pt}.score-row{font-size:8pt}.score-detail{font-size:8pt;display:inline}.track{height:9px}.bar{print-color-adjust:exact;-webkit-print-color-adjust:exact}.score-card p{margin:3px 0}body{background:white;font-size:9pt;line-height:1.35}p{margin:5px 0}main{padding:0;margin:0;max-width:none;border:0}h1{font-size:20pt;margin-bottom:8px}h2{font-size:11pt;margin-top:9px;margin-bottom:5px}.context{font-size:9pt}.scope,.brand,footer{font-size:8pt}nav{font-size:8pt;margin:8px 0}table{font-size:8pt}th,td{padding:5px}.decision{padding:7px 10px}h1,h2,thead{break-after:avoid}tr,.decision{break-inside:avoid}a{color:inherit}.identity{font-size:7pt}footer{margin-top:10px;padding-top:6px}.scroll{overflow:visible}}
 """
 
 
@@ -36,22 +44,87 @@ def _excerpt(value: str, limit: int = 360) -> str:
     )
 
 
+def _score_chart(metric: MetricView) -> str:
+    scale = score_scale(metric)
+    if scale is None:
+        return ""
+    scores = metric.scores
+    assert scores is not None
+    rows = []
+    for label, raw, displayed, detail in (
+        ("Baseline", scores.baseline, metric.baseline, metric.baseline_detail),
+        ("Candidate", scores.candidate, metric.candidate, metric.candidate_detail),
+    ):
+        assert raw is not None
+        rows.append(
+            f'<div class="score-row"><span>{label}</span><span class="track" aria-hidden="true"><span class="bar {label.lower()}" style="width:{raw / scale * 100:.6f}%"></span></span>'
+            f"<strong>{escape(displayed)}"
+            + (
+                f' <span class="score-detail">· {escape(detail)}</span>'
+                if detail
+                else ""
+            )
+            + "</strong></div>"
+        )
+    axis = (
+        "0–100%"
+        if scores.kind == "accuracy"
+        else "0–1"
+        if scores.kind == "rubric"
+        else f"0–{scale:.4g} nats / byte"
+    )
+    return (
+        '<div class="score-chart">'
+        + "".join(rows)
+        + f'<p class="scope">Observed scores · shared bar scale: {axis}.</p></div>'
+    )
+
+
 def brief(view: ReportView, *, digest: str, receipt: bool, html: bool) -> str:
     review = view.review
     assert review is not None
     receipt_note = (
-        "Not authenticated by packaging. The attached historical receipt references this evidence; its signature and recipient authority have not been checked here."
+        "Not authenticated by packaging. The attached historical receipt has not been checked for this recipient."
         if receipt
         else "No historical receipt supplied."
     )
+    reading = {
+        "pass": "Passing these checks does not establish improvement or suitability for release.",
+        "fail": "One or more recorded requirements were not met.",
+        "regression": "One or more recorded requirements were not met.",
+        "insufficient_evidence": "The recorded evidence is insufficient for a conclusion.",
+    }.get(
+        view.decision,
+        "The recorded outcome is unavailable; establish it before deciding.",
+    )
     context = review.context[:2]
     metrics = view.metrics[:6]
-    more = f"Showing {len(metrics)} of {len(view.metrics)} metric/scope results; all results and checks are in the technical appendix."
-    limits = (
-        " ".join(view.limitations[:2])
-        or "No limitations were supplied. Confirm workload coverage before deciding."
+    more = (
+        f"Showing {len(metrics)} of {len(view.metrics)} measure / test-group results. All results and checks are in the technical appendix."
+        if len(view.metrics) > len(metrics)
+        else ""
     )
+    limits = "Results cover the recorded tests. Workload performance and safety need separate evidence."
+    if any(m.scores and m.scores.kind == "rubric" for m in view.metrics):
+        limits += " Judge ratings do not establish correctness. Repeated ratings are not extra independent test units."
+    if len(view.metrics) > 1:
+        limits += " Overlapping groups cannot be added; separate ranges provide no combined confidence guarantee."
     intro = "The review author supplies the decision and interpretation. The recorded test result is separate from release approval."
+    summary = review.summary or (
+        (
+            "How to read the result",
+            "Baseline is the reference version; candidate is the version being assessed. Scores, requirements and uncertainty are explained below.",
+        ),
+        (
+            "Application meaning",
+            "An application-specific interpretation was not supplied. Ask the review owner how these results apply to the intended use.",
+        ),
+    )
+    attribution = (
+        "Summary by the review author."
+        if review.summary
+        else "Reading guide generated from the recorded comparison."
+    )
     if not html:
 
         def clean(value: str) -> str:
@@ -75,7 +148,7 @@ def brief(view: ReportView, *, digest: str, receipt: bool, html: bool) -> str:
             "",
             f"**Recorded policy result:** {clean(decision_label(view.decision))}",
             "",
-            decision_reading(view.decision),
+            reading,
             "",
             *([clean(view.decision_scope), ""] if view.decision_scope else []),
             f"**Recommendation:** {clean(_excerpt(review.recommendation))}",
@@ -86,50 +159,56 @@ def brief(view: ReportView, *, digest: str, receipt: bool, html: bool) -> str:
             "",
         ]
         lines += [f"- **{clean(k)}:** {clean(_excerpt(v))}" for k, v in context]
-        if review.summary:
-            lines += [
-                "",
-                "## In plain language",
-                "",
-                "Summary by the review author.",
-                "",
-            ]
-            lines += [f"- **{clean(k)}:** {clean(v)}" for k, v in review.summary]
-        else:
-            lines += [
-                "",
-                "## Recorded measurement summary",
-                "",
-                clean(view.summary),
-                "",
-            ]
-            lines += [
-                "An application-specific interpretation was not supplied. Ask the review owner how these results apply to the intended use."
-            ]
+        lines += ["", "## In plain language", "", attribution, ""]
+        lines += [f"- **{clean(k)}:** {clean(v)}" for k, v in summary]
         lines += ["", "## Results at a glance", "", more, ""]
+        for index, metric in enumerate(metrics, 1):
+            lines += [
+                f"### {clean(metric.display_name)} / {clean(metric.display_scope)}",
+                "",
+                clean(score_caption(metric)),
+                "",
+                f"- Baseline: {clean(metric.baseline)}"
+                + (
+                    f"; {clean(metric.baseline_detail)}"
+                    if metric.baseline_detail
+                    else ""
+                ),
+                f"- Candidate: {clean(metric.candidate)}"
+                + (
+                    f"; {clean(metric.candidate_detail)}"
+                    if metric.candidate_detail
+                    else ""
+                ),
+                f"- Change: {clean(observed_change(metric))}; {clean(decision_label(metric.decision))}.",
+                f"- {clean(metric.count_label)}: {clean(metric.count)}.",
+                "",
+                clean(range_reading(metric)),
+                "",
+            ]
+            if metric.decision != "pass":
+                lines += [
+                    f"**Suggested follow-up:** {clean(suggested_action(metric))}",
+                    "",
+                ]
+            lines += [
+                f"[See result {index}: evidence and checks](technical-report.html#metric-result-{index})",
+                "",
+            ]
         lines += [
-            "Baseline is the reference version; candidate is the version being assessed. Each result applies only to its named measure and test group.",
-            "",
-        ]
-        lines += [
-            f"- {clean(m.display_name)} / {clean(m.display_scope)}: baseline {clean(m.baseline)}; candidate {clean(m.candidate)}; change {clean(m.change)}; {clean(decision_label(m.decision))}."
-            for m in metrics
-        ]
-        lines += [
-            "",
             "## Decision limits",
             "",
-            clean(_excerpt(limits, 600)),
+            clean(limits),
             "",
-            "Full recorded limitations and authored rationale are in the review and appendix.",
+            "Full recorded limitations and authored rationale: [full review](review.html).",
             "",
             "## Recipient check",
             "",
-            "Not performed for this recipient. Follow the verification guide with separately approved inputs.",
+            "Not performed for this recipient. Your technical reviewer must check this package using your organization's approved inputs. See the verification guide.",
             "",
             receipt_note,
             "",
-            f"Evidence statement: {digest}",
+            f"Evidence statement identity (not approval): {digest}",
             "",
             " · ".join(f"[{k}]({v})" for k, v in view.handoff_links),
             "",
@@ -139,16 +218,31 @@ def brief(view: ReportView, *, digest: str, receipt: bool, html: bool) -> str:
     navigation = "".join(
         f'<a href="{e(path)}">{e(label)}</a>' for label, path in view.handoff_links
     )
-    rows = "".join(
-        f'<tr><th scope="row">{e(m.display_name)}<br><span class="scope">{e(m.display_scope)}</span></th><td>{e(m.baseline)}</td><td>{e(m.candidate)}</td><td>{e(m.change)}</td><td>{e(decision_label(m.decision))}</td></tr>'
-        for m in metrics
-    )
+    cards = []
+    for index, metric in enumerate(metrics, 1):
+        chart = _score_chart(metric)
+        if not chart:
+            chart = f"<p><strong>Baseline:</strong> {e(metric.baseline)} · <strong>Candidate:</strong> {e(metric.candidate)}</p>"
+        cards.append(
+            '<article class="score-card">'
+            f'<h3>{e(metric.display_name)} <span class="scope">· {e(metric.display_scope)}</span></h3>'
+            f'<p class="scope">{e(score_caption(metric))}</p>'
+            + chart
+            + f'<p class="result-line"><strong>{e(decision_label(metric.decision))}.</strong> Change: {e(observed_change(metric))} · {e(metric.count_label)}: {e(metric.count)}.</p>'
+            + f"<p>{e(range_reading(metric))}</p>"
+            + (
+                f"<p><strong>Suggested follow-up.</strong> {e(suggested_action(metric))}</p>"
+                if metric.decision != "pass"
+                else ""
+            )
+            + f'<p class="scope"><a href="technical-report.html#metric-result-{index}">See result {index}: evidence and checks</a></p></article>'
+        )
     body = (
         f'<div class="brand">InvarLock · Decision brief</div><h1>{e(view.title)}</h1>'
         f'<p class="scope">{e(review.label)} · {e(review.byline)}</p><p class="scope">{intro}</p>'
         f'<nav aria-label="Review package">{navigation}</nav>'
         f'<section class="decision"><p><strong>Owner decision.</strong> {e(_excerpt(review.decision, 600))}</p>'
-        f"<p><strong>Recorded policy result.</strong> {e(decision_label(view.decision))}</p><p>{e(decision_reading(view.decision))}</p>"
+        f"<p><strong>Recorded policy result.</strong> {e(decision_label(view.decision))}</p><p>{e(reading)}</p>"
         + (f"<p>{e(view.decision_scope)}</p>" if view.decision_scope else "")
         + f"<p><strong>Recommendation.</strong> {e(_excerpt(review.recommendation))}</p>"
         f"<p><strong>Next action.</strong> {e(_excerpt(review.next_action))}</p></section>"
@@ -157,22 +251,19 @@ def brief(view: ReportView, *, digest: str, receipt: bool, html: bool) -> str:
             f'<p class="context"><strong>{e(k)}.</strong> {e(_excerpt(v))}</p>'
             for k, v in context
         )
-        + '<p class="scope">Full context and attributed rationale: <a href="review.html">full review</a>.</p></section>'
-        + (
-            '<section class="reader-summary"><h2>In plain language</h2><p class="scope">Summary by the review author.</p>'
-            + "".join(
-                f"<p><strong>{e(k)}.</strong> {e(v)}</p>" for k, v in review.summary
-            )
-            + "</section>"
-            if review.summary
-            else f"<section><h2>Recorded measurement summary</h2><p>{e(view.summary)}</p><p>An application-specific interpretation was not supplied. Ask the review owner how these results apply to the intended use.</p></section>"
-        )
-        + f'<section><h2>Results at a glance</h2><p class="scope">{more}</p><p class="scope">Baseline is the reference version; candidate is the version being assessed. Each result applies only to its named measure and test group.</p><div class="scroll"><table><thead><tr><th scope="col">Metric / scope</th><th scope="col">Baseline</th><th scope="col">Candidate</th><th scope="col">Change</th><th scope="col">Recorded result</th></tr></thead><tbody>{rows}</tbody></table></div></section>'
-        '<div class="grid"><section><h2>Decision limits</h2>'
-        + f"<p>{e(_excerpt(limits, 600))}</p>"
-        + '<p class="scope">Full recorded limitations and authored rationale remain in the review and appendix.</p></section>'
-        f'<section><h2>Recipient check</h2><p><strong>Not performed for this recipient.</strong> Follow the verification guide with separately approved inputs.</p><p class="scope">{receipt_note}</p></section></div>'
-        f'<footer>Evidence statement identity (not approval): <span class="identity">{e(digest)}</span><br>Keep this brief with the full review, technical appendix, immutable evidence and separate recipient result.</footer>'
+        + '</section><section class="reader-summary"><h2>In plain language</h2>'
+        + f'<p class="scope">{attribution}</p>'
+        + "".join(f"<p><strong>{e(k)}.</strong> {e(v)}</p>" for k, v in summary)
+        + "</section><section><h2>Results at a glance</h2>"
+        + (f'<p class="scope">{more}</p>' if more else "")
+        + "".join(cards)
+        + "</section>"
+        + '<div class="grid"><section><h2>Decision limits</h2>'
+        + f'<p>{e(limits)}</p><p class="scope">Full recorded limitations and authored rationale: <a href="review.html">full review</a>.</p></section>'
+        + "<section><h2>Recipient check</h2><p><strong>Not performed for this recipient.</strong> Your technical reviewer must check the package with your organization’s approved inputs.</p>"
+        + f'<p class="scope">{receipt_note}</p></section></div>'
+        + f'<footer><details><summary>Evidence statement identity (not approval)</summary><span class="identity">{e(digest)}</span></details>'
+        + "</footer>"
     )
     return _document(view.title, body)
 

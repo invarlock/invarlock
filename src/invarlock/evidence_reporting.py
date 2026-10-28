@@ -44,6 +44,7 @@ from invarlock.report_presentation import (
     IntervalView,
     MetricView,
     ReportView,
+    ScoreView,
     number,
     xml_text,
 )
@@ -1265,6 +1266,12 @@ def _report_view(
     metric = MetricView(
         evidence_source="reports/evaluation.report.json#",
         name=names.get(report["metric"], report["metric"]),
+        scores=ScoreView(
+            "accuracy" if exact else "loss" if ratio else "score",
+            report["baseline"]["mean_score"],
+            report["subject"]["mean_score"],
+            "lower" if ratio else "higher",
+        ),
         scope="All paired records",
         decision=report["verdict"],
         baseline=number(report["baseline"]["mean_score"] * value_scale) + suffix,

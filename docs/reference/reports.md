@@ -94,6 +94,11 @@ how many remain and retains every result below. It does not rank unrelated
 metrics by numerical severity. **Scope and limitations** and **Next decision**
 remain visible before the detailed statistics.
 
+Each finding also supplies a **Suggested follow-up** tied to its unresolved
+checks. Missing results, insufficient independent evidence, a wide range and
+unmet score requirements lead to different actions. This generated guidance
+neither changes acceptance requirements nor authorizes further execution.
+
 The opening also gives a **Review action** appropriate to the recorded result.
 This is generated guidance, not an owner's recommendation. The **Change context**
 preview quotes a retained comparison note and identifies any additional notes

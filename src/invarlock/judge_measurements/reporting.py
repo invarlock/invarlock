@@ -25,6 +25,7 @@ from invarlock.report_presentation import (
     IntervalView,
     MetricView,
     ReportView,
+    ScoreView,
     decision_label,
     number,
     render_html,
@@ -420,6 +421,12 @@ def _view(
     metric = MetricView(
         evidence_source="analysis_result.json#",
         name=policy["metric_name"],
+        scores=ScoreView(
+            "rubric",
+            float(baseline_mean) if baseline_mean is not None else None,
+            float(subject["mean"]) if subject is not None else None,
+            policy["direction"],
+        ),
         scope="Fixed benchmark; equal independent-unit weights"
         if required
         else "Advisory metric; fixed benchmark; equal independent-unit weights",

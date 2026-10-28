@@ -175,6 +175,6 @@ def test_worked_review_context_survives_actual_print(tmp_path, name, paper):
         scenario["next_action"],
         "Recorded policy result",
         "Not performed for this recipient",
-        "Evidence statement identity",
+        "See result 1: evidence and checks",
     ):
         assert compact(value) in brief_text

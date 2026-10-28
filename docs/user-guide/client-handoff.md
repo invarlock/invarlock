@@ -38,8 +38,9 @@ or claim that an illustrative workload represents production. Commentary is plai
 text. Unknown fields, duplicate keys and invalid dates are rejected. The context
 is limited to 64 KiB, each text field to 4,000 characters and each row list to 32.
 The shorter `summary` limits above are an exception. Existing contexts without
-this optional field remain supported; their briefs retain the recorded measurement
-summary and explicitly mark the missing application-specific interpretation.
+this optional field remain supported; their briefs explain the recorded scores,
+change range and requirements and explicitly mark the missing application-specific
+interpretation. The generated reading guide does not supply a business decision.
 
 Write the summary for a reader who does not know the metric or statistical method.
 Use four rows: **What was tested**, **What happened**, **What this means**, and
@@ -94,6 +95,21 @@ Open `client-handoff/brief.html`. Deliver the directory or its `handoff.zip`:
 The brief explicitly marks excerpts and omitted metric rows; the complete review
 and appendix remain available. HTML uses local links and no remote assets.
 Print the brief for a short decision record and keep the full review alongside it.
+The expandable evidence identity stays in HTML; the printed brief links to the
+technical appendix, which retains the evidence identities and exact checks.
+
+Each displayed result links directly to its evidence and checks in the technical
+appendix. Score bars start at zero. Accuracy uses the full 0–100% scale; judge
+ratings use their 0–1 rubric and are explicitly not accuracy percentages. Loss
+comparisons use the recorded NLL units and label their shared scale. Custom
+metrics and missing or unsupported values use text without an inferred scale.
+The observed scores and the uncertainty range have different roles: the linked
+checks retain the exact rule that produced the recorded decision.
+
+Unmet checks have suggested follow-up actions, such as resolving missing results,
+reviewing uncertainty or investigating candidate behavior. These suggestions do
+not change the policy, authorize another run or replace the author's next action.
+The full review retains all limitations; the brief provides a shorter scope note.
 Unsigned inventories identify bytes relative to an inventory; they do not establish
 signer authority or client acceptance. PDFs printed afterward are not added to the
 original ZIP or inventory.

@@ -30,6 +30,7 @@ from invarlock.report_presentation import (
     IntervalView,
     MetricView,
     ReportView,
+    ScoreView,
     number,
     xml_text,
 )
@@ -842,6 +843,16 @@ def _metric_views(
         metrics.append(
             MetricView(
                 name=m["name"],
+                scores=ScoreView(
+                    "loss"
+                    if likelihood
+                    else "accuracy"
+                    if binary and m["aggregation"] == "mean"
+                    else "score",
+                    m["baseline_mean"],
+                    m["subject_mean"],
+                    m["direction"],
+                ),
                 evidence_source=f"reports/evaluation.report.json#/metrics/{source_index}",
                 scope=m["slice"],
                 decision=m["decision"],

@@ -20,7 +20,16 @@ const { pathToFileURL } = require('node:url');
       }
       if (document === 'brief') {
         for (const href of await page.locator('a').evaluateAll(links => links.map(link => link.getAttribute('href')))) {
-          if (!fs.existsSync(path.join(root, href))) throw new Error('Missing package link: ' + href);
+          const [file, fragment] = href.split('#');
+          if (!fs.existsSync(path.join(root, file))) throw new Error('Missing package link: ' + href);
+          if (fragment) {
+            const target = await browser.newPage();
+            try {
+              await target.goto(pathToFileURL(path.join(root, file)).href + '#' + fragment);
+              const result = target.locator('[id="' + fragment + '"]');
+              if (await result.count() !== 1 || !await result.isVisible()) throw new Error('Missing or hidden result: ' + href);
+            } finally { await target.close(); }
+          }
         }
       }
     }

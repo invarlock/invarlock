@@ -238,6 +238,16 @@ def display_label(value: str) -> str:
 
 
 @dataclass(frozen=True)
+class ScoreView:
+    """Typed display facts from validated records, never inferred from labels."""
+
+    kind: str
+    baseline: float | None
+    candidate: float | None
+    direction: str
+
+
+@dataclass(frozen=True)
 class MetricView:
     name: str
     scope: str
@@ -255,6 +265,7 @@ class MetricView:
     count_detail: str = ""
     count_label: str = "Observed pairs"
     evidence_source: str = ""
+    scores: ScoreView | None = None
 
     @property
     def display_name(self) -> str:
@@ -1035,6 +1046,8 @@ def _review_context_html(view: ReportView) -> str:
 
 
 def _findings_html(view: ReportView) -> str:
+    from invarlock.report_reading import suggested_action
+
     findings, note = _findings(view)
     return (
         '<section class="panel findings"><h2>Findings to review</h2>'
@@ -1046,7 +1059,7 @@ def _findings_html(view: ReportView) -> str:
         )
         + "<ul>"
         + "".join(
-            f'<li><span class="finding-status {_tone(metric.decision)}">{escape(decision_label(metric.decision))}</span> <a href="#metric-result-{index}">Result {index}: {escape(metric.display_name)} · {escape(metric.display_scope)}</a> — {escape(metric.explanation)}</li>'
+            f'<li><span class="finding-status {_tone(metric.decision)}">{escape(decision_label(metric.decision))}</span> <a href="#metric-result-{index}">Result {index}: {escape(metric.display_name)} · {escape(metric.display_scope)}</a> — {escape(metric.explanation)}<p><strong>Suggested follow-up.</strong> {escape(suggested_action(metric))}</p></li>'
             for index, metric in findings
         )
         + '</ul><p><a href="#results-and-requirements">Supporting evidence: results and decision checks</a></p></section>'
@@ -1324,12 +1337,14 @@ def render_markdown(view: ReportView, *, include_details: bool = False) -> str:
         f"**{'Owner recommendation' if view.review else 'Review action'}:** {clean(view.review.recommendation) if view.review else _review_action(view)}",
         "",
     ]
+    from invarlock.report_reading import suggested_action
+
     findings, note = _findings(view)
     lines += ["## Findings to review", "", note, ""]
     if view.metrics:
         lines += [_result_counts(view), ""]
     lines.extend(
-        f"- {decision_label(m.decision)} — Result {i}: {clean(m.display_name)} · {clean(m.display_scope)} — {clean(m.explanation)} Supporting record: {clean(m.evidence_source or 'Not supplied with this view')}"
+        f"- {decision_label(m.decision)} — Result {i}: {clean(m.display_name)} · {clean(m.display_scope)} — {clean(m.explanation)} Suggested follow-up: {clean(suggested_action(m))} Supporting record: {clean(m.evidence_source or 'Not supplied with this view')}"
         for i, m in findings
     )
     lines += [
