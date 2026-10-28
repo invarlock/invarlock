@@ -42,6 +42,9 @@ nav:
       - Python reference audit: reference/rust-reference-audit.md
       - Rust small-workload results: reference/rust-small-workload-results.md
       - Rust FFI results: reference/rust-ffi-results.md
+      - Rust standalone checkpoint: reference/rust-standalone-results.md
+      - Native installation: reference/rust-native-installation.md
+      - Expanded standalone results: reference/rust-standalone-expanded-results.md
       - Contracts: reference/contracts.md
       - Evaluation records: reference/evaluation-records.md
       - Evaluation capacity: reference/evaluation-capacity.md

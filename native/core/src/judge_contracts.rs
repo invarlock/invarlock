@@ -943,7 +943,7 @@ fn validate_measurements_inner(
     }
     Ok(())
 }
-pub(crate) fn validate_frozen_answers(
+pub fn validate_frozen_answers(
     plan: &Value,
     baseline: &Value,
     subject: &Value,

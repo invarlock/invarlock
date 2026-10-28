@@ -1,0 +1,240 @@
+{
+  "hf_transformers": {
+    "allowed": [
+      "batch_size",
+      "checkpoint_tree_sha256",
+      "context_length",
+      "immutable_revision",
+      "max_output_tokens",
+      "offline",
+      "seed",
+      "timeout_seconds",
+      "tokenizer_metadata_sha256"
+    ],
+    "required": [],
+    "positive": [
+      "batch_size",
+      "context_length",
+      "max_output_tokens",
+      "timeout_seconds"
+    ],
+    "digests": [],
+    "capabilities": {
+      "provider_name": "hf_transformers",
+      "artifact_formats": [
+        "hf_snapshot"
+      ],
+      "tasks": [
+        "text_causal"
+      ],
+      "metrics": [
+        "exact_match",
+        "normalized_nll_per_utf8_byte"
+      ],
+      "execution_modes": [
+        "in_process"
+      ],
+      "required_extra": null,
+      "required_image": null,
+      "format_version": "runtime-provider-capabilities-v1",
+      "provider_abi": "1"
+    }
+  },
+  "hf_vision_text": {
+    "allowed": [
+      "batch_size",
+      "checkpoint_tree_sha256",
+      "context_length",
+      "immutable_revision",
+      "max_output_tokens",
+      "offline",
+      "processor_metadata_sha256",
+      "seed",
+      "timeout_seconds",
+      "tokenizer_metadata_sha256"
+    ],
+    "required": [
+      "batch_size",
+      "checkpoint_tree_sha256",
+      "context_length",
+      "max_output_tokens",
+      "offline",
+      "processor_metadata_sha256",
+      "seed",
+      "timeout_seconds",
+      "tokenizer_metadata_sha256"
+    ],
+    "positive": [
+      "batch_size",
+      "context_length",
+      "max_output_tokens",
+      "timeout_seconds"
+    ],
+    "digests": [],
+    "capabilities": {
+      "provider_name": "hf_vision_text",
+      "artifact_formats": [
+        "hf_snapshot"
+      ],
+      "tasks": [
+        "vision_text_generation"
+      ],
+      "metrics": [
+        "exact_match"
+      ],
+      "execution_modes": [
+        "container"
+      ],
+      "required_extra": null,
+      "required_image": null,
+      "format_version": "runtime-provider-capabilities-v1",
+      "provider_abi": "1"
+    }
+  },
+  "llama_cpp": {
+    "allowed": [
+      "artifact_byte_length",
+      "artifact_sha256",
+      "backend_binary_sha256",
+      "backend_source_sha256",
+      "backend_version",
+      "batch_size",
+      "context_length",
+      "cpu_threads",
+      "gguf_metadata_sha256",
+      "max_output_tokens",
+      "prompt_batch_size",
+      "prompt_microbatch_size",
+      "seed",
+      "tensor_inventory_sha256",
+      "timeout_seconds",
+      "tokenizer_metadata_sha256"
+    ],
+    "required": [
+      "artifact_byte_length",
+      "artifact_sha256",
+      "backend_binary_sha256",
+      "backend_source_sha256",
+      "backend_version",
+      "batch_size",
+      "context_length",
+      "cpu_threads",
+      "gguf_metadata_sha256",
+      "max_output_tokens",
+      "prompt_batch_size",
+      "prompt_microbatch_size",
+      "seed",
+      "tensor_inventory_sha256",
+      "timeout_seconds",
+      "tokenizer_metadata_sha256"
+    ],
+    "positive": [
+      "artifact_byte_length",
+      "batch_size",
+      "context_length",
+      "cpu_threads",
+      "max_output_tokens",
+      "prompt_batch_size",
+      "prompt_microbatch_size",
+      "timeout_seconds"
+    ],
+    "digests": [
+      "artifact_sha256",
+      "backend_binary_sha256",
+      "backend_source_sha256",
+      "gguf_metadata_sha256",
+      "tensor_inventory_sha256",
+      "tokenizer_metadata_sha256"
+    ],
+    "capabilities": {
+      "provider_name": "llama_cpp",
+      "artifact_formats": [
+        "gguf"
+      ],
+      "tasks": [
+        "text_causal"
+      ],
+      "metrics": [
+        "exact_match"
+      ],
+      "execution_modes": [
+        "container",
+        "local_process"
+      ],
+      "required_extra": null,
+      "required_image": null,
+      "format_version": "runtime-provider-capabilities-v1",
+      "provider_abi": "1"
+    },
+    "version_pattern": "^version: (?:0|[1-9][0-9]{0,9}) \\([A-Za-z0-9][A-Za-z0-9._+-]{0,63}\\) built with [A-Za-z0-9][A-Za-z0-9 ._(),=@~+-]{0,383} for [A-Za-z0-9][A-Za-z0-9 ._(),=@~+-]{0,127}\\z",
+    "sensitive_pattern": "(?i)(?:api[_.-]?key|bearer|credential|password|private[_.-]?key|secret|token)"
+  },
+  "tensorrt_llm": {
+    "allowed": [
+      "backend_build_sha256",
+      "backend_version",
+      "batch_size",
+      "builder_config_sha256",
+      "context_length",
+      "engine_bundle_tree_sha256",
+      "engine_metadata_sha256",
+      "file_inventory_sha256",
+      "max_output_tokens",
+      "runner_binary_sha256",
+      "seed",
+      "target_compute_capability",
+      "timeout_seconds",
+      "tokenizer_metadata_sha256"
+    ],
+    "required": [
+      "backend_build_sha256",
+      "backend_version",
+      "batch_size",
+      "builder_config_sha256",
+      "context_length",
+      "engine_bundle_tree_sha256",
+      "engine_metadata_sha256",
+      "file_inventory_sha256",
+      "max_output_tokens",
+      "runner_binary_sha256",
+      "seed",
+      "target_compute_capability",
+      "timeout_seconds",
+      "tokenizer_metadata_sha256"
+    ],
+    "positive": [
+      "batch_size",
+      "context_length",
+      "max_output_tokens",
+      "timeout_seconds"
+    ],
+    "digests": [
+      "backend_build_sha256",
+      "builder_config_sha256",
+      "engine_bundle_tree_sha256",
+      "engine_metadata_sha256",
+      "file_inventory_sha256",
+      "runner_binary_sha256",
+      "tokenizer_metadata_sha256"
+    ],
+    "capabilities": {
+      "provider_name": "tensorrt_llm",
+      "artifact_formats": [
+        "tensorrt_llm_engine"
+      ],
+      "tasks": [
+        "text_causal"
+      ],
+      "metrics": [
+        "exact_match"
+      ],
+      "execution_modes": [
+        "container"
+      ],
+      "required_extra": null,
+      "required_image": null,
+      "format_version": "runtime-provider-capabilities-v1",
+      "provider_abi": "1"
+    }
+  }
+}

@@ -176,3 +176,19 @@ The original 128 macOS timings and optimized-Python control remain historical.
 Report Linux results separately with their own denominator and environment.
 The eight fixture journeys establish only their exercised behavior; they do not
 establish large native/judge capacity or all-input equivalence.
+
+## Expanded standalone comparison
+
+The later `standalone_expanded.py` protocol measures 24 offline workloads against
+corrected Python 0.17.3, with an additional Python/Rust facade candidate on the
+20 workflows that expose it. Each Linux architecture runs 68 qualification and
+340 timed executions. `ffi_boundary.py` separately measures immutable and mutable
+buffer handling. Both protocols stop on failed execution or mismatched output;
+they never retry or exclude an outcome automatically.
+
+The frozen fixture manifest, installed baseline file hashes, separate experimental
+Python wheel, native extension, executable and actual harness hash are retained
+with each result. The fixture and harness repairs are identified separately from
+the binary source archive. `report_standalone_expanded.py` renders the retained
+summaries without executing workloads. The expanded results are documented in
+[the comparison report](../../../docs/reference/rust-standalone-expanded-results.md).

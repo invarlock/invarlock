@@ -8,7 +8,9 @@ command surface.
 
 ## Implemented paths
 
-- `evaluate REQUEST --signing-key KEY --json`: canonical captured inputs, signed
+- `evaluate REQUEST --signing-key KEY --json`: captured inputs through all eight
+  adapter entry points, nineteen evaluator profiles, retained runtime import and
+  retained judge import, signed
   publication, optional `--preflight`, `--unsigned`, `--fail-on-policy`, input/output
   overrides, and the bootstrap budget. JSON and bounded strict YAML requests use
   the reference scalar semantics; aliases, anchors, tags and directives are refused.
@@ -28,9 +30,13 @@ command surface.
 - `evaluate --freeze-cases FILE --case-set-output OUTPUT --json`: validated,
   sorted case sets and their existing digest format.
 
-The new command interface emits JSON. The Python terminal presentation and every
-CLI/environment combination have not been replicated. Existing low-level JSON
-transactions remain available through `COMMAND --request FILE`.
+Use `--json` for the machine contract. Native plain terminal output, help and
+version information are also available. Signing keys, verifier identity, policy
+and trust-pin environment defaults follow the Python CLI; explicit options win.
+Reports print Markdown instead of reproducing Rich terminal layout. Exhaustive
+diagnostic wording and every CLI/environment combination are not claimed.
+Existing low-level JSON transactions remain available through
+`COMMAND --request FILE`.
 
 ## Package and memory boundaries
 
@@ -48,8 +54,10 @@ identities across implementations. Those differences are declared in the
 comparison protocol, not hidden by dropping a failed result.
 
 The embedded recipient guide retains the reference Python installation guidance
-for output compatibility. Shipping a supported native distribution and updating
-recipient instructions are separate release work.
+for output compatibility. Experimental source-bound Linux bundles now ship for
+ARM64 and x86_64.
+Changing embedded recipient guidance remains separate release work because that
+would change the currently compared handoff bytes.
 
 ## Qualification and remaining migration
 
@@ -59,18 +67,23 @@ families, signed and unsigned captured evaluation, receipts, setup, key
 interoperability, request scalar rules and refused unsafe inputs. Filesystem
 streaming tests independently exercise mutation detection and cleanup.
 
-The target architecture is not complete. These paths still need work:
+The remaining Python boundary is compatibility execution: model frameworks,
+provider SDK calls, live judge collection, installed custom scorers/providers and
+existing Python SDK callers. `invarlock-native --python-worker /absolute/python`
+selects this path explicitly. The worker requires the matching native extension,
+uses bounded request/output capture, and has a deadline and process-group
+cancellation. It does not turn live SDK behavior into a qualified offline path.
 
-- Public runtime-import workflow assembly and provider discovery.
-- External evaluator-format adapters beyond canonical captured inputs.
-- Arbitrary Python scorer/plugin execution through an explicit worker boundary.
-- Full public CLI diagnostic, environment-variable and terminal-output parity.
-- Release packaging, additional Linux targets, and live execution qualification.
+Native import tests cover accepted and rejected evaluator exports; runtime
+provider identity fixtures cover four built-in providers. Judge-import fixtures
+compare signed and unsigned publication bytes and missing-input preflight.
+Linux ARM64 and x86_64 tests exercise the process and descriptor boundaries.
+Live provider/GPU execution, real OCI engines, Windows and older Linux C library
+versions require separate qualification. Existing native report/parser work
+limits remain; fixture parity is not an all-input equivalence claim.
 
-Python model frameworks and Python SDK callers remain compatibility integrations.
-There is no silent fallback from the standalone executable to Python. Existing
-native report work limits and parser limits still apply; fixture parity is not an
-all-input equivalence claim.
+See the [installation guide](../../docs/reference/rust-native-installation.md)
+for the two native executables, bundle checksums and explicit worker setup.
 
 ## Performance protocol
 
@@ -88,3 +101,14 @@ to those older ratios. No live provider or inference work is timed.
 
 The completed checkpoint results and retained limitations are documented in
 [standalone results](../../docs/reference/rust-standalone-results.md).
+
+The expanded `linux/standalone_expanded.py` matrix adds one-, four- and twelve-row
+captured inputs, small/large JSONL imports, DeepEval imports, retained runtime
+import and judge import. It compares Python, the experimental Python/Rust facade
+and standalone Rust, except handoff packages which have no FFI route. Each Linux
+target runs 68 qualification executions and 340 timed executions. A separate
+`linux/ffi_boundary.py` diagnostic measures immutable and mutable JSON buffers;
+it does not substitute for end-to-end workflow results.
+
+Completed expanded results, qualification limits and retained artifact identities
+are in [the final comparison](../../docs/reference/rust-standalone-expanded-results.md).

@@ -64,6 +64,15 @@ pub fn validate_authored(value: &Value) -> Result<()> {
     match format.as_str() {
         Some(CAPTURED) => validate_schema(value, true),
         Some(RUNTIME) => validate_schema(value, false),
+        Some("invarlock/evaluation-request-v3") => {
+            if let Some(message) = first_schema_error_details(value, "evaluation_request_v3")? {
+                return Err(error(format!(
+                    "judge request is invalid: {}",
+                    message.chars().take(240).collect::<String>()
+                )));
+            }
+            Ok(())
+        }
         _ => Err(error(format!(
             "unsupported evaluation request format {}",
             python_repr(format)

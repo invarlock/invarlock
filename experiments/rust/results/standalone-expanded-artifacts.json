@@ -1,0 +1,107 @@
+{
+  "format": "invarlock/standalone-expanded-artifacts-v1",
+  "reference_revision": "1dc9cb644684dc915810da77326f6da8764c58c1",
+  "source_archive": {
+    "file": "source-v4.tar",
+    "bytes": 138936320,
+    "sha256": "80385c6dab7bf8adb0410847c2527eb5021d844f4a944fe2d1f636b712477496"
+  },
+  "python_candidate_wheel": {
+    "file": "invarlock-0.17.3-py3-none-any.whl",
+    "bytes": 699403,
+    "sha256": "d964420b5812b10e619524ecd0f0bbba28803fcd23293b323ae514af1a95792f"
+  },
+  "source_distribution": {
+    "file": "invarlock_native_experiment-0.1.0.tar.gz",
+    "bytes": 1223450,
+    "sha256": "a3c55db2aea1e5611f20070e909a38b7922f5949ca7859a2ed38051817221e99"
+  },
+  "production_files_matched_to_source_archive": 463,
+  "linux": {
+    "aarch64": {
+      "evidence_archive": {
+        "file": "retained-expanded-aarch64.tar.gz",
+        "bytes": 302431810,
+        "sha256": "adfa9ac9bb67e169de1a99d86568dd7b630826e03a2f75daec951ec45c66640b"
+      },
+      "native_distribution": {
+        "file": "invarlock-native-final-linux-aarch64.tar.gz",
+        "bytes": 8580383,
+        "sha256": "a97355e77954202b8c693a8d009bfc0e63deaff919c336649a1c8b7b21b36e46"
+      },
+      "native_wheel": {
+        "file": "invarlock_native_experiment-0.1.0-cp312-cp312-manylinux_2_39_aarch64.whl",
+        "bytes": 5972109,
+        "sha256": "70061bd7d4a548e79533316e7e79854515a7e140f6b06037b2e4e8d791d41df0"
+      },
+      "comparison_summary": {
+        "file": "standalone-expanded-aarch64.json",
+        "bytes": 57369,
+        "sha256": "9efe06d2340be390b259890102d715e4f8495bb1ab295b7cc6c5878946bf0b3c"
+      },
+      "buffer_summary": {
+        "file": "ffi-boundary-aarch64.json",
+        "bytes": 3751,
+        "sha256": "16bad5d49b91f4a39b64c554b7d6c35abeef4b2bed0bc31c764951550e4dde86"
+      },
+      "qualification_executions": 68,
+      "timed_executions": 340,
+      "buffer_executions": 36,
+      "all_matched": true,
+      "harness_sha256": "ab6136a5391e3c11164ed21da3da72ab873370f4dde4b06544ea131fb5bdd6f7",
+      "fixture_manifest_sha256": "c64a76d8370f9179a168c4c49efb23b415ec0e5550cdcf257f2938f329305b85"
+    },
+    "x86_64": {
+      "evidence_archive": {
+        "file": "retained-expanded-x86_64.tar.gz",
+        "bytes": 300357817,
+        "sha256": "d1a4ed42ff916ca2421a0a0b456f64a4fb3eaae2afdeaf0e01c38a7af00497b9"
+      },
+      "native_distribution": {
+        "file": "invarlock-native-final-linux-x86_64.tar.gz",
+        "bytes": 9156014,
+        "sha256": "24f288269a49c79ac6369a5fe5de824f918f66561289ba1213ba606dc14f131b"
+      },
+      "native_wheel": {
+        "file": "invarlock_native_experiment-0.1.0-cp312-cp312-manylinux_2_34_x86_64.whl",
+        "bytes": 6241029,
+        "sha256": "4a88be80ad3fe455e9822885f862773753713c438dc1ab686e57c9ca7f22515f"
+      },
+      "comparison_summary": {
+        "file": "standalone-expanded-x86_64.json",
+        "bytes": 57384,
+        "sha256": "66acae0bb5921e408c435fe380e1e9633202d625fe47c3b2d54d79c8c2aae651"
+      },
+      "buffer_summary": {
+        "file": "ffi-boundary-x86_64.json",
+        "bytes": 3715,
+        "sha256": "ed78bab0011cc7f2ca6b153baf63c8c15e77088cecd98d08470c078c50fbb088"
+      },
+      "qualification_executions": 68,
+      "timed_executions": 340,
+      "buffer_executions": 36,
+      "all_matched": true,
+      "harness_sha256": "ab6136a5391e3c11164ed21da3da72ab873370f4dde4b06544ea131fb5bdd6f7",
+      "fixture_manifest_sha256": "c64a76d8370f9179a168c4c49efb23b415ec0e5550cdcf257f2938f329305b85"
+    }
+  },
+  "retention": "Full evidence remains on TB4. Only compact summaries, charts and metadata are committed. Synthetic fixture private keys are not included in public reports.",
+  "host_qualification_archive": {
+    "file": "host-qualification-evidence.tar.gz",
+    "bytes": 331162100,
+    "sha256": "175c1ad3b9a6800f38b85368437e573b28b80b14a086e2dd784bcda01e62a40c",
+    "scope": "Host qualification logs, failed preparation/recovery attempts, retained import corpus, all expanded source snapshots and recovery scripts."
+  },
+  "final_checks": {
+    "docs_check": "passed, including strict build, spelling and public-text checks",
+    "python_lint": "44 native test/tool/comparison files passed Ruff; report renderer passed after formatting fixes",
+    "production_source_match": 463,
+    "reference_refetched_unchanged": true
+  },
+  "final_delivery_check_log": {
+    "file": "final-delivery-checks.log",
+    "sha256": "acb7f3eee22a0cfed976a2b6fa9a07073acfe799d00f63bcb537f4d80cea382b",
+    "result": "passed"
+  },
+  "source_relation": "The retained source archive identifies the qualified binary build. All 463 relevant current production files match it; report, documentation and separately identified harness/fixture updates followed the build freeze."
+}

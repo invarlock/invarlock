@@ -1,3 +1,7 @@
+#[path = "judge_import.rs"]
+mod judge_import;
+#[path = "runtime_import.rs"]
+mod runtime_import;
 #[path = "setup.rs"]
 mod setup;
 // Offline user commands. No Python interpreter or automatic compatibility fallback.
@@ -55,6 +59,44 @@ impl Args {
             }
             i += 1;
         }
+        for (key, variable) in [
+            ("signing-key", "INVARLOCK_SIGNING_KEY"),
+            ("policy", "INVARLOCK_POLICY"),
+            ("verifier-signing-key", "INVARLOCK_VERIFIER_SIGNING_KEY"),
+            ("verifier-identity", "INVARLOCK_VERIFIER_IDENTITY"),
+            (
+                "expected-baseline-artifact",
+                "INVARLOCK_EXPECTED_BASELINE_ARTIFACT",
+            ),
+            (
+                "expected-subject-artifact",
+                "INVARLOCK_EXPECTED_SUBJECT_ARTIFACT",
+            ),
+            ("expected-baseline-run", "INVARLOCK_EXPECTED_BASELINE_RUN"),
+            ("expected-subject-run", "INVARLOCK_EXPECTED_SUBJECT_RUN"),
+            (
+                "expected-baseline-runtime",
+                "INVARLOCK_EXPECTED_BASELINE_RUNTIME",
+            ),
+            (
+                "expected-subject-runtime",
+                "INVARLOCK_EXPECTED_SUBJECT_RUNTIME",
+            ),
+            ("expected-schedule", "INVARLOCK_EXPECTED_SCHEDULE"),
+            ("expected-signer", "INVARLOCK_EXPECTED_SIGNER"),
+            (
+                "expected-request-digest",
+                "INVARLOCK_EXPECTED_REQUEST_DIGEST",
+            ),
+        ] {
+            if allowed.contains(&key) && !a.values.contains_key(key) {
+                if let Ok(value) = std::env::var(variable) {
+                    if !value.is_empty() {
+                        a.values.insert(key.into(), vec![value]);
+                    }
+                }
+            }
+        }
         Ok(a)
     }
     fn get(&self, k: &str) -> Option<&str> {
@@ -84,6 +126,7 @@ fn outcome(payload: Value, status: u8) -> Result<evidence::transaction::Outcome>
         payload,
         status,
         verified_report: None,
+        terminal: None,
     })
 }
 pub fn run(command: &str, args: &[String]) -> Result<evidence::transaction::Outcome> {
@@ -127,7 +170,9 @@ pub fn run(command: &str, args: &[String]) -> Result<evidence::transaction::Outc
             }
             let config = json!({"evidence_path":a.input()?,"html_path":a.path("html")?,"markdown_path":a.path("markdown")?,"junit_path":a.path("junit")?,"explain":a.flag("explain"),"case_ids":a.values.get("case-id").cloned().unwrap_or_default()});
             let result = evidence::reporting::render(&config);
-            outcome(result.payload, result.status)
+            let mut output = outcome(result.payload, result.status)?;
+            output.terminal = Some(result.text);
+            Ok(output)
         }
         "verify" => {
             let a = Args::parse(
@@ -152,6 +197,11 @@ pub fn run(command: &str, args: &[String]) -> Result<evidence::transaction::Outc
                 ],
             )?;
             let input = a.input()?;
+            if !std::fs::symlink_metadata(&input)
+                .is_ok_and(|m| m.is_dir() && !m.file_type().is_symlink())
+            {
+                return Err(err("evidence must be a real directory"));
+            }
             let set = input.join("evidence-set.json").exists();
             let judge = input.join("envelope.json").exists();
             let trust = a.path("trust-profile")?;
@@ -286,8 +336,8 @@ pub fn run(command: &str, args: &[String]) -> Result<evidence::transaction::Outc
                 input.parent().unwrap().to_path_buf()
             };
             contracts::request::validate_authored(&request)?;
-            if request["execution"]["mode"] != "captured" {
-                return Err(err("this standalone evaluate path requires captured inputs; model execution still requires the explicit compatibility integration"));
+            if request["format_version"] == "invarlock/evaluation-request-v3" {
+                return judge_import::run(&a, &request, &root);
             }
             if request["comparison"]["metric"] == "judge" {
                 return Err(err("configured judge collection requires the explicit compatibility integration; retained judge evidence supports standalone verify and report"));
@@ -305,6 +355,9 @@ pub fn run(command: &str, args: &[String]) -> Result<evidence::transaction::Outc
                 request["output"]["evidence"] = json!(path
                     .strip_prefix(&root)
                     .map_err(|_| err("output must be inside request root"))?);
+            }
+            if request["execution"]["mode"] != "captured" {
+                return runtime_import::run(&a, &request, &root);
             }
             for side in ["baseline", "subject"] {
                 if request["comparison"][side].get("adapter").is_none() {
@@ -338,14 +391,41 @@ pub fn run(command: &str, args: &[String]) -> Result<evidence::transaction::Outc
             let published = evidence::captured::publish(&prepared)?;
             let manifest = &published["manifest"];
             let verdict = &published["comparison"]["decision"];
-            outcome(
+            let mut result = outcome(
                 json!({"format_version":"invarlock/evaluation-result-v2","kind":"captured","ok":true,"evidence":preflight["output"],"comparison_id":manifest["comparison_id"],"baseline_run_digest":preflight["baseline_run_digest"],"subject_run_digest":preflight["subject_run_digest"],"policy_digest":preflight["policy_digest"],"authentication":manifest["authentication"],"policy_verdict":verdict,"decision":verdict,"pack_manifest_digest":published["pack_manifest_digest"],"request_digest":preflight["request_digest"]}),
                 if a.flag("fail-on-policy") && verdict != "pass" {
                     7
                 } else {
                     0
                 },
-            )
+            )?;
+            if !a.flag("json") {
+                let mut lines = Vec::new();
+                for metric in published["comparison"]["metrics"].as_array().unwrap() {
+                    let missing = metric["missing_ids"].as_array().map_or(0, Vec::len);
+                    let safe =
+                        |v: &Value| evidence::reporting::terminal_text(v.as_str().unwrap_or(""));
+                    lines.push(format!(
+                        "{} / {}: {}; {} usable pairs; {} missing results",
+                        safe(&metric["name"]),
+                        safe(&metric["slice"]),
+                        safe(&metric["decision"]),
+                        metric["count"]
+                            .as_u64()
+                            .unwrap_or(0)
+                            .saturating_sub(missing as u64),
+                        missing
+                    ));
+                    if let Some(reasons) = metric["reasons"].as_array().filter(|r| !r.is_empty()) {
+                        lines.push(format!(
+                            "Recorded reasons: {}",
+                            reasons.iter().map(safe).collect::<Vec<_>>().join("; ")
+                        ));
+                    }
+                }
+                result.terminal = Some(lines.join("\n"));
+            }
+            Ok(result)
         }
         _ => Err(err("unsupported standalone workflow")),
     }

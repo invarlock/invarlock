@@ -86,9 +86,11 @@ The standalone executable now provides its own `report --package` workflow; see
 [standalone offline workflows](../experiments/rust/STANDALONE.md) for the implemented
 commands, parity boundaries and remaining migration work.
 
-Provider discovery, external evaluator format adapters, SDK calls and model
-execution remain Python integrations. The standalone front door has its own
-bounded strict YAML decoder for captured requests. Rust owns the portable
+SDK calls, model execution and installed custom providers remain Python
+integrations. The standalone front door owns bounded strict YAML decoding,
+external evaluator-format imports, retained runtime import and retained judge
+import. An explicit Python compatibility worker is available through the control
+executable; it never searches for an interpreter or falls back automatically. Rust owns the portable
 analysis/evidence path and the selected process, admission and checkpoint work.
 OCI worker images must contain the native extension when Rust is selected.
 The selection also scopes host provider hooks, GGUF inspection and worker-side
@@ -136,8 +138,9 @@ The differential suite checks exact canonical output, binary64 results, signed
 bytes, public error/status behavior, retained historical artifacts, bounded
 resources, interrupted recovery and complete public API paths. Controlled SDK,
 provider and container fixtures are distinct from live execution qualification.
-Linux descriptor execution and real container/provider operation are not
-qualified by macOS fixtures.
+Linux ARM64 and x86_64 suites also exercise descriptor and process fixtures.
+Real container engines, live providers and GPU operation remain separate
+qualification boundaries.
 
 The original interval measurements are retained under `experiments/rust/`.
 They describe that earlier slice only. Expanded measurements use separate frozen

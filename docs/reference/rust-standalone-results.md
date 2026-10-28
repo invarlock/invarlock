@@ -1,12 +1,18 @@
 # Standalone Rust checkpoint
 
+This is the historical 16-workload checkpoint. The
+[expanded standalone comparison](rust-standalone-expanded-results.md) covers the
+completed offline imports, compatibility worker, Linux bundles and separate FFI
+measurements. Its final qualification also resolves the environment gates left
+open at this checkpoint.
+
 The implemented standalone workflows preserve the exercised outputs and reduce median elapsed time, CPU time and peak RSS in every measured workload on both Linux targets. This checkpoint does not complete the migration or measure Python FFI overhead.
 
 ## Scope and protocol
 
 Reference: corrected Python 0.17.3 at `staging/next` revision `1dc9cb644684dc915810da77326f6da8764c58c1`. Each target ran 32 qualification executions followed by 160 timed executions: 16 workloads, two implementations, five balanced rounds. All 192 executions per target matched; there were no retries or exclusions within either final run. A fresh-exec supervisor measured wall time, total user/system CPU and process peak RSS. Identity checks ran outside timed processes.
 
-Each Linux container had a four-CPU quota and a 12 GiB memory limit. ARM64 ran in a local Docker VM; x86_64 ran on the authorized remote KVM server reporting AMD EPYC 9655 processors. These are separate within-machine comparisons, not a comparison of hardware performance. Rust ran with `PATH=/nonexistent`. No model, provider, network or GPU execution was timed.
+Each Linux container had a four-CPU quota and a 12 GiB memory limit. ARM64 ran in a local Docker VM; x86_64 ran on the authorized remote KVM server reporting AMD EPYC 9655 processors. These are separate within-machine comparisons, not a comparison of hardware performance. Rust ran with an empty executable search path. No model, provider, network or GPU execution was timed.
 
 JSON payloads were compared as values. Deterministic output files were compared by bytes; output paths were normalized. Package generator source identities correctly differ. ZIP compression and metadata differ, while every uncompressed member was checked against the delivered file. These are declared representation differences, not excluded failures.
 
@@ -58,9 +64,19 @@ JSON payloads were compared as values. Deterministic output files were compared 
 
 Both final Linux artifacts passed 143 native checks and 53 standalone parity checks. The latter exercised signed/unsigned captured evaluation, preflight, all-family verification/receipts/reporting/packages, setup, key interoperability and strict request parsing. Fixtures establish their exercised behavior, not all-input equivalence.
 
-The first complete ARM64 run exposed 720.93 MiB Rust peak RSS versus 618.59 MiB Python for 50,000 records. Moving run values into the prepared result removed a duplicate JSON tree. Its original 192 outcomes remain retained. Remote qualification also exposed same-size content mutation that metadata timestamps missed. Pinned-file and snapshot checks now bind content digests; GGUF parsing hashes its own complete input stream. A local intermediate run was stopped when these shared defects were discovered. Its partial outcomes and all failed qualification logs remain retained.
+The first complete ARM64 run exposed 720.93 MiB Rust peak RSS versus 618.59 MiB Python for 50,000
+records. Moving run values into the prepared result removed a duplicate JSON tree. Its original 192
+outcomes remain retained. Remote qualification also exposed same-size content mutation that metadata
+timestamps missed. Pinned-file and snapshot checks now bind content digests; GGUF parsing hashes its
+own complete input stream. A local intermediate run was stopped when these shared defects were
+discovered. Its partial outcomes and all failed qualification logs remain retained.
 
-The host differential attempt passed 505 tests and 16,448 subtests, skipped one unsupported filename case, and failed one OCI test fixture that cancelled before its container identity was ready. Six focused readiness/incomplete-identity cases passed after repair. A Rust timeout fixture was also repaired and passed separately. These two test-only changes followed the measured source freeze; they did not change the measured offline executable. The broader repository gate remains unresolved because its installed Python environment lacks required type stubs and a Transformers class.
+The host differential attempt passed 505 tests and 16,448 subtests, skipped one unsupported filename
+case, and failed one OCI test fixture that cancelled before its container identity was ready. Six
+focused readiness/incomplete-identity cases passed after repair. A Rust timeout fixture was also
+repaired and passed separately. These two test-only changes followed the measured source freeze;
+they did not change the measured offline executable. The broader repository gate remains unresolved
+because its installed Python environment lacks required type stubs and a Transformers class.
 
 External-format imports, runtime-import orchestration, full terminal/environment/error compatibility, explicit compatibility workers and native release packaging remain outside this checkpoint. FFI overhead, large real handoff packs, GGUF read overhead and live provider execution need separate evidence.
 

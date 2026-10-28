@@ -367,7 +367,7 @@ pub fn request_bindings(request: &Value, artifact: &Value, receipt: &Value) -> R
         }
         "tensorrt_llm" => {
             check(
-                artifact["artifact_format"] == "tensorrt_llm",
+                artifact["artifact_format"] == "tensorrt_llm_engine",
                 "tensorrt_llm request and TensorRT-LLM artifact identity do not agree",
             )?;
             for name in [
@@ -506,4 +506,34 @@ pub fn validate_runtime_provider_collection(configuration: &Value, plan: &Value)
     Ok(
         json!({"max_calls": configuration["max_calls"], "max_output_tokens": configuration["max_output_tokens"]}),
     )
+}
+
+#[cfg(test)]
+mod retained_request_tests {
+    use super::*;
+    #[test]
+    fn tensorrt_import_binds_the_engine_artifact_format() {
+        let hash = "a".repeat(64);
+        let artifact = json!({"artifact_format":"tensorrt_llm_engine","builder_config_sha256":hash,"engine_bundle_tree_sha256":hash,"engine_metadata_sha256":hash,"file_inventory_sha256":hash,"target_compute_capability":"9.0","tokenizer_metadata_sha256":hash});
+        let receipt = json!({"plugin":{"name":"tensorrt_llm"},"backend":{"name":"TensorRT-LLM","build_sha256":hash,"version":"1.0","binary_sha256":hash,"source_sha256":null},"execution_settings":{"allow_network":false,"batch_size":1,"context_length":128,"max_output_tokens":8,"seed":0,"timeout_seconds":30},"device":{"compute_capability":"9.0"}});
+        let mut settings = artifact.as_object().unwrap().clone();
+        settings.remove("artifact_format");
+        settings.extend(receipt["execution_settings"].as_object().unwrap().clone());
+        settings.remove("allow_network");
+        for (field, value) in [
+            ("backend_build_sha256", json!(hash)),
+            ("backend_version", json!("1.0")),
+            ("runner_binary_sha256", json!(hash)),
+        ] {
+            settings.insert(field.into(), value);
+        }
+        let side = json!({"runtime":{"provider":"tensorrt_llm","settings":settings}});
+        request_bindings(&side, &artifact, &receipt).unwrap();
+        let mut wrong = artifact.clone();
+        wrong["artifact_format"] = json!("tensorrt_llm");
+        assert!(request_bindings(&side, &wrong, &receipt).is_err());
+        let mut wrong = receipt.clone();
+        wrong["device"]["compute_capability"] = json!("8.0");
+        assert!(request_bindings(&side, &artifact, &wrong).is_err());
+    }
 }

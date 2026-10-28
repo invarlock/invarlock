@@ -3538,6 +3538,8 @@
         "pkg:cargo/invarlock-native-contracts@0.1.0",
         "pkg:cargo/invarlock-native-execution@0.1.0",
         "pkg:cargo/invarlock-native-filesystem@0.1.0",
+        "pkg:cargo/invarlock-native-verifier@0.1.0",
+        "pkg:cargo/libc@0.2.186",
         "pkg:cargo/serde_json@1.0.149"
       ]
     },
@@ -3597,6 +3599,7 @@
     {
       "ref": "pkg:cargo/invarlock-native-verifier@0.1.0",
       "dependsOn": [
+        "pkg:cargo/base64@0.22.1",
         "pkg:cargo/ed25519-dalek@2.2.0",
         "pkg:cargo/invarlock-native-contracts@0.1.0",
         "pkg:cargo/invarlock-native-core@0.1.0",

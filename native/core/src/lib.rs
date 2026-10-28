@@ -400,8 +400,8 @@ pub use judge::{judge_plan_precision, judge_statistics};
 mod judge_contracts;
 pub use judge_contracts::{
     expected_judge_trial_id, measurement_plan_digest, render_judge_request,
-    render_judge_runtime_prompt, validate_judge_analysis_policy, validate_measurement_plan,
-    validate_measurements,
+    render_judge_runtime_prompt, validate_frozen_answers, validate_judge_analysis_policy,
+    validate_measurement_plan, validate_measurements,
 };
 mod judge_analysis;
 pub use judge_analysis::{analyze_measurements, combine_judge_analysis_results};

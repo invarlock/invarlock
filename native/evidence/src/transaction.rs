@@ -12,10 +12,12 @@ pub struct Outcome {
     pub payload: Value,
     pub status: u8,
     pub verified_report: Option<Value>,
+    pub terminal: Option<String>,
 }
 pub const COMMANDS: &[&str] = &[
     "report",
     "client-review",
+    "import-evaluation-run",
     "gguf-identity",
     "canonicalize",
     "validate",
@@ -65,6 +67,11 @@ pub fn dispatch(
     key_bytes: Option<&[u8]>,
 ) -> Result<Outcome> {
     let value = match command {
+        "import-evaluation-run" => {
+            let raw = crate::decode_base64(required_string(config, "raw_base64")?)
+                .map_err(|_| EvidenceError::contract("invalid export base64"))?;
+            crate::imports::parse(&raw, &config["options"])?
+        }
         "client-review" => crate::reporting::handoff::build(config)?,
         "report" => {
             let output = crate::reporting::render(config);
@@ -72,6 +79,7 @@ pub fn dispatch(
                 payload: json!({"text":output.text,"report":output.payload}),
                 status: output.status,
                 verified_report: None,
+                terminal: None,
             });
         }
         "gguf-identity" => crate::gguf::dispatch(config)?,
@@ -201,6 +209,7 @@ pub fn dispatch(
                 payload: result.payload,
                 status: result.status,
                 verified_report: result.verified_report,
+                terminal: None,
             });
         }
         "verify-native-receipt" => native_pack::verify_receipt(config)?,
@@ -303,5 +312,6 @@ pub fn dispatch(
         payload: value,
         status,
         verified_report: None,
+        terminal: None,
     })
 }

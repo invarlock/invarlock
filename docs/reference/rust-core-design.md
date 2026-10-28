@@ -24,9 +24,9 @@ The isolated candidate now contains eight Rust crates covering contracts,
 analysis, filesystem snapshots, evidence transactions, execution, Python bindings,
 an offline verifier and a separate control executable. Public evaluation,
 verification and reporting commands accept an explicit Rust backend. Python
-continues to supply model frameworks, provider SDKs, external format adapters,
-resource negotiation and Python facade YAML loading. The standalone executable
-has its own bounded strict YAML decoder.
+continues to supply model frameworks, provider SDK execution, resource negotiation
+and the existing SDK facade. The standalone executable owns bounded strict YAML
+decoding, all eight export adapter entry points and nineteen evaluator profiles.
 
 The candidate includes captured/native/judge publication and replay, independent
 recipient trust and receipts, evidence sets, qualification and attestations,
@@ -40,16 +40,19 @@ observations and receipts, and GGUF identity inspection through the explicitly
 selected provider backend. The final rebuilt extension and tools passed the
 listed differential fixtures, including these routes; this does not qualify live
 provider execution.
-Provider hooks still run in Python, and `_validate_import_side` currently repeats
-some portable checks there. Low-level Python APIs remain Python unless callers
-select a supported native backend or transaction.
+Model execution and custom provider hooks still run in Python. The Python facade
+repeats some portable checks in `_validate_import_side`; the standalone runtime
+import path performs provider admission, identity binding and publication in Rust.
+Low-level Python APIs remain Python unless callers select a supported native
+backend or transaction.
 
 The implementation coverage ledger at `experiments/rust/implementation-coverage.json`
 records actual files, reachable interfaces, exercised tests, retained artifact
 identities and pending checks. It supplements the target module map without
-claiming every target module or migration stage is complete. Controlled macOS
-fixtures do not qualify live OCI/provider/GPU operation, Linux descriptor
-execution or Windows behavior. The first interval results remain historical.
+claiming every target module or migration stage is complete. Linux ARM64 and
+x86_64 suites additionally exercise descriptor and process
+fixtures. These fixtures do not qualify live OCI/provider/GPU operation or
+Windows behavior. The first interval results remain historical.
 Complete transaction measurements use separately retained artifacts and the
 expanded comparison protocol. The [expanded results](rust-expanded-results.md)
 show faster captured NLL transactions, slower small transactions and higher peak
@@ -62,8 +65,14 @@ reports and handoff packages for all four evidence families, plus setup. The
 [Linux standalone comparison](rust-standalone-results.md) retains completed
 ARM64 and x86_64 results against corrected Python 0.17.3. Those results supersede
 neither the historical FFI timing boundary nor the remaining migration work.
-External-format import, public runtime-import assembly, explicit compatibility
-workers and complete CLI/distribution behavior remain unfinished.
+The expanded implementation adds external-format import, public runtime-import
+assembly, retained judge import, an explicit bounded Python compatibility worker,
+CLI environment defaults and Linux binary bundles. Default terminal presentation
+is native plain text; exact Rich layout and exhaustive malformed-input diagnostic
+wording are not claimed. See the [native installation guide](rust-native-installation.md)
+for ownership, usage and deployment limits. The
+[expanded standalone comparison](rust-standalone-expanded-results.md) measures
+these additional paths and Python/Rust FFI separately from standalone execution.
 
 ## Objective and constraints
 

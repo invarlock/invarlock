@@ -1,0 +1,126 @@
+{
+  "plan": {
+    "format": "invarlock/ffi-boundary-v2",
+    "sizes": [
+      64,
+      1048576,
+      16777216,
+      67108864
+    ],
+    "rounds": 3,
+    "candidates": [
+      "python",
+      "immutable",
+      "mutable"
+    ],
+    "tiny_iterations": 1000,
+    "other_iterations": 1,
+    "script_sha256": "52d7cacf58100b482f26eb57b56c41f59aad8d000701176a26cd8da2d37f652d",
+    "native_extension_files": {
+      "invarlock_native.cpython-312-x86_64-linux-gnu.so": "bccb0111147b2586ab06c29ad291445ca7421dc4efe147e665b0d4c90778cb68"
+    },
+    "scope": "Separate Linux FFI diagnostic: canonical JSON, immutable and mutable buffers.\n\nIdentity checks are outside measured workers. Each fresh child includes imports,\ninput read, repeated canonicalization and one output hash. The inner operation\nclock excludes imports, input loading and the final hash. No retry or exclusions.\nThis diagnostic is not a substitute for complete evaluation/verification timing.\n",
+    "retries": 0,
+    "exclusions": 0
+  },
+  "all_matched": true,
+  "outcomes": 36,
+  "rows": [
+    {
+      "size": 64,
+      "python": {
+        "elapsed_seconds": 0.025504222,
+        "cpu_seconds": 0.025445,
+        "peak_rss_mib": 16.5,
+        "operation_seconds": 0.003006730999913998,
+        "samples": 3
+      },
+      "immutable": {
+        "elapsed_seconds": 0.02369819,
+        "cpu_seconds": 0.023638000000000003,
+        "peak_rss_mib": 19.75,
+        "operation_seconds": 0.00037986999086569995,
+        "samples": 3
+      },
+      "mutable": {
+        "elapsed_seconds": 0.02349095,
+        "cpu_seconds": 0.023438999999999998,
+        "peak_rss_mib": 19.75,
+        "operation_seconds": 0.00041141000110656023,
+        "samples": 3
+      }
+    },
+    {
+      "size": 1048576,
+      "python": {
+        "elapsed_seconds": 0.027120381,
+        "cpu_seconds": 0.027065,
+        "peak_rss_mib": 20.23046875,
+        "operation_seconds": 0.003205151006113738,
+        "samples": 3
+      },
+      "immutable": {
+        "elapsed_seconds": 0.025118781,
+        "cpu_seconds": 0.025066,
+        "peak_rss_mib": 22.5,
+        "operation_seconds": 0.0014723310014232993,
+        "samples": 3
+      },
+      "mutable": {
+        "elapsed_seconds": 0.026485281,
+        "cpu_seconds": 0.026421,
+        "peak_rss_mib": 24.5703125,
+        "operation_seconds": 0.0017660910089034587,
+        "samples": 3
+      }
+    },
+    {
+      "size": 16777216,
+      "python": {
+        "elapsed_seconds": 0.085285247,
+        "cpu_seconds": 0.085201,
+        "peak_rss_mib": 80.23046875,
+        "operation_seconds": 0.047718071000417694,
+        "samples": 3
+      },
+      "immutable": {
+        "elapsed_seconds": 0.063306808,
+        "cpu_seconds": 0.063224,
+        "peak_rss_mib": 67.75,
+        "operation_seconds": 0.025539260997902602,
+        "samples": 3
+      },
+      "mutable": {
+        "elapsed_seconds": 0.073884233,
+        "cpu_seconds": 0.073807,
+        "peak_rss_mib": 99.56640625,
+        "operation_seconds": 0.03169648400216829,
+        "samples": 3
+      }
+    },
+    {
+      "size": 67108864,
+      "python": {
+        "elapsed_seconds": 0.283553905,
+        "cpu_seconds": 0.283463,
+        "peak_rss_mib": 272.73046875,
+        "operation_seconds": 0.210839623992797,
+        "samples": 3
+      },
+      "immutable": {
+        "elapsed_seconds": 0.177177237,
+        "cpu_seconds": 0.17709,
+        "peak_rss_mib": 211.82421875,
+        "operation_seconds": 0.1028313650022028,
+        "samples": 3
+      },
+      "mutable": {
+        "elapsed_seconds": 0.209974673,
+        "cpu_seconds": 0.209876,
+        "peak_rss_mib": 275.5703125,
+        "operation_seconds": 0.11951776199566666,
+        "samples": 3
+      }
+    }
+  ]
+}

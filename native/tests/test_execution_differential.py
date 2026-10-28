@@ -67,6 +67,7 @@ def _native(script: str, payload: bytes, stdout_limit: int, stderr_limit: int):
         ("import sys; sys.exit(7)", b"x" * 300_000),
         ("import os; os.write(1,b'abc'); os.write(2,b'def')", b""),
     ],
+    ids=["echo", "concurrent-stderr", "slow-consumer", "early-exit", "small-streams"],
 )
 def test_real_pipe_output_matches_python(script, payload):
     assert _native(script, payload, 1_000_000, 1_000_000) == _python(

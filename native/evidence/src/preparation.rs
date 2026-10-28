@@ -36,7 +36,7 @@ fn read(
     }
     Ok(bytes)
 }
-fn output(root: &Path, value: &Value) -> Result<PathBuf> {
+pub fn runtime_destination(root: &Path, value: &Value) -> Result<PathBuf> {
     let path = reference(root, value, "output.evidence")?;
     let parts = request::reference_parts(value.as_str().unwrap(), "output.evidence")?;
     let mut current = root.to_path_buf();
@@ -71,7 +71,11 @@ fn run(root: &fs::PinnedDirectory, authored: &Value, config: &Value, side: &str)
     let result = (|| -> Result<Value> {
         let imported = source["adapter"] != "invarlock";
         let value = if imported {
-            let value=config["imported_runs"].get(side).ok_or_else(||error("external evaluator format requires its explicitly supplied Python import adapter"))?.clone();
+            let value = if let Some(value) = config["imported_runs"].get(side) {
+                value.clone()
+            } else {
+                crate::imports::parse(&raw, source)?
+            };
             if value["source_digest"] != sha256_digest(&raw) {
                 return Err(error(
                     "imported run source digest does not match the captured input bytes",
@@ -129,7 +133,7 @@ pub fn prepare_captured(config: &Value) -> Result<Value> {
     let pinned = fs::PinnedDirectory::open(&root, false).map_err(io_error)?;
     let authored = &config["authored_request"];
     request::validate_schema(authored, true)?;
-    let destination = output(&root, &authored["output"]["evidence"])?;
+    let destination = runtime_destination(&root, &authored["output"]["evidence"])?;
     let baseline = run(&pinned, authored, config, "baseline")?;
     let subject = run(&pinned, authored, config, "subject")?;
     let raw = read(

@@ -1,4 +1,5 @@
 //! Execution authority is kept out of the offline verifier binary.
+mod compatibility;
 use invarlock_native_contracts::{canonical_json, parse_json, Value};
 use invarlock_native_execution::{Amounts, Checkpoint, ProcessSpec, TransactionStatus};
 use serde_json::json;
@@ -431,6 +432,36 @@ fn dispatch(v: &Value) -> Result<Value> {
 }
 fn main() {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
+    if args.iter().any(|v| v == "--python-worker") {
+        std::process::exit(compatibility::entry(&args));
+    }
+    if args.is_empty()
+        || args.first().is_some_and(|v| {
+            [
+                "evaluate",
+                "verify",
+                "report",
+                "--help",
+                "help",
+                "--version",
+                "--capabilities",
+            ]
+            .iter()
+            .any(|s| v == s)
+        })
+    {
+        let args = args
+            .into_iter()
+            .map(|v| v.into_string())
+            .collect::<std::result::Result<Vec<_>, _>>();
+        match args {
+            Ok(args) => std::process::exit(invarlock_native_verifier::entry(args).into()),
+            Err(_) => {
+                eprintln!("command arguments must be valid UTF-8");
+                std::process::exit(2);
+            }
+        }
+    }
     let result = (|| -> Result<Value> {
         if args.len() == 1 && args[0] == "diagnostics" {
             return Ok(

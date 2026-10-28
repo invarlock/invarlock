@@ -29,7 +29,8 @@
     "htmlcov/**",
     "*.egg-info/**",
     "native/vendor/jsonschema/README.md",
-    "native/vendor/serde_json/README.md"
+    "native/vendor/serde_json/README.md",
+    "native/licenses/**"
   ],
   "words": [
     "metaschema",

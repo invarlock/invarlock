@@ -23,3 +23,6 @@ htmlcov/**
 native/vendor/jsonschema/README.md
 native/vendor/serde_json/README.md
 native/vendor/serde_json/CONTRIBUTING.md
+
+# Exact retained handoff text shared with the Python publisher.
+native/evidence/src/reporting/assets/handoff/*.md

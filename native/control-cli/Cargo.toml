@@ -13,3 +13,6 @@ invarlock-native-execution = { path = "../execution", version = "=0.1.0" }
 invarlock-native-filesystem = { path = "../filesystem", version = "=0.1.0" }
 invarlock-native-contracts = { path = "../contracts", version = "=0.1.0" }
 serde_json = { version = "=1.0.149", features = ["arbitrary_precision", "preserve_order"] }
+
+invarlock-native-verifier = { path = "../cli" }
+libc = "=0.2.186"

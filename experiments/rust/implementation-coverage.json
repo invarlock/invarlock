@@ -2,7 +2,7 @@
   "format": "invarlock/native-implementation-coverage-v1",
   "target_architecture_manifest": "experiments/rust/module-map.json",
   "scope": "Implemented experimental contracts, analysis, evidence, reporting, filesystem, and execution surfaces, with explicit Python integrations. This supplements the target-ownership map; it does not claim exhaustive parity, migration of every mapped module, or completion of an architectural stage.",
-  "backend_selection": "Python remains the default. Rust is selected explicitly through backend arguments, the native transaction adapter, or native command-line operations. Provider SDK execution and external-format import adapters remain explicit host integrations.",
+  "backend_selection": "Python remains the default public package. Rust is selected explicitly through backend arguments, native transactions, or native executables. Standalone offline imports and evidence workflows are native; model/SDK/custom-plugin execution requires explicit compatibility integration.",
   "groups": [
     {
       "surface": "Strict JSON, canonical bytes, and packaged schemas",
@@ -86,9 +86,9 @@
         "Actual source facade projections for run and import requests; explicit JSONL import followed by native publication."
       ],
       "remaining_boundaries": [
-        "Provider registry admission, configuration hooks, and artifact resources remain explicit host adapters; standalone YAML decoding is implemented.",
-        "External evaluator formats remain Python import adapters; native preparation checks imported canonical values and their physical source digest against owned input bytes.",
-        "Malformed filesystem OS error text has not been exhaustively matched."
+        "Model execution, installed custom providers and resource negotiation remain explicit host integrations. Native provider admission and retained runtime imports cover the four built-in provider identities.",
+        "The Python facade can still supply imported canonical values; standalone preparation parses external evaluator formats and binds their physical source digest natively.",
+        "Malformed filesystem OS error wording has not been exhaustively matched."
       ],
       "status": "qualified_on_listed_fixtures",
       "evidence_reference": "qualification.final_aggregate"
@@ -581,6 +581,45 @@
       ],
       "status": "qualified_on_listed_fixtures",
       "evidence_reference": "qualification.final_aggregate"
+    },
+    {
+      "surface": "Standalone offline imports, native CLI and explicit compatibility worker",
+      "native_files": [
+        "native/evidence/src/imports",
+        "native/cli/src/runtime_import.rs",
+        "native/cli/src/provider_spec.rs",
+        "native/cli/src/judge_import.rs",
+        "native/cli/src/terminal.rs",
+        "native/control-cli/src/compatibility.rs",
+        "src/invarlock/native_compat_worker.py",
+        "native/tools/package_binaries.py"
+      ],
+      "facade_reachability": [
+        "Native public evaluate, verify and report commands; import-evaluation-run transaction.",
+        "Explicit --python-worker with bounded capture, deadline and process-group cancellation; matching native extension required."
+      ],
+      "test_sources": [
+        "native/tests/test_standalone_imports.py",
+        "native/tests/test_standalone_judge_import.py",
+        "native/tests/test_standalone_cli.py",
+        "native/tests/test_compatibility_worker.py",
+        "native/tools/replay_import_corpus.py",
+        "native/cli/src/assets/provider-identity-corpus.json"
+      ],
+      "exercised_behavior": [
+        "Eight export adapters and nineteen evaluator profiles; 275 accepted exports and 191 rejection outcomes match the reference corpus. One alternate test-limit configuration is retained separately.",
+        "Four built-in provider identity contracts exercised with 521 configuration cases; retained runtime import binds original six-file observations and receipts.",
+        "Signed and unsigned judge import, missing inputs and preflight; exact evidence bytes.",
+        "Installed scorer publication, worker deadline and descendant cancellation; native defaults and error payload shapes.",
+        "Linux ARM64 and x86_64 checksum-verified bundles launch offline with no discoverable Python interpreter."
+      ],
+      "remaining_boundaries": [
+        "Live SDK/model/GPU execution and real OCI engines have not been qualified.",
+        "Plain native terminal presentation differs from Rich. Exact malformed-input wording is not exhaustively equivalent.",
+        "Bundled executable compatibility is established only for the retained Linux build environments."
+      ],
+      "status": "qualified_on_listed_fixtures",
+      "evidence_reference": "qualification.expanded_standalone"
     }
   ],
   "audit": {
@@ -618,9 +657,9 @@
   },
   "known_boundaries": [
     "Selected Rust runtime evaluation still runs _validate_import_side in Python, including repeated portable receipt/configuration/request-binding checks alongside required provider capability and artifact-identity hooks. Removing those repetitions requires a validated side-facts interface and diagnostic-order qualification.",
-    "Strict YAML decoding, provider discovery, resource negotiation, model and evaluator SDK execution, and external evaluator format import remain explicit Python adapters.",
+    "The existing Python facade retains YAML and import adapters for compatibility. Standalone strict YAML and all export adapter entry points are native. Model/provider SDK execution, live judge collection, resource negotiation and custom plugins remain explicit Python integrations.",
     "Low-level Python APIs remain Python unless their caller selects an exposed native transaction, native executable, or supported backend argument. Availability of a native counterpart does not imply every Python entry point routes through it.",
-    "Real OCI engines, live provider calls, GPU workloads and Linux descriptor execution are not qualified by the retained macOS fixtures. Current Unix-specific native code requires a Windows port."
+    "Linux ARM64 and x86_64 descriptor/process fixtures are qualified by the expanded Linux suites. Real OCI engines, live provider calls, GPU workloads, older Linux C library versions and Windows remain unqualified."
   ],
   "qualification": {
     "current_artifact_status": "passed_listed_fixtures",
@@ -690,6 +729,29 @@
       "timed_executions": 320,
       "all_matched": true,
       "scope": "Canonical captured evaluation; four-family verification, reports and handoff packages; strict authored JSON/YAML and setup have separate fixture coverage. External formats, public runtime import and compatibility workers remain incomplete."
+    },
+    "expanded_standalone": {
+      "linux_arm64": {
+        "passed": 583,
+        "skipped": 1,
+        "subtests_passed": 16448
+      },
+      "linux_x86_64": {
+        "passed": 583,
+        "skipped": 1,
+        "subtests_passed": 16448
+      },
+      "skip": "The separate sdist archive was not provided to Linux pytest; its exact-byte test passed independently on the host.",
+      "source_archive_sha256": "80385c6dab7bf8adb0410847c2527eb5021d844f4a944fe2d1f636b712477496",
+      "comparison_status": "complete: 816 workflow executions and 72 separate buffer diagnostics matched across the two Linux targets",
+      "report": "docs/reference/rust-standalone-expanded-results.md",
+      "artifacts": "experiments/rust/results/standalone-expanded-artifacts.json",
+      "results": [
+        "experiments/rust/results/standalone-expanded-aarch64.json",
+        "experiments/rust/results/standalone-expanded-x86_64.json"
+      ],
+      "performance": "Standalone Rust had lower median elapsed, CPU and peak RSS on all 24 workflows per architecture. Python/Rust FFI had lower elapsed and CPU on 19/20 workflows and lower peak RSS on 2/20, on each architecture; those sets need not be the same workloads.",
+      "production_source_files_matched": 463
     }
   }
 }
