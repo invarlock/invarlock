@@ -20,6 +20,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 from jsonschema import Draft202012Validator
 
+from invarlock.ed25519 import verify_ed25519_signature
 from invarlock.evaluation_record_contracts import contracts as record_contracts
 from invarlock.evaluation_record_contracts.contracts import (
     EvaluationRecordsError,
@@ -438,8 +439,10 @@ def authenticate_manifest(
         )
         if not isinstance(public, ed25519.Ed25519PublicKey):
             raise ValueError("manifest signer must be Ed25519")
-        public.verify(
-            base64.b64decode(signature["signature"]["value"], validate=True), raw
+        verify_ed25519_signature(
+            public,
+            base64.b64decode(signature["signature"]["value"], validate=True),
+            raw,
         )
     except (ValueError, TypeError, InvalidSignature) as exc:
         raise CapturedIntegrityError("captured manifest signature is invalid") from exc

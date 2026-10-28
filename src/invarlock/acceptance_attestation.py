@@ -25,6 +25,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
 from invarlock.core.checkpoint_identity import checkpoint_tree_sha256
+from invarlock.ed25519 import verify_ed25519_signature
 from invarlock.evidence_pack_integrity import public_key_fingerprint
 from invarlock.evidence_pack_json import (
     StrictJsonError,
@@ -352,7 +353,9 @@ def _authenticate_receipt(
         if not isinstance(encoded_signature, str):
             raise ValueError("signature value is invalid")
         signature_bytes = base64.b64decode(encoded_signature, validate=True)
-        public_key.verify(signature_bytes, _canonical_json_bytes(statement))
+        verify_ed25519_signature(
+            public_key, signature_bytes, _canonical_json_bytes(statement)
+        )
     except (InvalidSignature, TypeError, ValueError) as exc:
         raise AcceptanceAttestationError(
             "embedded receipt signature verification failed"
@@ -856,7 +859,8 @@ def _authenticated_statement(
             "recipient public key does not match DSSE key ID"
         )
     try:
-        public_key.verify(
+        verify_ed25519_signature(
+            public_key,
             signature_bytes,
             _dsse_pae(DSSE_PAYLOAD_TYPE, payload),
         )

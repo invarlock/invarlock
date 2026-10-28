@@ -14,6 +14,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
 from invarlock import evidence_pack_json as evidence_pack_json_mod
+from invarlock.ed25519 import verify_ed25519_signature
 
 MANIFEST_SIGNATURE_FILENAME = "manifest.signature.json"
 EVIDENCE_PACK_SIGNATURE_FORMAT = "invarlock/evidence-pack-signature-v1"
@@ -269,7 +270,7 @@ def verify_signature(
         manifest_bytes = evidence_pack_json_mod.read_regular_file_bytes(
             pack_dir / "manifest.json", label="manifest.json", max_bytes=256 * 1024
         )
-        public_key_obj.verify(signature_bytes, manifest_bytes)
+        verify_ed25519_signature(public_key_obj, signature_bytes, manifest_bytes)
     except (TypeError, ValueError, evidence_pack_json_mod.StrictJsonError) as exc:
         return [f"manifest signature verification failed: {exc}"], [], fingerprint
     except InvalidSignature:

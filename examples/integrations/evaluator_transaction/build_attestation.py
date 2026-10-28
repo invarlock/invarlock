@@ -16,6 +16,7 @@ from typing import Any
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
+from invarlock.ed25519 import verify_ed25519_signature
 from invarlock.evidence_pack_contract import canonical_json_bytes
 from invarlock.evidence_pack_integrity import public_key_fingerprint
 from invarlock.evidence_pack_json import (
@@ -348,7 +349,8 @@ def verify_evaluator_build_attestation(
             "evaluator builder signature encoding is invalid"
         ) from exc
     try:
-        builder_public_key.verify(
+        verify_ed25519_signature(
+            builder_public_key,
             raw_signature,
             canonical_json_bytes(statement, newline=False),
         )
