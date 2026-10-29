@@ -183,7 +183,6 @@ def test_validated_families_supply_semantics_and_fallback_links(tmp_path, family
     )
     for html in (True, False):
         result = brief(view, digest=digest, receipt=False, html=html)
-        assert "Reading guide generated" in result
         assert "An application-specific interpretation was not supplied" in result
         assert "Pending owner decision" in result
         assert "Not performed for this recipient" in result

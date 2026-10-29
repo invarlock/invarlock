@@ -25,7 +25,9 @@ const { pathToFileURL } = require('node:url');
         note.className='identity identity-block';
         note.style.cssText='font:7pt/1.4 ui-monospace,monospace;border-top:1px solid #d5ded8;padding-top:8px;margin-top:12px;overflow-wrap:anywhere';
         note.textContent='Forwardable summary. Companion package required for supporting records and replay. '+(document.querySelector('footer.identity-block')?'':'Evidence: '+evidence+'. Report snapshot: '+snapshot+'. ')+'Navigation labels refer to files in that package; this PDF contains no file links.';
-        document.querySelector('main').append(note);
+        const identityBlock=document.querySelector('footer.identity-block');
+        if (identityBlock) { note.style.cssText='font:7pt/1.3 system-ui,sans-serif;margin:6px 0 0;overflow-wrap:anywhere'; note.className='scope'; const navigation=document.querySelector('nav'); if(navigation) navigation.after(note); else document.querySelector('main').prepend(note); }
+        else document.querySelector('main').append(note);
       },{snapshot:manifest.snapshot_sha256,evidence:manifest.evidence_statement_sha256});
       await page.pdf({path:output,format:paper,printBackground:paper==='A4'});
     }
