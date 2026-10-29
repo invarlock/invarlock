@@ -31,6 +31,7 @@ from invarlock.captured_normalization import (
     normalize_captured_request,
 )
 from invarlock.client_review import CONTEXT_FORMAT as CLIENT_REVIEW_CONTEXT_FORMAT
+from invarlock.client_review import CONTEXT_FORMAT_V2 as CLIENT_REVIEW_CONTEXT_FORMAT_V2
 from invarlock.client_review import ClientReviewError, build_client_review
 from invarlock.core.checkpoint_identity import checkpoint_tree_sha256
 from invarlock.core.evaluation_request import (
@@ -171,6 +172,7 @@ from invarlock.judge_measurements.acceptance import (
 )
 from invarlock.judge_measurements.captured_workflow import prepare_evaluator_judge
 from invarlock.judge_measurements.source_import import import_judge_sources
+from invarlock.report_delivery import export_client_review
 from invarlock.runtime_import_authoring import (
     RuntimeImportAuthoringError,
     RuntimeImportPairedRecords,
@@ -257,6 +259,8 @@ def compare_runs(
 
 __all__ = [
     "CLIENT_REVIEW_CONTEXT_FORMAT",
+    "CLIENT_REVIEW_CONTEXT_FORMAT_V2",
+    "export_client_review",
     "ClientReviewError",
     "build_client_review",
     "CapturedEvaluationPreflightResult",

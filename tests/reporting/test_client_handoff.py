@@ -72,7 +72,7 @@ def test_package_retains_evidence_receipt_context_and_separate_pending_decision(
     assert 'href="verification.receipt.json"' in brief
     assert "Not authenticated by packaging" in brief
     assert "Not performed for this recipient" in brief
-    assert "Signed manifest verified" not in brief  # not a recipient-acceptance badge
+    assert "not authenticated it against a recipient-owned key" in brief
     assert "An application-specific interpretation was not supplied" in brief
     assert 'href="brief.html"' in (output / "review.html").read_text()
     manifest = json.loads((output / "package-manifest.json").read_text())
@@ -314,13 +314,13 @@ def test_duplicate_json_fields_and_symlink_members_are_rejected(tmp_path):
     assert not (tmp_path / "out").exists()
 
 
-def test_commentary_is_bounded_and_brief_preserves_a_link_to_full_text(tmp_path):
+def test_commentary_is_bounded_and_brief_preserves_full_text(tmp_path):
     value = "Detailed review sentence. " * 80
     ctx = context(tmp_path, recommendation=value)
     build_client_review(
         REFERENCE / "evidence", context_path=ctx, output=tmp_path / "out"
     )
-    assert "full text in review" in (tmp_path / "out/brief.html").read_text()
+    assert value in (tmp_path / "out/brief.html").read_text()
     assert value in (tmp_path / "out/review.html").read_text()
     ctx.write_bytes(b" " * (64 * 1024 + 1))
     with pytest.raises(ClientReviewError, match="limit"):
@@ -356,7 +356,7 @@ def test_plain_language_summary_is_attributed_escaped_and_separate_from_evidence
             assert all(value in unescape(text) for _, value in summary)
         brief = (output / f"brief.{suffix}").read_text()
         assert brief.index("Next action") < brief.index("In plain language")
-        assert brief.index("In plain language") < brief.index("Results at a glance")
+        assert brief.index("Results at a glance") < brief.index("In plain language")
         technical = (output / f"technical-report.{suffix}").read_text()
         assert summary[1][1] not in technical
         assert "1.091" in technical and "1.05" in technical

@@ -78,20 +78,21 @@ package explains how recipients perform their own verification. See the
 
 ## Check print delivery
 
-Print the review from a browser, or use the optional local Chromium helper with
-an already installed Playwright module:
+Use the complete delivery exporter with an installed Playwright module and browser:
 
 ```bash
-node examples/client-review/print.cjs /path/to/playwright \
-  output/client-review-worked/likelihood-adverse A4
+python examples/client-review/export.py \
+  output/client-review-worked/likelihood-adverse output/client-review-delivery \
+  --browser-module /absolute/node_modules/playwright --paper A4
 ```
 
-The helper writes `review.pdf`, `brief.pdf` and cover images inside the example directory,
-then checks a 320-pixel viewport. Use a copied output directory for a second
-paper size if you want to retain both PDFs. PDFs created afterward are not in
-the original ZIP; the ZIP already contains the printable HTML.
+The fresh delivery contains full and summary-only archives, PDF exports and a
+separate final inventory. PDFs print evidence and snapshot identities and state
+the companion-package requirement; they contain no local file URLs. Use `Letter`
+for US paper. Long valid content continues onto further pages without truncating
+conditions. A page-count target is not a comprehension guarantee.
 
-The print regression tests extract the actual PDF and check every authored
-field, with the completed decision on page one, for A4 and US Letter. Both worked
-briefs fit on one page and retain their decisions and next actions. General
-missing-data fixtures remain separate from these complete worked examples.
+The lower-level `print.cjs` writes PDFs and runtime metadata in a fresh package
+copy for diagnostics. Use `export.py` when distributing an inventoried delivery.
+See the client handoff guide for authenticated historical snapshots, structured
+context v2, audience restrictions and reproducibility boundaries.

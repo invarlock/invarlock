@@ -30,7 +30,11 @@ MAX_ARCHIVE_MEMBERS = 50_000
 RUNTIME_PACKAGE_SUFFIXES = frozenset({".json", ".py", ".pyi", ".yaml", ".yml"})
 RUNTIME_PACKAGE_FILENAMES = frozenset({"py.typed"})
 NATIVE_STARTER_DATA_FILES = frozenset(
-    {"_data/examples/native-judge/README.md", "_data/examples/native-judge/cases.jsonl"}
+    {
+        "_data/examples/native-judge/README.md",
+        "_data/examples/native-judge/cases.jsonl",
+        "_data/client-review-print.cjs",
+    }
 )
 OS_METADATA_FILENAMES = frozenset({".DS_Store", "Thumbs.db", "desktop.ini"})
 IMPORT_AFFECTING_SUFFIXES = frozenset({".pth"})

@@ -53,7 +53,7 @@ def test_worked_examples_keep_original_evidence_and_populate_the_review(tmp_path
                 assert value in unescape(review)
                 assert value in unescape(brief)
         assert (
-            "Decision owner and recommendation: Not supplied"
+            "Legacy unstructured commentary"
             in (destination / "technical-report.html").read_text()
         )
         for match in re.finditer(
@@ -166,8 +166,9 @@ def test_worked_review_context_survives_actual_print(tmp_path, name, paper):
         timeout=30,
     )
     brief_pages = json.loads(brief_result.stdout)
-    assert len(brief_pages) == 1
-    brief_text = compact(brief_pages[0])
+    assert brief_pages
+    assert "Recipient verification" in brief_pages[0]
+    brief_text = compact(" ".join(brief_pages))
     for _, value in scenario["summary"]:
         assert compact(value) in brief_text
     for value in (

@@ -319,3 +319,7 @@ InvarLock uses:
 
 These references define primitives and encodings. They do not extend the
 assurance claim beyond the implemented checks and documented assumptions.
+
+## Client report boundary
+
+Client packages keep generated policy facts separate from attributed owner decisions. An authenticated historical receipt snapshot binds independent expectations and an exact evidence identity; it does not establish current signer authorization or deployment fitness. Combined snapshots retain component scopes and the existing conjunction, without a new signed joint attestation.

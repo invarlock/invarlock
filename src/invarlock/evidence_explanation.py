@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import Any, TypedDict
 
+from invarlock.report_reading import exact_number
+
 
 class PolicyCheck(TypedDict):
     name: str
@@ -18,7 +20,7 @@ class PolicyCheck(TypedDict):
 
 
 def _number(value: int | float) -> str:
-    return f"{value:.6g}"
+    return exact_number(value)
 
 
 def core_policy_checks(report: dict[str, Any]) -> list[PolicyCheck]:

@@ -237,6 +237,7 @@ def build_evidence_set_view(
             *first.limitations,
             *second.limitations,
         ),
+        explanations=first.explanations + second.explanations,
         details=tuple(
             (f"Deterministic · {name}", detail) for name, detail in first.details
         )

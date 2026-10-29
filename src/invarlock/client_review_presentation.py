@@ -23,7 +23,7 @@ _STYLE = """
 .score-card{border-top:1px solid #d9dfd3;padding:10px 0}.score-card h3{font-size:16px;margin:0 0 5px;overflow-wrap:anywhere}.score-row{display:grid;grid-template-columns:75px minmax(50px,1fr) 230px;gap:10px;align-items:center;font-size:14px}.score-row strong{text-align:right}.track{height:12px;background:#f1f3ed;border-bottom:1px solid #c5cfc0}.bar{display:block;height:100%;background:#73816d}.bar.candidate{background:#185c78}.score-detail{font-size:12px;font-weight:400;color:#586054}.score-card .scope{margin:3px 0}.result-line{margin-top:8px}summary{cursor:pointer}summary:focus-visible{outline:3px solid #145d7b}
 @media(max-width:600px){main{padding:18px;margin:0}.grid{display:block}.score-row{grid-template-columns:65px minmax(20px,1fr) 95px;font-size:12px;gap:6px}.score-detail{display:block;font-size:11px}h1{font-size:25px}table{font-size:12px}th,td{padding:5px}}
 @page{margin:14mm;@bottom-right{content:"Page " counter(page) " of " counter(pages);font:8pt sans-serif}}
-@media print{footer{display:none}.grid{break-inside:avoid}.score-card{padding:5px 0;break-inside:avoid}.score-card h3{font-size:10pt}.score-row{font-size:8pt}.score-detail{font-size:8pt;display:inline}.track{height:9px}.bar{print-color-adjust:exact;-webkit-print-color-adjust:exact}.score-card p{margin:3px 0}body{background:white;font-size:9pt;line-height:1.35}p{margin:5px 0}main{padding:0;margin:0;max-width:none;border:0}h1{font-size:20pt;margin-bottom:8px}h2{font-size:11pt;margin-top:9px;margin-bottom:5px}.context{font-size:9pt}.scope,.brand,footer{font-size:8pt}nav{font-size:8pt;margin:8px 0}table{font-size:8pt}th,td{padding:5px}.decision{padding:7px 10px}h1,h2,thead{break-after:avoid}tr,.decision{break-inside:avoid}a{color:inherit}.identity{font-size:7pt}footer{margin-top:10px;padding-top:6px}.scroll{overflow:visible}}
+@media print{.grid{break-inside:avoid}.score-card{padding:5px 0;break-inside:avoid}.score-card h3{font-size:10pt}.score-row{font-size:8pt}.score-detail{font-size:8pt;display:inline}.track{height:9px}.bar{print-color-adjust:exact;-webkit-print-color-adjust:exact}.score-card p{margin:3px 0}body{background:white;font-size:9pt;line-height:1.35}p{margin:5px 0}main{padding:0;margin:0;max-width:none;border:0}h1{font-size:20pt;margin-bottom:8px}h2{font-size:11pt;margin-top:9px;margin-bottom:5px}.context{font-size:9pt}.scope,.brand,footer{font-size:8pt}nav{font-size:8pt;margin:8px 0}table{font-size:8pt}th,td{padding:5px}.decision{padding:7px 10px}h1,h2,thead{break-after:avoid}tr{break-inside:avoid}a{color:inherit}.identity{font-size:7pt}footer{margin-top:10px;padding-top:6px}.scroll{overflow:visible}}
 """
 
 
@@ -81,34 +81,37 @@ def _score_chart(metric: MetricView) -> str:
 
 
 def brief(view: ReportView, *, digest: str, receipt: bool, html: bool) -> str:
+    """One ordered content model, with full conditions and stable result indices."""
+    from invarlock.report_facts import generated_facts
+
     review = view.review
     assert review is not None
+    facts = view.critical_facts or generated_facts(view)
+    recipient = dict(facts).get(
+        "Recipient verification", "Not performed for this recipient."
+    )
+    authenticated = not recipient.startswith("Not performed")
     receipt_note = (
-        "Not authenticated by packaging. The attached historical receipt has not been checked for this recipient."
+        "The retained receipt snapshot was checked against independent expectations. See verification-snapshot.json."
+        if authenticated
+        else "Not authenticated by packaging. The attached historical receipt has not been checked for this recipient."
         if receipt
         else "No historical receipt supplied."
     )
-    reading = {
-        "pass": "Passing these checks does not establish improvement or suitability for release.",
-        "fail": "One or more recorded requirements were not met.",
-        "regression": "One or more recorded requirements were not met.",
-        "insufficient_evidence": "The recorded evidence is insufficient for a conclusion.",
-    }.get(
-        view.decision,
-        "The recorded outcome is unavailable; establish it before deciding.",
-    )
-    context = review.context[:2]
-    metrics = view.metrics[:6]
+    indexed = list(enumerate(view.metrics, 1))
+    blockers = [
+        (i, m)
+        for i, m in indexed
+        if m.decision != "pass" or any(c.passed is not True for c in m.checks)
+    ]
+    blockers.sort(key=lambda pair: not pair[1].required)
+    others = [(i, m) for i, m in indexed if (i, m) not in blockers]
+    metrics = blockers + others[: max(0, 6 - len(blockers))]
     more = (
         f"Showing {len(metrics)} of {len(view.metrics)} measure / test-group results. All results and checks are in the technical appendix."
-        if len(view.metrics) > len(metrics)
+        if len(metrics) < len(view.metrics)
         else ""
     )
-    limits = "Results cover the recorded tests. Workload performance and safety need separate evidence."
-    if any(m.scores and m.scores.kind == "rubric" for m in view.metrics):
-        limits += " Judge ratings do not establish correctness. Repeated ratings are not extra independent test units."
-    if len(view.metrics) > 1:
-        limits += " Overlapping groups cannot be added; separate ranges provide no combined confidence guarantee."
     intro = "The review author supplies the decision and interpretation. The recorded test result is separate from release approval."
     summary = review.summary or (
         (
@@ -125,14 +128,36 @@ def brief(view: ReportView, *, digest: str, receipt: bool, html: bool) -> str:
         if review.summary
         else "Reading guide generated from the recorded comparison."
     )
+    # Owner rows already appear in structured facts; keep legacy context intact below.
+    fact_keys = {k for k, _ in facts}
+    context = tuple((k, v) for k, v in review.context if k not in fact_keys)
+    limits = list(view.limitations)
+    limits += [
+        "Results cover the recorded tests. Workload performance and safety need separate evidence."
+    ]
+    if any(m.scores and m.scores.kind == "rubric" for m in view.metrics):
+        limits.append(
+            "Judge ratings do not establish correctness. Repeated ratings are not extra independent test units."
+        )
+    if len(view.metrics) > 1:
+        limits.append(
+            "Overlapping groups cannot be added; separate ranges provide no combined confidence guarantee."
+        )
+    # Put trust, blockers and requirements before unbounded authored narrative.
+    essentials = tuple((k, v) for k, v in facts if k != "Evidence limit")
+    owner = (
+        ("Owner decision", review.decision),
+        ("Recommendation", review.recommendation),
+        ("Next action", review.next_action),
+    ) + context
+
+    def clean(value: str) -> str:
+        value = escape(value, quote=False).replace("\n", " ").replace("\r", " ")
+        for ch in "|\\`*[]()":
+            value = value.replace(ch, f"&#{ord(ch)};")
+        return re.sub(r"(?<!\w)_|_(?!\w)", "&#95;", value)
+
     if not html:
-
-        def clean(value: str) -> str:
-            value = escape(value, quote=False).replace("\n", " ").replace("\r", " ")
-            for ch in "|\\`*[]()":
-                value = value.replace(ch, f"&#{ord(ch)};")
-            return re.sub(r"(?<!\w)_|_(?!\w)", "&#95;", value)
-
         lines = [
             f"# {clean(view.title)}",
             "",
@@ -144,69 +169,51 @@ def brief(view: ReportView, *, digest: str, receipt: bool, html: bool) -> str:
             "",
             intro,
             "",
-            f"**Owner decision:** {clean(review.decision)}",
-            "",
-            f"**Recorded policy result:** {clean(decision_label(view.decision))}",
-            "",
-            reading,
-            "",
-            *([clean(view.decision_scope), ""] if view.decision_scope else []),
-            f"**Recommendation:** {clean(_excerpt(review.recommendation))}",
-            "",
-            f"**Next action:** {clean(_excerpt(review.next_action))}",
-            "",
-            "## Intended use and review context",
+            "## Generated facts",
             "",
         ]
-        lines += [f"- **{clean(k)}:** {clean(_excerpt(v))}" for k, v in context]
-        lines += ["", "## In plain language", "", attribution, ""]
-        lines += [f"- **{clean(k)}:** {clean(v)}" for k, v in summary]
+        lines += [f"- **{clean(k)}:** {clean(v)}" for k, v in essentials]
+        if view.decision_scope:
+            lines += ["", clean(view.decision_scope)]
+        lines += ["", "## Intended use and owner decision", ""]
+        lines += [f"- **{clean(k)}:** {clean(v)}" for k, v in owner]
         lines += ["", "## Results at a glance", "", more, ""]
-        for index, metric in enumerate(metrics, 1):
+        for index, m in metrics:
             lines += [
-                f"### {clean(metric.display_name)} / {clean(metric.display_scope)}",
+                f"### {clean(m.display_name)} / {clean(m.display_scope)}",
                 "",
-                clean(score_caption(metric)),
+                clean(score_caption(m)),
                 "",
-                f"- Baseline: {clean(metric.baseline)}"
-                + (
-                    f"; {clean(metric.baseline_detail)}"
-                    if metric.baseline_detail
-                    else ""
-                ),
-                f"- Candidate: {clean(metric.candidate)}"
-                + (
-                    f"; {clean(metric.candidate_detail)}"
-                    if metric.candidate_detail
-                    else ""
-                ),
-                f"- Change: {clean(observed_change(metric))}; {clean(decision_label(metric.decision))}.",
-                f"- {clean(metric.count_label)}: {clean(metric.count)}.",
+                f"- Baseline: {clean(m.baseline)}; {clean(m.baseline_detail)}",
+                f"- Candidate: {clean(m.candidate)}; {clean(m.candidate_detail)}",
+                f"- Change: {clean(observed_change(m))}; {clean(decision_label(m.decision))}.",
+                f"- {clean(m.count_label)}: {clean(m.count)}. {clean(m.count_detail)}",
                 "",
-                clean(range_reading(metric)),
+                clean(range_reading(m)),
                 "",
             ]
-            if metric.decision != "pass":
-                lines += [
-                    f"**Suggested follow-up:** {clean(suggested_action(metric))}",
-                    "",
-                ]
+            if m.decision != "pass":
+                lines += [f"**Suggested follow-up:** {clean(suggested_action(m))}", ""]
             lines += [
                 f"[See result {index}: evidence and checks](technical-report.html#metric-result-{index})",
                 "",
             ]
+        lines += ["## Decision limits", ""] + [clean(v) for v in limits]
         lines += [
-            "## Decision limits",
-            "",
-            clean(limits),
-            "",
-            "Full recorded limitations and authored rationale: [full review](review.html).",
             "",
             "## Recipient check",
             "",
-            "Not performed for this recipient. Your technical reviewer must check this package using your organization's approved inputs. See the verification guide.",
+            clean(recipient),
             "",
             receipt_note,
+            "",
+            "## In plain language",
+            "",
+            attribution,
+            "",
+        ]
+        lines += [f"- **{clean(k)}:** {clean(v)}" for k, v in summary]
+        lines += [
             "",
             f"Evidence statement identity (not approval): {digest}",
             "",
@@ -215,24 +222,31 @@ def brief(view: ReportView, *, digest: str, receipt: bool, html: bool) -> str:
         ]
         return "\n".join(lines)
     e = escape
+
+    def rows(values: tuple[tuple[str, str], ...]) -> str:
+        return "".join(
+            f'<p class="context"><strong>{e(k)}.</strong> {e(v)}</p>' for k, v in values
+        )
+
     navigation = "".join(
         f'<a href="{e(path)}">{e(label)}</a>' for label, path in view.handoff_links
     )
     cards = []
-    for index, metric in enumerate(metrics, 1):
-        chart = _score_chart(metric)
-        if not chart:
-            chart = f"<p><strong>Baseline:</strong> {e(metric.baseline)} · <strong>Candidate:</strong> {e(metric.candidate)}</p>"
+    for index, m in metrics:
+        chart = (
+            _score_chart(m)
+            or f"<p><strong>Baseline:</strong> {e(m.baseline)} · <strong>Candidate:</strong> {e(m.candidate)}</p>"
+        )
         cards.append(
             '<article class="score-card">'
-            f'<h3>{e(metric.display_name)} <span class="scope">· {e(metric.display_scope)}</span></h3>'
-            f'<p class="scope">{e(score_caption(metric))}</p>'
+            f'<h3>{e(m.display_name)} <span class="scope">· {e(m.display_scope)}</span></h3>'
+            f'<p class="scope">{e(score_caption(m))}</p>'
             + chart
-            + f'<p class="result-line"><strong>{e(decision_label(metric.decision))}.</strong> Change: {e(observed_change(metric))} · {e(metric.count_label)}: {e(metric.count)}.</p>'
-            + f"<p>{e(range_reading(metric))}</p>"
+            + f"<p><strong>{e(decision_label(m.decision))}.</strong> Change: {e(observed_change(m))} · {e(m.count_label)}: {e(m.count)}. {e(m.count_detail)}</p>"
+            f"<p>{e(range_reading(m))}</p>"
             + (
-                f"<p><strong>Suggested follow-up.</strong> {e(suggested_action(metric))}</p>"
-                if metric.decision != "pass"
+                f"<p><strong>Suggested follow-up.</strong> {e(suggested_action(m))}</p>"
+                if m.decision != "pass"
                 else ""
             )
             + f'<p class="scope"><a href="technical-report.html#metric-result-{index}">See result {index}: evidence and checks</a></p></article>'
@@ -241,29 +255,22 @@ def brief(view: ReportView, *, digest: str, receipt: bool, html: bool) -> str:
         f'<div class="brand">InvarLock · Decision brief</div><h1>{e(view.title)}</h1>'
         f'<p class="scope">{e(review.label)} · {e(review.byline)}</p><p class="scope">{intro}</p>'
         f'<nav aria-label="Review package">{navigation}</nav>'
-        f'<section class="decision"><p><strong>Owner decision.</strong> {e(_excerpt(review.decision, 600))}</p>'
-        f"<p><strong>Recorded policy result.</strong> {e(decision_label(view.decision))}</p><p>{e(reading)}</p>"
+        "<section><h2>Generated facts</h2>"
+        + rows(essentials)
         + (f"<p>{e(view.decision_scope)}</p>" if view.decision_scope else "")
-        + f"<p><strong>Recommendation.</strong> {e(_excerpt(review.recommendation))}</p>"
-        f"<p><strong>Next action.</strong> {e(_excerpt(review.next_action))}</p></section>"
-        "<section><h2>Intended use and review context</h2>"
-        + "".join(
-            f'<p class="context"><strong>{e(k)}.</strong> {e(_excerpt(v))}</p>'
-            for k, v in context
-        )
-        + '</section><section class="reader-summary"><h2>In plain language</h2>'
-        + f'<p class="scope">{attribution}</p>'
-        + "".join(f"<p><strong>{e(k)}.</strong> {e(v)}</p>" for k, v in summary)
+        + "</section><section><h2>Intended use and owner decision</h2>"
+        + rows(owner)
         + "</section><section><h2>Results at a glance</h2>"
         + (f'<p class="scope">{more}</p>' if more else "")
         + "".join(cards)
-        + "</section>"
-        + '<div class="grid"><section><h2>Decision limits</h2>'
-        + f'<p>{e(limits)}</p><p class="scope">Full recorded limitations and authored rationale: <a href="review.html">full review</a>.</p></section>'
-        + "<section><h2>Recipient check</h2><p><strong>Not performed for this recipient.</strong> Your technical reviewer must check the package with your organization’s approved inputs.</p>"
-        + f'<p class="scope">{receipt_note}</p></section></div>'
-        + f'<footer><details><summary>Evidence statement identity (not approval)</summary><span class="identity">{e(digest)}</span></details>'
-        + "</footer>"
+        + "</section><section><h2>Decision limits</h2>"
+        + "".join(f"<p>{e(v)}</p>" for v in limits)
+        + f"</section><section><h2>Recipient check</h2><p>{e(recipient)}</p><p>{e(receipt_note)}</p></section>"
+        '<section class="reader-summary"><h2>In plain language</h2>'
+        + f'<p class="scope">{attribution}</p>'
+        + rows(summary)
+        + "</section><footer>Evidence statement identity (not approval): "
+        + f'<span class="identity">{e(digest)}</span></footer>'
     )
     return _document(view.title, body)
 

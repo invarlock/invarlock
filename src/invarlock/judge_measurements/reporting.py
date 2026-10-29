@@ -419,6 +419,8 @@ def _view(
         _baseline_mean(plan, artifacts["measurements"]) if subject is not None else None
     )
     metric = MetricView(
+        quality_floor="configured" if policy["subject_bound"] is not None else "absent",
+        required=required,
         evidence_source="analysis_result.json#",
         name=policy["metric_name"],
         scores=ScoreView(

@@ -32,7 +32,7 @@ def test_all_configured_checks_survive_a_relative_failure():
     }
     checks = core_policy_checks(report)
     assert [c["passed"] for c in checks] == [False, True, True, True, False]
-    assert checks[0]["observed"] == "-10.4954 pp"
+    assert checks[0]["observed"] == "-10.4954435896 pp"
     assert checks[0]["required"] == ">= -10 pp"
     assert checks[3]["observed"] == "100%"
     assert checks[4]["observed"] == "98%"

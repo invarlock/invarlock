@@ -1264,6 +1264,9 @@ def _report_view(
             "This describes resampling of the fixed recorded schedule; it is not a population confidence interval or a claim that the sample represents production traffic.",
         )
     metric = MetricView(
+        quality_floor="configured"
+        if report.get("side_accuracy") is not None
+        else "absent",
         evidence_source="reports/evaluation.report.json#",
         name=names.get(report["metric"], report["metric"]),
         scores=ScoreView(
@@ -1315,7 +1318,30 @@ def _report_view(
             )
         )
     )
+    explanations = [
+        (
+            "Retained population",
+            f"{report['record_count']} paired records. Attempted or excluded records outside the authenticated schedule are unknown.",
+        )
+    ]
+    if paired:
+        explanations.append(("Paired outcomes", basis[1]))
+    for observation in observations:
+        payload = observation["payload"]
+        scalar = [
+            (k, v)
+            for k, v in payload.items()
+            if isinstance(v, (str, int, float, bool)) or v is None
+        ]
+        explanations.append(
+            (
+                f"Observation {observation['observation_id']} ({observation['kind']}, {observation['scope']})",
+                "; ".join(f"{k}: {v}" for k, v in scalar)
+                + ". Bound supplementary observation, not an acceptance requirement. Structured fields and complete bindings remain in technical details.",
+            )
+        )
     return ReportView(
+        explanations=tuple(explanations),
         title="InvarLock comparison report",
         family="Runtime evaluation evidence",
         decision=report["verdict"],

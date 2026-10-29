@@ -185,6 +185,14 @@ class CheckView:
     required: str
     passed: bool | None
     explanation: str = ""
+    reason_id: str = ""
+
+    def __post_init__(self) -> None:
+        # Compatibility translation at the presentation boundary only.
+        if not self.reason_id:
+            from invarlock.report_reading import check_reason
+
+            object.__setattr__(self, "reason_id", check_reason(self.name))
 
 
 @dataclass(frozen=True)
@@ -266,6 +274,8 @@ class MetricView:
     count_label: str = "Observed pairs"
     evidence_source: str = ""
     scores: ScoreView | None = None
+    quality_floor: str = "unknown"
+    required: bool = True
 
     @property
     def display_name(self) -> str:
@@ -309,6 +319,8 @@ class ReportView:
     review: AuthoredReview | None = None
     handoff_links: tuple[tuple[str, str], ...] = ()
     decision_scope: str = ""
+    critical_facts: tuple[tuple[str, str], ...] = ()
+    explanations: tuple[tuple[str, str], ...] = ()
 
 
 def _handoff_links(view: ReportView, *, markdown: bool = False) -> str:
@@ -322,6 +334,23 @@ def _handoff_links(view: ReportView, *, markdown: bool = False) -> str:
             else f'<a href="{target}">{escape(label)}</a>'
         )
     return " · ".join(links)
+
+
+def _record_link(source: str) -> str:
+    """Only renderer-owned relative record paths become navigation."""
+    from pathlib import PurePosixPath
+
+    file = source.split("#", 1)[0]
+    if (
+        not file.startswith("evidence/")
+        or not file
+        or ":" in file
+        or "\\" in file
+        or file.startswith("/")
+        or ".." in PurePosixPath(file).parts
+    ):
+        return escape(source or "Not supplied with this view")
+    return f'<a href="{escape(file)}">{escape(source)}</a>'
 
 
 def _metric_identifier_details(view: ReportView) -> tuple[tuple[str, Any], ...]:
@@ -656,7 +685,7 @@ a:focus-visible,summary:focus-visible,[tabindex]:focus-visible{outline:3px solid
 .change-summary{font-size:14px;margin:14px 0 0}.review-action{font-size:14px;margin:16px 0 0;padding-left:16px;border-left:3px solid var(--ink)}.result-counts{font-size:13px;font-weight:650;font-variant-numeric:tabular-nums}.finding-status{font-size:12px;font-weight:700;display:block;margin-bottom:3px}.finding-status.fail{color:var(--red)}.finding-status.insufficient{color:var(--amber)}.finding-status.unavailable{color:var(--muted)}
 @page{margin:14mm;@bottom-left{content:"InvarLock · Model change review";font:8pt sans-serif;color:#62695e}@bottom-right{content:"Page " counter(page) " of " counter(pages);font:8pt sans-serif;color:#62695e}}
 .identity-list>div{margin-bottom:10px;break-inside:avoid}.identity-list dt{font-size:12px;font-weight:650}.identity-list dd{margin:3px 0 0;font-size:12px;overflow-wrap:anywhere}
-@media print{p{break-inside:avoid}*:focus{outline:none!important}.report-heading{padding:16px 0 12px;margin-bottom:12px}.report-heading h1{font-size:25pt}.report-heading .eyebrow{margin-bottom:6px}.interpretation-note{font-size:9pt;margin-bottom:14px}.review-context h2{margin-bottom:10px}.review-subjects{margin-bottom:10px}.review-subjects dd{font-size:10pt}.context-status{gap:8px;margin-bottom:8px}.context-status li{padding:6px 8px}.change-summary{font-size:10pt;margin-top:8px}.decision-summary{font-size:10pt}.hero .verdict h2{font-size:19pt;margin-bottom:10px}.review-action{font-size:10pt;margin-bottom:12px}.findings{padding:12px 0}.interval-reading h5{break-after:avoid}.interval-reading dt,.interval-reading dd{break-inside:avoid}.metric-lead{break-inside:avoid}.metric-explanation,caption,thead{break-after:avoid}.metric .checks-table{break-inside:avoid;font-size:9pt}body{background:white;font-size:10pt}main{max-width:none;padding:0;margin:0;box-shadow:none;border-top:0}.hero{display:block;margin-top:12px;padding:14px;break-inside:auto}.verdict{break-inside:avoid}.assurance{margin-top:16px}.assurance dl>div{grid-template-columns:140px 1fr;padding:6px 0;break-inside:avoid}h1{font-size:25pt}.metric,.panel{padding:15px}.columns{display:block}.panel{margin:12px 0}details{break-inside:auto}details::details-content{display:block!important;content-visibility:visible!important;height:auto!important}details>.detail-content{display:block!important}details.evidence-detail:not([open])::details-content{display:none!important;content-visibility:hidden!important}details.evidence-detail:not([open])>.detail-content{display:none!important}summary{break-after:avoid}details>summary::marker{content:""}pre{max-height:none}.footer{font-size:9pt}.scroll{overflow:visible}a{color:inherit}.metric-group[hidden]{display:block!important}.metric-navigation,.metric-display-toggle,.metric-group>.section-heading>a{display:none}.overview-table,.checks-table{min-width:0;font-size:8pt;table-layout:fixed}.overview-table th{font-size:8pt}.overview-scroll{padding:0;border:0}.overview-table th,.overview-table td{padding:6px 4px}.overview-table .badge{font-size:8pt}.section-heading,.metric-heading,h2,h3,h4{break-after:avoid}tr,.review-context,.findings,.limits,.next-steps,.interval,.notes{break-inside:avoid}details.evidence-detail:not([open])>summary::after{content:" — available in HTML and original evidence";font-weight:400;font-size:9pt;color:var(--muted)}.checks-table td{white-space:normal}}
+@media print{p{break-inside:avoid}*:focus{outline:none!important}.report-heading{padding:16px 0 12px;margin-bottom:12px}.report-heading h1{font-size:25pt}.report-heading .eyebrow{margin-bottom:6px}.interpretation-note{font-size:9pt;margin-bottom:14px}.review-context h2{margin-bottom:10px}.review-subjects{margin-bottom:10px}.review-subjects dd{font-size:10pt}.context-status{gap:8px;margin-bottom:8px}.context-status li{padding:6px 8px}.change-summary{font-size:10pt;margin-top:8px}.decision-summary{font-size:10pt}.hero .verdict h2{font-size:19pt;margin-bottom:10px}.review-action{font-size:10pt;margin-bottom:12px}.findings{padding:12px 0}.interval-reading h5{break-after:avoid}.interval-reading dt,.interval-reading dd{break-inside:avoid}.metric-lead{break-inside:avoid}.metric-explanation,caption,thead{break-after:avoid}.metric .checks-table{break-inside:avoid;font-size:9pt}body{background:white;font-size:10pt}main{max-width:none;padding:0;margin:0;box-shadow:none;border-top:0}.hero{display:block;margin-top:12px;padding:14px;break-inside:auto}.verdict{break-inside:avoid}.assurance{margin-top:16px}.assurance dl>div{grid-template-columns:140px 1fr;padding:6px 0;break-inside:avoid}h1{font-size:25pt}.metric,.panel{padding:15px}.columns{display:block}.panel{margin:12px 0}details{break-inside:auto}details::details-content{display:block!important;content-visibility:visible!important;height:auto!important}details>.detail-content{display:block!important}details.evidence-detail:not([open])::details-content{display:none!important;content-visibility:hidden!important}details.evidence-detail:not([open])>.detail-content{display:none!important}summary{break-after:avoid}details>summary::marker{content:""}pre{max-height:none}.footer{font-size:9pt}.scroll{overflow:visible}a{color:inherit}.metric-group[hidden]{display:block!important}.metric-navigation,.metric-display-toggle,.metric-group>.section-heading>a{display:none}.overview-table,.checks-table{min-width:0;font-size:8pt;table-layout:fixed}.overview-table th{font-size:8pt}.overview-scroll{padding:0;border:0}.overview-table th,.overview-table td{padding:6px 4px}.overview-table .badge{font-size:8pt}.section-heading,.metric-heading,h2,h3,h4{break-after:avoid}tr,.interval{break-inside:avoid}.review-context,.findings,.limits,.next-steps,.notes{break-inside:auto}details.evidence-detail:not([open])>summary::after{content:" — available in HTML and original evidence";font-weight:400;font-size:9pt;color:var(--muted)}.checks-table td{white-space:normal}}
 """
 
 
@@ -992,13 +1021,11 @@ def _findings(view: ReportView) -> tuple[list[tuple[int, MetricView]], str]:
     findings = [(i, m) for i, m in enumerate(view.metrics, 1) if m.decision != "pass"]
     if findings:
         note = f"{len(findings)} of {len(view.metrics)} metric / scope results need review."
-        if len(findings) > 5:
-            note += " First 5 shown here; all results and checks follow below."
     elif view.metrics:
         note = "No failed or unresolved metric results are recorded. This describes only the evaluated scope and requirements."
     else:
         note = "Metric results are unavailable in this view."
-    return findings[:5], note
+    return findings, note
 
 
 def _review_context_html(view: ReportView) -> str:
@@ -1039,7 +1066,10 @@ def _review_context_html(view: ReportView) -> str:
             else ""
         )
         + '<ul class="context-status">'
-        + "".join(f"<li>{item}</li>" for item in _DECISION_CONTEXT)
+        + "".join(
+            f"<li>{item}</li>"
+            for item in (() if view.critical_facts else _DECISION_CONTEXT)
+        )
         + '</ul><p class="scope">The recorded task, cases and requirements define the evaluated scope. A policy result does not supply a business recommendation.</p></section>'
         + f'<p class="change-summary"><strong>Change context.</strong> {escape(_change_summary(view))}</p>'
     )
@@ -1105,7 +1135,24 @@ def render_html(view: ReportView) -> str:
     if not view.assurance:
         parts.append(f"<p>{_MISSING_ASSURANCE}</p>")
     parts.append("</aside></section>")
+    if view.critical_facts:
+        parts.append(
+            '<section class="panel"><h2>Generated facts</h2>'
+            + "".join(
+                f"<p><strong>{e(k)}.</strong> {e(v)}</p>"
+                for k, v in view.critical_facts
+            )
+            + "</section>"
+        )
     parts.append(_findings_html(view))
+    if view.explanations:
+        parts.append(
+            '<section class="panel"><h2>Case and operational explanations</h2>'
+            + "".join(
+                f"<p><strong>{e(k)}.</strong> {e(v)}</p>" for k, v in view.explanations
+            )
+            + "</section>"
+        )
     support = [
         f'<section class="panel next-steps"><h2>{"Decision follow-up" if view.review else "Next decision"}</h2><p>{e(view.review.next_action) if view.review else _NEXT_DECISION}</p>'
     ]
@@ -1224,7 +1271,7 @@ def render_html(view: ReportView) -> str:
             else:
                 parts.append(f'<p class="missing-checks">{_MISSING_CHECKS}</p>')
             parts.append(
-                f'<p class="scope">Result {result_index} · Supporting record: {e(metric.evidence_source or "Not supplied with this view")}</p>'
+                f'<p class="scope">Result {result_index} · Supporting record: {_record_link(metric.evidence_source)}</p>'
             )
             if metric.notes:
                 parts.append(
@@ -1323,7 +1370,10 @@ def render_markdown(view: ReportView, *, include_details: bool = False) -> str:
                 ),
             ]
             if view.review
-            else [f"- {item}" for item in _DECISION_CONTEXT]
+            else [
+                f"- {item}"
+                for item in (() if view.critical_facts else _DECISION_CONTEXT)
+            ]
         ),
         "",
         f"**Change context:** {clean(_change_summary(view))}",
@@ -1340,6 +1390,14 @@ def render_markdown(view: ReportView, *, include_details: bool = False) -> str:
     from invarlock.report_reading import suggested_action
 
     findings, note = _findings(view)
+    if view.critical_facts:
+        lines += ["## Generated facts", ""] + [
+            f"- **{clean(k)}:** {clean(v)}" for k, v in view.critical_facts
+        ]
+    if view.explanations:
+        lines += ["## Case and operational explanations", ""] + [
+            f"- **{clean(k)}:** {clean(v)}" for k, v in view.explanations
+        ]
     lines += ["## Findings to review", "", note, ""]
     if view.metrics:
         lines += [_result_counts(view), ""]
