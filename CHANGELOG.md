@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Give decision briefs distinct state panels, prominent conditions, labelled
+  evidence records and the existing InvarLock visual identity in HTML and print.
 - Preserve full review restrictions, prioritize every blocker and explain exact
   threshold failures. Share generated facts, quality requirements and distinct
   evidence-authentication and recipient states across client package formats.

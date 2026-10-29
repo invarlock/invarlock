@@ -195,8 +195,11 @@ an apparently valid report. This workflow performs no model inference.
 
 ## Reading layers and case selection
 
-The brief begins with generated results, authentication, recipient state and
-requirements, followed by the owner's full conditions. Detailed score cards and
+The brief begins with separate panels for the recorded policy result, evidence
+signing, recipient verification and owner decision. The comparison and requirements
+follow, with the owner's full conditions in a distinct section. Supporting facts
+use labelled rows, and full evidence and snapshot identities remain visible at the
+end. The pine, cream, teal and copper palette follows the existing product style. Detailed score cards and
 family limitations precede the attributed narrative. Long valid context continues
 onto further pages; one or two pages is a target, never a truncation rule.
 

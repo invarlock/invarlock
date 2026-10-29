@@ -22,9 +22,10 @@ const { pathToFileURL } = require('node:url');
         // A detached summary cannot resolve another computer's checkout paths.
         for (const anchor of document.querySelectorAll('a')) anchor.removeAttribute('href');
         const note=document.createElement('p');
-        note.className='identity';
-        note.textContent='Forwardable summary. Companion package required for supporting records and replay. Evidence: '+evidence+'. Report snapshot: '+snapshot+'. Navigation labels refer to files in that package; this PDF contains no file links.';
-        document.querySelector('main').prepend(note);
+        note.className='identity identity-block';
+        note.style.cssText='font:7pt/1.4 ui-monospace,monospace;border-top:1px solid #d5ded8;padding-top:8px;margin-top:12px;overflow-wrap:anywhere';
+        note.textContent='Forwardable summary. Companion package required for supporting records and replay. '+(document.querySelector('footer.identity-block')?'':'Evidence: '+evidence+'. Report snapshot: '+snapshot+'. ')+'Navigation labels refer to files in that package; this PDF contains no file links.';
+        document.querySelector('main').append(note);
       },{snapshot:manifest.snapshot_sha256,evidence:manifest.evidence_statement_sha256});
       await page.pdf({path:output,format:paper,printBackground:paper==='A4'});
     }

@@ -27,12 +27,20 @@ def test_restrictions_and_packaged_sources_survive(tmp_path):
     ctx = context(
         tmp_path,
         decision="Limited exercise. " + "Rationale. " * 340 + restriction,
-        context=[["First", "One"], ["Second", "Two"], ["Excluded use", restriction]],
+        context=[
+            ["First", "One"],
+            ["Second", "Two"],
+            ["Excluded use", restriction],
+            ["Comparison", "NO CUSTOMER USE FROM AUTHORED COMPARISON."],
+        ],
     )
     out = tmp_path / "package"
     build_client_review(REFERENCE / "evidence", context_path=ctx, output=out)
     for name in ("brief.html", "brief.md", "review.html", "review.md"):
         assert restriction in visible((out / name).read_text())
+        assert "NO CUSTOMER USE FROM AUTHORED COMPARISON." in visible(
+            (out / name).read_text()
+        )
     assert "Excluded use" in (out / "brief.html").read_text()
     assert (
         "evidence/reports/evaluation.report.json#/metrics/0"

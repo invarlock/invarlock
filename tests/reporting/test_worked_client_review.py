@@ -167,7 +167,7 @@ def test_worked_review_context_survives_actual_print(tmp_path, name, paper):
     )
     brief_pages = json.loads(brief_result.stdout)
     assert brief_pages
-    assert "Recipient verification" in brief_pages[0]
+    assert "recipient verification" in brief_pages[0].casefold()
     brief_text = compact(" ".join(brief_pages))
     for _, value in scenario["summary"]:
         assert compact(value) in brief_text
