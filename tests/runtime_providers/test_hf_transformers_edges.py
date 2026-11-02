@@ -546,10 +546,7 @@ def test_hf_scoring_rejects_invalid_logprob_timeout_and_unknown_metric(
         window = kwargs["input_ids"]
         return SimpleNamespace(logits=torch.zeros((1, window.shape[1], 3)))
 
-    invalid_logprob = SimpleNamespace(
-        gather=lambda *_args, **_kwargs: SimpleNamespace(item=lambda: 0.1)
-    )
-    monkeypatch.setattr(torch, "log_softmax", lambda *_args, **_kwargs: invalid_logprob)
+    monkeypatch.setattr(provider, "_hf_target_logprob", lambda *_args: math.nan)
     with pytest.raises(RuntimeError, match="invalid target logprob"):
         provider._hf_normalized_nll(
             record=_record(),
