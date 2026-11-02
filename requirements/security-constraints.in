@@ -7,3 +7,8 @@ setuptools>=84.1.0
 msgpack>=1.2.3
 # dnspython: GHSA-45c3-73f7-pv4m.
 dnspython>=2.9.0
+# pyasn1: GHSA-2qm8-x737-gmw5, GHSA-9m75-vc3g-4x39, GHSA-fm9c-5rcf-2q5p, GHSA-mm57-4v3p-rchx.
+pyasn1>=0.6.5
+# langgraph and langgraph-sdk: GHSA-3fx2-cqw9-xr3c.
+langgraph>=1.2.14
+langgraph-sdk>=0.4.6
