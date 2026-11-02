@@ -25,6 +25,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
 from jsonschema import Draft202012Validator, ValidationError
 
 from invarlock.captured_contracts import atomic_write, secure_directory
+from invarlock.ed25519 import verify_ed25519_signature
 from invarlock.evidence_pack_integrity import public_key_fingerprint
 from invarlock.evidence_pack_json import read_regular_file_bytes
 from invarlock.judge_evidence_types import JudgeRecipientPolicy
@@ -276,7 +277,8 @@ def verify_judge_evidence(
                     "judge signer differs from the additional recipient key anchor"
                 )
         try:
-            public_key.verify(
+            verify_ed25519_signature(
+                public_key,
                 base64.b64decode(envelope["signature"], validate=True),
                 signed_envelope_bytes(envelope),
             )
@@ -483,7 +485,8 @@ def verify_signed_judge_verification_receipt(
             or verifier["signing_key_fingerprint"] != derived
         ):
             raise JudgeEvidenceError("judge receipt verifier key is unauthorized")
-        public.verify(
+        verify_ed25519_signature(
+            public,
             base64.b64decode(signature["value"], validate=True),
             _signed_receipt_bytes(statement),
         )
