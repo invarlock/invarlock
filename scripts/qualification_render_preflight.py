@@ -30,6 +30,7 @@ from invarlock.core.runtime_provider.behavioral_schedule import (
     MAX_RUNTIME_BEHAVIORAL_SCHEDULE_BYTES,
     build_runtime_behavioral_schedule,
 )
+from invarlock.ed25519 import verify_ed25519_signature
 from invarlock.evidence_pack_integrity import public_key_fingerprint
 from invarlock.evidence_pack_json import parse_json_bytes, read_regular_file_bytes
 from invarlock.output_text_contract import exact_match_output_text
@@ -650,7 +651,7 @@ def verify_gguf_prefix(
     ):
         raise QualificationRenderPreflightError("GGUF prefix signer is not pinned")
     try:
-        public_key.verify(signature, _canonical_json(statement))
+        verify_ed25519_signature(public_key, signature, _canonical_json(statement))
     except InvalidSignature as exc:
         raise QualificationRenderPreflightError(
             "GGUF prefix signature is invalid"
