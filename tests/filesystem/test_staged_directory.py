@@ -4,6 +4,7 @@ import importlib
 import json
 import os
 import shutil
+import stat
 from dataclasses import replace
 
 import pytest
@@ -452,6 +453,15 @@ def test_exact_generated_files_compare_large_payload_in_bounded_chunks(
 def test_exact_reader_detects_changes_during_validation(tmp_path, monkeypatch, phase):
     original_open, original_read = os.open, os.read
     changed = False
+    if phase == "directory":
+        original_snapshot = stages._snapshot_identity
+
+        def coarse_directory_snapshot(value):
+            snapshot = original_snapshot(value)
+            # Retain identity while modeling unchanged directory size/clocks.
+            return (*snapshot[:3], 0, 0, 0) if stat.S_ISDIR(value.st_mode) else snapshot
+
+        monkeypatch.setattr(stages, "_snapshot_identity", coarse_directory_snapshot)
     with staged_directory(tmp_path / "output", prefix=".stage-") as stage:
         leaf = stage.path / "payload"
         leaf.write_bytes(b"expected")
@@ -463,7 +473,7 @@ def test_exact_reader_detects_changes_during_validation(tmp_path, monkeypatch, p
                 if phase == "directory":
                     (stage.path / "extra").write_bytes(b"unexpected")
                 else:
-                    leaf.unlink()
+                    leaf.rename(tmp_path / "retained-original-payload")
                     leaf.write_bytes(b"expected")
 
         def race_open(name, *args, **kwargs):
