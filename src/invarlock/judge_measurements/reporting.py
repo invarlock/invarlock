@@ -25,6 +25,7 @@ from invarlock.report_presentation import (
     IntervalView,
     MetricView,
     ReportView,
+    ScoreView,
     decision_label,
     number,
     render_html,
@@ -418,8 +419,16 @@ def _view(
         _baseline_mean(plan, artifacts["measurements"]) if subject is not None else None
     )
     metric = MetricView(
+        quality_floor="configured" if policy["subject_bound"] is not None else "absent",
+        required=required,
         evidence_source="analysis_result.json#",
         name=policy["metric_name"],
+        scores=ScoreView(
+            "rubric",
+            float(baseline_mean) if baseline_mean is not None else None,
+            float(subject["mean"]) if subject is not None else None,
+            policy["direction"],
+        ),
         scope="Fixed benchmark; equal independent-unit weights"
         if required
         else "Advisory metric; fixed benchmark; equal independent-unit weights",
@@ -818,6 +827,11 @@ def _view(
         if required
         else "Advisory judge measurement evidence",
         decision=analysis["decision"],
+        decision_scope=(
+            "Required judge comparison. A pass covers only the recorded judge requirements."
+            if required
+            else "Advisory judge result. It cannot satisfy a required release check."
+        ),
         summary=explanation
         + (
             f" Across {counts['complete_units']:,} complete independent units, the subject's mean rubric score was {number(float(subject['mean']))}, "

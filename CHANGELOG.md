@@ -34,6 +34,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Refresh documentation tooling, including CSpell, KaTeX and markdownlint.
 - Update pinned workflow actions and their installer regression checks.
+- Give decision briefs distinct state panels, prominent conditions, labelled
+  evidence records and the existing InvarLock visual identity in HTML and print.
+- Preserve full review restrictions, prioritize every blocker and explain exact
+  threshold failures. Share generated facts, quality requirements and distinct
+  evidence-authentication and recipient states across client package formats.
+- Add structured owner decisions with explicit exceptions, independently checked
+  receipt snapshots and companion-dependent PDF delivery with complete renderer
+  and output identities. Keep canonical evidence and recorded verdicts unchanged.
 
 ## [0.17.3] - 2026-10-27
 

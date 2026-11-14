@@ -1,0 +1,13 @@
+{
+  "format": "invarlock/client-review-context-v2",
+  "title": "Illustrative model change review",
+  "review_date": "2026-10-29",
+  "byline": "Illustrative evaluation owner",
+  "label": "Synthetic context; not a real approval",
+  "context": [["Purpose", "Assess a specific baseline-to-candidate change under an agreed policy"]],
+  "intended_use": "Internal evaluation of the recorded task",
+  "excluded_uses": "Customer traffic and unmeasured tasks",
+  "decision_conditions": "Independent recipient verification and owner review remain required",
+  "decision_state": "pending",
+  "next_action": "The decision owner reviews the generated facts and records the separately authorized decision."
+}

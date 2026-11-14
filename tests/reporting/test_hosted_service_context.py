@@ -165,3 +165,39 @@ def test_hosted_context_retains_distinct_evaluator_and_mixed_recorded_metadata()
     assert dict(subjects)["Baseline"].startswith("Requested model: example-8b")
     assert "Baseline evaluator" in dict(context)
     assert dict(context)["Baseline dataset"] == "Mixed or incomplete across records"
+
+
+@pytest.mark.parametrize("observed", ["fallback-model", None])
+def test_fallback_configuration_and_unknown_observation_survive_evidence_and_reports(
+    observed,
+):
+    baseline, subject, policy = runs()
+    descriptor = subject["service_identity"]
+    descriptor.update(requested_model="requested-alias", observed_model=observed)
+    descriptor["configuration"] = {"temperature": 0, "fallbacks": "default"}
+    descriptor["configuration_digest"] = digest(descriptor["configuration"])
+    snapshot = build_pack(baseline, subject, policy)
+    manifest, payloads, signer = load_payloads(snapshot)
+    for view in (
+        record_reporting._view(pack_json(snapshot, "report"), snapshot),
+        captured_reporting._view(manifest, payloads, signer),
+    ):
+        subjects = dict(view.subjects)
+        expected = (
+            "Observed model: fallback-model"
+            if observed is not None
+            else "Requested model: requested-alias"
+        )
+        assert subjects["Subject"].startswith(expected)
+        for rendered in (
+            render_html(view),
+            render_markdown(view, include_details=True),
+        ):
+            assert "requested-alias" in rendered
+            assert "fallbacks" in rendered
+            assert "default" in rendered
+            assert "Model weights are not identified" in rendered
+            if observed is not None:
+                assert "fallback-model" in rendered
+        assert subject["artifact_digest"] is None
+        assert descriptor["observed_model"] == observed

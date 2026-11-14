@@ -196,7 +196,7 @@ def test_report_escapes_external_labels_and_omits_large_run_payloads():
     )
     assert "&lt;img" in result
     assert "DO_NOT_RENDER_PAYLOAD" not in result
-    assert len(result.encode()) < 40_000
+    assert len(result.encode()) < 48_000  # Includes bounded category explanations.
     markdown = render_markdown(pack_json(value, "report"), evidence=value)
     assert attack not in markdown
     assert "[link](https://evil.invalid)" not in markdown
@@ -261,7 +261,7 @@ def test_large_bound_configuration_is_previewed_without_source_mutation():
     assert displayed_metric["subject_minimum"] == 0.8
     assert displayed_metric["minimum_count"] == 10
     html = render_html(pack_json(value, "report"), evidence=value)
-    assert len(html.encode()) < 40_000
+    assert len(html.encode()) < 48_000  # Includes bounded category explanations.
     assert key not in html and "&lt;img" in html
     assert pack_json(value, "report")["bindings"]["policy"] in html
     assert value.files == before

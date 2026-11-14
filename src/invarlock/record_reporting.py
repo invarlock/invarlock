@@ -30,6 +30,7 @@ from invarlock.report_presentation import (
     IntervalView,
     MetricView,
     ReportView,
+    ScoreView,
     number,
     xml_text,
 )
@@ -39,6 +40,7 @@ from invarlock.report_presentation import (
 from invarlock.report_presentation import (
     render_markdown as render_report_markdown,
 )
+from invarlock.report_reading import exact_number
 
 
 def _configuration_preview(value: Any) -> dict[str, Any]:
@@ -760,9 +762,9 @@ def _metric_views(
                 checks.append(
                     CheckView(
                         "Maximum NLL ratio" if likelihood else "Allowed change",
-                        number(bound * scale) + " " + unit,
+                        exact_number(bound * scale) + " " + unit,
                         (">= " if higher else "<= ")
-                        + number(cast(float, threshold) * scale)
+                        + exact_number(cast(float, threshold) * scale)
                         + " "
                         + unit,
                         bound >= threshold if higher else bound <= threshold,
@@ -773,9 +775,9 @@ def _metric_views(
                 checks.append(
                     CheckView(
                         "Interval width",
-                        number(width * scale) + " " + unit,
+                        exact_number(width * scale) + " " + unit,
                         "<= "
-                        + number(policy["maximum_interval_width"] * scale)
+                        + exact_number(policy["maximum_interval_width"] * scale)
                         + " "
                         + unit,
                         width <= policy["maximum_interval_width"],
@@ -790,9 +792,9 @@ def _metric_views(
                         checks.append(
                             CheckView(
                                 label,
-                                number(value * scale) + suffix,
+                                exact_number(value * scale) + suffix,
                                 (">= " if minimum else "<= ")
-                                + number(policy[key] * scale)
+                                + exact_number(policy[key] * scale)
                                 + suffix,
                                 value >= policy[key]
                                 if minimum
@@ -842,6 +844,21 @@ def _metric_views(
         metrics.append(
             MetricView(
                 name=m["name"],
+                quality_floor="unknown"
+                if policy is None
+                else "configured"
+                if any(k in policy for k in ("subject_minimum", "subject_maximum"))
+                else "absent",
+                scores=ScoreView(
+                    "loss"
+                    if likelihood
+                    else "accuracy"
+                    if binary and m["aggregation"] == "mean"
+                    else "score",
+                    m["baseline_mean"],
+                    m["subject_mean"],
+                    m["direction"],
+                ),
                 evidence_source=f"reports/evaluation.report.json#/metrics/{source_index}",
                 scope=m["slice"],
                 decision=m["decision"],
@@ -1143,7 +1160,10 @@ def _assemble_view(
     subjects, context, changes, context_details = (
         _captured_context(inputs) if inputs else ((), (), (), ())
     )
+    from invarlock.report_cases import captured_case_readings
+
     return ReportView(
+        explanations=captured_case_readings(inputs, comparison) if inputs else (),
         title="InvarLock captured comparison",
         family="Captured evaluation evidence",
         decision=comparison["decision"],

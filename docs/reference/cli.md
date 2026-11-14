@@ -487,7 +487,7 @@ For native and captured directory packs, `report` checks the closed inventory,
 checksums, reference digests, canonical JSON and embedded signature when signed,
 then renders `reports/evaluation.report.json` without a full comparison replay.
 Judge and evidence-set reports replay their retained judge measurements under
-their own contracts. None of these paths performs recipient acceptance.
+their own contracts. Individual rendering does not perform recipient acceptance; package mode can authenticate a retained receipt snapshot with independent expectations.
 
 | Input | Required | Meaning |
 | --- | --- | --- |
@@ -499,14 +499,17 @@ their own contracts. None of these paths performs recipient acceptance.
 | `--case-id ID` | No | Select one retained judge case for detailed inspection; repeat for up to 50 cases |
 | `--review-context PATH` | With `--package` | Read separately attributed client context |
 | `--package PATH` | With `--review-context` | Publish a new client handoff directory and ZIP |
-| `--retained-receipt PATH` | No | Attach a matching historical receipt without authenticating it |
+| `--retained-receipt PATH` | No | Attach a matching historical receipt |
+| `--receipt-expectations PATH` | With retained receipt | Authenticate the snapshot using independent family-specific expectations |
 | `--json` | No | Emit one compact machine-readable rendering result instead of the text view |
 
 Package mode requires `--review-context` and `--package` together and cannot mix
 with individual report outputs, `--explain` or `--case-id`. It publishes a complete
 new directory only after preparation and source checks. With `--json`, success
 returns `invarlock/client-review-package-v1`, `ok`, `kind`, `output`, `brief`,
-`archive`, `evidence_statement_sha256` and `recipient_verification: not_performed`.
+`archive`, `evidence_statement_sha256` and `recipient_verification` (`not_performed`,
+`authenticated_acceptance` or `authenticated_rejection`). Successful rendering
+exits 0 even for a recorded or authenticated rejection.
 Failure returns the same format identifier, `ok: false` and `errors`, with exit 2.
 See [client review packages](../user-guide/client-handoff.md) for context fields,
 output contents and recipient instructions.
