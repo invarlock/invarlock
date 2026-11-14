@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 
 import pytest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from invarlock.client_review import build_client_review
 from tests.reporting.test_client_handoff import REFERENCE, context
@@ -59,8 +61,12 @@ def test_private_key_attachment_rejected_and_sensitive_output_not_in_brief(tmp_p
     from invarlock.client_review import ClientReviewError
 
     key = tmp_path / "secret.pem"
-    key.write_text(
-        "-----BEGIN PRIVATE KEY-----\nSYNTHETIC_SECRET\n-----END PRIVATE KEY-----"
+    key.write_bytes(
+        Ed25519PrivateKey.generate().private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption(),
+        )
     )
     with pytest.raises(ClientReviewError, match="private keys"):
         build_client_review(
