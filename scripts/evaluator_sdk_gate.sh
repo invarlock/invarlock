@@ -92,6 +92,9 @@ SDK_LOCK="$SDK_ROOT/examples/evaluator-qualification/locks/$SDK_NAME.txt"
 if [ "$SDK_NAME" = "evidently" ]; then
   # Preserve the historical SDK identity while selecting its compatible pandas API.
   SDK_LOCK="$SDK_ROOT/examples/integrations/evaluator-live/locks/evidently.txt"
+elif [ "$SDK_NAME" = "inspect-ai" ]; then
+  # Inspect 0.3.254 imports acp.helpers, removed in agent-client-protocol 1.0.
+  SDK_LOCK="$SDK_ROOT/examples/integrations/evaluator-live/locks/inspect-ai.txt"
 elif [ "$SDK_NAME" = "lighteval" ]; then
   # Preserve the historical qualification lock. The live pipeline needs the
   # compatible hash-library constraint, plus independently checked NLP assets.
