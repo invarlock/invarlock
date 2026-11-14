@@ -207,3 +207,29 @@ def test_bounded_brief_does_not_silently_hide_additional_results():
         assert "Showing 6 of 7" in result
         assert "technical-report.html#metric-result-6" in result
         assert "technical-report.html#metric-result-7" not in result
+
+
+def test_unknown_scores_do_not_invent_units_or_release_authority():
+    assert "recorded units" in score_caption(metric(scores=None))
+    action = suggested_action(metric())
+    assert "intended use" in action and "before making a release decision" in action
+
+
+@pytest.mark.parametrize("threshold,direction", [(None, None), (1.0, None)])
+def test_range_without_a_defined_requirement_does_not_invent_one(threshold, direction):
+    value = metric(
+        interval=IntervalView(0.1, 0.2, 0.15, threshold, "Range", "score", direction)
+    )
+    text = range_reading(value)
+    assert "Change range: +0.1 to +0.2 score." == text
+    assert "Required" not in text and "Failure margin" not in text
+
+
+def test_finite_loss_ratio_that_overflows_percent_conversion_stays_unavailable():
+    value = metric(
+        change="Recorded ratio: 1e308",
+        scores=ScoreView("loss", 1.0, 1e308, "lower"),
+        interval=IntervalView(1e308, 1e308, 1e308, None, "Range", "ratio", None, 1),
+    )
+    assert "unavailable to unavailable%" in range_reading(value)
+    assert observed_change(value) == "Recorded ratio: 1e308"

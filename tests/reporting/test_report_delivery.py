@@ -2,13 +2,14 @@
 
 import json
 from pathlib import Path
+from zipfile import ZipFile
 
 import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from invarlock.client_review import build_client_review
-from tests.reporting.test_client_handoff import REFERENCE, context
+from tests.reporting.test_client_handoff import REFERENCE, context, inventory
 
 
 def test_renderer_identity_covers_helpers_and_package_is_repeatable(tmp_path):
@@ -103,3 +104,114 @@ def test_stale_delivery_inventory_is_rejected(tmp_path):
             package, output=tmp_path / "delivery", browser_module=Path("/unused")
         )
     assert not (tmp_path / "delivery").exists()
+
+
+@pytest.mark.parametrize("paper", ["A4", "Letter"])
+def test_export_publishes_complete_archives_and_preserves_source(
+    tmp_path, monkeypatch, paper
+):
+    import invarlock.report_delivery as module
+
+    package = tmp_path / "package"
+    build_client_review(
+        REFERENCE / "evidence", context_path=context(tmp_path), output=package
+    )
+    before = inventory(package)
+    browser = tmp_path / "browser-module"
+
+    def render(command, **options):
+        # Substitute only the external renderer; exercise publication and archive I/O.
+        assert command[0] == "node"
+        assert command[2] == str(browser)
+        assert command[4] == paper
+        assert options["check"] and options["timeout"] == 120
+        root = Path(command[3])
+        for name in ("brief", "review", "technical-report"):
+            (root / f"{name}.pdf").write_bytes(f"fixture PDF: {name}, {paper}".encode())
+
+    monkeypatch.setattr(module.subprocess, "run", render)
+    output = tmp_path / "delivery"
+    result = module.export_client_review(
+        package, output=output, browser_module=browser, paper=paper
+    )
+    assert inventory(package) == before
+    delivered = inventory(output)
+    manifest = json.loads((output / "delivery-inventory.json").read_text())
+    assert manifest["snapshot_sha256"] == result["snapshot_sha256"]
+    assert manifest["files"] == {
+        name: digest
+        for name, digest in delivered.items()
+        if name not in {"delivery-inventory.json", "delivery.zip"}
+    }
+    with ZipFile(result["archive"]) as archive:
+        assert archive.testzip() is None
+        assert set(archive.namelist()) == set(delivered) - {"delivery.zip"}
+        for name in archive.namelist():
+            assert archive.read(name) == (output / name).read_bytes()
+    with ZipFile(result["summary"]) as archive:
+        assert archive.testzip() is None
+        assert set(archive.namelist()) == {
+            "package/brief.pdf",
+            "summary-inventory.json",
+        }
+        summary = json.loads(archive.read("summary-inventory.json"))
+        assert summary["files"] == {"package/brief.pdf": delivered["package/brief.pdf"]}
+    assert not list(tmp_path.glob(".report-delivery-*"))
+
+
+@pytest.mark.parametrize("name", ["/outside", "../outside", "nested/../../outside"])
+def test_export_rejects_inventory_path_escape_before_rendering(tmp_path, name):
+    from invarlock.report_delivery import export_client_review
+
+    package = tmp_path / "package"
+    build_client_review(
+        REFERENCE / "evidence", context_path=context(tmp_path), output=package
+    )
+    path = package / "package-manifest.json"
+    manifest = json.loads(path.read_text())
+    manifest["files"][name] = "0" * 64
+    path.write_text(json.dumps(manifest))
+    with pytest.raises(ValueError, match="unsafe package inventory"):
+        export_client_review(
+            package, output=tmp_path / "delivery", browser_module=Path("/unused")
+        )
+    assert not (tmp_path / "delivery").exists()
+    assert not list(tmp_path.glob(".report-delivery-*"))
+
+
+@pytest.mark.parametrize("target", ["staged-package", "source-package"])
+def test_renderer_cannot_publish_after_original_input_changes(
+    tmp_path, monkeypatch, target
+):
+    import invarlock.report_delivery as module
+
+    package = tmp_path / "package"
+    build_client_review(
+        REFERENCE / "evidence", context_path=context(tmp_path), output=package
+    )
+
+    def render(root, *_args):
+        (root / "brief.pdf").write_bytes(b"fixture PDF")
+        changed = root if target == "staged-package" else package
+        (changed / "brief.html").write_text("modified during rendering")
+
+    monkeypatch.setattr(module, "_print", render)
+    with pytest.raises(ValueError, match="changed during"):
+        module.export_client_review(
+            package, output=tmp_path / "delivery", browser_module=Path("/unused")
+        )
+    assert not (tmp_path / "delivery").exists()
+    assert not list(tmp_path.glob(".report-delivery-*"))
+
+
+def test_unsupported_paper_never_creates_a_delivery(tmp_path):
+    from invarlock.report_delivery import export_client_review
+
+    with pytest.raises(ValueError, match="supported paper sizes"):
+        export_client_review(
+            tmp_path / "missing-package",
+            output=tmp_path / "delivery",
+            browser_module=Path("/unused"),
+            paper="A3",
+        )
+    assert list(tmp_path.iterdir()) == []

@@ -46,6 +46,9 @@ def captured_inputs(tmp_path):
 
 def test_public_authenticated_rejection_is_not_acceptance(tmp_path):
     inputs = captured_inputs(tmp_path)
+    values = json.loads(inputs.read_text())
+    values["expectations"]["policy_path"] = "policy.json"
+    inputs.write_text(json.dumps(values))
     out = tmp_path / "handoff"
     r = CliRunner().invoke(
         app,
@@ -106,9 +109,18 @@ def test_wrong_expectations_do_not_publish(tmp_path, field, value):
     assert not (tmp_path / "out").exists()
 
 
-@pytest.mark.parametrize("family", ["runtime", "judge", "evidence_set"])
-@pytest.mark.parametrize("reject", [False, True])
-def test_family_receipts_keep_their_scope(tmp_path, family, reject):
+@pytest.mark.parametrize(
+    "family,reject,invalid_expectations",
+    [
+        (family, reject, False)
+        for family in ("runtime", "judge", "evidence_set")
+        for reject in (False, True)
+    ]
+    + [("judge", False, True), ("evidence_set", False, True)],
+)
+def test_family_receipts_keep_their_scope(
+    tmp_path, family, reject, invalid_expectations
+):
     from invarlock.evidence_pack_integrity import public_key_fingerprint
     from tests.reporting.test_client_handoff import ROOT
 
@@ -206,6 +218,13 @@ def test_family_receipts_keep_their_scope(tmp_path, family, reject):
         receipt = tmp_path / "receipt.json"
         verify_evidence_set(source, recipient_policy=policy, receipt=receipt)
         args = {"recipient_policy_path": str(policy)}
+    if invalid_expectations:
+        if family == "judge":
+            args["expected_verifier_identity"] = "different-recipient-verifier"
+        else:
+            value = json.loads(receipt.read_text())
+            value["accepted"] = not value["accepted"]
+            receipt.write_text(json.dumps(value))
     inputs = tmp_path / "inputs.json"
     inputs.write_text(
         json.dumps(
@@ -217,6 +236,17 @@ def test_family_receipts_keep_their_scope(tmp_path, family, reject):
         )
     )
     out = tmp_path / "out"
+    if invalid_expectations:
+        with pytest.raises(ClientReviewError, match="authentication|stored result"):
+            build_client_review(
+                source,
+                context_path=context(tmp_path),
+                output=out,
+                retained_receipt=receipt,
+                receipt_expectations=inputs,
+            )
+        assert not out.exists()
+        return
     result = build_client_review(
         source,
         context_path=context(tmp_path),
@@ -236,7 +266,15 @@ def test_family_receipts_keep_their_scope(tmp_path, family, reject):
 
 @pytest.mark.parametrize(
     "attack",
-    ["policy", "tampered-receipt", "missing-anchor", "run", "submitted-policy"],
+    [
+        "policy",
+        "tampered-receipt",
+        "missing-anchor",
+        "run",
+        "submitted-policy",
+        "wrong-family",
+        "unsupported-expectation",
+    ],
 )
 def test_changed_binding_or_attachment_cannot_reuse_snapshot(tmp_path, attack):
     inputs = captured_inputs(tmp_path)
@@ -256,6 +294,10 @@ def test_changed_binding_or_attachment_cannot_reuse_snapshot(tmp_path, attack):
         del values["expectations"]["expected_request_digest"]
     elif attack == "run":
         values["expectations"]["expected_run_digests"]["subject"] = "sha256:" + "0" * 64
+    elif attack == "wrong-family":
+        values["kind"] = "judge"
+    elif attack == "unsupported-expectation":
+        values["expectations"]["accepted"] = True
     else:
         values["expectations"]["policy_path"] = str(
             REFERENCE / "evidence/inputs/policy.json"
@@ -270,3 +312,35 @@ def test_changed_binding_or_attachment_cannot_reuse_snapshot(tmp_path, attack):
             receipt_expectations=inputs,
         )
     assert not (tmp_path / "out").exists()
+
+
+@pytest.mark.parametrize("changed", ["inputs", "policy"])
+def test_receipt_check_cannot_publish_after_independent_inputs_change(
+    tmp_path, monkeypatch, changed
+):
+    import invarlock.evidence_receipt as receipt_module
+
+    inputs = captured_inputs(tmp_path)
+    policy = Path(json.loads(inputs.read_text())["expectations"]["policy_path"])
+    original_verify = receipt_module.verify_signed_verification_receipt
+
+    def verify_then_change(*args, **kwargs):
+        result = original_verify(*args, **kwargs)
+        assert result.ok
+        target = inputs if changed == "inputs" else policy
+        target.write_bytes(target.read_bytes() + b"\n")
+        return result
+
+    monkeypatch.setattr(
+        receipt_module, "verify_signed_verification_receipt", verify_then_change
+    )
+    with pytest.raises(ClientReviewError, match="inputs changed during authentication"):
+        build_client_review(
+            REFERENCE / "evidence",
+            context_path=context(tmp_path),
+            output=tmp_path / "out",
+            retained_receipt=REFERENCE / "verification.receipt.json",
+            receipt_expectations=inputs,
+        )
+    assert not (tmp_path / "out").exists()
+    assert not list(tmp_path.glob(".client-review-*"))

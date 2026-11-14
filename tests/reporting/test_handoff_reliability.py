@@ -145,6 +145,7 @@ def test_structured_exception_and_generated_facts(tmp_path):
 @pytest.mark.parametrize(
     "change",
     [
+        {},
         {"decision_state": "made-up"},
         {"recipient_verification": "accepted"},
         {"exception_rationale": ""},
@@ -168,6 +169,28 @@ def test_structured_invalid_or_unacknowledged_acceptance_fails(tmp_path, change)
             output=tmp_path / "out",
         )
     assert not (tmp_path / "out").exists()
+
+
+def test_pending_structured_decision_preserves_failed_policy_without_an_exception(
+    tmp_path,
+):
+    output = tmp_path / "pending"
+    build_client_review(
+        REFERENCE / "evidence",
+        context_path=context(
+            tmp_path,
+            format="invarlock/client-review-context-v2",
+            intended_use="Internal evaluation",
+            excluded_uses="Customer traffic",
+            decision_conditions="Review failed requirements first",
+            decision_state="pending",
+        ),
+        output=output,
+    )
+    text = " ".join(visible((output / "brief.html").read_text()).split())
+    assert "Policy not met" in text
+    assert "pending. Authored statement" in text
+    assert "Owner exception rationale" not in text
 
 
 def test_critical_facts_precede_long_authored_narrative(tmp_path):
