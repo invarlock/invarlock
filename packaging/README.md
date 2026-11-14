@@ -236,6 +236,7 @@ reference establishes its declared workflow and scope:
 
 | Reference | Retained work |
 | --- | --- |
+| [KitOps ModelKit handoff](https://github.com/invarlock/invarlock/blob/v0.17.3/examples/integrations/modelkit-handoff/references/mistral-7b/README.md) | See how a recipient verifies that the delivered GGUF model matches the evaluated artifact |
 | [Native model and runtime comparisons](https://github.com/invarlock/invarlock/tree/v0.17.3/public_evidence) | Pinned text, GGUF, vision-text and TensorRT-LLM comparisons |
 | [Evaluator handoffs](https://github.com/invarlock/invarlock/blob/v0.17.3/examples/evaluator-qualification/signed-transactions/README.md) | 400-record Qwen3.5 9B Harness and Inspect journeys; a Gemma instruction-to-QAT comparison |
 | [Hosted HTTP capture](https://github.com/invarlock/invarlock/blob/v0.17.3/examples/hosted-service/references/mistral-7b-http/README.md) | 400 paired cases from distinct Mistral 7B base and instruction checkpoints behind a local HTTP service |

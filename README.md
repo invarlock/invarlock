@@ -20,7 +20,6 @@
   <a href="https://invarlock.github.io/invarlock/"><img alt="Docs" src="https://img.shields.io/badge/docs-quickstart-1f3a7a?labelColor=18150f" /></a>
   <a href="LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-1f3a7a?labelColor=18150f" /></a>
   <a href="https://www.python.org/downloads/release/python-3120/"><img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12%2B-1f3a7a?logo=python&logoColor=f4efe3&labelColor=18150f" /></a>
-  <a href="https://kitops.org"><img alt="Packaged with KitOps" src="https://img.shields.io/badge/Packaged%20with-KitOps-FFAF52?labelColor=363636" /></a>
 </p>
 
 **InvarLock evaluates model changes and produces evidence that another team can
@@ -243,6 +242,7 @@ reference establishes its declared workflow and scope:
 
 | Reference | Retained work |
 | --- | --- |
+| [KitOps ModelKit handoff](examples/integrations/modelkit-handoff/references/mistral-7b/README.md) | See how a recipient verifies that the delivered GGUF model matches the evaluated artifact |
 | [Native model and runtime comparisons](public_evidence) | Pinned text, GGUF, vision-text and TensorRT-LLM comparisons |
 | [Evaluator handoffs](examples/evaluator-qualification/signed-transactions/README.md) | 400-record Qwen3.5 9B Harness and Inspect journeys; a Gemma instruction-to-QAT comparison |
 | [Hosted HTTP capture](examples/hosted-service/references/mistral-7b-http/README.md) | 400 paired cases from distinct Mistral 7B base and instruction checkpoints behind a local HTTP service |
