@@ -4,6 +4,18 @@ title = "InvarLock gitleaks configuration"
 useDefault = true
 
 [[allowlists]]
+description = "The dependency constraint comment cites a public OpenTelemetry advisory."
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "line"
+paths = [
+  '''^requirements/security-constraints\.in$''',
+]
+regexes = [
+  '''^\n?# opentelemetry-api[:] GHSA-mf5v-w3w3-f6cg\.$''',
+]
+
+[[allowlists]]
 description = "Authenticated tokenizer digest fields contain public hashes, not secrets."
 condition = "AND"
 regexTarget = "match"
