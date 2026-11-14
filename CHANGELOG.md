@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- Raise dnspython, Soup Sieve and OpenTelemetry API to patched versions in
+  maintained dependency locks, and preserve their minimum versions during
+  regeneration.
 - Reject small-order Ed25519 public keys and signature points consistently across
   evidence, receipts and acceptance attestations, including standalone recipient
   examples. This closes verification with an explicitly trusted small-order key;
