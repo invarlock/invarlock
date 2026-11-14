@@ -950,3 +950,13 @@ copies explicit public attachments with safe, distinct basenames (up to 32 files
 32 MiB each). Review them for disclosure before including them; never include
 private keys. They cannot replace generated package files and are not trust anchors.
 See the [handoff guide](../user-guide/client-handoff.md) for the context contract.
+
+## Client review snapshots and PDF delivery
+
+`invarlock.engine.build_client_review` accepts optional `receipt_expectations`
+with `retained_receipt` to authenticate a historical snapshot. Context v1 remains
+supported; `CLIENT_REVIEW_CONTEXT_FORMAT_V2` supplies structured owner decisions,
+exclusions, conditions and exception rationale. `export_client_review` validates a
+package inventory and atomically publishes a fresh PDF delivery with full and
+summary archives. See [client review packages](../user-guide/client-handoff.md)
+for complete signatures, independent trust preparation and family boundaries.
