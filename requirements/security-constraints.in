@@ -5,8 +5,12 @@ filelock>=4.2.1
 setuptools>=84.1.0
 # msgpack: GHSA-j586-36cw-2gc2.
 msgpack>=1.2.3
-# dnspython: GHSA-45c3-73f7-pv4m.
-dnspython>=2.9.0
+# dnspython: GHSA-45c3-73f7-pv4m, GHSA-vvf4-9x63-8xvv.
+dnspython>=2.9.2
+# soupsieve: GHSA-6655-6qjp-jx7x, GHSA-mmhr-3c5m-f64f, GHSA-4j63-6c4x-wfg4, GHSA-7g44-g9rc-x53w.
+soupsieve>=4.0.0
+# opentelemetry-api: GHSA-mf5v-w3w3-f6cg.
+opentelemetry-api>=1.45.2
 # pyasn1: GHSA-2qm8-x737-gmw5, GHSA-9m75-vc3g-4x39, GHSA-fm9c-5rcf-2q5p, GHSA-mm57-4v3p-rchx.
 pyasn1>=0.6.5
 # langgraph and langgraph-sdk: GHSA-3fx2-cqw9-xr3c.
