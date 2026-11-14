@@ -932,3 +932,58 @@ def test_deadline_attempt_has_explicit_bounded_cleanup_tolerance(
     else:
         with pytest.raises(ValueError, match="request duration"):
             helper.export_run(values[0], values[1], changed, pin, "baseline")
+
+
+@pytest.mark.parametrize("observed", ["fallback-model", None])
+def test_routed_capture_never_substitutes_requested_alias_for_observation(
+    tmp_path, observed
+):
+    helper = module()
+    body = response(model=observed)
+    if observed is None:
+        body.pop("model")
+    with server([(200, helper.encoded(body))]) as (url, calls):
+        declaration = protocol(helper, url)
+        declaration["services"]["baseline"].update(
+            model="requested-alias", expected_observed_model=None
+        )
+        values = collect_fixture(tmp_path, helper, declaration)
+        run = helper.export_run(*values, "baseline")
+        identity = run["service_identity"]
+        assert all(call["body"]["model"] == "requested-alias" for call in calls)
+        assert identity["requested_model"] == "requested-alias"
+        assert identity["observed_model"] == observed
+        assert identity["exposed_revision"] is None
+        assert run["artifact_digest"] is None
+        for record in run["records"]:
+            assert record["error"] == ("invalid_response" if observed is None else None)
+            assert record["output"] == (None if observed is None else "yes")
+            raw = json.loads(
+                base64.b64decode(record["context"]["http_observation"]["body_base64"])
+            )
+            assert raw.get("model") == observed
+        # Offline export must not make a further provider request.
+        helper.export_run(*values, "baseline")
+        assert len(calls) == 2
+
+
+def test_mixed_routing_cannot_be_flattened_into_one_observed_model(tmp_path):
+    helper = module()
+    responses = [
+        (200, helper.encoded(response(model=model)))
+        for model in ("primary-model", "fallback-model")
+    ]
+    with server(responses) as (url, calls):
+        declaration = protocol(helper, url)
+        declaration["services"]["baseline"]["expected_observed_model"] = None
+        values = collect_fixture(tmp_path, helper, declaration)
+        with pytest.raises(
+            ValueError, match="observed model changed within capture window"
+        ):
+            helper.export_run(*values, "baseline")
+        retained = json.loads(values[2].read_bytes())
+        assert [
+            json.loads(base64.b64decode(item["body_base64"]))["model"]
+            for item in retained["observations"]
+        ] == ["primary-model", "fallback-model"]
+        assert len(calls) == 2
