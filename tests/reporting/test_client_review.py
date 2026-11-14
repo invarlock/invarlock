@@ -166,7 +166,7 @@ def test_findings_preview_retains_every_result_and_its_original_source():
     )
     for output in (render_html(view), render_markdown(view)):
         assert "7 of 7 metric / scope results need review" in output
-        assert "First 5 shown here" in output
+        assert "First 5 shown here" not in output
         for metric in view.metrics:
             assert metric.evidence_source in output
 

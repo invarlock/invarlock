@@ -1262,6 +1262,12 @@ def report(
         help="Create a fresh client handoff directory and ZIP.",
         rich_help_panel="Client handoff",
     ),
+    receipt_expectations: Path | None = typer.Option(
+        None,
+        "--receipt-expectations",
+        help="Independent receipt expectations JSON; authenticates a retained receipt in package mode.",
+        rich_help_panel="Client handoff",
+    ),
     retained_receipt: Path | None = typer.Option(
         None,
         "--retained-receipt",
@@ -1277,7 +1283,10 @@ def report(
 ) -> None:
     """Render EVIDENCE without changing any evidence-pack byte."""
 
-    if any(value is not None for value in (review_context, package, retained_receipt)):
+    if any(
+        value is not None
+        for value in (review_context, package, retained_receipt, receipt_expectations)
+    ):
         from invarlock.client_review import ClientReviewError, build_client_review
 
         try:
@@ -1298,6 +1307,7 @@ def report(
                 context_path=review_context,
                 output=package,
                 retained_receipt=retained_receipt,
+                receipt_expectations=receipt_expectations,
             )
         except ClientReviewError as exc:
             if json_out:
@@ -1317,7 +1327,9 @@ def report(
             _echo_json(json.dumps(handoff))
         else:
             console.print(f"Client handoff: {_terminal_text(handoff['output'])}")
-            console.print("Recipient verification has not been performed by packaging.")
+            console.print(
+                f"Recipient verification: {handoff['recipient_verification']}"
+            )
         return
 
     from invarlock.evidence_reporting import (
