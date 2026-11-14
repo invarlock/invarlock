@@ -1,6 +1,8 @@
 """Deliveries identify renderer helpers and reject incomplete or changed inputs."""
 
 import json
+import runpy
+import sys
 from pathlib import Path
 from zipfile import ZipFile
 
@@ -108,7 +110,7 @@ def test_stale_delivery_inventory_is_rejected(tmp_path):
 
 @pytest.mark.parametrize("paper", ["A4", "Letter"])
 def test_export_publishes_complete_archives_and_preserves_source(
-    tmp_path, monkeypatch, paper
+    tmp_path, monkeypatch, capsys, paper
 ):
     import invarlock.report_delivery as module
 
@@ -131,9 +133,19 @@ def test_export_publishes_complete_archives_and_preserves_source(
 
     monkeypatch.setattr(module.subprocess, "run", render)
     output = tmp_path / "delivery"
-    result = module.export_client_review(
-        package, output=output, browser_module=browser, paper=paper
+    command = Path(__file__).resolve().parents[2] / "examples/client-review/export.py"
+    runpy.run_path(str(command))
+    assert not output.exists()
+    assert capsys.readouterr().out == ""
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [str(command), str(package), str(output), "--browser-module", str(browser)]
+        + ([] if paper == "A4" else ["--paper", paper]),
     )
+    runpy.run_path(str(command), run_name="__main__")
+    result = json.loads(capsys.readouterr().out)
+    assert result["output"] == str(output)
     assert inventory(package) == before
     delivered = inventory(output)
     manifest = json.loads((output / "delivery-inventory.json").read_text())
