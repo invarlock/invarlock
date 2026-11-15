@@ -44,6 +44,16 @@ separate stakeholder reports from full evaluation data. InvarLock applies these
 patterns to a specific baseline-to-subject change, with recorded requirements,
 supporting file locations and separate recipient verification.
 
+For non-specialist readers, client briefs also draw on
+[Anthropic's summary-to-system-card structure](https://www.anthropic.com/transparency),
+[Braintrust's behavioral explanations of comparison results](https://www.braintrust.dev/foundations/how-to-analyze-your-eval-results),
+and [Promptfoo's findings-to-actions structure](https://www.promptfoo.dev/docs/enterprise/remediation-reports/).
+An optional attributed summary explains the tested task, observed result, practical
+meaning and unknowns. Generated results, verification state and blockers precede lengthy authored narrative. Exact
+measurements and methods remain available in the full review and technical appendix.
+These presentation choices do not establish comprehension; that requires testing
+with the intended readers.
+
 ## Reading a report for a release review
 
 The evidence-only report starts with **Decision context**, including the compared
@@ -79,10 +89,14 @@ judge reports identify their advisory role in the title and at the start of
 the explanation. Browser-tab titles include the recorded outcome.
 
 **Findings to review** highlights failed or unresolved metric/scope results and
-links to their numbered checks. If more than five need review, the report says
-how many remain and retains every result below. It does not rank unrelated
+links to their numbered checks. Every blocker remains visible, retaining its source result identifier. It does not rank unrelated
 metrics by numerical severity. **Scope and limitations** and **Next decision**
 remain visible before the detailed statistics.
+
+Each finding also supplies a **Suggested follow-up** tied to its unresolved
+checks. Missing results, insufficient independent evidence, a wide range and
+unmet score requirements lead to different actions. This generated guidance
+neither changes acceptance requirements nor authorizes further execution.
 
 The opening also gives a **Review action** appropriate to the recorded result.
 This is generated guidance, not an owner's recommendation. The **Change context**

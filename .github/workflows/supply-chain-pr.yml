@@ -136,6 +136,18 @@ jobs:
               for number, (_, count) in enumerate(cases, 1):
                   extra_expected.extend([[relative, number]] * count)
 
+          relative = "requirements/security-constraints.in"
+          advisory = "GHSA-mf5v-w3w3-f6cg"
+          public_line = "# opentelemetry-" + "api: " + advisory + "."
+          write_cases(relative, [
+              (public_line, 0),
+              (public_line.replace(advisory, canary), 1),
+              (public_line + f' api_key = "{canary}"', 2),
+              (f'api_key = "{canary}"', 1),
+          ])
+          for other in ("prefix/" + relative, relative + ".bak"):
+              write_cases(other, [(public_line, 1)])
+
           relative = "examples/integrations/modelkit-handoff/references/mistral-7b/provenance.json"
           revision = "27d67f1b5f57dc0953326b2601d68371d40ea8da"
           field = "tokenizer_revision"

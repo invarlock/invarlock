@@ -1364,6 +1364,19 @@ def _hf_causal_logits(model: object, torch: Any, window: Any) -> Any:
     return logits
 
 
+def _hf_target_logprob(logits: Any, target_id: int, torch: Any) -> float:
+    # Exclude the target before summing its competitors. Including its unit
+    # mass in a low-precision softmax can erase a small, representable loss.
+    last = logits[0, -1]
+    if last.device.type == "mps":
+        last = last.cpu()
+    scores = last.double()
+    relative = scores - scores[target_id]
+    relative[target_id] = -math.inf
+    log_odds = float(torch.logsumexp(relative, dim=0).item())
+    return -(max(log_odds, 0.0) + math.log1p(math.exp(-abs(log_odds))))
+
+
 def _hf_normalized_nll(
     *,
     record: EvaluationRecord,
@@ -1432,12 +1445,10 @@ def _hf_normalized_nll(
         window = history[:, -settings.context_length :]
         logits = _hf_causal_logits(model, torch, window)
         target_token = target_ids[:, target_index : target_index + 1]
-        if int(target_token.item()) < 0 or int(target_token.item()) >= logits.shape[-1]:
+        target_id = int(target_token.item())
+        if target_id < 0 or target_id >= logits.shape[-1]:
             raise RuntimeError("strict HF target token is outside the model vocabulary")
-        token_logprob = torch.log_softmax(logits[:, -1, :], dim=-1).gather(
-            1, target_token
-        )
-        value = float(token_logprob.item())
+        value = _hf_target_logprob(logits, target_id, torch)
         if not math.isfinite(value) or value > 0:
             raise RuntimeError("strict HF model returned an invalid target logprob")
         target_logprobs.append(value)

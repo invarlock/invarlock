@@ -85,7 +85,12 @@ def _require_exact_tree(
                 os.close(child)
             except OSError:
                 pass
-    if _snapshot_identity(os.fstat(descriptor)) != before:
+    # Directory timestamps and sizes may remain unchanged across additions on
+    # filesystems with coarse clocks. Recheck the actual inventory as well.
+    if (
+        set(os.listdir(descriptor)) != files.keys() | directories.keys()
+        or _snapshot_identity(os.fstat(descriptor)) != before
+    ):
         raise PathChangedError(
             "staged directory changed while validating generated files"
         )

@@ -1600,13 +1600,15 @@ langdetect==1.0.9 \
     --hash=sha256:7cbc0746252f19e76f77c0b1690aadf01963be835ef0cd4b56dddf2a8f1dfc2a \
     --hash=sha256:cbc1fef89f8d062739774bd51eda3da3274006b3661d199c2655f6b3f6d605a0
     # via evals
-langgraph==1.2.10 \
-    --hash=sha256:05a183a746ed570a06c7c1b879920163509a75df9e44e92dd2238218d677fd37 \
-    --hash=sha256:52c48bd42fa31a1de0e1c0f0ebfe342e11ca2957b8b3563f83dbd60d8e30f921
-    # via langchain
-langgraph-checkpoint==4.2.0 \
-    --hash=sha256:0547fd228935a0b758865de3a3d6d7a2537c308895d0f9ab092ce9151b5da942 \
-    --hash=sha256:51a593b6bee684b0818e5d6e58e28ab340c6db7794575056ce7bd1b746a84ed7
+langgraph==1.2.19 \
+    --hash=sha256:4a00fa1aad2b5fc2d3a789a8e9eaf993f76218ca924b434902ecf1bbaaf300f6 \
+    --hash=sha256:6094a5cbed52a77d8c74c276fcd2056abde7b2836eab1c7a6b74bacbd1a269b3
+    # via
+    #   -c requirements/security-constraints.in
+    #   langchain
+langgraph-checkpoint==4.3.1 \
+    --hash=sha256:215a826935c8db4d9676e79fd95943e5b3847d78604390898e1d98581cc594e5 \
+    --hash=sha256:625e7c78a72b33e7c47f7e87ca051060fb90aa66f5fd551c472c08376fb669cb
     # via
     #   langgraph
     #   langgraph-prebuilt
@@ -1614,10 +1616,12 @@ langgraph-prebuilt==1.1.0 \
     --hash=sha256:3c579cf6eed2d17f9c157c2d0fcaddcd8688524e7022d3b22b37a3bf4589d528 \
     --hash=sha256:51e311747d755b751d5c6b39b0c1446124d3a7643d2515017e6714b323508fc9
     # via langgraph
-langgraph-sdk==0.4.4 \
-    --hash=sha256:39afe416c91742925e6f8a93715f566d499b36e1b636b804a4ffe3190e4f4e64 \
-    --hash=sha256:4e651ffa09de695681579396375377bdde23bedbc8e35b070e615cbd5af7da8b
-    # via langgraph
+langgraph-sdk==0.4.11 \
+    --hash=sha256:2550af3bc7cb78ac4facb97d141ec1a76568fa3eb3d29040cff70b45bda84740 \
+    --hash=sha256:6a65be4a8f825966a07317b8e34e3337cd227b9b58b185f0123fd13c3d0116fa
+    # via
+    #   -c requirements/security-constraints.in
+    #   langgraph
 langsmith==0.10.17 \
     --hash=sha256:2a1242a0500147ed846ecbd5fe2f41c21b1652f6833b1af0f209231006f67e5e \
     --hash=sha256:2bf0e69246ef77282ea93e78eb22dad1ec8d8a002d31cbd607d0d6448f9c6458
@@ -3304,10 +3308,12 @@ pyarrow==25.0.0 \
     --hash=sha256:f57a39dbcb416345401c2e77a4373669b45fd111a1768e6cf267a7a0607ff0ec \
     --hash=sha256:fa1482b3da10cac2d4db6e26b81da543e237616af2ef6d466018b31ca586496f
     # via datasets
-pyasn1==0.6.4 \
-    --hash=sha256:9c447d8431c947fe4c8febc4ed9e760bc29011a5b01e5c74b67025bd9fb8ce81 \
-    --hash=sha256:deda9277cfd454080ec40b207fb6df82206a3a2688735233cdcd8d3d565f088b
-    # via pyasn1-modules
+pyasn1==0.6.5 \
+    --hash=sha256:4017b0fce125096b8573b39c989fdb1a4b19cf761e683398184550fea0e66587 \
+    --hash=sha256:6b11616a6bcf3a40e635f082bb232fa57b5e0dd7f517bd7ddd69ec3794508a47
+    # via
+    #   -c requirements/security-constraints.in
+    #   pyasn1-modules
 pyasn1-modules==0.4.2 \
     --hash=sha256:29253a9207ce32b64c3ac6600edc75368f98473906e8fd1043bd6b5b1de2c14a \
     --hash=sha256:677091de870a80aae844b1ca6134f54652fa2c8c5a52aa396440ac3106e941e6

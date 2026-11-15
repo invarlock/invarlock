@@ -949,3 +949,32 @@ def test_hf_strict_rescore_reuses_authenticated_checkpoint(
     session.score(_batch())
 
     assert observed == [checkpoint, checkpoint]
+
+
+@pytest.mark.parametrize(
+    ("scores", "target"),
+    [([10, 0, -1], 0), ([80, 0, -1], 0), ([1000, 0], 1), ([1, 1], 0), ([1], 0)],
+)
+def test_target_logprob_preserves_small_losses(scores, target):
+    from decimal import Decimal, localcontext
+
+    torch = pytest.importorskip("torch")
+    logits = torch.tensor([[scores]], dtype=torch.bfloat16)
+    with localcontext() as ctx:
+        ctx.prec = 100
+        values = [Decimal(value) for value in logits[0, 0].tolist()]
+        expected = -sum((value - values[target]).exp() for value in values).ln()
+    actual = hf_transformers._hf_target_logprob(logits, target, torch)
+    assert actual == pytest.approx(float(expected), rel=1e-12, abs=0)
+    assert logits[0, 0].tolist() == scores
+
+
+def test_target_logprob_on_mps():
+    torch = pytest.importorskip("torch")
+    if not torch.backends.mps.is_available():
+        pytest.skip("requires Metal")
+    logits = torch.tensor([[[10.0, 0.0, -1.0]]], device="mps", dtype=torch.float16)
+    expected = -math.log1p(math.exp(-10) + math.exp(-11))
+    assert hf_transformers._hf_target_logprob(logits, 0, torch) == pytest.approx(
+        expected, rel=1e-12, abs=0
+    )

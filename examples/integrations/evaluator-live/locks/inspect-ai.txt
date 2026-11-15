@@ -1,0 +1,2 @@
+inspect-ai==0.3.254
+agent-client-protocol==0.12.1

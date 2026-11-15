@@ -41,6 +41,7 @@ from invarlock.core.scoring import (
     UnsupportedScoringEnvironment,
     require_scoring_environment,
 )
+from invarlock.ed25519 import verify_ed25519_signature
 from invarlock.evaluation_comparison.capacity import DEFAULT_MAX_BOOTSTRAP_DRAWS
 from invarlock.evaluation_comparison.comparison import (
     LocalWorkBudgetExceeded,
@@ -510,7 +511,8 @@ def verify_captured_receipt(
             or verifier["signing_key_fingerprint"] != derived
         ):
             raise ValueError("captured receipt verifier key is unauthorized")
-        public.verify(
+        verify_ed25519_signature(
+            public,
             base64.b64decode(signature["value"], validate=True),
             canonical_json_bytes(statement),
         )

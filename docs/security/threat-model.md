@@ -381,3 +381,7 @@ decision. Portable recipient verification is specified in
 - in-toto project,
   [Attestation Framework Specification 1.2](https://github.com/in-toto/attestation/blob/v1.2.0/spec/README.md),
   2026.
+
+## Client report boundary
+
+Client receipt snapshots require independently supplied expectations. A byline, opaque attachment or package-provided public key cannot authorize acceptance. Summary PDFs omit replay records and explicitly require a companion package. Full evidence can contain sensitive inputs and outputs; distribution review is separate from verification. Renderer and delivery hashes identify bytes but are unsigned and confer no authority.

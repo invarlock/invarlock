@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.4] - 2026-11-15
+
+### Security
+
+- Raise `dnspython`, Soup Sieve and OpenTelemetry API to patched versions in
+  maintained dependency locks, and preserve their minimum versions during
+  regeneration.
+- Reject small-order Ed25519 public keys and signature points consistently across
+  evidence, receipts and acceptance attestations, including standalone recipient
+  examples. This closes verification with an explicitly trusted small-order key;
+  it does not change the requirement to supply independently approved trust inputs.
+- Update vulnerable documentation and evaluator dependencies and preserve the
+  `pyasn1`, `langgraph` and `langgraph-sdk` security floors in maintained locks.
+
+### Fixed
+
+- Keep Inspect SDK capture compatible with its pinned evaluator by selecting
+  agent-client-protocol 0.12.1, which provides the required `acp.helpers` module.
+- Preserve small target losses in Hugging Face scoring by using higher precision
+  for loss calculation, preventing low-precision rounding from producing false zero
+  losses. Existing zero-denominator and insufficient-evidence rules still apply.
+- Recheck the staged directory's file inventory immediately before publication,
+  rejecting added or removed entries even when directory metadata appears
+  unchanged.
+
+### Changed
+
+- Refresh documentation tooling, including CSpell, KaTeX and markdownlint.
+- Update pinned workflow actions and their installer regression checks.
+- Give decision briefs distinct state panels, prominent conditions, labelled
+  evidence records and the existing InvarLock visual identity in HTML and print.
+- Preserve full review restrictions, prioritize every blocker and explain exact
+  threshold failures. Share generated facts, quality requirements and distinct
+  evidence-authentication and recipient states across client package formats.
+- Add structured owner decisions with explicit exceptions, independently checked
+  receipt snapshots and companion-dependent PDF delivery with complete renderer
+  and output identities. Keep canonical evidence and recorded verdicts unchanged.
+
 ## [0.17.3] - 2026-10-27
 
 Supersedes the unpublished `0.17.2` tag, whose release build stopped at the

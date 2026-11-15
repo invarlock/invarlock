@@ -60,7 +60,7 @@ const fs = require('node:fs');
     const page = await browser.newPage({viewport: {width: 1280, height: 900}});
     await page.goto(process.argv[3]);
     if (!(await page.locator('details:not([open])').count())) throw Error('No closed details exercised');
-    const expected = await page.locator('.review-context li,.review-context dt,.review-context dd,.review-context p,.interpretation-note,.change-summary,.review-action,.decision-summary,.assurance dt,.assurance dd,.findings li,.findings p,.limits li,.next-steps p,.next-steps li,.metric-explanation,.interval-reading dt,.interval-reading dd,.interval-basis p,.notes li,.shared-context dd').allTextContents();
+    const expected = await page.locator('.review-context li,.review-context dt,.review-context dd,.review-context p,.interpretation-note,.change-summary,.review-action,.result-reading,.decision-summary,.assurance dt,.assurance dd,.findings li,.findings p,.limits li,.next-steps p,.next-steps li,.metric-explanation,.interval-reading dt,.interval-reading dd,.interval-basis p,.notes li,.shared-context dd').allTextContents();
     fs.writeFileSync(process.argv[6], JSON.stringify(expected));
     await page.pdf({path: process.argv[4], format: process.argv[7], printBackground: process.argv[7] === 'A4',
       margin: {top: '14mm', bottom: '14mm', left: '14mm', right: '14mm'}});
