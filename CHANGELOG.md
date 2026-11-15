@@ -747,7 +747,7 @@ or allowing observation-only results to drive acceptance.
   qualification and runtime-import contracts.
 - Refreshed hash-pinned runtime and workflow dependencies, including the
   cryptography security baseline used by signed evidence and receipt paths,
-  Ruff 0.16.2, PEFT 0.20.0, and TorchAO 0.17.4.
+  Ruff 0.16.2, PEFT 0.20.0, and TorchAO 0.18.0.
 - Reframed the public project overview around independently replayable signed
   evaluation evidence, with a clear decision boundary and assurance limits plus
   a retained proof map connecting evaluator output, qualification, evidence,
