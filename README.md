@@ -20,6 +20,7 @@
   <a href="https://invarlock.github.io/invarlock/"><img alt="Docs" src="https://img.shields.io/badge/docs-quickstart-1f3a7a?labelColor=18150f" /></a>
   <a href="LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-1f3a7a?labelColor=18150f" /></a>
   <a href="https://www.python.org/downloads/release/python-3120/"><img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12%2B-1f3a7a?logo=python&logoColor=f4efe3&labelColor=18150f" /></a>
+  <a href="https://kitops.org"><img alt="Packaged with KitOps" src="https://img.shields.io/badge/Packaged%20with-KitOps-FFAF52?labelColor=363636" /></a>
 </p>
 
 **InvarLock evaluates model changes and produces evidence that another team can
