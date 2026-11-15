@@ -2938,7 +2938,7 @@ receipts</a> for the complete field matrix.</p>
 checksums, reference digests, canonical JSON and embedded signature when signed,
 then renders <code>reports/evaluation.report.json</code> without a full comparison replay.
 Judge and evidence-set reports replay their retained judge measurements under
-their own contracts. None of these paths performs recipient acceptance.</p>
+their own contracts. Individual rendering does not perform recipient acceptance; package mode can authenticate a retained receipt snapshot with independent expectations.</p>
 <table>
 <thead>
 <tr>
@@ -2991,7 +2991,12 @@ their own contracts. None of these paths performs recipient acceptance.</p>
 <tr>
 <td><code>--retained-receipt PATH</code></td>
 <td>No</td>
-<td>Attach a matching historical receipt without authenticating it</td>
+<td>Attach a matching historical receipt</td>
+</tr>
+<tr>
+<td><code>--receipt-expectations PATH</code></td>
+<td>With retained receipt</td>
+<td>Authenticate the snapshot using independent family-specific expectations</td>
 </tr>
 <tr>
 <td><code>--json</code></td>
@@ -3004,7 +3009,9 @@ their own contracts. None of these paths performs recipient acceptance.</p>
 with individual report outputs, <code>--explain</code> or <code>--case-id</code>. It publishes a complete
 new directory only after preparation and source checks. With <code>--json</code>, success
 returns <code>invarlock/client-review-package-v1</code>, <code>ok</code>, <code>kind</code>, <code>output</code>, <code>brief</code>,
-<code>archive</code>, <code>evidence_statement_sha256</code> and <code>recipient_verification: not_performed</code>.
+<code>archive</code>, <code>evidence_statement_sha256</code> and <code>recipient_verification</code> (<code>not_performed</code>,
+<code>authenticated_acceptance</code> or <code>authenticated_rejection</code>). Successful rendering
+exits 0 even for a recorded or authenticated rejection.
 Failure returns the same format identifier, <code>ok: false</code> and <code>errors</code>, with exit 2.
 See <a href="../../user-guide/client-handoff/">client review packages</a> for context fields,
 output contents and recipient instructions.</p>

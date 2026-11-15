@@ -604,6 +604,50 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#structured-decisions-and-generated-facts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Structured decisions and generated facts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authenticate-a-receipt-snapshot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authenticate a receipt snapshot
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reading-layers-and-case-selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading layers and case selection
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#export-a-portable-pdf-delivery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Export a portable PDF delivery
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -2038,6 +2082,50 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#structured-decisions-and-generated-facts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Structured decisions and generated facts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authenticate-a-receipt-snapshot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authenticate a receipt snapshot
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reading-layers-and-case-selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading layers and case selection
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#export-a-portable-pdf-delivery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Export a portable PDF delivery
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -2070,7 +2158,7 @@ evidence directory and a separately authored review context.</p>
 <p>The package explains a specific baseline-to-candidate change. It does not infer
 business suitability from a passing policy result or turn commentary into an
 approval. Native, captured, judge and combined evidence use their existing report
-validation. Packaging performs no model calls or new recipient acceptance.</p>
+validation. Packaging performs no model calls. Optional independent receipt expectations enable an authenticated snapshot; combined snapshots use the existing component recheck.</p>
 <h2 id="supply-the-context">Supply the context<a class="headerlink" href="#supply-the-context" title="Permanent link">&para;</a></h2>
 <p>Start from the <a href="https://github.com/invarlock/invarlock/blob/main/examples/client-review/context.example.json">context example</a>
 and replace its illustrative text. The JSON format is
@@ -2111,13 +2199,35 @@ and replace its illustrative text. The JSON format is
 <td><code>basis</code></td>
 <td>Optional labeled rationale rows, distinct from recorded measurements</td>
 </tr>
+<tr>
+<td><code>summary</code></td>
+<td>Optional plain-language summary: up to four labeled rows, each string at most 600 characters</td>
+</tr>
 </tbody>
 </table>
 <p>Include intended use, changed inputs, business purpose, policy rationale,
 workload coverage and decision ownership. Do not invent a sample-size rationale
 or claim that an illustrative workload represents production. Commentary is plain
 text. Unknown fields, duplicate keys and invalid dates are rejected. The context
-is limited to 64 KiB, each text field to 4,000 characters and each row list to 32.</p>
+is limited to 64 KiB, each text field to 4,000 characters and each row list to 32.
+The shorter <code>summary</code> limits above are an exception. Existing contexts without
+this optional field remain supported; their briefs explain the recorded scores,
+change range and requirements and explicitly mark the missing application-specific
+interpretation. The generated reading guide does not supply a business decision.</p>
+<p>Write the summary for a reader who does not know the metric or statistical method.
+Use four rows: <strong>What was tested</strong>, <strong>What happened</strong>, <strong>What this means</strong>, and
+<strong>What remains unknown</strong>. Describe the task and case count, explain the score in
+ordinary words, and state the requirement and its outcome. Distinguish an observed
+decline from uncertainty that prevents a pass. A passing comparison does not by
+itself establish improvement or application suitability. Keep the intended change
+in <code>context</code>, and the accountable next step in <code>next_action</code>.</p>
+<p>The summary is attributed commentary, not automatically verified against the
+measurements. Its author must check numerical statements and limits against the
+retained evidence. It appears in both the brief and full review; exact measurements,
+methods and all recorded limitations remain in the full review and appendix.
+For concrete examples, add labeled <code>basis</code> rows citing retained record paths and
+JSON pointers. Explain how examples were selected and show counterexamples when
+available; do not use an illustration to imply a frequency or a general capability.</p>
 <h2 id="build-a-fresh-package">Build a fresh package<a class="headerlink" href="#build-a-fresh-package" title="Permanent link">&para;</a></h2>
 <div class="codehilite"><pre><span></span><code>invarlock<span class="w"> </span>report<span class="w"> </span>./evidence<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--review-context<span class="w"> </span>./review-context.json<span class="w"> </span><span class="se">\</span>
@@ -2181,12 +2291,22 @@ be combined with package mode.</p>
 </tr>
 </tbody>
 </table>
-<p>The brief explicitly marks excerpts and omitted metric rows; the complete review
-and appendix remain available. HTML uses local links and no remote assets.
+<p>The brief preserves full conditions and all blockers; omitted passing results are counted and remain available in the appendix. HTML uses local links and no remote assets.
 Print the brief for a short decision record and keep the full review alongside it.
+The supported PDF exporter prints evidence and snapshot identities and explicitly requires the companion package for supporting records and replay.</p>
+<p>Each displayed result links directly to its evidence and checks in the technical
+appendix. Score bars start at zero. Accuracy uses the full 0–100% scale; judge
+ratings use their 0–1 rubric and are explicitly not accuracy percentages. Loss
+comparisons use the recorded NLL units and label their shared scale. Custom
+metrics and missing or unsupported values use text without an inferred scale.
+The observed scores and the uncertainty range have different roles: the linked
+checks retain the exact rule that produced the recorded decision.</p>
+<p>Unmet checks have suggested follow-up actions, such as resolving missing results,
+reviewing uncertainty or investigating candidate behavior. These suggestions do
+not change the policy, authorize another run or replace the author's next action.
+The brief and full review retain family-specific limits.
 Unsigned inventories identify bytes relative to an inventory; they do not establish
-signer authority or client acceptance. PDFs printed afterward are not added to the
-original ZIP or inventory.</p>
+signer authority or client acceptance. The delivery exporter creates a separate inventory and archive covering the PDFs; it preserves the original package inventory unchanged.</p>
 <h2 id="recipient-verification-and-decision">Recipient verification and decision<a class="headerlink" href="#recipient-verification-and-decision" title="Permanent link">&para;</a></h2>
 <p>Extract the ZIP, read <code>verification.html</code>, and obtain approved trust inputs from
 an independent source. Keep trust profiles and private verifier keys outside the
@@ -2202,6 +2322,117 @@ scopes; their aggregate result is not a new signed attestation.</p>
 approved input identities and separately recorded owner decision. For full trust
 semantics, see <a href="../evidence-and-verification/">evidence and verification</a> and
 <a href="../../reference/reports/">reports and receipts</a>.</p>
+<h2 id="structured-decisions-and-generated-facts">Structured decisions and generated facts<a class="headerlink" href="#structured-decisions-and-generated-facts" title="Permanent link">&para;</a></h2>
+<p>The optional <code>invarlock/client-review-context-v2</code> format adds required plain-text
+<code>intended_use</code>, <code>excluded_uses</code>, <code>decision_conditions</code> and <code>decision_state</code> fields.
+Keep the other v1 required fields. Use explicit text such as “None declared” when
+no exclusion or condition is supplied; an empty string is rejected. Decision state
+is <code>pending</code>, <code>accepted</code>, <code>rejected</code>, <code>conditional</code> or <code>exception</code>. An exception
+requires <code>exception_rationale</code>. Acceptance or conditional acceptance alongside an
+unmet or unavailable recorded policy also requires that rationale and is displayed
+as an owner exception. It never changes a recorded requirement or verdict.</p>
+<p>Version 1 inputs remain supported and their original bytes are retained. They are
+labelled legacy unstructured commentary: arbitrary decision prose is never parsed
+into an approval state. A byline identifies the supplied attribution; it does not
+authenticate authority. Unknown fields, states and forged verification fields are
+rejected. All conditions remain visible without excerpts, including long inputs.</p>
+<p>All package formats share generated result, authentication, quality-requirement
+and family-limit facts. Authored interpretation remains separate and may be
+incorrect; it cannot override those facts. Missing observation and verification
+times remain unavailable. A review date does not establish evidence freshness.</p>
+<h2 id="authenticate-a-receipt-snapshot">Authenticate a receipt snapshot<a class="headerlink" href="#authenticate-a-receipt-snapshot" title="Permanent link">&para;</a></h2>
+<p>Add <code>--receipt-expectations /absolute/independent-inputs.json</code> to package mode to
+check the attached receipt. The closed JSON object has <code>format</code> equal to
+<code>invarlock/report-verification-inputs-v1</code>, <code>kind</code> equal to <code>runtime</code>, <code>captured</code>,
+<code>judge</code> or <code>evidence_set</code>, and an <code>expectations</code> object. Obtain this file through
+an independent trusted channel; never populate it by trusting the submission.</p>
+<p>For native (<code>runtime</code>) and captured evidence, expectations are the keyword
+arguments of <code>verify_signed_verification_receipt</code>: <code>policy_path</code>,
+<code>expected_pack_signer_fingerprint</code>, <code>expected_verifier_identity</code> and
+<code>expected_verifier_fingerprint</code>, plus family bindings. Native requires
+<code>expected_artifact_digests</code>, <code>expected_schedule_digest</code> and
+<code>expected_runtime_digests</code>; captured requires <code>expected_run_digests</code> and
+<code>expected_request_digest</code>. Supply <code>expected_request_digest</code> for native v2 and
+<code>expected_trust_profile_digest</code> when the receipt was issued with a profile.
+Omitting the latter expects no recorded profile, rather than disabling checking.</p>
+<p>Judge expectations contain <code>recipient_policy_path</code>, <code>expected_verifier_identity</code>
+and <code>expected_verifier_fingerprint</code>. The independently supplied policy's canonical
+identity must match the authenticated receipt, which must name this exact evidence.
+Combined expectations contain <code>recipient_policy_path</code>; the existing combined
+verifier freshly rechecks both components and compares the complete stored result.
+Its independent profiles must provide the existing verifier signing configuration.
+This is not a new signed joint attestation. Keep private keys outside the package.
+Relative policy paths resolve from the expectations file's directory.</p>
+<p><code>verification-snapshot.json</code> records exact evidence, receipt and independent-input
+identities, verifier identity, receipt authentication time and acceptance separately.
+The snapshot excludes local policy paths and private keys. The original verification
+time remains unavailable where the receipt contract has no timestamp. Historical
+acceptance does not establish current signer authorization or evidence freshness.
+Changing evidence, policy or expectations requires a new check and package.</p>
+<p>An authentic rejection is rendered as a rejection. A wrong binding, unauthorized
+verifier or corrupt receipt aborts publication with exit 2. Successful rendering
+still exits 0 for both accepted and rejected snapshots; use <code>recipient_verification</code>
+in the JSON output to distinguish them. Without expectations, a supplied receipt
+remains an unverified attachment. Invalid evidence is rejected rather than given
+an apparently valid report. This workflow performs no model inference.</p>
+<h2 id="reading-layers-and-case-selection">Reading layers and case selection<a class="headerlink" href="#reading-layers-and-case-selection" title="Permanent link">&para;</a></h2>
+<p>The brief begins with separate panels for the recorded policy result, evidence
+signing, recipient verification and owner decision. The comparison and requirements
+follow, with the owner's full conditions in a distinct section. Supporting facts
+use labelled rows, and full evidence and snapshot identities remain visible at the
+end. The pine, cream, teal and copper palette follows the existing product style. Detailed score cards and
+family limitations precede the attributed narrative. Long valid context continues
+onto further pages; one or two pages is a target, never a truncation rule.</p>
+<p>The engineering review includes captured-case explanations selected by stable ID:
+one improved, regressed, unchanged and missing example per overall metric when
+per-case scores are retained. Otherwise it shows output changed, unchanged and
+missing categories without scoring again or inferring a quality direction. Category counts cover the retained paired run. They are not added across
+overlapping slices. Examples show scoring outcomes and record IDs without repeating
+raw inputs or outputs. Missing categories are stated explicitly. Attempted and
+excluded totals outside the retained runs remain unknown. Other evidence families
+retain their own paired-count and independent-unit explanations and case detail
+where supported; judge repetitions are never counted as additional independent
+cases. Authenticated operational observations remain supplementary and do not
+change the policy requirements.</p>
+<h2 id="export-a-portable-pdf-delivery">Export a portable PDF delivery<a class="headerlink" href="#export-a-portable-pdf-delivery" title="Permanent link">&para;</a></h2>
+<p>Install Playwright and its supported Chromium locally, then use the public API:</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.engine</span><span class="w"> </span><span class="kn">import</span> <span class="n">export_client_review</span>
+
+<span class="n">export_client_review</span><span class="p">(</span>
+    <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;client-handoff&quot;</span><span class="p">),</span>
+    <span class="n">output</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;delivery&quot;</span><span class="p">),</span>
+    <span class="n">browser_module</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;/absolute/node_modules/playwright&quot;</span><span class="p">),</span>
+    <span class="n">paper</span><span class="o">=</span><span class="s2">&quot;A4&quot;</span><span class="p">,</span>  <span class="c1"># or Letter</span>
+<span class="p">)</span>
+</code></pre></div>
+
+<p>The source-checkout equivalent is <code>python examples/client-review/export.py
+client-handoff delivery --browser-module /absolute/node_modules/playwright</code>.
+<code>INVARLOCK_REPORT_BROWSER_EXECUTABLE</code> optionally selects an approved installed
+browser. The exporter validates the package inventory and writes into a fresh
+staged directory. A missing browser, stale inventory or interrupted export cannot
+publish a completed delivery. It never modifies the source package or evidence.</p>
+<p>Deliver <code>delivery.zip</code> for the full extracted offline package, or <code>summary.zip</code>
+for the brief PDF and its inventory only. The summary identifies the withheld
+companion evidence and cannot replay it. PDFs print evidence and snapshot identities
+and contain no links into the author's checkout. Navigation labels refer to the
+companion HTML package. <code>delivery-inventory.json</code> covers the final files and
+<code>print-runtime.json</code> records browser, Node and paper configuration. Neither an
+inventory nor its containing archive claims to hash itself.</p>
+<p>Renderer identity covers the installed Python sources, templates and contract
+resources, not just the package builder. Deterministic HTML, Markdown and ZIP
+outputs repeat byte-for-byte with identical renderer, evidence, context and
+verification snapshot. A new receipt check changes its recorded local check time.
+PDF bytes can vary with browser metadata and timestamps: retain their exact hashes
+and compare extracted content when testing repeat exports. No byte reproducibility
+claim is made for PDFs across environments.</p>
+<p>Review distribution permissions before sharing. Full evidence contains retained
+inputs and outputs; summaries omit those records but can still disclose authored
+context and declared model names. Private PEM key attachments are rejected, but
+this is not a general secret detector. Do not redact signed evidence in place.
+An audience-specific summary must say which content was withheld and retain its
+companion identity. Keep credentials and private trust-profile paths external.</p>
 
 
 

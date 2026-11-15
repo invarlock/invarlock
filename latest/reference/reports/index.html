@@ -2593,6 +2593,15 @@ and <a href="https://docs.aws.amazon.com/sagemaker/latest/dg/model-cards.html">S
 separate stakeholder reports from full evaluation data. InvarLock applies these
 patterns to a specific baseline-to-subject change, with recorded requirements,
 supporting file locations and separate recipient verification.</p>
+<p>For non-specialist readers, client briefs also draw on
+<a href="https://www.anthropic.com/transparency">Anthropic's summary-to-system-card structure</a>,
+<a href="https://www.braintrust.dev/foundations/how-to-analyze-your-eval-results">Braintrust's behavioral explanations of comparison results</a>,
+and <a href="https://www.promptfoo.dev/docs/enterprise/remediation-reports/">Promptfoo's findings-to-actions structure</a>.
+An optional attributed summary explains the tested task, observed result, practical
+meaning and unknowns. Generated results, verification state and blockers precede lengthy authored narrative. Exact
+measurements and methods remain available in the full review and technical appendix.
+These presentation choices do not establish comprehension; that requires testing
+with the intended readers.</p>
 <h2 id="reading-a-report-for-a-release-review">Reading a report for a release review<a class="headerlink" href="#reading-a-report-for-a-release-review" title="Permanent link">&para;</a></h2>
 <p>The evidence-only report starts with <strong>Decision context</strong>, including the compared
 identities. When no authored review is provided, intended use, business context,
@@ -2623,10 +2632,13 @@ Combined evidence reports name both required component outcomes. Advisory
 judge reports identify their advisory role in the title and at the start of
 the explanation. Browser-tab titles include the recorded outcome.</p>
 <p><strong>Findings to review</strong> highlights failed or unresolved metric/scope results and
-links to their numbered checks. If more than five need review, the report says
-how many remain and retains every result below. It does not rank unrelated
+links to their numbered checks. Every blocker remains visible, retaining its source result identifier. It does not rank unrelated
 metrics by numerical severity. <strong>Scope and limitations</strong> and <strong>Next decision</strong>
 remain visible before the detailed statistics.</p>
+<p>Each finding also supplies a <strong>Suggested follow-up</strong> tied to its unresolved
+checks. Missing results, insufficient independent evidence, a wide range and
+unmet score requirements lead to different actions. This generated guidance
+neither changes acceptance requirements nor authorizes further execution.</p>
 <p>The opening also gives a <strong>Review action</strong> appropriate to the recorded result.
 This is generated guidance, not an owner's recommendation. The <strong>Change context</strong>
 preview quotes a retained comparison note and identifies any additional notes

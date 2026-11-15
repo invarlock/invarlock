@@ -1698,6 +1698,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#client-review-snapshots-and-pdf-delivery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Client review snapshots and PDF delivery
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -2408,6 +2419,17 @@
     <span class="md-ellipsis">
       
         Client handoff packages
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#client-review-snapshots-and-pdf-delivery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Client review snapshots and PDF delivery
       
     </span>
   </a>
@@ -3497,6 +3519,14 @@ copies explicit public attachments with safe, distinct basenames (up to 32 files
 32 MiB each). Review them for disclosure before including them; never include
 private keys. They cannot replace generated package files and are not trust anchors.
 See the <a href="../../user-guide/client-handoff/">handoff guide</a> for the context contract.</p>
+<h2 id="client-review-snapshots-and-pdf-delivery">Client review snapshots and PDF delivery<a class="headerlink" href="#client-review-snapshots-and-pdf-delivery" title="Permanent link">&para;</a></h2>
+<p><code>invarlock.engine.build_client_review</code> accepts optional <code>receipt_expectations</code>
+with <code>retained_receipt</code> to authenticate a historical snapshot. Context v1 remains
+supported; <code>CLIENT_REVIEW_CONTEXT_FORMAT_V2</code> supplies structured owner decisions,
+exclusions, conditions and exception rationale. <code>export_client_review</code> validates a
+package inventory and atomically publishes a fresh PDF delivery with full and
+summary archives. See <a href="../../user-guide/client-handoff/">client review packages</a>
+for complete signatures, independent trust preparation and family boundaries.</p>
 
 
 
