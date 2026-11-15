@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.18.0] - 2026-11-15
+## [0.17.4] - 2026-11-15
 
 ### Security
 
@@ -747,7 +747,7 @@ or allowing observation-only results to drive acceptance.
   qualification and runtime-import contracts.
 - Refreshed hash-pinned runtime and workflow dependencies, including the
   cryptography security baseline used by signed evidence and receipt paths,
-  Ruff 0.16.2, PEFT 0.20.0, and TorchAO 0.18.0.
+  Ruff 0.16.2, PEFT 0.20.0, and TorchAO 0.17.4.
 - Reframed the public project overview around independently replayable signed
   evaluation evidence, with a clear decision boundary and assurance limits plus
   a retained proof map connecting evaluator output, qualification, evidence,

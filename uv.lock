@@ -1517,7 +1517,7 @@ wheels = [
 
 [[package]]
 name = "invarlock"
-version = "0.18.0"
+version = "0.17.4"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
