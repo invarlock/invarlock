@@ -15,8 +15,8 @@ resolution-markers = [
 
 [[package]]
 name = "accelerate"
-version = "1.14.0+invarlock.1"
-source = { registry = "runtime/wheels" }
+version = "1.16.0"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "huggingface-hub" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.14'" },
@@ -27,8 +27,9 @@ dependencies = [
     { name = "safetensors" },
     { name = "torch" },
 ]
+sdist = { url = "https://files.pythonhosted.org/packages/62/dd/14c28a3918ae4d3e40d87e2edcb8737731e52c57f28f0980bb780f50dad6/accelerate-1.16.0.tar.gz", hash = "sha256:43c446b9affb145220946a63fe32e14e968fcfca645d25b5f1f3fdbc375657ae", size = 424969, upload-time = "2026-11-16T21:00:38.494Z" }
 wheels = [
-    { path = "accelerate-1.14.0+invarlock.1-py3-none-any.whl" },
+    { url = "https://files.pythonhosted.org/packages/29/8e/d77aa769cf76472ede10e73e5c27ed22587ff12091fdd7408bc390f41af7/accelerate-1.16.0-py3-none-any.whl", hash = "sha256:180885b6d7b05a19dc2dd6f722c5ce930f615e81e9e5f79d3ca910ddb9e6859e", size = 389390, upload-time = "2026-11-16T21:00:36.979Z" },
 ]
 
 [[package]]
@@ -1766,7 +1767,7 @@ docs = [
     { name = "soupsieve", specifier = ">=4.0.0" },
 ]
 example-peft = [
-    { name = "accelerate", specifier = "==1.14.0+invarlock.1" },
+    { name = "accelerate", specifier = "==1.16.0" },
     { name = "filelock", specifier = ">=4.2.1" },
     { name = "peft", specifier = "==0.20.0" },
     { name = "protobuf", specifier = ">=4.25" },
@@ -1777,7 +1778,7 @@ example-peft = [
     { name = "transformers", specifier = ">=5.14.1" },
 ]
 example-torchao = [
-    { name = "accelerate", specifier = "==1.14.0+invarlock.1" },
+    { name = "accelerate", specifier = "==1.16.0" },
     { name = "filelock", specifier = ">=4.2.1" },
     { name = "protobuf", specifier = ">=4.25" },
     { name = "safetensors", specifier = ">=0.8.0" },
@@ -1788,7 +1789,7 @@ example-torchao = [
     { name = "transformers", specifier = ">=5.14.1" },
 ]
 hf = [
-    { name = "accelerate", specifier = "==1.14.0+invarlock.1" },
+    { name = "accelerate", specifier = "==1.16.0" },
     { name = "filelock", specifier = ">=4.2.1" },
     { name = "protobuf", specifier = ">=4.25" },
     { name = "safetensors", specifier = ">=0.8.0" },
@@ -1815,7 +1816,7 @@ release = [
     { name = "wheel", specifier = ">=0.48.0" },
 ]
 runtime-test = [
-    { name = "accelerate", specifier = "==1.14.0+invarlock.1" },
+    { name = "accelerate", specifier = "==1.16.0" },
     { name = "filelock", specifier = ">=4.2.1" },
     { name = "peft", specifier = "==0.20.0" },
     { name = "pillow", specifier = ">=13.0.0,<14" },
