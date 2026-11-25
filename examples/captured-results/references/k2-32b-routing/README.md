@@ -1,11 +1,11 @@
 # K2 Horizon 32B routing prompt comparison
 
-This reference retains the complete 4,000-pair routing comparison between two
-prompt configurations of the same K2 Horizon 32B model revision. Its signed
-captured evidence reproduces the original **regression** with no missing scores.
-Both sides use the same model; the changed prompt is what is being tested.
-InvarLock rechecks the scores supplied by the original evaluator. It does not
-rerun that scorer or model, and this result does not qualify a native runtime.
+This campaign tested a prompt change. Its source manifest names one K2 Horizon
+32B revision. The signed runs record the model key `k2-32b` on both sides and
+the extra system instruction on the subject side. Offline replay verifies the
+signed evidence and reproduces the **regression** from all 4,000 paired scores
+supplied by the evaluator. The checkpoint revision comes from the source
+manifest. Replay runs neither the model nor the original scorer.
 
 | Slice | Pairs | Baseline mean | Subject mean | Difference | Paired 95% interval |
 | --- | ---: | ---: | ---: | ---: | --- |

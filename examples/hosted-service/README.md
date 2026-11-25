@@ -224,8 +224,13 @@ python examples/hosted-service/capture.py export \
 
 Repeat with the baseline role and approved baseline capture pin if preparing the
 [core captured request](../../docs/user-guide/captured-results.md) yourself. Export
-checks physical pins, request order, timing, response facts and service identity,
-then writes a canonical run with `artifact_digest: null`. It makes no HTTP calls.
+checks file hashes, request order and timing. It compares the model and system
+prompt in each saved request with the approved protocol and checks the model
+label and optional revision in the saved responses. It writes a canonical run
+with `artifact_digest: null` without contacting the endpoint. Offline verification
+authenticates the retained evidence and replays the comparison. Hidden model
+weights, undisclosed server-side instructions and service safety are outside
+those checks.
 
 For the complete wheel handoff, create separate operator and recipient environments
 with the same core version. The following installs a released version matching
