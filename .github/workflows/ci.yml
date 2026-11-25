@@ -83,9 +83,10 @@ jobs:
         with:
           python-version: '3.13'
       - name: Set up uv
-        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2
+        uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d
         with:
           version: "0.13.4"
+          require-checksums: true
           enable-cache: false
       - name: Install dependencies
         run: |
@@ -143,9 +144,10 @@ jobs:
         with:
           python-version: '3.13'
       - name: Set up uv
-        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2
+        uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d
         with:
           version: "0.13.4"
+          require-checksums: true
           enable-cache: false
       - name: Install dependencies
         run: |
@@ -175,9 +177,10 @@ jobs:
         with:
           python-version: '3.13'
       - name: Set up uv
-        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2
+        uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d
         with:
           version: "0.13.4"
+          require-checksums: true
           enable-cache: false
       - name: Install dependencies
         run: |
@@ -226,9 +229,10 @@ jobs:
         with:
           python-version: '3.12'
       - name: Set up uv
-        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2
+        uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d
         with:
           version: "0.13.4"
+          require-checksums: true
           enable-cache: false
       - name: Install dependencies
         run: |
@@ -260,9 +264,10 @@ jobs:
         with:
           python-version: '3.12'
       - name: Set up uv
-        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2
+        uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d
         with:
           version: "0.13.4"
+          require-checksums: true
           enable-cache: false
       - name: Install dependencies
         run: |
@@ -299,9 +304,10 @@ jobs:
         with:
           python-version: '3.12'
       - name: Set up uv
-        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2
+        uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d
         with:
           version: "0.13.4"
+          require-checksums: true
           enable-cache: false
       - name: Install dependencies
         run: |
@@ -351,9 +357,10 @@ jobs:
         with:
           python-version: '3.13'
       - name: Set up uv
-        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2
+        uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d
         with:
           version: "0.13.4"
+          require-checksums: true
           enable-cache: false
       - name: Install dependencies
         run: |
@@ -451,9 +458,10 @@ jobs:
         with:
           python-version: '3.13'
       - name: Set up uv
-        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2
+        uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d
         with:
           version: "0.13.4"
+          require-checksums: true
       - name: Set up Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
