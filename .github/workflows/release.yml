@@ -169,6 +169,7 @@ jobs:
         uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d
         with:
           version: "0.13.4"
+          require-checksums: true
           enable-cache: false
       - name: Install measured coverage dependencies
         run: |

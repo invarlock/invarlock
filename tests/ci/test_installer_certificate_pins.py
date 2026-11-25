@@ -10,7 +10,7 @@ from packaging.version import Version
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def test_every_workflow_uv_selection_meets_certificate_security_floor():
+def test_every_workflow_uv_selection_requires_checksums_and_meets_security_floor():
     selections = []
     for path in sorted((ROOT / ".github/workflows").glob("*.yml")):
         workflow = yaml.safe_load(path.read_text())
@@ -20,6 +20,7 @@ def test_every_workflow_uv_selection_meets_certificate_security_floor():
                     version = str(step.get("with", {}).get("version", ""))
                     assert re.fullmatch(r"\d+\.\d+\.\d+", version), path
                     assert Version(version) >= Version("0.13.4"), (path, version)
+                    assert step["with"].get("require-checksums") is True, path
                     selections.append((path, version))
     assert selections
     project = tomllib.loads((ROOT / "pyproject.toml").read_text())
